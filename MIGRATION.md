@@ -36,7 +36,7 @@
 | PROC-SPOOL-COMPLETE | 全输出 spool | `tests-next/Process/ProcessRunnerTests.fs` | local proof | bounded-memory stream proof |
 | REV-DOUBLE-PERFECT | 同 tree 双 PERFECT | `tests-next/Session/ReviewGuardTests.fs` + `reviewer-verdict-canary.mjs` | Port + real Host terminal guard | 完整 Manager 审查工作流 |
 | REV-DURABLE-NUDGE | Reviewer missing-verdict nudge durable、重启去重、发送失败不写事实 | `HostReviewGuardTests.fs` | Port + Journal proof | real restart canary |
-| FB-A-A-B-B | session 累计 A/A/B/B | `tests-next/Session/FallbackContractTests.fs` | pure proof | provider request model sequence |
+| FB-A-A-B-B | session 累计 A/A/B/B | `tests-next/Session/FallbackContractTests.fs` + `HostForkRuntimeTests.fs` + `fallback-canary.mjs` | pure + Port + real Host/restart proof | Process boundary |
 | ORCH-FF-ONLY | rebase 后复审与 ff-only | `tests-next/Integration/OrchestratorTests.fs` | Port proof | real Git worktree E2E |
 | TESTKIT-LANES | scenario/session/role/turn/request-kind lane；真实 session/parent 绑定 | `gate-testkit.mjs` + P0 canaries | Gate + real-host harness proof | 生产语义仍逐阶段验收 |
 | TESTKIT-CAUSAL-WATCHDOG | 2s watchdog 仅接受 blocking 因果进展 | `watchdog.js` + `watchdog-constants.js` + `gate-timeout-cases.mjs` | Gate + P0 proof | 每个新场景保持同一门槛 |
@@ -55,7 +55,8 @@
 2. ✅ Companion production projection/restart semantics：`CompanionAdvanced` 原子持久 B+baseline；真实 replacement restart 恢复完整 B 与 raw tail。
 3. ✅ Reviewer terminal guard：Manager 无当前 tree 的双 PERFECT 会收到 durable guard；Reviewer terminal 无 verdict 会 nudge 同一会话并 durable 去重；abort terminal 不触发 guard/continuation。
 4. ✅ Companion canonical prefix、JSON remove delta、cheap Blogger model 配置。
-5. Fallback → Process → PTY → Orchestrator。
+5. ✅ Fallback durable model wiring、attempt deduplication、A/A/B/B、restart recovery。
+6. Process → PTY → Orchestrator。
 
 ## TestKit 因果接管证据
 
@@ -64,6 +65,6 @@
 - `afterExpectation()` 在消费点同步注册合法后继，避免并发 child response 在 test continuation 之前到达的竞态。
 - P0 维持 staggered parallel；Companion replacement 以一个明确的 busy Blogger response 验证 busy skip，而不是靠 timing 接受任意额外 Blogger 请求。
 - Journal runtime files 位于 Git common directory；隔离环境不再在受测 workspace 创建 `node_modules`。这些是 harness/host 边界，不是 Orchestrator ff-only 发布证据。
-- `HostEventRouter` 用 message ID 合并 `message.updated` 与 `message.part.updated`，兼容 `messageID`/`messageId`；真实 text/tool part 的 terminal 不会被误判为空轮，空 terminal 仍发送零宽续命。Manager terminal 仅在当前 tree 未确认时发出 durable ReviewGuard，Reviewer 无 verdict 会 nudge；`MessageAbortedError`/`session.aborted` terminal 抑制二者。provider 500 的 `session.status=retry` 每 attempt 只 append 一个 durable failure fact；fallback canary 以零延迟 retry、重启和累计事实证明该边界，不声称 A/A/B/B 模型切换。
+- `HostEventRouter` 用 message ID 合并 `message.updated` 与 `message.part.updated`，兼容 `messageID`/`messageId`；真实 text/tool part 的 terminal 不会被误判为空轮，空 terminal 仍发送零宽续命。Manager terminal 仅在当前 tree 未确认时发出 durable ReviewGuard，Reviewer 无 verdict 会 nudge；`MessageAbortedError`/`session.aborted` terminal 抑制二者。provider 500 的 `session.status=retry` 每个 prompt attempt 只 append 一个 durable failure fact；fallback canary 以零延迟 retry、重启、累计事实和同一 child 的 A/A/B/B provider model 证明该边界。
 
 旧资产只能在相应行为有新层级证据后删除。任何未列入总账的旧测试先分类，再决定保留、提炼或废弃。

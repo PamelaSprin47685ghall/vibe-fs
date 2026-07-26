@@ -168,3 +168,81 @@ module HostForkRuntimeTests =
             Assert.Equal(0, bridge.PendingRunCount)
             Assert.Equal(0, bridge.PendingCompletionCount)
         }
+
+    [<Fact>]
+    let ``HostForkRuntime_resolves_child_model_from_durable_fallback_projection`` () =
+        withTempDir (fun tempDir ->
+            task {
+                let parentId = SessionId.create "parent-model"
+                let childId = SessionId.create "child-model"
+                let captured = ResizeArray<OpenCodePromptOptions>()
+                let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
+
+                let config: ModelResolver.ModelConfig =
+                    { SideA =
+                        { providerID = "test"
+                          modelID = "test-model"
+                          variant = None }
+                      SideB =
+                        { providerID = "test"
+                          modelID = "test-model-b"
+                          variant = None } }
+
+                let host =
+                    { new ISessionHostPort with
+                        member _.SubscribeTerminal(_, listener) =
+                            terminal <- Some listener
+
+                            { new IDisposable with
+                                member _.Dispose() = terminal <- None }
+
+                        member _.SendPrompt(_, _, options) =
+                            captured.Add options
+                            Task.FromResult(Ok(MessageId.create "accepted"))
+
+                        member _.SendChildPromptFireAndForget(_, _, _, options) =
+                            captured.Add options
+                            Task.FromResult(Ok())
+
+                        member _.AbortSession(_) = Task.FromResult(Ok())
+                        member _.AbortChildren(_) = Task.FromResult(()) :> Task
+                        member _.CreateChildSession(_, _) = Task.FromResult(Ok childId)
+                        member _.GetSessionOutput(_) = [] }
+
+                let trigger () =
+                    terminal
+                    |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "model-terminal")))
+
+                use journal =
+                    AgentJournal.create tempDir (RuntimeId.create "runtime-model") 1 DateTimeOffset.UtcNow
+
+                let bridge =
+                    HostForkRuntime(parentId, host, journal = journal, modelResolver = config)
+
+                let! first = bridge.Fork("agent-model", AgentRole.Coder, "first")
+                Assert.Equal(Ok(ForkResult.Created "agent-model"), first)
+                Assert.Equal(Some config.SideA, captured.[0].Model)
+                trigger ()
+
+                let appendFailure reason =
+                    AgentJournal.appendAgent
+                        (StreamId.Session childId)
+                        None
+                        (AgentFact.FallbackFailureRecorded
+                            {| SessionId = childId
+                               Reason = reason |})
+                        journal
+                    |> Result.isOk
+
+                Assert.True(appendFailure "first failure")
+                let! second = bridge.Reuse("agent-model", "second")
+                Assert.Equal(Ok(ForkResult.Nudged "agent-model"), second)
+                Assert.Equal(Some config.SideA, captured.[1].Model)
+                trigger ()
+
+                Assert.True(appendFailure "second failure")
+                let! third = bridge.Reuse("agent-model", "third")
+                Assert.Equal(Ok(ForkResult.Nudged "agent-model"), third)
+                Assert.Equal(Some config.SideB, captured.[2].Model)
+                trigger ()
+            })

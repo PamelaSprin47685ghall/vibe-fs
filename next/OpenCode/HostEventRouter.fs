@@ -28,6 +28,7 @@ type HostEventRouter
     let lastAssistantMsgs = Dictionary<string, obj>()
     let assistantParts = AssistantParts()
     let fallbackFailures = defaultArg recordedErrors (HashSet<string>())
+    let retryAttempts = Dictionary<string, HashSet<string>>()
     let abortedSessions = AbortTracker()
 
     let rawEvent (raw: obj) =
@@ -84,32 +85,6 @@ type HostEventRouter
     let abortChildren parentId =
         sessionPort.AbortChildren(SessionId.create parentId) |> ignore
 
-    let errorReason (raw: obj) =
-        let properties = rawProperties raw
-
-        if not (isNull properties) && not (isNull properties?error) then
-            let err = properties?error
-            let name = if isNull err?name then "" else unbox<string> err?name
-            let message = if isNull err?message then "" else unbox<string> err?message
-
-            if String.IsNullOrWhiteSpace name then
-                message
-            else
-                sprintf "%s: %s" name message
-        else
-            "unknown provider error"
-
-    let recordProviderError sessionId raw =
-        match journal with
-        | None -> ()
-        | Some journal ->
-            let fact =
-                AgentFact.FallbackFailureRecorded
-                    {| SessionId = SessionId.create sessionId
-                       Reason = errorReason raw |}
-
-            AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
-            |> ignore
 
     let recordRetryFailure sessionId raw =
         let properties = rawProperties raw
@@ -122,9 +97,15 @@ type HostEventRouter
                 else
                     string status?attempt
 
-            let key = $"retry:{sessionId}:{attempt}"
+            let seenAttempts =
+                match retryAttempts.TryGetValue sessionId with
+                | true, values -> values
+                | false, _ ->
+                    let values = HashSet<string>()
+                    retryAttempts.[sessionId] <- values
+                    values
 
-            if fallbackFailures.Add key then
+            if seenAttempts.Add attempt then
                 match journal with
                 | None -> ()
                 | Some journal ->
@@ -209,12 +190,14 @@ type HostEventRouter
 
                 if r = "assistant" then
                     lastAssistantMsgs.[sessionId] <- target
+                elif r = "user" then
+                    retryAttempts.Remove sessionId |> ignore
 
             if isAbortError raw then
                 abortedSessions.Mark sessionId
                 abortChildren sessionId
             elif eventType raw = "session.error" then
-                recordProviderError sessionId raw
+                ()
             elif eventType raw = "session.status" then
                 recordRetryFailure sessionId raw
 

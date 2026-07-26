@@ -85,7 +85,8 @@ module ToolSurface =
                                         (fun _ role childId ->
                                             let cid = SessionId.value childId
                                             sessionParents.[cid] <- sid
-                                            sessionRoles.[cid] <- role.ToString().ToLowerInvariant())
+                                            sessionRoles.[cid] <- role.ToString().ToLowerInvariant()),
+                                    ?modelResolver = modelConfig
                                 )
 
                             runtimes.[sid] <- r

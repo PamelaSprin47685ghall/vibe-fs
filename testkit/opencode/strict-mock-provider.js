@@ -233,7 +233,7 @@ export class StrictMockProvider {
       candidates: candidateLabels,
     });
     const lastUser = JSON.stringify(extractLastUserMsg(parsed));
-    console.error(`[MOCK-500] reason=${reason} session=${sessId} parent=${parentSessionId || '-'} role=${requestRoleOf(parsed)} kind=${requestKindOf(parsed)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)} candidates=${JSON.stringify(candidateLabels)}`);
+    console.error(`[MOCK-500] reason=${reason} session=${sessId} parent=${parentSessionId || '-'} role=${requestRoleOf(parsed)} kind=${requestKindOf(parsed)} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)} candidates=${JSON.stringify(candidateLabels)}`);
     return sendJSON(res, 500, { error: reason, sessionId: sessId, tools: extractToolNames(parsed) });
   }
 

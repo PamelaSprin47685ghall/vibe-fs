@@ -147,6 +147,18 @@ export function extractLastUserMsg(body) {
   return null;
 }
 
+function modelMatches(actual, expected) {
+  if (expected === undefined || expected === null) return true;
+  if (typeof expected === 'string') {
+    if (typeof actual === 'string') return actual === expected;
+    return actual?.modelID === expected || actual?.id === expected;
+  }
+  if (!actual || typeof actual !== 'object') return false;
+  return actual.providerID === expected.providerID
+    && (actual.modelID || actual.id) === (expected.modelID || expected.id)
+    && (expected.variant === undefined || actual.variant === expected.variant);
+}
+
 export function matchesExpectation(body, expectation, sessionBindings) {
   const match = expectation.match || {};
   const sessionID = requestSessionOf(body);
@@ -159,7 +171,7 @@ export function matchesExpectation(body, expectation, sessionBindings) {
   if (sessionID && expectedSessionID && sessionID !== expectedSessionID) return false;
   if (sessionID && !expectedSessionID && !expectedParentSessionID) return false;
   if (expectedParentSessionID && parentSessionID !== expectedParentSessionID) return false;
-  if (match.model && (body?.model || '') !== match.model) return false;
+  if (match.model && !modelMatches(body?.model, match.model)) return false;
   if (match.requestKind && requestKindOf(body) !== match.requestKind) return false;
   if (match.role && requestRoleOf(body) !== match.role) return false;
   if (match.requiredTools && match.requiredTools.length > 0) {
