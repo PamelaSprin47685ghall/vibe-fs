@@ -6,6 +6,11 @@ type Deadline = private Deadline of expiresAt: DateTimeOffset
 
 module Deadline =
 
+    /// JS/Int32 ceiling for setTimeout: a larger delay is clamped/rejected by the
+    /// runtime, so any wait longer than this must be segmented. ponytail: 0x7FFFFFFF ms (~24.8 days).
+    [<Literal>]
+    let MaxTimerWaitMs = 2147483647
+
     let ofBudget (now: DateTimeOffset) (budget: TimeSpan) : Deadline = Deadline(now.Add(budget))
 
     let remaining (clock: unit -> DateTimeOffset) (Deadline expiresAt: Deadline) : TimeSpan =
@@ -13,3 +18,19 @@ module Deadline =
         if rem < TimeSpan.Zero then TimeSpan.Zero else rem
 
     let isExpired (clock: unit -> DateTimeOffset) (Deadline expiresAt: Deadline) : bool = clock () >= expiresAt
+
+    /// Next wait duration in milliseconds against the absolute deadline, capped at
+    /// the JS timer ceiling. A huge legal estimate (tens of days) therefore returns
+    /// the cap instead of overflowing int, so the caller can wait in segments.
+    let nextWaitMs (clock: unit -> DateTimeOffset) (Deadline expiresAt: Deadline) : int =
+        let rem = expiresAt - clock ()
+
+        if rem <= TimeSpan.Zero then
+            0
+        else
+            let total = int64 rem.TotalMilliseconds
+
+            if total > int64 MaxTimerWaitMs then
+                MaxTimerWaitMs
+            else
+                int total

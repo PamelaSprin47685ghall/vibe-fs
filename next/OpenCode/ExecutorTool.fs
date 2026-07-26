@@ -58,6 +58,7 @@ module ExecutorTool =
     let create
         (toolModule: obj)
         (runtimeFor: obj -> Result<HostForkRuntime, string>)
+        (executorRuntimeFor: obj -> HostForkRuntime)
         (workspaceDirectory: string option)
         : obj =
         let factory = toolModule?tool
@@ -112,7 +113,12 @@ module ExecutorTool =
                         | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                             try
                                 try
-                                    let! summary = ExecutorSummarize.summarizeSpool runtime spoolPath
+                                    let execRuntime = executorRuntimeFor context
+
+                                    let! summary =
+                                        ExecutorSummarize.summarizeSpool
+                                            (ExecutorSummarize.asExecutorRuntime execRuntime)
+                                            spoolPath
 
                                     return
                                         box (

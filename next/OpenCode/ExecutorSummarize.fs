@@ -10,8 +10,30 @@ open Wanxiangshu.Next.Session
 
 /// Bounded hierarchical map/reduce for spooled Executor output.
 module ExecutorSummarize =
+
     [<Literal>]
     let ReduceFanIn = 8
+
+    /// Minimal runtime surface the summarizer needs: fork an Executor agent and
+    /// await one completion. Decoupled from HostForkRuntime so the summarizer can
+    /// run on a PRIVATE mailbox (never the Manager's Join) — bug #1.
+    type IExecutorRuntime =
+        abstract Fork: string * AgentRole * string -> Task<Result<ForkResult, string>>
+        abstract Join: unit -> Task<Result<RunCompletion, ForkError>>
+
+    /// Wrap a HostForkRuntime as the summarizer's private mailbox (production path).
+    let asExecutorRuntime (runtime: HostForkRuntime) : IExecutorRuntime =
+        { new IExecutorRuntime with
+            member _.Fork(agentId, role, prompt) = runtime.Fork(agentId, role, prompt)
+            member _.Join() = runtime.Join() }
+
+    /// Wrap a bare ForkRuntime as the summarizer mailbox (tests / fakes).
+    let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
+        { new IExecutorRuntime with
+            member _.Fork(agentId, role, prompt) =
+                task { return Ok(runtime.Fork(agentId, role, prompt = prompt)) }
+
+            member _.Join() = runtime.Join() }
 
     [<Emit("Math.random().toString(36).slice(2, 8)")>]
     let private newAgentId () : string = jsNative
@@ -21,9 +43,11 @@ module ExecutorSummarize =
         | Ok text -> text
         | Error error -> raise (InvalidOperationException error)
 
-    /// Join until the target Executor completes; stash foreign completions so a
-    /// concurrent Coder/Reviewer/PTY cannot be mistaken for a map/reduce result.
-    let awaitAgent (runtime: HostForkRuntime) (agentId: string) (stash: Dictionary<string, RunCompletion>) =
+    /// Join until the target Executor completes; stash foreign (other Executor)
+    /// completions so a concurrent reduce cannot be mistaken for a map result.
+    /// Only sees completions on THIS private mailbox, so the Manager mailbox is
+    /// never starved.
+    let awaitAgent (runtime: IExecutorRuntime) (agentId: string) (stash: Dictionary<string, RunCompletion>) =
         task {
             match stash.TryGetValue agentId with
             | true, completion ->
@@ -48,7 +72,7 @@ module ExecutorSummarize =
                 return result
         }
 
-    let runExecutorPrompt (runtime: HostForkRuntime) (stash: Dictionary<string, RunCompletion>) (prompt: string) =
+    let runExecutorPrompt (runtime: IExecutorRuntime) (stash: Dictionary<string, RunCompletion>) (prompt: string) =
         task {
             let agentId = newAgentId ()
             let! fork = runtime.Fork(agentId, AgentRole.Executor, prompt)
@@ -61,7 +85,7 @@ module ExecutorSummarize =
         }
 
     let summarizeChunk
-        (runtime: HostForkRuntime)
+        (runtime: IExecutorRuntime)
         (stash: Dictionary<string, RunCompletion>)
         (chunk: byte[])
         (index: int)
@@ -77,7 +101,7 @@ module ExecutorSummarize =
         runExecutorPrompt runtime stash prompt
 
     let reduceBatch
-        (runtime: HostForkRuntime)
+        (runtime: IExecutorRuntime)
         (stash: Dictionary<string, RunCompletion>)
         (level: int)
         (batch: string list)
@@ -92,48 +116,73 @@ module ExecutorSummarize =
 
         runExecutorPrompt runtime stash prompt
 
-    /// Fixed fan-in hierarchical reduce: every level holds at most ReduceFanIn
-    /// summaries so the reduce prompt stays bounded.
-    let reduceHierarchical
-        (runtime: HostForkRuntime)
-        (stash: Dictionary<string, RunCompletion>)
-        (summaries: ResizeArray<string>)
+    /// Online carry/ripple reduce: summaries fill level 0 up to ReduceFanIn-1; at
+    /// fanIn they collapse immediately into one summary pushed to level 1, and so
+    /// on. Memory stays O(fanIn * log chunks) — never holds all summaries at once.
+    let private rippleInsert
+        (reduceBatch: int -> string list -> Task<string>)
+        (levels: ResizeArray<ResizeArray<string>>)
+        (summary: string)
         =
         task {
-            if summaries.Count = 0 then
-                return ""
-            elif summaries.Count = 1 then
-                return summaries.[0]
-            else
-                let mutable level = 0
-                let mutable current = summaries |> Seq.toList
+            if levels.Count = 0 then
+                levels.Add(ResizeArray())
 
-                while current.Length > 1 do
-                    level <- level + 1
-                    let next = ResizeArray<string>()
-                    let mutable offset = 0
+            levels.[0].Add summary
+            let mutable lvl = 0
 
-                    while offset < current.Length do
-                        let take = min ReduceFanIn (current.Length - offset)
-                        let batch = current |> List.skip offset |> List.take take
-                        offset <- offset + take
+            while levels.[lvl].Count >= ReduceFanIn do
+                let batch = levels.[lvl] |> Seq.toList
+                levels.[lvl].Clear()
+                let! reduced = reduceBatch (lvl + 1) batch
 
-                        if batch.Length = 1 then
-                            next.Add batch.Head
-                        else
-                            let! reduced = reduceBatch runtime stash level batch
-                            next.Add reduced
+                if levels.Count <= lvl + 1 then
+                    levels.Add(ResizeArray())
 
-                    current <- next |> Seq.toList
-
-                return current.Head
+                levels.[lvl + 1].Add reduced
+                lvl <- lvl + 1
         }
 
-    /// Maps each bounded spool chunk sequentially, then hierarchically reduces.
-    let summarizeSpool (runtime: HostForkRuntime) (spoolPath: string) =
+    /// Fold remaining level arrays bottom-up into a single summary.
+    let private foldLevels
+        (reduceBatch: int -> string list -> Task<string>)
+        (levels: ResizeArray<ResizeArray<string>>)
+        =
+        task {
+            if levels.Count = 0 then
+                return ""
+            else
+                let mutable carry: string list = []
+
+                for i in 0 .. levels.Count - 1 do
+                    let batch = carry @ (levels.[i] |> Seq.toList)
+
+                    if not (List.isEmpty batch) then
+                        let! reduced = reduceBatch (i + 1) batch
+                        carry <- [ reduced ]
+
+                match carry with
+                | [ single ] -> return single
+                | _ -> return ""
+        }
+
+    /// Testable core: reduce an already-materialized summary list online.
+    let reduceOnline (reduceBatch: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
+        task {
+            let levels = ResizeArray<ResizeArray<string>>()
+
+            for summary in summaries do
+                do! rippleInsert reduceBatch levels summary
+
+            return! foldLevels reduceBatch levels
+        }
+
+    /// Maps each bounded spool chunk sequentially, reducing online so memory stays
+    /// bounded; never holds more than ReduceFanIn * log(chunks) summaries.
+    let summarizeSpool (runtime: IExecutorRuntime) (spoolPath: string) =
         task {
             let stash = Dictionary<string, RunCompletion>()
-            let summaries = ResizeArray<string>()
+            let levels = ResizeArray<ResizeArray<string>>()
             let mutable index = 0
 
             do!
@@ -142,9 +191,9 @@ module ExecutorSummarize =
                         let current = index
                         index <- index + 1
                         let! summary = summarizeChunk runtime stash chunk current
-                        summaries.Add summary
+                        do! rippleInsert (reduceBatch runtime stash) levels summary
                         return ()
                     })
 
-            return! reduceHierarchical runtime stash summaries
+            return! foldLevels (reduceBatch runtime stash) levels
         }

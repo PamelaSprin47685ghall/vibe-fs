@@ -133,13 +133,6 @@ module RunnerCore =
                 | Some stdinText -> writeStdin child stdinText
                 | None -> closeStdin child
 
-                let remainingMs =
-                    max
-                        0
-                        (int
-                            (Deadline.remaining (fun () -> DateTimeOffset.UtcNow) deadline)
-                                .TotalMilliseconds)
-
                 let completion = TaskCompletionSource<int * bool>()
                 let mutable finished = false
                 let mutable timerId: obj = null
@@ -150,6 +143,8 @@ module RunnerCore =
                 let mutable stderrEnded = isNull (emitJsExpr child "$0 && $0.stderr")
                 let mutable exitCode = 0
 
+                let clock = fun () -> DateTimeOffset.UtcNow
+
                 let tryFinish () =
                     if childClosed && stdoutEnded && stderrEnded && not finished then
                         finished <- true
@@ -159,15 +154,34 @@ module RunnerCore =
 
                         completion.SetResult(exitCode, timedOut)
 
-                let timer =
-                    emitJsExpr
-                        (remainingMs,
-                         (fun () ->
-                             timedOut <- true
-                             RunnerPrimitives.killProcessGroup child))
-                        "setTimeout($1, $0)"
+                // Huge legal estimates (tens of days) overflow int/JS timer max. Wait in
+                // capped segments against the absolute deadline so the command runs to
+                // completion instead of timing out immediately. ponytail: 0x7FFFFFFF ms cap.
+                let armTimer =
+                    let rec loop () =
+                        let ms = Deadline.nextWaitMs clock deadline
 
-                timerId <- timer
+                        if ms <= 0 then
+                            if not finished then
+                                timedOut <- true
+                                RunnerPrimitives.killProcessGroup child
+                        else
+                            timerId <-
+                                emitJsExpr
+                                    (ms,
+                                     (fun () ->
+                                         if finished then
+                                             ()
+                                         elif Deadline.isExpired clock deadline then
+                                             timedOut <- true
+                                             RunnerPrimitives.killProcessGroup child
+                                         else
+                                             loop ()))
+                                    "setTimeout($1, $0)"
+
+                    loop
+
+                armTimer ()
 
                 emitJsExpr
                     (child,
