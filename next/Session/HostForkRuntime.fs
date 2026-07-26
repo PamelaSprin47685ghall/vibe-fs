@@ -295,20 +295,20 @@ type HostForkRuntime
             if String.IsNullOrWhiteSpace command then
                 return Error "PTY command is required"
             else
+                let id = Pty.newId ()
+                lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
+
+                runtime.RegisterPty
+                    { PtyId = id.Value
+                      AgentId = id.Value
+                      Command = command
+                      StartedAt = DateTimeOffset.UtcNow }
+
                 try
-                    let id = Pty.newId ()
-                    lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
                     ptyPort.Fork(command, ptyId = id) |> ignore
-
-                    if ptyPort.Exists id then
-                        runtime.RegisterPty
-                            { PtyId = id.Value
-                              AgentId = id.Value
-                              Command = command
-                              StartedAt = DateTimeOffset.UtcNow }
-
                     return Ok id
                 with ex ->
+                    runtime.UnregisterPty id.Value
                     return Error ex.Message
         }
 
