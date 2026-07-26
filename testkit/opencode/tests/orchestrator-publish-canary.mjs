@@ -108,30 +108,22 @@ try {
     text: 'Coder background.',
   });
 
-  scenario.provider.expectToolCall({
-    id: 'reviewer-perfect-1',
-    lane: expectationLane('orch-publish', 'reviewer', 'reviewer', 1, 'chat', 'orchestrator'),
-    tool: 'verdict',
-    args: { verdict: 'PERFECT' },
-    match: { requiredTools: ['verdict'] },
-  });
-  scenario.provider.expectText({
-    id: 'reviewer-terminal-1',
-    lane: expectationLane('orch-publish', 'reviewer', 'reviewer', 2, 'chat', 'orchestrator'),
-    text: 'Review round one done.',
-  });
-  scenario.provider.expectToolCall({
-    id: 'reviewer-perfect-2',
-    lane: expectationLane('orch-publish', 'reviewer', 'reviewer', 3, 'chat', 'orchestrator'),
-    tool: 'verdict',
-    args: { verdict: 'PERFECT' },
-    match: { requiredTools: ['verdict'] },
-  });
-  scenario.provider.expectText({
-    id: 'reviewer-terminal-2',
-    lane: expectationLane('orch-publish', 'reviewer', 'reviewer', 4, 'chat', 'orchestrator'),
-    text: 'Review round two done.',
-  });
+  // JoinPublished runs reverifyTwice before candidate and again after rebase.
+  // Each reverify is one reviewer run when the first verdict is PERFECT → 4 rounds.
+  for (const [n, label] of [[1, 'one'], [2, 'two'], [3, 'three'], [4, 'four']]) {
+    scenario.provider.expectToolCall({
+      id: `reviewer-perfect-${n}`,
+      lane: expectationLane('orch-publish', 'reviewer', 'reviewer', n * 2 - 1, 'chat', 'orchestrator'),
+      tool: 'verdict',
+      args: { verdict: 'PERFECT' },
+      match: { requiredTools: ['verdict'] },
+    });
+    scenario.provider.expectText({
+      id: `reviewer-terminal-${n}`,
+      lane: expectationLane('orch-publish', 'reviewer', 'reviewer', n * 2, 'chat', 'orchestrator'),
+      text: `Review round ${label} done.`,
+    });
+  }
 
   const orchestrator = await scenario.client.createSession();
   const orchestratorId = getSessionId(orchestrator);
@@ -154,10 +146,12 @@ try {
   await scenario.provider.waitForExpectation('manager-terminal', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForExpectation('reviewer-perfect-1', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForExpectation('reviewer-perfect-2', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('reviewer-perfect-3', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('reviewer-perfect-4', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForExpectation('orch-final', WATCHDOG_TIMEOUT_MS);
   scenario.provider.expectSatisfied();
 
-  const workDir = scenario.fs.workDir;
+  const workDir = scenario.host.workDir;
   const git = (args) => execFileSync('git', args, { cwd: workDir, encoding: 'utf8' });
   const log = git(['log', '--format=%s', 'HEAD']);
   assert.ok(log.includes('candidate:'), `target branch must contain the candidate commit, got: ${log}`);
