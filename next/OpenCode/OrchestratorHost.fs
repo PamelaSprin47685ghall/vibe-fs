@@ -229,6 +229,17 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                         )
 
                     engineInstance <- Some value
+
+                    match deps.Journal with
+                    | Some journal ->
+                        let jobs = (AgentJournal.snapshot journal).AgentProjections.Orchestrator.ManagerJobs
+
+                        for KeyValue(managerId, job) in jobs do
+                            let id = ManagerId.value managerId
+                            worktrees.[id] <- job.WorktreePath
+                            value.RecoverManagerJob(id, job.WorktreePath, job.Prompt, job.CandidateCommit.IsSome)
+                    | None -> ()
+
                     return Ok value
         }
 

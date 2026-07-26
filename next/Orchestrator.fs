@@ -94,6 +94,20 @@ type Orchestrator
     let waiters =
         System.Collections.Generic.Queue<TaskCompletionSource<ManagerCompletion>>()
 
+    let enqueueCompletion completion =
+        lock lockObj (fun () ->
+            if waiters.Count > 0 then
+                waiters.Dequeue().SetResult(completion)
+            else
+                mailbox.Enqueue(completion))
+
+    let startManager handle prompt =
+        task {
+            let! result = manager.RunManager handle.ManagerId handle.WorktreePath prompt
+            enqueueCompletion { Handle = handle; Result = result }
+        }
+        |> ignore
+
     let runSerial (fn: unit -> Task<'T>) : Task<'T> =
         task {
             let tcs = TaskCompletionSource<'T>()
@@ -182,20 +196,21 @@ type Orchestrator
                                 )
                             )
                     | Ok() ->
-                        let _ =
-                            task {
-                                let! res = manager.RunManager managerId path prompt
-                                let completion = { Handle = handle; Result = res }
-
-                                lock lockObj (fun () ->
-                                    if waiters.Count > 0 then
-                                        waiters.Dequeue().SetResult(completion)
-                                    else
-                                        mailbox.Enqueue(completion))
-                            }
-
+                        startManager handle prompt
                         return Ok handle
         }
+
+    member _.RecoverManagerJob(managerId: string, worktreePath: string, prompt: string, managerCompleted: bool) : unit =
+        prompts.[managerId] <- prompt
+
+        let handle =
+            { ManagerId = managerId
+              WorktreePath = worktreePath }
+
+        if managerCompleted then
+            enqueueCompletion { Handle = handle; Result = Ok() }
+        else
+            startManager handle prompt
 
     member this.JoinPublished() : Task<OrchestratorVerdict> =
         task {

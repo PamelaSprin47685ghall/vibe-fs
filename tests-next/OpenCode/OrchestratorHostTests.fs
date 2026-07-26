@@ -10,6 +10,7 @@ open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Orchestrator
 
 module OrchestratorHostTests =
 
@@ -69,6 +70,54 @@ module OrchestratorHostTests =
                     failwithf
                         "CreateChildSession must not be called when worktree fails, got %d calls"
                         log.CreateChild.Length
+        }
+
+    [<Fact>]
+    let ``RecoverManagerJob reuses durable identity prompt and checkpoint`` () =
+        task {
+            let calls = ResizeArray<string * string * string>()
+
+            let git: GitPort =
+                { IsDirty = fun _ -> Task.FromResult false
+                  CreateWorktree = fun _ _ _ -> Task.FromResult(Ok())
+                  Rebase = fun _ _ -> Task.FromResult(Ok())
+                  FfMerge = fun _ _ -> Task.FromResult(Ok "commit")
+                  ConflictedFiles = fun _ -> Task.FromResult(Ok [])
+                  RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
+
+            let manager: ManagerPort =
+                { RunManager =
+                    fun managerId worktree prompt ->
+                        calls.Add(managerId, worktree, prompt)
+                        Task.FromResult(Ok())
+                  Reverify = fun _ _ -> Task.FromResult(Ok()) }
+
+            let resumed = Orchestrator(git, manager, "/repo", "main")
+            resumed.RecoverManagerJob("m1", "/worktree/m1", "saved prompt", false)
+            let! resumedVerdict = resumed.JoinPublished()
+
+            Assert.True(
+                match resumedVerdict with
+                | OrchestratorVerdict.Published _ -> true
+                | _ -> false
+            )
+
+            Assert.Equal<(string * string * string) list>(
+                [ ("m1", "/worktree/m1", "saved prompt") ],
+                calls |> Seq.toList
+            )
+
+            let checkpointed = Orchestrator(git, manager, "/repo", "main")
+            checkpointed.RecoverManagerJob("m2", "/worktree/m2", "saved candidate", true)
+            let! checkpointedVerdict = checkpointed.JoinPublished()
+
+            Assert.True(
+                match checkpointedVerdict with
+                | OrchestratorVerdict.Published _ -> true
+                | _ -> false
+            )
+
+            Assert.Equal(1, calls.Count)
         }
 
     [<Fact>]
