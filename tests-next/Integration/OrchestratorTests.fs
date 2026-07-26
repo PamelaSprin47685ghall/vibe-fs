@@ -58,6 +58,86 @@ module OrchestratorTests =
             falseThat worktreeCreated "CreateWorktree must not be called when dirty"
         }
 
+    let ``conflict returns same manager for continuation`` () =
+        task {
+            let mutable managerCalls = 0
+            let mutable rebaseCalls = 0
+
+            let git =
+                { createStubGitPort () with
+                    Rebase =
+                        fun _ _ ->
+                            rebaseCalls <- rebaseCalls + 1
+
+                            if rebaseCalls = 1 then
+                                Task.FromResult(Error "conflict")
+                            else
+                                Task.FromResult(Ok()) }
+
+            let mgr =
+                { createStubManagerPort () with
+                    RunManager =
+                        fun _ _ ->
+                            managerCalls <- managerCalls + 1
+                            Task.FromResult(Ok()) }
+
+            let orch = Orchestrator(git, mgr, "/repo", "main")
+
+            let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
+
+            match forkResult with
+            | Error e -> failwithf "Fork failed: %A" e
+            | Ok _ -> ()
+
+            let! joinVerdict = orch.JoinPublished()
+
+            match joinVerdict with
+            | OrchestratorVerdict.Published _ -> ()
+            | other -> failwithf "Expected Published after conflict resolution, got %A" other
+
+            equal 2 managerCalls
+        }
+
+    let ``rebase after conflict requires double perfect`` () =
+        task {
+            let mutable reverifyCalls = 0
+            let mutable rebaseCalls = 0
+
+            let git =
+                { createStubGitPort () with
+                    Rebase =
+                        fun _ _ ->
+                            rebaseCalls <- rebaseCalls + 1
+
+                            if rebaseCalls = 1 then
+                                Task.FromResult(Error "conflict")
+                            else
+                                Task.FromResult(Ok()) }
+
+            let mgr =
+                { createStubManagerPort () with
+                    Reverify =
+                        fun _ _ ->
+                            reverifyCalls <- reverifyCalls + 1
+                            Task.FromResult(Ok()) }
+
+            let orch = Orchestrator(git, mgr, "/repo", "main")
+
+            let! forkResult = orch.ForkManager("m1", "/repo/.worktrees/m1")
+
+            match forkResult with
+            | Error e -> failwithf "Fork failed: %A" e
+            | Ok _ -> ()
+
+            let! joinVerdict = orch.JoinPublished()
+
+            match joinVerdict with
+            | OrchestratorVerdict.Published _ -> ()
+            | other -> failwithf "Expected Published, got %A" other
+
+            equal 4 reverifyCalls
+        }
+
     let ``failed review prevents merge and returns NeedsReview`` () =
         task {
             let mutable ffMergeCalled = false
