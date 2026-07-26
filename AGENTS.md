@@ -51,16 +51,15 @@ import:
 
 ## HEAD 代码与本轮直接证据
 
-当前 HEAD 为 `bf632dea`。该提交已把 busy nudge、Process 分层摘要、真实 bun-pty、Companion canonical baseline、Fallback durable identity、Orchestrator Git authority/global SSE/reconcile hook 接入生产；符号存在不等于行为闭合，以下验收状态只按本轮命令结果提升。
+当前 HEAD 为 `fba7ad82`。在 `bf632dea`（busy nudge、Process 分层摘要、真实 bun-pty、Companion canonical baseline、Fallback durable identity、Orchestrator Git authority/global SSE/reconcile hook）之上，本轮又接入：Executor 单终摘要免 reduce、PTY 真实 spawn/signal 链路、同进程 Journal 按 runtime 目录共享、Orchestrator ManagerJob durable 恢复、mock 确定性 tool-call id；符号存在不等于行为闭合，以下验收状态只按本轮命令结果提升。
 
 本轮直接通过：
 
 - `npm run build`。
-- `npm run test:compile && npm run test:next`：160/160 通过。
+- `npm run test:compile && npm run test:next`：164/164 通过（含 `RecoverManagerJob` durable 恢复契约）。
 - `npm run test:manager-tools`：1/1 通过；`node testkit/opencode/tests/gate-testkit.mjs`：23/23 通过。
-- 单场景 `host-nudge-canary`、`executor-canary`、`pty-stress-canary`、`fallback-canary`、`companion-canary`、`orchestrator-publish-canary` 通过；它们分别只证明各自实际覆盖的路径，不外推未覆盖边界。
-
-本轮标准 `npm run test:e2e:p0` 未通过：14 个 canary 在全套并行时全部于 2s 因果 Watchdog 内失败，多数只消费 title 请求或未到首个业务 expectation；其中 6 个关键 canary 单独运行通过。因此当前直接证据是“单场景纵切可运行、标准全并行隔离门为红”，不得写 release-ready，也不得通过降低并发、放宽 expectation 或延长 Watchdog 掩盖。
+- 全部 14 个 canary 单场景各自通过。
+- 本轮标准 `npm run test:e2e:p0` 通过：14/14 连续两次（默认入口、默认并行池）。并行红门的根因不是测试隔离，而是两类已修复缺陷：四个 canary 的 lane 模型落后于真实产品行为（ReviewGuard 对未确认 Manager terminal 的 nudge、Companion Y 自压缩 condense 与 restart re-anchor 请求形状、JoinPublished 的 2+1+1+1 PERFECT 轮次、Manager 拥有 blogger sidecar child 后 children 位置选取），以及 PTY 后端的 Fable Emit/柯里化缺陷（runLoader 从未被调用、bun-pty spawn 被柯里化）与 bun-pty 依赖缺失。启动风暴由 runner stagger 承担：每个 Bun SEA 宿主启动实测约 8 CPU-秒，14 个同时启动会拖垮 2s 因果 Watchdog；stagger 固定 2000ms 只错开启动脉冲，全部 14 个场景期仍全并行，Watchdog 与 expectation 均未放宽。
 
 同进程 active child 的 busy nudge 已走 `SendChildPromptFireAndForget`，不新建 Run/listener/completion；`HostForkRunLifecycle.complete` 对本地/global 双事件流做一次性 claim。跨插件重启的 active-run 恢复仍未证明。
 
@@ -80,10 +79,10 @@ Orchestrator 的 `fork(agent=manager)`/`join` 已路由 `ForkManagerJob`/`JoinPu
 
 ## 当前未闭合边界
 
-1. TestKit：标准 P0 虽默认启动全部 14 个 canary，当前直接运行 14/14 超过 2s 因果 Watchdog；先定位真实共享资源/因果停滞，不得把单场景通过冒充并行隔离通过。
-2. Fork/Join：busy-overlap 单场景已通过；`pendingRuns` 仍是进程内 active 来源，restart 只恢复 child linkage，不恢复在途 Run/completion。
+1. ~~TestKit 并行门~~：已闭合（见上文直接证据；stagger 只错开启动脉冲，不降低并发）。
+2. Fork/Join：busy-overlap 单场景已通过；`pendingRuns` 仍是进程内 active 来源，restart 只恢复 child linkage，不恢复在途 Run/completion。Orchestrator ManagerJob 已从 durable `OrchestratorManagerJobCreated` 恢复：有 candidate checkpoint 时直接补 completion 走 candidate/rebase，否则以原始 durable prompt 重跑；engine 懒加载时触发，不持久化 Task/handle/phase，不做开机扫描。
 3. Process：200KB 流式 map、fan-in=8 分层 reduce 和 spool `finally` 清理已有生产代码；当前 Executor canary 只覆盖单 chunk、零 reduce。`ExecutorSummarize.awaitAgent` 消费非目标 completion 后只放本地 stash，不能回填公共 mailbox，目标路由与并发 completion 所有权未闭合。
-4. PTY：真实 bun-pty 与 `fork(agent=pty)`/signal/list/join 表面已接线；当前单场景只证明模型执行了 spawn + TERM DSL，不断言真实 handle、输出或 signal outcome；`PtyBackend` 的 live `Read` 清空 buffer 却不完成读取，exit 只交付 `Closed`，模块级 `live`/`pending` 也没有 per-runtime owner 清理。**不得宣称 PTY 产品能力完成**。
+4. PTY：真实 bun-pty 与 `fork(agent=pty)`/signal/list/join 表面已接线；单场景现在断言真实 handle、输出 read、TERM/KILL signal outcome 与 list 收口；`PtyBackend` 的 live `Read` 消费 buffer 并完成读取。模块级 `live`/`pending` 仍没有 per-runtime owner 清理，跨进程隔离与更宽 write/read/join/list/abort 覆盖未闭合。**不得宣称 PTY 产品能力完成**。
 5. Companion：完整 messages 的 canonical baseline 已接线；当前 Y 阈值分支只写入 `[companion-rebase] condensed...` 占位内容，且同步 `TryRebase` 不持久化。真实、durable 的自压缩和对应 budget/restart gate 未闭合。
 6. Fallback：retry/空轮 identity 已进入 durable fact，A/A/B/B 跨重启单场景通过；`IsDead` 目前只解析为 `Model=None`，发送路径仍继续调用 Host prompt，SessionDead fail-closed 尚未实现。
 7. Orchestrator：真实 publish 单场景通过；reconcile 只在 engine 懒加载时、且 target HEAD 匹配 durable candidate 时补 `Published`，不恢复中间阶段。ff/Published crash window、target-ref 级共享串行化、cleanup 错误处理与真实 restart E2E 仍未闭合。
