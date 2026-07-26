@@ -45,6 +45,22 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                     {| SessionId = sessionId
                        Active = true |})
 
+        member _.AppendLink(sessionId, childId, targetAgent, role) =
+            append
+                sessionId
+                (AgentFact.AgentLinked
+                    {| ParentId = sessionId
+                       ChildId = childId
+                       TargetAgent = targetAgent
+                       Role = role |})
+
+        member _.AppendUnlink(sessionId, childId) =
+            append
+                sessionId
+                (AgentFact.AgentUnlinked
+                    {| ParentId = sessionId
+                       ChildId = childId |})
+
 type CompanionHost
     (
         primaryId: SessionId,
@@ -61,12 +77,24 @@ type CompanionHost
         defaultArg bloggerModel (Error "WANXIANGSHU_BLOGGER_MODEL is not configured")
 
     let mutable bloggerTask: Task<SessionId> option = None
+    let bloggerNeedsReset = ref false
 
     let ensureBlogger () =
         lock gate (fun () ->
             match bloggerTask with
             | Some task -> task
             | None ->
+                // A restored companion already holds B; the freshly created
+                // blogger child must be re-anchored on the full context so it
+                // does not delude itself with a lost baseline.
+                // ponytail: re-association to the SAME pre-restart child session
+                // is gated on child-session liveness, which this runtime does not
+                // preserve across restart; the durable AgentLinked fact is now
+                // persisted and the reset-frame below covers the not-recoverable
+                // case (new child re-anchored on full B + projection).
+                if companion.Memory.CurrentB.IsSome then
+                    bloggerNeedsReset.Value <- true
+
                 let task =
                     task {
                         let! created =
@@ -83,6 +111,17 @@ type CompanionHost
                             // companion gate can never recurse into blogger
                             // sessions, not even before its first event.
                             bloggerCreated id
+
+                            durable
+                            |> Option.iter (fun port ->
+                                port.AppendLink(
+                                    primaryId,
+                                    ChildId.create (SessionId.value id),
+                                    "blogger",
+                                    Some "blogger"
+                                )
+                                |> ignore)
+
                             return id
                         | Error error -> return raise (InvalidOperationException error)
                     }
@@ -90,97 +129,44 @@ type CompanionHost
                 bloggerTask <- Some task
                 task)
 
-    let assistantOutput childId watermark =
-        let output = sessions.GetSessionOutput childId
+    member private this.BloggerDeps: CompanionHostBlogger.BloggerDeps =
+        { Sessions = sessions
+          Model = configuredBloggerModel
+          EnsureBlogger = ensureBlogger
+          Gate = gate
+          BloggerNeedsReset = bloggerNeedsReset
+          Companion = companion
+          AssistantOutput =
+            (fun childId watermark ->
+                CompanionDelta.assistantOutput (fun id -> sessions.GetSessionOutput id) childId watermark) }
 
-        output
-        |> List.skip (min watermark output.Length)
-        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
-        |> String.concat "\n"
-
-    let failBlog (message: string) : string =
-        raise (InvalidOperationException message)
-
-    let blog (delta: ProjectionSnapshot) : Task<BlogText> =
-        task {
-            match configuredBloggerModel with
-            | Error error -> return failBlog error
-            | Ok model ->
-                let! childId = ensureBlogger ()
-
-                let completion =
-                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                let watermark = sessions.GetSessionOutput childId |> List.length
-
-                use subscription =
-                    sessions.SubscribeTerminal(childId, (fun _ outcome -> completion.SetResult outcome))
-
-                let prompt =
-                    sprintf
-                        "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
-                        delta
-
-                let! sent =
-                    sessions.SendPrompt(
-                        childId,
-                        prompt,
-                        { Model = Some model
-                          Agent = Some "blogger"
-                          Directory = None }
-                    )
-
-                match sent with
-                | Error error -> return failBlog error
-                | Ok _ ->
-                    let! outcome = completion.Task
-
-                    match outcome with
-                    | Completed _ ->
-                        let text = assistantOutput childId watermark
-
-                        if String.IsNullOrWhiteSpace text then
-                            return failBlog "Blogger returned no assistant text"
-                        else
-                            return text
-                    | Aborted reason -> return failBlog reason
-                    | Failed error -> return failBlog error
-        }
-
-    let jsonOfMessages (messages: obj list) =
-        // Full projection baseline must be the same canonical bytes as
-        // Projection.canonicalJson — not insertion-order JSON.stringify.
-        Projection.canonicalJson (List.toArray messages)
-
-    let prefixLength (previous: string) (current: string) (maximum: int) =
-        try
-            let oldMessages = Fable.Core.JS.JSON.parse previous
-            let newMessages = Fable.Core.JS.JSON.parse current
-
-            let sameMessage oldValue newValue =
-                match Projection.messageId oldValue, Projection.messageId newValue with
-                | Some oldId, Some newId when oldId <> newId -> false
-                | _ -> Projection.sameCanonicalMessage oldValue newValue
-
-            let mutable index = 0
-            let mutable stopped = false
-
-            while index < maximum && not stopped do
-                let oldValue: obj = emitJsExpr (oldMessages, index) "$0[$1]"
-                let newValue: obj = emitJsExpr (newMessages, index) "$0[$1]"
-
-                if not (sameMessage oldValue newValue) then
-                    stopped <- true
-                else
-                    index <- index + 1
-
-            index
-        with _ ->
-            0
-
-    member _.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome = companion.Submit(projection, blog)
+    member this.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome =
+        let deps = this.BloggerDeps
+        companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps delta))
 
     member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
+
+    /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
+    /// into B' and durably persist (CompanionAdvanced). Fire-and-forget; the
+    /// underlying async rebase returns false (SkippedBusy) when the Blogger is
+    /// busy, and leaves B unchanged on failure.
+    member this.SelfRebase(currentProjection: ProjectionSnapshot) : CompanionOutcome =
+        let before = companion.Memory
+
+        if not before.ReplacementActive || before.CurrentB.IsNone then
+            Submitted
+        else
+            let currentB = before.CurrentB.Value
+            let deps = this.BloggerDeps
+
+            let started =
+                companion.TryRebase(fun () ->
+                    async {
+                        let! bPrime = CompanionHostBlogger.selfRebaseBlog deps currentB |> Async.AwaitTask
+                        return (bPrime, currentProjection)
+                    })
+
+            if started then Submitted else SkippedBusy
 
     member _.TryRebase(newB: string, newBaseline: string) : bool = companion.TryRebase(newB, newBaseline)
 
@@ -189,15 +175,24 @@ type CompanionHost
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
 
     member this.TransformRaw(messages: obj list) : obj list =
-        let current = jsonOfMessages messages
+        let current = CompanionDelta.jsonOfMessages Projection.canonicalJson messages
         let before = companion.Memory
 
         let watermark =
             match before.LastSuccessfulProjection with
-            | Some previous -> prefixLength previous current (List.length messages)
+            | Some previous ->
+                CompanionDelta.prefixLength
+                    Projection.messageId
+                    Projection.sameCanonicalMessage
+                    previous
+                    current
+                    (List.length messages)
             | None -> 0
 
-        companion.Submit(current, blog) |> ignore
+        let deps = this.BloggerDeps
+
+        companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps delta))
+        |> ignore
 
         match before.ReplacementActive, before.CurrentB, before.LastSuccessfulProjection with
         | true, Some b, Some _ when watermark > 0 ->
@@ -219,3 +214,27 @@ type CompanionHost
         lock gate (fun () -> bloggerTask |> Option.map (fun task -> task.Result))
 
     member _.PrimarySessionId = primaryId
+
+    /// Tear down the Blogger child and record the durable unlink on the same
+    /// session stream so a restart never mistakes a dead child for a live link.
+    member this.CloseBloggerAsync() : Task =
+        task {
+            let taskOpt = lock gate (fun () -> bloggerTask)
+
+            match taskOpt with
+            | Some task ->
+                let! childId = task
+                do! sessions.AbortChildren(primaryId)
+
+                durable
+                |> Option.iter (fun port ->
+                    port.AppendUnlink(primaryId, ChildId.create (SessionId.value childId)) |> ignore)
+            | None -> ()
+        }
+
+    interface IDisposable with
+        member this.Dispose() =
+            // Best-effort teardown: drop the blogger child and record the
+            // durable unlink on the same session stream.
+            if bloggerTask.IsSome then
+                this.CloseBloggerAsync() |> ignore

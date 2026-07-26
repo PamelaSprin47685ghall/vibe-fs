@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Next.Session
 
+open System
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel.Identity
 
 type ProjectionSnapshot = string
 
@@ -97,3 +99,48 @@ module CompanionDelta =
                 if patch = "{\"ops\":[]}" then None else Some patch
             with _ ->
                 Some current
+
+    let jsonOfMessages (canonicalJson: obj -> string) (messages: obj list) : string =
+        // Full projection baseline must be the same canonical bytes as
+        // Projection.canonicalJson — not insertion-order JSON.stringify.
+        canonicalJson (List.toArray messages)
+
+    let prefixLength
+        (messageId: obj -> string option)
+        (sameCanonicalMessage: obj -> obj -> bool)
+        (previous: string)
+        (current: string)
+        (maximum: int)
+        : int =
+        try
+            let oldMessages = Fable.Core.JS.JSON.parse previous
+            let newMessages = Fable.Core.JS.JSON.parse current
+
+            let sameMessage oldValue newValue =
+                match messageId oldValue, messageId newValue with
+                | Some oldId, Some newId when oldId <> newId -> false
+                | _ -> sameCanonicalMessage oldValue newValue
+
+            let mutable index = 0
+            let mutable stopped = false
+
+            while index < maximum && not stopped do
+                let oldValue: obj = emitJsExpr (oldMessages, index) "$0[$1]"
+                let newValue: obj = emitJsExpr (newMessages, index) "$0[$1]"
+
+                if not (sameMessage oldValue newValue) then
+                    stopped <- true
+                else
+                    index <- index + 1
+
+            index
+        with _ ->
+            0
+
+    let assistantOutput (getSessionOutput: SessionId -> string list) (childId: SessionId) (watermark: int) : string =
+        let output = getSessionOutput childId
+
+        output
+        |> List.skip (min watermark output.Length)
+        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
+        |> String.concat "\n"

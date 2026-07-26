@@ -25,6 +25,8 @@ type ICompanionDurablePort =
     abstract Load: SessionId -> CompanionMemory option
     abstract AppendSuccessful: SessionId * ProjectionSnapshot * BlogText -> Result<unit, string>
     abstract EnableReplacement: SessionId -> Result<unit, string>
+    abstract AppendLink: SessionId * ChildId * string * string option -> Result<unit, string>
+    abstract AppendUnlink: SessionId * ChildId -> Result<unit, string>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Companion =

@@ -61,7 +61,7 @@ module CompanionHostTests =
             let host, childCount, sentModel = makeFake ()
 
             let companion =
-                CompanionHost(SessionId.create "primary", host, ?bloggerModel = Some(Ok bloggerModel))
+                new CompanionHost(SessionId.create "primary", host, ?bloggerModel = Some(Ok bloggerModel))
 
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
             do! companion.WaitInFlightAsync()
@@ -89,7 +89,7 @@ module CompanionHostTests =
             let host2, _, _ = makeFake ()
 
             let companion2 =
-                CompanionHost(SessionId.create "raw-primary", host2, ?bloggerModel = Some(Ok bloggerModel))
+                new CompanionHost(SessionId.create "raw-primary", host2, ?bloggerModel = Some(Ok bloggerModel))
 
             let first = [ createObj [ "role", box "user"; "text", box "old" ] ]
             let second = first @ [ createObj [ "role", box "user"; "text", box "tail" ] ]
@@ -114,7 +114,7 @@ module CompanionHostTests =
                 let host, _, _ = makeFake ()
 
                 let companion =
-                    CompanionHost(primaryId, host, durable, ?bloggerModel = Some(Ok bloggerModel))
+                    new CompanionHost(primaryId, host, durable, ?bloggerModel = Some(Ok bloggerModel))
 
                 Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
                 do! companion.WaitInFlightAsync()
@@ -142,7 +142,7 @@ module CompanionHostTests =
                 let restoredHost, _, _ = makeFake ()
 
                 let restored =
-                    CompanionHost(primaryId, restoredHost, restoredDurable, ?bloggerModel = Some(Ok bloggerModel))
+                    new CompanionHost(primaryId, restoredHost, restoredDurable, ?bloggerModel = Some(Ok bloggerModel))
 
                 Assert.Equal(Some "blog paragraph\n\nblog paragraph", restored.Memory.CurrentB)
                 Assert.Equal(Some "{\"step\":2}", restored.Memory.LastSuccessfulProjection)
@@ -156,7 +156,7 @@ module CompanionHostTests =
             let host, _, _ = makeFake ()
 
             let companion =
-                CompanionHost(SessionId.create "canonical-primary", host, ?bloggerModel = Some(Ok bloggerModel))
+                new CompanionHost(SessionId.create "canonical-primary", host, ?bloggerModel = Some(Ok bloggerModel))
 
             let first =
                 [ createObj

@@ -123,7 +123,7 @@ module CompanionTransform =
                                 |> Option.map (fun j -> AgentJournalCompanionPort j :> ICompanionDurablePort)
 
                             let value =
-                                CompanionHost(
+                                new CompanionHost(
                                     SessionId.create sessionId,
                                     sessionPort,
                                     ?durable = durable,
@@ -145,11 +145,11 @@ module CompanionTransform =
                         companion.EnablePrefixReplacement() |> ignore
                     | _ -> ()
 
-                // Y self-compress: when B itself approaches the model budget and
-                // prefix replacement is already active, rebase B+baseline so the
-                // sidecar stays bounded. Compressed B must NOT contain the
-                // blogger system phrase — request role classifiers look at user
-                // text and would mis-label the primary session as blogger.
+                // Y self-rebase: when B itself approaches the model budget and
+                // prefix replacement is already active, ask the Blogger child to
+                // condense the FULL current B into B' and durably persist it
+                // (CompanionAdvanced). Never synthesize a placeholder: if the
+                // Blogger is busy we skip; if it fails we keep the old B.
                 match
                     companion.Memory.CurrentB, companion.Memory.ReplacementActive, sessionBudgets.TryGetValue sessionId
                 with
@@ -157,11 +157,8 @@ module CompanionTransform =
                     budget > 0
                     && float ((String.length b + 3) / 4) >= float budget * activationRatio
                     ->
-                    let compressed =
-                        sprintf "[companion-rebase] condensed cognitive context (%d chars)" (String.length b)
-
-                    let baseline = Projection.canonicalJson (List.toArray rawMsgs)
-                    companion.TryRebase(compressed, baseline) |> ignore
+                    let currentProjection = Projection.canonicalJson (List.toArray rawMsgs)
+                    companion.SelfRebase(currentProjection) |> ignore
                 | _ -> ()
 
                 replaceMessagesInPlace rawOutObj (companion.TransformRaw rawMsgs)

@@ -73,6 +73,7 @@
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
+    <Compile Include="Session/CompanionHostBlogger.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>
     <Compile Include="OpenCode/HostSessionNudge.fs"/>

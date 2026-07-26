@@ -49,16 +49,22 @@ import:
 
 上述是本轮直接证据。未在本轮重新执行的旧 canary、全量测试和 release 结论不得重新写成“已通过”。
 
-## 本轮 TestKit 因果证据
+## HEAD 代码与本轮直接证据
 
-本轮纠偏四项已闭合，Orchestrator 生产接线已落地（WIP）：
+当前 HEAD 为 `bf632dea`。该提交已把 busy nudge、Process 分层摘要、真实 bun-pty、Companion canonical baseline、Fallback durable identity、Orchestrator Git authority/global SSE/reconcile hook 接入生产；符号存在不等于行为闭合，以下验收状态只按本轮命令结果提升。
 
-1. busy existing agent 的 nudge 不再经过带 `runWork` 的新 `Fork`；同一 active source 只允许一个 completion。
-2. SSOT 将 idle existing 与 busy existing 明确分开：前者建 Run，后者只 nudge。
-3. Watchdog 的 `session.created` 不再无条件续命，只匹配 pending causal barrier 或显式 advance。
-4. 重复控制统一为外层 1～3 次，child canary 强制 `CANARY_REPEAT=1`；标准 P0 默认全套并行隔离（`MAX_PARALLEL_CANARIES` 默认等于 canary 数）。
+本轮直接通过：
 
-Orchestrator 生产接线（WIP）：`fork(agent=manager)` 从 orchestrator session 路由到 `ForkManagerJob`；`join` 路由到 `JoinPublished`。Git authority port 与 boot reconcile 已接线；真实 publish canary 是否全绿以当前 `npm run test:e2e:p0` 证据为准，不得预先写成完成。
+- `npm run build`。
+- `npm run test:compile && npm run test:next`：160/160 通过。
+- `npm run test:manager-tools`：1/1 通过；`node testkit/opencode/tests/gate-testkit.mjs`：23/23 通过。
+- 单场景 `host-nudge-canary`、`executor-canary`、`pty-stress-canary`、`fallback-canary`、`companion-canary`、`orchestrator-publish-canary` 通过；它们分别只证明各自实际覆盖的路径，不外推未覆盖边界。
+
+本轮标准 `npm run test:e2e:p0` 未通过：14 个 canary 在全套并行时全部于 2s 因果 Watchdog 内失败，多数只消费 title 请求或未到首个业务 expectation；其中 6 个关键 canary 单独运行通过。因此当前直接证据是“单场景纵切可运行、标准全并行隔离门为红”，不得写 release-ready，也不得通过降低并发、放宽 expectation 或延长 Watchdog 掩盖。
+
+同进程 active child 的 busy nudge 已走 `SendChildPromptFireAndForget`，不新建 Run/listener/completion；`HostForkRunLifecycle.complete` 对本地/global 双事件流做一次性 claim。跨插件重启的 active-run 恢复仍未证明。
+
+Orchestrator 的 `fork(agent=manager)`/`join` 已路由 `ForkManagerJob`/`JoinPublished`，真实 Git publish 单场景覆盖 worktree → candidate → 双 PERFECT → rebase → ff-only → cleanup；authority 与懒加载 reconcile hook 已接线，但不构成完整 restart resume。
 
 - `StrictMockProvider` 的 expectation lane 已包含 scenario、session alias、role、turn、request-kind；真实 OpenCode 请求以 `x-session-affinity` 绑定 session，child 首请求还校验 `x-parent-session-id`。已绑定 session 优先于未绑定 sibling lane；错 parent、错顺序、extra、missing、ambiguous 全部返回 500。
 - 每个实际产生的 title、零宽 continuation、Blogger、Executor、Reviewer 请求都是显式 expectation；`allowOutOfOrder`、`allowBloggerRequests`、`allowTitleGeneration`、`allowSyntheticContinuations` 已删除。没有自动吞请求路径。
@@ -74,12 +80,13 @@ Orchestrator 生产接线（WIP）：`fork(agent=manager)` 从 orchestrator sess
 
 ## 当前未闭合边界
 
-1. busy nudge 实现已有单元证据；真实 busy-overlap E2E 与标准全并行 P0（含 publish canary）正在纠偏，不得写成已验收。
-2. Process：raw spool 已流式化；仍需验证分层 reduce、spool finally 清理、Executor 目标 completion 路由。
-3. PTY：类型与 fork DSL 存在；真实 bun-pty 生产后端与 `fork(agent=pty)` canary 正在接线，**不得宣称 PTY 产品能力完成**。
-4. Companion：canonical full projection / Y 自压缩调度需当前 build+canary 证据。
-5. Fallback：A/A/B/B 有真实证据；跨重启 durable failure identity 正在落地，不得只靠进程内 HashSet。
-6. Orchestrator：ToolSurface 已接线；Git authority + boot reconcile 正在落地；真实 publish canary 与重启恢复未闭合前不得 release-ready。
+1. TestKit：标准 P0 虽默认启动全部 14 个 canary，当前直接运行 14/14 超过 2s 因果 Watchdog；先定位真实共享资源/因果停滞，不得把单场景通过冒充并行隔离通过。
+2. Fork/Join：busy-overlap 单场景已通过；`pendingRuns` 仍是进程内 active 来源，restart 只恢复 child linkage，不恢复在途 Run/completion。
+3. Process：200KB 流式 map、fan-in=8 分层 reduce 和 spool `finally` 清理已有生产代码；当前 Executor canary 只覆盖单 chunk、零 reduce。`ExecutorSummarize.awaitAgent` 消费非目标 completion 后只放本地 stash，不能回填公共 mailbox，目标路由与并发 completion 所有权未闭合。
+4. PTY：真实 bun-pty 与 `fork(agent=pty)`/signal/list/join 表面已接线；当前单场景只证明模型执行了 spawn + TERM DSL，不断言真实 handle、输出或 signal outcome；`PtyBackend` 的 live `Read` 清空 buffer 却不完成读取，exit 只交付 `Closed`，模块级 `live`/`pending` 也没有 per-runtime owner 清理。**不得宣称 PTY 产品能力完成**。
+5. Companion：完整 messages 的 canonical baseline 已接线；当前 Y 阈值分支只写入 `[companion-rebase] condensed...` 占位内容，且同步 `TryRebase` 不持久化。真实、durable 的自压缩和对应 budget/restart gate 未闭合。
+6. Fallback：retry/空轮 identity 已进入 durable fact，A/A/B/B 跨重启单场景通过；`IsDead` 目前只解析为 `Model=None`，发送路径仍继续调用 Host prompt，SessionDead fail-closed 尚未实现。
+7. Orchestrator：真实 publish 单场景通过；reconcile 只在 engine 懒加载时、且 target HEAD 匹配 durable candidate 时补 `Published`，不恢复中间阶段。ff/Published crash window、target-ref 级共享串行化、cleanup 错误处理与真实 restart E2E 仍未闭合。
 
 ## 解冻后的严格顺序
 
@@ -168,13 +175,13 @@ npm run test:e2e:p0
 
 ## 当前解冻动作
 
-1. Watchdog 冻结 2s；心跳只认场景因果进展。
-2. 标准 P0 改为全套并行隔离，并纳入 orchestrator-publish canary。
-3. busy-overlap 真实 E2E（非顺序三轮）与危险两参数 Fork 删除。
-4. Process 分层 reduce / spool finally / 目标 join 路由。
-5. 真实 bun-pty 生产后端 + PTY fork DSL canary。
-6. Orchestrator Git authority + boot reconcile。
-7. Companion canonical full projection + Y 自压缩调度；Fallback durable failure identity。
+1. 保持 Watchdog 2s、14-way 标准 P0 和显式 expectation 不变，闭合当前全并行红门；先证明因果停滞归属，不以单场景绿色替代隔离契约。
+2. 保留已通过的 busy-overlap 场景，补 restart active-run/completion 语义；不得恢复危险的双 completion 路径。
+3. 按既定顺序先完成 Companion：用真实且 durable 的 Y 自压缩替换占位 rebase，并补 budget/restart deterministic gate；随后回归 Reviewer。
+4. Fallback 在第四次失败后必须阻止新 Host prompt；保留 durable attempt identity 与跨重启 A/A/B/B 证据。
+5. Process 修复非目标 completion 的 mailbox 所有权，并以多 chunk、跨 reduce level、summarizer 失败清理场景验收。
+6. PTY 补真实输出 read/terminal 交付、owner cleanup 与角色权限边界，再扩展 canary 覆盖 write/read/join/list/abort。
+7. Orchestrator 补 target-ref 级串行化、ff/Published crash-safe reconcile、阶段恢复和 cleanup 失败处理，以真实 restart publish E2E 收口。
 8. `MIGRATION.md` 继续记录行为接管和删除门槛；不把旧实现重新引入。完成状态禁止写进本文件当宣言。
 
 任何“为了让测试不挂”“先加几十次重试”“测试环境才设置变量”“以后换真正 PTY”“读不到就忽略”“方便清理所以全局 kill”的修改均拒绝。测试必须证明 SSOT；生产不得追着测试夹具跑。
