@@ -84,36 +84,24 @@ module internal AgentFactsFoldHelpers =
         (commitHash: string)
         =
         let mgrId = ManagerId.create managerId
-        let candId = CandidateId.create candidateId
-        let status = Published(candId, commitHash)
-
-        let existingMgr =
-            match Map.tryFind mgrId proj.Orchestrator.Managers with
-            | Some _ -> { Status = Some status }
-            | None -> { Status = Some status }
 
         let orch =
             { ManagerJobs = Map.remove mgrId proj.Orchestrator.ManagerJobs
-              Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers
+              // Terminal state: drop from both maps so the projection stays
+              // bounded; the durable fact stream retains the audit history.
+              Managers = Map.remove mgrId proj.Orchestrator.Managers
               PublishedCommit = Some commitHash }
 
         { proj with Orchestrator = orch }
 
     let foldOrchestratorRejected (proj: AgentProjectionSet) (managerId: string) (candidateId: string) (reason: string) =
         let mgrId = ManagerId.create managerId
-        let candId = CandidateId.create candidateId
-        let status = Rejected(candId, reason)
-
-        let existingMgr =
-            match Map.tryFind mgrId proj.Orchestrator.Managers with
-            | Some _ -> { Status = Some status }
-            | None -> { Status = Some status }
 
         let orch =
             { proj.Orchestrator with
-                Managers = Map.add mgrId existingMgr proj.Orchestrator.Managers
-                // Terminal state: drop from the in-progress ManagerJobs map so the
-                // projection does not grow unbounded with history.
+                // Terminal state: drop from both maps so the projection stays
+                // bounded; the durable fact stream retains the audit history.
+                Managers = Map.remove mgrId proj.Orchestrator.Managers
                 ManagerJobs = Map.remove mgrId proj.Orchestrator.ManagerJobs }
 
         { proj with Orchestrator = orch }

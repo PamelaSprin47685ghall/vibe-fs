@@ -141,7 +141,8 @@ module AgentJournalTests =
                 Assert.Equal(Some "{\"k\":\"v\"}", sessionProj.Companion.Value.LastSuccessfulProjection)
 
                 let orchProj = snap.AgentProjections.Orchestrator
-                Assert.True(orchProj.Managers.ContainsKey(ManagerId.create mgrId))
+                Assert.False(orchProj.Managers.ContainsKey(ManagerId.create mgrId))
+                Assert.Equal(Some "commitABC", orchProj.PublishedCommit)
             })
 
     [<Fact>]

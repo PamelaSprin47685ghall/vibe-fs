@@ -28,6 +28,7 @@
     <Compile Include="Journal/FactCodecTests.fs"/>
     <Compile Include="Journal/JournalIsolationTests.fs"/>
     <Compile Include="Journal/AgentFactsTests.fs"/>
+    <Compile Include="Journal/AgentFactsOrchestratorTests.fs"/>
     <Compile Include="Journal/AgentJournalTests.fs"/>
     <Compile Include="Process/ProcessBudgetTests.fs"/>
     <Compile Include="Process/ProcessRunnerTests.fs"/>

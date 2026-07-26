@@ -180,39 +180,6 @@ module AgentFactsTests =
         Assert.True(comp.ReplacementActive)
 
     [<Fact>]
-    let Orchestrator_candidate_and_publish_facts () =
-        let rt = RuntimeId.create "rt-orch-1"
-        let mgrIdStr = "manager-alpha"
-        let candIdStr = "candidate-001"
-        let t0 = DateTimeOffset.UtcNow
-
-        let regFact =
-            AgentFact.OrchestratorCandidateRegistered
-                {| ManagerId = mgrIdStr
-                   CandidateId = candIdStr
-                   Branch = "feature/agent-dsl"
-                   CommitHash = "c0mm1t123" |}
-
-        let pubFact =
-            AgentFact.OrchestratorPublished
-                {| ManagerId = mgrIdStr
-                   CandidateId = candIdStr
-                   CommitHash = "c0mm1t123" |}
-
-        let env1 = createTestEnv 1L t0 regFact rt None
-        let env2 = createTestEnv 2L (t0.AddSeconds 1.0) pubFact rt None
-
-        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
-
-        let mgrId = ManagerId.create mgrIdStr
-        let candId = CandidateId.create candIdStr
-        Assert.True(proj.Orchestrator.Managers.ContainsKey mgrId)
-
-        let mgrState = proj.Orchestrator.Managers.[mgrId]
-        Assert.Equal(Some(Published(candId, "c0mm1t123")), mgrState.Status)
-        Assert.Equal(Some "c0mm1t123", proj.Orchestrator.PublishedCommit)
-
-    [<Fact>]
     let Agent_linkage_and_durable_effect_folds () =
         let rt = RuntimeId.create "rt-misc-1"
         let parentSid = SessionId.create "session-parent"
