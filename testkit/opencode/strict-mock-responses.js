@@ -124,7 +124,9 @@ function reasoningOnlyChunks(id, exp, promptTokens) {
 }
 
 export async function respond(state, res, exp, parsed) {
-  const id = exp.respond.type === 'title' ? `title_${Date.now()}` : `call_${Date.now()}`;
+  const id = exp.respond.type === 'title'
+    ? `title_${++state.responseCounter}`
+    : `call_${++state.responseCounter}`;
   const promptTokens = estimatePromptTokens(parsed);
 
   if (exp.respond.type === 'error') {

@@ -13,6 +13,7 @@ export function createState() {
     sessionBindings: new Map(),
     unexpected: [],
     requests: [],
+    responseCounter: 0,
     idCounter: 0,
     strict: true,
   };
@@ -62,5 +63,6 @@ export function resetState(state) {
   state.sessionBindings.clear();
   state.unexpected.length = 0;
   state.requests.length = 0;
+  state.responseCounter = 0;
   state.stopped = false;
 }
