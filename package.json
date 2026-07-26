@@ -5,18 +5,15 @@
   "type": "module",
   "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
   "main": "build/next/OpenCode/Plugin.js",
-  "types": "index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
       "import": "./build/next/OpenCode/Plugin.js",
       "require": "./build/next/OpenCode/Plugin.js",
       "default": "./build/next/OpenCode/Plugin.js"
     }
   },
   "files": [
-    "build",
-    "index.d.ts"
+    "build"
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",

@@ -29,7 +29,7 @@ type HostEventRouter
     let lastAssistantMsgs = Dictionary<string, obj>()
     let assistantParts = AssistantParts()
     let fallbackFailures = defaultArg recordedErrors (HashSet<string>())
-    let retryAttempts = Dictionary<string, HashSet<string>>()
+    let retryAttemptBySession = Dictionary<string, string>()
     let abortedSessions = AbortTracker()
 
     let rawEvent (raw: obj) =
@@ -162,7 +162,7 @@ type HostEventRouter
                 if r = "assistant" then
                     lastAssistantMsgs.[sessionId] <- target
                 elif r = "user" then
-                    retryAttempts.Remove sessionId |> ignore
+                    retryAttemptBySession.Remove sessionId |> ignore
 
             if isAbortError raw then
                 abortedSessions.Mark sessionId
@@ -170,7 +170,12 @@ type HostEventRouter
             elif eventType raw = "session.error" then
                 ()
             elif eventType raw = "session.status" then
-                HostEventRetry.record journal retryAttempts sessionId raw
+                let lastAssistantMsgId =
+                    match lastAssistantMsgs.TryGetValue sessionId with
+                    | true, lastMsg -> FallbackDetect.messageId sessionId lastMsg
+                    | false, _ -> ""
+
+                HostEventRetry.record journal fallbackFailures retryAttemptBySession lastAssistantMsgId sessionId raw
 
             abortedSessions.Observe(raw, sessionId)
 
@@ -250,7 +255,7 @@ type HostEventRouter
 
                     match completedAssistant with
                     | Some completeMsg when hasTerminalAssistant ->
-                        FallbackDetect.observeIdle journal fallbackFailures sessionId completeMsg
+                        FallbackDetect.observeIdle journal fallbackFailures retryAttemptBySession sessionId completeMsg
 
                         if FallbackDetect.isFailedAssistant completeMsg then
                             nudgeContinue sessionId terminalMessageId

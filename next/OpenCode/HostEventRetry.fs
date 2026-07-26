@@ -7,11 +7,19 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-/// Durable provider-retry failure identity for HostEventRouter.
+/// Detects a provider-retry status and attributes the failure to the single
+/// FallbackDetect attributor. `retryAttemptBySession` records the attempt per
+/// session so the failed-assistant detector can recognize the same physical
+/// failure instead of appending a second fact. When the host supplies no message
+/// id, `fallbackMessageId` (the in-flight assistant message id from the router)
+/// is used — never a session+attempt+reason hash, which would wrongly dedupe
+/// across distinct user turns.
 module HostEventRetry =
     let record
         (journal: AgentJournal option)
-        (retryAttempts: Dictionary<string, HashSet<string>>)
+        (recorded: HashSet<string>)
+        (retryAttemptBySession: Dictionary<string, string>)
+        (fallbackMessageId: string)
         (sessionId: string)
         (raw: obj)
         =
@@ -32,9 +40,10 @@ module HostEventRetry =
                 else
                     unbox<string> status?message
 
-            // Prefer host message id; otherwise bind identity to session+attempt+reason
-            // so distinct failure rounds never collapse, while the same retry event
-            // remains restart-stable (no random GUID).
+            // The attempt belongs to this session so a later failed-assistant
+            // terminal for the same attempt attributes to the same identity.
+            retryAttemptBySession.[sessionId] <- attempt
+
             let assistantMessageId =
                 if not (isNull properties) && not (isNull properties?messageID) then
                     unbox<string> (properties?messageID)
@@ -47,30 +56,7 @@ module HostEventRetry =
                 then
                     unbox<string> (properties?info?id)
                 else
-                    sprintf "retry-%s-%s-%d" sessionId attempt (hash reason)
+                    fallbackMessageId
 
-            let identity = sprintf "%s|%s|%s" assistantMessageId attempt reason
-
-            let seenAttempts =
-                match retryAttempts.TryGetValue sessionId with
-                | true, values -> values
-                | false, _ ->
-                    let values = HashSet<string>()
-                    retryAttempts.[sessionId] <- values
-                    values
-
-            // Process-local set is only a hot-path filter; fold is the durable
-            // idempotency boundary across restarts.
-            if seenAttempts.Add identity then
-                match journal with
-                | None -> ()
-                | Some journal ->
-                    let fact =
-                        AgentFact.FallbackFailureRecorded
-                            {| SessionId = SessionId.create sessionId
-                               Reason = reason
-                               AssistantMessageId = assistantMessageId
-                               ProviderAttempt = attempt |}
-
-                    AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
-                    |> ignore
+            if not (String.IsNullOrWhiteSpace assistantMessageId) then
+                FallbackDetect.recordFallbackFailure journal recorded sessionId assistantMessageId attempt reason

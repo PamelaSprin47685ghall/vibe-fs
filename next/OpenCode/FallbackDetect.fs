@@ -130,21 +130,56 @@ module FallbackDetect =
             let text = partsText msg
             sprintf "anon-%s-%d" sessionId (hash text)
 
-    let observeIdle (journal: AgentJournal option) (recorded: HashSet<string>) (sessionId: string) (msg: obj) : unit =
+    /// Single attributor: the ONLY writer of FallbackFailureRecorded.
+    /// Both detectors (provider-retry status and failed-assistant terminal) route
+    /// through this so the same physical failure is counted exactly once. The
+    /// in-memory set mirrors the durable fold's identity (assistantMessageId|
+    /// providerAttempt) so one process run never double-appends; the fold is the
+    /// cross-restart idempotency boundary.
+    let recordFallbackFailure
+        (journal: AgentJournal option)
+        (recorded: HashSet<string>)
+        (sessionId: string)
+        (assistantMessageId: string)
+        (providerAttempt: string)
+        (reason: string)
+        : unit =
+        let identity = sprintf "%s|%s|%s" sessionId assistantMessageId providerAttempt
+
+        if recorded.Add identity then
+            match journal with
+            | None -> ()
+            | Some journal ->
+                let fact =
+                    AgentFact.FallbackFailureRecorded
+                        {| SessionId = SessionId.create sessionId
+                           Reason = reason
+                           AssistantMessageId = assistantMessageId
+                           ProviderAttempt = providerAttempt |}
+
+                AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
+                |> ignore
+
+    /// Reports a failed-assistant observation. Does NOT independently append a
+    /// failure fact: when the same physical provider attempt was already
+    /// attributed via the retry-status detector (recorded in retryAttemptBySession),
+    /// this is the very same failure and must not be counted again.
+    let observeIdle
+        (journal: AgentJournal option)
+        (recorded: HashSet<string>)
+        (retryAttemptBySession: Dictionary<string, string>)
+        (sessionId: string)
+        (msg: obj)
+        : unit =
         match journal with
         | None -> ()
         | Some journal ->
             if not (isNull msg) && isFailedAssistant msg then
                 let msgId = messageId sessionId msg
-                let identity = sprintf "%s|empty-xml" msgId
 
-                if recorded.Add identity then
-                    let fact =
-                        AgentFact.FallbackFailureRecorded
-                            {| SessionId = SessionId.create sessionId
-                               Reason = "empty or xml-only assistant turn"
-                               AssistantMessageId = msgId
-                               ProviderAttempt = "empty-xml" |}
+                let providerAttempt, reason =
+                    match retryAttemptBySession.TryGetValue sessionId with
+                    | true, attempt -> attempt, "provider retry (empty/xml terminal)"
+                    | false, _ -> "empty-xml", "empty or xml-only assistant turn"
 
-                    AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
-                    |> ignore
+                recordFallbackFailure (Some journal) recorded sessionId msgId providerAttempt reason
