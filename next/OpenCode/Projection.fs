@@ -4,41 +4,30 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-type CanonicalRole =
-    | User
-    | Assistant
-    | System
-    | UnknownRole of string
+/// Provider-visible parts only. Unknown host noise is dropped, never raw-object
+/// embedded into canonical JSON (SSOT P0-3).
+type ProviderVisiblePart =
+    | Text of text: string
+    | Reasoning of text: string
+    | ToolCall of callId: string * name: string * argsCanonical: string
+    | ToolResult of callId: string * resultCanonical: string
 
-type CanonicalPart =
-    | TextPart of id: string * text: string * synthetic: bool option
-    | ToolCallPart of id: string * callId: string * tool: string * argsStr: string
-    | CompactionPart of id: string * auto: bool * overflow: bool
-    | RawPart of id: string * kind: string * rawObj: obj
-
-type CanonicalMessage =
-    { Id: string
-      Role: CanonicalRole
-      SessionId: string
-      Agent: string option
-      Text: string
-      Parts: CanonicalPart list
-      Raw: obj }
+type ProviderVisibleMessage =
+    { Role: string
+      Parts: ProviderVisiblePart list }
 
 module Projection =
-    // Keep the canonical serializer available at the Projection boundary so
-    // callers cannot accidentally introduce a second JSON normalization rule.
     let canonicalJson = CanonicalJson.canonicalJson
 
     let private readField (value: obj) (name: string) : obj =
-        if isNull value then
-            null
-        else
-            emitJsExpr (value, name) "$0[$1]"
+        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
 
-    let private readStringField (value: obj) (name: string) : string =
+    let private readString (value: obj) (name: string) : string option =
         let field = readField value name
-        if isNull field then "" else unbox<string> field
+        if isNull field then None
+        else
+            let text = unbox<string> field
+            if String.IsNullOrWhiteSpace text then None else Some text
 
     let private infoObject (rawObj: obj) : obj =
         if isNull rawObj then null
@@ -47,226 +36,158 @@ module Projection =
 
     let private rawParts (rawObj: obj) : obj list =
         let parts = readField rawObj "parts"
-
-        if isNull parts then
-            []
-        else
-            emitJsExpr parts "Array.from($0)" |> unbox<obj array> |> Array.toList
+        if isNull parts then []
+        else emitJsExpr parts "Array.from($0)" |> unbox<obj array> |> Array.toList
 
     let messageId (rawObj: obj) : string option =
         let info = infoObject rawObj
-        let id = readField info "id"
+        readString info "id" |> Option.orElse (readString rawObj "id")
 
-        if isNull id then None else Some(unbox<string> id)
+    let private roleOf (rawObj: obj) : string =
+        let info = infoObject rawObj
+        readString rawObj "role"
+        |> Option.orElse (readString info "role")
+        |> Option.defaultValue ""
+        |> fun value -> value.ToLowerInvariant()
 
-    let parseRole (roleStr: string) =
-        match if isNull roleStr then "" else roleStr.ToLowerInvariant() with
-        | "user" -> User
-        | "assistant" -> Assistant
-        | "system" -> System
-        | other -> UnknownRole other
+    let private canonicalArgs (value: obj) : string =
+        if isNull value then "{}"
+        elif emitJsExpr value "typeof $0 === 'string'" then unbox<string> value
+        else canonicalJson value
 
-    let roleToString (role: CanonicalRole) =
-        match role with
-        | User -> "user"
-        | Assistant -> "assistant"
-        | System -> "system"
-        | UnknownRole s -> s
-
-    let projectPart (partObj: obj) : CanonicalPart =
+    /// Project one host part into provider-visible shape. Returns None for
+    /// bookkeeping-only parts (step markers, ids, synthetic flags, etc.).
+    let projectPart (partObj: obj) : ProviderVisiblePart option =
         if isNull partObj then
-            RawPart("", "null", null)
+            None
         else
-            let id = if isNull partObj?id then "" else unbox<string> partObj?id
-
             let kind =
-                if isNull partObj?``type`` then
-                    ""
-                else
-                    unbox<string> partObj?``type``
+                readString partObj "type"
+                |> Option.defaultValue ""
+                |> fun value -> value.ToLowerInvariant()
 
             match kind with
             | "text" ->
-                let text =
-                    if isNull partObj?text then
-                        ""
-                    else
-                        unbox<string> partObj?text
-
-                let synth =
-                    if isNull partObj?synthetic then
-                        None
-                    else
-                        Some(unbox<bool> partObj?synthetic)
-
-                TextPart(id, text, synth)
+                readString partObj "text"
+                |> Option.map Text
+            | "reasoning"
+            | "thinking" ->
+                readString partObj "text"
+                |> Option.orElse (readString partObj "reasoning")
+                |> Option.map Reasoning
             | "tool-call"
-            | "tool_call" ->
+            | "tool_call"
+            | "tool" ->
                 let callId =
-                    if isNull partObj?callID then
-                        ""
-                    else
-                        unbox<string> partObj?callID
+                    readString partObj "callID"
+                    |> Option.orElse (readString partObj "callId")
+                    |> Option.orElse (readString partObj "id")
+                    |> Option.defaultValue ""
 
-                let tool =
-                    if isNull partObj?tool then
-                        ""
-                    else
-                        unbox<string> partObj?tool
+                let name =
+                    readString partObj "tool"
+                    |> Option.orElse (readString partObj "name")
+                    |> Option.defaultValue ""
 
-                let argsStr =
-                    if isNull partObj?args then
-                        "{}"
-                    else
-                        canonicalJson partObj?args
+                let args =
+                    let a = readField partObj "args"
+                    let b = readField partObj "arguments"
+                    if not (isNull a) then canonicalArgs a
+                    elif not (isNull b) then canonicalArgs b
+                    else "{}"
 
-                ToolCallPart(id, callId, tool, argsStr)
-            | "compaction" ->
-                let auto =
-                    if isNull partObj?auto then
-                        false
-                    else
-                        unbox<bool> partObj?auto
+                if String.IsNullOrWhiteSpace name && String.IsNullOrWhiteSpace callId then
+                    None
+                else
+                    Some(ToolCall(callId, name, args))
+            | "tool-result"
+            | "tool_result" ->
+                let callId =
+                    readString partObj "callID"
+                    |> Option.orElse (readString partObj "callId")
+                    |> Option.orElse (readString partObj "id")
+                    |> Option.defaultValue ""
 
-                let overflow =
-                    if isNull partObj?overflow then
-                        false
-                    else
-                        unbox<bool> partObj?overflow
+                let result =
+                    let r = readField partObj "result"
+                    let o = readField partObj "output"
+                    let c = readField partObj "content"
+                    if not (isNull r) then canonicalArgs r
+                    elif not (isNull o) then canonicalArgs o
+                    elif not (isNull c) then canonicalArgs c
+                    else "null"
 
-                CompactionPart(id, auto, overflow)
-            | other -> RawPart(id, other, partObj)
+                Some(ToolResult(callId, result))
+            // Host bookkeeping — never provider-visible.
+            | "step-start"
+            | "step-finish"
+            | "step_start"
+            | "step_finish"
+            | "compaction"
+            | "patch"
+            | "file"
+            | "image"
+            | "" -> None
+            | _ -> None
 
-    let projectMessage (rawObj: obj) : CanonicalMessage option =
+    let projectMessage (rawObj: obj) : ProviderVisibleMessage option =
         if isNull rawObj then
             None
         else
-            let info = infoObject rawObj
-            let id = readStringField info "id"
+            let role = roleOf rawObj
+            let parts = rawParts rawObj |> List.choose projectPart
 
-            let roleField =
-                let directRole = readField rawObj "role"
-
-                if isNull directRole then
-                    readField info "role"
-                else
-                    directRole
-
-            let roleStr = if isNull roleField then "" else unbox<string> roleField
-
-            let sId =
-                let directSession = readField rawObj "sessionID"
-
-                let session =
-                    if isNull directSession then
-                        readField info "sessionID"
-                    else
-                        directSession
-
-                if isNull session then "" else unbox<string> session
-
-            let agent =
-                let directAgent = readField rawObj "agent"
-
-                let agentField =
-                    if isNull directAgent then
-                        readField info "agent"
-                    else
-                        directAgent
-
-                if isNull agentField then
-                    None
-                else
-                    Some(unbox<string> agentField)
-
-            let parts = rawParts rawObj |> List.map projectPart
-
-            let text =
-                let directText = readField rawObj "text"
-
-                let textField =
-                    if isNull directText then
-                        readField info "text"
-                    else
-                        directText
-
-                if not (isNull textField) then
-                    unbox<string> textField
-                else
+            let parts =
+                if parts <> [] then
                     parts
-                    |> List.choose (function
-                        | TextPart(_, t, _) -> Some t
-                        | _ -> None)
-                    |> String.concat "\n"
+                else
+                    // Fallback: plain text field on message root (legacy fixtures).
+                    let info = infoObject rawObj
+                    match readString rawObj "text" |> Option.orElse (readString info "text") with
+                    | Some text -> [ Text text ]
+                    | None -> []
 
-            Some
-                { Id = id
-                  Role = parseRole roleStr
-                  SessionId = sId
-                  Agent = agent
-                  Text = text
-                  Parts = parts
-                  Raw = rawObj }
+            if String.IsNullOrWhiteSpace role && parts = [] then
+                None
+            else
+                Some { Role = role; Parts = parts }
 
-    let projectMessages (rawMsgs: obj list) : CanonicalMessage list = rawMsgs |> List.choose projectMessage
+    let projectMessages (rawMsgs: obj list) : ProviderVisibleMessage list =
+        rawMsgs |> List.choose projectMessage
 
-    let private canonicalPartValue (part: CanonicalPart) : obj =
+    let private partValue (part: ProviderVisiblePart) : obj =
         match part with
-        | TextPart(id, text, synthetic) ->
+        | Text text -> createObj [ "type", box "text"; "text", box text ]
+        | Reasoning text -> createObj [ "type", box "reasoning"; "text", box text ]
+        | ToolCall(callId, name, args) ->
             createObj
-                [ "id", box id
-                  "type", box "text"
-                  "text", box text
-                  "synthetic", synthetic |> Option.map box |> Option.defaultValue null ]
-        | ToolCallPart(id, callId, tool, argsStr) ->
-            createObj
-                [ "id", box id
-                  "type", box "tool-call"
+                [ "type", box "tool-call"
                   "callID", box callId
-                  "tool", box tool
-                  "args", box argsStr ]
-        | CompactionPart(id, auto, overflow) ->
+                  "tool", box name
+                  "args", box args ]
+        | ToolResult(callId, result) ->
             createObj
-                [ "id", box id
-                  "type", box "compaction"
-                  "auto", box auto
-                  "overflow", box overflow ]
-        | RawPart(id, kind, rawObj) -> createObj [ "id", box id; "type", box kind; "raw", box rawObj ]
+                [ "type", box "tool-result"
+                  "callID", box callId
+                  "result", box result ]
 
-    /// Stable message content used by Companion prefix matching.  The
-    /// message id is intentionally omitted from the content projection: it is
-    /// a locator, not evidence that a message's contents are unchanged.
-    /// Stable message content used by Companion prefix matching.  The
-    /// message id is intentionally omitted from the content projection: it is
-    /// a locator, not evidence that a message's contents are unchanged.
-    /// Only includes provider-visible fields (role, text, tool call metadata)
-    /// and explicitly excludes timestamp, cost, usage, runtime ID, directory,
-    /// status, and other non-model fields that differ between requests without
-    /// affecting the cache prefix.
+    /// Stable provider-visible JSON. Excludes id/sessionID/agent/synthetic/
+    /// timestamp/cost/usage/directory/status and any host bookkeeping.
     let canonicalMessageJson (rawObj: obj) : string =
         match projectMessage rawObj with
-        | None -> canonicalJson rawObj
+        | None -> "null"
         | Some message ->
-            // Provider-visible projection: only fields that actually enter the model.
-            // Explicitly excludes: timestamp, cost, usage, runtime ID, directory,
-            // status, UI metadata, and any other non-model bookkeeping fields.
             let normalized =
                 createObj
-                    [ "role", box (roleToString message.Role)
-                      "text", box message.Text
+                    [ "role", box message.Role
                       "parts",
-                      box (message.Parts |> List.map canonicalPartValue |> List.toArray)
-                      // Include sessionID for Companion delta routing; it is a
-                      // routing identifier, not cache content — its stability is
-                      // guaranteed by the causal transform pipeline.
-                      "sessionID", box message.SessionId ]
+                      box (message.Parts |> List.map partValue |> List.toArray) ]
 
             canonicalJson normalized
 
     let sameCanonicalMessage (left: obj) (right: obj) : bool =
         canonicalMessageJson left = canonicalMessageJson right
 
-    // AG-CURRENT-TAIL-PRESERVED: pure prefix replacement over raw message JSON
     let replaceRawPrefix (newPrefix: obj list) (prefixLen: int) (rawMsgs: obj list) : obj list =
         let len = List.length rawMsgs
 
@@ -278,4 +199,5 @@ module Projection =
             let rawTail = rawMsgs |> List.skip prefixLen
             List.append newPrefix rawTail
 
-    let preserveRawTail (prefix: obj list) (rawTail: obj list) : obj list = List.append prefix rawTail
+    let preserveRawTail (prefix: obj list) (rawTail: obj list) : obj list =
+        List.append prefix rawTail

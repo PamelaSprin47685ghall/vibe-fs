@@ -98,32 +98,32 @@ Fallback 不需要状态图。它只需要：
 1. OpenCode 官方 compaction 关闭。
 2. 每个有伴随的 Session `X` 拥有廉价 Blogger Session `Y`。
 3. `A` = X 的正式模型输出，不含 reasoning；`B` = Y 当前投影中所有正式 assistant 输出，不含 Y 输入和 reasoning。
-4. X 接近上下文上限后，投影层用 B 等价替换已被 B 覆盖的前缀；此后每次投影继续替换。
+4. X 的 ProjectedInputTokens + ReservedOutputTokens 超过 ContextLimit 且 BlogBase coverage proof 通过后，投影层用 B 等价替换已被 B 覆盖的前缀；此后每次投影继续替换。Cutoff 必须位于完整 semantic turn 边界；CoveredPrefixDigest 必须在投影前重新验证。Estimator 不可用时不切换 epoch。
 5. Delta 在 canonical JSON 投影层计算；Y 忙时不打断、不排插件队列、不推进 delta 基线，下一次自然包含跳过期间的全部变化。
 6. Y 自身接近上限时，把旧 B 作为唯一正文输入重投影；Y 新输出 B' 替代旧 B。
 7. Manager 无 read/write/edit/grep/glob 等普通工具；只有 `fork / join / list`。
-8. `fork(role, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。
-9. `join()` 等任意一个完成项；不指定对象。
+8. `fork(role, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。Nudge 成功 = Host 已确认接受 prompt。Busy→idle 竞态以 Host AcceptPrompt 返回的 run identity 为归属依据。若 Host 不支持 busy append，返回 BusyNudgeUnsupported。
+9. `join()` 等任意一个完成项；不指定对象。每个 RunIdentity 对应 single-assignment completion cell。Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。join 消费后永久删除 completed handle。
 10. `list()` 统一显示 Agent 与 PTY，但内部资源实现保持独立。
 11. Inspector 同步调用 Executor Tool；Coder 每次同步 Inspector 调用创建一次性 Inspector Session，并可并行。
 12. Executor Agent 只负责命令输出摘要；无工具、无伴随。Executor Tool 负责真实进程。
 13. `3 × estimated_running_secs` 是进程唯一时限；无其他 timeout 层。模型允许用巨大 estimate 主动申请巨大预算。
-14. `actual_output_bytes > 3 × estimated_output_bytes` 时触发 spool；摘要按 200KB 块做在线 ripple-carry reduce，不积存全部 map summary。
+14. `actual_output_bytes > 3 × estimated_output_bytes` 时触发 spool；摘要按 200KB 块做在线 ripple-carry reduce（fan-in=8，按 chunk index 排序，Executor ID 由 processId+level+range hash 生成），不积存全部 map summary。
 15. `estimated_mem_usage=large` 全 OpenCode 进程同时最多一个；medium 不限并发。
-16. Fallback：A 失败重试 A；再次失败永久切 B；B 失败重试 B；第四次失败 Session 真死。成功不把 Session 切回 A。唯一写 durable fallback 事实的入口是 `session.status=retry`；空输出/XML-only 不进入 A/B 计数。
-17. Review：REVISE 一次立即生效；PERFECT 必须连续确认两次才生效。每个审查屏障要求两个新的、不同的 ToolCallId。
+16. Fallback：retry event #1 → A 重试；#2 → 永久切 B；#3 → B 重试；#4 → Session 真死。成功不把 Session 切回 A。唯一写 durable fallback 事实的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 Host run root user message，不包括插件 synthetic 消息。
+17. Review：REVISE 一次立即生效；PERFECT 必须来自不同 ProviderRunIdentity 且第二次的 user 输入包含第一次后的确认请求。每个审查屏障要求两个不同的 ProviderRunIdentity。
 18. ReviewGuard 同时守 Manager 结束和 Reviewer 未给出有效 verdict。
 19. PTY 仍复用 `fork` 表面，但 signal 使用结构化 enum，不使用魔法字符串。PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
 20. Orchestrator 只有 `fork / join`；fork Manager 自动建 worktree、进入 ReviewGuard；发布前 rebase、复审、串行 ff。Rebase 后的审查必须是全新的双 PERFECT（两个新 ToolCallId），不得复用 rebase 前的确认。
 21. 用户向 Orchestrator 发消息时，目标工作区 dirty 则拒绝。
 22. 万象阵、todowrite SSOT、select_methodology、通用 nudge、fuzzy 工具与同步 subagent 伪工具全部删除。
-23. **B 前缀缓存保护**：`CurrentB` 拆分为 `LatestB`（Y 最新工作记忆，不直接进入 X）与 `ActivePrefixEpoch`（冻结的 B 快照，只在上下文阈值到达时切换）。平常回合 LatestB 累积，X 的请求前缀保持逐字节不变。**`companion-b-head` 合成消息在两次 epoch 切换之间必须保持逐字节不变，不能因 LatestB 累积就修改它的 content。** 原因：Provider KV-cache 匹配的是 token 序列，不是 message ID。内容变化会让从该消息开始的所有后续消息缓存失效。
-24. **SSE 只是唤醒信号**：业务事实不从碎片事件拼装。`session.status=idle` 只触发一次 single-flight API reconcile 读取完整消息；`session.status=retry` 是唯一 durable fallback 入口。`message.updated`/`message.part.updated`/`part.delta`/`session.updated` 被直接丢弃。关联 child terminal 也只由 idle 唤醒后 reconcile 确认，不监听 `current_parts`/`message_finalized` 等深度事件。
+23. **B 前缀缓存保护**：`CurrentB` 拆分为 `LatestB`（Y 最新工作记忆）与 `ActivePrefixEpoch`（冻结的 B 快照）。Epoch 切换算法：ProjectedInputTokens + ReservedOutputTokens > ContextLimit。**`companion-b-head` 合成消息在两次 epoch 切换之间必须保持逐字节不变。** Synthetic ID = hash(sessionId + epochId + semanticKind)，禁止随机值。
+24. **SSE 只是唤醒信号**：业务事实不从碎片事件拼装。`session.status=idle` 建立 Dirty latch，触发 single-flight reconcile；`session.status=retry` 是唯一 durable fallback 入口。`message.updated`/`message.part.updated`/`part.delta`/`session.updated` 被直接丢弃。Unknown 协议：单次 idle 后最多 3 次因果重读，仍 Unknown 则保持 Dirty 等下一信号。
 25. **Host 事实通过 SDK API 读取**：completion、ReviewGuard、continuation、abort 都先从 reconcile 得到完整的 `ReconciledTurn` 再决策。Unknown（API 尚未反映当前 Run 的 assistant）= 不产生副作用，保持 PendingRun。
 26. **不修改 OpenCode 本体**：生产功能只在现有插件 Hook（`chat.message`/`experimental.chat.messages.transform`/`tool.execute.before`/`after`/`event`）和 SDK API 边界内工作。
-27. **稳定性门禁**：scenario-local 因果 Watchdog 超时 2 秒；只认因果进展（expectation 消费 / API reconcile 发现新 terminal / tool 完成 / PTY exit），不认 SSE 噪音。P0 全套并行启动、场景天然隔离。最多重复 3 次。
+27. **稳定性门禁**：scenario-local 因果 Watchdog 超时 2 秒；只认因果进展。Watchdog deadline > 被测动作 deadline + cleanup allowance。P0 全套 100ms 窗口内并行 spawn，不得 stagger。Release gate 恰好运行 3 轮。最多重复 3 次。
 28. **Provider-visible projection**：缓存比较只使用真正进入模型的字段（role/text/reasoning/tool call/result），排除 timestamp/cost/usage/runtimeId 等非模型 metadata。
-29. **Fallback identity**：`sessionId + currentUserMessageId + providerAttempt`。Single-flight `retry` 事件到达后 append `FallbackFailureRecorded`。空 terminal/重复 idle 不写 durable failure。
+29. **Fallback identity**：`sessionId + currentUserMessageId + providerAttempt`。`currentUserMessageId` 是 Host run root user message。Single-flight `retry` 事件到达后 append `FallbackFailureRecorded`。空/XML-only terminal 触发 InteractionRepairIdentity 去重（最多一次）。
 
 ## 三、总形状
 
@@ -874,6 +874,23 @@ type ActiveEpoch =
       CoveredPrefixDigest: string }
 ```
 
+### Cutoff 证明算法
+
+[NORMATIVE]
+
+```text
+Cutoff 只能位于完整 semantic turn 边界。
+CoveredPrefixDigest = hash(provider-visible messages[0..cutoffExclusive]).
+投影前必须重新计算该 digest。
+不匹配时禁止替换，保留原始上下文。
+
+Semantic turn 边界定义：
+  - 用户输入 + 对应的完整 assistant 输出（含所有 tool call/result 来回）
+  - 完整的 user→assistant 轮次，不得在 tool call pending 状态截断
+  - pending→completed 的 tool part 更新不破坏已 seal 的前缀
+  - message ID 相同但 content 变化（retry/revert/undo）→ 原 cutoff 无效
+```
+
 [NORMATIVE] 不建立 Blogger 队列。LatestB 累积不影响 X 的 active prefix。
 
 ```fsharp
@@ -904,14 +921,25 @@ let offerDelta current =
     }```
 ```
 
-关键点：
+[NORMATIVE] 唯一原子 durable fact：
 
-- Y 忙时 `BlogBase` 不动。
-- 下一次 Y 空闲时，从旧 `BlogBase` 到最新 current 做 JSON delta，自然包含所有跳过内容。
-- 没有 pending list、generation、lease、retry queue。
-- `InFlight` 就是真实正在运行的 Task。
+```text
+CompanionAdvanced {
+  sessionId
+  bloggerId
+  previousBaseDigest
+  newBaseCanonical
+  completeLatestB
+}
+```
 
-Y 失败由该 Session 的 A/B Fallback 处理；最终死亡时 X 继续工作，只是 B 暂停更新。
+只有 append `CompanionAdvanced` 成功后才更新内存。
+重启只 fold journal；宿主 metadata 只能是可重建索引，不能和 journal 平级。
+
+Crash window 恢复：
+- LatestB 已写，BlogBase 未写 → 以 journal 为准，回退 BlogBase
+- BlogBase 已写，LatestB 未写 → 以 journal 为准，重算 LatestB
+- association 已写，B 未写 → 删除 association，视为 Blogger 未创建
 
 ---
 
@@ -929,7 +957,23 @@ Provider KV-cache 匹配的是**逐字节 token 前缀**。模型输入中最早
 
 OpenCode 官方 compaction 必须关闭。
 
-当 X 接近上下文上限时，才进行 epoch 切换：
+[NORMATIVE] Epoch 切换算法：
+
+```text
+ProjectedInputTokens =
+  tokens(system + tools + caps + active messages + current request)
+
+SwitchEpoch iff:
+  ProjectedInputTokens + ReservedOutputTokens > ContextLimit
+  AND tokens(FrozenCandidate) + tokens(rawTail) < tokens(current active messages)
+  AND BlogBase coverage proof succeeds
+
+Estimator 不可用时，使用保守估算：
+  按 UTF-8 bytes ÷ 3 估算 token 数
+  ReservedOutputTokens = max(2048, estimated_output_tokens)
+  ContextLimit = min(provider_max, model_max, host_max)
+  三者任一不可知 → fail-closed，不切换 epoch
+```
 
 ```fsharp
 if shouldActivateEpoch memory then
@@ -974,6 +1018,20 @@ Raw append-only tail (只追加，不回写)
 Current request
 ```
 
+### Seal Barrier（追加冻结）
+
+[NORMATIVE]
+
+```text
+Provider request R_n 发出后，R_n 中的所有 provider-visible bytes 永久 sealed。
+尚未进入任何 provider request 的 tail entity 可以 upsert。
+每次新请求只允许在上一次 sealed bytes 后追加。
+
+Seal 边界 = 最终进入 provider 的完整消息序列，
+不是 OpenCode 原始 message（因为 part 会追加/更新）。
+只有 terminal 后的 semantic turn 可被 seal。
+```
+
 ## Provider-visible projection
 
 缓存比较只使用真正进入模型的字段：
@@ -988,6 +1046,18 @@ type ProviderVisibleMessage =
       ToolArgs: JsonValue option
       ToolResult: JsonValue option
       SyntheticProvenance: string option }
+```
+
+### Synthetic 稳定身份
+
+[NORMATIVE]
+
+```text
+syntheticId = hash(sessionId + epochId + semanticKind)
+同一 epoch 内 role/content/parts/IDs/order 全部逐字节固定
+不得使用 GUID、Math.random、当前时间
+
+Synthetic provenance 不进 canonical delta，不进 Provider-visible cache comparison。
 ```
 
 排除字段：timestamp、cost、usage、runtimeId、directory、status、UI metadata、finish reason。
@@ -1022,6 +1092,13 @@ System role prompt
 Parent B background
 Current fork prompt
 ```
+
+[NORMATIVE] ChildBackgroundB =
+  fork 动词开始时，父 session durable LatestB 的不可变快照。
+
+它只是背景，不声称父模型已经见过；
+必须记录 ParentBDigest；
+创建失败重试时复用同一快照，不重新读取最新值。
 
 父 B 是背景，不要求 Manager 重复解释仓库历史。
 
@@ -1129,6 +1206,15 @@ Orchestrator 只暴露 `fork / join`，不暴露 `list`。
 ```fsharp
 type HandleId = private HandleId of string
 
+[NORMATIVE]
+
+```text
+HandleId 至少包含 parent session identity；
+同一 parent 生命周期内永不复用；
+重启恢复原 handle，不能重新生成；
+已退休 ID 永久返回 RetiredHandle，不回落为"把它当角色名"。
+```
+
 type AgentHandle =
     { Id: HandleId
       Role: AgentRole
@@ -1212,16 +1298,25 @@ let nudgeExisting handle prompt =
     }
 ```
 
-语义：
+[NORMATIVE]
 
-- 正在运行：宿主在下一次可接受的 LLM 请求尾部加入该 prompt。
-- 已 idle：自然成为 continuation。
-- 插件不打断当前输出。
-- 插件不维护 pending prompt queue。
-- 偶发物理完成顺序差异不引入 ordering protocol；Manager 根据返回的 child ID 和内容继续即可。
-- 一个 child 同时最多一个 active completion。busy nudge 不替换它。
+```text
+Nudged = Host 已确认接受 prompt
+NudgeSubmitted = 已尝试提交，不保证接受
+
+若 Host 不支持 busy append，不能用 prompt queue 补救（SSOT 禁止插件队列）；
+正确结果应是显式 BusyNudgeUnsupported，而不是返回成功。
 
 Fire-and-forget Task 必须被最小观察：失败写诊断，不能触发第二调度器。
+```
+
+[NORMATIVE] Busy→idle 竞态归属：
+
+```text
+Host AcceptPrompt 返回的 run/message identity 是唯一归属依据。
+不能仅依据运行时缓存的 Busy/Idle。
+无法获得 identity 时，该 Host 不满足 busy-nudge contract。
+```
 
 ---
 
@@ -1245,6 +1340,15 @@ let joinAny () =
 - 父取消时 `ReadAsync` 被取消。
 
 若当前无活跃 handle，`join()` 应返回明确的 `NothingToJoin` 工具结果，避免模型永等。这个判断直接由 Handles/PTY 派生，不保存 `JoinState`。
+
+[NORMATIVE] Completion exactly-once：
+
+```text
+每个 RunIdentity 对应一个 single-assignment completion cell。
+Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。
+Mailbox 只接收该 cell 的唯一结果。
+join 消费后永久删除 completed handle。
+```
 
 ---
 
@@ -1348,6 +1452,71 @@ let executeFork input =
 |`executor` Agent|否|无|命令大输出 summarizer|
 |`blogger`|否|无|增量工作记录|
 
+[NORMATIVE] 任何未列出的工具都必须在 schema 层不可见，不是 execute 时拒绝。
+
+规范工具集合：
+
+```text
+Coder      = read, write, edit, glob, grep, inspector
+Inspector  = executor
+Browser    = read, glob, grep, web tools
+Meditator  = read, glob, grep, inspector
+Reviewer   = read, glob, grep, inspector, verdict
+Orchestrator = fork, join
+Manager    = fork, join, list
+Executor Agent = （无）
+Blogger    = （无）
+```
+
+### PTY 与 Executor 权限规则
+
+[NORMATIVE]
+
+1. **Inspector 只能使用 Executor Tool。**
+   * Inspector 不得拥有 `fork`、`join`、`list`。
+   * Inspector 不得创建、读取、写入、发送信号或关闭 PTY。
+   * Inspector 不得创建任何 subagent。
+   * Inspector 的完整工具集合必须严格等于：
+
+```text
+executor
+```
+
+2. **只有 Manager 可以创建和操作 PTY。**
+   * Manager 通过 `fork` 的结构化 PTY 变体创建 PTY。
+   * Manager 通过 `fork(existingPtyId, operation)` 对已有 PTY 执行输入、读取、Signal 或 Close。
+   * PTY handle 出现在 Manager 的 `list()` 中。
+   * PTY completion 进入 Manager 的统一 `join()` 邮箱。
+   * Orchestrator、Coder、Inspector、Browser、Meditator、Reviewer、Executor、Blogger 均不得直接操作 PTY。
+
+3. **`fork` 的可见语义按角色静态收窄。**
+
+```text
+Manager 的 fork 支持：
+  fork(role, prompt)
+  fork(existingAgentId, prompt)
+  fork(ptyRequest)
+  fork(existingPtyId, ptyOperation)
+
+Orchestrator 的 fork 只支持：
+  fork(managerPrompt)
+
+其他角色不得看到 fork 工具。
+```
+
+4. **权限必须在工具 Schema 层隐藏。**
+   角色无权使用的工具或 union variant，必须根本不出现在其模型可见 Schema 中。
+
+5. **Inspector 需要执行命令时只能调用 Executor Tool。**
+   Executor Tool 负责：
+```text
+启动非交互命令
+执行唯一的 3 × estimated_running_secs 时限
+捕获 stdout/stderr
+按输出预算进行 spool 和摘要
+返回结构化命令结果
+```
+
 [FORBIDDEN]
 
 - fuzzy_grep / fuzzy_glob / fuzzy_continue。
@@ -1425,6 +1594,28 @@ let inspectMany prompts =
 - Coder 只接收 Inspector A 版结果。
 
 这是同步局部调用，不与 Manager 异步 fork 语义混用。
+
+[NORMATIVE] One-shot Inspector 契约：
+
+```text
+它是资源作用域，不是 ForkRuntime 的特殊模式。
+  use! inspector = createInspector snapshotB
+  let! result = inspector.Run request
+  return result
+
+约束：
+- 阻塞当前 Coder tool call
+- 使用独立 completion mailbox（不污染 Manager mailbox）
+- 不创建 Blogger
+- 继承 Coder fallback side
+- Inspector provider failure 作为 Coder 工具错误返回
+- Coder cancel 必须 await Inspector abort
+- 多个 Inspector 并发时结果顺序与输入 prompts 顺序一致
+- Inspector terminal 无正文 → 返回空结果（不是错误）
+- 完成后删除 session，不只解除关联
+- 不注册到 Manager 的 list/join
+- 不可持久化为可 nudge agent
+```
 
 ---
 
@@ -1548,6 +1739,16 @@ let summaryTrigger request =
 - `Medium` 不做并发限制。
 - `Large` 使用 OpenCode 进程级 `SemaphoreSlim(1)`。
 
+[NORMATIVE]
+
+```text
+running_secs > 0
+output_bytes >= 0
+必须是有限数
+乘法使用饱和/checked 语义
+超过可表达范围 = effectively unbounded，由 CancellationToken 终止
+```
+
 ---
 
 ## 二、Process DSL
@@ -1627,36 +1828,19 @@ stdout bytes + stderr bytes > 3 × estimated_output_bytes
 
 触发后：
 
-1. 完整输出持续写临时 spool 文件，避免全量驻留内存。
-2. 按 **200KB** 逻辑块读取。
-3. 每块交给一次性 Executor Agent 摘要。
-4. 在线 ripple-carry reduce：level 0 收满 fanIn（如 8 个）→ 立即 reduce 成一条送 level 1；level 1 收满 → 送 level 2；以此类推。
-5. 结束时从高层向低层收束，得到一个最终摘要。
-6. 返回摘要、原始 byte 数、exit code、duration 和 spool diagnostics。
-7. Tool 结束后删除 spool；删除失败写诊断。
+[NORMATIVE]
 
-```fsharp
-let rec reduceLevel level summaries =
-    process {
-        match summaries with
-        | [] -> return ""
-        | [s] -> return s
-        | _ ->
-            let! reduced =
-                summaries
-                |> List.chunkBySize fanIn
-                |> List.map (fun chunk ->
-                    reduceChunkWithExecutorAgent chunk)
-                |> parallel
-            return! reduceLevel (level + 1) reduced
-    }
+```text
+chunk = 连续合并 stdout/stderr 后的 UTF-8 byte stream，每块 204800 bytes
+fan-in = 8
+map 并发，但结果按 chunk index 排序
+每凑齐 8 个同 level summary，立即 reduce 为 level+1
+最终从低 level 到高 level 按原始范围归并
+所有 Executor IDs 由 processId + level + range hash 生成（确定性，不使用 Math.random）
+
+最后一块不足 200KB：正常作为一块处理。
+map/reduce 失败：返回原始尾部（最后 200KB 原始输出）+ 已完成的部分摘要。
 ```
-
-关键不变量：
-
-- 任何时刻内存只保存 `O(fanIn × log chunkCount)` 的摘要条目，不是全部 map summary。
-- 200KB 是摘要批尺寸，不是隐藏的命令输出上限。
-- 巨大 estimate 可让正常输出不触发摘要；触发后也允许任意多块。
 
 ## 五、Executor 私有 Runtime
 
@@ -1778,6 +1962,19 @@ Executor Agent 输入包含：
 - PTY 自然退出写 `PtyExited` completion。
 - `list()` 与 Agent 一起展示。
 - 内部仍是独立 `IPtyProcess`，不强行伪装成 LLM Session。
+
+[NORMATIVE] PTY read 契约：
+
+```text
+每次 read 返回自上次 read 后的 unread delta，不清空总 buffer。
+UTF-8 半字符：保留在内部 buffer，下次 read 时拼接。
+buffer 上限：实现定义，但必须 > 64KB。
+背压：由 pump 和 buffer 上限自然形成。
+process exit 后：可读剩余 buffer，然后返回 PtyExited。
+Signal enum 精确集合：TERM, KILL, INT, HUP, QUIT, USR1, USR2。
+TERM 后默认等待 5 秒再 KILL（可被 Manager 覆盖）。
+Close = stdin EOF（不是 SIGKILL）。
+```
 
 ---
 
@@ -1948,6 +2145,13 @@ match failures with
 
 ```text
 sessionId + currentUserMessageId + providerAttempt
+
+currentUserMessageId =
+  当前 provider attempt 所属的 Host run root user message，
+  不包括插件 synthetic continuation/background/reset frame。
+
+Adapter 必须从 typed Host API 获得 currentUserMessageId，
+禁止通过"最后一条 user message"猜测。
 ```
 
 `session.status=retry` 事件到达后，提取上述 identity，检查是否已记录：
@@ -1968,6 +2172,42 @@ sessionId + currentUserMessageId + providerAttempt
 - 零宽 continuation
 
 空/XML-only terminal 最多触发一次 continuation，不进入 A/B 计数。
+
+[NORMATIVE] 空/XML-only continuation identity：
+
+```text
+InteractionRepairIdentity =
+  sessionId + rootUserMessageId + terminalAssistantMessageId + repairKind
+
+修复合法的 classifier：
+  - 只包含 XML tag 的 assistant（不含任何非 XML 正文）
+  - 只包含 reasoning（不含 text）
+  - 只包含 tool call（不含 text）
+  - 空
+  - 空白
+
+同一 identity 最多触发一次 continuation。
+任何新 root user message 自动产生新预算。
+
+XML-only = 输出只包含 <tag>...</tag>，没有可见正文。
+Tool call XML 计入 XML-only（因为它不是自然语言）。
+```
+
+[NORMATIVE] OpenCode 原生 retry 与 A/A/B/B 轨迹：
+
+```text
+git retry event #1 → Failures=1，下一 provider request 仍 A
+git retry event #2 → Failures=2，下一 provider request B
+git retry event #3 → Failures=3，下一 provider request B
+git retry event #4 → SessionDead，禁止下一 request
+
+同一 user turn 可能产生多次 retry，每次独立计数。
+providerAttempt 是插件自增编号（不是宿主原始编号）。
+
+宿主在发下一 request 前，插件必须有能力确定模型。
+若 Hook 做不到，则这套语义在"不修改 OpenCode 本体"约束下不可实现，
+必须先证明 Host contract。
+```
 
 ---
 
@@ -2009,7 +2249,13 @@ Schema：
 
 - `REVISE`：第一次调用立即生效。
 - `PERFECT`：第一次仅返回"请再次调用 PERFECT 确认"；第二次连续 PERFECT 才生效。
-- 两次 PERFECT 必须来自两个不同的 `ToolCallId`。
+- 第二次 PERFECT 必须来自不同 ProviderRunIdentity，
+  且该 Run 的 user 输入必须包含第一次 PERFECT 后由 ReviewGuard 发出的确认请求。
+  仅 ToolCallId 不同不足以证明独立确认。
+  同一个 assistant message 内连续调用两次 PERFECT 无效。
+  两次之间出现普通文本、read、grep 不打断确认序列。
+  verdict tool 自身失败不改变当前确认状态。
+  REVISE 后立即建立新 barrier。
 - 任意 REVISE 清除未完成的 PERFECT 确认。
 - Git tree 变化清除未完成或已确认的 PERFECT。
 - Post-rebase 审查屏障必须是全新的双 PERFECT（两个新的不同 ToolCallId），不得复用 rebase 前或历史上对同一 tree hash 的确认。
@@ -2060,7 +2306,15 @@ let rec awaitVerdict confirmations reviewedTree =
 ```fsharp
 type ReviewWitness =
     | NoConfirmedReview
-    | ConfirmedPerfect of tree: GitTreeHash
+    | ConfirmedPerfect of
+        {| ManagerJobId: string
+           ReviewerSessionId: string
+           ReviewBarrierId: string
+           GitTreeHash: string
+           FirstProviderRunId: string
+           FirstToolCallId: string
+           SecondProviderRunId: string
+           SecondToolCallId: string |}
     | RevisionRequired of report: ARecord
 ```
 
@@ -2071,6 +2325,16 @@ type ReviewWitness =
 - 文件改动/tree hash 变化 → 投影为 `NoConfirmedReview`。
 
 可以运行期保存；Orchestrator 发布时重新审查，所以无需复杂跨进程恢复。
+
+[NORMATIVE] Manager Guard 只接受 durable projection 中完全匹配当前 Job 和 HEAD 的 witness。
+Witness 必须满足：
+- 来自该 Manager 创建的 Reviewer
+- Reviewer 的 worktree 与 Manager worktree 相同
+- barrier 是当前 ManagerJob
+- tree 是当前 HEAD
+- review 发生在最新修改之后
+- reviewer role 未被伪造
+- verdict tool call 已真正成功执行
 
 ---
 
@@ -2221,6 +2485,18 @@ let ensureClean target =
 
 插件临时文件、worktree、spool 不得放进目标工作树制造 dirty；放在 Git common dir、仓库 sibling 或系统 cache。
 
+[NORMATIVE] Clean Gate 竞态：
+
+```text
+接受用户消息时同时读取 target HEAD + porcelain。
+创建 ManagerJob 前重新验证 HEAD 与 clean 状态。
+不一致则拒绝本次 fork，不自动重试。
+untracked、ignored 不算 dirty（仅 tracked file changes 和 staged changes）。
+submodule dirty 算 dirty。
+用户消息处理期间再次变 dirty：不影响已在执行的 ManagerJob，
+但下一条用户消息必须重新验证。
+```
+
 ---
 
 ## 三、fork ManagerJob
@@ -2348,6 +2624,16 @@ type OrchestratorFact =
 - Git 是权威来源：candidate 是否已进入 target 由 `git merge-base --is-ancestor candidate target` 判断。
 - 发布后从活跃 Projection 删除，不会随历史积累。
 
+[NORMATIVE] 崩溃恢复判定顺序（Git 优先于 Journal）：
+
+```text
+target contains candidate commit → 已发布
+worktree HEAD rebased on target + 无有效 witness → 重新 review
+存在 valid witness + target 未包含 candidate → 尝试 ff
+branch/worktree 不存在 → 从 Git 事实判定 success 或 failure
+Journal 只记录不可从 Git 推导的 reviewer witness 与 association
+```
+
 ---
 
 ## 七、Rebase / 冲突 / 复审 / FF
@@ -2387,6 +2673,17 @@ let rec rebaseReviewAndFastForward job candidate =
 - Rebase 后旧 PERFECT 无效。
 - FF 前再次 clean check。
 - FF 失败作为真实 PublishFailed 返回，不伪装成功。
+
+[NORMATIVE] 冲突返回同一 Manager 的 Run 归属：
+
+```text
+Manager 仍 busy 时：通过 nudge 发送冲突诊断（不打断当前 run）。
+Manager 已 terminal 时：作为 continuation 发送（不是新 run）。
+原 Manager completion 未消费：先消费 completion，再 nudge。
+冲突解决后：创建新 candidate（新 commit）。
+旧 pre-rebase witness：ManagerJob 级别失效。
+Manager 四次死亡后 worktree 保留由 Orchestrator 决定：可放弃、可指派新 Manager。
+```
 
 ---
 
@@ -2549,6 +2846,21 @@ let sessionReconcileLoop (sessionId: SessionId) =
 
 - Single-flight：同一 session 同时最多一次 reconcile 请求。
 - Dirty 标记：idle 信号到达时设 dirty=true，若已 running 则不会额外启动。
+
+[NORMATIVE] Unknown 等待协议：
+
+```text
+一次 idle 建立 Dirty latch。
+Reconciler 在同一 single-flight 中进行有限次 event-loop yield 后重读；
+只要 API snapshot version 有因果进展即可继续；
+达到 3 次仍 Unknown，则保持 Dirty，
+下一个任何允许的粗粒度 signal 再重试。
+
+不依赖 wall-clock timeout 解决 Unknown 问题。
+若 Host API 不保证 idle 后立即可见，
+则"等下一次信号"策略不满足 liveness，需要 Host 补 idle-visible 契约。
+```
+
 ## 五、Terminal 与 A 版
 
 ReconciledTurn 提供完整 assistant：
@@ -3111,22 +3423,36 @@ SubsessionActor
 ## 十五、稳定性门禁
 
 ```text
-P0 全套并行启动：MAX_PARALLEL = 全部 canary 数，场景天然隔离
+P0 全套并行启动：所有场景在 100ms 窗口内完成 spawn，不得 index-based stagger
 因果 Watchdog：2 秒 scenario-local，只认因果进展，不认 SSE 噪音
-最多重复 3 次：外层统一控制，每个 canary 自身只执行一次
+Release gate 恰好运行 3 轮，每轮所有场景并行
+任一场景失败仍收割全部场景结果，再使本轮失败
 泄漏检查：每个 scenario dispose 后检查 PID / port / session / worktree / 临时目录
+```
 
 Watchdog 有效心跳：
+```text
   - blocking expectation 消费
   - API reconcile 发现新 terminal
   - Tool 完成（fork/join/list/verdict）
   - PTY/Process 退出
   - 显式因果 barrier
+```
 
 Watchdog 无效心跳：
+```text
   - 任意 SSE 到达
   - session-created 事件（除非对应显式 barrier）
   - Blogger/Title/Compaction 等后台请求
+```
+
+[NORMATIVE] Watchdog 边界：
+
+```text
+Watchdog 只终止 test scenario，不终止生产资源。
+被测动作拥有自己的 SSOT deadline 时，Watchdog deadline 必须大于该 deadline + cleanup allowance。
+没有产品 deadline 的 LLM 请求，Watchdog 只能依据 mock expectation 因果进展，
+不可用于真实 provider release gate。
 ```
 
 ## 十六、不修改 OpenCode 原则

@@ -38,6 +38,8 @@ module Roles =
                 [ ToolPermission.Read
                   ToolPermission.Write
                   ToolPermission.Edit
+                  ToolPermission.Glob
+                  ToolPermission.Grep
                   ToolPermission.Inspector ]
         | Role.Inspector -> set [ ToolPermission.Exec ]
         | Role.Browser -> set [ ToolPermission.Read; ToolPermission.Network ]

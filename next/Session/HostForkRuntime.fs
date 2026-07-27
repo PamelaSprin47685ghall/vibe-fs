@@ -248,7 +248,24 @@ type HostForkRuntime
             do! ptyPort.CloseAll()
             Pty.unregisterParentAbort parentKey parentAbortToken
 
-            match HostForkRunLifecycle.teardownChildren sessions journal parentId children gate with
+            // Complete every pending run as Cancelled before clearing tables so
+            // join waiters never hang after parent abort.
+            let pending =
+                lock gate (fun () ->
+                    pendingRuns.Values |> Seq.toList)
+
+            for run in pending do
+                HostForkRunLifecycle.complete
+                    gate
+                    pendingRuns
+                    sessions
+                    run
+                    (TerminalOutcome.Failed "cancelled")
+
+            let! teardown =
+                HostForkRunLifecycle.teardownChildren sessions journal parentId children gate
+
+            match teardown with
             | Ok() ->
                 // Drop stale linkage/run bookkeeping so a re-entrant Fork/Reuse
                 // after Cancel cannot re-resolve an already-aborted child. Cleared

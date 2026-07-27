@@ -52,6 +52,7 @@
     <Compile Include="Session/DurableFallbackTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="OpenCode/EventsTests.fs"/>
+    <Compile Include="OpenCode/ProjectionCanonicalTests.fs"/>
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
     <Compile Include="OpenCode/HostReviewGuardTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTests.fs"/>

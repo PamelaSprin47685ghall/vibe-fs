@@ -221,11 +221,27 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (children: Dictionary<string, SessionId>)
         (gate: obj)
-        : Result<unit, string> =
-        let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
+        : Task<Result<unit, string>> =
+        task {
+            let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
 
-        match unlinkChildren journal parentId childIds with
-        | Error err -> Error err
-        | Ok() ->
-            childIds |> List.iter (fun childId -> sessions.AbortSession childId |> ignore)
-            Ok()
+            match unlinkChildren journal parentId childIds with
+            | Error err -> return Error err
+            | Ok() ->
+                let mutable firstError: string option = None
+
+                for childId in childIds do
+                    try
+                        let! abortResult = sessions.AbortSession childId
+
+                        match abortResult, firstError with
+                        | Error err, None -> firstError <- Some err
+                        | _ -> ()
+                    with ex ->
+                        if firstError.IsNone then
+                            firstError <- Some ex.Message
+
+                match firstError with
+                | Some err -> return Error err
+                | None -> return Ok()
+        }

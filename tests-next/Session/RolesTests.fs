@@ -38,6 +38,8 @@ module RolesTests =
                 [ ToolPermission.Read
                   ToolPermission.Write
                   ToolPermission.Edit
+                  ToolPermission.Glob
+                  ToolPermission.Grep
                   ToolPermission.Inspector ]
 
         Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Coder)
