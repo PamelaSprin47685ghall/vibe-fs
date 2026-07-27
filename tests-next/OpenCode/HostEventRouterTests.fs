@@ -158,19 +158,193 @@ module HostEventRouterTests =
         Assert.Empty(prompts)
 
     [<Fact>]
-    let ``Terminal_empty_assistant_receives_one_zero_width_continuation`` () =
-        task {
-            let sessionId = "manager-session"
-            let prompts = ResizeArray<string * string>()
-            let router = routerFor prompts sessionId
+    let ``Missing_parts_is_unknown_not_empty`` () =
+        // An assistant message whose parts were never observed (shutdown race,
+        // SSE reorder, or already-consumed turn) is UNKNOWN, not empty: it must
+        // produce no zero-width continuation and no durable fallback fact.
+        let sessionId = "manager-session"
+        let prompts = ResizeArray<string * string>()
+        let router = routerFor prompts sessionId
 
-            router.Observe(assistantUpdated sessionId "assistant-empty", ignore)
-            router.Observe(idle sessionId, ignore)
-            do! drainMicrotasks 8
+        router.Observe(assistantUpdated sessionId "assistant-empty", ignore)
+        router.Observe(idle sessionId, ignore)
 
-            Assert.Single(prompts) |> ignore
-            Assert.Equal("\u200B", snd prompts.[0])
-        }
+        Assert.Empty(prompts)
+
+    [<Fact>]
+    let ``Idle_without_current_assistant_is_ignored`` () =
+        // A stray/duplicate idle with no unconsumed assistant message performs
+        // no message-level side effects at all.
+        let sessionId = "manager-session"
+        let prompts = ResizeArray<string * string>()
+        let router = routerFor prompts sessionId
+
+        router.Observe(idle sessionId, ignore)
+        router.Observe(idle sessionId, ignore)
+
+        Assert.Empty(prompts)
+
+    [<Fact>]
+    let ``Successful_message_followed_by_duplicate_idle_is_consumed_once`` () =
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "dup-idle-session"
+                let prompts = ResizeArray<string * string>()
+                let roles = Dictionary<string, string>()
+                roles.[sessionId] <- "coder"
+
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "dup-idle-runtime") 1 DateTimeOffset.UtcNow
+
+                let router =
+                    HostEventRouter(
+                        recordingPort prompts,
+                        Dictionary<string, string>(),
+                        roles,
+                        HashSet<string>(),
+                        HashSet<string>(),
+                        journal = journal
+                    )
+
+                router.Observe(assistantUpdated sessionId "assistant-dup", ignore)
+                router.Observe(assistantTextPart sessionId "assistant-dup", ignore)
+                router.Observe(idle sessionId, ignore)
+                // Restart/shutdown re-propagates idle; the turn was already consumed.
+                router.Observe(idle sessionId, ignore)
+                do! drainMicrotasks 8
+
+                Assert.Empty(prompts)
+
+                let failures =
+                    match
+                        (AgentJournal.snapshot journal)
+                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
+                    with
+                    | Some session ->
+                        session.Fallback
+                        |> Option.map (fun fb -> fb.TotalFailures)
+                        |> Option.defaultValue 0
+                    | None -> 0
+
+                Assert.Equal(0, failures)
+            })
+
+    [<Fact>]
+    let ``Successful_terminal_then_shutdown_idle_records_no_fallback`` () =
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "shutdown-idle-session"
+                let prompts = ResizeArray<string * string>()
+                let roles = Dictionary<string, string>()
+                roles.[sessionId] <- "reviewer"
+
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "shutdown-idle-runtime") 1 DateTimeOffset.UtcNow
+
+                let router =
+                    HostEventRouter(
+                        recordingPort prompts,
+                        Dictionary<string, string>(),
+                        roles,
+                        HashSet<string>(),
+                        HashSet<string>(),
+                        journal = journal
+                    )
+
+                router.Observe(assistantUpdated sessionId "assistant-good", ignore)
+                router.Observe(assistantTextPart sessionId "assistant-good", ignore)
+                router.Observe(idle sessionId, ignore)
+                // Host shutdown: the transport is torn down mid-turn; the aborted
+                // assistant message carries no parts and must not poison fallback.
+                router.Observe(
+                    createObj
+                        [ "type", box "message.updated"
+                          "properties",
+                          box (
+                              createObj
+                                  [ "sessionID", box sessionId
+                                    "info",
+                                    box (
+                                        createObj
+                                            [ "id", box "assistant-aborted"
+                                              "role", box "assistant"
+                                              "error",
+                                              box (
+                                                  createObj
+                                                      [ "name", box "MessageAbortedError"
+                                                        "message", box "mocking stopped" ]
+                                              ) ]
+                                    ) ]
+                          ) ],
+                    ignore
+                )
+
+                router.Observe(idle sessionId, ignore)
+                do! drainMicrotasks 8
+
+                let failures =
+                    match
+                        (AgentJournal.snapshot journal)
+                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
+                    with
+                    | Some session ->
+                        session.Fallback
+                        |> Option.map (fun fb -> fb.TotalFailures)
+                        |> Option.defaultValue 0
+                    | None -> 0
+
+                Assert.Equal(0, failures)
+            })
+
+    [<Fact>]
+    let ``Abort_and_idle_in_either_order_do_not_poison_fallback`` () =
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "abort-order-session"
+                let prompts = ResizeArray<string * string>()
+                let roles = Dictionary<string, string>()
+                roles.[sessionId] <- "coder"
+
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "abort-order-runtime") 1 DateTimeOffset.UtcNow
+
+                let router =
+                    HostEventRouter(
+                        recordingPort prompts,
+                        Dictionary<string, string>(),
+                        roles,
+                        HashSet<string>(),
+                        HashSet<string>(),
+                        journal = journal
+                    )
+
+                // Order 1: abort error first, then idle.
+                router.Observe(abortError sessionId, ignore)
+                router.Observe(idle sessionId, ignore)
+
+                // Order 2: consumed good terminal, then abort, then idle again.
+                router.Observe(assistantUpdated sessionId "assistant-ok", ignore)
+                router.Observe(assistantTextPart sessionId "assistant-ok", ignore)
+                router.Observe(idle sessionId, ignore)
+                router.Observe(abortError sessionId, ignore)
+                router.Observe(idle sessionId, ignore)
+                do! drainMicrotasks 8
+
+                Assert.Empty(prompts)
+
+                let failures =
+                    match
+                        (AgentJournal.snapshot journal)
+                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
+                    with
+                    | Some session ->
+                        session.Fallback
+                        |> Option.map (fun fb -> fb.TotalFailures)
+                        |> Option.defaultValue 0
+                    | None -> 0
+
+                Assert.Equal(0, failures)
+            })
 
     [<Fact>]
     let ``Terminal_empty_text_part_receives_one_zero_width_continuation`` () =

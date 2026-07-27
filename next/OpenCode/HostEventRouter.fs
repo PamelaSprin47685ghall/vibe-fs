@@ -134,11 +134,18 @@ type HostEventRouter
                     ignore
                     journal
 
-    let terminalRole sessionId =
-        match lastAssistantMsgs.TryGetValue sessionId with
-        | true, message when not (isNull message?info) && not (isNull message?info?agent) ->
-            HostSessionContext.canonicalRole (unbox<string> message?info?agent)
-        | _ ->
+    let terminalRoleOf (takenAssistant: obj option) (sessionId: string) =
+        let fromMessage =
+            takenAssistant
+            |> Option.bind (fun message ->
+                if not (isNull message?info) && not (isNull message?info?agent) then
+                    HostSessionContext.canonicalRole (unbox<string> message?info?agent)
+                else
+                    None)
+
+        match fromMessage with
+        | Some role -> Some role
+        | None ->
             match sessionRoles.TryGetValue sessionId with
             | true, role -> Some role
             | false, _ -> None
@@ -240,14 +247,25 @@ type HostEventRouter
 
                 let aborted = abortedSessions.Contains sessionId
 
-                let terminalMessageId =
+                // A terminal consumes the current assistant message exactly once:
+                // take-and-remove. A duplicate or stray idle (restart/shutdown
+                // re-propagation) finds no message and performs NO message-level
+                // side effects — no fallback fact, no guard nudge, no continuation.
+                let takenAssistant =
                     match lastAssistantMsgs.TryGetValue sessionId with
-                    | true, lastMsg -> FallbackDetect.messageId sessionId lastMsg
-                    | false, _ -> "terminal"
+                    | true, lastMsg ->
+                        lastAssistantMsgs.Remove sessionId |> ignore
+                        Some lastMsg
+                    | false, _ -> None
+
+                let terminalMessageId =
+                    match takenAssistant with
+                    | Some lastMsg -> FallbackDetect.messageId sessionId lastMsg
+                    | None -> "terminal"
 
                 let terminalModel =
-                    match lastAssistantMsgs.TryGetValue sessionId with
-                    | true, lastMsg when not (isNull lastMsg?info) ->
+                    match takenAssistant with
+                    | Some lastMsg when not (isNull lastMsg?info) ->
                         let info = lastMsg?info
 
                         if not (isNull info?providerID) && not (isNull info?modelID) then
@@ -265,14 +283,17 @@ type HostEventRouter
                     | _ -> None
 
                 let completedAssistant =
-                    match lastAssistantMsgs.TryGetValue sessionId with
-                    | true, lastMsg -> Some(assistantParts.Hydrate(terminalMessageId, lastMsg))
-                    | false, _ -> None
+                    takenAssistant
+                    |> Option.bind (fun lastMsg -> assistantParts.TryHydrate(terminalMessageId, lastMsg))
 
                 let hasTerminalAssistant =
                     completedAssistant |> Option.exists FallbackDetect.isTerminalAssistant
 
-                if not aborted && not (hostShutdownSessions.Contains sessionId) then
+                if
+                    not aborted
+                    && takenAssistant.IsSome
+                    && not (hostShutdownSessions.Contains sessionId)
+                then
                     // Record the terminal failure before any internal nudge. The
                     // fourth failed terminal therefore becomes Dead before the
                     // guard/continuation sites consult the durable projection.
@@ -281,7 +302,7 @@ type HostEventRouter
                         FallbackDetect.observeIdle journal fallbackFailures retryAttemptBySession sessionId completeMsg
                     | _ -> ()
 
-                    match terminalRole sessionId with
+                    match terminalRoleOf takenAssistant sessionId with
                     | Some agent when
                         agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)
                         && not (verdictSessions.Remove sessionId)

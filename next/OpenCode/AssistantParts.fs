@@ -40,10 +40,14 @@ type AssistantParts() =
             parts.[partId] <- part
         | None -> ()
 
-    member _.Hydrate(messageId: string, lastMessage: obj) =
+    /// Some only when there is positive part evidence: observed parts, or parts
+    /// embedded on the raw message. "No part evidence" is UNKNOWN — never
+    /// confused with an empty model output — and yields None.
+    member _.TryHydrate(messageId: string, lastMessage: obj) : obj option =
         match byMessageId.TryGetValue messageId with
         | true, parts when parts.Count > 0 ->
-            createObj [ "info", box lastMessage?info; "parts", box (parts.Values |> Seq.toArray) ]
-        | _ -> lastMessage
+            Some(createObj [ "info", box lastMessage?info; "parts", box (parts.Values |> Seq.toArray) ])
+        | _ when not (isNull lastMessage?parts) -> Some lastMessage
+        | _ -> None
 
     member _.Remove(messageId: string) = byMessageId.Remove messageId |> ignore
