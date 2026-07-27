@@ -39,8 +39,7 @@ type CompanionProjection =
 
 type AgentLinkageProjection =
     { LinkedChildren: Map<ChildId, string>
-      LinkedRoles: Map<ChildId, string>
-      LinkedRuntimeIds: Map<ChildId, RuntimeId> }
+      LinkedRoles: Map<ChildId, string> }
 
 type ReviewGuardProjection =
     { LastGitTreeHash: GitTreeHash option

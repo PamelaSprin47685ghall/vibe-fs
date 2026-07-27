@@ -13,8 +13,7 @@ module AgentFacts =
 
     let emptyLinkage: AgentLinkageProjection =
         { LinkedChildren = Map.empty
-          LinkedRoles = Map.empty
-          LinkedRuntimeIds = Map.empty }
+          LinkedRoles = Map.empty }
 
     let emptyReviewGuard: ReviewGuardProjection =
         { LastGitTreeHash = None
@@ -207,15 +206,13 @@ module AgentFacts =
                                   LinkedRoles =
                                     match role with
                                     | Some role -> Map.add p.ChildId role existing.LinkedRoles
-                                    | None -> existing.LinkedRoles
-                                  LinkedRuntimeIds = Map.add p.ChildId envelope.RuntimeId existing.LinkedRuntimeIds }
+                                    | None -> existing.LinkedRoles }
                             | None ->
                                 { LinkedChildren = Map.ofList [ (p.ChildId, p.TargetAgent) ]
                                   LinkedRoles =
                                     role
                                     |> Option.map (fun role -> Map.ofList [ (p.ChildId, role) ])
-                                    |> Option.defaultValue Map.empty
-                                  LinkedRuntimeIds = Map.ofList [ (p.ChildId, envelope.RuntimeId) ] }
+                                    |> Option.defaultValue Map.empty }
 
                         { s with Linkage = Some link })
                     proj.Sessions
@@ -230,15 +227,8 @@ module AgentFacts =
                         let link =
                             match s.Linkage with
                             | Some existing ->
-                                // In-flight unlink facts appended by a previous runtime can
-                                // sort after the new runtime's AgentLinked fact. Only remove
-                                // a link owned by the same runtime as the unlink envelope.
-                                match Map.tryFind p.ChildId existing.LinkedRuntimeIds with
-                                | Some linkedRuntimeId when linkedRuntimeId <> envelope.RuntimeId -> existing
-                                | _ ->
-                                    { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren
-                                      LinkedRoles = Map.remove p.ChildId existing.LinkedRoles
-                                      LinkedRuntimeIds = Map.remove p.ChildId existing.LinkedRuntimeIds }
+                                { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren
+                                  LinkedRoles = Map.remove p.ChildId existing.LinkedRoles }
                             | None -> emptyLinkage
 
                         { s with Linkage = Some link })

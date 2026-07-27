@@ -24,7 +24,6 @@ type HostForkRuntime
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
-    let childRuntimes = Dictionary<string, RuntimeId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
     let gate = obj ()
@@ -64,14 +63,7 @@ type HostForkRuntime
                     match role with
                     | Some role ->
                         let childSessionId = SessionId.create (ChildId.value childId)
-
-                        let linkedRt =
-                            linkage.LinkedRuntimeIds
-                            |> Map.tryFind childId
-                            |> Option.defaultValue (RuntimeId.create "")
-
                         children.[agentId] <- childSessionId
-                        childRuntimes.[agentId] <- linkedRt
                         runtime.Restore(agentId, role)
                         childCreatedDir agentId childSessionId (directoryOf agentId)
                     | None -> ()
@@ -92,24 +84,14 @@ type HostForkRuntime
 
     member _.Fork(agentId: string, role: AgentRole, prompt: string) : Task<Result<ForkResult, string>> =
         task {
-            // A child linked by a PRIOR runtime is dead; reusing it would never
-            // re-execute the agent (e.g. a manager/reviewer re-run during restart
-            // recovery). A child linked by the CURRENT runtime is reused (so a
-            // review nudge re-prompts the same session). This is the runtime-aware
-            // linkage fold: links owned by a different runtime are not reused.
+            // Restart recovery: linkage restore repopulates the child map from
+            // the journal; Fork reuses the SAME child session (OpenCode is the
+            // external authority on child identity; plugin runtime restart does
+            // not invalidate it). Dead state is checked before any send below.
             let existing =
                 lock gate (fun () ->
                     match children.TryGetValue agentId with
-                    | true, childId ->
-                        let reuse =
-                            match journal with
-                            | Some j ->
-                                match childRuntimes.TryGetValue agentId with
-                                | true, linkedRt -> linkedRt = j.RuntimeId
-                                | false, _ -> true
-                            | None -> true
-
-                        if reuse then Some childId else None
+                    | true, childId -> Some childId
                     | false, _ -> None)
 
             match existing with
@@ -186,13 +168,7 @@ type HostForkRuntime
                     | Ok() ->
                         let run = installRun agentId childId
 
-                        lock gate (fun () ->
-                            children.[agentId] <- childId
-
-                            childRuntimes.[agentId] <-
-                                (match journal with
-                                 | Some j -> j.RuntimeId
-                                 | None -> RuntimeId.create ""))
+                        lock gate (fun () -> children.[agentId] <- childId)
 
                         childCreated agentId role childId
                         childCreatedDir agentId childId (directoryOf agentId)
