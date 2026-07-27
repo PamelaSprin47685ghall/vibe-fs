@@ -40,6 +40,7 @@
     <Compile Include="Session/ForkRuntimeTests.fs"/>
     <Compile Include="Session/HostForkRuntimeTests.fs"/>
     <Compile Include="Session/HostForkRuntimeSessionDeadTests.fs"/>
+    <Compile Include="Session/HostForkRuntimeLinkageTests.fs"/>
     <Compile Include="Session/CompanionHostTests.fs"/>
     <Compile Include="Session/CompanionResetTests.fs"/>
     <Compile Include="Session/RolesTests.fs"/>

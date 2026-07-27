@@ -11,49 +11,6 @@ open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Orchestrator
 
-/// Private helpers for OrchestratorHost (F# namespaces cannot contain values,
-/// so module-level helpers live here).
-module private OrchestratorHostHelpers =
-    /// Emit a ReviewBarrierStarted fact that resets the review guard so the
-    /// phase requires two FRESH PERFECT verdicts on the current tree.
-    let emitReviewBarrier
-        (journal: AgentJournal option)
-        (orchestratorId: SessionId)
-        (barrierKey: string)
-        : Task<Result<unit, string>> =
-        task {
-            match journal with
-            | Some j ->
-                let fact =
-                    AgentFact.ReviewBarrierStarted
-                        {| ManagerSessionId = orchestratorId
-                           BarrierKey = barrierKey |}
-
-                match AgentJournal.appendAgent (StreamId.Session orchestratorId) None fact j with
-                | Ok _ -> return Ok()
-                | Error failure -> return Error(sprintf "%A" failure.Failure)
-            | None -> return Ok()
-        }
-
-    /// Build the recovery prompt for a manager job: conflict-resumption prompt
-    /// when REBASE_HEAD exists and no candidate, otherwise the original prompt.
-    let recoveryPrompt (gitPort: GitPort) (job: ManagerJob) : Task<string> =
-        task {
-            let! hasRb = gitPort.HasRebaseHead job.WorktreePath
-
-            if not job.CandidateCommit.IsSome && hasRb then
-                let! conflicted = gitPort.ConflictedFiles job.WorktreePath
-
-                let files =
-                    match conflicted with
-                    | Ok fs -> fs
-                    | Error _ -> []
-
-                return OrchestratorPrompts.buildConflictResumePrompt job.Prompt files
-            else
-                return job.Prompt
-        }
-
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let orchestratorKey = SessionId.value orchestratorId
     let worktrees = Dictionary<string, string>()
@@ -147,7 +104,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let reverify (managerId: string) (worktree: string) (barrierKey: string) : Task<Result<unit, string>> =
         task {
-            let! barrierResult = OrchestratorHostHelpers.emitReviewBarrier deps.Journal orchestratorId barrierKey
+            let! barrierResult = OrchestratorManagerJob.emitReviewBarrier deps.Journal orchestratorId barrierKey
 
             match barrierResult with
             | Error err -> return Error err
@@ -265,25 +222,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
                     match deps.Journal with
                     | Some journal ->
-                        let snapshot = AgentJournal.snapshot journal
-                        let jobs = snapshot.AgentProjections.Orchestrator.ManagerJobs
-
-                        for KeyValue(managerId, job) in jobs do
-                            let id = ManagerId.value managerId
-                            worktrees.[id] <- job.WorktreePath
-                            worktrees.[sprintf "%s-reviewer" id] <- job.WorktreePath
-
-                        OrchestratorSessionDirectories.registerRestored
-                            snapshot
-                            orchestratorId
-                            worktrees
-                            deps.RegisterChildDirectory
-                            deps.RegisterReviewerTree
-
-                        for KeyValue(managerId, job) in jobs do
-                            let id = ManagerId.value managerId
-                            let! prompt = OrchestratorHostHelpers.recoveryPrompt gitPort job
-                            value.RecoverManagerJob(id, job.WorktreePath, prompt, job.CandidateCommit.IsSome)
+                        do!
+                            OrchestratorManagerJob.recoverJobs
+                                journal
+                                gitPort
+                                orchestratorId
+                                worktrees
+                                deps.RegisterChildDirectory
+                                deps.RegisterReviewerTree
+                                value
                     | None -> ()
 
                     lock engineGate (fun () -> engineInstance <- Some value)

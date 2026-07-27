@@ -99,41 +99,17 @@ type HostForkRuntime
                 match HostPendingRun.sessionDeadRefusal journal childId with
                 | Some refusal -> return Error refusal
                 | None ->
-                    let activeRun =
-                        lock gate (fun () ->
-                            match pendingRuns.TryGetValue agentId with
-                            | true, run -> Some run
-                            | false, _ -> None)
-
-                    match activeRun with
-                    | Some _ when runtime.IsCancelled -> return Error "Fork runtime is cancelled"
-                    | Some _ ->
-                        let! sent = sendChildPrompt agentId childId role prompt
-
-                        match sent with
-                        | Ok() -> return Ok(ForkResult.Nudged agentId)
-                        | Error err -> return Error err
-                    | None ->
-                        let run = installRun agentId childId
-                        let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
-
-                        match result with
-                        | ForkResult.NotFound _ ->
-                            failRun run "Fork runtime is cancelled"
-                            return Error "Fork runtime is cancelled"
-                        | _ ->
-                            markReady run
-
-                            let! sent = sendChildPrompt agentId childId role prompt
-
-                            match sent, result with
-                            | Ok(), ForkResult.Nudged _ -> return Ok result
-                            | Ok(), _ ->
-                                failRun run "Existing agent did not accept a new run"
-                                return Error "Existing agent did not accept a new run"
-                            | Error err, _ ->
-                                failRun run err
-                                return Error err
+                    return!
+                        HostForkRunLifecycle.sendToExistingChild
+                            gate
+                            pendingRuns
+                            sessions
+                            runtime
+                            sendChildPrompt
+                            agentId
+                            childId
+                            role
+                            prompt
             | None ->
                 let! childResult =
                     sessions.CreateChildSession(
@@ -220,44 +196,20 @@ type HostForkRuntime
                     match roleOpt with
                     | None -> return Error(sprintf "Unknown agent id: %s" agentId)
                     | Some role ->
-                        let activeRun =
-                            lock gate (fun () ->
-                                match pendingRuns.TryGetValue agentId with
-                                | true, run -> Some run
-                                | false, _ -> None)
-
-                        match activeRun with
-                        | Some _ when runtime.IsCancelled -> return Error "Fork runtime is cancelled"
-                        | Some _ ->
-                            // The prompt must carry the role: after a host restart
-                            // OpenCode resolves an agent-less child prompt to the
-                            // default build agent, not the session's original role.
-                            let! sent = sendChildPrompt agentId childId role prompt
-
-                            match sent with
-                            | Ok() -> return Ok(ForkResult.Nudged agentId)
-                            | Error err -> return Error err
-                        | None ->
-                            let run = installRun agentId childId
-                            let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
-
-                            match result with
-                            | ForkResult.NotFound _ ->
-                                failRun run "Fork runtime is cancelled"
-                                return Error "Fork runtime is cancelled"
-                            | _ ->
-                                markReady run
-
-                                let! sent = sendChildPrompt agentId childId role prompt
-
-                                match sent, result with
-                                | Ok(), ForkResult.Nudged _ -> return Ok result
-                                | Ok(), _ ->
-                                    failRun run "Existing agent did not accept a new run"
-                                    return Error "Existing agent did not accept a new run"
-                                | Error err, _ ->
-                                    failRun run err
-                                    return Error err
+                        // The prompt must carry the role: after a host restart
+                        // OpenCode resolves an agent-less child prompt to the
+                        // default build agent, not the session's original role.
+                        return!
+                            HostForkRunLifecycle.sendToExistingChild
+                                gate
+                                pendingRuns
+                                sessions
+                                runtime
+                                sendChildPrompt
+                                agentId
+                                childId
+                                role
+                                prompt
         }
 
     member internal _.TrackPtyRun(id: PtyId) =

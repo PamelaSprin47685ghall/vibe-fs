@@ -8,94 +8,22 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
 module PublishChain =
-    type Deps =
-        { Git: GitPort
-          Manager: ManagerPort
-          AppendFact: StreamId -> AgentFact -> Result<unit, string>
-          ReverifyTwice: string -> string -> string -> Task<Result<unit, string>>
-          ReadHead: string -> string -> Task<Result<string, string>>
-          ReconcileTarget: unit -> Task<Result<unit, string>>
-          GetTargetHead: unit -> Task<Result<string, string>>
-          TargetBranch: string
-          Prompts: Dictionary<string, string>
-          Snapshot: unit -> ProjectionSet }
+    // `Deps` is defined in ReviewStages and re-exported here so external callers
+    // (e.g. Orchestrator.fs) keep constructing `PublishChain.Deps`.
+    type Deps = ReviewStages.Deps
 
     type private PassResult =
         | Redrive
         | PublishedCommit of string
 
-    let private emptyJob managerId worktreePath : ManagerJob =
-        { WorktreePath = worktreePath
-          Branch = sprintf "manager/%s" managerId
-          CandidateId = None
-          CandidateCommit = None
-          PublishedCommit = None
-          Prompt = ""
-          PreRebaseReviewCommit = None
-          RebasedCommit = None
-          ConflictFiles = None
-          PostRebaseReviewCommit = None
-          PublishClaimHead = None }
-
-    let private currentJob (deps: Deps) managerId worktreePath : ManagerJob =
-        let projection = deps.Snapshot()
-
-        Map.tryFind (ManagerId.create managerId) projection.AgentProjections.Orchestrator.ManagerJobs
-        |> Option.defaultValue (emptyJob managerId worktreePath)
-
-    let private candidateIdString job managerId =
-        job.CandidateId
-        |> Option.map CandidateId.value
-        |> Option.defaultValue (sprintf "candidate-%s" managerId)
-
-    let private append deps managerId message : Result<unit, OrchestratorVerdict> =
-        match deps.AppendFact StreamId.Workspace message with
-        | Ok() -> Ok()
-        | Error err -> Error(IntegrationFailed(managerId, err))
-
-    let private readHead (deps: Deps) managerId worktreePath : Task<Result<string, OrchestratorVerdict>> =
-        task {
-            match! deps.ReadHead worktreePath "" with
-            | Ok head -> return Ok head
-            | Error err -> return Error(IntegrationFailed(managerId, sprintf "Git head lookup failed: %s" err))
-        }
-
-    let private reviewStage (deps: Deps) managerId worktreePath : Task<Result<unit, OrchestratorVerdict>> =
-        task {
-            let job = currentJob deps managerId worktreePath
-            let! headResult = readHead deps managerId worktreePath
-
-            match headResult with
-            | Error verdict -> return Error verdict
-            | Ok head ->
-                // Idempotent skip: the pre-rebase review is durably confirmed
-                // once OrchestratorPreRebaseReviewConfirmed is recorded. A manager
-                // re-run (crash recovery) regenerates the candidate commit hash,
-                // so comparing against the current head would wrongly re-run the
-                // review; the confirmation is content-stable, so skip on presence.
-                match job.PreRebaseReviewCommit with
-                | Some _ -> return Ok()
-                | None ->
-                    match! deps.ReverifyTwice managerId worktreePath "pre-rebase" with
-                    | Error err -> return Error(NeedsReview(managerId, err))
-                    | Ok() ->
-                        let fact =
-                            AgentFact.OrchestratorPreRebaseReviewConfirmed
-                                {| ManagerId = managerId
-                                   CandidateId = candidateIdString job managerId
-                                   CommitHash = head |}
-
-                        return append deps managerId fact
-        }
-
     let private candidateStage (deps: Deps) managerId worktreePath : Task<Result<unit, OrchestratorVerdict>> =
         task {
-            let job = currentJob deps managerId worktreePath
+            let job = ReviewStages.currentJob deps managerId worktreePath
 
             match job.CandidateCommit with
             | Some _ -> return Ok()
             | None ->
-                let! headResult = readHead deps managerId worktreePath
+                let! headResult = ReviewStages.readHead deps managerId worktreePath
 
                 match headResult with
                 | Error verdict -> return Error verdict
@@ -103,16 +31,16 @@ module PublishChain =
                     let fact =
                         AgentFact.OrchestratorCandidateRegistered
                             {| ManagerId = managerId
-                               CandidateId = candidateIdString job managerId
+                               CandidateId = ReviewStages.candidateIdString job managerId
                                Branch = sprintf "manager/%s" managerId
                                CommitHash = head |}
 
-                    return append deps managerId fact
+                    return ReviewStages.append deps managerId fact
         }
 
     let private recordRebased deps managerId worktreePath candidateId : Task<Result<unit, OrchestratorVerdict>> =
         task {
-            let! headResult = readHead deps managerId worktreePath
+            let! headResult = ReviewStages.readHead deps managerId worktreePath
 
             match headResult with
             | Error verdict -> return Error verdict
@@ -123,7 +51,7 @@ module PublishChain =
                            CandidateId = candidateId
                            RebasedCommit = head |}
 
-                return append deps managerId fact
+                return ReviewStages.append deps managerId fact
         }
 
     let private conflictFiles (deps: Deps) worktreePath : Task<string list> =
@@ -135,9 +63,9 @@ module PublishChain =
 
     let private rebaseStage (deps: Deps) managerId worktreePath isRedrive : Task<Result<unit, OrchestratorVerdict>> =
         task {
-            let job = currentJob deps managerId worktreePath
-            let candidateId = candidateIdString job managerId
-            let! headResult = readHead deps managerId worktreePath
+            let job = ReviewStages.currentJob deps managerId worktreePath
+            let candidateId = ReviewStages.candidateIdString job managerId
+            let! headResult = ReviewStages.readHead deps managerId worktreePath
 
             match headResult with
             | Error verdict -> return Error verdict
@@ -159,7 +87,7 @@ module PublishChain =
                                    CandidateId = candidateId
                                    Files = files |}
 
-                        match append deps managerId conflictFact with
+                        match ReviewStages.append deps managerId conflictFact with
                         | Error verdict -> return Error verdict
                         | Ok() ->
                             let prompt =
@@ -189,32 +117,9 @@ module PublishChain =
                                 | Ok() -> return! recordRebased deps managerId worktreePath candidateId
         }
 
-    let private postReviewStage (deps: Deps) managerId worktreePath : Task<Result<unit, OrchestratorVerdict>> =
-        task {
-            let job = currentJob deps managerId worktreePath
-            let! headResult = readHead deps managerId worktreePath
-
-            match headResult with
-            | Error verdict -> return Error verdict
-            | Ok head ->
-                match job.PostRebaseReviewCommit = Some head with
-                | true -> return Ok()
-                | false ->
-                    match! deps.ReverifyTwice managerId worktreePath "post-rebase" with
-                    | Error err -> return Error(NeedsReview(managerId, err))
-                    | Ok() ->
-                        let fact =
-                            AgentFact.OrchestratorPostRebaseReviewConfirmed
-                                {| ManagerId = managerId
-                                   CandidateId = candidateIdString job managerId
-                                   RebasedCommit = head |}
-
-                        return append deps managerId fact
-        }
-
     let private publishStage (deps: Deps) managerId worktreePath : Task<Result<PassResult, OrchestratorVerdict>> =
         task {
-            let job = currentJob deps managerId worktreePath
+            let job = ReviewStages.currentJob deps managerId worktreePath
             let! targetResult = deps.GetTargetHead()
 
             match targetResult with
@@ -233,12 +138,12 @@ module PublishChain =
                         match job.PublishClaimHead = Some expected with
                         | true -> Ok()
                         | false ->
-                            append
+                            ReviewStages.append
                                 deps
                                 managerId
                                 (AgentFact.OrchestratorPublishClaimed
                                     {| ManagerId = managerId
-                                       CandidateId = candidateIdString job managerId
+                                       CandidateId = ReviewStages.candidateIdString job managerId
                                        ExpectedTargetHead = expected |})
 
                 match claimResult with
@@ -251,10 +156,13 @@ module PublishChain =
                         let publishedFact =
                             AgentFact.OrchestratorPublished
                                 {| ManagerId = managerId
-                                   CandidateId = candidateIdString (currentJob deps managerId worktreePath) managerId
+                                   CandidateId =
+                                    ReviewStages.candidateIdString
+                                        (ReviewStages.currentJob deps managerId worktreePath)
+                                        managerId
                                    CommitHash = commitHash |}
 
-                        match append deps managerId publishedFact with
+                        match ReviewStages.append deps managerId publishedFact with
                         | Error verdict -> return Error verdict
                         | Ok() ->
                             let! _ = deps.Git.RemoveWorktree worktreePath
@@ -269,7 +177,7 @@ module PublishChain =
             match rebaseResult with
             | Error verdict -> return Error verdict
             | Ok() ->
-                let! reviewResult = postReviewStage deps managerId worktreePath
+                let! reviewResult = ReviewStages.postReviewStage deps managerId worktreePath
 
                 match reviewResult with
                 | Error verdict -> return Error verdict
@@ -301,7 +209,7 @@ module PublishChain =
                 match! deps.ReconcileTarget() with
                 | Error err -> return IntegrationFailed(managerId, sprintf "Git reconcile failed: %s" err)
                 | Ok() ->
-                    let! reviewResult = reviewStage deps managerId worktreePath
+                    let! reviewResult = ReviewStages.reviewStage deps managerId worktreePath
 
                     match reviewResult with
                     | Error verdict -> return verdict

@@ -7,40 +7,8 @@ open Wanxiangshu.Next.Process
 module ProcessGitPort =
 
     let createWithRepo (repoPath: string) (runner: Command -> Task<int * string * string>) : GitPort =
-        { IsDirty =
-            fun targetPath ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "status"; "--porcelain" ]
-                          WorkingDirectory = Some targetPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, _) = runner cmd
-                    return code = 0 && not (String.IsNullOrWhiteSpace stdout)
-                }
-          CreateWorktree =
-            fun targetRepoPath managerId targetPath ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "worktree"; "add"; targetPath; "-b"; sprintf "manager/%s" managerId ]
-                          WorkingDirectory = Some targetRepoPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        return Ok()
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
+        { IsDirty = GitPortWorktree.isDirty runner
+          CreateWorktree = GitPortWorktree.createWorktree runner
           Rebase =
             fun worktreePath targetBranch ->
                 task {
@@ -218,25 +186,7 @@ module ProcessGitPort =
                                                 else
                                                     return Error message
                 }
-          RemoveWorktree =
-            fun worktreePath ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "worktree"; "remove"; "--force"; worktreePath ]
-                          WorkingDirectory = None
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        return Ok()
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
+          RemoveWorktree = GitPortWorktree.removeWorktree runner
           HasRebaseHead =
             fun worktreePath ->
                 task {
@@ -252,72 +202,8 @@ module ProcessGitPort =
                     let! (code, _, _) = runner cmd
                     return code = 0
                 }
-          ListWorktrees =
-            fun () ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "worktree"; "list"; "--porcelain" ]
-                          WorkingDirectory = Some repoPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        let lines =
-                            stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
-                            |> Array.toList
-
-                        return Ok(GitPortHelpers.parseWorktreeList lines)
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
-          ListManagerBranches =
-            fun () ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "branch"; "--list"; "manager/*" ]
-                          WorkingDirectory = Some repoPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        let branches =
-                            stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
-                            |> Array.map (fun s -> s.Trim().TrimStart('*').Trim())
-                            |> Array.filter (fun s -> not (System.String.IsNullOrWhiteSpace s))
-                            |> Array.toList
-
-                        return Ok branches
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                }
-          DeleteBranch =
-            fun branch ->
-                task {
-                    let cmd =
-                        { FileName = "git"
-                          Arguments = [ "branch"; "-D"; branch ]
-                          WorkingDirectory = Some repoPath
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let! (code, stdout, stderr) = runner cmd
-
-                    if code = 0 then
-                        return Ok()
-                    else
-                        return Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-                } }
+          ListWorktrees = GitPortWorktree.listWorktrees runner repoPath
+          ListManagerBranches = GitPortWorktree.listManagerBranches runner repoPath
+          DeleteBranch = GitPortWorktree.deleteBranch runner repoPath }
 
     let createWithRunner (runner: Command -> Task<int * string * string>) : GitPort = createWithRepo "." runner

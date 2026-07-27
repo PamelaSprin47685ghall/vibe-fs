@@ -28,23 +28,12 @@ type HostEventRouter
     /// Zero-width space: invisible nudge that prompts LLM to continue.
     let ZWSP = "​"
 
-    let lastAssistantMsgs = Dictionary<string, obj>()
+    let assistantTracker = AssistantTurnTracker()
     let assistantParts = AssistantParts()
     let fallbackFailures = defaultArg recordedErrors (HashSet<string>())
     let abortedSessions = AbortTracker()
     let disposeExecOpt = defaultArg disposeExecutorRuntime (fun _ -> ())
     let onSessionDirectory = defaultArg onSessionDirectory (fun _ _ -> ())
-
-    /// A session is dead after 4 consecutive fallback failures (SSOT §6:
-    /// DurableFallback.nextDecision = FallbackDecision.Dead). Dead sessions must
-    /// not receive internal nudges — the router has no diagnostics channel, so a
-    /// dead session is skipped silently at the prompt-send sites below.
-    let sessionDead (sessionId: string) : bool =
-        match journal with
-        | Some j ->
-            j.IsPoisoned
-            || DurableFallback.isDead (SessionId.create sessionId) (AgentJournal.snapshot j)
-        | None -> false
 
     let rawEvent (raw: obj) =
         if isNull raw || isNull raw?event then raw else raw?event
@@ -188,7 +177,7 @@ type HostEventRouter
                         ""
 
                 if r = "assistant" then
-                    lastAssistantMsgs.[sessionId] <- target
+                    assistantTracker.Record(sessionId, target)
                 elif r = "user" then
                     ()
 
@@ -201,10 +190,7 @@ type HostEventRouter
                 // Provider retry is the ONLY durable fallback writer (SSOT §6).
                 // Aborted sessions are torn-down transports, not model failures.
                 if not (abortedSessions.Contains sessionId) then
-                    let lastAssistantMsgId =
-                        match lastAssistantMsgs.TryGetValue sessionId with
-                        | true, lastMsg -> FallbackDetect.messageId sessionId lastMsg
-                        | false, _ -> ""
+                    let lastAssistantMsgId = assistantTracker.LastMessageId sessionId
 
                     HostEventRetry.record journal fallbackFailures lastAssistantMsgId sessionId raw
 
@@ -219,90 +205,33 @@ type HostEventRouter
 
                 let aborted = abortedSessions.Contains sessionId
 
-                // A terminal consumes the current assistant message exactly once:
-                // take-and-remove. A duplicate or stray idle (restart/shutdown
-                // re-propagation) finds no message and performs NO message-level
-                // side effects — no fallback fact, no guard nudge, no continuation.
-                let takenAssistant =
-                    match lastAssistantMsgs.TryGetValue sessionId with
-                    | true, lastMsg ->
-                        lastAssistantMsgs.Remove sessionId |> ignore
-                        Some lastMsg
-                    | false, _ -> None
+                let takenAssistant = assistantTracker.TakeTerminal sessionId
 
                 let terminalMessageId =
-                    match takenAssistant with
-                    | Some lastMsg -> FallbackDetect.messageId sessionId lastMsg
-                    | None -> "terminal"
+                    AssistantTurnTracker.terminalMessageId sessionId takenAssistant
 
-                let terminalModel =
-                    match takenAssistant with
-                    | Some lastMsg when not (isNull lastMsg?info) ->
-                        let info = lastMsg?info
-
-                        if not (isNull info?providerID) && not (isNull info?modelID) then
-                            Some
-                                { providerID = unbox<string> info?providerID
-                                  modelID = unbox<string> info?modelID
-                                  variant = None }
-                        elif not (isNull info?model) && not (isNull info?model?providerID) then
-                            Some
-                                { providerID = unbox<string> info?model?providerID
-                                  modelID = unbox<string> info?model?modelID
-                                  variant = None }
-                        else
-                            None
-                    | _ -> None
+                let terminalModel = AssistantTurnTracker.terminalModel takenAssistant
 
                 let completedAssistant =
                     takenAssistant
                     |> Option.bind (fun lastMsg -> assistantParts.TryHydrate(terminalMessageId, lastMsg))
 
-                let hasTerminalAssistant =
-                    completedAssistant |> Option.exists FallbackDetect.isTerminalAssistant
-
-                if not aborted && takenAssistant.IsSome then
-                    match terminalRoleOf takenAssistant sessionId with
-                    | Some agent when
-                        agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)
-                        && not (verdictSessions.Remove sessionId)
-                        ->
-                        if not (sessionDead sessionId) then
-                            HostReviewGuard.nudgeReviewer
-                                sessionPort
-                                journal
-                                nudgeSent
-                                sessionId
-                                terminalMessageId
-                                terminalModel
-                    | Some agent when
-                        agent.Equals("manager", StringComparison.OrdinalIgnoreCase)
-                        && not (sessionParents.ContainsKey sessionId)
-                        ->
-                        // Every unconfirmed manager terminal re-evaluates the guard.
-                        // Send is deferred one microtask so Host idle is fully released;
-                        // failed sends do not lock the guard key, so the next terminal retries.
-                        if not (sessionDead sessionId) then
-                            match HostReviewGuard.missingTree journal gitTreePort sessionId with
-                            | HostReviewGuard.ReviewGuardMissing treeHash ->
-                                HostReviewGuard.nudgeManager
-                                    sessionPort
-                                    journal
-                                    managerGuardNudges
-                                    sessionId
-                                    terminalMessageId
-                                    treeHash
-                                    terminalModel
-                            | HostReviewGuard.ReviewGuardConfirmed -> ()
-                            | HostReviewGuard.ReviewGuardUnavailable reason ->
-                                raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
-                    | _ -> ()
-
-                    match completedAssistant with
-                    | Some completeMsg when hasTerminalAssistant && FallbackDetect.isFailedAssistant completeMsg ->
-                        if not (sessionDead sessionId) then
-                            nudgeContinue sessionId terminalMessageId
-                    | _ -> ()
+                HostTerminalHandler.handle
+                    sessionPort
+                    journal
+                    gitTreePort
+                    verdictSessions
+                    nudgeSent
+                    managerGuardNudges
+                    nudgeContinue
+                    sessionParents
+                    aborted
+                    sessionId
+                    takenAssistant
+                    completedAssistant
+                    terminalMessageId
+                    terminalModel
+                    (terminalRoleOf takenAssistant sessionId)
 
                 completedAssistant
                 |> Option.iter (fun _ -> assistantParts.Remove terminalMessageId)

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Session
 
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -118,6 +119,61 @@ module HostForkRunLifecycle =
         complete gate pendingRuns sessions run (Failed error)
 
     let markReady (gate: obj) (run: PendingHostRun) = lock gate (fun () -> run.Ready <- true)
+
+    /// Sends a prompt to an already-linked child: if a run is active for this
+    /// agent, nudge (fire-and-forget send, carrying role explicitly — after a
+    /// host restart OpenCode would otherwise resolve an agent-less child prompt
+    /// to the default build agent, not the session's original role); otherwise
+    /// install a fresh run and fork it. Shared by HostForkRuntime.Fork's
+    /// existing-child path and Reuse, which differ only in how they obtain
+    /// `role` before reaching this point.
+    let sendToExistingChild
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (sessions: ISessionHostPort)
+        (runtime: ForkRuntime)
+        (sendChildPrompt: string -> SessionId -> AgentRole -> string -> Task<Result<unit, string>>)
+        (agentId: string)
+        (childId: SessionId)
+        (role: AgentRole)
+        (prompt: string)
+        : Task<Result<ForkResult, string>> =
+        task {
+            let activeRun =
+                lock gate (fun () ->
+                    match pendingRuns.TryGetValue agentId with
+                    | true, run -> Some run
+                    | false, _ -> None)
+
+            match activeRun with
+            | Some _ when runtime.IsCancelled -> return Error "Fork runtime is cancelled"
+            | Some _ ->
+                let! sent = sendChildPrompt agentId childId role prompt
+
+                match sent with
+                | Ok() -> return Ok(ForkResult.Nudged agentId)
+                | Error err -> return Error err
+            | None ->
+                let run = installRun gate pendingRuns sessions agentId childId
+                let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+
+                match result with
+                | ForkResult.NotFound _ ->
+                    failRun gate pendingRuns sessions run "Fork runtime is cancelled"
+                    return Error "Fork runtime is cancelled"
+                | _ ->
+                    markReady gate run
+                    let! sent = sendChildPrompt agentId childId role prompt
+
+                    match sent, result with
+                    | Ok(), ForkResult.Nudged _ -> return Ok result
+                    | Ok(), _ ->
+                        failRun gate pendingRuns sessions run "Existing agent did not accept a new run"
+                        return Error "Existing agent did not accept a new run"
+                    | Error err, _ ->
+                        failRun gate pendingRuns sessions run err
+                        return Error err
+        }
 
     /// Persist AgentUnlinked facts for each distinct child BEFORE aborting, so a
     /// crash mid-Cancel cannot leave a session aborted but still linked (which

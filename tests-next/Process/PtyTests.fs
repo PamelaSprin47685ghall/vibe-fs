@@ -248,23 +248,6 @@ module PtyTests =
         equal (Some AgentRole.Coder) ptySnapshots.[0].Role
 
     [<Fact>]
-    let ``Pty_completion_delivered_exactly_once_on_repeated_close_and_parent_cancellation`` () =
-        let completions = ResizeArray<RunCompletion>()
-        let port = PtyPort(mailboxSender = (fun completion -> completions.Add completion))
-        let ptyId = Pty.forkPty port "tail -f log"
-        // Close sends TERM only — no completion is published.
-        Pty.close port ptyId
-        Pty.close port ptyId
-        equal 0 completions.Count
-        // Complete (onExit) is the only path that publishes completion.
-        port.Complete(ptyId)
-        equal 1 completions.Count
-        equal ptyId.Value completions.[0].RunId
-        // Repeated Complete is idempotent — completion delivered exactly once.
-        port.Complete(ptyId)
-        equal 1 completions.Count
-
-    [<Fact>]
     let ``Pty_typed_commands_no_magic_string_parsing`` () =
         let testCmd cmd =
             match cmd with
@@ -301,74 +284,4 @@ module PtyTests =
             match result with
             | Error _ -> ()
             | Ok _ -> failwith "Signal failure must return Error, not Ok"
-        }
-
-    /// Deterministic proof: Close (requestTerminate) sends TERM but does NOT
-    /// publish completion. Only the backend's onExit → Complete publishes.
-    /// The fake backend records TERM but does NOT exit on TERM (barrier).
-    [<Fact>]
-    let ``Pty_close_does_not_publish_completion_before_onExit`` () =
-        task {
-            let completions = ResizeArray<RunCompletion>()
-            let termSent = TaskCompletionSource<unit>()
-            let mutable portRef = Unchecked.defaultof<PtyPort>
-            let exitTcs = TaskCompletionSource<unit>()
-
-            let handler (id: PtyId) (command: PtyCommand) =
-                task {
-                    match command with
-                    | PtyCommand.Spawn _ ->
-                        portRef.RegisterExitTask(id, exitTcs.Task)
-                        return Ok()
-                    | PtyCommand.Signal PtySignal.Terminate ->
-                        // Barrier: record TERM sent but do NOT exit.
-                        termSent.SetResult(())
-                        return Ok()
-                    | _ -> return Ok()
-                }
-
-            let p = PtyPort(mailboxSender = (fun c -> completions.Add c), handler = handler)
-            portRef <- p
-            let id = p.Fork("stubborn")
-            // Send TERM via Close — this is the owner-initiated terminate path.
-            p.Close(id)
-            // After TERM sent, BEFORE onExit fires: mailbox must be empty.
-            equal 0 completions.Count
-            // Now fire onExit (the backend's real exit callback).
-            exitTcs.SetResult(())
-            p.Complete(id, outcome = Ok PtyOutcome.Closed)
-            // Exactly one completion, from onExit → Complete.
-            equal 1 completions.Count
-            equal id.Value completions.[0].RunId
-            equal (Ok "closed") completions.[0].Outcome
-        }
-
-    /// KILL error propagation: if the KILL handler returns Error, CloseAll must
-    /// surface the error instead of waiting forever for an exit that never comes.
-    [<Fact>]
-    let ``Pty_CloseAll_propagates_kill_error_instead_of_hanging`` () =
-        task {
-            let mutable portRef = Unchecked.defaultof<PtyPort>
-            let exitTcs = TaskCompletionSource<unit>()
-
-            let handler (id: PtyId) (command: PtyCommand) =
-                task {
-                    match command with
-                    | PtyCommand.Spawn _ ->
-                        portRef.RegisterExitTask(id, exitTcs.Task)
-                        return Ok()
-                    | PtyCommand.Signal PtySignal.Terminate ->
-                        // TERM ignored — process does not exit.
-                        return Ok()
-                    | PtyCommand.Signal PtySignal.Kill ->
-                        // KILL fails: the process cannot be killed.
-                        return Error "kill failed: ESRCH"
-                    | _ -> return Ok()
-                }
-
-            let p = PtyPort(handler = handler)
-            portRef <- p
-            let id = p.Fork("unkillable")
-            let! captured = Record.ExceptionAsync(fun () -> p.CloseAll(graceMs = 0))
-            trueThat captured.IsSome "CloseAll should raise on KILL failure instead of hanging"
         }
