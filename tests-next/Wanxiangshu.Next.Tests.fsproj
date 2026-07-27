@@ -69,6 +69,8 @@
     <Compile Include="MockOpenCode/ForkRuntimeIntegration.fs"/>
     <Compile Include="MockOpenCode/ReviewGuardIntegration.fs"/>
     <Compile Include="MockOpenCode/FallbackIntegration.fs"/>
+    <Compile Include="MockOpenCode/CompanionIntegration.fs"/>
+    <Compile Include="MockOpenCode/ReconcilerIntegration.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
     <Compile Include="Integration/OrchestratorIntegrationTests.fs"/>
     <Compile Include="Integration/OrchestratorRecoveryTests.fs"/>
