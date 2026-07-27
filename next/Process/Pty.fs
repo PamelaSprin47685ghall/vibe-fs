@@ -2,83 +2,50 @@ namespace Wanxiangshu.Next.Process
 
 open System
 open System.Collections.Generic
-open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Session
 
-[<RequireQualifiedAccess>]
-type PtySignal =
-    | Terminate
-    | Kill
-    | Interrupt
-
-module PtySignal =
-    [<Literal>]
-    let TermName = "TERM"
-
-    [<Literal>]
-    let KillName = "KILL"
-
-    let tryParse (value: string) =
-        match value with
-        | TermName -> Ok PtySignal.Terminate
-        | KillName -> Ok PtySignal.Kill
-        | _ -> Error(sprintf "Unsupported PTY signal: %s" value)
-
-[<RequireQualifiedAccess>]
-type PtyCommand =
-    | Spawn of command: string * cwd: string
-    | Write of bytes: byte[]
-    | Read
-    | Signal of signal: PtySignal
-    | Resize of width: int * height: int
-
-type PtyId =
-    | PtyId of id: string
-
-    member this.Value =
-        match this with
-        | PtyId id -> id
-
-    static member Create(id: string) = PtyId id
-
-type PtyHandle =
-    { Id: PtyId
-      Command: string
-      StartedAt: DateTimeOffset
-      AgentId: string option
-      Role: AgentRole option }
-
-type PtyRead =
-    { Id: PtyId
-      Output: string
-      Closed: bool }
-
-type PtyBackendHandler = PtyId -> PtyCommand -> unit
-
-[<RequireQualifiedAccess>]
-module PtyOutcome =
-    [<Literal>]
-    let Closed = "closed"
-
-    [<Literal>]
-    let Signalled = "signalled"
-
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
 /// are supplied by Complete and share every registered mailbox sender.
 type PtyPort
-    (?mailboxSender: RunCompletion -> unit, ?handler: PtyBackendHandler, ?agentProvider: unit -> AgentRecord list) =
-    let handler = defaultArg handler (fun _ _ -> ())
+    (?mailboxSender: RunCompletion -> unit, ?handler: PtyBackendHandler, ?agentProvider: unit -> AgentRecord list) as this
+    =
+    let handler = defaultArg handler (fun _ _ -> Task.FromResult(Ok()))
     let agentProvider = defaultArg agentProvider (fun () -> [])
     let mailboxSenders = ResizeArray<RunCompletion -> unit>()
     let gate = obj ()
     let active = Dictionary<PtyId, PtyHandle * ref<bool>>()
-    let readWaiters = Dictionary<PtyId, TaskCompletionSource<string * bool>>()
+    let closedIds = HashSet<PtyId>()
+
+    let readWaiters =
+        Dictionary<PtyId, TaskCompletionSource<Result<string * bool, string>>>()
+
+    let exitTasks = Dictionary<PtyId, Task>()
     do mailboxSender |> Option.iter mailboxSenders.Add
 
-    let closeInternal (id: PtyId) (outcome: Result<string, string>) (sendTerminate: bool) =
+    /// Owner-initiated terminate: sends TERM to the backend ONLY. Does NOT
+    /// remove from active, does NOT mark closed, does NOT FailRead, does NOT
+    /// publish completion. Completion belongs exclusively to the backend's
+    /// onExit → Complete path. (SSOT §7 cleanup policy.)
+    let requestTerminate (id: PtyId) =
+        let live =
+            lock gate (fun () ->
+                match active.TryGetValue id with
+                | true, (_, closed) when not closed.Value -> true
+                | _ -> false)
+
+        if live then
+            try
+                handler id (PtyCommand.Signal PtySignal.Terminate) |> ignore
+            with _ ->
+                ()
+
+    /// Complete from a backend exit (onExit). This is the ONLY path that
+    /// publishes completion to mailbox senders. Removes from active, marks
+    /// closed, fails any parked reader, then delivers the completion.
+    let completeFromExit (id: PtyId) (outcome: Result<string, string>) =
         let target =
             lock gate (fun () ->
                 match active.TryGetValue id with
@@ -97,13 +64,13 @@ type PtyPort
                         false)
 
             if not alreadyClosed then
-                if sendTerminate then
-                    try
-                        handler id (PtyCommand.Signal PtySignal.Terminate)
-                    with _ ->
-                        ()
+                lock gate (fun () ->
+                    active.Remove id |> ignore
+                    closedIds.Add id |> ignore)
 
-                lock gate (fun () -> active.Remove id |> ignore)
+                // Any in-flight read must resolve with an error; the completion
+                // below is the authoritative exit outcome delivered to Join.
+                this.FailRead(id, "PTY closed before read completed")
 
                 let completion =
                     { RunId = id.Value
@@ -138,45 +105,71 @@ type PtyPort
               AgentId = agentId
               Role = role }
 
-        lock gate (fun () -> active.[id] <- (handle, ref false))
-        handler id (PtyCommand.Spawn(command, defaultArg cwd ""))
+        lock gate (fun () ->
+            closedIds.Remove id |> ignore
+            active.[id] <- (handle, ref false))
+
+        handler id (PtyCommand.Spawn(command, defaultArg cwd "")) |> ignore
         id
 
     member this.Exists(id: PtyId) =
         lock gate (fun () -> active.ContainsKey id)
 
-    member this.Send(id: PtyId, command: PtyCommand) =
-        let live =
+    member this.Known(id: PtyId) =
+        lock gate (fun () -> active.ContainsKey id || closedIds.Contains id)
+
+    /// Sends a command to the backend. Returns the backend's outcome so callers
+    /// (e.g. SendPty) can surface write errors as tool errors instead of always
+    /// succeeding. Completion/exit still belongs to the backend's onExit.
+    member this.Send(id: PtyId, command: PtyCommand) : Task<Result<unit, string>> =
+        let live, closed =
             lock gate (fun () ->
                 match active.TryGetValue id with
-                | true, (_, closed) when not closed.Value -> true
-                | _ -> false)
-
-        if live then
-            // Signal only forwards to the backend; completion belongs to the
-            // backend's onExit, never to Send.
-            handler id command
-
-    /// Reads the currently buffered PTY output without completing the join.
-    /// The backend resolves the waiter with (output, closed); final exit still
-    /// belongs to onExit -> Complete.
-    member this.Read(id: PtyId) : Task<Result<string * bool, string>> =
-        let live =
-            lock gate (fun () ->
-                match active.TryGetValue id with
-                | true, (_, closed) when not closed.Value -> true
-                | _ -> false)
+                | true, (_, c) -> (not c.Value, c.Value)
+                | false, _ -> (false, closedIds.Contains id))
 
         if not live then
-            Task.FromResult(Error(sprintf "Unknown PTY id: %s" id.Value))
+            if closed then
+                Task.FromResult(Error "PTY closed")
+            else
+                Task.FromResult(Error(sprintf "Unknown PTY id: %s" id.Value))
         else
-            let tcs = TaskCompletionSource<string * bool>()
-            lock gate (fun () -> readWaiters.[id] <- tcs)
-            handler id PtyCommand.Read
+            task {
+                try
+                    return! handler id command
+                with ex ->
+                    return Error ex.Message
+            }
+
+    /// Reads the currently buffered PTY output without completing the join.
+    /// At most one read may be in flight per id; a second concurrent Read
+    /// returns immediately with an error. A Read after the PTY has closed
+    /// returns (output="", closed=true) without parking.
+    member this.Read(id: PtyId) : Task<Result<string * bool, string>> =
+        let plan =
+            lock gate (fun () ->
+                match active.TryGetValue id with
+                | true, (_, closed) when not closed.Value ->
+                    if readWaiters.ContainsKey id then
+                        AlreadyInProgress
+                    else
+                        let tcs = TaskCompletionSource<Result<string * bool, string>>()
+                        readWaiters.[id] <- tcs
+                        Park tcs
+                | true, _ -> ClosedImmediate
+                | false, _ when closedIds.Contains id -> ClosedImmediate
+                | false, _ -> Unknown(sprintf "Unknown PTY id: %s" id.Value))
+
+        match plan with
+        | Unknown msg -> Task.FromResult(Error msg)
+        | AlreadyInProgress -> Task.FromResult(Error "PTY read already in progress")
+        | ClosedImmediate -> Task.FromResult(Ok("", true))
+        | Park tcs ->
+            handler id PtyCommand.Read |> ignore
 
             task {
                 let! result = tcs.Task
-                return Ok result
+                return result
             }
 
     /// Resolved by the backend when it has drained the buffer for a Read.
@@ -190,91 +183,84 @@ type PtyPort
                 | false, _ -> None)
 
         match tcs with
-        | Some t -> t.SetResult((output, closed))
+        | Some t -> t.SetResult(Ok(output, closed))
         | None -> ()
 
-    /// Complete from a backend exit, signal notification, or read result.
-    member _.Complete(id: PtyId, ?outcome: Result<string, string>) =
-        closeInternal id (defaultArg outcome (Ok PtyOutcome.Closed)) false
+    /// Resolves any parked read waiter with an error. Used by every path that
+    /// ends a PTY (close, spawn failure, pending drop, onExit) so a parked
+    /// reader never hangs.
+    member _.FailRead(id: PtyId, reason: string) =
+        let tcs =
+            lock gate (fun () ->
+                match readWaiters.TryGetValue id with
+                | true, t ->
+                    readWaiters.Remove id |> ignore
+                    Some t
+                | false, _ -> None)
 
-    member _.Close(id: PtyId, ?outcome: Result<string, string>) =
-        closeInternal id (defaultArg outcome (Ok PtyOutcome.Closed)) true
+        match tcs with
+        | Some t -> t.SetResult(Error reason)
+        | None -> ()
 
-    member this.CloseAll() =
+    /// Bridges a backend per-process exit task into the port so CloseAll can
+    /// await process exit without the backend reaching into port dicts.
+    member this.RegisterExitTask(id: PtyId, task: Task) =
+        lock gate (fun () -> exitTasks.[id] <- task)
+
+    /// Complete from a backend exit (onExit). This is the ONLY path that
+    /// publishes completion to mailbox senders.
+    member this.Complete(id: PtyId, ?outcome: Result<string, string>) =
+        completeFromExit id (defaultArg outcome (Ok PtyOutcome.Closed))
+        lock gate (fun () -> exitTasks.Remove id |> ignore)
+
+    /// Owner-initiated close: sends TERM only. Does NOT publish completion —
+    /// completion is delivered by the backend's onExit → Complete. The caller
+    /// must await the exit (via CloseAll or the registered exit task) for the
+    /// process to actually exit and Complete to fire.
+    member this.Close(id: PtyId, ?outcome: Result<string, string>) : unit = requestTerminate id
+
+    /// Async owner cleanup: for each active id, send TERM (requestTerminate),
+    /// await exit for `termToKillGraceMs` (or the supplied override), then
+    /// escalate to KILL. If KILL itself fails, propagate the error instead of
+    /// waiting forever. The exitTask resolves via the backend's onExit, which
+    /// calls Complete (the only completion-publishing path). See SSOT §7.
+    member this.CloseAll(?graceMs: int) : Task<unit> =
+        let grace = max 0 (defaultArg graceMs PtyOutcome.termToKillGraceMs)
         let ids = lock gate (fun () -> active.Keys |> Seq.toList)
 
-        for id in ids do
-            this.Close id
+        task {
+            for id in ids do
+                requestTerminate id
+
+                let exitTaskOpt =
+                    lock gate (fun () ->
+                        match exitTasks.TryGetValue id with
+                        | true, t -> Some t
+                        | false, _ -> None)
+
+                match exitTaskOpt with
+                | None -> ()
+                | Some exitTask ->
+                    let! exited = PtyTiming.raceExit exitTask grace
+
+                    if not exited then
+                        // Grace elapsed without exit: escalate to KILL.
+                        let! killResult = handler id (PtyCommand.Signal PtySignal.Kill)
+
+                        match killResult with
+                        | Error err ->
+                            // KILL failed: do NOT wait forever for an exit that
+                            // will never come. Propagate the kill error.
+                            return raise (InvalidOperationException(sprintf "PTY kill failed for %s: %s" id.Value err))
+                        | Ok() ->
+                            // KILL sent; await the real onExit which calls
+                            // Complete (publishes completion).
+                            do! exitTask
+
+                    lock gate (fun () -> exitTasks.Remove id |> ignore)
+        }
 
     member _.List() : AgentRecord list * PtyHandle list =
         let agents = agentProvider ()
         let ptys = lock gate (fun () -> active.Values |> Seq.map fst |> Seq.toList)
         agents, ptys
-
-module Pty =
-    [<Literal>]
-    let AgentName = "pty"
-
-    let forkPty (port: PtyPort) (command: string) : PtyId = port.Fork command
-
-    let forkPtyWith
-        (port: PtyPort)
-        (command: string)
-        (agentId: string option)
-        (role: AgentRole option)
-        (ptyId: PtyId option)
-        : PtyId =
-        port.Fork(command, ?agentId = agentId, ?role = role, ?ptyId = ptyId)
-
-    let send (port: PtyPort) (id: PtyId) (command: PtyCommand) = port.Send(id, command)
-    let complete (port: PtyPort) (id: PtyId) (outcome: Result<string, string>) = port.Complete(id, outcome = outcome)
-    let list (port: PtyPort) = port.List()
-    let close (port: PtyPort) (id: PtyId) = port.Close id
-    let bytes (text: string) = Encoding.UTF8.GetBytes text
-
-    let newId () =
-        PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8))
-
-    let private parentGate = obj ()
-    let private parentAborters = Dictionary<string, Dictionary<int, unit -> unit>>()
-    let mutable private nextAbortToken = 0
-
-    let registerParentAbort (parentId: string) (abort: unit -> unit) =
-        lock parentGate (fun () ->
-            nextAbortToken <- nextAbortToken + 1
-            let token = nextAbortToken
-
-            let callbacks =
-                match parentAborters.TryGetValue parentId with
-                | true, values -> values
-                | _ ->
-                    let values = Dictionary<int, unit -> unit>()
-                    parentAborters.[parentId] <- values
-                    values
-
-            callbacks.[token] <- abort
-            token)
-
-    let unregisterParentAbort (parentId: string) (token: int) =
-        lock parentGate (fun () ->
-            match parentAborters.TryGetValue parentId with
-            | true, callbacks ->
-                callbacks.Remove token |> ignore
-
-                if callbacks.Count = 0 then
-                    parentAborters.Remove parentId |> ignore
-            | _ -> ())
-
-    let abortParent (parentId: string) =
-        let callbacks =
-            lock parentGate (fun () ->
-                match parentAborters.TryGetValue parentId with
-                | true, values -> values.Values |> Seq.toList
-                | _ -> [])
-
-        callbacks
-        |> List.iter (fun abort ->
-            try
-                abort ()
-            with _ ->
-                ())

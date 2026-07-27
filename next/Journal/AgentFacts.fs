@@ -13,14 +13,16 @@ module AgentFacts =
 
     let emptyLinkage: AgentLinkageProjection =
         { LinkedChildren = Map.empty
-          LinkedRoles = Map.empty }
+          LinkedRoles = Map.empty
+          LinkedRuntimeIds = Map.empty }
 
     let emptyReviewGuard: ReviewGuardProjection =
         { LastGitTreeHash = None
           ConsecutivePerfects = 0
           IsConfirmed = false
           AcceptedGuardKey = None
-          RecentToolCallIds = [] }
+          RecentToolCallIds = []
+          CurrentBarrierKey = None }
 
     let emptyFallback: FallbackProjection =
         { Side = SideA
@@ -49,6 +51,8 @@ module AgentFacts =
 
     let foldAgentFact (proj: AgentProjectionSet) (fact: AgentFact) : AgentProjectionSet =
         match fact with
+        | AgentFact.AgentLinked _ -> proj
+        | AgentFact.AgentUnlinked _ -> proj
         | AgentFact.CompanionBaselineSet p ->
             let sessions =
                 updateSession
@@ -130,55 +134,11 @@ module AgentFacts =
 
             { proj with Sessions = sessions }
 
-        | AgentFact.AgentLinked p ->
-            let role =
-                p.Role
-                |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
+        | AgentFact.GuardPromptAccepted p -> AgentFactsReview.foldGuardPromptAccepted proj p
 
-            let sessions =
-                updateSession
-                    p.ParentId
-                    (fun s ->
-                        let link =
-                            match s.Linkage with
-                            | Some existing ->
-                                { LinkedChildren = Map.add p.ChildId p.TargetAgent existing.LinkedChildren
-                                  LinkedRoles =
-                                    match role with
-                                    | Some role -> Map.add p.ChildId role existing.LinkedRoles
-                                    | None -> existing.LinkedRoles }
-                            | None ->
-                                { LinkedChildren = Map.ofList [ (p.ChildId, p.TargetAgent) ]
-                                  LinkedRoles =
-                                    role
-                                    |> Option.map (fun role -> Map.ofList [ (p.ChildId, role) ])
-                                    |> Option.defaultValue Map.empty }
-
-                        { s with Linkage = Some link })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
-
-        | AgentFact.AgentUnlinked p ->
-            let sessions =
-                updateSession
-                    p.ParentId
-                    (fun s ->
-                        let link =
-                            match s.Linkage with
-                            | Some existing ->
-                                { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren
-                                  LinkedRoles = Map.remove p.ChildId existing.LinkedRoles }
-                            | None -> emptyLinkage
-
-                        { s with Linkage = Some link })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
+        | AgentFact.ReviewBarrierStarted p -> AgentFactsReview.foldReviewBarrierStarted proj p
 
         | AgentFact.ReviewVerdictRecorded p -> AgentFactsReview.foldReviewVerdictRecorded proj p
-
-        | AgentFact.GuardPromptAccepted p -> AgentFactsReview.foldGuardPromptAccepted proj p
 
         | AgentFact.FallbackFailureRecorded p -> AgentFactsReview.foldFallbackFailureRecorded proj p
 
@@ -199,15 +159,98 @@ module AgentFacts =
         | AgentFact.OrchestratorRejected p ->
             AgentFactsFoldHelpers.foldOrchestratorRejected proj p.ManagerId p.CandidateId p.Reason
 
+        | AgentFact.OrchestratorPreRebaseReviewConfirmed p ->
+            AgentFactsFoldHelpers.foldOrchestratorPreRebaseReviewConfirmed proj p.ManagerId p.CandidateId p.CommitHash
+
+        | AgentFact.OrchestratorRebased p ->
+            AgentFactsFoldHelpers.foldOrchestratorRebased proj p.ManagerId p.CandidateId p.RebasedCommit
+
+        | AgentFact.OrchestratorConflictDetected p ->
+            AgentFactsFoldHelpers.foldOrchestratorConflictDetected proj p.ManagerId p.CandidateId p.Files
+
+        | AgentFact.OrchestratorPostRebaseReviewConfirmed p ->
+            AgentFactsFoldHelpers.foldOrchestratorPostRebaseReviewConfirmed
+                proj
+                p.ManagerId
+                p.CandidateId
+                p.RebasedCommit
+
+        | AgentFact.OrchestratorPublishClaimed p ->
+            AgentFactsFoldHelpers.foldOrchestratorPublishClaimed proj p.ManagerId p.CandidateId p.ExpectedTargetHead
+
         | AgentFact.DurableEffectRequested p ->
             AgentFactsFoldHelpers.foldDurableEffectRequested proj p.SessionId p.EffectId p.Target p.Payload
 
         | AgentFact.DurableEffectAccepted p ->
             AgentFactsFoldHelpers.foldDurableEffectAccepted proj p.SessionId p.EffectId p.Result
 
+    let rec foldAgentFactWithEnvelope (proj: AgentProjectionSet) (envelope: Envelope) : AgentProjectionSet =
+        match envelope.Fact with
+        | Fact.Agent fact -> foldAgentFactEnvelope proj envelope fact
+        | _ -> proj
+
+    and foldAgentFactEnvelope (proj: AgentProjectionSet) (envelope: Envelope) (fact: AgentFact) : AgentProjectionSet =
+        match fact with
+        | AgentFact.AgentLinked p ->
+            let role =
+                p.Role
+                |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
+
+            let sessions =
+                updateSession
+                    p.ParentId
+                    (fun s ->
+                        let link =
+                            match s.Linkage with
+                            | Some existing ->
+                                { LinkedChildren = Map.add p.ChildId p.TargetAgent existing.LinkedChildren
+                                  LinkedRoles =
+                                    match role with
+                                    | Some role -> Map.add p.ChildId role existing.LinkedRoles
+                                    | None -> existing.LinkedRoles
+                                  LinkedRuntimeIds = Map.add p.ChildId envelope.RuntimeId existing.LinkedRuntimeIds }
+                            | None ->
+                                { LinkedChildren = Map.ofList [ (p.ChildId, p.TargetAgent) ]
+                                  LinkedRoles =
+                                    role
+                                    |> Option.map (fun role -> Map.ofList [ (p.ChildId, role) ])
+                                    |> Option.defaultValue Map.empty
+                                  LinkedRuntimeIds = Map.ofList [ (p.ChildId, envelope.RuntimeId) ] }
+
+                        { s with Linkage = Some link })
+                    proj.Sessions
+
+            { proj with Sessions = sessions }
+
+        | AgentFact.AgentUnlinked p ->
+            let sessions =
+                updateSession
+                    p.ParentId
+                    (fun s ->
+                        let link =
+                            match s.Linkage with
+                            | Some existing ->
+                                // In-flight unlink facts appended by a previous runtime can
+                                // sort after the new runtime's AgentLinked fact. Only remove
+                                // a link owned by the same runtime as the unlink envelope.
+                                match Map.tryFind p.ChildId existing.LinkedRuntimeIds with
+                                | Some linkedRuntimeId when linkedRuntimeId <> envelope.RuntimeId -> existing
+                                | _ ->
+                                    { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren
+                                      LinkedRoles = Map.remove p.ChildId existing.LinkedRoles
+                                      LinkedRuntimeIds = Map.remove p.ChildId existing.LinkedRuntimeIds }
+                            | None -> emptyLinkage
+
+                        { s with Linkage = Some link })
+                    proj.Sessions
+
+            { proj with Sessions = sessions }
+
+        | fact -> foldAgentFact proj fact
+
     let foldEnvelope (proj: AgentProjectionSet) (env: Envelope) : AgentProjectionSet =
         match env.Fact with
-        | Fact.Agent agentFact -> foldAgentFact proj agentFact
+        | Fact.Agent agentFact -> foldAgentFactEnvelope proj env agentFact
         | _ -> proj
 
     let apply (proj: AgentProjectionSet) (envelopes: Envelope list) : AgentProjectionSet =

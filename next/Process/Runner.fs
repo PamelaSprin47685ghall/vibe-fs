@@ -8,13 +8,64 @@ open Fable.Core.JsInterop
 
 module Runner =
 
-    [<Emit("""
-        new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('RUNNER_DEADLINE')), $1);
-            $0.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
-        })
-    """)>]
-    let private withDeadline<'T> (work: Task<'T>) (milliseconds: int) : Task<'T> = jsNative
+    /// Races the launcher task against the absolute deadline using JS-timer-segmented
+    /// waits, so a huge legal budget (tens of days) never overflows int / the JS
+    /// timer ceiling the way a single setTimeout(int) would. Mirrors RunnerCore.armTimer.
+    /// Rejects with RUNNER_DEADLINE on expiry so executeLauncher maps it to TimeoutExceeded.
+    let private withSegmentedDeadline<'T>
+        (clock: unit -> DateTimeOffset)
+        (deadline: Deadline)
+        (work: Task<'T>)
+        : Task<'T> =
+        let completion = TaskCompletionSource<'T>()
+        let mutable timerId: obj = null
+        let mutable settled = false
+
+        let clearTimer () =
+            if not (isNull timerId) then
+                emitJsExpr timerId "clearTimeout($0)" |> ignore
+                timerId <- null
+
+        let fireTimeout () =
+            if not settled then
+                settled <- true
+                clearTimer ()
+                completion.SetException(Exception "RUNNER_DEADLINE")
+
+        let rec armTimer () =
+            let ms = Deadline.nextWaitMs clock deadline
+
+            if ms <= 0 then
+                fireTimeout ()
+            else
+                timerId <-
+                    emitJsExpr
+                        (ms,
+                         (fun () ->
+                             if settled then ()
+                             elif Deadline.isExpired clock deadline then fireTimeout ()
+                             else armTimer ()))
+                        "setTimeout($1, $0)"
+
+        armTimer ()
+
+        task {
+            try
+                let! result = work
+
+                if not settled then
+                    settled <- true
+                    clearTimer ()
+                    completion.SetResult result
+            with ex ->
+                if not settled then
+                    settled <- true
+                    clearTimer ()
+                    completion.SetException ex
+        }
+        |> ignore
+
+        completion.Task
 
     let getLargeGateCount () : int = LargeGate.getCount ()
     let acquireLargeGate (ct: CancellationToken) : Task = LargeGate.acquire ct
@@ -49,8 +100,10 @@ module Runner =
         : Task<Result<RunnerOutcome, RunnerError>> =
         task {
             try
-                let! (exitCode, stdoutBytes, stderrBytes) =
-                    withDeadline (launcher cmd ct) (int budgetSpan.TotalMilliseconds)
+                let clock = fun () -> DateTimeOffset.UtcNow
+                let deadline = Deadline.ofBudget (clock ()) budgetSpan
+
+                let! (exitCode, stdoutBytes, stderrBytes) = withSegmentedDeadline clock deadline (launcher cmd ct)
 
                 if ct.IsCancellationRequested then
                     return Error(RunnerError.ProcessCancelled "Cancelled by token")

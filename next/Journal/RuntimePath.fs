@@ -15,6 +15,9 @@ module RuntimePath =
     [<Import("resolve", "node:path")>]
     let private resolvePath (basePath: string) (relativePath: string) : string = jsNative
 
+    [<Import("realpathSync", "node:fs")>]
+    let private realpathSync (path: string) : string = jsNative
+
     [<Import("join", "node:path")>]
     let private joinPath (left: string) (right: string) : string = jsNative
 
@@ -33,6 +36,12 @@ module RuntimePath =
     let private runtimeDirectory root =
         joinPath (joinPath root "wanxiangshu-next") "runtimes"
 
+    let private canonicalPath path =
+        try
+            realpathSync path
+        with _ ->
+            path
+
     let private stateDirectory workspace =
         let stateRoot =
             let configured = xdgStateHome ()
@@ -43,6 +52,26 @@ module RuntimePath =
                 configured
 
         runtimeDirectory (joinPath stateRoot (digest (createHash "sha256") workspace))
+
+    let internal gitCommonDir (workspace: string) : string =
+        try
+            let output =
+                execFileSync
+                    "git"
+                    [| "-C"; workspace; "rev-parse"; "--git-common-dir" |]
+                    (createObj [ "encoding", box "utf8" ])
+
+            let commonDirectory = output.Trim()
+
+            let resolved =
+                if isAbsolute commonDirectory then
+                    commonDirectory
+                else
+                    resolvePath workspace commonDirectory
+
+            canonicalPath resolved
+        with _ ->
+            workspace
 
     let forWorkspace workspace =
         try
@@ -61,6 +90,6 @@ module RuntimePath =
                 else
                     resolvePath workspace commonDirectory
 
-            runtimeDirectory gitDirectory
+            runtimeDirectory (canonicalPath gitDirectory)
         with _ ->
             stateDirectory workspace

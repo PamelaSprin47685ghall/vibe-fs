@@ -180,6 +180,40 @@ module AgentFactsTests =
         Assert.True(comp.ReplacementActive)
 
     [<Fact>]
+    let Stale_previous_runtime_unlink_does_not_remove_new_runtime_link () =
+        let oldRuntime = RuntimeId.create "rt-link-old"
+        let newRuntime = RuntimeId.create "rt-link-new"
+        let parentSid = SessionId.create "session-parent-race"
+        let childId = ChildId.create "session-child-race"
+        let t0 = DateTimeOffset.UtcNow
+
+        let oldLink =
+            AgentFact.AgentLinked
+                {| ParentId = parentSid
+                   ChildId = childId
+                   TargetAgent = "coder"
+                   Role = Some "coder" |}
+
+        let oldUnlink =
+            AgentFact.AgentUnlinked
+                {| ParentId = parentSid
+                   ChildId = childId |}
+
+        // Cross-runtime boot order can place the in-flight unlink after the new
+        // runtime's link. The unlink owns only the old runtime's link.
+        let env1 = createTestEnv 1L t0 oldLink oldRuntime (Some parentSid)
+        let env2 = createTestEnv 1L (t0.AddSeconds 1.0) oldLink newRuntime (Some parentSid)
+
+        let env3 =
+            createTestEnv 2L (t0.AddSeconds 2.0) oldUnlink oldRuntime (Some parentSid)
+
+        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2; env3 ]
+
+        let linkage = proj.Sessions.[parentSid].Linkage.Value
+        Assert.Equal("coder", linkage.LinkedChildren.[childId])
+        Assert.Equal(newRuntime, linkage.LinkedRuntimeIds.[childId])
+
+    [<Fact>]
     let Agent_linkage_and_durable_effect_folds () =
         let rt = RuntimeId.create "rt-misc-1"
         let parentSid = SessionId.create "session-parent"

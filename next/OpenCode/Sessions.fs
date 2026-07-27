@@ -171,3 +171,11 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
 
                 localOutput
                 @ (capturedOutput |> List.filter (fun line -> not (existing.Contains line))))
+
+
+    interface ISessionOutputBoundaryPort with
+        member _.GetSessionOutputWatermark(sessionId) =
+            eventPort.GetSessionOutputWatermark sessionId
+
+        member _.GetSessionOutputSince(sessionId, watermark) =
+            eventPort.GetSessionOutputSince(sessionId, watermark)

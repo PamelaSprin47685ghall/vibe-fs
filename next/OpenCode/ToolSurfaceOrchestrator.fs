@@ -19,6 +19,7 @@ module ToolSurfaceOrchestrator =
           WorkspaceDirectory: string option
           SessionParents: Dictionary<string, string>
           SessionRoles: Dictionary<string, string>
+          SessionDirectories: Dictionary<string, string>
           TreePorts: Dictionary<string, GitTreePort> }
 
     let isOrchestratorSession (sessionRoles: Dictionary<string, string>) (sid: string) =
@@ -54,6 +55,8 @@ module ToolSurfaceOrchestrator =
                           ModelConfig = deps.ModelConfig
                           OnChildCreated =
                             fun _ role childId -> registerChild deps.SessionParents deps.SessionRoles sid role childId
+                          RegisterChildDirectory =
+                            fun childId path -> deps.SessionDirectories.[SessionId.value childId] <- path
                           RegisterReviewerTree = fun reviewerId port -> deps.TreePorts.[reviewerId] <- port
                           RepoPath = defaultArg deps.WorkspaceDirectory "."
                           TargetBranch = "" },
@@ -120,3 +123,20 @@ module ToolSurfaceOrchestrator =
 
                 executorRuntimes.[sid] <- r
                 r)
+
+    /// Disposes the per-session executor runtime: drops the cached instance and
+    /// cancels it (best-effort, fire-and-forget). The next `executorRuntimeFor`
+    /// call recreates a fresh runtime, so a cancelled runtime is never reused.
+    let disposeExecutorRuntime
+        (gate: obj)
+        (executorRuntimes: System.Collections.Generic.Dictionary<string, HostForkRuntime>)
+        (sessionKey: string)
+        : unit =
+        lock gate (fun () ->
+            match executorRuntimes.TryGetValue sessionKey with
+            | true, r ->
+                executorRuntimes.Remove sessionKey |> ignore
+                // Fire-and-forget: Cancel is async (PTY cleanup + child abort) but
+                // disposal must not block the host event path.
+                r.Cancel() |> ignore
+            | false, _ -> ())

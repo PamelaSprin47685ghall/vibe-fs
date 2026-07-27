@@ -28,3 +28,8 @@ module ManagerConfig =
             agents?browser <- StaticTools.browserAgentConfig ()
             agents?meditator <- StaticTools.meditatorAgentConfig ()
             agents?reviewer <- StaticTools.reviewerAgentConfig ()
+            // SSOT §3 declares auto-compaction OFF, but no production config set it
+            // (only the OPENCODE_DISABLE_AUTOCOMPACT test env var did). The opencode
+            // host only honors it via cfg.compaction.auto === false (host-docs 05.md:331),
+            // so emit it explicitly on the mutated config object.
+            config?compaction <- createObj [ "auto" ==> false ]

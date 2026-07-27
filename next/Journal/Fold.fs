@@ -24,8 +24,8 @@ module Fold =
         | Runtime(RuntimeStarted r) ->
             { proj with
                 RuntimeId = Some r.RuntimeId }
-        | Agent agentFact ->
-            let agentProj = AgentFacts.foldAgentFact proj.AgentProjections agentFact
+        | Agent _ ->
+            let agentProj = AgentFacts.foldAgentFactWithEnvelope proj.AgentProjections env
 
             { proj with
                 AgentProjections = agentProj }

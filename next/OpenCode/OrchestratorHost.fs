@@ -11,16 +11,48 @@ open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Orchestrator
 
-/// Production wiring: an Orchestrator-role session drives the real ManagerJob
-/// publish chain instead of forking a generic child session.
-type OrchestratorHostDeps =
-    { Sessions: ISessionHostPort
-      Journal: AgentJournal option
-      ModelConfig: ModelResolver.ModelConfig option
-      OnChildCreated: string -> AgentRole -> SessionId -> unit
-      RegisterReviewerTree: string -> GitTreePort -> unit
-      RepoPath: string
-      TargetBranch: string }
+/// Private helpers for OrchestratorHost (F# namespaces cannot contain values,
+/// so module-level helpers live here).
+module private OrchestratorHostHelpers =
+    /// Emit a ReviewBarrierStarted fact that resets the review guard so the
+    /// phase requires two FRESH PERFECT verdicts on the current tree.
+    let emitReviewBarrier
+        (journal: AgentJournal option)
+        (orchestratorId: SessionId)
+        (barrierKey: string)
+        : Task<Result<unit, string>> =
+        task {
+            match journal with
+            | Some j ->
+                let fact =
+                    AgentFact.ReviewBarrierStarted
+                        {| ManagerSessionId = orchestratorId
+                           BarrierKey = barrierKey |}
+
+                match AgentJournal.appendAgent (StreamId.Session orchestratorId) None fact j with
+                | Ok _ -> return Ok()
+                | Error failure -> return Error(sprintf "%A" failure.Failure)
+            | None -> return Ok()
+        }
+
+    /// Build the recovery prompt for a manager job: conflict-resumption prompt
+    /// when REBASE_HEAD exists and no candidate, otherwise the original prompt.
+    let recoveryPrompt (gitPort: GitPort) (job: ManagerJob) : Task<string> =
+        task {
+            let! hasRb = gitPort.HasRebaseHead job.WorktreePath
+
+            if not job.CandidateCommit.IsSome && hasRb then
+                let! conflicted = gitPort.ConflictedFiles job.WorktreePath
+
+                let files =
+                    match conflicted with
+                    | Ok fs -> fs
+                    | Error _ -> []
+
+                return OrchestratorPrompts.buildConflictResumePrompt job.Prompt files
+            else
+                return job.Prompt
+        }
 
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let orchestratorKey = SessionId.value orchestratorId
@@ -44,6 +76,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             deps.Sessions,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,
+            onChildCreatedDir =
+                (fun _ childId dirOpt -> dirOpt |> Option.iter (fun path -> deps.RegisterChildDirectory childId path)),
             ?modelResolver = deps.ModelConfig,
             directoryFor =
                 (fun agentId ->
@@ -59,15 +93,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 stash.Remove agentId |> ignore
                 return Ok completion
             | false, _ ->
-                let mutable found: Result<RunCompletion, string> option = None
+                let mutable found = None
 
                 while found.IsNone do
                     let! joined = runtime.Join()
 
                     match joined with
                     | Error err -> found <- Some(Error(sprintf "%A" err))
-                    | Ok completion when completion.AgentId = agentId -> found <- Some(Ok completion)
-                    | Ok completion -> stash.[completion.AgentId] <- completion
+                    | Ok c when c.AgentId = agentId -> found <- Some(Ok c)
+                    | Ok c -> stash.[c.AgentId] <- c
 
                 return found.Value
         }
@@ -92,41 +126,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | Ok _ -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
         }
 
-    /// Read the Reviewer guard for this Orchestrator's own journal (in-memory
-    /// projection). The Reviewer verdict is written to this same journal by the
-    /// verdict tool surface, so the projection is authoritative — no disk scan.
-    let reviewState (worktree: string) : Task<Result<bool, string>> =
-        task {
-            match deps.Journal with
-            | None -> return Error "Orchestrator review requires a journal"
-            | Some journal ->
-                let tree = (GitTree.create worktree).GetTreeHash()
-                let snapshot = AgentJournal.snapshot journal
-
-                match Map.tryFind orchestratorId snapshot.AgentProjections.Sessions with
-                | Some session ->
-                    match session.ReviewGuard with
-                    | Some guard when guard.LastGitTreeHash = Some(GitTreeHash.create tree) && guard.IsConfirmed ->
-                        // Two distinct-ToolCallId PERFECTs on the same tree.
-                        return Ok true
-                    | Some guard when
-                        guard.LastGitTreeHash = Some(GitTreeHash.create tree)
-                        && guard.ConsecutivePerfects >= 1
-                        ->
-                        // One PERFECT so far; needs a second distinct verdict.
-                        return Ok false
-                    | Some guard when guard.LastGitTreeHash = Some(GitTreeHash.create tree) ->
-                        // A REVISE was the last verdict on this tree.
-                        return Error "Reviewer requested revision"
-                    | _ -> return Ok false
-                | None -> return Ok false
-        }
-
     let runReviewerOnce (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
         task {
             let reviewerId = sprintf "%s-reviewer" managerId
             worktrees.[reviewerId] <- worktree
-
             let! forked = runtime.Fork(reviewerId, AgentRole.Reviewer, prompt)
 
             match forked with
@@ -142,37 +145,48 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | Ok _ -> return Ok()
         }
 
-    let reverify (managerId: string) (worktree: string) : Task<Result<unit, string>> =
+    let reverify (managerId: string) (worktree: string) (barrierKey: string) : Task<Result<unit, string>> =
         task {
-            let prompt =
-                "Review the current worktree for correctness. Submit your verdict with the verdict tool."
+            let! barrierResult = OrchestratorHostHelpers.emitReviewBarrier deps.Journal orchestratorId barrierKey
 
-            let! ran = runReviewerOnce managerId worktree prompt
-
-            match ran with
+            match barrierResult with
             | Error err -> return Error err
             | Ok() ->
-                let! state = reviewState worktree
+                let! priorState = OrchestratorReviewState.read deps.Journal orchestratorId worktree
 
-                match state with
+                match priorState with
                 | Error err -> return Error err
                 | Ok true -> return Ok()
                 | Ok false ->
-                    let! nudged =
-                        runReviewerOnce
-                            managerId
-                            worktree
-                            "You produced no verdict. Submit your verdict with the verdict tool."
+                    let prompt =
+                        "Review the current worktree for correctness. Submit your verdict with the verdict tool."
 
-                    match nudged with
+                    let! ran = runReviewerOnce managerId worktree prompt
+
+                    match ran with
                     | Error err -> return Error err
                     | Ok() ->
-                        let! retry = reviewState worktree
+                        let! state = OrchestratorReviewState.read deps.Journal orchestratorId worktree
 
-                        match retry with
+                        match state with
                         | Error err -> return Error err
                         | Ok true -> return Ok()
-                        | Ok false -> return Error "Reviewer produced no verdict"
+                        | Ok false ->
+                            let! nudged =
+                                runReviewerOnce
+                                    managerId
+                                    worktree
+                                    "You produced no verdict. Submit your verdict with the verdict tool."
+
+                            match nudged with
+                            | Error err -> return Error err
+                            | Ok() ->
+                                let! retry = OrchestratorReviewState.read deps.Journal orchestratorId worktree
+
+                                match retry with
+                                | Error err -> return Error err
+                                | Ok true -> return Ok()
+                                | Ok false -> return Error "Reviewer produced no verdict"
         }
 
     let managerPort: ManagerPort =
@@ -200,8 +214,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         }
 
     let mutable engineInstance: Orchestrator option = None
+    let engineGate = obj ()
+    let mutable engineTask: Task<Result<Orchestrator, string>> option = None
 
-    let engine () : Task<Result<Orchestrator, string>> =
+    let initializeEngine () : Task<Result<Orchestrator, string>> =
         task {
             match engineInstance with
             | Some value -> return Ok value
@@ -211,12 +227,27 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 match branchResult with
                 | Error reason -> return Error reason
                 | Ok branch ->
-                    do!
+                    let! reconciledPublished =
                         OrchestratorAuthority.reconcilePublishedFromAuthority
                             deps.Journal
                             authorityPort
                             deps.RepoPath
                             branch
+
+                    // Sweep orphaned manager artifacts before resuming jobs.
+                    // Best-effort: failures are skipped, engine init is never blocked.
+                    let sweepLockPath =
+                        PublishLock.lockPath (RuntimePath.gitCommonDir deps.RepoPath) branch
+
+                    match deps.Journal with
+                    | Some journal ->
+                        let jobs = (AgentJournal.snapshot journal).AgentProjections.Orchestrator.ManagerJobs
+                        do! OrchestratorSweep.sweepLocked sweepLockPath gitPort jobs
+                    | None -> ()
+
+                    // Canonicalize the repo path via git common-dir so symlinked
+                    // spellings share one cross-process publish lock.
+                    let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
 
                     let value =
                         Orchestrator(
@@ -225,23 +256,51 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                             deps.RepoPath,
                             branch,
                             ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
-                            ?authority = Some authorityPort
+                            ?authority = Some authorityPort,
+                            ?lockRepoPath = Some lockRepoPath
                         )
 
-                    engineInstance <- Some value
+                    for managerId, commitHash in reconciledPublished do
+                        value.RecoverPublished(managerId, commitHash)
 
                     match deps.Journal with
                     | Some journal ->
-                        let jobs = (AgentJournal.snapshot journal).AgentProjections.Orchestrator.ManagerJobs
+                        let snapshot = AgentJournal.snapshot journal
+                        let jobs = snapshot.AgentProjections.Orchestrator.ManagerJobs
 
                         for KeyValue(managerId, job) in jobs do
                             let id = ManagerId.value managerId
                             worktrees.[id] <- job.WorktreePath
-                            value.RecoverManagerJob(id, job.WorktreePath, job.Prompt, job.CandidateCommit.IsSome)
+                            worktrees.[sprintf "%s-reviewer" id] <- job.WorktreePath
+
+                        OrchestratorSessionDirectories.registerRestored
+                            snapshot
+                            orchestratorId
+                            worktrees
+                            deps.RegisterChildDirectory
+                            deps.RegisterReviewerTree
+
+                        for KeyValue(managerId, job) in jobs do
+                            let id = ManagerId.value managerId
+                            let! prompt = OrchestratorHostHelpers.recoveryPrompt gitPort job
+                            value.RecoverManagerJob(id, job.WorktreePath, prompt, job.CandidateCommit.IsSome)
                     | None -> ()
 
+                    lock engineGate (fun () -> engineInstance <- Some value)
                     return Ok value
         }
+
+    let engine () : Task<Result<Orchestrator, string>> =
+        lock engineGate (fun () ->
+            match engineInstance with
+            | Some value -> Task.FromResult(Ok value)
+            | None ->
+                match engineTask with
+                | Some task -> task
+                | None ->
+                    let task = initializeEngine ()
+                    engineTask <- Some task
+                    task)
 
     member _.ForkManagerJob(managerId: string, prompt: string) : Task<Result<string, string>> =
         task {

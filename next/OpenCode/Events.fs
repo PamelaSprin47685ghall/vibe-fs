@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
+open System.Collections.Generic
 open Wanxiangshu.Next.Kernel.Identity
 open Fable.Core
 open Fable.Core.JsInterop
@@ -12,17 +13,17 @@ type TerminalOutcome =
 
 type TerminalCompletionListener = SessionId -> TerminalOutcome -> unit
 
+/// Optional output boundary used to isolate one prompt/run from prior session history.
+type IEventOutputBoundaryPort =
+    abstract GetSessionOutputWatermark: sessionId: SessionId -> int
+    abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
+
 type IEventObservationPort =
+    inherit IEventOutputBoundaryPort
     abstract SubscribeTerminalListener: listener: TerminalCompletionListener -> IDisposable
     abstract NotifyTerminal: sessionId: SessionId -> outcome: TerminalOutcome -> bool
     abstract IsCompleted: sessionId: SessionId -> bool
     abstract GetSessionOutput: sessionId: SessionId -> string list
-
-/// Optional output boundary used to isolate one prompt/run from prior session history.
-/// Kept separate from IEventObservationPort so existing event-port implementations remain compatible.
-type IEventOutputBoundaryPort =
-    abstract GetSessionOutputWatermark: sessionId: SessionId -> int
-    abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
 
 module Events =
 
@@ -63,6 +64,10 @@ module Events =
         let sessionOutputs =
             System.Collections.Generic.Dictionary<SessionId, ResizeArray<string>>()
 
+        let assistantMessageIds = HashSet<string>()
+        let recordedPartIds = HashSet<string>()
+        let pendingParts = Dictionary<string, SessionId * string * string option>()
+
         let lockObj = obj ()
 
         let recordOutput sessionId text =
@@ -73,6 +78,16 @@ module Events =
                     let output = ResizeArray<string>()
                     output.Add(text)
                     sessionOutputs.[sessionId] <- output)
+
+        let recordAssistantOutput (sessionId: SessionId) (partId: string option) (text: string) =
+            let meaningfulText = text.Replace("\u200B", "").Replace("\uFEFF", "")
+
+            if String.IsNullOrWhiteSpace meaningfulText then
+                ()
+            else
+                match partId with
+                | Some id when not (recordedPartIds.Add id) -> ()
+                | _ -> recordOutput sessionId text
 
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
@@ -103,11 +118,57 @@ module Events =
                         )
                     )
 
+                let messageId =
+                    MessageOriginDecoder.messageIdOf properties eventObj
+                    |> Option.map MessageId.value
+
+                let part = properties?part
+
+                let partId =
+                    if isNull part then
+                        None
+                    else
+                        MessageOriginDecoder.asString part?id
+
+                let info = properties?info
+                let message = properties?message
+
+                let roleValue value =
+                    MessageOriginDecoder.asString value
+                    |> Option.map (fun role -> role.ToLowerInvariant())
+
+                let role: string option =
+                    match roleValue properties?role with
+                    | Some value -> Some value
+                    | None when not (isNull info) -> roleValue info?role
+                    | None when not (isNull message) -> roleValue message?role
+                    | None -> None
+
+                match role, messageId with
+                | Some "assistant", Some id ->
+                    assistantMessageIds.Add id |> ignore
+
+                    match pendingParts.TryGetValue id with
+                    | true, (pendingSession, text, pendingPartId) ->
+                        recordAssistantOutput pendingSession pendingPartId text
+                        pendingParts.Remove id |> ignore
+                    | false, _ -> ()
+                | Some _, Some id -> pendingParts.Remove id |> ignore
+                | _ -> ()
+
                 match MessageOriginDecoder.sessionIdOf properties eventObj with
                 | None -> ()
                 | Some sessionId ->
-                    MessageOriginDecoder.assistantText properties eventObj eventType
-                    |> Option.iter (recordOutput sessionId)
+                    let assistantText = MessageOriginDecoder.assistantText properties eventObj eventType
+
+                    if eventType.StartsWith("message.part") && role.IsNone then
+                        match messageId, assistantText with
+                        | Some id, Some text when assistantMessageIds.Contains id ->
+                            recordAssistantOutput sessionId partId text
+                        | Some id, Some text -> pendingParts.[id] <- sessionId, text, partId
+                        | _ -> ()
+                    else
+                        assistantText |> Option.iter (recordAssistantOutput sessionId partId)
 
                     let outcome =
                         match MessageOriginDecoder.errorText properties eventObj with

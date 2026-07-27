@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Session
 
+open System
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -33,15 +34,30 @@ module DurableFallback =
             | None -> Fallback.initial
         | None -> Fallback.initial
 
-    let nextDecision (sessionId: SessionId) (projSet: ProjectionSet) : FallbackDecision =
-        let state = currentState sessionId projSet
+    let isDead (sessionId: SessionId) (projSet: ProjectionSet) : bool =
+        match Map.tryFind sessionId projSet.AgentProjections.Sessions with
+        | Some session -> session.Fallback |> Option.exists (fun fallback -> fallback.IsDead)
+        | None -> false
 
-        match state.Side, state.Failures with
-        | ModelSide.A, 1 -> FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 1 }
-        | ModelSide.B, 2 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 2 }
-        | ModelSide.B, 3 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }
-        | _, failures when failures >= 4 -> FallbackDecision.Dead
-        | _ -> Fallback.nextAttempt state
+    let nextDecision (sessionId: SessionId) (projSet: ProjectionSet) : FallbackDecision =
+        // SSOT §6: A(0) → A retry(1) → permanent switch B(2) → B retry(3) → Dead(4).
+        // nextDecision returns the model to use for the NEXT attempt given the
+        // current cumulative failure count. A gets two attempts (original + retry);
+        // B gets two attempts (original + retry); the 5th failure is Dead.
+        // The returned Failures = current count + 1 (the count if this attempt fails).
+        // ModelResolver reads the fold's Side directly for production model
+        // selection; nextDecision is the decision contract for callers and tests.
+        if isDead sessionId projSet then
+            FallbackDecision.Dead
+        else
+            let state = currentState sessionId projSet
+
+            match state.Failures with
+            | 0 -> FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 1 }
+            | 1 -> FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 2 }
+            | 2 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }
+            | 3 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 4 }
+            | _ -> FallbackDecision.Dead
 
     let recordFailure
         (journalPort: FallbackJournalPort)
@@ -52,7 +68,8 @@ module DurableFallback =
             AgentFact.FallbackFailureRecorded
                 {| SessionId = sessionId
                    Reason = reason
-                   AssistantMessageId = sprintf "manual-%s" (SessionId.value sessionId)
+                   AssistantMessageId =
+                    sprintf "manual-%s-%s" (SessionId.value sessionId) (Guid.NewGuid().ToString("N"))
                    ProviderAttempt = "manual" |}
 
         match journalPort.AppendFact (StreamId.Session sessionId) fact with

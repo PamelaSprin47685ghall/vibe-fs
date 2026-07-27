@@ -67,7 +67,8 @@ type CompanionHost
         sessions: ISessionHostPort,
         ?durable: ICompanionDurablePort,
         ?onBloggerCreated: SessionId -> unit,
-        ?bloggerModel: Result<OpencodeModel, string>
+        ?bloggerModel: Result<OpencodeModel, string>,
+        ?outputBoundary: IEventOutputBoundaryPort
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
@@ -76,11 +77,37 @@ type CompanionHost
     let configuredBloggerModel =
         defaultArg bloggerModel (Error "WANXIANGSHU_BLOGGER_MODEL is not configured")
 
+    let outputWatermark (sessionId: SessionId) =
+        match outputBoundary with
+        | Some boundary -> boundary.GetSessionOutputWatermark sessionId
+        | None -> sessions.GetSessionOutput sessionId |> List.length
+
+    let assistantOutput (childId: SessionId) (watermark: int) =
+        let output =
+            match outputBoundary with
+            | Some boundary -> boundary.GetSessionOutputSince(childId, watermark)
+            | None ->
+                sessions.GetSessionOutput childId
+                |> List.skip (min watermark (sessions.GetSessionOutput childId).Length)
+
+        output
+        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
+        |> String.concat "\n"
+
     let mutable bloggerTask: Task<SessionId> option = None
+    let mutable bloggerId: SessionId option = None
+    let mutable bloggerFailed = false
     let bloggerNeedsReset = ref false
 
     let ensureBlogger () =
         lock gate (fun () ->
+            match bloggerTask with
+            | Some _ when bloggerFailed ->
+                bloggerTask <- None
+                bloggerId <- None
+                bloggerFailed <- false
+            | _ -> ()
+
             match bloggerTask with
             | Some task -> task
             | None ->
@@ -97,33 +124,41 @@ type CompanionHost
 
                 let task =
                     task {
-                        let! created =
-                            sessions.CreateChildSession(
-                                primaryId,
-                                { Title = Some "blogger"
-                                  Agent = Some "blogger"
-                                  Directory = None }
-                            )
-
-                        match created with
-                        | Ok id ->
-                            // Register the blogger role synchronously so the
-                            // companion gate can never recurse into blogger
-                            // sessions, not even before its first event.
-                            bloggerCreated id
-
-                            durable
-                            |> Option.iter (fun port ->
-                                port.AppendLink(
+                        try
+                            let! created =
+                                sessions.CreateChildSession(
                                     primaryId,
-                                    ChildId.create (SessionId.value id),
-                                    "blogger",
-                                    Some "blogger"
+                                    { Title = Some "blogger"
+                                      Agent = Some "blogger"
+                                      Directory = None }
                                 )
-                                |> ignore)
 
-                            return id
-                        | Error error -> return raise (InvalidOperationException error)
+                            match created with
+                            | Ok id ->
+                                bloggerId <- Some id
+                                bloggerFailed <- false
+
+                                // Register the blogger role synchronously so the
+                                // companion gate can never recurse into blogger
+                                // sessions, not even before its first event.
+                                bloggerCreated id
+
+                                durable
+                                |> Option.iter (fun port ->
+                                    port.AppendLink(
+                                        primaryId,
+                                        ChildId.create (SessionId.value id),
+                                        "blogger",
+                                        Some "blogger"
+                                    )
+                                    |> ignore)
+
+                                return id
+                            | Error error -> return raise (InvalidOperationException error)
+                        with ex ->
+                            bloggerFailed <- true
+                            bloggerId <- None
+                            return raise ex
                     }
 
                 bloggerTask <- Some task
@@ -136,39 +171,38 @@ type CompanionHost
           Gate = gate
           BloggerNeedsReset = bloggerNeedsReset
           Companion = companion
-          AssistantOutput =
-            (fun childId watermark ->
-                CompanionDelta.assistantOutput (fun id -> sessions.GetSessionOutput id) childId watermark) }
+          OutputWatermark = outputWatermark
+          AssistantOutput = assistantOutput }
 
     member this.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome =
         let deps = this.BloggerDeps
-        companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps delta))
+        companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps projection delta))
 
     member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
 
     /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
-    /// into B' and durably persist (CompanionAdvanced). Fire-and-forget; the
-    /// underlying async rebase returns false (SkippedBusy) when the Blogger is
-    /// busy, and leaves B unchanged on failure.
-    member this.SelfRebase(currentProjection: ProjectionSnapshot) : CompanionOutcome =
+    /// into B' and durably persist (CompanionAdvanced with the EXISTING baseline,
+    /// so the projection baseline is NOT advanced — only B is replaced). The
+    /// Blogger sees only the old B when condensing and never processes the
+    /// P0→P1 delta, so advancing the baseline here would lose those messages.
+    /// Fire-and-forget; the underlying async rebase returns false (SkippedBusy)
+    /// when the Blogger is busy, and leaves B unchanged on failure.
+    member this.SelfRebase() : CompanionOutcome =
         let before = companion.Memory
 
-        if not before.ReplacementActive || before.CurrentB.IsNone then
+        // Y self-rebase is independent of X prefix replacement: trigger once B
+        // exists. The 0.8 budget gate lives in CompanionTransform against the
+        // blogger child's own (usually smaller) model limit.
+        if before.CurrentB.IsNone then
             Submitted
         else
             let currentB = before.CurrentB.Value
             let deps = this.BloggerDeps
 
             let started =
-                companion.TryRebase(fun () ->
-                    async {
-                        let! bPrime = CompanionHostBlogger.selfRebaseBlog deps currentB |> Async.AwaitTask
-                        return (bPrime, currentProjection)
-                    })
+                companion.TrySelfRebase(fun () -> CompanionHostBlogger.selfRebaseBlog deps currentB)
 
             if started then Submitted else SkippedBusy
-
-    member _.TryRebase(newB: string, newBaseline: string) : bool = companion.TryRebase(newB, newBaseline)
 
     member _.Memory = companion.Memory
 
@@ -191,7 +225,7 @@ type CompanionHost
 
         let deps = this.BloggerDeps
 
-        companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps delta))
+        companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps current delta))
         |> ignore
 
         match before.ReplacementActive, before.CurrentB, before.LastSuccessfulProjection with
@@ -210,8 +244,7 @@ type CompanionHost
     member _.ReplacePrefix(messages: HostMessage list, watermarkIndex: int) =
         Companion.compressPrefix messages companion.Memory.CurrentB watermarkIndex
 
-    member _.BloggerSession =
-        lock gate (fun () -> bloggerTask |> Option.map (fun task -> task.Result))
+    member _.BloggerSession = lock gate (fun () -> bloggerId)
 
     member _.PrimarySessionId = primaryId
 

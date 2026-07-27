@@ -43,6 +43,19 @@ module CompanionTransform =
     /// budget capture no activation can happen.
     let activationRatio = 0.8
 
+    /// Conservative default blogger context budget (tokens), used only when the
+    /// blogger child has not yet reported its own model limit via the
+    /// system.transform hook. The blogger model is cheap and usually smaller
+    /// than X, so this is intentionally below typical X limits.
+    let defaultBloggerBudgetTokens = 32000
+
+    /// Y self-rebase predicate: the current B's estimated token count has
+    /// crossed 0.8 of the blogger model's context budget. Independent of X
+    /// prefix replacement; no ReplacementActive gate.
+    let bloggerSelfRebaseDue (bloggerBudget: int) (b: string) : bool =
+        bloggerBudget > 0
+        && float ((String.length b + 3) / 4) >= float bloggerBudget * activationRatio
+
     let estimateTokens (messages: obj list) =
         let json = Projection.canonicalJson (List.toArray messages)
         (String.length json + 3) / 4
@@ -51,6 +64,7 @@ module CompanionTransform =
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
         (sessionPort: ISessionHostPort)
+        (outputBoundary: IEventOutputBoundaryPort option)
         (journal: AgentJournal option)
         (sessionBudgets: Dictionary<string, int>)
         (sessionRoles: Dictionary<string, string>)
@@ -128,6 +142,7 @@ module CompanionTransform =
                                     sessionPort,
                                     ?durable = durable,
                                     ?bloggerModel = Some bloggerModel,
+                                    ?outputBoundary = outputBoundary,
                                     onBloggerCreated =
                                         (fun bloggerId -> sessionRoles.[SessionId.value bloggerId] <- "blogger")
                                 )
@@ -145,20 +160,27 @@ module CompanionTransform =
                         companion.EnablePrefixReplacement() |> ignore
                     | _ -> ()
 
-                // Y self-rebase: when B itself approaches the model budget and
-                // prefix replacement is already active, ask the Blogger child to
-                // condense the FULL current B into B' and durably persist it
-                // (CompanionAdvanced). Never synthesize a placeholder: if the
-                // Blogger is busy we skip; if it fails we keep the old B.
-                match
-                    companion.Memory.CurrentB, companion.Memory.ReplacementActive, sessionBudgets.TryGetValue sessionId
-                with
-                | Some b, true, (true, budget) when
-                    budget > 0
-                    && float ((String.length b + 3) / 4) >= float budget * activationRatio
-                    ->
-                    let currentProjection = Projection.canonicalJson (List.toArray rawMsgs)
-                    companion.SelfRebase(currentProjection) |> ignore
-                | _ -> ()
+                // Y self-rebase: independent of X prefix replacement. Triggers
+                // when B's estimated tokens cross 0.8 of the BLOGGER child's own
+                // model context budget (the cheap blogger model usually has a
+                // smaller limit than X). We use the blogger budget once the child
+                // has reported one via the system.transform hook, else a
+                // conservative default. No ReplacementActive gate: X replacement
+                // and Y self-rebase are orthogonal. Never synthesize a
+                // placeholder: if the Blogger is busy we skip; if it fails we
+                // keep the old B.
+                match companion.Memory.CurrentB with
+                | Some b ->
+                    let bloggerBudget =
+                        match companion.BloggerSession with
+                        | Some bloggerId ->
+                            match sessionBudgets.TryGetValue(SessionId.value bloggerId) with
+                            | true, budget when budget > 0 -> budget
+                            | _ -> defaultBloggerBudgetTokens
+                        | None -> defaultBloggerBudgetTokens
+
+                    if bloggerSelfRebaseDue bloggerBudget b then
+                        companion.SelfRebase() |> ignore
+                | None -> ()
 
                 replaceMessagesInPlace rawOutObj (companion.TransformRaw rawMsgs)

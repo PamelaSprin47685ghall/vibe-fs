@@ -191,17 +191,3 @@ module ProcessRunnerTests =
                 trueThat (stdout.Contains("shell-output")) "Expected shell output"
             | _ -> failwith "Expected Completed outcome from shell process execution"
         }
-
-    let ``ExecutorSummarizer_summarizes_chunks_using_injected_port`` () =
-        let port: SummarizerPort<byte[], int> =
-            { MapChunk = fun bytes -> bytes.Length
-              ReduceSummaries = fun list -> List.sum list }
-
-        let chunk1 = Encoding.UTF8.GetBytes("hello ")
-        let chunk2 = Encoding.UTF8.GetBytes("world")
-
-        let res = ExecutorSummarizer.summarizeChunks port [ chunk1; chunk2 ]
-
-        match res with
-        | Ok(Some totalLen) -> equal 11 totalLen
-        | _ -> failwith "Expected summarized length result"

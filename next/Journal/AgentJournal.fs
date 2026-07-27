@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Journal
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -14,6 +15,12 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
     let gate = obj ()
     let mutable proj = initialProjection
 
+    /// Durable dedupe identity for a fallback failure. Matches the identity the
+    /// fold stores in the per-session bounded `RecentFailureIds` (max 4 — the
+    /// Dead threshold), so dedupe is O(sessions), not O(history).
+    let fallbackIdentity (assistantMessageId: string) (providerAttempt: string) =
+        sprintf "%s|%s" assistantMessageId providerAttempt
+
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
     member _.IsPoisoned = writer.IsPoisoned
@@ -26,12 +33,29 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
         (fact: AgentFact)
         : Result<ProjectionSet, JournalAppendFailure> =
         lock gate (fun () ->
-            match writer.Append stream turnId (Fact.Agent fact) with
-            | Committed env ->
-                let updated = Fold.foldEnvelope proj env
-                proj <- updated
-                Ok updated
-            | CommitUnknown(eventId, failure) -> Error { EventId = eventId; Failure = failure })
+            // Fallback append boundary (SSOT §6): dedupe and Dead-refusal read
+            // the bounded per-session projection — never a global history set.
+            let refuseFallback =
+                match fact with
+                | AgentFact.FallbackFailureRecorded p ->
+                    match Map.tryFind p.SessionId proj.AgentProjections.Sessions with
+                    | Some { Fallback = Some fb } ->
+                        fb.IsDead
+                        || List.contains (fallbackIdentity p.AssistantMessageId p.ProviderAttempt) fb.RecentFailureIds
+                    | _ -> false
+                | _ -> false
+
+            if refuseFallback then
+                // Duplicate identity, or the session is already Dead (4 failures):
+                // idempotent no-op, no new envelope.
+                Ok proj
+            else
+                match writer.Append stream turnId (Fact.Agent fact) with
+                | Committed env ->
+                    let updated = Fold.foldEnvelope proj env
+                    proj <- updated
+                    Ok updated
+                | CommitUnknown(eventId, failure) -> Error { EventId = eventId; Failure = failure })
 
     interface IDisposable with
         member _.Dispose() = (writer :> IDisposable).Dispose()
@@ -61,7 +85,9 @@ module AgentJournal =
         (boot: BootSnapshot)
         : AgentJournal =
         let projection = Fold.apply Fold.empty boot.Envelopes
-        createFromProjection directory runtimeId processId startedAt projection
+        let writer, initEnv = JournalWriter.create directory runtimeId processId startedAt
+        let initialProj = Fold.foldEnvelope projection initEnv
+        new AgentJournal(writer, initialProj)
 
     let create (directory: string) (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) : AgentJournal =
         createFromProjection directory runtimeId processId startedAt Fold.empty

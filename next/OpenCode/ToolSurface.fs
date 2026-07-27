@@ -16,24 +16,8 @@ module ToolSurface =
 
     open ToolSurfaceEmit
 
-    [<RequireQualifiedAccess>]
-    module private ForkField =
-        [<Literal>]
-        let Agent = "agent"
-
-        [<Literal>]
-        let Prompt = "prompt"
-
-        [<Literal>]
-        let Signal = "signal"
-
-    [<RequireQualifiedAccess>]
-    module private ListKind =
-        [<Literal>]
-        let Agent = "agent"
-
-        [<Literal>]
-        let Pty = "pty"
+    [<Emit("Object.defineProperty($0, $1, { value: $2, enumerable: false })")>]
+    let private defineHidden (target: obj) (name: string) (value: obj) : unit = jsNative
 
     let private mkSid (s: string) = SessionId.create s
 
@@ -46,6 +30,7 @@ module ToolSurface =
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (verdictSessions: HashSet<string>)
+        (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
         : obj =
         let factory = toolModule?tool
@@ -64,6 +49,7 @@ module ToolSurface =
                   WorkspaceDirectory = workspaceDirectory
                   SessionParents = sessionParents
                   SessionRoles = sessionRoles
+                  SessionDirectories = sessionDirectories
                   TreePorts = worktreeTreePorts }
                 gate
                 orchestratorHosts
@@ -97,7 +83,17 @@ module ToolSurface =
                                                 sid
                                                 role
                                                 childId),
-                                    ?modelResolver = modelConfig
+                                    onChildCreatedDir =
+                                        (fun _ childId dirOpt ->
+                                            dirOpt
+                                            |> Option.iter (fun d ->
+                                                sessionDirectories.[SessionId.value childId] <- d)),
+                                    ?modelResolver = modelConfig,
+                                    directoryFor =
+                                        (fun _ ->
+                                            match sessionDirectories.TryGetValue sid with
+                                            | true, path -> Some path
+                                            | false, _ -> None)
                                 )
 
                             runtimes.[sid] <- r
@@ -106,9 +102,9 @@ module ToolSurface =
 
         let forkExecute (args: obj) (ctx: obj) =
             task {
-                let agent = textArg args ForkField.Agent
-                let prompt = textArg args ForkField.Prompt
-                let signalText = optionalTextArg args ForkField.Signal
+                let agent = textArg args ToolSurfaceFields.ForkField.Agent
+                let prompt = textArg args ToolSurfaceFields.ForkField.Prompt
+                let signalText = optionalTextArg args ToolSurfaceFields.ForkField.Signal
 
                 match runtimeFor ctx with
                 | Error err -> return box (stringify (createObj [ "error", box err ]))
@@ -143,7 +139,19 @@ module ToolSurface =
                                 return
                                     box (stringify (createObj [ "error", box "PTY creation does not accept signal" ]))
                             | None ->
-                                let! result = runtime.ForkPty(prompt, ?cwd = workspaceDirectory)
+                                // Resolve the PTY cwd from the per-session
+                                // directory map, defaulting to the plugin
+                                // workspace directory (SSOT §7 / requirement 7).
+                                let cwd =
+                                    match
+                                        sessionDirectories.TryGetValue(
+                                            contextString ctx "sessionID" |> Option.defaultValue ""
+                                        )
+                                    with
+                                    | true, d -> Some d
+                                    | _ -> workspaceDirectory
+
+                                let! result = runtime.ForkPty(prompt, ?cwd = cwd)
 
                                 match result with
                                 | Ok id ->
@@ -234,7 +242,7 @@ module ToolSurface =
                         |> List.sortBy (fun a -> a.AgentId)
                         |> List.map (fun a ->
                             createObj
-                                [ "kind", box ListKind.Agent
+                                [ "kind", box ToolSurfaceFields.ListKind.Agent
                                   "agentId", box a.AgentId
                                   "role", box (a.Role.ToString())
                                   "status", box (a.Status.ToString()) ])
@@ -244,7 +252,7 @@ module ToolSurface =
                         |> List.sortBy (fun p -> p.PtyId)
                         |> List.map (fun p ->
                             createObj
-                                [ "kind", box ListKind.Pty
+                                [ "kind", box ToolSurfaceFields.ListKind.Pty
                                   "ptyId", box p.PtyId
                                   "command", box p.Command
                                   "startedAt", box p.StartedAt ])
@@ -277,14 +285,21 @@ module ToolSurface =
                 sessionRoles
                 modelConfig
 
+        let disposeExecutorRuntime =
+            ToolSurfaceOrchestrator.disposeExecutorRuntime gate executorRuntimes
+
         let executor =
             ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory
 
-        createObj
-            [ "fork",
-              box (applyTool factory (definition "Fork, nudge, or control an agent or PTY" forkArgs forkExecute))
-              "join",
-              box (applyTool factory (definition "Wait for any agent or PTY completion" (createObj []) joinExecute))
-              "list", box (applyTool factory (definition "List active agents and PTYs" (createObj []) listExecute))
-              "verdict", box (applyTool factory (definition "Submit the review verdict" verdictArgs verdictExecute))
-              "executor", executor ]
+        let tools =
+            createObj
+                [ "fork",
+                  box (applyTool factory (definition "Fork, nudge, or control an agent or PTY" forkArgs forkExecute))
+                  "join",
+                  box (applyTool factory (definition "Wait for any agent or PTY completion" (createObj []) joinExecute))
+                  "list", box (applyTool factory (definition "List active agents and PTYs" (createObj []) listExecute))
+                  "verdict", box (applyTool factory (definition "Submit the review verdict" verdictArgs verdictExecute))
+                  "executor", executor ]
+
+        defineHidden tools "disposeExecutorRuntime" (box disposeExecutorRuntime)
+        tools

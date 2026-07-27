@@ -171,20 +171,33 @@ module MessageOriginDecoder =
     let messageIdOf properties eventObj =
         let propertyMessage = properties?message
         let propertyInfo = properties?info
+        let propertyPart = properties?part
         let eventMessage = eventObj?message
+        let candidates = ResizeArray<string>()
 
-        [ properties?messageID
-          properties?messageId
-          if not (isNull propertyMessage) then
-              propertyMessage?id
-          else
-              null
-          if not (isNull propertyInfo) then propertyInfo?id else null
-          eventObj?messageID
-          eventObj?messageId
-          if not (isNull eventMessage) then eventMessage?id else null ]
-        |> firstString
-        |> Option.map MessageId.create
+        let add value =
+            asString value |> Option.iter candidates.Add
+
+        add properties?messageID
+        add properties?messageId
+
+        if not (isNull propertyMessage) then
+            add propertyMessage?id
+
+        if not (isNull propertyInfo) then
+            add propertyInfo?id
+
+        if not (isNull propertyPart) then
+            add propertyPart?messageID
+            add propertyPart?messageId
+
+        add eventObj?messageID
+        add eventObj?messageId
+
+        if not (isNull eventMessage) then
+            add eventMessage?id
+
+        candidates |> Seq.toList |> List.tryHead |> Option.map MessageId.create
 
     let errorText properties eventObj =
         let propertyError = properties?error

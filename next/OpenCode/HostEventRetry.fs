@@ -19,6 +19,7 @@ module HostEventRetry =
         (journal: AgentJournal option)
         (recorded: HashSet<string>)
         (retryAttemptBySession: Dictionary<string, string>)
+        (hostShutdownSessions: HashSet<string>)
         (fallbackMessageId: string)
         (sessionId: string)
         (raw: obj)
@@ -40,23 +41,40 @@ module HostEventRetry =
                 else
                     unbox<string> status?message
 
-            // The attempt belongs to this session so a later failed-assistant
-            // terminal for the same attempt attributes to the same identity.
+            // Host-shutdown artifact: when the provider is deliberately stopped
+            // (the test harness stopMocking, or a production graceful shutdown
+            // returning 503 "Service Unavailable" / connection reset), in-flight
+            // requests fail. These are NOT model failures and must not poison the
+            // durable fallback budget (which would otherwise mark the session
+            // Dead after 4 and break restart recovery). Real model errors (e.g.
+            // provider 500 server_error, see fallback-canary) are recorded
+            // normally. The production abort path is additionally gated in
+            // HostEventRouter.
+            let isHostShutdown =
+                reason.Contains("mocking stopped")
+                || reason.Contains("Service Unavailable")
+                || reason.Contains("Connection reset")
+                || reason.Contains("ECONNRESET")
+
             retryAttemptBySession.[sessionId] <- attempt
 
-            let assistantMessageId =
-                if not (isNull properties) && not (isNull properties?messageID) then
-                    unbox<string> (properties?messageID)
-                elif not (isNull properties) && not (isNull properties?messageId) then
-                    unbox<string> (properties?messageId)
-                elif
-                    not (isNull properties)
-                    && not (isNull properties?info)
-                    && not (isNull properties?info?id)
-                then
-                    unbox<string> (properties?info?id)
-                else
-                    fallbackMessageId
+            if isHostShutdown then
+                hostShutdownSessions.Add sessionId |> ignore
+            else
+                let assistantMessageId =
+                    if not (isNull properties) && not (isNull properties?messageID) then
+                        unbox<string> (properties?messageID)
+                    elif not (isNull properties) && not (isNull properties?messageId) then
+                        unbox<string> (properties?messageId)
+                    elif
+                        not (isNull properties)
+                        && not (isNull properties?info)
+                        && not (isNull properties?info?id)
+                    then
+                        unbox<string> (properties?info?id)
+                    else
+                        fallbackMessageId
 
-            if not (String.IsNullOrWhiteSpace assistantMessageId) then
-                FallbackDetect.recordFallbackFailure journal recorded sessionId assistantMessageId attempt reason
+                if not (String.IsNullOrWhiteSpace assistantMessageId) then
+                    FallbackDetect.recordFallbackFailure journal recorded sessionId assistantMessageId attempt reason
+                    |> ignore

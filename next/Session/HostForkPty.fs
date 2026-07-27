@@ -28,7 +28,7 @@ module HostForkRuntimePty =
         member this.TryPty(id: string) =
             let candidate = PtyId.Create id
 
-            if this.PtyPort.Exists candidate then
+            if this.PtyPort.Known candidate then
                 Some candidate
             else
                 None
@@ -40,8 +40,11 @@ module HostForkRuntimePty =
                 else
                     match signal with
                     | Some value ->
-                        this.PtyPort.Send(id, PtyCommand.Signal value)
-                        return Ok { Id = id; Output = ""; Closed = false }
+                        let! sent = this.PtyPort.Send(id, PtyCommand.Signal value)
+
+                        match sent with
+                        | Ok() -> return Ok { Id = id; Output = ""; Closed = false }
+                        | Error err -> return Error err
                     | None when String.IsNullOrEmpty prompt ->
                         let! read = this.PtyPort.Read id
 
@@ -54,6 +57,9 @@ module HostForkRuntimePty =
                                       Closed = closed }
                         | Error err -> return Error err
                     | None ->
-                        this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
-                        return Ok { Id = id; Output = ""; Closed = false }
+                        let! writeResult = this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
+
+                        match writeResult with
+                        | Ok() -> return Ok { Id = id; Output = ""; Closed = false }
+                        | Error err -> return Error err
             }

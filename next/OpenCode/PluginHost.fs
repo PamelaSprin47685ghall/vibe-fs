@@ -59,6 +59,19 @@ module PluginHost =
                         sessionRoles.[ChildId.value childId] <- role.Trim().ToLowerInvariant()
                 | None -> ()
 
+    let restoreSessionParents (journal: AgentJournal option) (sessionParents: Dictionary<string, string>) =
+        match journal with
+        | None -> ()
+        | Some journal ->
+            let snapshot = AgentJournal.snapshot journal
+
+            for KeyValue(parentId, session) in snapshot.AgentProjections.Sessions do
+                match session.Linkage with
+                | Some linkage ->
+                    for KeyValue(childId, _) in linkage.LinkedChildren do
+                        sessionParents.[ChildId.value childId] <- SessionId.value parentId
+                | None -> ()
+
     let gitTreePortFromInput (input: obj) : GitTreePort option =
         if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
             None
@@ -73,6 +86,7 @@ module PluginHost =
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
+        (onDirectory: (obj -> unit) option)
         : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
         // Always keep the plugin event-hook observer: it covers main-directory
         // sessions. Also open /global/event when available so worktree-scoped
@@ -82,6 +96,6 @@ module PluginHost =
         let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
         let observe = Some(fun raw -> HostEventSubscribe.observe hostEventPort raw)
 
-        match HostEventSubscribe.trySubscribeHostEvents input hostEventPort with
+        match HostEventSubscribe.trySubscribeHostEvents input hostEventPort onDirectory with
         | Error err -> Error err
         | Ok subscription -> Ok(eventPort, sessionPort, subscription, observe)

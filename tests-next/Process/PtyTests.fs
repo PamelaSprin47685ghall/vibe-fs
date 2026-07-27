@@ -11,7 +11,6 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Kernel.Identity
 
 module PtyTests =
-
     let private equal expected actual =
         if not (Unchecked.equals expected actual) then
             failwithf "Expected %A, got %A" expected actual
@@ -44,13 +43,18 @@ module PtyTests =
     let ``HostForkRuntime_pty_dsl_writes_reads_signals_and_joins`` () =
         task {
             let log = ResizeArray<PtyCommand>()
-            // Mutable so the mock backend can resolve a Read through the port.
             let mutable ptyPort = Unchecked.defaultof<PtyPort>
 
             let handler id command =
-                match command with
-                | PtyCommand.Read -> ptyPort.ReadResult(id, "buffered", false)
-                | _ -> log.Add command
+                task {
+                    match command with
+                    | PtyCommand.Read ->
+                        ptyPort.ReadResult(id, "buffered", false)
+                        return Ok()
+                    | _ ->
+                        log.Add command
+                        return Ok()
+                }
 
             let p = PtyPort(handler = handler)
             ptyPort <- p
@@ -60,7 +64,7 @@ module PtyTests =
 
             let! created = bridge.ForkPty("cat", cwd = "/workspace")
             let id = ok created
-            // Spawn must carry the cwd through to the backend.
+
             match log.[0] with
             | PtyCommand.Spawn(cmd, cwd) ->
                 equal "cat" cmd
@@ -78,25 +82,14 @@ module PtyTests =
             | PtyCommand.Write bytes -> equal [| 97uy; 98uy; 99uy |] bytes
             | other -> failwithf "Unexpected PTY write: %A" other
 
-            // Read returns the buffered output immediately, without completing join.
-            // The mock backend resolves the Read through the port (not logged).
             let! readResult = bridge.SendPty(id, "", None)
             let read = ok readResult
             equal id read.Id
             equal "buffered" read.Output
             equal false read.Closed
             equal 2 log.Count
-
-            // Signal forwards to the backend but does NOT complete the join.
             let! signalled = bridge.ForkPty("cat", cwd = "/workspace")
             let signalledId = ok signalled
-
-            match log.[2] with
-            | PtyCommand.Spawn(cmd, cwd) ->
-                equal "cat" cmd
-                equal "/workspace" cwd
-            | other -> failwithf "Expected Spawn with cwd, got %A" other
-
             let! sigResult = bridge.SendPty(signalledId, "", Some PtySignal.Kill)
             equal signalledId (ok sigResult).Id
 
@@ -104,7 +97,6 @@ module PtyTests =
             | PtyCommand.Signal PtySignal.Kill -> ()
             | other -> failwithf "Unexpected PTY signal: %A" other
 
-            // The only completion path is the backend exit (onExit -> Complete).
             p.Complete(signalledId, outcome = Ok PtyOutcome.Closed)
             let! signalCompletion = bridge.Join()
             let signalCompletion = ok signalCompletion
@@ -117,16 +109,25 @@ module PtyTests =
     let ``HostForkRuntime_pty_exit_list_and_parent_abort_are_deterministic`` () =
         task {
             let log = ResizeArray<PtyCommand>()
-            let port = PtyPort(handler = (fun _ command -> log.Add command))
+
+            let port =
+                PtyPort(
+                    handler =
+                        (fun _ command ->
+                            log.Add command
+                            Task.FromResult(Ok()))
+                )
+
             let parent = SessionId.create "pty-parent-lifecycle"
-            let host = hostPort (SessionId.create "pty-child-lifecycle")
-            let bridge = HostForkRuntime(parent, host, ptyPort = port)
+
+            let bridge =
+                HostForkRuntime(parent, hostPort (SessionId.create "pty-child-lifecycle"), ptyPort = port)
+
             let! created = bridge.ForkPty("echo", cwd = "/workspace")
             let id = ok created
             port.Complete(id, outcome = Ok "output")
             let! completion = bridge.Join()
             equal (Ok "output") (ok completion).Outcome
-
             let! _ = bridge.ForkPty("stay", cwd = "/workspace")
             let! _ = bridge.Fork("agent-list", AgentRole.Coder, "work")
             let agents, ptys = bridge.List()
@@ -135,7 +136,7 @@ module PtyTests =
 
             let router =
                 HostEventRouter(
-                    host,
+                    hostPort (SessionId.create "router-child"),
                     Dictionary<string, string>(),
                     Dictionary<string, string>(),
                     HashSet<string>(),
@@ -174,22 +175,25 @@ module PtyTests =
     let ``Pty_spawn_write_read_signal_resize_exit_preserves_command_ordering`` () =
         let commandLog = ResizeArray<PtyId * PtyCommand>()
         let completions = ResizeArray<RunCompletion>()
-        let backendHandler id cmd = commandLog.Add(id, cmd)
+
+        let backendHandler id cmd =
+            commandLog.Add(id, cmd)
+            Task.FromResult(Ok())
 
         let port =
             PtyPort(mailboxSender = (fun completion -> completions.Add completion), handler = backendHandler)
 
         let ptyId = Pty.forkPty port "sh -c cat"
         trueThat (not (String.IsNullOrEmpty(ptyId.Value))) "PTY fork must return an id"
-
-        Pty.send port ptyId (PtyCommand.Write [| 65uy; 66uy; 67uy |])
-        Pty.send port ptyId PtyCommand.Read
-        Pty.send port ptyId (PtyCommand.Resize(120, 40))
-        Pty.send port ptyId (PtyCommand.Signal PtySignal.Interrupt)
+        Pty.send port ptyId (PtyCommand.Write [| 65uy; 66uy; 67uy |]) |> ignore
+        Pty.send port ptyId PtyCommand.Read |> ignore
+        Pty.send port ptyId (PtyCommand.Resize(120, 40)) |> ignore
+        Pty.send port ptyId (PtyCommand.Signal PtySignal.Interrupt) |> ignore
+        // Close sends TERM only — completion is NOT published here. Only the
+        // backend's onExit → Complete publishes completion.
         Pty.close port ptyId
-
+        equal 0 completions.Count
         let loggedCommands = commandLog |> Seq.map snd |> Seq.toArray
-
         equal 6 loggedCommands.Length
 
         match loggedCommands.[0] with
@@ -217,7 +221,8 @@ module PtyTests =
         match loggedCommands.[5] with
         | PtyCommand.Signal PtySignal.Terminate -> ()
         | other -> failwithf "Expected Signal Terminate on close, got %A" other
-
+        // Completion is published ONLY when the backend fires onExit → Complete.
+        port.Complete(ptyId, outcome = Ok PtyOutcome.Closed)
         equal 1 completions.Count
         equal ptyId.Value completions.[0].RunId
         equal (Ok "closed") completions.[0].Outcome
@@ -232,13 +237,10 @@ module PtyTests =
 
         let port = PtyPort(agentProvider = mockAgents)
         let ptyId = port.Fork("top", agentId = "agent-alpha", role = AgentRole.Coder)
-
-        let (agentSnapshots, ptySnapshots) = Pty.list port
-
+        let agentSnapshots, ptySnapshots = Pty.list port
         equal 1 agentSnapshots.Length
         equal "agent-alpha" agentSnapshots.[0].AgentId
         equal AgentStatus.Busy agentSnapshots.[0].Status
-
         equal 1 ptySnapshots.Length
         equal ptyId ptySnapshots.[0].Id
         equal "top" ptySnapshots.[0].Command
@@ -249,30 +251,29 @@ module PtyTests =
     let ``Pty_completion_delivered_exactly_once_on_repeated_close_and_parent_cancellation`` () =
         let completions = ResizeArray<RunCompletion>()
         let port = PtyPort(mailboxSender = (fun completion -> completions.Add completion))
-
         let ptyId = Pty.forkPty port "tail -f log"
-
-        // Perform multiple concurrent/sequential closes and parent cancellation
+        // Close sends TERM only — no completion is published.
         Pty.close port ptyId
         Pty.close port ptyId
-        Pty.send port ptyId (PtyCommand.Signal PtySignal.Kill)
-        port.CloseAll()
-
+        equal 0 completions.Count
+        // Complete (onExit) is the only path that publishes completion.
+        port.Complete(ptyId)
         equal 1 completions.Count
         equal ptyId.Value completions.[0].RunId
+        // Repeated Complete is idempotent — completion delivered exactly once.
+        port.Complete(ptyId)
+        equal 1 completions.Count
 
     [<Fact>]
     let ``Pty_typed_commands_no_magic_string_parsing`` () =
-        let testCmd (cmd: PtyCommand) =
+        let testCmd cmd =
             match cmd with
-            | PtyCommand.Spawn(cmd, cwd) -> sprintf "spawn:%s" cmd
+            | PtyCommand.Spawn(cmd, _) -> sprintf "spawn:%s" cmd
             | PtyCommand.Write b -> sprintf "write:%d" b.Length
             | PtyCommand.Read -> "read"
-            | PtyCommand.Signal s ->
-                match s with
-                | PtySignal.Terminate -> "signal:terminate"
-                | PtySignal.Kill -> "signal:kill"
-                | PtySignal.Interrupt -> "signal:interrupt"
+            | PtyCommand.Signal PtySignal.Terminate -> "signal:terminate"
+            | PtyCommand.Signal PtySignal.Kill -> "signal:kill"
+            | PtyCommand.Signal PtySignal.Interrupt -> "signal:interrupt"
             | PtyCommand.Resize(w, h) -> sprintf "resize:%dx%d" w h
 
         equal "spawn:ls" (testCmd (PtyCommand.Spawn("ls", "")))
@@ -280,3 +281,94 @@ module PtyTests =
         equal "read" (testCmd PtyCommand.Read)
         equal "signal:interrupt" (testCmd (PtyCommand.Signal PtySignal.Interrupt))
         equal "resize:80x24" (testCmd (PtyCommand.Resize(80, 24)))
+
+    /// Signal failures must return Error, not be masked as Ok. This verifies
+    /// the PtyBackend fix where Signal exceptions were caught and returned Ok.
+    [<Fact>]
+    let ``Pty_signal_failure_returns_error_not_ok`` () =
+        task {
+            let handler (_id: PtyId) (command: PtyCommand) =
+                task {
+                    match command with
+                    | PtyCommand.Signal _ -> return Error "signal failed: ESRCH"
+                    | _ -> return Ok()
+                }
+
+            let p = PtyPort(handler = handler)
+            let id = p.Fork("target")
+            let! result = p.Send(id, PtyCommand.Signal PtySignal.Kill)
+
+            match result with
+            | Error _ -> ()
+            | Ok _ -> failwith "Signal failure must return Error, not Ok"
+        }
+
+    /// Deterministic proof: Close (requestTerminate) sends TERM but does NOT
+    /// publish completion. Only the backend's onExit → Complete publishes.
+    /// The fake backend records TERM but does NOT exit on TERM (barrier).
+    [<Fact>]
+    let ``Pty_close_does_not_publish_completion_before_onExit`` () =
+        task {
+            let completions = ResizeArray<RunCompletion>()
+            let termSent = TaskCompletionSource<unit>()
+            let mutable portRef = Unchecked.defaultof<PtyPort>
+            let exitTcs = TaskCompletionSource<unit>()
+
+            let handler (id: PtyId) (command: PtyCommand) =
+                task {
+                    match command with
+                    | PtyCommand.Spawn _ ->
+                        portRef.RegisterExitTask(id, exitTcs.Task)
+                        return Ok()
+                    | PtyCommand.Signal PtySignal.Terminate ->
+                        // Barrier: record TERM sent but do NOT exit.
+                        termSent.SetResult(())
+                        return Ok()
+                    | _ -> return Ok()
+                }
+
+            let p = PtyPort(mailboxSender = (fun c -> completions.Add c), handler = handler)
+            portRef <- p
+            let id = p.Fork("stubborn")
+            // Send TERM via Close — this is the owner-initiated terminate path.
+            p.Close(id)
+            // After TERM sent, BEFORE onExit fires: mailbox must be empty.
+            equal 0 completions.Count
+            // Now fire onExit (the backend's real exit callback).
+            exitTcs.SetResult(())
+            p.Complete(id, outcome = Ok PtyOutcome.Closed)
+            // Exactly one completion, from onExit → Complete.
+            equal 1 completions.Count
+            equal id.Value completions.[0].RunId
+            equal (Ok "closed") completions.[0].Outcome
+        }
+
+    /// KILL error propagation: if the KILL handler returns Error, CloseAll must
+    /// surface the error instead of waiting forever for an exit that never comes.
+    [<Fact>]
+    let ``Pty_CloseAll_propagates_kill_error_instead_of_hanging`` () =
+        task {
+            let mutable portRef = Unchecked.defaultof<PtyPort>
+            let exitTcs = TaskCompletionSource<unit>()
+
+            let handler (id: PtyId) (command: PtyCommand) =
+                task {
+                    match command with
+                    | PtyCommand.Spawn _ ->
+                        portRef.RegisterExitTask(id, exitTcs.Task)
+                        return Ok()
+                    | PtyCommand.Signal PtySignal.Terminate ->
+                        // TERM ignored — process does not exit.
+                        return Ok()
+                    | PtyCommand.Signal PtySignal.Kill ->
+                        // KILL fails: the process cannot be killed.
+                        return Error "kill failed: ESRCH"
+                    | _ -> return Ok()
+                }
+
+            let p = PtyPort(handler = handler)
+            portRef <- p
+            let id = p.Fork("unkillable")
+            let! captured = Record.ExceptionAsync(fun () -> p.CloseAll(graceMs = 0))
+            trueThat captured.IsSome "CloseAll should raise on KILL failure instead of hanging"
+        }

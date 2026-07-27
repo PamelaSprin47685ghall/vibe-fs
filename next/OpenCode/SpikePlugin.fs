@@ -57,6 +57,7 @@ module SpikePlugin =
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
         (verdictSessions: HashSet<string>)
+        (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
         : obj =
         ToolSurface.create
@@ -68,14 +69,23 @@ module SpikePlugin =
             sessionParents
             sessionRoles
             verdictSessions
+            sessionDirectories
             modelConfig
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
             let portOpt = OpenCodePort.create input
             let journal = PluginHost.createJournal input
+            let sessionDirectories = Dictionary<string, string>()
 
-            match PluginHost.createHost input portOpt with
+            let registerEventDirectory (raw: obj) =
+                let sessionId, _ = HostSessionContext.read raw
+
+                if not (String.IsNullOrWhiteSpace sessionId) then
+                    HostEventDirectory.rawDirectory raw
+                    |> Option.iter (fun directory -> sessionDirectories.[sessionId] <- directory)
+
+            match PluginHost.createHost input portOpt (Some registerEventDirectory) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, subscription, observeEvent) ->
                 let companions = Dictionary<string, CompanionHost>()
@@ -86,6 +96,7 @@ module SpikePlugin =
                 let nudgeSent = HashSet<string>()
 
                 PluginHost.restoreSessionRoles journal sessionRoles
+                PluginHost.restoreSessionParents journal sessionParents
 
                 let gitTreePort =
                     match PluginHost.gitTreePortFromInput input with
@@ -95,6 +106,13 @@ module SpikePlugin =
                 let sessionBudgets = Dictionary<string, int>()
                 let bloggerModel = ModelResolver.bloggerModelFromEnv ()
 
+                let mutable toolSurfaceRef: obj option = None
+
+                let disposeExecutorRuntimeCb (sid: string) =
+                    match toolSurfaceRef with
+                    | Some ts -> ts?disposeExecutorRuntime (sid) |> ignore
+                    | None -> ()
+
                 let eventRouter =
                     HostEventRouter(
                         sessionPort,
@@ -103,7 +121,9 @@ module SpikePlugin =
                         verdictSessions,
                         nudgeSent,
                         ?journal = journal,
-                        ?gitTreePort = gitTreePort
+                        ?gitTreePort = gitTreePort,
+                        ?disposeExecutorRuntime = Some disposeExecutorRuntimeCb,
+                        ?onSessionDirectory = Some(fun sid directory -> sessionDirectories.[sid] <- directory)
                     )
 
                 let transform inObj outObj =
@@ -154,6 +174,7 @@ module SpikePlugin =
                         companions
                         companionGate
                         sessionPort
+                        (Some(eventPort :> IEventOutputBoundaryPort))
                         journal
                         sessionBudgets
                         sessionRoles
@@ -186,7 +207,7 @@ module SpikePlugin =
                     try
                         let! toolModule = importToolModule ()
 
-                        hooks?tool <-
+                        let toolSurface =
                             toolHooks
                                 toolModule
                                 sessionPort
@@ -196,7 +217,11 @@ module SpikePlugin =
                                 sessionParents
                                 sessionRoles
                                 verdictSessions
+                                sessionDirectories
                                 modelConfig
+
+                        toolSurfaceRef <- Some toolSurface
+                        hooks?tool <- toolSurface
                     with ex ->
                         raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 

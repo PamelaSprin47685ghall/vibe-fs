@@ -8,6 +8,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Session
 
 /// Detects failed assistant turns when a session reaches IDLE status.
 /// Does NOT rely on remote error fields or raw SSE streaming chunks.
@@ -117,6 +118,17 @@ module FallbackDetect =
             else
                 xmlTag.IsMatch text && not (hasToolCallPart msg)
 
+    [<Import("createHash", "node:crypto")>]
+    let private createHashImport: string -> obj = jsNative
+
+    [<Emit("JSON.stringify($0)")>]
+    let private stringifyMessage (message: obj) : string = jsNative
+
+    let private sha256Hex (text: string) : string =
+        let hasher = createHashImport "sha256"
+        hasher?update (text) |> ignore
+        unbox<string> (hasher?digest ("hex"))
+
     let messageId (sessionId: string) (msg: obj) : string =
         let info = msg?info
 
@@ -125,10 +137,11 @@ module FallbackDetect =
         elif not (isNull msg?id) then
             unbox<string> msg?id
         else
-            // Deterministic fallback when Host omits message id: content hash +
-            // session keeps identity stable across restarts for the same turn.
-            let text = partsText msg
-            sprintf "anon-%s-%d" sessionId (hash text)
+            // Deterministic fallback when Host omits message id: hash the full
+            // message shape, not just text, so distinct part metadata or finish
+            // boundaries remain distinct across restarts.
+            let canonical = stringifyMessage msg
+            sprintf "anon-%s-%s" sessionId (sha256Hex canonical)
 
     /// Single attributor: the ONLY writer of FallbackFailureRecorded.
     /// Both detectors (provider-retry status and failed-assistant terminal) route
@@ -143,22 +156,51 @@ module FallbackDetect =
         (assistantMessageId: string)
         (providerAttempt: string)
         (reason: string)
-        : unit =
+        : FallbackDecision =
+        let sid = SessionId.create sessionId
         let identity = sprintf "%s|%s|%s" sessionId assistantMessageId providerAttempt
 
-        if recorded.Add identity then
+        let currentDecision (j: AgentJournal) =
+            DurableFallback.nextDecision sid (AgentJournal.snapshot j)
+
+        let append () : FallbackDecision =
             match journal with
-            | None -> ()
-            | Some journal ->
+            | None -> FallbackDecision.NextAttempt Fallback.initial
+            | Some j ->
                 let fact =
                     AgentFact.FallbackFailureRecorded
-                        {| SessionId = SessionId.create sessionId
+                        {| SessionId = sid
                            Reason = reason
                            AssistantMessageId = assistantMessageId
                            ProviderAttempt = providerAttempt |}
 
-                AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionId)) None fact journal
-                |> ignore
+                match AgentJournal.appendAgent (StreamId.Session sid) None fact j with
+                | Ok _ -> currentDecision j
+                | Error _ -> FallbackDecision.Dead
+
+        if recorded.Add identity then
+            // In-memory fast path passed. Check the durable projection — the
+            // cross-restart boundary — and skip the append if this identity was
+            // already recorded in a prior process run. Uses the BOUNDED
+            // per-session RecentFailureIds (not a global HashSet) so memory is
+            // O(sessions), not O(history).
+            match journal with
+            | None -> append ()
+            | Some j ->
+                let alreadyRecorded =
+                    let projection = AgentJournal.snapshot j
+
+                    projection.AgentProjections.Sessions
+                    |> Map.tryFind sid
+                    |> Option.bind (fun session -> session.Fallback)
+                    |> Option.exists (fun fb -> List.contains identity fb.RecentFailureIds)
+
+                if alreadyRecorded then currentDecision j else append ()
+        else
+            // Already seen this process run; return the current projection decision.
+            match journal with
+            | None -> FallbackDecision.NextAttempt Fallback.initial
+            | Some j -> currentDecision j
 
     /// Reports a failed-assistant observation. Does NOT independently append a
     /// failure fact: when the same physical provider attempt was already
@@ -183,3 +225,4 @@ module FallbackDetect =
                     | false, _ -> "empty-xml", "empty or xml-only assistant turn"
 
                 recordFallbackFailure (Some journal) recorded sessionId msgId providerAttempt reason
+                |> ignore

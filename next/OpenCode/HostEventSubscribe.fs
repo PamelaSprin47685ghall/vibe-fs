@@ -28,6 +28,9 @@ module HostEventSubscribe =
             if isNull payload then
                 rawEvent
             elif not (isNull payload?``type``) || not (isNull payload?properties) then
+                if not (isNull rawEvent?directory) && isNull payload?directory then
+                    payload?directory <- rawEvent?directory
+
                 payload
             else
                 rawEvent
@@ -49,14 +52,23 @@ module HostEventSubscribe =
                             d.Dispose() }
             )
 
-    let private subscribeListen (events: obj) (port: Events.HostEventPort) : Result<IDisposable, string> =
+    let private subscribeListen
+        (events: obj)
+        (port: Events.HostEventPort)
+        (directoryObserver: obj -> unit)
+        : Result<IDisposable, string> =
         let listen = events?listen
 
         if isNull listen then
             Error "OPENCODE-EVENT-SUBSCRIBE: host event capability exists but events.listen is unavailable"
         else
             try
-                let callback = box (fun rawEvent -> observe port rawEvent)
+                let callback =
+                    box (fun rawEvent ->
+                        let normalized = normalizeHostEvent rawEvent
+                        directoryObserver normalized
+                        port.Observe normalized)
+
                 let subscription = listen?call (events, callback)
 
                 if isNull subscription then
@@ -71,7 +83,11 @@ module HostEventSubscribe =
 
     /// Drain /global/event so worktree-directory terminals still complete runs.
     /// Soft-fails: missing global.event is Ok None (plugin event hook remains).
-    let private subscribeGlobalEvent (client: obj) (port: Events.HostEventPort) : IDisposable option =
+    let private subscribeGlobalEvent
+        (client: obj)
+        (port: Events.HostEventPort)
+        (directoryObserver: obj -> unit)
+        : IDisposable option =
         if isNull client then
             None
         else
@@ -82,7 +98,12 @@ module HostEventSubscribe =
             else
                 try
                     let abortCtrl = newAbortController ()
-                    let onEvent = box (fun data -> observe port data)
+
+                    let onEvent =
+                        box (fun data ->
+                            let normalized = normalizeHostEvent data
+                            directoryObserver normalized
+                            port.Observe normalized)
 
                     let options =
                         createObj
@@ -91,7 +112,9 @@ module HostEventSubscribe =
                               box (fun (evt: obj) ->
                                   if not (isNull evt) then
                                       let data = if isNull evt?data then evt else evt?data
-                                      observe port data) ]
+                                      let normalized = normalizeHostEvent data
+                                      directoryObserver normalized
+                                      port.Observe normalized) ]
 
                     // client.global.event is async (SDK get.sse). Await the result,
                     // then drain stream so onSseEvent keeps firing.
@@ -124,7 +147,11 @@ module HostEventSubscribe =
                 with _ ->
                     None
 
-    let trySubscribeHostEvents (input: obj) (port: Events.HostEventPort) : Result<IDisposable option, string> =
+    let trySubscribeHostEvents
+        (input: obj)
+        (port: Events.HostEventPort)
+        (onDirectory: (obj -> unit) option)
+        : Result<IDisposable option, string> =
         let listenTarget =
             if isNull input then
                 None
@@ -140,18 +167,20 @@ module HostEventSubscribe =
 
         let client = if isNull input then null else input?client
 
+        let directoryObserver = Option.defaultValue ignore onDirectory
+
         let listenSub =
             match listenTarget with
             | None -> Ok None
             | Some events ->
-                match subscribeListen events port with
+                match subscribeListen events port directoryObserver with
                 | Error err -> Error err
                 | Ok sub -> Ok(Some sub)
 
         match listenSub with
         | Error err -> Error err
         | Ok localSub ->
-            let globalSub = subscribeGlobalEvent client port
+            let globalSub = subscribeGlobalEvent client port directoryObserver
 
             let parts =
                 [ match localSub with

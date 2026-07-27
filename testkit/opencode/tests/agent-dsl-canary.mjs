@@ -261,6 +261,7 @@ try {
     strict: true,
   });
   await canaryScenario(scenario);
+  scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
 } catch (error) {
   console.error(`\n  ✗ Manager DSL scenario failed: ${error.stack || error}`);

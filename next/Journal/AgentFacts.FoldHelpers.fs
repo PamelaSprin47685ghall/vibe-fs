@@ -37,7 +37,12 @@ module internal AgentFactsFoldHelpers =
               CandidateId = None
               CandidateCommit = None
               PublishedCommit = None
-              Prompt = prompt }
+              Prompt = prompt
+              PreRebaseReviewCommit = None
+              RebasedCommit = None
+              ConflictFiles = None
+              PostRebaseReviewCommit = None
+              PublishClaimHead = None }
 
         { proj with
             Orchestrator =
@@ -105,6 +110,67 @@ module internal AgentFactsFoldHelpers =
                 ManagerJobs = Map.remove mgrId proj.Orchestrator.ManagerJobs }
 
         { proj with Orchestrator = orch }
+
+    let private updateManagerJob (proj: AgentProjectionSet) (managerId: string) (f: ManagerJob -> ManagerJob) =
+        let mgrId = ManagerId.create managerId
+
+        match Map.tryFind mgrId proj.Orchestrator.ManagerJobs with
+        | Some job ->
+            { proj with
+                Orchestrator =
+                    { proj.Orchestrator with
+                        ManagerJobs = Map.add mgrId (f job) proj.Orchestrator.ManagerJobs } }
+        | None -> proj
+
+    let foldOrchestratorPreRebaseReviewConfirmed
+        (proj: AgentProjectionSet)
+        (managerId: string)
+        (candidateId: string)
+        (commitHash: string)
+        =
+        updateManagerJob proj managerId (fun job ->
+            { job with
+                PreRebaseReviewCommit = Some commitHash })
+
+    let foldOrchestratorRebased
+        (proj: AgentProjectionSet)
+        (managerId: string)
+        (candidateId: string)
+        (rebasedCommit: string)
+        =
+        // A successful rebase also clears any prior conflict barrier.
+        updateManagerJob proj managerId (fun job ->
+            { job with
+                RebasedCommit = Some rebasedCommit
+                ConflictFiles = None })
+
+    let foldOrchestratorConflictDetected
+        (proj: AgentProjectionSet)
+        (managerId: string)
+        (candidateId: string)
+        (files: string list)
+        =
+        updateManagerJob proj managerId (fun job -> { job with ConflictFiles = Some files })
+
+    let foldOrchestratorPostRebaseReviewConfirmed
+        (proj: AgentProjectionSet)
+        (managerId: string)
+        (candidateId: string)
+        (rebasedCommit: string)
+        =
+        updateManagerJob proj managerId (fun job ->
+            { job with
+                PostRebaseReviewCommit = Some rebasedCommit })
+
+    let foldOrchestratorPublishClaimed
+        (proj: AgentProjectionSet)
+        (managerId: string)
+        (candidateId: string)
+        (expectedTargetHead: string)
+        =
+        updateManagerJob proj managerId (fun job ->
+            { job with
+                PublishClaimHead = Some expectedTargetHead })
 
     let foldDurableEffectRequested
         (proj: AgentProjectionSet)

@@ -37,6 +37,9 @@ module Fact =
         | AgentUnlinked of
             {| ParentId: SessionId
                ChildId: ChildId |}
+        | ReviewBarrierStarted of
+            {| ManagerSessionId: SessionId
+               BarrierKey: string |}
         | ReviewVerdictRecorded of
             {| ManagerSessionId: SessionId
                ReviewerSessionId: SessionId
@@ -70,6 +73,29 @@ module Fact =
             {| ManagerId: string
                CandidateId: string
                Reason: string |}
+        // Barrier facts (durable publish-chain checkpoint facts). Each records the
+        // commit identity it was confirmed against so a re-run can skip it only when
+        // the current HEAD still matches — stale barriers never match a new HEAD.
+        | OrchestratorPreRebaseReviewConfirmed of
+            {| ManagerId: string
+               CandidateId: string
+               CommitHash: string |}
+        | OrchestratorRebased of
+            {| ManagerId: string
+               CandidateId: string
+               RebasedCommit: string |}
+        | OrchestratorConflictDetected of
+            {| ManagerId: string
+               CandidateId: string
+               Files: string list |}
+        | OrchestratorPostRebaseReviewConfirmed of
+            {| ManagerId: string
+               CandidateId: string
+               RebasedCommit: string |}
+        | OrchestratorPublishClaimed of
+            {| ManagerId: string
+               CandidateId: string
+               ExpectedTargetHead: string |}
         | DurableEffectRequested of
             {| EffectId: string
                SessionId: SessionId

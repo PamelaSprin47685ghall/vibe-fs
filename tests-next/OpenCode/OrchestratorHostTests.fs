@@ -56,6 +56,7 @@ module OrchestratorHostTests =
                   ModelConfig = None
                   OnChildCreated =
                     fun agentId role childId -> created.Add(agentId, role.ToString(), SessionId.value childId)
+                  RegisterChildDirectory = fun _ _ -> ()
                   RegisterReviewerTree = fun _ _ -> ()
                   RepoPath = "/nonexistent-path-xyz"
                   TargetBranch = "" }
@@ -81,16 +82,20 @@ module OrchestratorHostTests =
                 { IsDirty = fun _ -> Task.FromResult false
                   CreateWorktree = fun _ _ _ -> Task.FromResult(Ok())
                   Rebase = fun _ _ -> Task.FromResult(Ok())
-                  FfMerge = fun _ _ -> Task.FromResult(Ok "commit")
+                  FfMerge = fun _ _ _ -> Task.FromResult(Ok "commit")
                   ConflictedFiles = fun _ -> Task.FromResult(Ok [])
-                  RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
+                  RemoveWorktree = fun _ -> Task.FromResult(Ok())
+                  HasRebaseHead = fun _ -> Task.FromResult false
+                  ListWorktrees = fun () -> Task.FromResult(Ok [])
+                  ListManagerBranches = fun () -> Task.FromResult(Ok [])
+                  DeleteBranch = fun _ -> Task.FromResult(Ok()) }
 
             let manager: ManagerPort =
                 { RunManager =
                     fun managerId worktree prompt ->
                         calls.Add(managerId, worktree, prompt)
                         Task.FromResult(Ok())
-                  Reverify = fun _ _ -> Task.FromResult(Ok()) }
+                  Reverify = fun _ _ _ -> Task.FromResult(Ok()) }
 
             let resumed = Orchestrator(git, manager, "/repo", "main")
             resumed.RecoverManagerJob("m1", "/worktree/m1", "saved prompt", false)
@@ -118,6 +123,61 @@ module OrchestratorHostTests =
             )
 
             Assert.Equal(1, calls.Count)
+        }
+
+    [<Fact>]
+    let ``sweep removes stale manager worktree and branch but keeps active`` () =
+        task {
+            let activeId = "active"
+            let activePath = "/wt/active"
+            let stalePath = "/wt/stale"
+
+            let activeJob: ManagerJob =
+                { WorktreePath = activePath
+                  Branch = "manager/active"
+                  CandidateId = None
+                  CandidateCommit = None
+                  PublishedCommit = None
+                  Prompt = ""
+                  PreRebaseReviewCommit = None
+                  RebasedCommit = None
+                  ConflictFiles = None
+                  PostRebaseReviewCommit = None
+                  PublishClaimHead = None }
+
+            let activeJobs = Map.ofList [ (ManagerId.create activeId, activeJob) ]
+            let removedWorktrees = ResizeArray<string>()
+            let deletedBranches = ResizeArray<string>()
+
+            let git: GitPort =
+                { IsDirty = fun _ -> Task.FromResult false
+                  CreateWorktree = fun _ _ _ -> Task.FromResult(Ok())
+                  Rebase = fun _ _ -> Task.FromResult(Ok())
+                  FfMerge = fun _ _ _ -> Task.FromResult(Ok "x")
+                  ConflictedFiles = fun _ -> Task.FromResult(Ok [])
+                  RemoveWorktree =
+                    fun p ->
+                        removedWorktrees.Add p
+                        Task.FromResult(Ok())
+                  HasRebaseHead = fun _ -> Task.FromResult false
+                  ListWorktrees =
+                    fun () ->
+                        Task.FromResult(
+                            Ok
+                                [ (activePath, Some "refs/heads/manager/active")
+                                  (stalePath, Some "refs/heads/manager/stale") ]
+                        )
+                  ListManagerBranches = fun () -> Task.FromResult(Ok [ "manager/active"; "manager/stale" ])
+                  DeleteBranch =
+                    fun b ->
+                        deletedBranches.Add b
+                        Task.FromResult(Ok()) }
+
+            do! OrchestratorSweep.sweepStaleArtifacts git activeJobs
+            Assert.True(removedWorktrees.Contains stalePath, "stale worktree not removed")
+            Assert.False(removedWorktrees.Contains activePath, "active worktree removed")
+            Assert.True(deletedBranches.Contains "manager/stale", "stale branch not removed")
+            Assert.False(deletedBranches.Contains "manager/active", "active branch removed")
         }
 
     [<Fact>]

@@ -39,14 +39,16 @@ type CompanionProjection =
 
 type AgentLinkageProjection =
     { LinkedChildren: Map<ChildId, string>
-      LinkedRoles: Map<ChildId, string> }
+      LinkedRoles: Map<ChildId, string>
+      LinkedRuntimeIds: Map<ChildId, RuntimeId> }
 
 type ReviewGuardProjection =
     { LastGitTreeHash: GitTreeHash option
       ConsecutivePerfects: int
       IsConfirmed: bool
       AcceptedGuardKey: string option
-      RecentToolCallIds: string list }
+      RecentToolCallIds: string list
+      CurrentBarrierKey: string option }
 
 type ModelSide =
     | SideA
@@ -75,7 +77,14 @@ type ManagerJob =
       CandidateId: CandidateId option
       CandidateCommit: string option
       PublishedCommit: string option
-      Prompt: string }
+      Prompt: string
+      // Durable publish-chain barrier facts (latest wins; keyed by commit identity
+      // so a stale barrier never matches a new HEAD on re-run):
+      PreRebaseReviewCommit: string option
+      RebasedCommit: string option
+      ConflictFiles: string list option
+      PostRebaseReviewCommit: string option
+      PublishClaimHead: string option }
 
 type OrchestratorProjection =
     { ManagerJobs: Map<ManagerId, ManagerJob>

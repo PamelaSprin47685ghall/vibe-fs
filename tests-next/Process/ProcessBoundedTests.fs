@@ -79,29 +79,37 @@ module ProcessBoundedTests =
         }
 
     [<Fact>]
-    let ``ExecutorSummarizer_streams_spool_chunks_with_bounded_reads`` () =
+    let ``Spool_readChunks_streams_in_bounded_200KB_segments_preserving_total`` () =
         task {
+            // Exercises the production path ExecutorSummarize.summarizeSpool consumes:
+            // Spool.readChunks must never hand back a chunk larger than 200KB and must
+            // preserve the entire spool byte-for-byte.
             let payload = Array.init 500000 (fun i -> byte (i % 251))
             let spool = Spool.startStreamingSpool ()
             Spool.appendStreamingSpool spool payload
+
+            let mutable totalRead = 0
             let mutable maxChunk = 0
+            let mutable position = 0
 
-            let port: SummarizerPort<byte[], int> =
-                { MapChunk =
-                    fun bytes ->
-                        maxChunk <- max maxChunk bytes.Length
-                        bytes.Length
-                  ReduceSummaries = fun list -> List.sum list }
+            do!
+                Spool.readChunks spool.Path (fun chunk ->
+                    task {
+                        maxChunk <- max maxChunk chunk.Length
 
-            let! result = ExecutorSummarizer.summarizeSpool port spool.Path
+                        for offset in 0 .. chunk.Length - 1 do
+                            if chunk.[offset] <> byte ((position + offset) % 251) then
+                                failwithf "Spool byte mismatch at %d" (position + offset)
 
-            match result with
-            | Ok(Some total) ->
-                if total <> payload.Length then
-                    failwithf "Expected %d mapped bytes, got %d" payload.Length total
+                        position <- position + chunk.Length
+                        totalRead <- totalRead + chunk.Length
+                        return ()
+                    })
 
-                trueThat (maxChunk <= Spool.ChunkSizeBytes) "Spool reader exceeded 200KB bound"
-            | _ -> failwith "Expected streamed spool summary"
+            if totalRead <> payload.Length then
+                failwithf "Expected %d bytes read, got %d" payload.Length totalRead
+
+            trueThat (maxChunk <= Spool.ChunkSizeBytes) "Spool reader exceeded 200KB bound"
 
             System.IO.File.Delete(spool.Path)
         }

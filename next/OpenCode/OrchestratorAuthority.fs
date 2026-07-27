@@ -31,22 +31,15 @@ module OrchestratorAuthority =
                     if code = 0 && not (String.IsNullOrWhiteSpace stdout) then
                         return Ok(stdout.Trim())
                     else
-                        let! code2, stdout2, stderr2 =
-                            OrchestratorGit.run (OrchestratorGit.command repoPath [ "rev-parse"; "HEAD" ])
+                        // Fail closed: never fall back to HEAD. A missing target
+                        // branch must not publish to an unrelated commit.
+                        let reason =
+                            if String.IsNullOrWhiteSpace stderr then
+                                sprintf "target branch not found: %s" branch
+                            else
+                                stderr.Trim()
 
-                        if code2 = 0 && not (String.IsNullOrWhiteSpace stdout2) then
-                            return Ok(stdout2.Trim())
-                        else
-                            return
-                                Error(
-                                    if String.IsNullOrWhiteSpace stderr then
-                                        if String.IsNullOrWhiteSpace stderr2 then
-                                            stdout2
-                                        else
-                                            stderr2
-                                    else
-                                        stderr
-                                )
+                        return Error reason
                 } }
 
     /// Proper ancestor check via `git merge-base --is-ancestor <candidate> <head>`.
@@ -73,11 +66,12 @@ module OrchestratorAuthority =
         (authority: GitAuthorityPort)
         (repoPath: string)
         (branch: string)
-        : Task<unit> =
+        : Task<(string * string) list> =
         task {
             match journal with
-            | None -> return ()
+            | None -> return []
             | Some journal ->
+                let reconciled = ResizeArray<string * string>()
                 let snapshot = AgentJournal.snapshot journal
                 let jobs = snapshot.AgentProjections.Orchestrator.ManagerJobs
 
@@ -105,12 +99,20 @@ module OrchestratorAuthority =
                                     | Some id -> CandidateId.value id
                                     | None -> sprintf "candidate-%s" (ManagerId.value mgrId)
 
+                                // Record the CANDIDATE commit, not the current target
+                                // HEAD. The target HEAD is only used for the ancestor
+                                // check; the published fact must identify the commit
+                                // that was published, which is the candidate.
                                 let fact =
                                     AgentFact.OrchestratorPublished
                                         {| ManagerId = ManagerId.value mgrId
                                            CandidateId = candId
-                                           CommitHash = head |}
+                                           CommitHash = candidate |}
 
-                                AgentJournal.appendAgent StreamId.Workspace None fact journal |> ignore
+                                match AgentJournal.appendAgent StreamId.Workspace None fact journal with
+                                | Ok _ -> reconciled.Add(ManagerId.value mgrId, candidate)
+                                | Error _ -> ()
                         | _ -> ()
+
+                return reconciled |> Seq.toList
         }

@@ -59,6 +59,15 @@ module OrchestratorGit =
                 return Error reason
         }
 
+    /// True when an in-progress rebase is present (REBASE_HEAD exists). Shared by
+    /// the publish chain skip-check and finalizeWorktree so both agree on rebase
+    /// state.
+    let hasRebaseHead (runner: Command -> Task<int * string * string>) (worktree: string) : Task<bool> =
+        task {
+            let! code, _, _ = runner (command worktree [ "rev-parse"; "--verify"; "REBASE_HEAD" ])
+            return code = 0
+        }
+
     /// After a manager terminal: stage everything, then either continue an
     /// in-flight rebase or create the candidate commit.
     let finalizeWorktree
@@ -69,27 +78,25 @@ module OrchestratorGit =
         task {
             let! addCode, _, addErr = runner (command worktree [ "add"; "-A" ])
 
-            if addCode <> 0 then
-                return Error(sprintf "git add failed: %s" addErr)
-            else
-                let! headCode, _, _ = runner (command worktree [ "rev-parse"; "--verify"; "REBASE_HEAD" ])
+            match addCode with
+            | code when code <> 0 -> return Error(sprintf "git add failed: %s" addErr)
+            | _ ->
+                let! hasRb = hasRebaseHead runner worktree
 
-                if headCode = 0 then
+                match hasRb with
+                | true ->
                     let! contCode, _, contErr =
                         runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
-                    if contCode = 0 then
-                        return Ok()
-                    else
-                        return Error(sprintf "git rebase --continue failed: %s" contErr)
-                else
+                    match contCode with
+                    | 0 -> return Ok()
+                    | _ -> return Error(sprintf "git rebase --continue failed: %s" contErr)
+                | false ->
                     let! commitCode, commitOut, commitErr =
                         runner (command worktree [ "commit"; "-m"; sprintf "candidate: %s" managerId ])
 
-                    if commitCode = 0 then
-                        return Ok()
-                    elif (commitOut + commitErr).Contains("nothing to commit") then
-                        return Ok()
-                    else
-                        return Error(sprintf "git commit failed: %s" commitErr)
+                    match commitCode with
+                    | 0 -> return Ok()
+                    | _ when (commitOut + commitErr).Contains("nothing to commit") -> return Ok()
+                    | _ -> return Error(sprintf "git commit failed: %s" commitErr)
         }

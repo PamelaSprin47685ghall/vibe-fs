@@ -1,7 +1,15 @@
 /**
- * run-canary-staggered.mjs — Runs P0 canary tests in staggered parallel mode.
- * Spawns one test per 0.5s to prevent startup process storms while allowing
- * execution to proceed in parallel.
+ * run-canary-staggered.mjs — Runs P0 canary tests in full-parallel isolation.
+ *
+ * All 15 canaries spawn concurrently into one pool sized to the suite. A tiny
+ * fixed stagger (default 50ms) de-overlaps Bun SEA boot file-lock bursts — it is
+ * NOT a cumulative delay, so the last canary starts ~50ms after the first, not
+ * 28s later. True concurrent isolation is the proof: every scenario's semantic
+ * phase overlaps every other's.
+ *
+ * The 2s causal watchdog arms only AFTER host.start() returns (inside
+ * setupScenarioParallel, after listen+health), so concurrent boots stretching
+ * past 2s is a boot problem, not a watchdog problem.
  */
 
 import { spawn } from "node:child_process";
@@ -33,22 +41,23 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/fallback-canary.mjs",
   "testkit/opencode/tests/orchestrator-canary.mjs",
   "testkit/opencode/tests/orchestrator-publish-canary.mjs",
+  "testkit/opencode/tests/orchestrator-restart-publish-canary.mjs",
   "testkit/opencode/tests/pty-stress-canary.mjs",
   "testkit/opencode/tests/reviewer-restart-canary.mjs",
 ];
 
 // Full-suite parallel isolation is the standard gate: every canary starts under
-// one pool sized to the suite. The stagger only de-overlaps Bun SEA boot bursts:
-// each opencode host burns ~8 CPU-seconds compiling at boot (measured 2026-07),
-// so 14 simultaneous boots saturate 16 threads and stretch every boot past the
-// 2s causal watchdog. 2s spacing keeps at most ~1 boot burst in flight while all
-// scenario phases still run fully concurrent.
+// one pool sized to the suite. The tiny fixed stagger only de-overlaps Bun SEA
+// boot file-lock bursts — it is NOT cumulative, so all 15 canaries enter their
+// semantic phase within ~50ms of each other. The 2s causal watchdog arms after
+// host.start() returns (inside setupScenarioParallel), so boot duration does not
+// consume the watchdog budget.
 const MAX_PARALLEL = parsePositiveInt(
   process.env.MAX_PARALLEL_CANARIES,
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 50, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -85,7 +94,10 @@ async function runPool(items, limit, worker) {
   };
 
   await Promise.all(items.map(async (item, index) => {
-    if (index > 0) await new Promise((resolve) => setTimeout(resolve, index * STAGGER_DELAY_MS));
+    // Tiny fixed (non-cumulative) stagger to de-overlap Bun SEA boot file locks.
+    // This is NOT index*STAGGER — the last canary starts ~50ms after the first,
+    // not 28s later, preserving true concurrent isolation.
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, STAGGER_DELAY_MS));
     await acquire();
     try {
       results[index] = await worker(item);

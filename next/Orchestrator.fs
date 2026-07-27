@@ -3,42 +3,8 @@ namespace Wanxiangshu.Next.Orchestrator
 open System
 open System.IO
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
-
-module private PublishLock =
-    [<Import("default", "proper-lockfile")>]
-    let private lockfile: obj = jsNative
-
-    // proper-lockfile's lock(file, options) takes 2 positional JS args, so call it
-    // via Emit: a tupled F# unbox would pass a single array argument (stringifying
-    // to "path,[object Object]"), and a curried unbox would call lock(file)(options).
-    // lock() returns a release function; unlock by invoking it directly.
-    [<Emit("$0($1, $2)")>]
-    let private lockAsync (fn: obj) (path: string) (opts: obj) : Task<obj> = jsNative
-
-    /// Cross-process publication lock path: lives in the temp dir (never inside the
-    /// repo) so git status stays clean. No ".lock" suffix: proper-lockfile appends it.
-    let lockPath (repoPath: string) (branch: string) =
-        let norm = repoPath.Replace('/', '_').Replace('\\', '_')
-        let b = branch.Replace('/', '_').Replace('\\', '_')
-        Path.Combine(Path.GetTempPath(), sprintf "wanxiangshu-publish-%s-%s" norm b)
-
-    /// Acquire a cross-process publication lock on the target ref. The in-object
-    /// publishChain only serializes within one Orchestrator instance; this lock
-    /// serializes publication across sessions, runtimes, and processes on the same
-    /// repo. proper-lockfile v4 has no .sync API, so this is async and released in a
-    /// `finally`. Keep the happy path: a single instance behaves exactly as before.
-    /// realpath:false lets the lock target be a synthetic temp path that need not exist.
-    let acquire (path: string) : Task<obj> =
-        lockAsync lockfile path (createObj [ "retries", box 5; "realpath", box false ])
-
-    /// Release by invoking the release function returned by lock.
-    let release (releaseFn: obj) : Task<unit> =
-        let fn: unit -> Task<unit> = unbox releaseFn
-        fn ()
 
 type Orchestrator
     (
@@ -47,13 +13,16 @@ type Orchestrator
         repoPath: string,
         targetBranch: string,
         ?journal: OrchestratorJournalPort,
-        ?authority: GitAuthorityPort
+        ?authority: GitAuthorityPort,
+        ?lockRepoPath: string
     ) =
     let lockObj = obj ()
     let mutable publishChain: Task = Task.FromResult(()) :> Task
     let mailbox = System.Collections.Generic.Queue<ManagerCompletion>()
+    let recoveredPublished = System.Collections.Generic.Queue<OrchestratorVerdict>()
     let journalPort = journal
     let authorityPort = authority
+    let lockRepoPath = defaultArg lockRepoPath repoPath
     let prompts = System.Collections.Generic.Dictionary<string, string>()
 
     let appendFact stream fact =
@@ -64,11 +33,16 @@ type Orchestrator
             | Ok _ -> Ok()
             | Error err -> Error err
 
-    let reverifyTwice managerId worktreePath =
+    let reverifyTwice managerId worktreePath barrierKey =
         task {
-            match! manager.Reverify managerId worktreePath with
-            | Error err -> return Error err
-            | Ok() -> return! manager.Reverify managerId worktreePath
+            // A single Reverify call performs the full double-PERFECT check
+            // (reviewer, state, nudge, state). The barrier key is forwarded so
+            // the host emits ReviewBarrierStarted before the first reviewer
+            // call, resetting the guard to require two FRESH verdicts for this
+            // phase. Calling Reverify twice would either waste a third reviewer
+            // call (old bug) or short-circuit immediately (barrier already
+            // confirmed) — either way, one call is the correct contract.
+            return! manager.Reverify managerId worktreePath barrierKey
         }
 
     let readHead worktreePath fallback =
@@ -90,6 +64,21 @@ type Orchestrator
                 | Ok _ -> return Ok()
                 | Error err -> return Error err
         }
+
+    let getTargetHead () =
+        task {
+            match authorityPort with
+            | None -> return Ok ""
+            | Some port ->
+                match! port.GetTargetHead repoPath targetBranch with
+                | Ok head -> return Ok head
+                | Error err -> return Error err
+        }
+
+    let snapshotProjection () =
+        match journalPort with
+        | Some port -> port.Snapshot()
+        | None -> Fold.empty
 
     let waiters =
         System.Collections.Generic.Queue<TaskCompletionSource<ManagerCompletion>>()
@@ -140,16 +129,41 @@ type Orchestrator
         // still serialize on the file lock.
         runSerial (fun () ->
             task {
-                let! release = PublishLock.acquire lockPath
+                let! release =
+                    task {
+                        try
+                            return! PublishLock.acquire lockPath
+                        with ex ->
+                            // Convert lock acquisition failure (contention budget
+                            // exhausted or fs error) into a named domain error.
+                            return
+                                raise (
+                                    InvalidOperationException(
+                                        sprintf "publish lock acquire failed for %s: %s" lockPath ex.Message
+                                    )
+                                )
+                    }
 
-                try
-                    return! fn ()
-                finally
-                    PublishLock.release release |> ignore
+                let! outcome =
+                    task {
+                        try
+                            let! value = fn ()
+                            return Choice1Of2 value
+                        with ex ->
+                            return Choice2Of2 ex
+                    }
+
+                do! PublishLock.release release
+
+                match outcome with
+                | Choice1Of2 value -> return value
+                | Choice2Of2 ex -> return raise ex
             })
 
-    member this.ForkManager
-        (managerId: string, prompt: string, ?worktreePath: string)
+    let forkManagerCore
+        (managerId: string)
+        (prompt: string)
+        (worktreePath: string option)
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
         task {
             let path =
@@ -200,6 +214,15 @@ type Orchestrator
                         return Ok handle
         }
 
+    member this.ForkManager
+        (managerId: string, prompt: string, ?worktreePath: string)
+        : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
+        runSerialLocked (PublishLock.lockPath lockRepoPath targetBranch) (fun () ->
+            forkManagerCore managerId prompt worktreePath)
+
+    member _.RecoverPublished(managerId: string, commitHash: string) : unit =
+        lock lockObj (fun () -> recoveredPublished.Enqueue(OrchestratorVerdict.Published(managerId, commitHash)))
+
     member _.RecoverManagerJob(managerId: string, worktreePath: string, prompt: string, managerCompleted: bool) : unit =
         prompts.[managerId] <- prompt
 
@@ -214,36 +237,48 @@ type Orchestrator
 
     member this.JoinPublished() : Task<OrchestratorVerdict> =
         task {
-            let completion =
+            let terminal =
                 lock lockObj (fun () ->
-                    if mailbox.Count > 0 then
-                        Task.FromResult(mailbox.Dequeue())
+                    if recoveredPublished.Count > 0 then
+                        Some(recoveredPublished.Dequeue())
                     else
-                        let waiter = TaskCompletionSource<ManagerCompletion>()
-                        waiters.Enqueue(waiter)
-                        waiter.Task)
+                        None)
 
-            let! completion = completion
+            match terminal with
+            | Some verdict -> return verdict
+            | None ->
+                let completion =
+                    lock lockObj (fun () ->
+                        if mailbox.Count > 0 then
+                            Task.FromResult(mailbox.Dequeue())
+                        else
+                            let waiter = TaskCompletionSource<ManagerCompletion>()
+                            waiters.Enqueue(waiter)
+                            waiter.Task)
 
-            match completion.Result with
-            | Error err ->
-                return
-                    OrchestratorVerdict.IntegrationFailed(
-                        completion.Handle.ManagerId,
-                        sprintf "Manager run failed: %s" err
-                    )
-            | Ok() ->
-                let deps: PublishChain.Deps =
-                    { Git = git
-                      Manager = manager
-                      AppendFact = appendFact
-                      ReverifyTwice = reverifyTwice
-                      ReadHead = readHead
-                      ReconcileTarget = reconcileTarget
-                      TargetBranch = targetBranch
-                      Prompts = prompts }
+                let! completion = completion
 
-                return!
-                    runSerialLocked (PublishLock.lockPath repoPath targetBranch) (fun () ->
-                        PublishChain.run deps completion)
+                match completion.Result with
+                | Error err ->
+                    return
+                        OrchestratorVerdict.IntegrationFailed(
+                            completion.Handle.ManagerId,
+                            sprintf "Manager run failed: %s" err
+                        )
+                | Ok() ->
+                    let deps: PublishChain.Deps =
+                        { Git = git
+                          Manager = manager
+                          AppendFact = appendFact
+                          ReverifyTwice = reverifyTwice
+                          ReadHead = readHead
+                          ReconcileTarget = reconcileTarget
+                          GetTargetHead = getTargetHead
+                          TargetBranch = targetBranch
+                          Prompts = prompts
+                          Snapshot = snapshotProjection }
+
+                    return!
+                        runSerialLocked (PublishLock.lockPath lockRepoPath targetBranch) (fun () ->
+                            PublishChain.run deps completion)
         }

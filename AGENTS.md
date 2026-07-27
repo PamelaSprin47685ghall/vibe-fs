@@ -77,10 +77,19 @@ Orchestrator 的 `fork(agent=manager)`/`join` 已路由 `ForkManagerJob`/`JoinPu
 - ReviewGuard 的 Manager/Reviewer nudge 共用 durable `GuardPromptAccepted`，GuardKey 绑定 target、trigger、reason；重启可去重，发送失败不写事实。Journal/GitTreePort 缺失或读取异常不再返回允许完成的 `None`，而是阻止 Manager finish。
 - 完成状态只允许由当前直接测试证据提升；历史“全量通过”不得复读。Watchdog 冻结为 2s scenario-local 静默探针。
 
+## 本轮直接证据（2026-07-27 工作树状态）
+
+- `npm run build`：通过。
+- `npm run test:compile && npm run test:next`：215/217。失败 2 项：`Next_source_files_do_not_exceed_300_lines`（`next/Session/HostForkRuntime.fs` 314 行、`next/Orchestrator.PublishChain.fs` 303 行、`next/OpenCode/HostEventRouter.fs` 323 行）；`HostForkRuntimeSessionDeadTests > Dead_decision_survives_journal_rebuild`。本轮只记录，未处理。
+- 本轮未重跑任何 canary 与 P0；下述 canary 状态为此前证据。
+- 工作树含未提交的 best-effort 修复与调试清理：`HostEventRetry.record` 的 `isHostShutdown` 守卫、`HostEventRouter.fs` 的 `hostShutdownSessions` 集合、`AgentJournal` 按 session 有界 `RecentFailureIds`；`observeIdle`/`recordFallbackFailure`/`HostEventRetry` 三处调试 printfn 已移除。
+- 工作树含未评审的 runtime-aware child linkage 改动（`LinkedRuntimeIds`/`childRuntimes`/`onChildCreatedDir`，跨 `HostForkRuntime.fs`、`AgentFacts*.fs`、`OrchestratorHost.fs`、`ToolSurface.fs`）；来源是被终止子代理的未完成工作，已最小修复至可编译，语义未验证。疑点见 `困惑.md` 谜团三。
+
 ## 当前未闭合边界
 
+0. **Restart 红门（最高优先）**：`host-restart-canary.mjs` 与 `orchestrator-restart-publish-canary.mjs` 红。重启风暴期间出现幽灵 `FallbackFailureRecorded`（`empty-xml`），累计 4 条使 Reviewer/Coder session 误判 Dead，expectation 永不消费。三条证据互相矛盾（仅 `observeIdle` 可能写该签名、失败 session 无 `session.idle` 事件、被记录消息实际完好非空）；调试 printfn 写入 Host stdout 不进 canary 日志，故“踪迹未出现”不证“路径未走”。完整证据与假设见 `困惑.md` 谜团一。
 1. ~~TestKit 并行门~~：已闭合（见上文直接证据；stagger 只错开启动脉冲，不降低并发）。
-2. Fork/Join：busy-overlap 单场景已通过；`pendingRuns` 仍是进程内 active 来源，restart 只恢复 child linkage，不恢复在途 Run/completion。Orchestrator ManagerJob 已从 durable `OrchestratorManagerJobCreated` 恢复：有 candidate checkpoint 时直接补 completion 走 candidate/rebase，否则以原始 durable prompt 重跑；engine 懒加载时触发，不持久化 Task/handle/phase，不做开机扫描。
+2. Fork/Join：busy-overlap 单场景已通过；`pendingRuns` 仍是进程内 active 来源，restart 只恢复 child linkage，不恢复在途 Run/completion。Orchestrator ManagerJob 已从 durable `OrchestratorManagerJobCreated` 恢复：有 candidate checkpoint 时直接补 completion 走 candidate/rebase，否则以原始 durable prompt 重跑；engine 懒加载时触发，不持久化 Task/handle/phase，不做开机扫描。新增未评审的 runtime-aware linkage（`LinkedRuntimeIds`）改变了 restart 复用语义，且疑似破坏 `Dead_decision_survives_journal_rebuild`；复用/拒绝边界需按 SSOT restart resume 语义重新裁决。
 3. Process：200KB 流式 map、fan-in=8 分层 reduce 和 spool `finally` 清理已有生产代码；当前 Executor canary 只覆盖单 chunk、零 reduce。`ExecutorSummarize.awaitAgent` 消费非目标 completion 后只放本地 stash，不能回填公共 mailbox，目标路由与并发 completion 所有权未闭合。
 4. PTY：真实 bun-pty 与 `fork(agent=pty)`/signal/list/join 表面已接线；单场景现在断言真实 handle、输出 read、TERM/KILL signal outcome 与 list 收口；`PtyBackend` 的 live `Read` 消费 buffer 并完成读取。模块级 `live`/`pending` 仍没有 per-runtime owner 清理，跨进程隔离与更宽 write/read/join/list/abort 覆盖未闭合。**不得宣称 PTY 产品能力完成**。
 5. Companion：完整 messages 的 canonical baseline 已接线；当前 Y 阈值分支只写入 `[companion-rebase] condensed...` 占位内容，且同步 `TryRebase` 不持久化。真实、durable 的自压缩和对应 budget/restart gate 未闭合。
@@ -173,6 +182,12 @@ npm run test:e2e:p0
 - `ORCH-*`：dirty reject、same-manager conflict、post-rebase double PERFECT、ff-only、cleanup。
 
 ## 当前解冻动作
+
+0. 未完成事项（2026-07-27 记录，未处理）：
+   - 解开 Restart 红门幽灵 fallback（`困惑.md` 谜团一）：下一步建议将诊断改为插件写文件（非 printfn），定位 `observeIdle` 在关闭竞态下的 parts 缺失假设。
+   - 处理 2 项单元测试失败：300 行门禁三个文件需拆分；`Dead_decision_survives_journal_rebuild` 需定位与 runtime-aware linkage 的交互。
+   - 评审/验证 runtime-aware child linkage（谜团三），必要时按 SSOT 重裁或回退。
+   - 原 release 四提交计划（Companion/Fallback、PTY、TestKit、Orchestrator）未执行；稳定性三重复扫（`CANARY_REPEAT=3`）未跑；未推送。
 
 1. 保持 Watchdog 2s、14-way 标准 P0 和显式 expectation 不变，闭合当前全并行红门；先证明因果停滞归属，不以单场景绿色替代隔离契约。
 2. 保留已通过的 busy-overlap 场景，补 restart active-run/completion 语义；不得恢复危险的双 completion 路径。

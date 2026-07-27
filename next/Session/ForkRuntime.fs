@@ -140,33 +140,39 @@ type ForkRuntime
         (agentId: string, role: AgentRole, ?prompt: string, ?runWork: unit -> Task<Result<string, string>>)
         : ForkResult =
         lock lockObj (fun () ->
-            match agents.TryGetValue(agentId) with
-            | true, rec' when rec'.Status = AgentStatus.Busy ->
-                // A busy agent owns its current completion. A nudge never
-                // creates another run waiting on the same physical terminal.
-                ForkResult.Nudged agentId
-            | true, rec' ->
-                let runId, launch = startRun agentId role prompt runWork
+            // A cancelled runtime must reject new forks. The parent-abort path
+            // cancels but leaves the dict entry until disposal, so a reused
+            // runtime would otherwise fork on a torn-down mailbox.
+            if isCancelled then
+                ForkResult.NotFound agentId
+            else
+                match agents.TryGetValue agentId with
+                | true, rec' when rec'.Status = AgentStatus.Busy ->
+                    // A busy agent owns its current completion. A nudge never
+                    // creates another run waiting on the same physical terminal.
+                    ForkResult.Nudged agentId
+                | true, rec' ->
+                    let runId, launch = startRun agentId role prompt runWork
 
-                agents.[agentId] <-
-                    { rec' with
-                        Role = role
-                        Status = AgentStatus.Busy
-                        CurrentRunId = Some runId }
+                    agents.[agentId] <-
+                        { rec' with
+                            Role = role
+                            Status = AgentStatus.Busy
+                            CurrentRunId = Some runId }
 
-                launch ()
-                ForkResult.Nudged agentId
-            | false, _ ->
-                let runId, launch = startRun agentId role prompt runWork
+                    launch ()
+                    ForkResult.Nudged agentId
+                | false, _ ->
+                    let runId, launch = startRun agentId role prompt runWork
 
-                agents.[agentId] <-
-                    { AgentId = agentId
-                      Role = role
-                      Status = AgentStatus.Busy
-                      CurrentRunId = Some runId }
+                    agents.[agentId] <-
+                        { AgentId = agentId
+                          Role = role
+                          Status = AgentStatus.Busy
+                          CurrentRunId = Some runId }
 
-                launch ()
-                ForkResult.Created agentId)
+                    launch ()
+                    ForkResult.Created agentId)
 
     member _.Join() : Task<Result<RunCompletion, ForkError>> =
         lock lockObj (fun () ->
@@ -205,6 +211,8 @@ type ForkRuntime
             let agentList = agents.Values |> Seq.toList
             let ptyList = ptys.Values |> Seq.toList
             (agentList, ptyList))
+
+    member _.IsCancelled = lock lockObj (fun () -> isCancelled)
 
     member _.ActiveRunCount =
         lock lockObj (fun () ->

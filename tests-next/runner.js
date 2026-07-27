@@ -241,7 +241,7 @@ async function runTests() {
   console.log("tests-next Results: " + passed + " passed, " + failed + " failed, " + skipped + " skipped, Total " + (passed + failed + skipped));
   console.log("========================================\n");
 
-  if (failed > 0) {
+  if (failed > 0 || skipped > 0) {
     process.exit(1);
   }
 }

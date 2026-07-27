@@ -106,6 +106,7 @@ module HostReviewGuard =
                                 sprintf "Failed to persist review guard prompt acceptance: %A" failure.Failure
                             )
                         ))
+                (Some journal)
 
     let nudgeManager
         (sessionPort: ISessionHostPort)

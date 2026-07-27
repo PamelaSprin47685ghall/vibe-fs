@@ -26,3 +26,12 @@ module HostPendingRun =
         | Some resolver, Some journal ->
             ModelResolver.resolveForSession resolver childId (AgentJournal.snapshot journal)
         | _ -> None
+
+    /// Fail-closed gate: a session is dead after 4 consecutive fallback failures
+    /// (DurableFallback.nextDecision = FallbackDecision.Dead). Returns a refusal
+    /// reason when the linked child is dead so callers can skip installs and sends.
+    let sessionDeadRefusal (journal: AgentJournal option) (childId: SessionId) : string option =
+        match journal with
+        | Some j when DurableFallback.isDead childId (AgentJournal.snapshot j) ->
+            Some(sprintf "Session %s is dead after 4 consecutive fallback failures" (SessionId.value childId))
+        | _ -> None

@@ -24,13 +24,17 @@ module ManagerCanaryTests =
         { IsDirty = fun _ -> Task.FromResult false
           CreateWorktree = fun _ _ _ -> Task.FromResult(Ok())
           Rebase = fun _ _ -> Task.FromResult(Ok())
-          FfMerge = fun _ _ -> Task.FromResult(Ok "commit-canary-123")
+          FfMerge = fun _ _ _ -> Task.FromResult(Ok "commit-canary-123")
           ConflictedFiles = fun _ -> Task.FromResult(Ok [])
-          RemoveWorktree = fun _ -> Task.FromResult(Ok()) }
+          RemoveWorktree = fun _ -> Task.FromResult(Ok())
+          HasRebaseHead = fun _ -> Task.FromResult false
+          ListWorktrees = fun () -> Task.FromResult(Ok [])
+          ListManagerBranches = fun () -> Task.FromResult(Ok [])
+          DeleteBranch = fun _ -> Task.FromResult(Ok()) }
 
     let private createStubManagerPort () =
         { RunManager = fun _ _ _ -> Task.FromResult(Ok())
-          Reverify = fun _ _ -> Task.FromResult(Ok()) }
+          Reverify = fun _ _ _ -> Task.FromResult(Ok()) }
 
     let ``Exact_manager_role_surface_has_no_file_or_exec_permissions`` () =
         let expectedPermissions =
@@ -79,7 +83,7 @@ module ManagerCanaryTests =
                         if mgrId = "mgr-inspector" then tcs1.Task
                         elif mgrId = "mgr-coder" then tcs2.Task
                         else Task.FromResult(Ok())
-                  Reverify = fun _ _ -> Task.FromResult(Ok()) }
+                  Reverify = fun _ _ _ -> Task.FromResult(Ok()) }
 
             let gitPort = createStubGitPort ()
             let orch = Orchestrator(gitPort, managerPort, "/repo", "main")
@@ -195,7 +199,7 @@ module ManagerCanaryTests =
             // Part B: Orchestrator integration returning NeedsReview when reverify fails guard
             let mgrPort =
                 { createStubManagerPort () with
-                    Reverify = fun mgrId _ -> Task.FromResult(Error(sprintf "Review required for %s" mgrId)) }
+                    Reverify = fun mgrId _ _ -> Task.FromResult(Error(sprintf "Review required for %s" mgrId)) }
 
             let orch = Orchestrator(createStubGitPort (), mgrPort, "/repo", "main")
             let! forkRes = orch.ForkManager("mgr-review-test", "/repo/.worktrees/mgr-review-test")

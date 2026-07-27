@@ -150,19 +150,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                     replacementActive <- true
                     true)
 
-    /// Blogger context reset (self-rebase): updates B and baseline if idle, returns true; returns false if busy.
-    member this.TryRebase(newB: BlogText option, newBaseline: ProjectionSnapshot option) : bool =
-        lock lockObj (fun () ->
-            if isBusyUnlocked () then
-                false
-            else
-                currentB <- newB
-                lastSuccessfulProjection <- newBaseline
-                true)
-
-    member this.TryRebase(newB: BlogText, newBaseline: ProjectionSnapshot) : bool =
-        this.TryRebase(Some newB, Some newBaseline)
-
     member this.TryRebase(rebaseFn: unit -> Async<BlogText * ProjectionSnapshot>) : bool =
         lock lockObj (fun () ->
             if isBusyUnlocked () then
@@ -190,6 +177,43 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     member this.TryRebase(rebaseFn: unit -> Task<BlogText * ProjectionSnapshot>) : bool =
         this.TryRebase(fun () -> rebaseFn () |> Async.AwaitTask)
+
+    /// Y self-rebase: persist ONLY a new B' and leave the projection baseline
+    /// (lastSuccessfulProjection) UNCHANGED. The Blogger child sees only the old
+    /// B when condensing — it never processes the P0→P1 projection delta — so
+    /// advancing the baseline here would silently lose the P0→P1 messages: the
+    /// next TransformRaw(P1) would see no delta vs P1 and skip. By keeping the
+    /// baseline at P0, the subsequent TransformRaw computes the full P0→P1
+    /// delta and the Blogger processes it normally. Only currentB is replaced.
+    member this.TrySelfRebase(rebaseFn: unit -> Async<BlogText>) : bool =
+        lock lockObj (fun () ->
+            if isBusyUnlocked () then
+                false
+            else
+                busy <- true
+
+                let t =
+                    async {
+                        try
+                            let! b = rebaseFn ()
+
+                            // Persist B' with the EXISTING baseline so the
+                            // durable CompanionAdvanced keeps the same projection.
+                            // If there is no baseline yet (no prior Submit), skip
+                            // the durable append — B' stays in memory only.
+                            lastSuccessfulProjection |> Option.iter (fun proj -> persistSuccessful proj b)
+
+                            lock lockObj (fun () -> currentB <- Some b)
+                        with _ ->
+                            ()
+                    }
+                    |> startAsTask
+
+                inFlightTask <- Some t
+                true)
+
+    member this.TrySelfRebase(rebaseFn: unit -> Task<BlogText>) : bool =
+        this.TrySelfRebase(fun () -> rebaseFn () |> Async.AwaitTask)
 
     /// Submit: starts async blog function only when idle, returns SkippedBusy when busy, never queues.
     /// Completion atomically updates currentB and lastSuccessfulProjection on success; failure leaves both unchanged.

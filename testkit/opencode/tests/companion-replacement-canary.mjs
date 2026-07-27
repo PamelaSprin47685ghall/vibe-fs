@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
+import path from 'path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getSessionId, runStaticGate, setupScenario, teardownScenario } from '../index.js';
@@ -15,6 +15,12 @@ const contextLimit = 1000;
 // Activation: estimateTokens >= 0.8 * 1000 = 800 tokens = 3200 chars/4.
 const longText = 'dense work record sentence. '.repeat(70); // ~1960 chars per round
 const rounds = 4;
+const bloggerParagraph = (round) => `Blogger paragraph ${round}. ${'durable blogger detail. '.repeat(90)}`;
+
+// B' — the condensed companion context the self-rebase blogger returns.
+// Kept short so the Y-rebase threshold fires once after the Blogger budget
+// is captured, and does not re-fire after the replacement.
+const condensedB = 'B-prime condensed context.';
 
 function journalContains(workDir, needle) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
@@ -25,6 +31,15 @@ function journalContains(workDir, needle) {
     if (fs.readFileSync(path.join(runtimeDir, file), 'utf8').includes(needle)) return true;
   }
   return false;
+}
+
+async function waitForJournal(workDir, needle) {
+  const deadline = Date.now() + WATCHDOG_TIMEOUT_MS;
+  while (!journalContains(workDir, needle)) {
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  return true;
 }
 
 function primaryRequests(scenario) {
@@ -57,6 +72,15 @@ try {
     lane: expectationLane('companion-replacement', 'primary-title', 'title', 1, 'title'),
   });
 
+  // Capture every reset-frame (FULL re-anchor) blogger request the companion
+  // issues, so we can prove re-anchor content and the failure→retry re-send.
+  const resetFrames = [];
+  scenario.provider.onRequest = (parsed) => {
+    if (JSON.stringify(parsed.messages || []).includes('Re-anchor on the FULL current companion context B')) {
+      resetFrames.push(parsed);
+    }
+  };
+
   const parent = await scenario.client.request('POST', '/api/session', {
     body: { agent: primaryRole, model: { providerID: 'test', id: 'test-model' } },
   });
@@ -76,24 +100,31 @@ try {
       scenario.provider.expectText({
         id: `manager-blogger-${round}`,
         lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', round, 'chat', 'primary'),
-        text: `Blogger paragraph ${round}.`,
+        text: bloggerParagraph(round),
         match: {
           containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
         },
       });
     }
     if (round === 3) {
-      // Y-threshold rebase: the blogger's next request is the durable condense
-      // of FULL B, not an ordinary delta paragraph. Park it open (neverEnd) so
-      // the replacement background stays busy exactly like the old stream.
+      // Y-threshold self-rebase: the blogger condenses the FULL B into B'.
       scenario.provider.expectText({
         id: 'manager-blogger-3',
         lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', 3, 'chat', 'primary'),
-        neverEnd: true,
-        blocking: false,
-        text: 'Blogger paragraph 1. Blogger paragraph 2.',
+        text: condensedB,
         match: {
           containsText: ['Condense the following FULL companion context'],
+        },
+      });
+    }
+    if (round === 4) {
+      // After the rebase, the next projection delta-blogs normally.
+      scenario.provider.expectText({
+        id: 'manager-blogger-4',
+        lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', 4, 'chat', 'primary'),
+        text: 'Blogger paragraph 4.',
+        match: {
+          containsText: ['You are the blogger of a coding agent session.', 'Write one dense paragraph'],
         },
       });
     }
@@ -112,14 +143,18 @@ try {
       await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
     }
     if (round === 3) {
-      scenario.watchdog?.advance({
-        reason: 'replacement-blogger-busy',
-        lane: 'manager-blogger:3',
-        blocking: true,
-      });
+      await scenario.provider.waitForExpectation('manager-blogger-3', WATCHDOG_TIMEOUT_MS);
+      await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
+      scenario.watchdog?.advance({ reason: 'rebase-blogger-done', lane: 'manager-blogger:3', blocking: true });
+    }
+    if (round === 4) {
+      await scenario.provider.waitForExpectation('manager-blogger-4', WATCHDOG_TIMEOUT_MS);
+      await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
     }
   }
 
+  // (b) Durability: the journal holds a CompanionAdvanced whose Content is the
+  // condensed B' (the rebase persisted it); distinct from the old long B.
   assert.ok(
     journalContains(scenario.host.workDir, 'CompanionReplacementActiveSet'),
     'journal must record the durable PrefixReplacementEnabled fact',
@@ -128,8 +163,15 @@ try {
     journalContains(scenario.host.workDir, 'CompanionAdvanced'),
     'each successful Blogger checkpoint must atomically persist its B and baseline',
   );
+  assert.ok(
+    journalContains(scenario.host.workDir, condensedB),
+    `journal must durably persist the condensed B' ("${condensedB}") via CompanionAdvanced`,
+  );
 
+  // ---- Part 1 (a)+(c): restart restores B', and the post-restart reset frame ----
+  // re-anchors on B' and succeeds, advancing B.
   await scenario.restart();
+
   scenario.provider.expectText({
     id: 'round-restarted',
     lane: expectationLane('companion-replacement', 'primary', primaryRole, 5),
@@ -139,11 +181,9 @@ try {
   scenario.provider.expectText({
     id: 'manager-blogger-restarted',
     lane: expectationLane('companion-replacement', 'primary-blogger-restarted', 'blogger', 1, 'chat', 'primary'),
-    neverEnd: true,
-    blocking: false,
-    text: 'Blogger restart background remains busy.',
+    text: 'Blogger restart recovered.',
     match: {
-      containsText: ['Re-anchor on the FULL current companion context B'],
+      containsText: ['Re-anchor on the FULL current companion context B', 'You are the blogger of a coding agent session.'],
     },
   });
 
@@ -158,39 +198,120 @@ try {
   assert.ok(restartedPrompt.ok, `restarted round failed: ${JSON.stringify(restartedPrompt.data)}`);
   await restartedTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
   await scenario.provider.waitForExpectation('manager-blogger-restarted', WATCHDOG_TIMEOUT_MS);
-  scenario.watchdog?.advance({
-    reason: 'replacement-blogger-restarted-busy',
-    lane: 'manager-blogger-restarted:1',
-    blocking: true,
+  await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
+
+  // (a) B' written back: the restarted projection's synthetic B head carries B',
+  // not the old long accumulated B. ReplacementActive is reloaded from the
+  // journal, so this is the robust point to observe the rewrite.
+  const restartedPrimary = primaryRequests(scenario).at(-1);
+  const restartedPrimaryText = JSON.stringify(restartedPrimary.messages || []);
+  assert.ok(
+    restartedPrimaryText.includes(condensedB),
+    `rebase must write B' back into the next projection's synthetic B head: ${restartedPrimaryText.slice(0, 200)}`,
+  );
+  assert.ok(
+    !restartedPrimaryText.includes('Blogger paragraph 1. Blogger paragraph 2.'),
+    'the rebase must replace the old long B, not accumulate it',
+  );
+
+  // (c1) Restart reset frame re-anchors on B': its FULL B section contains B'.
+  const restartedReset = resetFrames.find((body) =>
+    JSON.stringify(body.messages || []).includes('Re-anchor on the FULL current companion context B'));
+  assert.ok(restartedReset, 'post-restart must send the FULL reset frame');
+  assert.ok(
+    JSON.stringify(restartedReset.messages || []).includes(condensedB),
+    'restart reset frame must re-anchor on the FULL current companion context B (B\')',
+  );
+
+  // (c2) Reset success advanced B (durable CompanionAdvanced persisted).
+  assert.equal(
+    await waitForJournal(scenario.host.workDir, 'Blogger restart recovered.'),
+    true,
+    'reset success must advance B (persist a new CompanionAdvanced with the recovered paragraph)',
+  );
+
+  // ---- Part 2: reset failure → full reset re-sent → success advances B. ----
+  // After restart the restored B is Some, so the next blog sends the FULL reset
+  // frame. We fail that FIRST frame (500). OpenCode auto-retries the same child
+  // LLM call; the retry lane (registered via afterExpectation when the failing
+  // expectation is consumed) catches the re-sent FULL reset frame.
+  await scenario.restart();
+
+  scenario.provider.expectText({
+    id: 'round-resetfail',
+    lane: expectationLane('companion-replacement', 'primary', primaryRole, 6),
+    text: `round resetfail: ${longText}`,
+    match: { requiredTools: primaryTools, forbiddenTools: forbiddenPrimaryTools },
+  });
+  // FIRST reset-frame blogger request FAILS (mock 500, no permissive escape).
+  scenario.provider.expectError({
+    id: 'manager-blogger-resetfail',
+    lane: expectationLane('companion-replacement', 'primary-blogger-resetfail', 'blogger', 1, 'chat', 'primary'),
+    status: 500,
+    headers: { 'retry-after-ms': '0' },
+    body: { error: { message: 'mock reset frame failure', type: 'server_error' } },
+    match: {
+      containsText: ['Re-anchor on the FULL current companion context B', 'You are the blogger of a coding agent session.'],
+    },
+  });
+  // Causal successor: when the failing reset frame is consumed, queue the RETRY
+  // lane so the re-sent request is matched (avoids ambiguity with the failure
+  // lane, which would otherwise still be head).
+  scenario.provider.afterExpectation('manager-blogger-resetfail', () => {
+    scenario.provider.expectText({
+      id: 'manager-blogger-resetretry',
+      lane: expectationLane('companion-replacement', 'primary-blogger-resetfail', 'blogger', 2, 'chat', 'primary'),
+      text: 'Blogger reset retry recovered.',
+      match: {
+        containsText: ['Re-anchor on the FULL current companion context B', 'You are the blogger of a coding agent session.'],
+      },
+    });
   });
 
-  const requests = primaryRequests(scenario);
-  assert.ok(requests.length >= rounds + 1, `expected primary requests, got ${requests.length}`);
-  const last = requests[requests.length - 1];
-  const bIndex = last.messages.findIndex((m) => messageText(m).includes('Blogger paragraph'));
-  assert.ok(bIndex >= 0, `replaced projection must carry the current B: ${JSON.stringify(last.messages.map(messageRole))}`);
-  assert.equal(messageRole(last.messages[bIndex]), 'user', 'the B head travels as a user-role synthetic');
+  const rfTurn = scenario.turn.start(parentId);
+  const rfPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
+    body: {
+      agent: primaryRole,
+      parts: [{ type: 'text', text: 'Record round resetfail.' }],
+      model: { providerID: 'test', modelID: 'test-model' },
+    },
+  });
+  assert.ok(rfPrompt.ok, `resetfail round failed: ${JSON.stringify(rfPrompt.data)}`);
+  await rfTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+  await scenario.provider.waitForExpectation('manager-blogger-resetfail', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForExpectation('manager-blogger-resetretry', WATCHDOG_TIMEOUT_MS);
+  await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
+
+  // The failed frame MUST be followed by a retry that re-sends the FULL reset
+  // frame (proves the failure flag survived and the frame was re-anchored).
+  assert.ok(resetFrames.length >= 3, `reset failure must produce a retry reset frame (saw ${resetFrames.length})`);
+  const retryFrame = resetFrames[resetFrames.length - 1];
   assert.ok(
-    messageText(last.messages[bIndex]).includes('Blogger paragraph 1.')
-      && messageText(last.messages[bIndex]).includes('Blogger paragraph 2.'),
-    'restarted projection must restore the complete accumulated B',
+    JSON.stringify(retryFrame.messages || []).includes('Re-anchor on the FULL current companion context B'),
+    'retried request must be the FULL reset frame (re-anchor)',
   );
-  const lastUser = last.messages[last.messages.length - 1];
   assert.ok(
-    messageText(lastUser).includes('Record round restarted.'),
-    'uncovered raw tail must be preserved verbatim',
+    JSON.stringify(retryFrame.messages || []).includes(condensedB),
+    'retried reset frame must re-anchor on B\' (the flag survived the failure)',
   );
-  assert.ok(
-   last.messages.length < rounds * 2 + 3,
-    `covered prefix must be skipped, got ${last.messages.length} messages after restart`,
+
+  // Retry success advanced B (durable CompanionAdvanced persisted).
+  assert.equal(
+    await waitForJournal(scenario.host.workDir, 'Blogger reset retry recovered.'),
+    true,
+    'reset retry success must advance B (persist a new CompanionAdvanced with the recovered paragraph)',
   );
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
-  console.log('Companion replacement canary passed: real budget activated atomic B persistence and restart-safe prefix replacement.');
+  console.log('Companion replacement + reset canary passed: self-rebase persists B\', restart re-anchors B\', reset failure retries the full frame and advances B.');
 } catch (error) {
   console.error(`Companion replacement canary failed: ${error.stack || error}`);
+  if (scenario?.host?.workDir) console.error(`workDir: ${scenario.host.workDir}`);
   if (scenario?.host?.stderrLog) console.error(`── host stderr tail ──\n${scenario.host.stderrLog.slice(-4000)}`);
+  if (scenario?.provider?.unexpectedRequests) {
+    console.error(`unexpected: ${JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 4).map((r) => ({ reason: r.reason, lastUser: r.body?.messages?.at(-1)?.content, candidates: r.candidates })))}`);
+  }
   if (scenario) {
     try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
   }
