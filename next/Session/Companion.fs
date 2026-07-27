@@ -121,16 +121,11 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                         try
                             let! (b, proj) = rebaseFn ()
                             persistSuccessful proj b
+                            // LatestB only. ActivePrefixEpoch.FrozenB stays frozen until
+                            // an explicit SwitchEpoch cold boundary.
                             lock lockObj (fun () ->
                                 latestB <- Some b
-                                lastSuccessfulProjection <- Some proj
-                                match activePrefixEpoch with
-                                | Some epoch ->
-                                    let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
-                                    let updatedEpoch = { epoch with FrozenB = b; EpochId = sprintf "%s|%d|%d" sessionStr epoch.CutoffMessageIndex (String.length b) }
-                                    persistEpochSwitched updatedEpoch
-                                    activePrefixEpoch <- Some updatedEpoch
-                                | None -> ())
+                                lastSuccessfulProjection <- Some proj)
                         with _ -> ()
                     } |> startAsTask
                 inFlightTask <- Some t
@@ -140,7 +135,8 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         this.TryRebase(fun () -> rebaseFn () |> Async.AwaitTask)
 
     /// Y self-rebase: persist ONLY B', keep projection baseline UNCHANGED.
-    /// IF ActivePrefixEpoch exists, its FrozenB is updated to the condensed B'.
+    /// Never rewrites ActivePrefixEpoch.FrozenB — that would bust X's provider
+    /// prefix cache. Epoch switches are explicit cold boundaries only.
     member this.TrySelfRebase(rebaseFn: unit -> Async<BlogText>) : bool =
         lock lockObj (fun () ->
             if isBusyUnlocked () then false
@@ -151,15 +147,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                         try
                             let! b = rebaseFn ()
                             lastSuccessfulProjection |> Option.iter (fun proj -> persistSuccessful proj b)
-                            lock lockObj (fun () ->
-                                latestB <- Some b
-                                match activePrefixEpoch with
-                                | Some epoch ->
-                                    let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
-                                    let updatedEpoch = { epoch with FrozenB = b; EpochId = sprintf "%s|%d|%d" sessionStr epoch.CutoffMessageIndex (String.length b) }
-                                    persistEpochSwitched updatedEpoch
-                                    activePrefixEpoch <- Some updatedEpoch
-                                | None -> ())
+                            lock lockObj (fun () -> latestB <- Some b)
                         with _ -> ()
                     } |> startAsTask
                 inFlightTask <- Some t

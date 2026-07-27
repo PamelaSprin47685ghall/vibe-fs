@@ -140,7 +140,14 @@ type CompanionHost
         let deps = this.BloggerDeps
         companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps projection delta))
 
-    member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
+    member _.EnablePrefixReplacement() : bool =
+        let enabled = companion.TryEnableReplacement()
+        // Freeze LatestB immediately so later blog success cannot change the
+        // X-visible head. No-op if already frozen or LatestB missing.
+        if enabled then companion.FreezeEpoch() |> ignore
+        enabled
+
+    member _.FreezeEpoch() : bool = companion.FreezeEpoch()
 
     /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
     /// into B' and durably persist (CompanionAdvanced with the EXISTING baseline,
@@ -223,7 +230,12 @@ type CompanionHost
         | _ -> messages
 
     member _.ReplacePrefix(messages: HostMessage list, watermarkIndex: int) =
-        Companion.compressPrefix messages companion.Memory.LatestB watermarkIndex
+        let prefixB =
+            match companion.Memory.ActivePrefixEpoch with
+            | Some epoch -> Some epoch.FrozenB
+            | None -> companion.Memory.LatestB
+
+        Companion.compressPrefix messages prefixB watermarkIndex
 
     member _.BloggerSession = lock gate (fun () -> bloggerId)
 
