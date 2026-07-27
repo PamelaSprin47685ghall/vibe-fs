@@ -116,11 +116,23 @@ module VerdictSurface =
                             |> Option.defaultValue toolCallId
 
                         // Root user message for this run (confirmation identity for 2nd PERFECT).
+                        // Host may expose it under several keys; also walk ctx.message if nested.
                         let rootUserMessageId =
                             contextString ctx "userMessageId"
                             |> Option.orElse (contextString ctx "userMessageID")
                             |> Option.orElse (contextString ctx "parentMessageID")
                             |> Option.orElse (contextString ctx "message.parentID")
+                            |> Option.orElse (
+                                if isNull ctx || isNull ctx?message then
+                                    None
+                                elif not (isNull ctx?message?parentID) then
+                                    Some(unbox<string> ctx?message?parentID)
+                                elif not (isNull ctx?message?id) && not (isNull ctx?message?role)
+                                     && unbox<string> ctx?message?role = "user" then
+                                    Some(unbox<string> ctx?message?id)
+                                else
+                                    None
+                            )
 
                         match host.SubmitVerdict(toolCallId, verdict, providerRunId, ?rootUserMessageId = rootUserMessageId) with
                         | Error err -> return box (stringify (createObj [ "error", box err ]))
