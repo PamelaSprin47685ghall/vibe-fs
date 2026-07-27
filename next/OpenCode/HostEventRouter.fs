@@ -73,18 +73,36 @@ type HostEventRouter
         | "session.aborted" -> true
         | _ -> false
 
-    /// Real OpenCode has no session.aborted event: an abort surfaces as
-    /// session.error with name MessageAbortedError, followed by idle.
-    let isAbortError (raw: obj) =
-        if eventType raw <> "session.error" then
+    /// Detects abort across the surfaces OpenCode uses:
+    ///   1. `session.error` with `error.name = MessageAbortedError | AbortError`
+    ///   2. `message.updated` where the assistant message carries
+    ///      `info.error.name` or `message.error.name` = `MessageAbortedError | AbortError`.
+    /// A pure, standalone function — no side effects, no string-heuristic guesses.
+    let isAbortedAssistant (raw: obj) =
+        let properties = rawProperties raw
+
+        if isNull properties then
             false
         else
-            let properties = rawProperties raw
+            let errorNameMatches name =
+                name = "MessageAbortedError" || name = "AbortError"
 
-            not (isNull properties)
-            && not (isNull properties?error)
-            && not (isNull properties?error?name)
-            && unbox<string> properties?error?name = "MessageAbortedError"
+            // 1. session.error with error.name
+            if eventType raw = "session.error" then
+                not (isNull properties?error)
+                && not (isNull properties?error?name)
+                && errorNameMatches (unbox<string> properties?error?name)
+            else
+                // 2. message.updated with info.error.name
+                (not (isNull properties?info)
+                 && not (isNull properties?info?error)
+                 && not (isNull properties?info?error?name)
+                 && errorNameMatches (unbox<string> properties?info?error?name))
+                // 3. message.updated where error surfaces at message level
+                || (not (isNull properties?message)
+                    && not (isNull properties?message?error)
+                    && not (isNull properties?message?error?name)
+                    && errorNameMatches (unbox<string> properties?message?error?name))
 
     let abortChildren parentId =
         Pty.abortParent parentId
@@ -179,11 +197,19 @@ type HostEventRouter
                 if r = "assistant" then
                     assistantTracker.Record(sessionId, target)
                 elif r = "user" then
-                    ()
+                    // New user turn id clears a stale assistant; same-id replay
+                    // during an in-flight provider call must keep the assistant
+                    // id so session.status=retry can attribute FallbackFailure.
+                    assistantTracker.NoteUser(sessionId, target)
 
-            if isAbortError raw then
+            if isAbortedAssistant raw then
                 abortedSessions.Mark sessionId
                 abortChildren sessionId
+                // Clear the aborted assistant message so it cannot be
+                // consumed by a terminal event — aborted state alone is
+                // sufficient to block nudges, but clearing prevents any
+                // other path from accessing it.
+                assistantTracker.ClearCurrent sessionId
             elif eventType raw = "session.error" then
                 ()
             elif eventType raw = "session.status" then
@@ -232,6 +258,11 @@ type HostEventRouter
                     terminalMessageId
                     terminalModel
                     (terminalRoleOf takenAssistant sessionId)
+
+                // Retire the terminal message ID regardless of whether parts
+                // were found — late-arriving parts must be rejected even when
+                // the message had no observable parts (aborted, unknown, empty).
+                assistantParts.Retire terminalMessageId
 
                 completedAssistant
                 |> Option.iter (fun _ -> assistantParts.Remove terminalMessageId)

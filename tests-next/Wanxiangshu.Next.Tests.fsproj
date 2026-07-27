@@ -53,6 +53,7 @@
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
     <Compile Include="OpenCode/HostReviewGuardTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTests.fs"/>
+    <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterSessionDeadTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>
     <Compile Include="OpenCode/OrchestratorHostTestSupport.fs"/>
@@ -60,6 +61,7 @@
     <Compile Include="OpenCode/ManagerConfigTests.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeTests.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
+    <Compile Include="Integration/OrchestratorIntegrationTests.fs"/>
     <Compile Include="Integration/OrchestratorRecoveryTests.fs"/>
     <Compile Include="Integration/ManagerCanaryTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>

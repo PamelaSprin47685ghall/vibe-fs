@@ -48,20 +48,10 @@ const CODER_PROMPT = 'Write publish_proof.txt.';
 const PROOF_CONTENT = 'Published by orchestrator canary\n';
 const PROOF_FILE = 'publish_proof.txt';
 
-// Recursively search a parsed journal line for a top-level (or [key,val]) fact tag,
-// matching how host-restart-canary.mjs reads the runtime NDJSON journal.
-function findValue(value, key) {
-  if (!value || typeof value !== 'object') return null;
-  if (Array.isArray(value) && value[0] === key && typeof value[1] === 'string') return value[1];
-  if (typeof value[key] === 'string') return value[key];
-  for (const child of Array.isArray(value) ? value : Object.values(value)) {
-    const found = findValue(child, key);
-    if (found) return found;
-  }
-  return null;
-}
-
 // Count durable facts of a given tag in the runtime journal (git-common-dir based).
+// Fable encodes DU cases as ["Tag", payload] where payload is often an object, so a
+// string-only recursive search misses the tag. Substring match on the serialized
+// line is the same contract fallback-canary uses for FallbackFailureRecorded.
 function countFact(workDir, factName) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
   const runtimeDir = path.join(
@@ -77,11 +67,7 @@ function countFact(workDir, factName) {
     if (!fs.statSync(fullPath).isFile()) continue;
     for (const line of fs.readFileSync(fullPath, 'utf8').split('\n')) {
       if (!line.trim()) continue;
-      try {
-        if (findValue(JSON.parse(line), factName)) count += 1;
-      } catch {
-        /* ignore malformed line */
-      }
+      if (line.includes(factName)) count += 1;
     }
   }
   return count;
@@ -273,13 +259,6 @@ function registerLanes(provider, scenario, { conflict }) {
     text: 'Manager restarted background.',
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
-  provider.expectText({
-    id: 'coder-blogger-restarted',
-    lane: L('coder-blogger-restarted', 'blogger', 1, 'coder'),
-    neverEnd: true,
-    text: 'Coder restarted background.',
-    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
-  });
 }
 
 function registerPreCandidateRecoveryLanes(provider, scenario) {
@@ -317,6 +296,13 @@ function registerPreCandidateRecoveryLanes(provider, scenario) {
     id: 'coder-recovery-terminal',
     lane: L('coder-recovery', 'coder', 2, 'manager-recovery'),
     text: 'Coder recovered.',
+  });
+  provider.expectText({
+    id: 'coder-blogger-restarted',
+    lane: L('coder-recovery-blogger', 'blogger', 1, 'coder-recovery'),
+    neverEnd: true,
+    text: 'Coder restarted background.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
   });
 }
 
@@ -394,12 +380,13 @@ async function runCrash({ conflict, restartAfterId, label, proofExpected }) {
           pendingBloggers.set(parentID, waiting);
         }
       }
-      // Recovery (post-restart) forks FRESH manager/reviewer sessions, so bind
-      // them to distinct recovery aliases; the initial run binds the base
-      // aliases. Without this, the initial and recovery manager/reviewer lanes
-      // (identical role/parent/requestKind) are both unbound at the new
-      // session's first request and the strict selector sees ambiguous heads.
-      if (role === 'manager' || role === 'reviewer') {
+      // Recovery (post-restart) forks FRESH manager/reviewer/coder sessions, so
+      // bind them to distinct recovery aliases; the initial run binds the base
+      // aliases. Without this, the initial and recovery lanes (identical
+      // role/parent/requestKind) are both unbound at the new session's first
+      // request and the strict selector sees ambiguous heads. Coder recovery
+      // also parents the post-restart coder blogger lane.
+      if (role === 'manager' || role === 'reviewer' || role === 'coder') {
         const recoveryAlias = `${role}-recovery`;
         if (scenario.provider.sessionFor(role) !== sessionID && scenario.provider.sessionFor(recoveryAlias) !== sessionID) {
           const target = restarted ? recoveryAlias : role;
@@ -412,15 +399,16 @@ async function runCrash({ conflict, restartAfterId, label, proofExpected }) {
     };
 
     // Crash point B: commit a conflicting change to the SAME proof file directly on
-    // the target ref, before any rebase. The coder later adds the file on the manager
-    // branch -> "both added" rebase conflict. Must happen while target is clean
-    // (ForkManager rejects a dirty worktree).
+    // the target ref AFTER the manager worktree has branched off master.
+    // When coder later writes the file on the manager branch -> "both added" rebase conflict.
     if (conflict) {
-      const workDir = scenario.host.workDir;
-      fs.writeFileSync(path.join(workDir, PROOF_FILE), 'Conflicting target edit\n');
-      execFileSync('git', ['-C', workDir, 'add', PROOF_FILE], { encoding: 'utf8' });
-      execFileSync('git', ['-C', workDir, 'commit', '-m', 'target: conflicting edit to proof file'], {
-        encoding: 'utf8',
+      scenario.provider.afterExpectation('manager-fork-coder', () => {
+        const workDir = scenario.host.workDir;
+        fs.writeFileSync(path.join(workDir, PROOF_FILE), 'Conflicting target edit\n');
+        execFileSync('git', ['-C', workDir, 'add', PROOF_FILE], { encoding: 'utf8' });
+        execFileSync('git', ['-C', workDir, 'commit', '-m', 'target: conflicting edit to proof file'], {
+          encoding: 'utf8',
+        });
       });
     }
 
@@ -499,7 +487,7 @@ async function runCrash({ conflict, restartAfterId, label, proofExpected }) {
     // post-restart blogger sidecars re-anchor after the host restart
     await scenario.provider.waitForExpectation('orch-blogger-restarted', WATCHDOG_TIMEOUT_MS);
     await scenario.provider.waitForExpectation('manager-blogger-restarted', WATCHDOG_TIMEOUT_MS);
-    await scenario.provider.waitForExpectation('coder-blogger-restarted', WATCHDOG_TIMEOUT_MS);
+    if (!conflict) await scenario.provider.waitForExpectation('coder-blogger-restarted', WATCHDOG_TIMEOUT_MS);
 
     await recoveryTurn.awaitTerminal({
       timeoutMs: WATCHDOG_TIMEOUT_MS,
@@ -540,28 +528,33 @@ async function runCrash({ conflict, restartAfterId, label, proofExpected }) {
     const branches = git(['branch', '--list', 'manager/*']);
     assert.equal(branches.trim(), '', `manager branch must be deleted after publish, got:\n${branches}`);
 
+    const candidateRegisteredFacts = countFact(workDir, 'OrchestratorCandidateRegistered');
+    const publishedFacts = countFact(workDir, 'OrchestratorPublished');
+    const conflictDetectedFacts = conflict ? countFact(workDir, 'OrchestratorConflictDetected') : 0;
+    const rebasedFacts = conflict ? countFact(workDir, 'OrchestratorRebased') : 0;
+
     // contract: durable barriers recorded exactly once — exactly one CandidateRegistered
     // and exactly one Published for the manager; no duplicate publish.
     assert.equal(
-      countFact(workDir, 'OrchestratorCandidateRegistered'),
+      candidateRegisteredFacts,
       1,
       'exactly one OrchestratorCandidateRegistered fact',
     );
     assert.equal(
-      countFact(workDir, 'OrchestratorPublished'),
+      publishedFacts,
       1,
       'exactly one OrchestratorPublished fact',
     );
 
     if (conflict) {
       // contract: conflict was detected (>=1) and the rebase converged (>=1 Rebased barrier).
-      assert.ok(countFact(workDir, 'OrchestratorConflictDetected') >= 1, 'expected a ConflictDetected fact');
-      assert.ok(countFact(workDir, 'OrchestratorRebased') >= 1, 'expected a Rebased barrier fact');
+      assert.ok(conflictDetectedFacts >= 1, 'expected a ConflictDetected fact');
+      assert.ok(rebasedFacts >= 1, 'expected a Rebased barrier fact');
     }
 
     await teardownScenario(scenario);
     console.log(
-      `  [${label}] passed: candidate=${candidateCommits} Published=${countFact(workDir, 'OrchestratorPublished')} ` +
+      `  [${label}] passed: candidate=${candidateCommits} Published=${publishedFacts} ` +
         `worktree-residue=${extra.length} manager-branch=${branches.trim() === '' ? 'none' : 'LEAK'}`,
     );
   } catch (error) {

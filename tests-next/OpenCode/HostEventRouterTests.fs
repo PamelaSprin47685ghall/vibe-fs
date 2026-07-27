@@ -122,16 +122,6 @@ module HostEventRouterTests =
             [ "type", box "session.idle"
               "properties", box (createObj [ "sessionID", box sessionId ]) ]
 
-    let private abortError sessionId =
-        createObj
-            [ "type", box "session.error"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
-              ) ]
-
 
     [<Fact>]
     let ``Assistant_text_part_prevents_zero_width_continuation`` () =
@@ -229,84 +219,54 @@ module HostEventRouterTests =
                 Assert.Equal(0, failures)
             })
 
-    [<Fact>]
-    let ``Successful_terminal_then_shutdown_idle_records_no_fallback`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "shutdown-idle-session"
-                let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "reviewer"
+    let private userUpdated sessionId messageId =
+        createObj
+            [ "type", box "message.updated"
+              "properties",
+              box (
+                  createObj
+                      [ "sessionID", box sessionId
+                        "info", box (createObj [ "id", box messageId; "role", box "user" ]) ]
+              ) ]
 
-                use journal =
-                    AgentJournal.create directory (RuntimeId.create "shutdown-idle-runtime") 1 DateTimeOffset.UtcNow
+    let private statusRetry sessionId attempt reason =
+        createObj
+            [ "type", box "session.status"
+              "properties",
+              box (
+                  createObj
+                      [ "sessionID", box sessionId
+                        "status",
+                        box (
+                            createObj
+                                [ "type", box "retry"
+                                  "attempt", box attempt
+                                  "message", box reason ]
+                        ) ]
+              ) ]
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
-
-                router.Observe(assistantUpdated sessionId "assistant-good", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-good", ignore)
-                router.Observe(idle sessionId, ignore)
-                // Host shutdown: the transport is torn down mid-turn; the aborted
-                // assistant message carries no parts and must not poison fallback.
-                router.Observe(
-                    createObj
-                        [ "type", box "message.updated"
-                          "properties",
-                          box (
-                              createObj
-                                  [ "sessionID", box sessionId
-                                    "info",
-                                    box (
-                                        createObj
-                                            [ "id", box "assistant-aborted"
-                                              "role", box "assistant"
-                                              "error",
-                                              box (
-                                                  createObj
-                                                      [ "name", box "MessageAbortedError"
-                                                        "message", box "mocking stopped" ]
-                                              ) ]
-                                    ) ]
-                          ) ],
-                    ignore
-                )
-
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
-
-                let failures =
-                    match
-                        (AgentJournal.snapshot journal)
-                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
-                    with
-                    | Some session ->
-                        session.Fallback
-                        |> Option.map (fun fb -> fb.TotalFailures)
-                        |> Option.defaultValue 0
-                    | None -> 0
-
-                Assert.Equal(0, failures)
-            })
+    let private fallbackFailures (journal: AgentJournal) sessionId =
+        match
+            (AgentJournal.snapshot journal)
+                .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
+        with
+        | Some session ->
+            session.Fallback
+            |> Option.map (fun fb -> fb.TotalFailures)
+            |> Option.defaultValue 0
+        | None -> 0
 
     [<Fact>]
-    let ``Abort_and_idle_in_either_order_do_not_poison_fallback`` () =
+    let ``Same_user_replay_keeps_assistant_id_for_provider_retry`` () =
         withTempDir (fun directory ->
             task {
-                let sessionId = "abort-order-session"
+                let sessionId = "retry-identity-session"
                 let prompts = ResizeArray<string * string>()
                 let roles = Dictionary<string, string>()
                 roles.[sessionId] <- "coder"
 
                 use journal =
-                    AgentJournal.create directory (RuntimeId.create "abort-order-runtime") 1 DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "retry-identity-runtime") 1 DateTimeOffset.UtcNow
 
                 let router =
                     HostEventRouter(
@@ -318,113 +278,19 @@ module HostEventRouterTests =
                         journal = journal
                     )
 
-                // Order 1: abort error first, then idle.
-                router.Observe(abortError sessionId, ignore)
-                router.Observe(idle sessionId, ignore)
+                // OpenCode creates the assistant, then re-emits the same user
+                // message.updated while the provider call is in flight. That
+                // replay must not drop the assistant id before session.status=retry.
+                router.Observe(userUpdated sessionId "user-1", ignore)
+                router.Observe(assistantUpdated sessionId "assistant-inflight", ignore)
+                router.Observe(userUpdated sessionId "user-1", ignore)
+                router.Observe(statusRetry sessionId 1 "mock provider failure round1", ignore)
 
-                // Order 2: consumed good terminal, then abort, then idle again.
-                router.Observe(assistantUpdated sessionId "assistant-ok", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-ok", ignore)
-                router.Observe(idle sessionId, ignore)
-                router.Observe(abortError sessionId, ignore)
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
+                Assert.Equal(1, fallbackFailures journal sessionId)
 
-                Assert.Empty(prompts)
-
-                let failures =
-                    match
-                        (AgentJournal.snapshot journal)
-                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
-                    with
-                    | Some session ->
-                        session.Fallback
-                        |> Option.map (fun fb -> fb.TotalFailures)
-                        |> Option.defaultValue 0
-                    | None -> 0
-
-                Assert.Equal(0, failures)
-            })
-
-    [<Fact>]
-    let ``Terminal_empty_text_part_receives_one_zero_width_continuation`` () =
-        task {
-            let sessionId = "manager-session"
-            let prompts = ResizeArray<string * string>()
-            let router = routerFor prompts sessionId
-
-            router.Observe(assistantUpdated sessionId "assistant-empty-text", ignore)
-            router.Observe(assistantEmptyTextPart sessionId "assistant-empty-text", ignore)
-            router.Observe(idle sessionId, ignore)
-            do! drainMicrotasks 8
-
-            Assert.Single(prompts) |> ignore
-            Assert.Equal("\u200B", snd prompts.[0])
-        }
-
-    [<Fact>]
-    let ``Manager_terminal_without_current_review_receives_durable_guard_prompt`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "manager-guard-session"
-                let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "manager"
-
-                use journal =
-                    AgentJournal.create directory (RuntimeId.create "manager-guard-runtime") 1 DateTimeOffset.UtcNow
-
-                let gitTreePort = { GetTreeHash = fun () -> "tree-without-review" }
-
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal,
-                        gitTreePort = gitTreePort
-                    )
-
-                router.Observe(assistantUpdated sessionId "assistant-manager-guard", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-manager-guard", ignore)
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
-
-                Assert.Single(prompts) |> ignore
-                Assert.Contains("Review is required before completion.", snd prompts.[0])
-            })
-
-
-
-
-    [<Fact>]
-    let ``Aborted_manager_terminal_never_receives_review_or_continuation_nudge`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "aborted-manager-session"
-                let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "manager"
-
-                use journal =
-                    AgentJournal.create directory (RuntimeId.create "aborted-manager-runtime") 1 DateTimeOffset.UtcNow
-
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal,
-                        gitTreePort = { GetTreeHash = fun () -> "tree-after-abort" }
-                    )
-
-                router.Observe(assistantUpdated sessionId "assistant-aborted", ignore)
-                router.Observe(abortError sessionId, ignore)
-                router.Observe(idle sessionId, ignore)
-
-                Assert.Empty(prompts)
+                // A genuinely new user turn still clears the stale assistant so a
+                // later retry cannot attribute against the previous turn.
+                router.Observe(userUpdated sessionId "user-2", ignore)
+                router.Observe(statusRetry sessionId 2 "should-not-record-without-assistant", ignore)
+                Assert.Equal(1, fallbackFailures journal sessionId)
             })

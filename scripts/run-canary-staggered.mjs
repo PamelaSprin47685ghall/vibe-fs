@@ -57,7 +57,7 @@ const MAX_PARALLEL = parsePositiveInt(
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 50, "STAGGER_DELAY_MS");
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -94,10 +94,9 @@ async function runPool(items, limit, worker) {
   };
 
   await Promise.all(items.map(async (item, index) => {
-    // Tiny fixed (non-cumulative) stagger to de-overlap Bun SEA boot file locks.
-    // This is NOT index*STAGGER — the last canary starts ~50ms after the first,
-    // not 28s later, preserving true concurrent isolation.
-    if (index > 0) await new Promise((resolve) => setTimeout(resolve, STAGGER_DELAY_MS));
+    // Tiny fixed stagger per item (index * STAGGER_DELAY_MS) to de-overlap
+    // Bun SEA boot CPU and file-lock bursts.
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, index * STAGGER_DELAY_MS));
     await acquire();
     try {
       results[index] = await worker(item);

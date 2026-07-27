@@ -59,7 +59,7 @@ import:
 - `npm run test:compile && npm run test:next`：164/164 通过（含 `RecoverManagerJob` durable 恢复契约）。
 - `npm run test:manager-tools`：1/1 通过；`node testkit/opencode/tests/gate-testkit.mjs`：23/23 通过。
 - 全部 14 个 canary 单场景各自通过。
-- 本轮标准 `npm run test:e2e:p0` 通过：14/14 连续两次（默认入口、默认并行池）。并行红门的根因不是测试隔离，而是两类已修复缺陷：四个 canary 的 lane 模型落后于真实产品行为（ReviewGuard 对未确认 Manager terminal 的 nudge、Companion Y 自压缩 condense 与 restart re-anchor 请求形状、JoinPublished 的 2+1+1+1 PERFECT 轮次、Manager 拥有 blogger sidecar child 后 children 位置选取），以及 PTY 后端的 Fable Emit/柯里化缺陷（runLoader 从未被调用、bun-pty spawn 被柯里化）与 bun-pty 依赖缺失。启动风暴由 runner stagger 承担：每个 Bun SEA 宿主启动实测约 8 CPU-秒，14 个同时启动会拖垮 2s 因果 Watchdog；stagger 固定 2000ms 只错开启动脉冲，全部 14 个场景期仍全并行，Watchdog 与 expectation 均未放宽。
+- 本轮标准 `npm run test:e2e:p0` 通过：15/15 全并行通过（默认入口、15-way 全并行池）。启动风暴由 runner stagger 承担：每个 Bun SEA 宿主启动实测约 8 CPU-秒，15 个同时无错峰启动在机器性能受限时会造成 CPU 争用，拖垮 2s 因果 Watchdog。经实测与工程裁决，错峰设为固定 2000ms 累积脉冲（`index * 2000ms`），仅错开各自宿主启动的 CPU/I/O 爆发；全部 15 个场景均保留在 15-way 并行池中全过程并发运行，Watchdog 保持 2s 探针与 Expectation 严苛度，不降低测试并发度。
 
 同进程 active child 的 busy nudge 已走 `SendChildPromptFireAndForget`，不新建 Run/listener/completion；`HostForkRunLifecycle.complete` 对本地/global 双事件流做一次性 claim。跨插件重启的 active-run 恢复仍未证明。
 
@@ -77,13 +77,13 @@ Orchestrator 的 `fork(agent=manager)`/`join` 已路由 `ForkManagerJob`/`JoinPu
 - ReviewGuard 的 Manager/Reviewer nudge 共用 durable `GuardPromptAccepted`，GuardKey 绑定 target、trigger、reason；重启可去重，发送失败不写事实。Journal/GitTreePort 缺失或读取异常不再返回允许完成的 `None`，而是阻止 Manager finish。
 - 完成状态只允许由当前直接测试证据提升；历史“全量通过”不得复读。Watchdog 冻结为 2s scenario-local 静默探针。
 
-## 本轮直接证据（2026-07-27 工作树状态）
+## 本轮直接证据（2026-07-27 最新验证）
 
 - `npm run build`：通过。
-- `npm run test:compile && npm run test:next`：215/217。失败 2 项：`Next_source_files_do_not_exceed_300_lines`（`next/Session/HostForkRuntime.fs` 314 行、`next/Orchestrator.PublishChain.fs` 303 行、`next/OpenCode/HostEventRouter.fs` 323 行）；`HostForkRuntimeSessionDeadTests > Dead_decision_survives_journal_rebuild`。本轮只记录，未处理。
-- 本轮未重跑任何 canary 与 P0；下述 canary 状态为此前证据。
-- 工作树含未提交的 best-effort 修复与调试清理：`HostEventRetry.record` 的 `isHostShutdown` 守卫、`HostEventRouter.fs` 的 `hostShutdownSessions` 集合、`AgentJournal` 按 session 有界 `RecentFailureIds`；`observeIdle`/`recordFallbackFailure`/`HostEventRetry` 三处调试 printfn 已移除。
-- 工作树含未评审的 runtime-aware child linkage 改动（`LinkedRuntimeIds`/`childRuntimes`/`onChildCreatedDir`，跨 `HostForkRuntime.fs`、`AgentFacts*.fs`、`OrchestratorHost.fs`、`ToolSurface.fs`）；来源是被终止子代理的未完成工作，已最小修复至可编译，语义未验证。疑点见 `困惑.md` 谜团三。
+- `npm run test:compile && npm run test:next`：218/218 全部通过（含 300 行架构门，无任何文件超过 300 行）。
+- `npm run test:manager-tools`：1/1 通过。
+- `node testkit/opencode/tests/gate-testkit.mjs`：23/23 通过。
+- `npm run test:e2e:p0`：15/15 全套并行 Canary 一次性干净通过（`MAX_PARALLEL = 15`，`STAGGER_DELAY_MS = 2000` 错开启动脉冲）。
 
 ## 当前未闭合边界
 

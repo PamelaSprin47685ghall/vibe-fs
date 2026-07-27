@@ -78,3 +78,7 @@ diagnostics-archive/
 
 *.fs.js
 .tokensave
+
+## Runtime state snapshots (万象术 next runtime)
+.sdd/
+

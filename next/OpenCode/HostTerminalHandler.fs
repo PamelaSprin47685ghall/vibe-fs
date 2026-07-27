@@ -25,6 +25,24 @@ module HostTerminalHandler =
             || DurableFallback.isDead (SessionId.create sessionId) (AgentJournal.snapshot j)
         | None -> false
 
+    /// Only formal working agents may receive a zero-width continuation.
+    /// Host-internal agents (title, compaction, blogger, executor, pty,
+    /// fallback) and unknown roles must never be nudged, preventing internal
+    /// recursion and spurious model requests.
+    let private continuationAllowedRole (role: string option) : bool =
+        match role with
+        | Some r ->
+            let lower = r.ToLowerInvariant()
+
+            lower = "manager"
+            || lower = "orchestrator"
+            || lower = "coder"
+            || lower = "reviewer"
+            || lower = "inspector"
+            || lower = "browser"
+            || lower = "meditator"
+        | None -> false
+
     /// reviewer missing-verdict nudge, manager review-guard evaluation, and the
     /// single zero-width continuation. `role` is the resolved agent role
     /// (message info.agent, else the known DSL role); `nudgeContinue` is the
@@ -83,9 +101,13 @@ module HostTerminalHandler =
                         raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
             | _ -> ()
 
+            // Zero-width continuation is only sent for working agents
+            // (manager, coder, reviewer, etc.) — never for title, compaction,
+            // blogger, executor, pty, fallback, or unknown roles.
             match completedAssistant with
             | Some completeMsg when
-                (completedAssistant |> Option.exists FallbackDetect.isTerminalAssistant)
+                continuationAllowedRole role
+                && FallbackDetect.isTerminalAssistant completeMsg
                 && FallbackDetect.isFailedAssistant completeMsg
                 ->
                 if not (sessionDead journal sessionId) then

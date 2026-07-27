@@ -93,6 +93,16 @@ module HostEventRouterSessionDeadTests =
             [ "type", box "session.idle"
               "properties", box (createObj [ "sessionID", box sid ]) ]
 
+    let private abortError sessionId =
+        createObj
+            [ "type", box "session.error"
+              "properties",
+              box (
+                  createObj
+                      [ "sessionID", box sessionId
+                        "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
+              ) ]
+
     let private recordFailures (journal: AgentJournal) (sessionId: string) (n: int) =
         for i in 1..n do
             AgentJournal.appendAgent
@@ -165,4 +175,34 @@ module HostEventRouterSessionDeadTests =
 
                 Assert.Single(prompts) |> ignore
                 Assert.Contains("Review is required before completion.", snd prompts.[0])
+            })
+
+    [<Fact>]
+    let ``Aborted_manager_terminal_never_receives_review_or_continuation_nudge`` () =
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "aborted-manager-session"
+                let prompts = ResizeArray<string * string>()
+                let roles = Dictionary<string, string>()
+                roles.[sessionId] <- "manager"
+
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "aborted-manager-runtime") 1 DateTimeOffset.UtcNow
+
+                let router =
+                    HostEventRouter(
+                        recordingPort prompts,
+                        Dictionary<string, string>(),
+                        roles,
+                        HashSet<string>(),
+                        HashSet<string>(),
+                        journal = journal,
+                        gitTreePort = { GetTreeHash = fun () -> "tree-after-abort" }
+                    )
+
+                router.Observe(assistantUpdated sessionId "assistant-aborted", ignore)
+                router.Observe(abortError sessionId, ignore)
+                router.Observe(idle sessionId, ignore)
+
+                Assert.Empty(prompts)
             })

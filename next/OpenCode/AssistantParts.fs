@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 
 type AssistantParts() =
     let byMessageId = Dictionary<string, Dictionary<string, obj>>()
+    let retiredIds = HashSet<string>()
 
     let messageIdOf (part: obj) =
         if isNull part then
@@ -22,22 +23,26 @@ type AssistantParts() =
 
         match messageIdOf part with
         | Some messageId ->
+            // Skip parts for already-consumed (retired) messages — prevents
+            // late-arriving parts from leaking into a future terminal.
+            if retiredIds.Contains messageId then
+                ()
+            else
+                let partId =
+                    if isNull part?id then
+                        Guid.NewGuid().ToString("N")
+                    else
+                        unbox<string> part?id
 
-            let partId =
-                if isNull part?id then
-                    Guid.NewGuid().ToString("N")
-                else
-                    unbox<string> part?id
+                let parts =
+                    match byMessageId.TryGetValue messageId with
+                    | true, existing -> existing
+                    | false, _ ->
+                        let created = Dictionary<string, obj>()
+                        byMessageId.[messageId] <- created
+                        created
 
-            let parts =
-                match byMessageId.TryGetValue messageId with
-                | true, existing -> existing
-                | false, _ ->
-                    let created = Dictionary<string, obj>()
-                    byMessageId.[messageId] <- created
-                    created
-
-            parts.[partId] <- part
+                parts.[partId] <- part
         | None -> ()
 
     /// Some only when there is positive part evidence: observed parts, or parts
@@ -50,4 +55,9 @@ type AssistantParts() =
         | _ when not (isNull lastMessage?parts) -> Some lastMessage
         | _ -> None
 
-    member _.Remove(messageId: string) = byMessageId.Remove messageId |> ignore
+    /// Retire a message ID so future late-arriving parts are ignored.
+    member _.Retire(messageId: string) = retiredIds.Add messageId |> ignore
+
+    member _.Remove(messageId: string) =
+        byMessageId.Remove messageId |> ignore
+        retiredIds.Add messageId |> ignore
