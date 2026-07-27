@@ -26,17 +26,22 @@ module internal AgentFactsReview =
                BarrierKey: string |})
         : AgentProjectionSet =
         // A new review barrier resets the guard so the phase requires two FRESH
-        // PERFECT verdicts (distinct ToolCallIds) on the current tree. The
-        // barrier key is recorded for auditability; the reset itself is what
+        // PERFECT verdicts (distinct ToolCallIds) on the current tree. The reset
         // prevents a stale confirmation from carrying across phases (e.g.
-        // pre-rebase confirmation borrowing into post-rebase when the tree
-        // hash is unchanged by rebase).
+        // pre-rebase confirmation borrowing into post-rebase when the tree hash
+        // is unchanged by rebase).
+        //
+        // Idempotent per key: re-emitting the barrier that is already current is
+        // a replay (restart resume re-runs the same phase), NOT a new phase. It
+        // must not discard durable verdicts already recorded for this barrier,
+        // which would burn two extra reviewer rounds after every restart.
         let sessions =
             updateSession
                 p.ManagerSessionId
                 (fun s ->
                     let rg =
                         match s.ReviewGuard with
+                        | Some existing when existing.CurrentBarrierKey = Some p.BarrierKey -> existing
                         | Some existing ->
                             { existing with
                                 // Clearing the tree hash is load-bearing: the

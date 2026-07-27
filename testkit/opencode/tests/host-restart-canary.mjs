@@ -256,6 +256,16 @@ try {
   ]);
   scenario.watchdog?.advance({ reason: 'initial-blogger-sidecars', lane: 'initial', blocking: true });
 
+  await scenario.provider.waitForExpectation('manager-fork-reviewer', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'manager-forked-reviewer', lane: 'manager', blocking: true });
+  await scenario.provider.waitForExpectation('reviewer-perfect-1', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'reviewer-perfect-1', lane: 'reviewer', blocking: true });
+  await scenario.provider.waitForExpectation('reviewer-perfect-2', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'reviewer-perfect-2', lane: 'reviewer', blocking: true });
+  await scenario.provider.waitForExpectation('reviewer-terminal', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'reviewer-terminal', lane: 'reviewer', blocking: true });
+  await scenario.provider.waitForExpectation('manager-join-reviewer', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'manager-joined-reviewer', lane: 'manager', blocking: true });
   await scenario.provider.waitForExpectation('manager-reviewed', WATCHDOG_TIMEOUT_MS);
   scenario.watchdog?.advance({ reason: 'review-confirmed', lane: 'manager', blocking: true });
 

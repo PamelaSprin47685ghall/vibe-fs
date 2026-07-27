@@ -78,9 +78,15 @@ export function handleWebFetch(req, res) {
 
 export function readRequestBody(req) {
   return new Promise((resolve, reject) => {
-    let raw = '';
-    req.on('data', (chunk) => { raw += chunk; });
+    // Buffer the chunks and decode ONCE: `raw += chunk` decodes every chunk
+    // independently, so a multi-byte UTF-8 character split across a TCP chunk
+    // boundary is mangled into replacement characters and JSON.parse fails.
+    // Only the largest bodies (companion projection + full history) span
+    // multiple chunks, which made this look like a payload-specific defect.
+    const chunks = [];
+    req.on('data', (chunk) => { chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)); });
     req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
       if (!raw) return resolve({});
       try { resolve(JSON.parse(raw)); } catch (e) { reject(e); }
     });

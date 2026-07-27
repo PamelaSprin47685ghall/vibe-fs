@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../index.js';
 import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
-import { requestSessionOf, requestRoleOf } from '../strict-mock-matches.js';
+import { requestSessionOf, requestRoleOf, requestParentSessionOf } from '../strict-mock-matches.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const SCENARIO = 'orch-restart-publish';
@@ -339,22 +339,60 @@ async function runCrash({ conflict, restartAfterId, label, proofExpected }) {
     // `restarted` flips true after the host restart resolves; recovery
     // manager/reviewer requests are routed to their distinct recovery aliases.
     let restarted = false;
+    // parent session id -> the role that owns it, learned from that session's own
+    // (non-blogger) requests. A blogger sidecar is then attributed by parentage
+    // instead of by scanning its prompt, which embeds the parent transcript.
+    const bloggerParents = new Map();
+    const bloggerRestarted = new Map();
+    // parent session id -> blogger sessions that spoke before the parent did.
+    const pendingBloggers = new Map();
+    // Alias binding is per SESSION and never crosses roles. Only the
+    // orchestrator emits the "Re-anchor" prompt after a restart; manager/coder
+    // sidecars re-anchor silently, so a SECOND session of the same role must
+    // take that role's `-restarted` alias instead of colliding with the initial
+    // binding (the collision threw inside this hook and surfaced as an opaque
+    // 400 that stalled both blogger lanes).
+    const bindRoleAlias = (base, sessionID, preferRestarted) => {
+      const restartedAlias = `${base}-restarted`;
+      if (scenario.provider.sessionFor(base) === sessionID) return;
+      if (scenario.provider.sessionFor(restartedAlias) === sessionID) return;
+      const first = preferRestarted ? restartedAlias : base;
+      const second = preferRestarted ? base : restartedAlias;
+      if (!scenario.provider.sessionFor(first)) scenario.provider.bindSession(first, sessionID);
+      else if (!scenario.provider.sessionFor(second)) scenario.provider.bindSession(second, sessionID);
+    };
     scenario.provider.onRequest = (body) => {
       const sessionID = requestSessionOf(body);
       const text = JSON.stringify(body?.messages || []);
       if (!sessionID) return;
       const role = requestRoleOf(body);
-      // Blogger re-anchor rebinding (existing): the companion re-anchors on
-      // restart with a distinct alias so an old pending lane can't collide.
+      if (role && role !== 'blogger') {
+        bloggerParents.set(sessionID, role === 'orchestrator' ? 'orchestrator' : role);
+        if (restarted && !bloggerRestarted.has(sessionID)) bloggerRestarted.set(sessionID, true);
+        // A sidecar can speak BEFORE its parent's first model call, so replay any
+        // blogger session that arrived while its parent was still unknown.
+        const waiting = pendingBloggers.get(sessionID);
+        if (waiting) {
+          pendingBloggers.delete(sessionID);
+          for (const bloggerSessionID of waiting) {
+            bindRoleAlias(`${bloggerParents.get(sessionID)}-blogger`, bloggerSessionID, Boolean(bloggerRestarted.get(sessionID)));
+          }
+        }
+      }
       if (text.includes('You are the blogger of a coding agent session.')) {
-        const restartedBlogger = text.includes('Re-anchor on the FULL current companion context B');
-        const bloggerRole = text.includes('"agent":"manager"')
-          ? 'manager'
-          : text.includes('"agent":"coder"')
-            ? 'coder'
-            : 'orchestrator';
-        const alias = `${bloggerRole}-blogger${restartedBlogger ? '-restarted' : ''}`;
-        scenario.provider.bindSession(alias, sessionID);
+        // Discriminate by the sidecar's PARENT session, not by scanning the
+        // prompt: the companion projection embeds the parent's transcript, so
+        // an orchestrator sidecar can also contain `"agent":"manager"` text.
+        // Parent identity is exact and already carried by x-parent-session-id.
+        const parentID = requestParentSessionOf(body);
+        const bloggerRole = parentID && bloggerParents.get(parentID);
+        if (bloggerRole) {
+          bindRoleAlias(`${bloggerRole}-blogger`, sessionID, Boolean(bloggerRestarted.get(parentID)));
+        } else if (parentID) {
+          const waiting = pendingBloggers.get(parentID) || new Set();
+          waiting.add(sessionID);
+          pendingBloggers.set(parentID, waiting);
+        }
       }
       // Recovery (post-restart) forks FRESH manager/reviewer sessions, so bind
       // them to distinct recovery aliases; the initial run binds the base
@@ -362,7 +400,14 @@ async function runCrash({ conflict, restartAfterId, label, proofExpected }) {
       // (identical role/parent/requestKind) are both unbound at the new
       // session's first request and the strict selector sees ambiguous heads.
       if (role === 'manager' || role === 'reviewer') {
-        scenario.provider.bindSession(restarted ? `${role}-recovery` : role, sessionID);
+        const recoveryAlias = `${role}-recovery`;
+        if (scenario.provider.sessionFor(role) !== sessionID && scenario.provider.sessionFor(recoveryAlias) !== sessionID) {
+          const target = restarted ? recoveryAlias : role;
+          if (!scenario.provider.sessionFor(target)) scenario.provider.bindSession(target, sessionID);
+          else if (!scenario.provider.sessionFor(restarted ? role : recoveryAlias)) {
+            scenario.provider.bindSession(restarted ? role : recoveryAlias, sessionID);
+          }
+        }
       }
     };
 

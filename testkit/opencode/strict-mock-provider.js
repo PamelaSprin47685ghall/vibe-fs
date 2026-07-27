@@ -112,6 +112,11 @@ export class StrictMockProvider {
     if (bound && bound !== sessionID) throw new Error(`StrictMock session alias ${alias} is already bound`);
     this._state.sessionBindings.set(alias, sessionID);
   }
+  /// Read-only: which session (if any) currently owns an alias. Lets a scenario
+  /// route a second session to a distinct alias instead of throwing on rebind.
+  sessionFor(alias) {
+    return this._state.sessionBindings.get(alias) || null;
+  }
   waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForExpectation(id, timeoutMs); }
   waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
   afterExpectation(id, callback) {
@@ -186,7 +191,13 @@ export class StrictMockProvider {
       Object.defineProperty(parsed, '__testkitHeaders', { value: req.headers, enumerable: false });
       this._dispatchChat(res, parsed);
     })
-      .catch(() => sendJSON(res, 400, { error: 'bad json' }));
+      .catch((error) => {
+        // Never mask a dispatch/hook failure as a body-parse failure: the
+        // diagnostic must name the real cause (alias binding, selector, etc.).
+        const badBody = error instanceof SyntaxError;
+        console.error(`[MOCK-DISPATCH-ERROR] ${badBody ? 'bad json' : 'dispatch'}: ${error?.stack || error}`);
+        sendJSON(res, 400, { error: badBody ? 'bad json' : `dispatch failed: ${error?.message || error}` });
+      });
   }
 
   _dispatchChat(res, parsed) {
