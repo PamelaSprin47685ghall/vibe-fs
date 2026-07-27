@@ -5,19 +5,24 @@ open System.Collections.Generic
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Thin JS/Fable boundary filter. No normalize recursion, no part parsing,
-/// no journal, no business effects — only idle/retry/deleted signals.
+/// Thin JS/Fable boundary filter. No part parsing, no journal, no business
+/// effects — only idle/retry/deleted signals for owned sessions.
 module HostSignalAdapter =
 
-    let private asString (value: obj) =
-        if isNull value then
-            None
+    let private unwrap (raw: obj) =
+        if isNull raw then
+            raw
+        elif not (isNull raw?event) then
+            raw?event
+        elif not (isNull raw?payload) then
+            let payload = raw?payload
+
+            if not (isNull raw?directory) && isNull payload?directory then
+                payload?directory <- raw?directory
+
+            payload
         else
-            try
-                let text = string value
-                if String.IsNullOrWhiteSpace text then None else Some text
-            with _ ->
-                None
+            raw
 
     let private eventTypeOf (raw: obj) =
         if isNull raw || isNull raw?``type`` then
@@ -31,22 +36,16 @@ module HostSignalAdapter =
         else
             let properties = raw?properties
 
-            let candidates =
-                [ if not (isNull properties) && not (isNull properties?sessionID) then
-                      Some(unbox<string> properties?sessionID)
-                  else
-                      None
-                  if not (isNull properties) && not (isNull properties?sessionId) then
-                      Some(unbox<string> properties?sessionId)
-                  else
-                      None
-                  if not (isNull raw?sessionID) then Some(unbox<string> raw?sessionID) else None
-                  if not (isNull raw?sessionId) then Some(unbox<string> raw?sessionId) else None ]
-
-            candidates
-            |> List.tryPick id
-            |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
-            |> Option.map SessionId.create
+            if not (isNull properties) && not (isNull properties?sessionID) then
+                Some(SessionId.create (unbox<string> properties?sessionID))
+            elif not (isNull properties) && not (isNull properties?sessionId) then
+                Some(SessionId.create (unbox<string> properties?sessionId))
+            elif not (isNull raw?sessionID) then
+                Some(SessionId.create (unbox<string> raw?sessionID))
+            elif not (isNull raw?sessionId) then
+                Some(SessionId.create (unbox<string> raw?sessionId))
+            else
+                None
 
     let private retrySignal (sessionId: SessionId) (raw: obj) : RetrySignal option =
         let properties = if isNull raw then null else raw?properties
@@ -56,16 +55,10 @@ module HostSignalAdapter =
             None
         else
             let attempt =
-                if isNull status?attempt then
-                    "unknown"
-                else
-                    string status?attempt
+                if isNull status?attempt then "unknown" else string status?attempt
 
             let reason =
-                if isNull status?message then
-                    "provider retry"
-                else
-                    unbox<string> status?message
+                if isNull status?message then "provider retry" else unbox<string> status?message
 
             let messageId =
                 if not (isNull properties) && not (isNull properties?messageID) then
@@ -81,9 +74,9 @@ module HostSignalAdapter =
                   Reason = reason
                   MessageId = messageId }
 
-    /// Returns Some signal only for owned idle/retry/deleted. Everything else
-    /// is dropped at the earliest boundary with a single string compare.
-    let tryAdapt (isOwned: SessionId -> bool) (raw: obj) : HostSignal option =
+    let tryAdapt (isOwned: SessionId -> bool) (rawInput: obj) : HostSignal option =
+        let raw = unwrap rawInput
+
         if isNull raw then
             None
         else
@@ -111,10 +104,26 @@ module HostSignalAdapter =
                 match sessionIdOf raw with
                 | Some sessionId when isOwned sessionId -> Some(SessionDeleted sessionId)
                 | _ -> None
+            | "session.error" ->
+                match sessionIdOf raw with
+                | None -> None
+                | Some sessionId when not (isOwned sessionId) -> None
+                | Some sessionId ->
+                    let properties = raw?properties
+                    let error = if isNull properties then null else properties?error
+                    let name =
+                        if isNull error || isNull error?name then ""
+                        else unbox<string> error?name
+                    if name.IndexOf("Abort", StringComparison.OrdinalIgnoreCase) >= 0 then
+                        Some(SessionAbort sessionId)
+                    else
+                        None
             | _ -> None
 
 type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> unit) =
 
+    // Empty registry means "accept all" only before the first owned session is
+    // registered; after that only explicit owned sessions pass.
     let isOwned (sessionId: SessionId) =
         ownedSessions.Count = 0
         || ownedSessions.Contains(SessionId.value sessionId)

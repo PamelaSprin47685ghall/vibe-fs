@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
 module HostSignalBootstrap =
@@ -45,6 +46,8 @@ module HostSignalBootstrap =
                     member _.GetMessages _ =
                         Task.FromResult(Ok([]: SessionMessage list)) }
 
+        let abortedSessions = HashSet<string>()
+
         let onTurn (turn: ReconciledTurn) =
             TerminalPolicies.apply
                 sessionPort
@@ -56,6 +59,7 @@ module HostSignalBootstrap =
                 managerGuardNudges
                 sessionParents
                 disposeExecutorRuntime
+                abortedSessions
                 turn
 
         let reconciler = SessionReconciler(snapshot, onTurn)
@@ -64,6 +68,16 @@ module HostSignalBootstrap =
             match signal with
             | ProviderRetry retry ->
                 RetrySignalHandler.handle journal fallbackFailures userMessageBindings retry
+            | SessionAbort sessionId ->
+                let key = SessionId.value sessionId
+                if abortedSessions.Add key then
+                    Pty.abortParent key
+                    sessionPort.AbortChildren sessionId |> ignore
+                    disposeExecutorRuntime key
+                    eventPort.NotifyTerminal sessionId (TerminalOutcome.Aborted "host session.error abort")
+                    |> ignore
+                // Still reconcile so any later durable assistant state is observed.
+                reconciler.HandleSignal(SessionIdle sessionId)
             | SessionIdle _
             | SessionDeleted _ -> reconciler.HandleSignal signal
 
@@ -88,6 +102,7 @@ module HostSignalBootstrap =
                 let mid = MessageId.create messageId
                 userMessageBindings.[sessionId] <- mid
                 reconciler.BindUserMessage(sid, mid)
+                abortedSessions.Remove sessionId |> ignore
                 registerOwned sessionId
 
         let bindActiveRun (sessionId: SessionId) (role: AgentRole) (directory: string option) =
@@ -114,6 +129,8 @@ module HostSignalBootstrap =
                     let messageId =
                         if not (isNull inputObj?messageID) then
                             unbox<string> inputObj?messageID
+                        elif not (isNull inputObj?messageId) then
+                            unbox<string> inputObj?messageId
                         elif
                             not (isNull outputObj)
                             && not (isNull outputObj?message)
@@ -126,6 +143,8 @@ module HostSignalBootstrap =
                             && not (isNull outputObj?info?id)
                         then
                             unbox<string> outputObj?info?id
+                        elif not (isNull outputObj) && not (isNull outputObj?id) then
+                            unbox<string> outputObj?id
                         else
                             ""
 

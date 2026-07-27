@@ -156,6 +156,7 @@ module PtyTests =
                 (HashSet())
                 (Dictionary())
                 (fun _ -> ())
+                (HashSet<string>())
                 abortedTurn
 
             equal

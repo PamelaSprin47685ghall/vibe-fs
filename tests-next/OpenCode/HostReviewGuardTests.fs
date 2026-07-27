@@ -19,7 +19,7 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 module HostReviewGuardTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
-        let activeSessions = HashSet<string>()
+        let activeSessions = (HashSet<string>())
 
         { new ISessionHostPort with
             member _.SubscribeTerminal(sessionId, _) =
@@ -52,7 +52,7 @@ module HostReviewGuardTests =
         (sendObserved: TaskCompletionSource<unit>)
         (acceptance: TaskCompletionSource<Result<MessageId, string>>)
         =
-        let activeSessions = HashSet<string>()
+        let activeSessions = (HashSet<string>())
 
         { new ISessionHostPort with
             member _.SubscribeTerminal(sessionId, _) =
@@ -107,6 +107,7 @@ module HostReviewGuardTests =
             managerGuard
             parents
             (fun _ -> ())
+            (HashSet<string>())
             turn
 
     let private reviewerTurn sessionId messageId =

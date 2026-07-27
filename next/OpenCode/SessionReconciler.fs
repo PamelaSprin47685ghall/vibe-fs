@@ -50,8 +50,19 @@ type SessionReconciler
             afterUser
             |> List.tryFind (fun message -> message.Role = "assistant")
 
+    let findLatestUser (messages: SessionMessage list) =
+        messages
+        |> List.rev
+        |> List.tryFind (fun message -> message.Role = "user")
+
     let findLatestBoundTurn (messages: SessionMessage list) (binding: ActiveRunBinding) =
-        match binding.UserMessageId with
+        let userMessageId =
+            match binding.UserMessageId with
+            | Some id -> Some id
+            | None -> findLatestUser messages |> Option.map (fun message -> message.Id)
+
+        match userMessageId with
+        | None -> None
         | Some userMessageId ->
             match findAssistantAfter messages userMessageId with
             | None -> None
@@ -64,9 +75,6 @@ type SessionReconciler
                         binding.AgentRole
                         binding.Directory
                 )
-        | None ->
-            // No chat.message binding yet: unknown, never invent empty failure.
-            None
 
     let consumeKey (turn: ReconciledTurn) =
         sprintf
@@ -150,7 +158,17 @@ type SessionReconciler
 
                 let binding = lock gate (fun () -> bindingOf sessionId)
 
-                match binding with
+                let active =
+                    match binding with
+                    | Some value -> Some value
+                    | None ->
+                        Some
+                            { SessionId = sessionId
+                              UserMessageId = None
+                              AgentRole = None
+                              Directory = "" }
+
+                match active with
                 | None -> ()
                 | Some active ->
                     let! snapshotResult = snapshot.GetMessages sessionId
@@ -188,4 +206,5 @@ type SessionReconciler
         match signal with
         | SessionIdle sessionId -> this.MarkDirty sessionId
         | SessionDeleted sessionId -> this.ClearSession sessionId
+        | SessionAbort sessionId -> this.MarkDirty sessionId
         | ProviderRetry _ -> ()

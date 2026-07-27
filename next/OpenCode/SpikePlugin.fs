@@ -198,7 +198,7 @@ module SpikePlugin =
                           "journal", box journal
                           "hostEventsSubscription", box wired.Subscription
                           "bindRunStarted", bindRunStarted
-                          "chat.message", wired.ChatMessageHook
+                          "chat.message", box (uncurriedExecute wired.ChatMessageHook)
                           "chat.transform", box (uncurriedExecute (box transform))
                           // Both hooks are registered for compatibility: some
                           // OpenCode host versions call chat.transform while
