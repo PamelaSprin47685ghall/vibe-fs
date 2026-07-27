@@ -65,6 +65,10 @@
     <Compile Include="OpenCode/OrchestratorHostTests.fs"/>
     <Compile Include="OpenCode/ManagerConfigTests.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeTests.fs"/>
+    <Compile Include="MockOpenCode/MockOpenCode.fs"/>
+    <Compile Include="MockOpenCode/ForkRuntimeIntegration.fs"/>
+    <Compile Include="MockOpenCode/ReviewGuardIntegration.fs"/>
+    <Compile Include="MockOpenCode/FallbackIntegration.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
     <Compile Include="Integration/OrchestratorIntegrationTests.fs"/>
     <Compile Include="Integration/OrchestratorRecoveryTests.fs"/>
