@@ -90,9 +90,10 @@ export async function initGitWorkspace(workDir) {
     execSync("git init", { cwd: workDir, stdio: "ignore" });
     execSync("git config user.email test@example.com", { cwd: workDir, stdio: "ignore" });
     execSync("git config user.name test", { cwd: workDir, stdio: "ignore" });
-    fs.writeFileSync(path.join(workDir, "AGENTS.md"), "- e2e workspace\n");
+    // Stage any fixture files already written by setupScenario, then commit.
+    // --allow-empty keeps an empty initial commit when the canary has no files.
     execSync("git add -A", { cwd: workDir, stdio: "ignore" });
-    execSync("git commit -m init", { cwd: workDir, stdio: "ignore" });
+    execSync("git commit --allow-empty -m init", { cwd: workDir, stdio: "ignore" });
   } catch {
     // Non-fatal.
   }
