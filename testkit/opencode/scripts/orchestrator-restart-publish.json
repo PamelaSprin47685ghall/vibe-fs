@@ -64,41 +64,53 @@
       }
     },
     {
-      "wait": "manager-recovery-fork-coder"
+      "wait": "manager-recovery-fork-coder",
+      "timeoutMs": 15000
     },
     {
-      "wait": "coder-recovery-write"
+      "wait": "coder-recovery-write",
+      "timeoutMs": 15000
     },
     {
-      "wait": "coder-recovery-terminal"
+      "wait": "coder-recovery-terminal",
+      "timeoutMs": 15000
     },
     {
-      "wait": "manager-recovery-join-coder"
+      "wait": "manager-recovery-join-coder",
+      "timeoutMs": 15000
     },
     {
-      "wait": "manager-recovery-terminal"
+      "wait": "manager-recovery-terminal",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-perfect-3"
+      "wait": "reviewer-perfect-3",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-terminal-3"
+      "wait": "reviewer-terminal-3",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-perfect-4"
+      "wait": "reviewer-perfect-4",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-terminal-4"
+      "wait": "reviewer-terminal-4",
+      "timeoutMs": 15000
     },
     {
-      "wait": "orch-join-2"
+      "wait": "orch-join-2",
+      "timeoutMs": 15000
     },
     {
-      "wait": "orch-final"
+      "wait": "orch-final",
+      "timeoutMs": 15000
     },
     {
       "awaitTerminal": true,
-      "requireAssistantTerminal": false
+      "requireAssistantTerminal": false,
+      "timeoutMs": 15000
     },
     {
       "expectSatisfied": true

@@ -73,29 +73,37 @@
       }
     },
     {
-      "wait": "manager-conflict-resume-2"
+      "wait": "manager-conflict-resume-2",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-perfect-3"
+      "wait": "reviewer-perfect-3",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-terminal-3"
+      "wait": "reviewer-terminal-3",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-perfect-4"
+      "wait": "reviewer-perfect-4",
+      "timeoutMs": 15000
     },
     {
-      "wait": "reviewer-terminal-4"
+      "wait": "reviewer-terminal-4",
+      "timeoutMs": 15000
     },
     {
-      "wait": "orch-join-2"
+      "wait": "orch-join-2",
+      "timeoutMs": 15000
     },
     {
-      "wait": "orch-final"
+      "wait": "orch-final",
+      "timeoutMs": 15000
     },
     {
       "awaitTerminal": true,
-      "requireAssistantTerminal": false
+      "requireAssistantTerminal": false,
+      "timeoutMs": 15000
     },
     {
       "expectSatisfied": true

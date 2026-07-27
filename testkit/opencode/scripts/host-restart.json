@@ -69,13 +69,16 @@
       }
     },
     {
-      "wait": "manager-nudge-coder"
+      "wait": "manager-nudge-coder",
+      "timeoutMs": 15000
     },
     {
-      "wait": "child-a2-text"
+      "wait": "child-a2-text",
+      "timeoutMs": 15000
     },
     {
-      "wait": "manager-finished-after-restart"
+      "wait": "manager-finished-after-restart",
+      "timeoutMs": 15000
     },
     {
       "awaitTerminal": true,

@@ -179,8 +179,13 @@ export function matchesExpectation(body, expectation, sessionBindings) {
     : null;
 
   if (match.sessionId && sessionID !== match.sessionId) return false;
-  if (sessionID && expectedSessionID && sessionID !== expectedSessionID) return false;
-  if (expectedParentSessionID && parentSessionID && parentSessionID !== expectedParentSessionID) {
+  // neverEnd scripts absorb every matching request for the scenario (busy hang,
+  // blogger sidecars). Do not require session-alias bind — bindChild races and
+  // post-nudge same-role sessions must still hit the same head.
+  if (!expectation.neverEnd && sessionID && expectedSessionID && sessionID !== expectedSessionID) {
+    return false;
+  }
+  if (!expectation.neverEnd && expectedParentSessionID && parentSessionID && parentSessionID !== expectedParentSessionID) {
     return false;
   }
 
