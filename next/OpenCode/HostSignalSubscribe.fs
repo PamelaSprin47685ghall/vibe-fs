@@ -4,11 +4,9 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Subscribes HostEventPort to OpenCode event streams.
-/// Instance plugin/event is filtered by location.directory; worktree-scoped
-/// agent prompts publish under a different directory, so we also open
-/// /global/event and normalize its { directory, payload } envelope.
-module HostEventSubscribe =
+/// Subscribes only coarse host signals. Message/part storms are discarded in JS
+/// before crossing into F# business code. At most one global listener per runtime.
+module HostSignalSubscribe =
 
     [<Emit("$0()")>]
     let private invokeDisposer (value: obj) : unit = jsNative
@@ -16,29 +14,35 @@ module HostEventSubscribe =
     [<Emit("new AbortController()")>]
     let private newAbortController () : obj = jsNative
 
-    /// Global SSE wraps instance events as { directory, payload: { id,type,properties } }.
-    let normalizeHostEvent (rawEvent: obj) : obj =
-        if isNull rawEvent then
-            rawEvent
-        elif not (isNull rawEvent?event) then
-            rawEvent
-        elif not (isNull rawEvent?payload) then
-            let payload = rawEvent?payload
-
-            if isNull payload then
-                rawEvent
-            elif not (isNull payload?``type``) || not (isNull payload?properties) then
-                if not (isNull rawEvent?directory) && isNull payload?directory then
-                    payload?directory <- rawEvent?directory
-
-                payload
-            else
-                rawEvent
+    let private eventTypeOf (raw: obj) =
+        if isNull raw then
+            ""
+        elif not (isNull raw?``type``) then
+            unbox<string> raw?``type``
+        elif not (isNull raw?payload) && not (isNull raw?payload?``type``) then
+            unbox<string> raw?payload?``type``
         else
-            rawEvent
+            ""
 
-    let observe (port: Events.HostEventPort) (rawEvent: obj) =
-        port.Observe(normalizeHostEvent rawEvent)
+    let private isSignalEvent (raw: obj) =
+        match eventTypeOf raw with
+        | "session.status"
+        | "session.idle"
+        | "session.deleted" -> true
+        | _ -> false
+
+    let private unwrap (raw: obj) =
+        if isNull raw then
+            raw
+        elif not (isNull raw?payload) then
+            let payload = raw?payload
+
+            if not (isNull raw?directory) && isNull payload?directory then
+                payload?directory <- raw?directory
+
+            payload
+        else
+            raw
 
     let private combine (parts: IDisposable list) : IDisposable option =
         match parts with
@@ -52,42 +56,31 @@ module HostEventSubscribe =
                             d.Dispose() }
             )
 
-    let private subscribeListen
-        (events: obj)
-        (port: Events.HostEventPort)
-        (directoryObserver: obj -> unit)
-        : Result<IDisposable, string> =
+    let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<IDisposable, string> =
         let listen = events?listen
 
         if isNull listen then
-            Error "OPENCODE-EVENT-SUBSCRIBE: host event capability exists but events.listen is unavailable"
+            Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen unavailable"
         else
             try
                 let callback =
                     box (fun rawEvent ->
-                        let normalized = normalizeHostEvent rawEvent
-                        directoryObserver normalized
-                        port.Observe normalized)
+                        if isSignalEvent rawEvent then
+                            onSignalEvent (unwrap rawEvent))
 
                 let subscription = listen?call (events, callback)
 
                 if isNull subscription then
-                    Error "OPENCODE-EVENT-SUBSCRIBE: events.listen returned no subscription"
+                    Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned no subscription"
                 else
                     Ok(
                         { new IDisposable with
                             member _.Dispose() = invokeDisposer subscription }
                     )
             with ex ->
-                Error(sprintf "OPENCODE-EVENT-SUBSCRIBE: %s" ex.Message)
+                Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    /// Drain /global/event so worktree-directory terminals still complete runs.
-    /// Soft-fails: missing global.event is Ok None (plugin event hook remains).
-    let private subscribeGlobalEvent
-        (client: obj)
-        (port: Events.HostEventPort)
-        (directoryObserver: obj -> unit)
-        : IDisposable option =
+    let private subscribeGlobalEvent (client: obj) (onSignalEvent: obj -> unit) : IDisposable option =
         if isNull client then
             None
         else
@@ -101,9 +94,10 @@ module HostEventSubscribe =
 
                     let onEvent =
                         box (fun data ->
-                            let normalized = normalizeHostEvent data
-                            directoryObserver normalized
-                            port.Observe normalized)
+                            let normalized = unwrap data
+
+                            if isSignalEvent normalized then
+                                onSignalEvent normalized)
 
                     let options =
                         createObj
@@ -112,12 +106,11 @@ module HostEventSubscribe =
                               box (fun (evt: obj) ->
                                   if not (isNull evt) then
                                       let data = if isNull evt?data then evt else evt?data
-                                      let normalized = normalizeHostEvent data
-                                      directoryObserver normalized
-                                      port.Observe normalized) ]
+                                      let normalized = unwrap data
 
-                    // client.global.event is async (SDK get.sse). Await the result,
-                    // then drain stream so onSseEvent keeps firing.
+                                      if isSignalEvent normalized then
+                                          onSignalEvent normalized) ]
+
                     emitJsExpr
                         (globalApi, options, onEvent, abortCtrl)
                         """
@@ -147,10 +140,9 @@ module HostEventSubscribe =
                 with _ ->
                     None
 
-    let trySubscribeHostEvents
+    let trySubscribe
         (input: obj)
-        (port: Events.HostEventPort)
-        (onDirectory: (obj -> unit) option)
+        (onSignalEvent: obj -> unit)
         : Result<IDisposable option, string> =
         let listenTarget =
             if isNull input then
@@ -167,20 +159,18 @@ module HostEventSubscribe =
 
         let client = if isNull input then null else input?client
 
-        let directoryObserver = Option.defaultValue ignore onDirectory
-
         let listenSub =
             match listenTarget with
             | None -> Ok None
             | Some events ->
-                match subscribeListen events port directoryObserver with
+                match subscribeListen events onSignalEvent with
                 | Error err -> Error err
                 | Ok sub -> Ok(Some sub)
 
         match listenSub with
         | Error err -> Error err
         | Ok localSub ->
-            let globalSub = subscribeGlobalEvent client port directoryObserver
+            let globalSub = subscribeGlobalEvent client onSignalEvent
 
             let parts =
                 [ match localSub with

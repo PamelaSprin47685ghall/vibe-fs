@@ -1,0 +1,207 @@
+namespace Wanxiangshu.Next.OpenCode
+
+open System
+open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel.Identity
+
+type SessionMessage =
+    { Id: MessageId
+      Role: string
+      Agent: string option
+      Finish: string option
+      ErrorName: string option
+      Model: OpencodeModel option
+      Parts: obj array
+      Raw: obj }
+
+type ISessionSnapshotPort =
+    abstract GetMessages: sessionId: SessionId -> Task<Result<SessionMessage list, string>>
+
+module SessionSnapshotPort =
+
+    let private readString (value: obj) =
+        if isNull value then
+            None
+        else
+            let text = unbox<string> value
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private infoOf (raw: obj) =
+        if isNull raw then null
+        elif not (isNull raw?info) then raw?info
+        else raw
+
+    let private partsOf (raw: obj) : obj array =
+        if isNull raw || isNull raw?parts then
+            [||]
+        else
+            try
+                unbox<obj array> raw?parts
+            with _ ->
+                [||]
+
+    let private modelOf (info: obj) : OpencodeModel option =
+        if isNull info then
+            None
+        elif not (isNull info?providerID) && not (isNull info?modelID) then
+            Some
+                { providerID = unbox<string> info?providerID
+                  modelID = unbox<string> info?modelID
+                  variant = None }
+        elif not (isNull info?model) && not (isNull info?model?providerID) then
+            Some
+                { providerID = unbox<string> info?model?providerID
+                  modelID = unbox<string> info?model?modelID
+                  variant = None }
+        else
+            None
+
+    let private errorNameOf (info: obj) (raw: obj) =
+        let candidates =
+            [ if not (isNull info) && not (isNull info?error) then info?error?name else null
+              if not (isNull raw) && not (isNull raw?error) then raw?error?name else null ]
+
+        candidates |> List.tryPick readString
+
+    let projectMessage (raw: obj) : SessionMessage option =
+        if isNull raw then
+            None
+        else
+            let info = infoOf raw
+
+            match
+                readString (if isNull info then null else info?id)
+                |> Option.orElse (readString raw?id)
+            with
+            | None -> None
+            | Some id ->
+                let role =
+                    readString (if isNull info then null else info?role)
+                    |> Option.orElse (readString raw?role)
+                    |> Option.defaultValue ""
+                    |> fun value -> value.ToLowerInvariant()
+
+                let agent =
+                    readString (if isNull info then null else info?agent)
+                    |> Option.orElse (readString raw?agent)
+
+                let finish =
+                    readString (if isNull info then null else info?finish)
+                    |> Option.orElse (readString raw?finish)
+                    |> Option.orElse (readString raw?finishReason)
+
+                Some
+                    { Id = MessageId.create id
+                      Role = role
+                      Agent = agent
+                      Finish = finish
+                      ErrorName = errorNameOf info raw
+                      Model = modelOf info
+                      Parts = partsOf raw
+                      Raw = raw }
+
+    let projectMessages (rawMessages: obj array) =
+        rawMessages |> Array.toList |> List.choose projectMessage
+
+    [<Emit("Array.isArray($0)")>]
+    let private isJsArray (value: obj) : bool = jsNative
+
+    let private unwrapPayload (response: obj) : obj array =
+        if isNull response then
+            [||]
+        elif isJsArray response then
+            unbox<obj array> response
+        elif not (isNull response?data) && isJsArray response?data then
+            unbox<obj array> response?data
+        elif
+            not (isNull response?data)
+            && not (isNull response?data?data)
+            && isJsArray response?data?data
+        then
+            unbox<obj array> response?data?data
+        else
+            [||]
+
+    type SdkSnapshotPort(client: obj, workspaceDirectory: string option) =
+        let headersObj () =
+            match workspaceDirectory with
+            | Some dir -> createObj [ "x-opencode-directory", box dir ]
+            | None -> createObj []
+
+        interface ISessionSnapshotPort with
+            member _.GetMessages(sessionId) =
+                task {
+                    try
+                        let sessObj = client?session
+                        let messagesFn = sessObj?messages
+
+                        if isNull messagesFn then
+                            return Error "session.messages unavailable on SDK client"
+                        else
+                            let payload =
+                                createObj
+                                    [ "path", box (createObj [ "id", box (SessionId.value sessionId) ])
+                                      "headers", box (headersObj ()) ]
+
+                            let! response = unbox<Task<obj>> (messagesFn?call (sessObj, payload))
+                            return Ok(projectMessages (unwrapPayload response))
+                    with ex ->
+                        return Error ex.Message
+                }
+
+    type HttpSnapshotPort(baseUrl: string) =
+        let cleanBase =
+            if baseUrl.EndsWith("/") then
+                baseUrl.Substring(0, baseUrl.Length - 1)
+            else
+                baseUrl
+
+        [<Emit("fetch($0, $1)")>]
+        let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
+
+        interface ISessionSnapshotPort with
+            member _.GetMessages(sessionId) =
+                task {
+                    try
+                        let url =
+                            sprintf "%s/session/%s/message" cleanBase (SessionId.value sessionId)
+
+                        let init = createObj [ "method", box "GET" ]
+                        let! response = jsFetch url init
+                        let status = unbox<int> response?status
+
+                        if status < 200 || status >= 300 then
+                            return Error(sprintf "HTTP %d" status)
+                        else
+                            let! text = unbox<Task<string>> (response?text ())
+
+                            if String.IsNullOrWhiteSpace text then
+                                return Ok []
+                            else
+                                return Ok(projectMessages (unwrapPayload (JS.JSON.parse text)))
+                    with ex ->
+                        return Error ex.Message
+                }
+
+    let create (input: obj) : ISessionSnapshotPort option =
+        let workDir =
+            if not (isNull input) && not (isNull input?directory) then
+                let d = unbox<string> input?directory
+                if String.IsNullOrWhiteSpace d then None else Some d
+            else
+                None
+
+        if isNull input then
+            None
+        elif not (isNull input?client) && not (isNull input?client?session) then
+            Some(SdkSnapshotPort(input?client, workDir) :> ISessionSnapshotPort)
+        elif not (isNull input?serverUrl) then
+            Some(HttpSnapshotPort(unbox<string> input?serverUrl) :> ISessionSnapshotPort)
+        elif not (isNull input?baseUrl) then
+            Some(HttpSnapshotPort(unbox<string> input?baseUrl) :> ISessionSnapshotPort)
+        elif not (isNull input?port) then
+            Some(HttpSnapshotPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionSnapshotPort)
+        else
+            None

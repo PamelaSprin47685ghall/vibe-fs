@@ -7,7 +7,8 @@
  * arbitrary SSE, provider requests, and HTTP traffic do not renew it. The kill is
  * process.exit(1) after a best-effort diagnostic dump. A runaway
  * canary costs one silence window instead of hanging until the outer
- * CI timeout.
+ * CI timeout. Correctness is asserted via API/reconciler/tool/git/journal
+ * oracles — raw SSE is a transport signal, never the watchdog heartbeat.
  *
  * The timer is unref'd: once every other handle closes the process
  * exits naturally — the watchdog only fires while something (a hung

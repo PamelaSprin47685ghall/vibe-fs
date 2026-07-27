@@ -12,6 +12,10 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.EventDrivenHarness
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
+/// ReviewGuard coverage migrated from the deleted HostEventRouter to the
+/// Decide layer (TerminalPolicies.apply). The router previously funneled
+/// completed turns through HostReviewGuard; we now drive the same path with a
+/// constructed ReconciledTurn.
 module HostReviewGuardTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
@@ -87,44 +91,47 @@ module HostReviewGuardTests =
             | None -> false
         | None -> false
 
-    let private assistantUpdated sessionId messageId agent =
-        createObj
-            [ "type", box "message.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "info",
-                        box (
-                            createObj
-                                [ "id", box messageId
-                                  "role", box "assistant"
-                                  "finish", box "stop"
-                                  "agent", box agent ]
-                        ) ]
-              ) ]
+    let private textPart text =
+        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
 
-    let private idle sessionId =
-        createObj
-            [ "type", box "session.idle"
-              "properties", box (createObj [ "sessionID", box sessionId ]) ]
+    let private applyDecide sessionPort journal git verdict nudgeSent managerGuard parents turn =
+        let eventPort = Events.HostEventPort()
 
-    let private assistantTextPart sessionId messageId =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "review-text"
-                                  "messageID", box messageId
-                                  "type", box "text"
-                                  "text", box "reviewed tree" ]
-                        ) ]
-              ) ]
+        TerminalPolicies.apply
+            (sessionPort :> ISessionHostPort)
+            (eventPort :> IEventObservationPort)
+            journal
+            git
+            verdict
+            nudgeSent
+            managerGuard
+            parents
+            (fun _ -> ())
+            turn
+
+    let private reviewerTurn sessionId messageId =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create messageId
+          AgentRole = Some AgentRole.Reviewer
+          Directory = "/tmp/ws"
+          Parts = [| textPart "reviewed tree" |]
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnCompleted }
+
+    let private managerTurn sessionId messageId =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create messageId
+          AgentRole = Some AgentRole.Manager
+          Directory = "/tmp/ws"
+          Parts = [| textPart "manager done" |]
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnCompleted }
 
     [<Fact>]
     let ``Reviewer_terminal_without_verdict_appends_guard_fact_after_send_and_survives_restart`` () =
@@ -133,28 +140,13 @@ module HostReviewGuardTests =
                 let sessionId = "reviewer-guard-session"
                 let messageId = "assistant-reviewer-guard"
                 let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "reviewer"
 
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "reviewer-guard-runtime") 1 DateTimeOffset.UtcNow
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
-
-                router.Observe(assistantUpdated sessionId messageId "reviewer", ignore)
-                router.Observe(assistantTextPart sessionId messageId, ignore)
-                router.Observe(idle sessionId, ignore)
-                // HostSessionNudge starts a Task/Promise; drain enough microtasks
-                // for the send + durable append to land before assertions.
-                do! drainMicrotasks 8
+                applyDecide (recordingPort prompts) (Some journal) None (HashSet()) (HashSet()) (HashSet()) (Dictionary())
+                    (reviewerTurn sessionId messageId)
+                do! drainMicrotasks 16
 
                 let guardKey = sprintf "review-guard:%s:%s:%s" sessionId messageId "missing-verdict"
                 Assert.Single(prompts) |> ignore
@@ -171,19 +163,10 @@ module HostReviewGuardTests =
                         DateTimeOffset.UtcNow
                         boot
 
-                let restartedRouter =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = restartedJournal
-                    )
-
-                restartedRouter.Observe(assistantUpdated sessionId messageId "reviewer", ignore)
-                restartedRouter.Observe(assistantTextPart sessionId messageId, ignore)
-                restartedRouter.Observe(idle sessionId, ignore)
+                // Restart must not append a second acceptance: the guard fact is
+                // durable and the in-memory dedupe is re-seeded from the projection.
+                applyDecide (recordingPort prompts) (Some restartedJournal) None (HashSet()) (HashSet()) (HashSet())
+                    (Dictionary()) (reviewerTurn sessionId messageId)
                 Assert.Single(prompts) |> ignore
             })
 
@@ -197,8 +180,6 @@ module HostReviewGuardTests =
                 let sendObserved = TaskCompletionSource<unit>()
                 let acceptance = TaskCompletionSource<Result<MessageId, string>>()
                 acceptance.SetResult(Error "send failed")
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "reviewer"
 
                 use journal =
                     AgentJournal.create
@@ -207,22 +188,11 @@ module HostReviewGuardTests =
                         1
                         DateTimeOffset.UtcNow
 
-                let router =
-                    HostEventRouter(
-                        gatedRecordingPort prompts sendObserved acceptance,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
-
-                router.Observe(assistantUpdated sessionId messageId "reviewer", ignore)
-                router.Observe(assistantTextPart sessionId messageId, ignore)
-                router.Observe(idle sessionId, ignore)
+                applyDecide (gatedRecordingPort prompts sendObserved acceptance) (Some journal) None (HashSet()) (HashSet())
+                    (HashSet()) (Dictionary()) (reviewerTurn sessionId messageId)
                 let! _ = sendObserved.Task
                 let! _ = acceptance.Task
-                do! yieldMicrotask ()
+                do! drainMicrotasks 8
 
                 let guardKey = sprintf "review-guard:%s:%s:%s" sessionId messageId "missing-verdict"
                 Assert.False(hasAcceptedGuard journal sessionId guardKey)
@@ -235,8 +205,6 @@ module HostReviewGuardTests =
             task {
                 let sessionId = "manager-guard-unavailable"
                 let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "manager"
 
                 use journal =
                     AgentJournal.create
@@ -256,22 +224,12 @@ module HostReviewGuardTests =
                 | HostReviewGuard.ReviewGuardUnavailable _ -> ()
                 | result -> Assert.True(false, sprintf "Expected unavailable tree result, got %A" result)
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>()
-                    )
-
-                router.Observe(assistantUpdated sessionId "assistant-unavailable" "manager", ignore)
-                let mutable caught: InvalidOperationException option = None
-
-                try
-                    router.Observe(idle sessionId, ignore)
-                with :? InvalidOperationException as ex ->
-                    caught <- Some ex
+                let caught =
+                    try
+                        applyDecide (recordingPort prompts) (Some journal) (Some throwingPort) (HashSet()) (HashSet())
+                            (HashSet()) (Dictionary()) (managerTurn sessionId "assistant-unavailable")
+                        None
+                    with :? InvalidOperationException as ex -> Some ex
 
                 match caught with
                 | Some ex -> Assert.Contains("Review guard unavailable", ex.Message)

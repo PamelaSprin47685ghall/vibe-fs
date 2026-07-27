@@ -86,16 +86,11 @@ module PluginHost =
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
-        (onDirectory: (obj -> unit) option)
-        : Result<IEventObservationPort * ISessionHostPort * IDisposable option * (obj -> unit) option, string> =
-        // Always keep the plugin event-hook observer: it covers main-directory
-        // sessions. Also open /global/event when available so worktree-scoped
-        // manager/coder/reviewer terminals still complete HostForkRuntime runs.
+        : Result<IEventObservationPort * ISessionHostPort * ISessionSnapshotPort option, string> =
+        // Completion/output port is local and driven by SessionReconciler.
+        // Host SSE is only used as a coarse idle/retry/deleted signal source.
         let hostEventPort = Events.HostEventPort()
         let eventPort = hostEventPort :> IEventObservationPort
         let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-        let observe = Some(fun raw -> HostEventSubscribe.observe hostEventPort raw)
-
-        match HostEventSubscribe.trySubscribeHostEvents input hostEventPort onDirectory with
-        | Error err -> Error err
-        | Ok subscription -> Ok(eventPort, sessionPort, subscription, observe)
+        let snapshotPort = SessionSnapshotPort.create input
+        Ok(eventPort, sessionPort, snapshotPort)

@@ -13,9 +13,10 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.EventDrivenHarness
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
-/// SessionDead gate at the router terminal path: a dead session must not receive a
-/// ReviewGuard guard prompt or a zero-width continuation nudge. A non-dead session
-/// (fewer than 4 failures) must still receive its guard prompt (no over-blocking).
+/// SessionDead gate at the Decide (TerminalPolicies) path: a dead session must
+/// not receive a ReviewGuard guard prompt or a zero-width continuation nudge.
+/// A non-dead session (fewer than 4 failures) must still receive its guard
+/// prompt (no over-blocking).
 module HostEventRouterSessionDeadTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
@@ -23,11 +24,11 @@ module HostEventRouterSessionDeadTests =
 
         { new ISessionHostPort with
             member _.SubscribeTerminal(sessionId, _) =
-                activeSessions.Add(SessionId.value sessionId) |> ignore
+                let id = SessionId.value sessionId
+                activeSessions.Add id |> ignore
 
                 { new IDisposable with
-                    member _.Dispose() =
-                        activeSessions.Remove(SessionId.value sessionId) |> ignore }
+                    member _.Dispose() = activeSessions.Remove id |> ignore }
 
             member _.SendPrompt(sessionId, text, _) =
                 let id = SessionId.value sessionId
@@ -47,61 +48,47 @@ module HostEventRouterSessionDeadTests =
 
             member _.GetSessionOutput(_) = [] }
 
-    let private routerFor prompts sessionId role (journal: AgentJournal option) git =
-        let roles = Dictionary<string, string>()
-        roles.[sessionId] <- role
+    let private textPart text =
+        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
 
-        HostEventRouter(
-            recordingPort prompts,
-            Dictionary<string, string>(),
-            roles,
-            HashSet<string>(),
-            HashSet<string>(),
-            ?journal = journal,
-            ?gitTreePort = git
-        )
+    let private applyDecide sessionPort journal git verdict nudgeSent managerGuard parents turn =
+        let eventPort = Events.HostEventPort()
 
-    let private assistantUpdated sid mid =
-        createObj
-            [ "type", box "message.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sid
-                        "info", box (createObj [ "id", box mid; "role", box "assistant"; "finish", box "stop" ]) ]
-              ) ]
+        TerminalPolicies.apply
+            (sessionPort :> ISessionHostPort)
+            (eventPort :> IEventObservationPort)
+            journal
+            git
+            verdict
+            nudgeSent
+            managerGuard
+            parents
+            (fun _ -> ())
+            turn
 
-    let private assistantTextPart sid mid =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sid
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "part-text"
-                                  "messageID", box mid
-                                  "type", box "text"
-                                  "text", box "Blogger record" ]
-                        ) ]
-              ) ]
+    let private completedTurn sessionId role parts =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = parts
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnCompleted }
 
-    let private idle sid =
-        createObj
-            [ "type", box "session.idle"
-              "properties", box (createObj [ "sessionID", box sid ]) ]
-
-    let private abortError sessionId =
-        createObj
-            [ "type", box "session.error"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
-              ) ]
+    let private abortedTurn sessionId role =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = [||]
+          Finish = Some "error"
+          ErrorName = Some "MessageAbortedError"
+          Model = None
+          Outcome = TurnOutcome.TurnAborted "aborted" }
 
     let private recordFailures (journal: AgentJournal) (sessionId: string) (n: int) =
         for i in 1..n do
@@ -122,18 +109,21 @@ module HostEventRouterSessionDeadTests =
             task {
                 let sid = "dead-mgr"
                 let prompts = ResizeArray<string * string>()
-
+                let sessionPort = recordingPort prompts
                 use j = AgentJournal.create d (RuntimeId.create "r-dm") 1 DateTimeOffset.UtcNow
                 recordFailures j sid 4
 
-                let r =
-                    routerFor prompts sid "manager" (Some j) (Some { GetTreeHash = fun () -> "tree-nr" })
+                applyDecide
+                    sessionPort
+                    (Some j)
+                    (Some { GetTreeHash = fun () -> "tree-nr" })
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sid AgentRole.Manager [| textPart "manager done" |])
 
-                r.Observe(assistantUpdated sid "am", ignore)
-                r.Observe(assistantTextPart sid "am", ignore)
-                r.Observe(idle sid, ignore)
-                do! drainMicrotasks 8
-
+                do! drainMicrotasks 16
                 Assert.Empty(prompts)
             })
 
@@ -143,15 +133,21 @@ module HostEventRouterSessionDeadTests =
             task {
                 let sid = "dead-cont"
                 let prompts = ResizeArray<string * string>()
-
+                let sessionPort = recordingPort prompts
                 use j = AgentJournal.create d (RuntimeId.create "r-dc") 1 DateTimeOffset.UtcNow
                 recordFailures j sid 4
 
-                let r = routerFor prompts sid "coder" (Some j) None
-                r.Observe(assistantUpdated sid "ae", ignore)
-                r.Observe(idle sid, ignore)
-                do! drainMicrotasks 8
+                applyDecide
+                    sessionPort
+                    (Some j)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sid AgentRole.Coder [| textPart "" |])
 
+                do! drainMicrotasks 16
                 Assert.Empty(prompts)
             })
 
@@ -161,48 +157,41 @@ module HostEventRouterSessionDeadTests =
             task {
                 let sid = "non-dead-mgr"
                 let prompts = ResizeArray<string * string>()
-
+                let sessionPort = recordingPort prompts
                 use j = AgentJournal.create d (RuntimeId.create "r-ndm") 1 DateTimeOffset.UtcNow
                 recordFailures j sid 3
 
-                let r =
-                    routerFor prompts sid "manager" (Some j) (Some { GetTreeHash = fun () -> "tree-nr" })
+                applyDecide
+                    sessionPort
+                    (Some j)
+                    (Some { GetTreeHash = fun () -> "tree-nr" })
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sid AgentRole.Manager [| textPart "manager done" |])
 
-                r.Observe(assistantUpdated sid "am", ignore)
-                r.Observe(assistantTextPart sid "am", ignore)
-                r.Observe(idle sid, ignore)
-                do! drainMicrotasks 8
-
+                do! drainMicrotasks 16
                 Assert.Single(prompts) |> ignore
                 Assert.Contains("Review is required before completion.", snd prompts.[0])
             })
 
     [<Fact>]
     let ``Aborted_manager_terminal_never_receives_review_or_continuation_nudge`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "aborted-manager-session"
-                let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "manager"
+        task {
+            let sessionId = "aborted-manager-session"
+            let prompts = ResizeArray<string * string>()
+            let sessionPort = recordingPort prompts
 
-                use journal =
-                    AgentJournal.create directory (RuntimeId.create "aborted-manager-runtime") 1 DateTimeOffset.UtcNow
+            applyDecide
+                sessionPort
+                None
+                (Some { GetTreeHash = fun () -> "tree-after-abort" })
+                (HashSet())
+                (HashSet())
+                (HashSet())
+                (Dictionary())
+                (abortedTurn sessionId AgentRole.Manager)
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal,
-                        gitTreePort = { GetTreeHash = fun () -> "tree-after-abort" }
-                    )
-
-                router.Observe(assistantUpdated sessionId "assistant-aborted", ignore)
-                router.Observe(abortError sessionId, ignore)
-                router.Observe(idle sessionId, ignore)
-
-                Assert.Empty(prompts)
-            })
+            Assert.Empty(prompts)
+        }

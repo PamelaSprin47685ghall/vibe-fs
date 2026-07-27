@@ -20,7 +20,8 @@ type HostForkRuntime
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
         ?modelResolver: ModelResolver.ModelConfig,
         ?ptyPort: PtyPort,
-        ?directoryFor: string -> string option
+        ?directoryFor: string -> string option,
+        ?onRunStarted: SessionId -> AgentRole -> string option -> unit
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -32,6 +33,7 @@ type HostForkRuntime
     let ptyPort = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
     let directoryOf = defaultArg directoryFor (fun _ -> None)
+    let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
 
     let sendChildPrompt =
         HostForkRunLifecycle.childPromptSender sessions parentId modelResolver journal directoryOf
@@ -74,8 +76,10 @@ type HostForkRuntime
     let complete run outcome =
         HostForkRunLifecycle.complete gate pendingRuns sessions run outcome
 
-    let installRun agentId childId =
-        HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId
+    let installRun agentId childId role =
+        let run = HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId
+        runStarted childId role (directoryOf agentId)
+        run
 
     let failRun run error =
         HostForkRunLifecycle.failRun gate pendingRuns sessions run error
@@ -106,6 +110,7 @@ type HostForkRuntime
                             sessions
                             runtime
                             sendChildPrompt
+                            (fun child role -> runStarted child role (directoryOf agentId))
                             agentId
                             childId
                             role
@@ -142,7 +147,7 @@ type HostForkRuntime
                         let! _ = sessions.AbortSession childId
                         return Error err
                     | Ok() ->
-                        let run = installRun agentId childId
+                        let run = installRun agentId childId role
 
                         lock gate (fun () -> children.[agentId] <- childId)
 
@@ -206,6 +211,7 @@ type HostForkRuntime
                                 sessions
                                 runtime
                                 sendChildPrompt
+                                (fun child role -> runStarted child role (directoryOf agentId))
                                 agentId
                                 childId
                                 role

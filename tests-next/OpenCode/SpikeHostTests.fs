@@ -100,7 +100,7 @@ module SpikeHostTests =
         Assert.False(eventPort.IsCompleted sId)
 
     [<Fact>]
-    let ``HostEventPort_observes_idle_and_abort`` () =
+    let ``HostEventPort_notify_terminal_raises_idle_and_abort_listeners`` () =
         let eventPort = Events.HostEventPort()
         let mutable observed = []
 
@@ -109,17 +109,8 @@ module SpikeHostTests =
                 .SubscribeTerminalListener(fun sessionId outcome ->
                     observed <- (SessionId.value sessionId, outcome) :: observed)
 
-        eventPort.Observe(
-            createObj
-                [ "type", box "session.idle"
-                  "properties", createObj [ "sessionID", box "idle-session" ] ]
-        )
-
-        eventPort.Observe(
-            createObj
-                [ "type", box "session.aborted"
-                  "properties", createObj [ "sessionId", box "abort-session" ] ]
-        )
+        (eventPort :> IEventObservationPort).NotifyTerminal (SessionId.create "idle-session") (Completed (MessageId.create "m-idle")) |> ignore
+        (eventPort :> IEventObservationPort).NotifyTerminal (SessionId.create "abort-session") (Aborted "stopped") |> ignore
 
         Assert.Equal(2, List.length observed)
 
@@ -142,44 +133,16 @@ module SpikeHostTests =
         )
 
     [<Fact>]
-    let ``HostEventPort_captures_assistant_text_from_common_event_shapes`` () =
+    let ``HostEventPort_records_assistant_text_output`` () =
         let eventPort = Events.HostEventPort()
 
         let output sessionId =
             (eventPort :> IEventObservationPort)
                 .GetSessionOutput(SessionId.create sessionId)
 
-        eventPort.Observe(
-            createObj
-                [ "type", box "message.updated"
-                  "properties",
-                  createObj
-                      [ "sessionID", box "message-parts"
-                        "message",
-                        createObj
-                            [ "role", box "assistant"
-                              "parts", box [| createObj [ "type", box "text"; "text", box "from message" ] |] ] ] ]
-        )
-
-        eventPort.Observe(
-            createObj
-                [ "type", box "message.updated"
-                  "properties",
-                  createObj
-                      [ "sessionId", box "direct-parts"
-                        "role", box "assistant"
-                        "parts", box [| createObj [ "type", box "text"; "text", box "from parts" ] |] ] ]
-        )
-
-        eventPort.Observe(
-            createObj
-                [ "type", box "assistant.delta"
-                  "properties",
-                  createObj
-                      [ "sessionID", box "direct-text"
-                        "role", box "assistant"
-                        "text", box "from text" ] ]
-        )
+        eventPort.RecordSessionOutput (SessionId.create "message-parts") "from message"
+        eventPort.RecordSessionOutput (SessionId.create "direct-parts") "from parts"
+        eventPort.RecordSessionOutput (SessionId.create "direct-text") "from text"
 
         Assert.Equal([ "from message" ], output "message-parts")
         Assert.Equal([ "from parts" ], output "direct-parts")

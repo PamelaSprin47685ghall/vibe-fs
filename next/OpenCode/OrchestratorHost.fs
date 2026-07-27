@@ -40,7 +40,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 (fun agentId ->
                     match worktrees.TryGetValue agentId with
                     | true, path -> Some path
-                    | false, _ -> None)
+                    | false, _ -> None),
+            onRunStarted = deps.OnRunStarted
         )
 
     let awaitAgent (agentId: string) : Task<Result<RunCompletion, string>> =
