@@ -172,6 +172,7 @@ try {
   console.log('Host nudge canary passed: busy-overlap nudge while first run still streaming.');
 } catch (error) {
   console.error(`Host nudge canary failed: ${error.stack || error}`);
+  if (scenario?.host?.workDir) console.error(`workDir: ${scenario.host.workDir}`);
   if (scenario?.provider?.unexpectedRequests) console.error(JSON.stringify(scenario.provider.unexpectedRequests));
   if (scenario?.host?.stdoutLog) console.error(`host stdout: ${scenario.host.stdoutLog.slice(-4000)}`);
   if (scenario?.host?.stderrLog) console.error(`host stderr: ${scenario.host.stderrLog.slice(-4000)}`);

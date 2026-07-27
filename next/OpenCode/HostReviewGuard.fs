@@ -24,8 +24,14 @@ module HostReviewGuard =
 
                 // No review needed when the worktree is empty or has no HEAD tree.
                 let emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+                let treeHash = treeHash.Trim()
 
-                if String.IsNullOrWhiteSpace treeHash || treeHash = "NO_HEAD_TREE" || treeHash = emptyTree then
+                let isEmpty =
+                    String.IsNullOrWhiteSpace treeHash
+                    || treeHash.Equals("NO_HEAD_TREE", StringComparison.Ordinal)
+                    || treeHash.Equals(emptyTree, StringComparison.Ordinal)
+
+                if isEmpty then
                     ReviewGuardUnavailable "No worktree changes to review"
                 else
                     let snapshot = AgentJournal.snapshot journal
