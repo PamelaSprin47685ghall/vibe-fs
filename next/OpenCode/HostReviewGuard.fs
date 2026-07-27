@@ -22,24 +22,22 @@ module HostReviewGuard =
             try
                 let treeHash = port.GetTreeHash()
 
-                if String.IsNullOrWhiteSpace treeHash then
-                    ReviewGuardUnavailable "Review guard GitTreePort returned an empty tree hash"
-                else
-                    let confirmed =
-                        AgentJournal.snapshot journal
-                        |> fun projection ->
-                            match Map.tryFind (SessionId.create sessionId) projection.AgentProjections.Sessions with
-                            | Some session ->
-                                match session.ReviewGuard with
-                                | Some guard ->
-                                    guard.IsConfirmed && guard.LastGitTreeHash = Some(GitTreeHash.create treeHash)
-                                | None -> false
-                            | None -> false
+                // No review needed when the worktree is empty or has no HEAD tree.
+                let emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-                    if confirmed then
-                        ReviewGuardConfirmed
-                    else
-                        ReviewGuardMissing treeHash
+                if String.IsNullOrWhiteSpace treeHash || treeHash = "NO_HEAD_TREE" || treeHash = emptyTree then
+                    ReviewGuardUnavailable "No worktree changes to review"
+                else
+                    let snapshot = AgentJournal.snapshot journal
+                    let sessionOpt = Map.tryFind (SessionId.create sessionId) snapshot.AgentProjections.Sessions
+
+                    match sessionOpt with
+                    | None -> ReviewGuardMissing treeHash
+                    | Some session ->
+                        match session.ReviewGuard with
+                        | Some guard when guard.IsConfirmed && guard.LastGitTreeHash = Some(GitTreeHash.create treeHash) ->
+                            ReviewGuardConfirmed
+                        | _ -> ReviewGuardMissing treeHash
             with ex ->
                 ReviewGuardUnavailable(sprintf "Review guard dependency failed: %s" ex.Message)
 

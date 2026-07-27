@@ -49,7 +49,7 @@ function isTerminalFor(sessionID) {
 let scenario;
 try {
   if (!runStaticGate([__filename]).passed) throw new Error('host nudge canary contains prohibited polling');
-  scenario = await setupScenario({ project: { files: { 'AGENTS.md': 'host busy-overlap nudge canary\n' } }, strict: true });
+  scenario = await setupScenario({ project: { files: {} }, strict: true });
 
   scenario.provider.expectTitle({
     id: 'parent-title',

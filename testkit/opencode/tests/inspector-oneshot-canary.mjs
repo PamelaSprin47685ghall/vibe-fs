@@ -64,8 +64,19 @@ try {
   });
   assert.ok(prompt.ok, `coder prompt failed: ${JSON.stringify(prompt.data)}`);
 
+  // Title and sidecar blogger are intermediate progress points; they keep the
+  // scenario watchdog alive while the Coder session is booting under load.
+  await scenario.provider.waitForExpectation('coder-title', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'coder-title', lane: 'coder', blocking: true });
+
+  await scenario.provider.waitForExpectation('coder-blogger-1', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'coder-blogger-1', lane: 'coder-blogger', blocking: true });
+
   await scenario.provider.waitForExpectation('coder-inspector', WATCHDOG_TIMEOUT_MS);
   scenario.watchdog?.advance({ reason: 'coder-inspector', lane: 'coder', blocking: true });
+
+  await scenario.provider.waitForExpectation('coder-final', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'coder-final', lane: 'coder', blocking: true });
 
   await turn.awaitTerminal({
     timeoutMs: WATCHDOG_TIMEOUT_MS,
