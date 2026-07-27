@@ -10,7 +10,11 @@ test('manager permission denies global executor tool and executes mailbox path',
   const journalDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-manager-'));
   try {
     execFileSync('git', ['init', '--quiet', journalDirectory]);
-    const hooks = await SpikePlugin_initSpikePlugin({ client: {}, directory: journalDirectory });
+    const hooks = await SpikePlugin_initSpikePlugin({
+      client: {},
+      directory: journalDirectory,
+      events: { listen: () => () => {} },
+    });
     const names = Object.keys(hooks.tool).sort();
 
     assert.deepEqual(names, ['executor', 'fork', 'inspector', 'join', 'list', 'verdict']);

@@ -193,7 +193,10 @@ module OrchestratorHostTests =
     [<Fact>]
     let ``SpikePlugin_initSpikePlugin_exposes_hooks_and_ports`` () =
         task {
-            let input = createObj []
+            let input =
+                createObj
+                    [ "events", box (createObj [ "listen", box (fun () -> box (fun () -> ())) ]) ]
+
             let! hooksObj = SpikePlugin.initSpikePlugin input
             Assert.False(isNull hooksObj)
             Assert.False(isNull hooksObj?projection)

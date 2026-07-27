@@ -4,10 +4,9 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Subscribes coarse host signals from local events.listen and/or global SSE.
-/// Dual-delivery prevention is per-session (SessionSignalSource), not a
-/// process-wide exclusive transport — Orchestrator worktree children need global
-/// while root sessions use the local plugin hook.
+/// Subscribes coarse host signals from exactly one source per plugin instance:
+/// local events.listen is preferred; if unavailable, global SSE is used.
+/// Both unavailable is a hard failure — no dual delivery, no silent degradation.
 module HostSignalSubscribe =
 
     [<Emit("$0()")>]
@@ -15,6 +14,9 @@ module HostSignalSubscribe =
 
     [<Emit("new AbortController()")>]
     let private newAbortController () : obj = jsNative
+
+    [<Emit("console.info($0, $1)")>]
+    let private logInfo (prefix: string) (message: string) : unit = jsNative
 
     let private eventTypeOf (raw: obj) =
         if isNull raw then
@@ -45,18 +47,6 @@ module HostSignalSubscribe =
         else
             raw
 
-    let private combine (parts: IDisposable list) : IDisposable option =
-        match parts with
-        | [] -> None
-        | [ single ] -> Some single
-        | many ->
-            Some(
-                { new IDisposable with
-                    member _.Dispose() =
-                        for d in many do
-                            d.Dispose() }
-            )
-
     let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<IDisposable, string> =
         let listen = events?listen
 
@@ -81,14 +71,14 @@ module HostSignalSubscribe =
             with ex ->
                 Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    let private subscribeGlobalEvent (client: obj) (onSignalEvent: obj -> unit) : IDisposable option =
+    let private subscribeGlobalEvent (client: obj) (onSignalEvent: obj -> unit) : Result<IDisposable, string> =
         if isNull client then
-            None
+            Error "OPENCODE-SIGNAL-SUBSCRIBE: no client for global event"
         else
             let globalApi = client?``global``
 
             if isNull globalApi || isNull globalApi?event then
-                None
+                Error "OPENCODE-SIGNAL-SUBSCRIBE: /global/event unavailable"
             else
                 try
                     let abortCtrl = newAbortController ()
@@ -130,7 +120,7 @@ module HostSignalSubscribe =
                         })($0, $1, $2, $3)
                         """
 
-                    Some(
+                    Ok(
                         { new IDisposable with
                             member _.Dispose() =
                                 try
@@ -138,8 +128,8 @@ module HostSignalSubscribe =
                                 with _ ->
                                     () }
                     )
-                with _ ->
-                    None
+                with ex ->
+                    Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
     let trySubscribe
         (input: obj)
@@ -160,32 +150,16 @@ module HostSignalSubscribe =
 
         let client = if isNull input then null else input?client
 
-        let listenSub =
-            match listenTarget with
-            | None -> Ok None
-            | Some events ->
-                match subscribeListen events onSignalEvent with
-                | Error _ -> Ok None // degrade; global may still work
-                | Ok sub -> Ok(Some sub)
-
-        match listenSub with
-        | Error err -> Error err
-        | Ok localSub ->
-            let globalSub = subscribeGlobalEvent client onSignalEvent
-
-            let parts =
-                [ match localSub with
-                  | Some s -> yield s
-                  | None -> ()
-                  match globalSub with
-                  | Some s -> yield s
-                  | None -> () ]
-
-            let source =
-                match localSub, globalSub with
-                | Some _, Some _ -> "events.listen+global.event"
-                | Some _, None -> "events.listen"
-                | None, Some _ -> "global.event"
-                | None, None -> "none"
-
-            Ok(combine parts, source)
+        match listenTarget with
+        | Some events ->
+            match subscribeListen events onSignalEvent with
+            | Ok sub ->
+                logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                Ok(Some sub, "events.listen")
+            | Error err -> Error err
+        | None ->
+            match subscribeGlobalEvent client onSignalEvent with
+            | Ok sub ->
+                logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
+                Ok(Some sub, "global.event")
+            | Error err -> Error err
