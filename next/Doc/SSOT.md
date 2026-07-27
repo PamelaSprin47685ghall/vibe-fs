@@ -60,6 +60,8 @@
 
 A/B 角色切换与失败计数必须持久化；禁止 AcceptanceUnknown/Reconcile、FallbackPhase、Governor、Lease 等旧状态机。
 
+durable `FallbackFailureRecorded` 只能由 Host 显式 `session.status=retry`（携带稳定 message/attempt identity）写入；空轮或 XML-only terminal 属于交互修复，最多触发一次零宽 continuation，不进入 fallback 计数、不切换 A/B、不累积 SessionDead。
+
 ## 7. Process
 
 - 唯一进程 deadline = `3 × estimated_running_secs`；estimate 可极大，不 clamp；超时 SIGKILL 进程树。SIGKILL 无法返回是实现 bug，不加第二层兜底 timeout。

@@ -31,11 +31,6 @@ type HostEventRouter
     let lastAssistantMsgs = Dictionary<string, obj>()
     let assistantParts = AssistantParts()
     let fallbackFailures = defaultArg recordedErrors (HashSet<string>())
-    let retryAttemptBySession = Dictionary<string, string>()
-    /// Sessions whose in-flight provider request failed due to host shutdown
-    /// (mocking stopped, connection reset). Their empty/xml terminal is a
-    /// transport artifact, NOT a model failure — observeIdle must skip them.
-    let hostShutdownSessions = HashSet<string>()
     let abortedSessions = AbortTracker()
     let disposeExecOpt = defaultArg disposeExecutorRuntime (fun _ -> ())
     let onSessionDirectory = defaultArg onSessionDirectory (fun _ _ -> ())
@@ -194,20 +189,8 @@ type HostEventRouter
 
                 if r = "assistant" then
                     lastAssistantMsgs.[sessionId] <- target
-
-                    // MessageAbortedError on a message.updated event is a host-
-                    // shutdown artifact (the session's transport was torn down),
-                    // not a model failure. Mark it so observeIdle skips the
-                    // empty/xml terminal.
-                    if
-                        not (isNull info)
-                        && not (isNull info?error)
-                        && not (isNull info?error?name)
-                        && unbox<string> info?error?name = "MessageAbortedError"
-                    then
-                        hostShutdownSessions.Add sessionId |> ignore
                 elif r = "user" then
-                    retryAttemptBySession.Remove sessionId |> ignore
+                    ()
 
             if isAbortError raw then
                 abortedSessions.Mark sessionId
@@ -215,26 +198,15 @@ type HostEventRouter
             elif eventType raw = "session.error" then
                 ()
             elif eventType raw = "session.status" then
-                // Fail-closed on shutdown: a provider retry observed while the
-                // session is being torn down is a host-shutdown artifact, not a
-                // model failure, and must not poison the durable fallback budget
-                // (which would otherwise mark the session Dead and break restart
-                // recovery). HostEventRetry.record also skips the harness stop
-                // sentinel as a second line of defense.
+                // Provider retry is the ONLY durable fallback writer (SSOT §6).
+                // Aborted sessions are torn-down transports, not model failures.
                 if not (abortedSessions.Contains sessionId) then
                     let lastAssistantMsgId =
                         match lastAssistantMsgs.TryGetValue sessionId with
                         | true, lastMsg -> FallbackDetect.messageId sessionId lastMsg
                         | false, _ -> ""
 
-                    HostEventRetry.record
-                        journal
-                        fallbackFailures
-                        retryAttemptBySession
-                        hostShutdownSessions
-                        lastAssistantMsgId
-                        sessionId
-                        raw
+                    HostEventRetry.record journal fallbackFailures lastAssistantMsgId sessionId raw
 
             abortedSessions.Observe(raw, sessionId)
 
@@ -289,19 +261,7 @@ type HostEventRouter
                 let hasTerminalAssistant =
                     completedAssistant |> Option.exists FallbackDetect.isTerminalAssistant
 
-                if
-                    not aborted
-                    && takenAssistant.IsSome
-                    && not (hostShutdownSessions.Contains sessionId)
-                then
-                    // Record the terminal failure before any internal nudge. The
-                    // fourth failed terminal therefore becomes Dead before the
-                    // guard/continuation sites consult the durable projection.
-                    match completedAssistant with
-                    | Some completeMsg when hasTerminalAssistant ->
-                        FallbackDetect.observeIdle journal fallbackFailures retryAttemptBySession sessionId completeMsg
-                    | _ -> ()
-
+                if not aborted && takenAssistant.IsSome then
                     match terminalRoleOf takenAssistant sessionId with
                     | Some agent when
                         agent.Equals("reviewer", StringComparison.OrdinalIgnoreCase)

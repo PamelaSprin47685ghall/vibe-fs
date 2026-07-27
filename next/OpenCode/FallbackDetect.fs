@@ -144,11 +144,13 @@ module FallbackDetect =
             sprintf "anon-%s-%s" sessionId (sha256Hex canonical)
 
     /// Single attributor: the ONLY writer of FallbackFailureRecorded.
-    /// Both detectors (provider-retry status and failed-assistant terminal) route
-    /// through this so the same physical failure is counted exactly once. The
-    /// in-memory set mirrors the durable fold's identity (assistantMessageId|
-    /// providerAttempt) so one process run never double-appends; the fold is the
-    /// cross-restart idempotency boundary.
+    /// The sole caller is the provider-retry detector (HostEventRetry): a
+    /// durable failure fact requires an explicit host retry status carrying a
+    /// stable message/attempt identity. Empty/xml terminals are interaction
+    /// repair (zero-width continuation), NOT provider call failures, and never
+    /// reach this function. The in-memory set mirrors the durable fold's
+    /// identity (assistantMessageId|providerAttempt) so one process run never
+    /// double-appends; the fold is the cross-restart idempotency boundary.
     let recordFallbackFailure
         (journal: AgentJournal option)
         (recorded: HashSet<string>)
@@ -201,28 +203,3 @@ module FallbackDetect =
             match journal with
             | None -> FallbackDecision.NextAttempt Fallback.initial
             | Some j -> currentDecision j
-
-    /// Reports a failed-assistant observation. Does NOT independently append a
-    /// failure fact: when the same physical provider attempt was already
-    /// attributed via the retry-status detector (recorded in retryAttemptBySession),
-    /// this is the very same failure and must not be counted again.
-    let observeIdle
-        (journal: AgentJournal option)
-        (recorded: HashSet<string>)
-        (retryAttemptBySession: Dictionary<string, string>)
-        (sessionId: string)
-        (msg: obj)
-        : unit =
-        match journal with
-        | None -> ()
-        | Some journal ->
-            if not (isNull msg) && isFailedAssistant msg then
-                let msgId = messageId sessionId msg
-
-                let providerAttempt, reason =
-                    match retryAttemptBySession.TryGetValue sessionId with
-                    | true, attempt -> attempt, "provider retry (empty/xml terminal)"
-                    | false, _ -> "empty-xml", "empty or xml-only assistant turn"
-
-                recordFallbackFailure (Some journal) recorded sessionId msgId providerAttempt reason
-                |> ignore
