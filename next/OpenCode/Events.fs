@@ -4,8 +4,10 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Next.Kernel.Identity
 
+open Wanxiangshu.Next.Kernel
+
 type TerminalOutcome =
-    | Completed of messageId: MessageId
+    | Completed of result: AgentRunResult
     | Aborted of reason: string
     | Failed of error: string
 

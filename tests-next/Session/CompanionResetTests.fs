@@ -25,7 +25,18 @@ module CompanionResetTests =
         let mutable output = [ "history" ]
         let mutable prompts: string list = []
         let mutable sendError = false
-        let mutable terminalOutcome: TerminalOutcome = Completed(MessageId.create "blog")
+
+        let mutable terminalOutcome: TerminalOutcome =
+            TerminalOutcome.Completed(
+                { SessionId = SessionId.create "blogger-1"
+                  RootUserMessageId = MessageId.create "blog"
+                  AssistantMessageId = MessageId.create "blog"
+                  Role = "test"
+                  Directory = ""
+                  FinalText = "done"
+                  Parts = [||] }
+            )
+
         let mutable growOutput = true
         let childId = SessionId.create "blogger-1"
 
@@ -157,7 +168,18 @@ module CompanionResetTests =
                 do! restored.WaitInFlightAsync()
                 Assert.Contains("FULL PROJECTION", prompts () |> List.head)
 
-                setTerminal (Completed(MessageId.create "empty"))
+                setTerminal (
+                    TerminalOutcome.Completed(
+                        { SessionId = SessionId.create "x"
+                          RootUserMessageId = MessageId.create "empty"
+                          AssistantMessageId = MessageId.create "empty"
+                          Role = "test"
+                          Directory = ""
+                          FinalText = "done"
+                          Parts = [||] }
+                    )
+                )
+
                 setGrowOutput false
                 Assert.Equal(Submitted, restored.SubmitProjection("{\"empty\":3}"))
                 do! restored.WaitInFlightAsync()

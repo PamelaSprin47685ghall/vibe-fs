@@ -68,8 +68,7 @@ module HostSignalBootstrap =
 
         let onSignal (signal: HostSignal) =
             match signal with
-            | ProviderRetry retry ->
-                RetrySignalHandler.handle journal fallbackFailures userMessageBindings retry
+            | ProviderRetry retry -> RetrySignalHandler.handle journal fallbackFailures userMessageBindings retry
             | SessionIdle _
             | SessionDeleted _ -> reconciler.HandleSignal signal
 
@@ -103,7 +102,8 @@ module HostSignalBootstrap =
                 registerSource sessionId LocalPluginEvent
 
         let workspaceDir =
-            if isNull input || isNull input?directory then None
+            if isNull input || isNull input?directory then
+                None
             else
                 let d = unbox<string> input?directory
                 if String.IsNullOrWhiteSpace d then None else Some d
@@ -115,17 +115,18 @@ module HostSignalBootstrap =
             // global SSE only; local plugin events belong to that worktree's
             // own plugin instance.
             match directory, workspaceDir with
-            | Some childDir, Some root when childDir <> root ->
-                registerSource key GlobalForeignDirectoryEvent
+            | Some childDir, Some root when childDir <> root -> registerSource key GlobalForeignDirectoryEvent
             | Some _, None -> registerSource key GlobalForeignDirectoryEvent
             | _ -> registerSource key LocalPluginEvent
 
             reconciler.BindActiveRun
                 { SessionId = sessionId
-                  UserMessageId =
+                  RunId = None
+                  RootUserMessageId =
                     match userMessageBindings.TryGetValue(SessionId.value sessionId) with
                     | true, mid -> Some mid
                     | false, _ -> None
+                  ContinuationMessageIds = Set.empty
                   AgentRole = Some role
                   Directory = defaultArg directory "" }
 
@@ -179,7 +180,9 @@ module HostSignalBootstrap =
                     // need the same path so Side B is not stuck on client-supplied model.
                     match modelConfig, journal, agent with
                     | Some cfg, Some j, Some _ when not (String.IsNullOrWhiteSpace sessionId) ->
-                        match ModelResolver.resolveForSession cfg (SessionId.create sessionId) (AgentJournal.snapshot j) with
+                        match
+                            ModelResolver.resolveForSession cfg (SessionId.create sessionId) (AgentJournal.snapshot j)
+                        with
                         | Some selected ->
                             let modelObj =
                                 createObj
@@ -190,8 +193,10 @@ module HostSignalBootstrap =
                             if not (isNull outputObj) then
                                 if not (isNull outputObj?message) then
                                     outputObj?message?model <- modelObj
+
                                 if not (isNull outputObj?info) then
                                     outputObj?info?model <- modelObj
+
                                 outputObj?model <- modelObj
 
                             inputObj?model <- modelObj

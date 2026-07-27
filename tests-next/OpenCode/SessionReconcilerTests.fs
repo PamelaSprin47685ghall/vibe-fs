@@ -39,7 +39,9 @@ module SessionReconcilerTests =
     let private bind (reconciler: SessionReconciler) sessionId userId role =
         reconciler.BindActiveRun
             { SessionId = SessionId.create sessionId
-              UserMessageId = Some(MessageId.create userId)
+              RunId = None
+              RootUserMessageId = Some(MessageId.create userId)
+              ContinuationMessageIds = Set.empty
               AgentRole = Some role
               Directory = "/tmp/ws" }
 
@@ -55,7 +57,7 @@ module SessionReconcilerTests =
                 )
 
             let reconciler =
-                SessionReconciler(snapshot :> ISessionSnapshotPort, fun turn -> turns.Add turn)
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
 
             bind reconciler "s1" "u1" AgentRole.Coder
             reconciler.MarkDirty(SessionId.create "s1")
@@ -76,7 +78,7 @@ module SessionReconcilerTests =
             let snapshot = FakeSnapshot([ msg "u1" "user" None None [||] None ])
 
             let reconciler =
-                SessionReconciler(snapshot :> ISessionSnapshotPort, fun turn -> turns.Add turn)
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
 
             bind reconciler "s1" "u1" AgentRole.Coder
             reconciler.MarkDirty(SessionId.create "s1")
@@ -91,7 +93,7 @@ module SessionReconcilerTests =
             let snapshot = FakeSnapshot([ msg "u1" "user" None None [||] None ])
 
             let reconciler =
-                SessionReconciler(snapshot :> ISessionSnapshotPort, fun turn -> turns.Add turn)
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
 
             bind reconciler "s1" "u1" AgentRole.Coder
             reconciler.MarkDirty(SessionId.create "s1")
@@ -121,7 +123,7 @@ module SessionReconcilerTests =
                 )
 
             let reconciler =
-                SessionReconciler(snapshot :> ISessionSnapshotPort, fun turn -> turns.Add turn)
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
 
             bind reconciler "s1" "u1" AgentRole.Coder
             reconciler.MarkDirty(SessionId.create "s1")
@@ -138,19 +140,11 @@ module SessionReconcilerTests =
         let parts = [| createObj [ "id", box "p"; "type", box "text"; "text", box "" ] |]
 
         Assert.False(
-            CompletedTurnClassifier.needsZeroWidthContinuation
-                (Some AgentRole.Executor)
-                TurnOutcome.TurnCompleted
-                parts
+            CompletedTurnClassifier.needsZeroWidthContinuation (Some AgentRole.Executor) TurnOutcome.TurnCompleted parts
         )
 
-        Assert.False(
-            CompletedTurnClassifier.needsZeroWidthContinuation None TurnOutcome.TurnCompleted parts
-        )
+        Assert.False(CompletedTurnClassifier.needsZeroWidthContinuation None TurnOutcome.TurnCompleted parts)
 
         Assert.True(
-            CompletedTurnClassifier.needsZeroWidthContinuation
-                (Some AgentRole.Coder)
-                TurnOutcome.TurnCompleted
-                parts
+            CompletedTurnClassifier.needsZeroWidthContinuation (Some AgentRole.Coder) TurnOutcome.TurnCompleted parts
         )

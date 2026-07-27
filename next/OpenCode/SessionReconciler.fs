@@ -47,14 +47,17 @@ type SessionReconciler
 
         match skipUntilUser messages with
         | None -> None
-        | Some afterUser -> afterUser |> List.tryFind (fun message -> message.Role = "assistant")
+        | Some afterUser ->
+            afterUser
+            |> List.filter (fun message -> message.Role = "assistant")
+            |> List.tryLast
 
     let findLatestUser (messages: SessionMessage list) =
         messages |> List.rev |> List.tryFind (fun message -> message.Role = "user")
 
     let findLatestBoundTurn (messages: SessionMessage list) (binding: ActiveRunBinding) =
         let userMessageId =
-            match binding.UserMessageId with
+            match binding.RootUserMessageId with
             | Some id -> Some id
             | None -> findLatestUser messages |> Option.map (fun message -> message.Id)
 
@@ -109,11 +112,13 @@ type SessionReconciler
             | true, binding ->
                 bindings.[key] <-
                     { binding with
-                        UserMessageId = Some userMessageId }
+                        RootUserMessageId = Some userMessageId }
             | false, _ ->
                 bindings.[key] <-
                     { SessionId = sessionId
-                      UserMessageId = Some userMessageId
+                      RunId = None
+                      RootUserMessageId = Some userMessageId
+                      ContinuationMessageIds = Set.empty
                       AgentRole = None
                       Directory = "" })
 
@@ -165,7 +170,9 @@ type SessionReconciler
                         | Some value -> value
                         | None ->
                             { SessionId = sessionId
-                              UserMessageId = None
+                              RunId = None
+                              RootUserMessageId = None
+                              ContinuationMessageIds = Set.empty
                               AgentRole = None
                               Directory = "" }
 
@@ -193,7 +200,14 @@ type SessionReconciler
                             | Error _ -> ()
                             | Ok messages ->
                                 match findLatestBoundTurn messages active with
-                                | Some turn when turn.Outcome <> TurnUnknown -> turnFound <- Some turn
+                                | Some turn when
+                                    (match turn.Outcome with
+                                     | TurnCompleted
+                                     | TurnAborted _
+                                     | TurnFailed _ -> true
+                                     | _ -> false)
+                                    ->
+                                    turnFound <- Some turn
                                 | _ -> ()
 
                     match turnFound with

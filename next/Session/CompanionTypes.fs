@@ -57,5 +57,10 @@ module Companion =
         | None -> messages
         | Some b -> MessageTransform.replacePrefix messages b (Index watermarkIndex)
 
+    let latestBFor (sessionId: SessionId) (companionMemory: CompanionMemory) : BlogText option = companionMemory.LatestB
+
+    let frozenBForProjection (sessionId: SessionId) (companionMemory: CompanionMemory) : BlogText option =
+        companionMemory.ActivePrefixEpoch |> Option.map (fun epoch -> epoch.FrozenB)
+
     let compressPrefixText (messages: HostMessage list) (currentB: BlogText) (watermarkIndex: int) : HostMessage list =
         compressPrefix messages (Some currentB) watermarkIndex

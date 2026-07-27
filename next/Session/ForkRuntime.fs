@@ -57,7 +57,10 @@ type AgentRecord =
     { AgentId: string
       Role: AgentRole
       Status: AgentStatus
-      CurrentRunId: string option }
+      CurrentRunId: string option
+      LastCompletionStatus: string option
+      HasPendingCompletion: bool
+      ChildSessionId: string option }
 
 type ForkRuntime
     (
@@ -122,12 +125,19 @@ type ForkRuntime
                     else
                         mailbox.Enqueue(completion)
 
+                    let statusStr =
+                        match completion.Outcome with
+                        | Ok _ -> Some "completed"
+                        | Error _ -> Some "failed"
+
                     match agents.TryGetValue(agentId) with
                     | true, rec' when rec'.Status <> AgentStatus.Closed ->
                         agents.[agentId] <-
                             { rec' with
                                 Status = AgentStatus.Idle
-                                CurrentRunId = None }
+                                CurrentRunId = None
+                                LastCompletionStatus = statusStr
+                                HasPendingCompletion = true }
                     | _ -> ())
 
                 // Notify observers after the completion is available to Join and status is updated.
@@ -159,7 +169,8 @@ type ForkRuntime
                         { rec' with
                             Role = role
                             Status = AgentStatus.Busy
-                            CurrentRunId = Some runId }
+                            CurrentRunId = Some runId
+                            HasPendingCompletion = false }
 
                     launch ()
                     ForkResult.Nudged agentId
@@ -170,7 +181,10 @@ type ForkRuntime
                         { AgentId = agentId
                           Role = role
                           Status = AgentStatus.Busy
-                          CurrentRunId = Some runId }
+                          CurrentRunId = Some runId
+                          LastCompletionStatus = None
+                          HasPendingCompletion = false
+                          ChildSessionId = None }
 
                     launch ()
                     ForkResult.Created agentId)
@@ -183,8 +197,7 @@ type ForkRuntime
                 Task.FromResult(Error ForkError.Cancelled)
             else
                 let hasBusy =
-                    agents.Values
-                    |> Seq.exists (fun record' -> record'.Status = AgentStatus.Busy)
+                    agents.Values |> Seq.exists (fun record' -> record'.Status = AgentStatus.Busy)
                     || ptys.Count > 0
 
                 if not hasBusy then
@@ -212,7 +225,10 @@ type ForkRuntime
                     { AgentId = agentId
                       Role = role
                       Status = AgentStatus.Idle
-                      CurrentRunId = None })
+                      CurrentRunId = None
+                      LastCompletionStatus = None
+                      HasPendingCompletion = false
+                      ChildSessionId = None })
 
     member _.UnregisterPty(ptyId: string) : unit =
         lock lockObj (fun () -> ptys.Remove(ptyId) |> ignore)
@@ -248,7 +264,8 @@ type ForkRuntime
                             agents.[id] <-
                                 { rec' with
                                     Status = AgentStatus.Closed
-                                    CurrentRunId = None }
+                                    CurrentRunId = None
+                                    HasPendingCompletion = false }
                         | _ -> ()
 
                     let ptyIds = ptys.Keys |> Seq.toList

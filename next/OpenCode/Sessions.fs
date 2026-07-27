@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
+open Wanxiangshu.Next.Kernel
 
 type SessionPromptOptions = OpenCodePromptOptions
 
@@ -111,7 +112,19 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
                         | Fatal err -> return Error err
                     | None ->
                         let msgId = MessageId.create (Guid.NewGuid().ToString("N"))
-                        eventPort.NotifyTerminal sessionId (Completed msgId) |> ignore
+
+                        let fakeResult: AgentRunResult =
+                            { SessionId = sessionId
+                              RootUserMessageId = msgId
+                              AssistantMessageId = msgId
+                              Role = "test"
+                              Directory = ""
+                              FinalText = "test output"
+                              Parts = [||] }
+
+                        eventPort.NotifyTerminal sessionId (TerminalOutcome.Completed fakeResult)
+                        |> ignore
+
                         return Ok msgId
             }
 

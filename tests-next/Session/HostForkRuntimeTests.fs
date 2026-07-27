@@ -48,7 +48,18 @@ module HostForkRuntimeTests =
             output <- output @ [ "A version output" ]
 
             terminal
-            |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "m-1")))
+            |> Option.iter (fun listener ->
+                listener
+                    childId
+                    (TerminalOutcome.Completed(
+                        { SessionId = SessionId.create "m-1"
+                          RootUserMessageId = MessageId.create "m-1"
+                          AssistantMessageId = MessageId.create "m-1"
+                          Role = "test"
+                          Directory = ""
+                          FinalText = "A version output"
+                          Parts = [||] }
+                    )))
 
         host, trigger, (fun () -> childCount), (fun () -> childPromptCount)
 
@@ -211,7 +222,18 @@ module HostForkRuntimeTests =
 
                 let trigger () =
                     terminal
-                    |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "model-terminal")))
+                    |> Option.iter (fun listener ->
+                        listener
+                            childId
+                            (TerminalOutcome.Completed(
+                                { SessionId = SessionId.create "model-terminal"
+                                  RootUserMessageId = MessageId.create "model-terminal"
+                                  AssistantMessageId = MessageId.create "model-terminal"
+                                  Role = "test"
+                                  Directory = ""
+                                  FinalText = "A version output"
+                                  Parts = [||] }
+                            )))
 
                 use journal =
                     AgentJournal.create tempDir (RuntimeId.create "runtime-model") 1 DateTimeOffset.UtcNow

@@ -4,6 +4,8 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 type TurnOutcome =
+    | TurnInProgress
+    | TurnNeedsContinuation of reason: string
     | TurnCompleted
     | TurnAborted of reason: string
     | TurnFailed of error: string
@@ -23,6 +25,8 @@ type ReconciledTurn =
 
 type ActiveRunBinding =
     { SessionId: SessionId
-      UserMessageId: MessageId option
+      RunId: string option
+      RootUserMessageId: MessageId option
+      ContinuationMessageIds: Set<string>
       AgentRole: AgentRole option
       Directory: string }

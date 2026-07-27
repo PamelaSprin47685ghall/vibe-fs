@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
@@ -104,6 +105,48 @@ module TerminalPolicies =
 
         match turn.Outcome with
         | TurnUnknown -> ()
+        | TurnInProgress ->
+            // Tool-calls in progress: never complete the run. Send zero-width
+            // continuation so the model continues its work.
+            if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
+                HostSessionNudge.send
+                    sessionPort
+                    turn.SessionId
+                    "\u200B"
+                    { Model = turn.Model
+                      Agent = roleName turn.AgentRole
+                      Directory =
+                        if String.IsNullOrWhiteSpace turn.Directory then
+                            None
+                        else
+                            Some turn.Directory }
+                    ignore
+                    journal
+        | TurnNeedsContinuation reason ->
+            // No final text or length limit. Do NOT complete the run. Send a
+            // repair prompt to get the final report.
+            let roleName =
+                turn.AgentRole |> Option.map (fun r -> r.ToString().ToLowerInvariant())
+
+            let repairPrompt =
+                "Your tool work is complete, but no final task report was produced. "
+                + "Return a concise final report containing:\n"
+                + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
+                + "Do not call another tool unless necessary."
+
+            HostSessionNudge.send
+                sessionPort
+                turn.SessionId
+                repairPrompt
+                { Model = turn.Model
+                  Agent = roleName
+                  Directory =
+                    if String.IsNullOrWhiteSpace turn.Directory then
+                        None
+                    else
+                        Some turn.Directory }
+                ignore
+                journal
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
@@ -116,10 +159,24 @@ module TerminalPolicies =
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
-            let output = textOutput turn
-            recordOutput eventPort turn.SessionId output
+            let roleStr =
+                turn.AgentRole
+                |> Option.map (fun r -> r.ToString().ToLowerInvariant())
+                |> Option.defaultValue "coder"
 
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed turn.AssistantMessageId)
+            let runResult: AgentRunResult =
+                { SessionId = turn.SessionId
+                  RootUserMessageId = turn.UserMessageId
+                  AssistantMessageId = turn.AssistantMessageId
+                  Role = roleStr
+                  Directory = turn.Directory
+                  FinalText = textOutput turn
+                  Parts = turn.Parts }
+
+            if String.IsNullOrWhiteSpace runResult.FinalText then
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
+            else
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
             |> ignore
 
             if wasAborted then

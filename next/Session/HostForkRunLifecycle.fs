@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Session
 
+open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
@@ -71,7 +72,15 @@ module HostForkRunLifecycle =
             |> Option.iter (fun subscription -> subscription.Dispose())
 
             match outcome with
-            | Completed _ -> run.Source.SetResult(Ok(outputSince sessions run))
+            | Completed result ->
+                // PR2: TerminalOutcome.Completed now carries AgentRunResult.
+                // Extract FinalText for backward-compatible Source channel.
+                let text = result.FinalText
+
+                if String.IsNullOrWhiteSpace text then
+                    run.Source.SetResult(Error "completed with empty final text (PR2 invariant)")
+                else
+                    run.Source.SetResult(Ok text)
             | Aborted reason -> run.Source.SetResult(Error reason)
             | Failed error -> run.Source.SetResult(Error error)
 

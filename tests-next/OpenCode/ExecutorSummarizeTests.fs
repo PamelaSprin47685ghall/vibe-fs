@@ -1,3 +1,4 @@
+#nowarn "3511"
 namespace Wanxiangshu.Next.Tests.OpenCodeTests
 
 open System
@@ -220,7 +221,18 @@ module ExecutorSummarizeTests =
 
         let trigger () =
             terminal
-            |> Option.iter (fun listener -> listener childId (Completed(MessageId.create "m-1")))
+            |> Option.iter (fun listener ->
+                listener
+                    childId
+                    (TerminalOutcome.Completed(
+                        { SessionId = childId
+                          RootUserMessageId = MessageId.create "m-1"
+                          AssistantMessageId = MessageId.create "m-1"
+                          Role = "test"
+                          Directory = ""
+                          FinalText = "done"
+                          Parts = [||] }
+                    )))
 
         host, trigger, (fun () -> childCount), (fun () -> childPromptCount)
 

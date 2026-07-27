@@ -38,7 +38,18 @@ module CompanionCacheTests =
                 output <- output @ [ text ]
 
                 terminal
-                |> Option.iter (fun l -> l childId (Completed(MessageId.create "blog")))
+                |> Option.iter (fun l ->
+                    l
+                        childId
+                        (TerminalOutcome.Completed(
+                            { SessionId = SessionId.create "blog"
+                              RootUserMessageId = MessageId.create "blog"
+                              AssistantMessageId = MessageId.create "blog"
+                              Role = "test"
+                              Directory = ""
+                              FinalText = "done"
+                              Parts = [||] }
+                        )))
 
                 Task.FromResult(Ok(MessageId.create "accepted"))
 

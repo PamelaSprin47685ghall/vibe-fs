@@ -21,7 +21,8 @@ type HostForkRuntime
         ?modelResolver: ModelResolver.ModelConfig,
         ?ptyPort: PtyPort,
         ?directoryFor: string -> string option,
-        ?onRunStarted: SessionId -> AgentRole -> string option -> unit
+        ?onRunStarted: SessionId -> AgentRole -> string option -> unit,
+        ?parentWorkRecordFor: SessionId -> string option
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -34,6 +35,7 @@ type HostForkRuntime
     let parentKey = SessionId.value parentId
     let directoryOf = defaultArg directoryFor (fun _ -> None)
     let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
+    let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> None)
 
     let sendChildPrompt =
         HostForkRunLifecycle.childPromptSender sessions parentId modelResolver journal directoryOf
@@ -162,10 +164,33 @@ type HostForkRuntime
                         | _ ->
                             markReady run
 
+                            // Inject parent work record (LatestB) as background context
+                            let enrichedPrompt =
+                                match parentWorkRecordOf parentId with
+                                | Some workRecord when not (System.String.IsNullOrWhiteSpace workRecord) ->
+                                    sprintf
+                                        "[Parent work record — background only]
+%s
+
+[Assignment]
+%s
+
+[Required final report]
+%s"
+                                        workRecord
+                                        prompt
+                                        "Result:
+Files changed:
+Tests run:
+Evidence:
+Remaining risks:
+Blockers:"
+                                | _ -> prompt
+
                             let! sent =
                                 sessions.SendPrompt(
                                     childId,
-                                    prompt,
+                                    enrichedPrompt,
                                     { Model = HostPendingRun.resolveModel modelResolver journal childId
                                       Agent = Some(role.ToString().ToLowerInvariant())
                                       Directory = directoryOf agentId }
@@ -250,20 +275,12 @@ type HostForkRuntime
 
             // Complete every pending run as Cancelled before clearing tables so
             // join waiters never hang after parent abort.
-            let pending =
-                lock gate (fun () ->
-                    pendingRuns.Values |> Seq.toList)
+            let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
 
             for run in pending do
-                HostForkRunLifecycle.complete
-                    gate
-                    pendingRuns
-                    sessions
-                    run
-                    (TerminalOutcome.Failed "cancelled")
+                HostForkRunLifecycle.complete gate pendingRuns sessions run (TerminalOutcome.Failed "cancelled")
 
-            let! teardown =
-                HostForkRunLifecycle.teardownChildren sessions journal parentId children gate
+            let! teardown = HostForkRunLifecycle.teardownChildren sessions journal parentId children gate
 
             match teardown with
             | Ok() ->

@@ -25,7 +25,18 @@ module CompanionHostTests =
         let mutable output = [ "history" ]
         let mutable prompts: string list = []
         let mutable sendError = false
-        let mutable terminalOutcome: TerminalOutcome = Completed(MessageId.create "blog")
+
+        let mutable terminalOutcome: TerminalOutcome =
+            TerminalOutcome.Completed(
+                { SessionId = SessionId.create "blog"
+                  RootUserMessageId = MessageId.create "blog"
+                  AssistantMessageId = MessageId.create "blog"
+                  Role = "test"
+                  Directory = ""
+                  FinalText = "done"
+                  Parts = [||] }
+            )
+
         let mutable growOutput = true
         let childId = SessionId.create "blogger-1"
 
@@ -214,7 +225,18 @@ module CompanionHostTests =
                         output <- output @ [ text ]
 
                         terminal
-                        |> Option.iter (fun l -> l childId (Completed(MessageId.create "blog")))
+                        |> Option.iter (fun l ->
+                            l
+                                childId
+                                (TerminalOutcome.Completed(
+                                    { SessionId = SessionId.create "blog"
+                                      RootUserMessageId = MessageId.create "blog"
+                                      AssistantMessageId = MessageId.create "blog"
+                                      Role = "test"
+                                      Directory = ""
+                                      FinalText = "done"
+                                      Parts = [||] }
+                                )))
 
                         Task.FromResult(Ok(MessageId.create "accepted"))
 

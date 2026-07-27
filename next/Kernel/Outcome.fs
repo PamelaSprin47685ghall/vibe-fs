@@ -2,6 +2,24 @@ namespace Wanxiangshu.Next.Kernel
 
 open Wanxiangshu.Next.Kernel.Identity
 
+/// Typed completion payload for a successful agent run.
+/// Carries the full result from ReconciledTurn directly.
+type AgentRunResult =
+    { SessionId: SessionId
+      RootUserMessageId: MessageId
+      AssistantMessageId: MessageId
+      Role: string // AgentRole serialized as string (avoid Kernel→Session dep)
+      Directory: string
+      FinalText: string
+      Parts: obj array }
+
+    /// Hard invariant: completed runs must have non-empty final text.
+    member this.IsValid = not (System.String.IsNullOrWhiteSpace this.FinalText)
+
+type AgentRunFailure =
+    { SessionId: SessionId; Reason: string }
+
+
 module Outcome =
 
     type SendOutcome =

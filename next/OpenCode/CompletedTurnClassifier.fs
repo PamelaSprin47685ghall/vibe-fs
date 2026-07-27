@@ -14,7 +14,8 @@ module CompletedTurnClassifier =
         Regex("<(?:tool_call|use_tool|call|function_call|invoke)[^>]*>", RegexOptions.Compiled)
 
     let private asString (value: obj) =
-        if isNull value then None
+        if isNull value then
+            None
         else
             let text = unbox<string> value
             if String.IsNullOrWhiteSpace text then None else Some text
@@ -62,7 +63,10 @@ module CompletedTurnClassifier =
     let classifyOutcome (finish: string option) (errorName: string option) (parts: obj array) : TurnOutcome =
         if isAbortErrorName errorName then
             TurnAborted(defaultArg errorName "aborted")
-        elif finish |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase)) then
+        elif
+            finish
+            |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase))
+        then
             TurnAborted("finish=aborted")
         else
             match finish with
@@ -71,9 +75,16 @@ module CompletedTurnClassifier =
                     TurnAborted(defaultArg errorName "aborted")
                 else
                     TurnFailed(defaultArg errorName "assistant finish=error")
-            | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) -> TurnCompleted
-            | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnCompleted
-            | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) -> TurnCompleted
+            | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
+                let text = partsText parts
+
+                if String.IsNullOrWhiteSpace text && not (hasToolCallPart parts) then
+                    TurnNeedsContinuation "assistant stop with empty text"
+                else
+                    TurnCompleted
+            | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnInProgress
+            | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
+                TurnNeedsContinuation "assistant finish=length"
             | Some value -> TurnFailed(sprintf "assistant finish=%s" value)
             // No finish yet: Unknown. Never invent Completed from parts alone —
             // abort/error may still be racing the idle wake-up.
@@ -81,6 +92,14 @@ module CompletedTurnClassifier =
 
     let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (parts: obj array) =
         match outcome, role with
+        | TurnInProgress, _ -> true
+        | TurnNeedsContinuation _, Some AgentRole.Manager
+        | TurnNeedsContinuation _, Some AgentRole.Orchestrator
+        | TurnNeedsContinuation _, Some AgentRole.Coder
+        | TurnNeedsContinuation _, Some AgentRole.Reviewer
+        | TurnNeedsContinuation _, Some AgentRole.Inspector
+        | TurnNeedsContinuation _, Some AgentRole.Browser
+        | TurnNeedsContinuation _, Some AgentRole.Meditator -> true
         | TurnCompleted, Some AgentRole.Manager
         | TurnCompleted, Some AgentRole.Orchestrator
         | TurnCompleted, Some AgentRole.Coder

@@ -233,7 +233,10 @@ module PtyTests =
             [ { AgentId = "agent-alpha"
                 Role = AgentRole.Coder
                 Status = AgentStatus.Busy
-                CurrentRunId = Some "run-1" } ]
+                CurrentRunId = Some "run-1"
+                LastCompletionStatus = None
+                HasPendingCompletion = false
+                ChildSessionId = None } ]
 
         let port = PtyPort(agentProvider = mockAgents)
         let ptyId = port.Fork("top", agentId = "agent-alpha", role = AgentRole.Coder)

@@ -8,6 +8,7 @@ open Xunit
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Tools
 
@@ -90,11 +91,34 @@ module SpikeHostTests =
             eventPort.SubscribeTerminalListener(fun _ _ -> callCount <- callCount + 1)
 
         let msgId = MessageId.create "msg1"
-        let firstNotify = eventPort.NotifyTerminal sId (Completed msgId)
+
+        let fakeResult =
+            { SessionId = sId
+              RootUserMessageId = msgId
+              AssistantMessageId = msgId
+              Role = "test"
+              Directory = ""
+              FinalText = "done"
+              Parts = [||] }
+
+        let firstNotify =
+            eventPort.NotifyTerminal sId (TerminalOutcome.Completed fakeResult)
+
         Assert.True(firstNotify)
         Assert.Equal(1, callCount)
 
-        let secondNotify = eventPort.NotifyTerminal sId (Completed msgId)
+        let fakeResult2 =
+            { SessionId = sId
+              RootUserMessageId = msgId
+              AssistantMessageId = msgId
+              Role = "test"
+              Directory = ""
+              FinalText = "done"
+              Parts = [||] }
+
+        let secondNotify =
+            eventPort.NotifyTerminal sId (TerminalOutcome.Completed fakeResult2)
+
         Assert.True(secondNotify)
         Assert.Equal(2, callCount)
         Assert.False(eventPort.IsCompleted sId)
@@ -109,8 +133,23 @@ module SpikeHostTests =
                 .SubscribeTerminalListener(fun sessionId outcome ->
                     observed <- (SessionId.value sessionId, outcome) :: observed)
 
-        (eventPort :> IEventObservationPort).NotifyTerminal (SessionId.create "idle-session") (Completed (MessageId.create "m-idle")) |> ignore
-        (eventPort :> IEventObservationPort).NotifyTerminal (SessionId.create "abort-session") (Aborted "stopped") |> ignore
+        let idleSid = SessionId.create "idle-session"
+        let idleMid = MessageId.create "m-idle"
+
+        let idleResult =
+            { SessionId = idleSid
+              RootUserMessageId = idleMid
+              AssistantMessageId = idleMid
+              Role = "test"
+              Directory = ""
+              FinalText = "done"
+              Parts = [||] }
+
+        (eventPort :> IEventObservationPort).NotifyTerminal idleSid (TerminalOutcome.Completed idleResult)
+        |> ignore
+
+        (eventPort :> IEventObservationPort).NotifyTerminal (SessionId.create "abort-session") (Aborted "stopped")
+        |> ignore
 
         Assert.Equal(2, List.length observed)
 
