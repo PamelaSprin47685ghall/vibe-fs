@@ -10,7 +10,9 @@
   },
   "session": {
     "agent": "manager",
-    "bind": []
+    "bind": [
+      "manager"
+    ]
   },
   "flow": [
     {
@@ -34,6 +36,9 @@
       "wait": "review-perfect-first"
     },
     {
+      "wait": "reviewer-first-turn"
+    },
+    {
       "awaitTerminal": true,
       "session": "child",
       "requireAssistantTerminal": true,
@@ -43,7 +48,17 @@
       "restart": true
     },
     {
+      "prompt": {
+        "agent": "reviewer",
+        "text": "After restart, re-verify the tree with another PERFECT verdict."
+      },
+      "session": "child"
+    },
+    {
       "wait": "review-perfect-restart"
+    },
+    {
+      "wait": "reviewer-restart-done"
     },
     {
       "awaitTerminal": true,

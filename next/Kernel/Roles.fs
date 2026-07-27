@@ -42,7 +42,7 @@ module Roles =
                   ToolPermission.Grep
                   ToolPermission.Inspector ]
         | Role.Inspector -> set [ ToolPermission.Exec ]
-        | Role.Browser -> set [ ToolPermission.Read; ToolPermission.Network ]
+        | Role.Browser -> set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep; ToolPermission.Network ]
         | Role.Meditator ->
             set
                 [ ToolPermission.Read

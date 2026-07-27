@@ -182,7 +182,8 @@ async function main() {
         triggerBark = resolve;
       });
 
-      // Safety fallback: if host bark is not seen within 10s, release launch gate
+      // Safety fallback: if host bark is not seen within 10s, release launch gate only.
+      // Does NOT mark the canary as passed — only unblocks canary N+1 spawn.
       const barkTimer = setTimeout(triggerBark, 10000);
       const onBark = () => {
         clearTimeout(barkTimer);

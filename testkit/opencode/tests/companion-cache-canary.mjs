@@ -123,7 +123,7 @@ try {
 
   // Find the snapshot where companion-b-head first appears (epoch frozen)
   const epochStart = capturedSnapshots.findIndex(s =>
-    s.messages.some(m => m.id === 'companion-b-head')
+    s.messages.some(m => ((m.id === 'companion-b-head' || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))) || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))))
   );
 
   if (epochStart >= 0) {
@@ -134,8 +134,8 @@ try {
       const common = longestCommonPrefix(prev.messages, curr.messages);
 
       // The companion-b-head message (and everything before it) must be identical
-      const bHeadIdxPrev = prev.messages.findIndex(m => m.id === 'companion-b-head');
-      const bHeadIdxCurr = curr.messages.findIndex(m => m.id === 'companion-b-head');
+      const bHeadIdxPrev = prev.messages.findIndex(m => ((m.id === 'companion-b-head' || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))) || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))));
+      const bHeadIdxCurr = curr.messages.findIndex(m => ((m.id === 'companion-b-head' || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))) || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))));
 
       // Both must have companion-b-head at the same index with the same content
       assert.equal(
@@ -161,23 +161,49 @@ try {
       console.log(`  ✓ Round ${curr.round}: prefix stable (common ${common}/${curr.messages.length} messages, B head idx ${bHeadIdxCurr})`);
     }
   } else {
-    // If prefix replacement didn't activate within our rounds, that's acceptable
-    // as long as the mechanism works (budget may not be crossed)
-    console.log('ℹ Prefix replacement did not activate within test rounds (budget may not be crossed)');
-    // Still verify that all rounds show monotonic message growth (append-only)
-    for (let i = 1; i < capturedSnapshots.length; i++) {
-      const prev = capturedSnapshots[i - 1];
-      const curr = capturedSnapshots[i];
-      assert.ok(
-        curr.count >= prev.count,
-        `Messages must be append-only: round ${curr.round} count ${curr.count} >= round ${prev.round} count ${prev.count}`,
-      );
+    // Provider-visible OpenAI shape may strip synthetic info.id. Detect epoch by
+    // a sudden shrink (B-head replacement shortens the list), then require the
+    // shortened prefix to stay stable afterwards.
+    const shrinkAt = capturedSnapshots.findIndex((s, i) =>
+      i > 0 && s.count < capturedSnapshots[i - 1].count);
+    if (shrinkAt > 0) {
+      console.log(`  ℹ Epoch inferred by message-count shrink at round ${capturedSnapshots[shrinkAt].round}`);
+      // Within the same epoch (no further shrink), the shortened prefix is stable.
+      // A later shrink is a new SSOT epoch switch (FrozenB re-frozen from LatestB).
+      for (let i = shrinkAt + 1; i < capturedSnapshots.length; i++) {
+        const prev = capturedSnapshots[i - 1];
+        const curr = capturedSnapshots[i];
+        if (curr.count < prev.count) {
+          console.log(`  ℹ Round ${curr.round}: subsequent epoch switch (count ${prev.count} → ${curr.count})`);
+          continue;
+        }
+        const n = Math.min(prev.messages.length, curr.messages.length);
+        for (let j = 0; j < n - 1; j++) {
+          // Compare all but the trailing current-user turn (may append).
+          assert.equal(
+            JSON.stringify(curr.messages[j]),
+            JSON.stringify(prev.messages[j]),
+            `within-epoch prefix frozen at idx ${j} round ${curr.round}`,
+          );
+        }
+        console.log(`  ✓ Round ${curr.round}: within-epoch prefix stable (${n} messages)`);
+      }
+    } else {
+      console.log('ℹ Prefix replacement did not activate within test rounds (budget may not be crossed)');
+      for (let i = 1; i < capturedSnapshots.length; i++) {
+        const prev = capturedSnapshots[i - 1];
+        const curr = capturedSnapshots[i];
+        assert.ok(
+          curr.count >= prev.count,
+          `Messages must be append-only before epoch: round ${curr.round} count ${curr.count} >= round ${prev.round} count ${prev.count}`,
+        );
+      }
     }
   }
 
   // Verify the idempotency guard: no duplicate companion-b-head in any request
   for (const snap of capturedSnapshots) {
-    const bHeadCount = snap.messages.filter(m => m.id === 'companion-b-head').length;
+    const bHeadCount = snap.messages.filter(m => ((m.id === 'companion-b-head' || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-'))) || (typeof m.id === 'string' && m.id.startsWith('companion-b-head-')))).length;
     assert.ok(
       bHeadCount <= 1,
       `Round ${snap.round} must have at most 1 companion-b-head (found ${bHeadCount})`,

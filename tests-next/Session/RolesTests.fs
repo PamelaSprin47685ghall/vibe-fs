@@ -60,9 +60,17 @@ module RolesTests =
 
     [<Fact>]
     let ``Browser_role_permission_matrix`` () =
-        let allowed = set [ ToolPermission.Read; ToolPermission.Network ]
-        Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Browser)
+        let allowed =
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Network ]
+
+        Assert.equal<ToolPermission Set>(allowed, Roles.permissions Role.Browser)
         Assert.True(Roles.isAllowed Role.Browser ToolPermission.Read)
+        Assert.True(Roles.isAllowed Role.Browser ToolPermission.Glob)
+        Assert.True(Roles.isAllowed Role.Browser ToolPermission.Grep)
         Assert.True(Roles.isAllowed Role.Browser ToolPermission.Network)
 
         Assert.False(Roles.isAllowed Role.Browser ToolPermission.Exec)
