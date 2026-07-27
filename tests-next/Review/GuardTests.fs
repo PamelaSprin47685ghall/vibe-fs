@@ -196,25 +196,41 @@ module GuardTests =
 
                 // Record 1st verdict -> appends to journal and returns projection immediately
                 let res1 =
-                    Guard.recordVerdict journalPort sid revSid "pr-1" "tc-1" treeHash ReviewGuardVerdict.Perfect
+                    Guard.recordVerdict
+                        journalPort
+                        sid
+                        revSid
+                        "pr-1"
+                        "tc-1"
+                        treeHash
+                        ReviewGuardVerdict.Perfect
+                        None
 
                 Assert.True(Result.isOk res1)
                 let proj1 = Result.defaultWith (fun _ -> failwith "unexpected") res1
 
                 // Prove append happened before return: snapshot matches returned projection
-                Assert.Equal(proj1, AgentJournal.snapshot journal)
-                Assert.Equal(ReviewFinishResult.NeedsReview, Guard.tryFinish gitPort sid proj1)
+                Assert.equal(proj1, AgentJournal.snapshot journal)
+                Assert.equal(ReviewFinishResult.NeedsReview, Guard.tryFinish gitPort sid proj1)
 
-                // Record 2nd verdict on same tree -> confirmed
+                // Record 2nd verdict on same tree with distinct run + confirmation root user id
                 let res2 =
-                    Guard.recordVerdict journalPort sid revSid "pr-2" "tc-2" treeHash ReviewGuardVerdict.Perfect
+                    Guard.recordVerdict
+                        journalPort
+                        sid
+                        revSid
+                        "pr-2"
+                        "tc-2"
+                        treeHash
+                        ReviewGuardVerdict.Perfect
+                        (Some "confirm-user-2")
 
                 Assert.True(Result.isOk res2)
                 let proj2 = Result.defaultWith (fun _ -> failwith "unexpected") res2
-                Assert.Equal(proj2, AgentJournal.snapshot journal)
+                Assert.equal(proj2, AgentJournal.snapshot journal)
 
-                // Double perfect on same tree -> Confirmed!
-                Assert.Equal(ReviewFinishResult.Confirmed, Guard.tryFinish gitPort sid proj2)
+                // Double perfect on same tree with confirmation identity -> Confirmed!
+                Assert.equal(ReviewFinishResult.Confirmed, Guard.tryFinish gitPort sid proj2)
 
                 // Git tree hash changes -> tryFinish returns NeedsReview without creating any fact
                 currentTreeHash <- "tree-durable-200"

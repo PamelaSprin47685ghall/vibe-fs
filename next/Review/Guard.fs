@@ -31,13 +31,14 @@ module Guard =
         (toolCallId: string)
         (gitTreeHash: string)
         (verdict: ReviewGuardVerdict)
+        (rootUserMessageId: string option)
         : Result<ProjectionSet, string> =
         let fact =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = managerSessionId
                    ReviewerSessionId = reviewerSessionId
                    ProviderRunId = providerRunId
-                   RootUserMessageId = None
+                   RootUserMessageId = rootUserMessageId
                    ToolCallId = toolCallId
                    GitTreeHash = gitTreeHash
                    Verdict = verdict |}

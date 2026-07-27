@@ -115,7 +115,14 @@ module VerdictSurface =
                             |> Option.orElse (contextString ctx "callID")
                             |> Option.defaultValue toolCallId
 
-                        match host.SubmitVerdict(toolCallId, verdict, providerRunId) with
+                        // Root user message for this run (confirmation identity for 2nd PERFECT).
+                        let rootUserMessageId =
+                            contextString ctx "userMessageId"
+                            |> Option.orElse (contextString ctx "userMessageID")
+                            |> Option.orElse (contextString ctx "parentMessageID")
+                            |> Option.orElse (contextString ctx "message.parentID")
+
+                        match host.SubmitVerdict(toolCallId, verdict, providerRunId, ?rootUserMessageId = rootUserMessageId) with
                         | Error err -> return box (stringify (createObj [ "error", box err ]))
                         | Ok result ->
                             lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)

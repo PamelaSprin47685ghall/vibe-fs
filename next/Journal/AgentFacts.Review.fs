@@ -106,6 +106,10 @@ module internal AgentFactsReview =
                             | Some lastHash when lastHash = hash ->
                                 match p.Verdict with
                                 | ReviewGuardVerdict.Perfect when not providerRunUsed ->
+                                    // Distinct ProviderRunId (above) + distinct ToolCallId is the
+                                    // dual-confirmation gate. RootUserMessageId is recorded for
+                                    // audit when the host exposes it; confirmation prompts often
+                                    // continue the same root user turn, so presence is not required.
                                     let count = existing.ConsecutivePerfects + 1
 
                                     { existing with

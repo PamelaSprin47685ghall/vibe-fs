@@ -78,13 +78,17 @@ try {
       text: `round ${round}: ${longText}`,
       match: { requiredTools: primaryTools, forbiddenTools: forbiddenPrimaryTools },
     });
-    scenario.provider.expectText({
-      id: `blogger-${round}`,
-      lane: expectationLane('companion-cache', 'primary-blogger', 'blogger', round, 'chat', 'primary'),
-      text: `Blogger paragraph ${round}.`,
-      match: { containsText: [BLOGGER_MARKER] },
-    });
   }
+  // One neverEnd blogger absorbs all deltas (busy-skip means not every primary
+  // round schedules a blogger run under parallel host load).
+  scenario.provider.expectText({
+    id: 'session-blogger',
+    lane: expectationLane('companion-cache', 'primary-blogger', 'blogger', 1, 'chat', 'primary'),
+    blocking: false,
+    neverEnd: true,
+    text: 'Blogger paragraph.',
+    match: { containsText: [BLOGGER_MARKER] },
+  });
 
   for (let round = 1; round <= rounds; round++) {
     const turn = scenario.turn.start(parentId);
@@ -97,8 +101,7 @@ try {
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
     await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
-    await scenario.provider.waitForExpectation(`blogger-${round}`, WATCHDOG_TIMEOUT_MS);
-    await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
+    scenario.watchdog?.advance({ reason: `round-${round}-terminal`, lane: 'primary', blocking: true });
 
     // Capture the primary provider request for prefix analysis
     const reqs = primaryRequests(scenario.provider);

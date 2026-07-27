@@ -25,13 +25,18 @@ module SpikePlugin =
 
     let createSpikeHost (portOpt: IOpenCodePort option) = PluginHost.createSpikeHost portOpt
 
-    let private systemTransformHook (sessionBudgets: Dictionary<string, int>) : obj =
+    let private systemTransformHook
+        (sessionBudgets: Dictionary<string, int>)
+        (sessionOutputLimits: Dictionary<string, int>)
+        : obj =
         emitJsExpr
-            sessionBudgets
+            (sessionBudgets, sessionOutputLimits)
             """
           (input, output) => {
-            if (input && input.sessionID && input.model && input.model.limit && input.model.limit.context > 0) {
-              $0.set(input.sessionID, input.model.limit.context);
+            if (input && input.sessionID && input.model && input.model.limit) {
+              const lim = input.model.limit;
+              if (lim.context > 0) $0.set(input.sessionID, lim.context);
+              if (lim.output > 0) $1.set(input.sessionID, lim.output);
             }
           }
         """
@@ -110,6 +115,7 @@ module SpikePlugin =
                     | None -> PluginHost.workspaceDirectory input |> Option.map GitTree.create
 
                 let sessionBudgets = Dictionary<string, int>()
+                let sessionOutputLimits = Dictionary<string, int>()
                 let bloggerModel = ModelResolver.bloggerModelFromEnv ()
                 let mutable toolSurfaceRef: obj option = None
 
@@ -190,6 +196,7 @@ module SpikePlugin =
                         (Some(eventPort :> IEventOutputBoundaryPort))
                         journal
                         sessionBudgets
+                        sessionOutputLimits
                         sessionRoles
                         bloggerModel
                         inObj
@@ -212,7 +219,7 @@ module SpikePlugin =
                           // detects companion-b-head already present and skips
                           // the second invocation, preventing duplicate B heads.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
-                          "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
+                          "experimental.chat.system.transform", box (systemTransformHook sessionBudgets sessionOutputLimits)
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 hooks?event <- box wired.ObserveEvent

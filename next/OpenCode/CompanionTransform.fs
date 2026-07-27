@@ -117,6 +117,7 @@ module CompanionTransform =
         (outputBoundary: IEventOutputBoundaryPort option)
         (journal: AgentJournal option)
         (sessionBudgets: Dictionary<string, int>)
+        (sessionOutputLimits: Dictionary<string, int>)
         (sessionRoles: Dictionary<string, string>)
         (bloggerModel: Result<OpencodeModel, string>)
         (inObj: obj)
@@ -235,17 +236,20 @@ module CompanionTransform =
                     let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
                     let budgetFacts =
+                        let outputLimit =
+                            match sessionOutputLimits.TryGetValue sessionId with
+                            | true, out when out > 0 -> Some out
+                            | _ -> None
+
                         match sessionBudgets.TryGetValue sessionId with
                         | true, context when context > 0 ->
-                            // Optional input/output stored as negative-key conventions are not used;
-                            // systemTransformHook may set context only. Fail-closed on missing context.
                             { ContextLimit = context
                               InputLimit = None
-                              OutputLimit = None }
+                              OutputLimit = outputLimit }
                         | _ ->
                             { ContextLimit = 0
                               InputLimit = None
-                              OutputLimit = None }
+                              OutputLimit = outputLimit }
 
                     // Pure epoch decision.
                     // First freeze: raw projection exceeds budget and BlogBase coverage
