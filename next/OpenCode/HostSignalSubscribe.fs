@@ -28,7 +28,8 @@ module HostSignalSubscribe =
         match eventTypeOf raw with
         | "session.status"
         | "session.idle"
-        | "session.deleted" -> true
+        | "session.deleted"
+        | "session.error" -> true
         | _ -> false
 
     let private unwrap (raw: obj) =

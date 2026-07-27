@@ -140,9 +140,17 @@ module SessionSnapshotPort =
                         if isNull messagesFn then
                             return Error "session.messages unavailable on SDK client"
                         else
+                            let sid = SessionId.value sessionId
+
                             let payload =
                                 createObj
-                                    [ "path", box (createObj [ "id", box (SessionId.value sessionId) ])
+                                    [ "path", box (createObj [ "id", box sid ])
+                                      "query",
+                                      box (
+                                          match workspaceDirectory with
+                                          | Some dir -> createObj [ "directory", box dir ]
+                                          | None -> createObj []
+                                      )
                                       "headers", box (headersObj ()) ]
 
                             let! response = unbox<Task<obj>> (messagesFn?call (sessObj, payload))

@@ -56,22 +56,27 @@ module CompletedTurnClassifier =
         match name with
         | Some value ->
             let lower = value.ToLowerInvariant()
-            lower = "messageabortederror" || lower = "aborterror"
+            lower.Contains("abort")
         | None -> false
 
     let classifyOutcome (finish: string option) (errorName: string option) (parts: obj array) : TurnOutcome =
         if isAbortErrorName errorName then
             TurnAborted(defaultArg errorName "aborted")
+        elif finish |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase)) then
+            TurnAborted("finish=aborted")
         else
             match finish with
             | Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->
-                TurnFailed(defaultArg errorName "assistant finish=error")
+                if isAbortErrorName errorName then
+                    TurnAborted(defaultArg errorName "aborted")
+                else
+                    TurnFailed(defaultArg errorName "assistant finish=error")
             | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) -> TurnCompleted
             | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnCompleted
             | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) -> TurnCompleted
-            | Some _ when not (isNull parts) && parts.Length > 0 -> TurnCompleted
             | Some value -> TurnFailed(sprintf "assistant finish=%s" value)
-            | None when not (isNull parts) && parts.Length > 0 -> TurnCompleted
+            // No finish yet: Unknown. Never invent Completed from parts alone —
+            // abort/error may still be racing the idle wake-up.
             | None -> TurnUnknown
 
     let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (parts: obj array) =

@@ -19,7 +19,7 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 module HostEventRouterTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
-        let activeSessions = HashSet<string>()
+        let activeSessions = (HashSet<string>())
 
         { new ISessionHostPort with
             member _.SubscribeTerminal(sessionId, _) =
@@ -63,6 +63,7 @@ module HostEventRouterTests =
             managerGuard
             parents
             (fun _ -> ())
+            (HashSet<string>())
             turn
 
     let private completedTurn sessionId role parts =
@@ -144,7 +145,7 @@ module HostEventRouterTests =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "retry-identity-runtime") 1 DateTimeOffset.UtcNow
 
-                let recorded = HashSet<string>()
+                let recorded = (HashSet<string>())
                 let userBindings = Dictionary<string, MessageId>()
                 userBindings.[sessionId] <- MessageId.create "user-1"
 

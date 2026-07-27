@@ -38,6 +38,7 @@ module TerminalPolicies =
         (managerGuardNudges: HashSet<string>)
         (sessionParents: Dictionary<string, string>)
         (disposeExecutorRuntime: string -> unit)
+        (abortedSessions: HashSet<string>)
         (turn: ReconciledTurn)
         =
         let sessionKey = SessionId.value turn.SessionId
@@ -46,18 +47,26 @@ module TerminalPolicies =
         match turn.Outcome with
         | TurnUnknown -> ()
         | TurnAborted reason ->
+            abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
             sessionPort.AbortChildren turn.SessionId |> ignore
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason) |> ignore
         | TurnFailed error ->
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
         | TurnCompleted ->
+            // A successful/failed terminal after abort clears the latch only when
+            // this turn is a genuine new completion; abort latch blocks nudges.
+            let wasAborted = abortedSessions.Contains sessionKey
+            abortedSessions.Remove sessionKey |> ignore
+
             let output = textOutput turn
             recordOutput eventPort turn.SessionId output
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed turn.AssistantMessageId)
             |> ignore
 
-            if not (sessionDead journal turn.SessionId) then
+            if wasAborted then
+                ()
+            elif not (sessionDead journal turn.SessionId) then
                 match turn.AgentRole with
                 | Some AgentRole.Reviewer when not (verdictSessions.Remove sessionKey) ->
                     HostReviewGuard.nudgeReviewer

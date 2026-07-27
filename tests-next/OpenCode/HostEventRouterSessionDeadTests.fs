@@ -20,7 +20,7 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 module HostEventRouterSessionDeadTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
-        let activeSessions = HashSet<string>()
+        let activeSessions = (HashSet<string>())
 
         { new ISessionHostPort with
             member _.SubscribeTerminal(sessionId, _) =
@@ -64,6 +64,7 @@ module HostEventRouterSessionDeadTests =
             managerGuard
             parents
             (fun _ -> ())
+            (HashSet<string>())
             turn
 
     let private completedTurn sessionId role parts =
