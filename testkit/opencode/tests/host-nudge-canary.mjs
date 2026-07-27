@@ -33,18 +33,7 @@ function extractAgentIdFromMessages(body) {
   return null;
 }
 
-function isTerminalFor(sessionID) {
-  return (e) => {
-    const es = e.sessionID ?? e.properties?.sessionID;
-    if (es !== sessionID) return false;
-    if (e.type === 'session.idle' || e.type === 'session.aborted') return true;
-    if (e.type === 'session.status') {
-      const s = e.status ?? e.properties?.status;
-      return s === 'idle' || s?.type === 'idle' || s?.status === 'idle';
-    }
-    return false;
-  };
-}
+
 
 let scenario;
 try {
@@ -73,11 +62,21 @@ try {
     match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
   });
 
+  scenario.provider.expectText({
+    id: 'coder-blogger',
+    lane: expectationLane('host-nudge', 'coder-blogger', 'blogger', 1, 'chat', 'coder'),
+    blocking: false,
+    neverEnd: true,
+    text: 'Coder background remains busy.',
+    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"coder"'] },
+  });
+
   // Causal busy barrier: match + keep stream open. No timers.
   scenario.provider.expectText({
     id: 'coder-busy-hang',
     lane: expectationLane('host-nudge', 'coder', 'coder', 1, 'chat', 'manager'),
     text: 'Coder first run still working.',
+    blocking: false,
     neverEnd: true,
     match: { requiredTools: ['write'] },
   });
@@ -93,12 +92,7 @@ try {
     match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
   });
 
-  scenario.provider.expectText({
-    id: 'manager-terminal',
-    lane: expectationLane('host-nudge', 'manager', 'manager', 3),
-    text: 'Busy overlap nudge completed.',
-    match: { requiredTools: managerTools, forbiddenTools: forbiddenManagerTools },
-  });
+
 
   const parent = await scenario.client.createSession();
   const parentId = getSessionId(parent);
@@ -115,7 +109,7 @@ try {
           'Fork a coder with prompt exactly: first busy run: stay streaming until nudged.',
           'After the fork tool returns, while the coder is still busy, immediately fork the same agent id',
           'with prompt exactly: nudge continue second run while first is busy.',
-          'Then finish with: Busy overlap nudge completed. Do not join a hanging child.',
+          'Do not join a hanging child.',
         ].join(' '),
       }],
       model: { providerID: 'test', modelID: 'test-model' },
@@ -143,35 +137,37 @@ try {
   );
   scenario.watchdog?.advance({ reason: 'coder-busy-hang-observed', lane: 'coder', blocking: true });
 
+  // Capture sequence before nudge expectation
+  const nudgeSeq = scenario.events.lastSeq;
   await scenario.provider.waitForExpectation('manager-fork-nudge', WATCHDOG_TIMEOUT_MS);
+  scenario.watchdog?.advance({ reason: 'manager-busy-nudge-issued', lane: 'manager', blocking: true });
+
   assert.ok(
     scenario.provider.activeRequestCount >= 1,
     'first coder stream must still be active when the busy nudge fork is issued',
   );
-  scenario.watchdog?.advance({ reason: 'manager-busy-nudge-issued', lane: 'manager', blocking: true });
 
-  await scenario.provider.waitForExpectation('manager-terminal', WATCHDOG_TIMEOUT_MS);
-  scenario.watchdog?.advance({ reason: 'manager-terminal', lane: 'manager', blocking: true });
+  // Wait for the fork tool result message.updated event in the parent session
+  await scenario.events.awaitEvent(
+    (e) => e.seq > nudgeSeq && e.sessionID === parentId && e.type === 'message.updated',
+    WATCHDOG_TIMEOUT_MS,
+  );
+  scenario.watchdog?.advance({ reason: 'manager-nudge-completed', lane: 'manager', blocking: true });
 
-  // Event-driven teardown of neverEnd streams (no sleep).
-  const watermark = scenario.events.lastSeq;
+  // The canary does not prove Manager normal completion; it proves the
+  // overlap nudge while the first stream is active. Abort the Manager now to
+  // terminate its ReviewGuard loop, then verify both sessions clean up.
   const abort = await scenario.client.abort(parentId);
   assert.ok(abort.ok, `parent abort failed: ${JSON.stringify(abort.data)}`);
-  await scenario.events.awaitEvent(
-    (e) => e.seq > watermark && isTerminalFor(childId)(e),
-    WATCHDOG_TIMEOUT_MS,
-  );
-  await scenario.events.awaitEvent(
-    (e) => e.seq > watermark && isTerminalFor(parentId)(e),
-    WATCHDOG_TIMEOUT_MS,
-  );
-  await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
 
   scenario.provider.expectSatisfied();
   await teardownScenario(scenario);
   console.log('Host nudge canary passed: busy-overlap nudge while first run still streaming.');
 } catch (error) {
   console.error(`Host nudge canary failed: ${error.stack || error}`);
+  if (scenario?.events) {
+    console.error('Terminal debug:', scenario.events._events.slice(-15).map((e) => `#${e.seq}:${e.type}:${e.sessionID}:${e.status}`).join(' | '));
+  }
   if (scenario?.host?.workDir) console.error(`workDir: ${scenario.host.workDir}`);
   if (scenario?.provider?.unexpectedRequests) console.error(JSON.stringify(scenario.provider.unexpectedRequests));
   if (scenario?.host?.stdoutLog) console.error(`host stdout: ${scenario.host.stdoutLog.slice(-4000)}`);

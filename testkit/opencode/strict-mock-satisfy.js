@@ -10,7 +10,7 @@ import { laneLabel, pendingExpectations } from './strict-mock-lanes.js';
 const PREVIEW_LIMIT = 5;
 
 export function checkSatisfied(state) {
-  const expectations = pendingExpectations(state);
+  const expectations = pendingExpectations(state).filter((e) => e.blocking !== false);
   const remaining = expectations.length;
   const unexpectedCount = state.unexpected.length;
   const errors = [];

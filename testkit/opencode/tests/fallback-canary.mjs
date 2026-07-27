@@ -24,6 +24,8 @@ import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
+const bloggerMarker = 'You are the blogger of a coding agent session.';
+
 function journalLines(workDir) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
   const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(workDir, common), 'wanxiangshu-next', 'runtimes');
@@ -37,10 +39,12 @@ function journalLines(workDir) {
   }
   return lines;
 }
+
 function countFallbackFacts(workDir) {
   return journalLines(workDir).filter((entry) =>
     JSON.stringify(entry).includes('FallbackFailureRecorded')).length;
 }
+
 function expectFailure(scenario, phase, prompt, model, turn) {
   scenario.provider.expectError({
     id: `${phase}-failure`,
@@ -57,6 +61,7 @@ function expectFailure(scenario, phase, prompt, model, turn) {
     match: { containsText: [prompt], model },
   });
 }
+
 async function awaitFailureSequence(scenario, phase, sessionId, afterSeq) {
   await scenario.provider.waitForExpectation(`${phase}-failure`, WATCHDOG_TIMEOUT_MS);
   await scenario.events.awaitEvent(
@@ -82,9 +87,8 @@ async function awaitFailureSequence(scenario, phase, sessionId, afterSeq) {
     blocking: true,
   });
 }
+
 function expectParentRound(scenario, index, turn, parentPrompt, childPrompt, agent) {
-  // Parent must be Manager (has list) — Orchestrator may only fork manager jobs
-  // and would reject fork(agent=coder).
   scenario.provider.expectToolCall({
     id: `parent-fork-${index}`,
     lane: expectationLane('fallback', 'parent', 'manager', turn),
@@ -102,6 +106,7 @@ function expectParentRound(scenario, index, turn, parentPrompt, childPrompt, age
     match: { containsText: [parentPrompt] },
   });
 }
+
 async function runChildRound(scenario, parentId, childId, index, parentPrompt) {
   const parentTurn = scenario.turn.start(parentId);
   const afterSeq = scenario.events.lastSeq;
@@ -152,11 +157,12 @@ async function runChildRound(scenario, parentId, childId, index, parentPrompt) {
   assert.equal(facts, index, `round ${index} must append exactly one durable failure fact, got ${facts}`);
   return { facts, childId: actualChildId };
 }
+
 let scenario;
 try {
   assert.equal(runStaticGate([__filename]).passed, true, 'static gate');
   scenario = await setupScenario({
-    project: { files: { 'AGENTS.md': 'fallback canary\n' } },
+    project: { files: {} },
     strict: true,
     extraEnv: {
       WANXIANGSHU_MODEL_A: 'test/test-model',
@@ -170,7 +176,7 @@ try {
     blocking: false,
     neverEnd: true,
     text: 'Fallback background.',
-    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
+    match: { containsText: [bloggerMarker, '"agent":"manager"'] },
   });
   scenario.provider.expectTitle({
     id: 'fallback-title',
@@ -240,7 +246,7 @@ try {
     blocking: false,
     neverEnd: true,
     text: 'Fallback restart background.',
-    match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
+    match: { containsText: [bloggerMarker, '"agent":"manager"'] },
   });
   scenario.provider.expectText({
     id: 'child-blogger-restart',
@@ -292,7 +298,7 @@ try {
     console.error(`unexpected: ${JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 2).map((r) => ({ reason: r.reason })))}`);
     console.error(`unexpected-details: ${JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 4).map((r) => ({ model: r.body?.model, session: r.sessId, parent: r.parentSessionId, lastUser: r.body?.messages?.at(-1)?.content, candidates: r.candidates })))}`);
   }
-  if (scenario?.provider?.requests) console.error(`child-models: ${JSON.stringify(scenario.provider.requests.filter((r) => JSON.stringify(r).includes('Child fallback attempt')).map((r) => ({ model: r.model, lastUser: r.messages?.at(-1)?.content })))}`);
+  if (scenario?.provider?.requests) console.error(`coder-models: ${JSON.stringify(scenario.provider.requests.filter((r) => JSON.stringify(r).includes('Fallback attempt')).map((r) => ({ model: r.model, lastUser: r.messages?.at(-1)?.content })))}`);
   if (scenario?.host?.stderrLog) console.error(`host stderr: ${scenario.host.stderrLog.slice(-2000)}`);
   if (scenario) {
     try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}

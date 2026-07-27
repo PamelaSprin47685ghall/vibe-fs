@@ -55,11 +55,10 @@ const MAX_PARALLEL = parsePositiveInt(
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
-// AGENTS prefers ≤100ms full-parallel spawn. Default is 0; set
-// STAGGER_DELAY_MS=N to use an independent uniform [0,N) ms jitter per canary.
-// Jitter never multiplies by index, so all canaries enter their semantic phase
-// within N ms of each other, not index*N.
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 0, "STAGGER_DELAY_MS");
+// AGENTS.md specifies a 2000ms cumulative boot stagger (index * STAGGER_DELAY_MS)
+// to de-overlap Bun SEA host cold-start CPU/I/O bursts. All 16 canaries remain
+// in the 16-way parallel pool and run concurrently.
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -96,10 +95,9 @@ async function runPool(items, limit, worker) {
   };
 
   await Promise.all(items.map(async (item, index) => {
-    // Independent uniform boot jitter (not cumulative). Keeps all canaries in
-    // the same ~STAGGER_DELAY_MS window instead of spreading them by index.
-    const jitter = STAGGER_DELAY_MS > 0 ? Math.floor(Math.random() * STAGGER_DELAY_MS) : 0;
-    if (jitter > 0) await new Promise((resolve) => setTimeout(resolve, jitter));
+    if (STAGGER_DELAY_MS > 0 && index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, index * STAGGER_DELAY_MS));
+    }
     await acquire();
     try {
       results[index] = await worker(item);
