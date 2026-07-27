@@ -120,7 +120,8 @@ module HostSignalAdapter =
                         None
             | _ -> None
 
-type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> unit) =
+type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> unit) as this =
+    let sources = Dictionary<string, SessionSignalSource>()
 
     // Empty registry means "accept all" only before the first owned session is
     // registered; after that only explicit owned sessions pass.
@@ -131,10 +132,47 @@ type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> un
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
 
-    member _.UnregisterOwned(sessionId: SessionId) =
-        ownedSessions.Remove(SessionId.value sessionId) |> ignore
+    member _.RegisterSource(sessionId: SessionId, source: SessionSignalSource) =
+        let key = SessionId.value sessionId
+        ownedSessions.Add key |> ignore
+        sources.[key] <- source
 
-    member _.Observe(raw: obj) =
+    member _.UnregisterOwned(sessionId: SessionId) =
+        let key = SessionId.value sessionId
+        ownedSessions.Remove key |> ignore
+        sources.Remove key |> ignore
+
+    /// Plugin-local event hook path. Drops sessions registered as global-only.
+    member _.ObserveLocal(raw: obj) =
         match HostSignalAdapter.tryAdapt isOwned raw with
         | None -> ()
-        | Some signal -> onSignal signal
+        | Some signal ->
+            let sid =
+                match signal with
+                | SessionIdle id
+                | SessionDeleted id
+                | SessionAbort id -> id
+                | ProviderRetry retry -> retry.SessionId
+
+            match sources.TryGetValue(SessionId.value sid) with
+            | true, GlobalForeignDirectoryEvent -> ()
+            | _ -> onSignal signal
+
+    /// Global SSE path. Drops sessions registered as local-only; unregistered
+    /// owned sessions still pass (legacy accept until source is set).
+    member _.ObserveGlobal(raw: obj) =
+        match HostSignalAdapter.tryAdapt isOwned raw with
+        | None -> ()
+        | Some signal ->
+            let sid =
+                match signal with
+                | SessionIdle id
+                | SessionDeleted id
+                | SessionAbort id -> id
+                | ProviderRetry retry -> retry.SessionId
+
+            match sources.TryGetValue(SessionId.value sid) with
+            | true, LocalPluginEvent -> ()
+            | _ -> onSignal signal
+
+    member _.Observe(raw: obj) = this.ObserveLocal raw

@@ -28,6 +28,46 @@ module TerminalPolicies =
         | :? Events.HostEventPort as hostPort -> hostPort.RecordSessionOutput sessionId text
         | _ -> ()
 
+    /// True when this session is a linked child of some parent in the durable
+    /// journal projection. Used when the in-memory sessionParents map is empty
+    /// (worktree plugin instance) so Orchestrator managers never receive the
+    /// top-level ReviewGuard nudge.
+    let private isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
+        match journal with
+        | None -> false
+        | Some j ->
+            let child = ChildId.create sessionKey
+            (AgentJournal.snapshot j).AgentProjections.Sessions
+            |> Map.exists (fun _ session ->
+                match session.Linkage with
+                | Some linkage -> Map.containsKey child linkage.LinkedChildren
+                | None -> false)
+
+    let private isTopLevelManager
+        (sessionParents: Dictionary<string, string>)
+        (journal: AgentJournal option)
+        (sessionKey: string)
+        =
+        not (sessionParents.ContainsKey sessionKey)
+        && not (isLinkedChild journal sessionKey)
+
+    /// Reviewer already left a durable verdict on its parent manager's guard.
+    let private reviewerSubmittedVerdict (journal: AgentJournal option) (reviewerKey: string) =
+        match journal with
+        | None -> false
+        | Some j ->
+            let snapshot = AgentJournal.snapshot j
+            let child = ChildId.create reviewerKey
+
+            snapshot.AgentProjections.Sessions
+            |> Map.exists (fun _ session ->
+                match session.Linkage, session.ReviewGuard with
+                | Some linkage, Some guard when Map.containsKey child linkage.LinkedChildren ->
+                    guard.IsConfirmed
+                    || guard.ConsecutivePerfects > 0
+                    || not (List.isEmpty guard.RecentToolCallIds)
+                | _ -> false)
+
     let apply
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -54,8 +94,6 @@ module TerminalPolicies =
         | TurnFailed error ->
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
         | TurnCompleted ->
-            // A successful/failed terminal after abort clears the latch only when
-            // this turn is a genuine new completion; abort latch blocks nudges.
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
@@ -68,7 +106,10 @@ module TerminalPolicies =
                 ()
             elif not (sessionDead journal turn.SessionId) then
                 match turn.AgentRole with
-                | Some AgentRole.Reviewer when not (verdictSessions.Remove sessionKey) ->
+                | Some AgentRole.Reviewer when
+                    not (verdictSessions.Remove sessionKey)
+                    && not (reviewerSubmittedVerdict journal sessionKey)
+                    ->
                     HostReviewGuard.nudgeReviewer
                         sessionPort
                         journal
@@ -76,7 +117,7 @@ module TerminalPolicies =
                         sessionKey
                         (MessageId.value turn.AssistantMessageId)
                         turn.Model
-                | Some AgentRole.Manager when not (sessionParents.ContainsKey sessionKey) ->
+                | Some AgentRole.Manager when isTopLevelManager sessionParents journal sessionKey ->
                     match HostReviewGuard.missingTree journal gitTreePort sessionKey with
                     | HostReviewGuard.ReviewGuardMissing treeHash ->
                         HostReviewGuard.nudgeManager

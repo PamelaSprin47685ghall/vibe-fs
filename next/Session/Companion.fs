@@ -134,9 +134,10 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member this.TryRebase(rebaseFn: unit -> Task<BlogText * ProjectionSnapshot>) : bool =
         this.TryRebase(fun () -> rebaseFn () |> Async.AwaitTask)
 
-    /// Y self-rebase: persist ONLY B', keep projection baseline UNCHANGED.
-    /// Never rewrites ActivePrefixEpoch.FrozenB — that would bust X's provider
-    /// prefix cache. Epoch switches are explicit cold boundaries only.
+    /// Y self-rebase: persist B' and keep projection baseline UNCHANGED.
+    /// Ordinary blog success never touches FrozenB. A successful self-rebase
+    /// while X replacement is active is an explicit cold epoch switch: X's
+    /// next requests use the condensed B' as the new frozen head.
     member this.TrySelfRebase(rebaseFn: unit -> Async<BlogText>) : bool =
         lock lockObj (fun () ->
             if isBusyUnlocked () then false
@@ -147,7 +148,24 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                         try
                             let! b = rebaseFn ()
                             lastSuccessfulProjection |> Option.iter (fun proj -> persistSuccessful proj b)
-                            lock lockObj (fun () -> latestB <- Some b)
+                            lock lockObj (fun () ->
+                                latestB <- Some b
+                                if replacementActive then
+                                    let sessionStr =
+                                        sessionId
+                                        |> Option.map SessionId.value
+                                        |> Option.defaultValue ""
+                                    let cutoff =
+                                        activePrefixEpoch
+                                        |> Option.map (fun e -> e.CutoffMessageIndex)
+                                        |> Option.defaultValue 0
+                                    let epoch: ActivePrefixEpoch =
+                                        { EpochId = sprintf "%s|%d|%d" sessionStr cutoff (String.length b)
+                                          FrozenB = b
+                                          CutoffMessageIndex = cutoff
+                                          CoveredPrefixDigest = string (String.length b) }
+                                    persistEpochSwitched epoch
+                                    activePrefixEpoch <- Some epoch)
                         with _ -> ()
                     } |> startAsTask
                 inFlightTask <- Some t

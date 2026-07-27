@@ -76,7 +76,20 @@ module VerdictSurface =
                     let mgrId =
                         match sessionParents.TryGetValue reviewerId with
                         | true, p -> Some p
-                        | false, _ -> None
+                        | false, _ ->
+                            // Worktree plugin instances do not share the in-memory
+                            // sessionParents map with the orchestrator root. Recover
+                            // the manager/orchestrator parent from durable linkage.
+                            match journal with
+                            | None -> None
+                            | Some j ->
+                                let child = ChildId.create reviewerId
+                                (AgentJournal.snapshot j).AgentProjections.Sessions
+                                |> Map.tryPick (fun parentId session ->
+                                    match session.Linkage with
+                                    | Some linkage when Map.containsKey child linkage.LinkedChildren ->
+                                        Some(SessionId.value parentId)
+                                    | _ -> None)
 
                     match journal, mgrId, gitTreePortFor reviewerId with
                     | None, _, _ ->

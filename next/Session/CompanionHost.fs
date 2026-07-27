@@ -73,10 +73,14 @@ type CompanionHost
                     bloggerFailed <- false
                     // Register the blogger role synchronously.
                     bloggerCreated sid
-                    // One-shot: clear the restore opt so a failure creates new
+                    // One-shot: clear the restore opt so a failure creates new.
                     restoredBloggerIdOpt <- None
-                    // No reset frame needed — session is ongoing
-                    bloggerNeedsReset.Value <- false
+                    // Cold plugin start after host restart cannot prove the
+                    // restored child still holds Y's in-memory context. If we
+                    // already have durable LatestB, force a FULL re-anchor frame
+                    // on the reused session id (or on the next newly created
+                    // child if this id is dead).
+                    bloggerNeedsReset.Value <- companion.Memory.LatestB.IsSome
                     let t = Task.FromResult(sid)
                     bloggerTask <- Some t
                     t

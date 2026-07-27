@@ -89,13 +89,14 @@ module CompanionCacheTests =
             Assert.Equal("B1", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
             Assert.Equal("B1", headText t2)
 
+// Self-rebase while replacement is active is an explicit cold epoch switch.
             Assert.Equal(Submitted, companion.SelfRebase())
             do! companion.WaitInFlightAsync()
             Assert.Equal(Some "B-condensed", companion.Memory.LatestB)
-            Assert.Equal("B1", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+            Assert.Equal("B-condensed", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
 
             let t3 = companion.TransformRaw (extended2 @ [ msg sid "u5" "later" ])
-            Assert.Equal("B1", headText t3)
+            Assert.Equal("B-condensed", headText t3)
         }
 
     /// Dual-hook safety: second transform with b-head present is a no-op.

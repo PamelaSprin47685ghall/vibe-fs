@@ -16,6 +16,7 @@ module HostSignalBootstrap =
           SignalRouter: HostSignalRouter
           Subscription: IDisposable option
           RegisterOwned: string -> unit
+          RegisterSource: string -> SessionSignalSource -> unit
           BindUserMessage: string -> string -> unit
           BindActiveRun: SessionId -> AgentRole -> string option -> unit
           ChatMessageHook: obj
@@ -84,7 +85,7 @@ module HostSignalBootstrap =
         let signalRouter = HostSignalRouter(ownedSessions, onSignal)
 
         let subscription =
-            match HostSignalSubscribe.trySubscribe input signalRouter.Observe with
+            match HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal with
             | Error err -> raise (InvalidOperationException err)
             | Ok sub -> sub
 
@@ -92,6 +93,10 @@ module HostSignalBootstrap =
             if not (String.IsNullOrWhiteSpace sessionId) then
                 ownedSessions.Add sessionId |> ignore
                 signalRouter.RegisterOwned(SessionId.create sessionId)
+
+        let registerSource (sessionId: string) (source: SessionSignalSource) =
+            if not (String.IsNullOrWhiteSpace sessionId) then
+                signalRouter.RegisterSource(SessionId.create sessionId, source)
 
         let bindUserMessage (sessionId: string) (messageId: string) =
             if
@@ -104,9 +109,25 @@ module HostSignalBootstrap =
                 reconciler.BindUserMessage(sid, mid)
                 abortedSessions.Remove sessionId |> ignore
                 registerOwned sessionId
+                registerSource sessionId LocalPluginEvent
+
+        let workspaceDir =
+            if isNull input || isNull input?directory then None
+            else
+                let d = unbox<string> input?directory
+                if String.IsNullOrWhiteSpace d then None else Some d
 
         let bindActiveRun (sessionId: SessionId) (role: AgentRole) (directory: string option) =
-            registerOwned (SessionId.value sessionId)
+            let key = SessionId.value sessionId
+            registerOwned key
+            // Child sessions in a different worktree directory are observed via
+            // global SSE only; local plugin events belong to that worktree's
+            // own plugin instance.
+            match directory, workspaceDir with
+            | Some childDir, Some root when childDir <> root ->
+                registerSource key GlobalForeignDirectoryEvent
+            | Some _, None -> registerSource key GlobalForeignDirectoryEvent
+            | _ -> registerSource key LocalPluginEvent
 
             reconciler.BindActiveRun
                 { SessionId = sessionId
@@ -169,4 +190,5 @@ module HostSignalBootstrap =
           BindUserMessage = bindUserMessage
           BindActiveRun = bindActiveRun
           ChatMessageHook = chatMessageHook
-          ObserveEvent = signalRouter.Observe }
+          RegisterSource = registerSource
+          ObserveEvent = signalRouter.ObserveLocal }
