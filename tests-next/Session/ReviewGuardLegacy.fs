@@ -1,4 +1,6 @@
-namespace Wanxiangshu.Next.Session
+namespace Wanxiangshu.Next.Tests.SessionTests
+
+open Wanxiangshu.Next.Session
 
 [<Struct>]
 type GitTreePort = { GetTreeHash: unit -> string }

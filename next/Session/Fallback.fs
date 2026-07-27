@@ -4,18 +4,19 @@ type ModelSide =
     | A
     | B
 
-type FallbackState = { Side: ModelSide; Failures: int }
+/// Pure counters only (Side + Failures). Not a stage/phase machine.
+type FallbackMemory = { Side: ModelSide; Failures: int }
 
 [<RequireQualifiedAccess>]
 type FallbackDecision =
-    | NextAttempt of FallbackState
+    | NextAttempt of FallbackMemory
     | Dead
 
 module Fallback =
 
-    let initial: FallbackState = { Side = ModelSide.A; Failures = 0 }
+    let initial: FallbackMemory = { Side = ModelSide.A; Failures = 0 }
 
-    let nextAttempt (state: FallbackState) : FallbackDecision =
+    let nextAttempt (state: FallbackMemory) : FallbackDecision =
         match state.Side with
         | ModelSide.A ->
             if state.Failures < 1 then

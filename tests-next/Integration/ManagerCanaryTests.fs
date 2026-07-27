@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Tests
 
 open System.Threading.Tasks
 open Xunit
+open Wanxiangshu.Next.Tests.SessionTests
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Orchestrator
 open Wanxiangshu.Next.Session

@@ -32,7 +32,6 @@
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
-    <Compile Include="Session/ReviewGuard.fs"/>
     <Compile Include="Session/ReviewerHost.fs"/>
     <Compile Include="Process/ProcessTypes.fs"/>
     <Compile Include="Process/Deadline.fs"/>
@@ -55,7 +54,7 @@
     <Compile Include="Review/Guard.fs"/>
     <Compile Include="Orchestrator.Types.fs"/>
     <Compile Include="Orchestrator.Prompts.fs"/>
-    <Compile Include="Orchestrator.ReviewStages.fs"/>
+    <Compile Include="Orchestrator.PublishStages.fs"/>
     <Compile Include="Orchestrator.PublishChain.fs"/>
     <Compile Include="Orchestrator.PublishLock.fs"/>
     <Compile Include="Orchestrator.fs"/>

@@ -29,6 +29,35 @@ module NodeProcess =
 
 module StaticTools =
 
+    open Wanxiangshu.Next.Kernel
+
+    let private toolName (p: ToolPermission) =
+        match p with
+        | ToolPermission.Fork -> "fork"
+        | ToolPermission.Join -> "join"
+        | ToolPermission.List -> "list"
+        | ToolPermission.Read -> "read"
+        | ToolPermission.Write -> "write"
+        | ToolPermission.Edit -> "edit"
+        | ToolPermission.Glob -> "glob"
+        | ToolPermission.Grep -> "grep"
+        | ToolPermission.Inspector -> "inspector"
+        | ToolPermission.Exec -> "executor"
+        | ToolPermission.Network -> "network"
+        | ToolPermission.Verdict -> "verdict"
+
+    /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
+    let permissionObj (role: Role) : obj =
+        let allowed = Roles.permissions role
+        let pairs =
+            [ yield "*", box "deny"
+              for p in allowed do
+                  yield toolName p, box "allow" ]
+        createObj pairs
+
+    let private primaryAgent (role: Role) : obj =
+        createObj [ "mode", box "primary"; "permission", permissionObj role ]
+
     /// The only values accepted by the OpenCode reviewer tool.  Keep this
     /// parser deliberately independent of assistant text: a verdict is a tool
     /// argument, never something inferred from a transcript.
@@ -41,81 +70,21 @@ module StaticTools =
     let reviewerVerdictSchemaJson =
         """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
 
-    let managerAgentConfig () : obj =
-        createObj
-            [ "mode", box "primary"
-              "permission",
-              box (
-                  createObj
-                      [ "*", box "deny"
-                        "fork", box "allow"
-                        "join", box "allow"
-                        "list", box "allow"
-                        "verdict", box "deny" ]
-              ) ]
+    let managerAgentConfig () : obj = primaryAgent Role.Manager
 
-    let orchestratorAgentConfig () : obj =
-        createObj
-            [ "mode", box "primary"
-              "permission", box (createObj [ "*", box "deny"; "fork", box "allow"; "join", box "allow" ]) ]
+    let orchestratorAgentConfig () : obj = primaryAgent Role.Orchestrator
 
-    let coderAgentConfig () : obj =
-        createObj
-            [ "mode", box "primary"
-              "permission",
-              box (
-                  createObj
-                      [ "*", box "deny"
-                        "read", box "allow"
-                        "write", box "allow"
-                        "edit", box "allow"
-                        "glob", box "allow"
-                        "grep", box "allow"
-                        "inspector", box "allow"
-                        "verdict", box "deny" ]
-              ) ]
+    let coderAgentConfig () : obj = primaryAgent Role.Coder
 
-    let reviewerAgentConfig () : obj =
-        createObj
-            [ "mode", box "primary"
-              "permission",
-              box (
-                  createObj
-                      [ "*", box "deny"
-                        "read", box "allow"
-                        "glob", box "allow"
-                        "grep", box "allow"
-                        "inspector", box "allow"
-                        "verdict", box "allow" ]
-              ) ]
+    let reviewerAgentConfig () : obj = primaryAgent Role.Reviewer
 
-    let toollessAgentConfig () : obj =
-        createObj [ "mode", box "primary"; "permission", box (createObj [ "*", box "deny" ]) ]
+    let toollessAgentConfig () : obj = primaryAgent Role.Blogger
 
-    let meditatorAgentConfig () : obj =
-        createObj
-            [ "mode", box "primary"
-              "permission",
-              box (
-                  createObj
-                      [ "*", box "deny"
-                        "read", box "allow"
-                        "glob", box "allow"
-                        "grep", box "allow"
-                        "inspector", box "allow" ]
-              ) ]
+    let meditatorAgentConfig () : obj = primaryAgent Role.Meditator
 
-    let browserAgentConfig () : obj =
-        createObj
-            [ "mode", box "primary"
-              "permission", box (createObj [ "*", box "deny"; "read", box "allow"; "network", box "allow" ]) ]
+    let browserAgentConfig () : obj = primaryAgent Role.Browser
 
-    let inspectorAgentConfig () : obj =
-        // SSOT: Inspector only has executor (Process). No fork/join/list.
-        createObj
-            [ "mode", box "primary"
-              "permission",
-              box (createObj [ "*", box "deny"; "executor", box "allow" ]) ]
+    let inspectorAgentConfig () : obj = primaryAgent Role.Inspector
 
     let executorTool () : Tool =
         { Name = "executor"

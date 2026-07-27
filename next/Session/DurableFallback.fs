@@ -19,7 +19,7 @@ module FallbackJournalPort =
 
 module DurableFallback =
 
-    let currentState (sessionId: SessionId) (projSet: ProjectionSet) : FallbackState =
+    let currentState (sessionId: SessionId) (projSet: ProjectionSet) : FallbackMemory =
         match Map.tryFind sessionId projSet.AgentProjections.Sessions with
         | Some sessionProj ->
             match sessionProj.Fallback with
@@ -58,45 +58,3 @@ module DurableFallback =
             | 2 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }
             | 3 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 4 }
             | _ -> FallbackDecision.Dead
-
-    /// TEST-ONLY helper. Production durable failures must go through
-    /// RetrySignalHandler → FallbackDetect.recordFallbackFailure with a stable
-    /// provider attempt identity. Do not call from OpenCode/ production paths.
-    let recordFailureForTests
-        (journalPort: FallbackJournalPort)
-        (sessionId: SessionId)
-        (reason: string)
-        (assistantMessageId: string)
-        (providerAttempt: string)
-        : Result<ProjectionSet * FallbackDecision, string> =
-        let fact =
-            AgentFact.FallbackFailureRecorded
-                {| SessionId = sessionId
-                   Reason = reason
-                   AssistantMessageId = assistantMessageId
-                   ProviderAttempt = providerAttempt |}
-
-        match journalPort.AppendFact (StreamId.Session sessionId) fact with
-        | Ok updatedProj ->
-            let decision = nextDecision sessionId updatedProj
-            Ok(updatedProj, decision)
-        | Error err -> Error err
-
-    /// Test-only. Production must use FallbackDetect.recordFallbackFailure.
-    /// Uses a process-local counter so repeated calls with the same reason still
-    /// produce distinct durable identities (A/A/B/B progression tests).
-    let mutable private testFailureSeq = 0
-
-    let recordFailure
-        (journalPort: FallbackJournalPort)
-        (sessionId: SessionId)
-        (reason: string)
-        : Result<ProjectionSet * FallbackDecision, string> =
-        testFailureSeq <- testFailureSeq + 1
-        let n = testFailureSeq
-        recordFailureForTests
-            journalPort
-            sessionId
-            reason
-            (sprintf "test-msg-%s-%d" (SessionId.value sessionId) n)
-            (sprintf "test-attempt-%d" n)

@@ -36,7 +36,7 @@ module DurableFallbackTests =
                 // After each failure, nextDecision returns the NEXT attempt's (Side, Failures).
 
                 // 1st failure: Side=A, TotalFailures=1. Next attempt is A retry (still A).
-                let res1 = DurableFallback.recordFailure port sid "Model A Timeout"
+                let res1 = DurableFallbackTestSupport.recordFailure port sid "Model A Timeout"
 
                 match res1 with
                 | Ok(proj1, decision1) ->
@@ -48,7 +48,7 @@ module DurableFallbackTests =
                 | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
 
                 // 2nd failure: Side=A exhausted, switches to B. TotalFailures=2.
-                let res2 = DurableFallback.recordFailure port sid "Model A Timeout"
+                let res2 = DurableFallbackTestSupport.recordFailure port sid "Model A Timeout"
 
                 match res2 with
                 | Ok(proj2, decision2) ->
@@ -60,7 +60,7 @@ module DurableFallbackTests =
                 | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
 
                 // 3rd failure: Side=B, TotalFailures=3. Next attempt is B retry.
-                let res3 = DurableFallback.recordFailure port sid "Model B RateLimit"
+                let res3 = DurableFallbackTestSupport.recordFailure port sid "Model B RateLimit"
 
                 match res3 with
                 | Ok(proj3, decision3) ->
@@ -72,7 +72,7 @@ module DurableFallbackTests =
                 | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
 
                 // 4th failure: Side=B exhausted → Dead. TotalFailures=4.
-                let res4 = DurableFallback.recordFailure port sid "Model B ServerError"
+                let res4 = DurableFallbackTestSupport.recordFailure port sid "Model B ServerError"
 
                 match res4 with
                 | Ok(proj4, decision4) ->
@@ -102,7 +102,7 @@ module DurableFallbackTests =
 
                 // Drive through the sequence and assert nextDecision at each step.
                 // failures=1 → A retry (still A, NOT switch to B)
-                let! _ = Task.FromResult(DurableFallback.recordFailure port sid "err-1")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-1")
                 let proj1 = AgentJournal.snapshot journal
 
                 Assert.Equal(
@@ -111,7 +111,7 @@ module DurableFallbackTests =
                 )
 
                 // failures=2 → switch to B
-                let! _ = Task.FromResult(DurableFallback.recordFailure port sid "err-2")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-2")
                 let proj2 = AgentJournal.snapshot journal
 
                 Assert.Equal(
@@ -120,7 +120,7 @@ module DurableFallbackTests =
                 )
 
                 // failures=3 → B retry
-                let! _ = Task.FromResult(DurableFallback.recordFailure port sid "err-3")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-3")
                 let proj3 = AgentJournal.snapshot journal
 
                 Assert.Equal(
@@ -129,7 +129,7 @@ module DurableFallbackTests =
                 )
 
                 // failures=4 → Dead
-                let! _ = Task.FromResult(DurableFallback.recordFailure port sid "err-4")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-4")
                 let proj4 = AgentJournal.snapshot journal
                 Assert.Equal(FallbackDecision.Dead, DurableFallback.nextDecision sid proj4)
             })
@@ -144,8 +144,8 @@ module DurableFallbackTests =
                 let port1 = FallbackJournalPort.fromAgentJournal journal1
 
                 // Append 2 failures in first process run
-                let! _ = Task.FromResult(DurableFallback.recordFailure port1 sid "Err 1")
-                let! _ = Task.FromResult(DurableFallback.recordFailure port1 sid "Err 2")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port1 sid "Err 1")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port1 sid "Err 2")
 
                 // Dispose journal (simulating process exit)
                 (journal1 :> IDisposable).Dispose()
@@ -222,7 +222,7 @@ module DurableFallbackTests =
                 use journal = AgentJournal.create tempDir runtimeId 300 DateTimeOffset.UtcNow
                 let port = FallbackJournalPort.fromAgentJournal journal
 
-                let! _ = Task.FromResult(DurableFallback.recordFailure port sid "Transient Error")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "Transient Error")
                 let snap1 = AgentJournal.snapshot journal
 
                 let state1 = DurableFallback.currentState sid snap1

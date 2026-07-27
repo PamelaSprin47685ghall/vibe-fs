@@ -8,9 +8,9 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
 module PublishChain =
-    // `Deps` is defined in ReviewStages and re-exported here so external callers
+    // `Deps` is defined in PublishStages and re-exported here so external callers
     // (e.g. Orchestrator.fs) keep constructing `PublishChain.Deps`.
-    type Deps = ReviewStages.Deps
+    type Deps = PublishStages.Deps
 
     type private PassResult =
         | Redrive
@@ -18,12 +18,12 @@ module PublishChain =
 
     let private candidateStage (deps: Deps) managerId worktreePath : Task<Result<unit, OrchestratorVerdict>> =
         task {
-            let job = ReviewStages.currentJob deps managerId worktreePath
+            let job = PublishStages.currentJob deps managerId worktreePath
 
             match job.CandidateCommit with
             | Some _ -> return Ok()
             | None ->
-                let! headResult = ReviewStages.readHead deps managerId worktreePath
+                let! headResult = PublishStages.readHead deps managerId worktreePath
 
                 match headResult with
                 | Error verdict -> return Error verdict
@@ -31,16 +31,16 @@ module PublishChain =
                     let fact =
                         AgentFact.OrchestratorCandidateRegistered
                             {| ManagerId = managerId
-                               CandidateId = ReviewStages.candidateIdString job managerId
+                               CandidateId = PublishStages.candidateIdString job managerId
                                Branch = sprintf "manager/%s" managerId
                                CommitHash = head |}
 
-                    return ReviewStages.append deps managerId fact
+                    return PublishStages.append deps managerId fact
         }
 
     let private recordRebased deps managerId worktreePath candidateId : Task<Result<unit, OrchestratorVerdict>> =
         task {
-            let! headResult = ReviewStages.readHead deps managerId worktreePath
+            let! headResult = PublishStages.readHead deps managerId worktreePath
 
             match headResult with
             | Error verdict -> return Error verdict
@@ -51,7 +51,7 @@ module PublishChain =
                            CandidateId = candidateId
                            RebasedCommit = head |}
 
-                return ReviewStages.append deps managerId fact
+                return PublishStages.append deps managerId fact
         }
 
     let private conflictFiles (deps: Deps) worktreePath : Task<string list> =
@@ -63,9 +63,9 @@ module PublishChain =
 
     let private rebaseStage (deps: Deps) managerId worktreePath isRedrive : Task<Result<unit, OrchestratorVerdict>> =
         task {
-            let job = ReviewStages.currentJob deps managerId worktreePath
-            let candidateId = ReviewStages.candidateIdString job managerId
-            let! headResult = ReviewStages.readHead deps managerId worktreePath
+            let job = PublishStages.currentJob deps managerId worktreePath
+            let candidateId = PublishStages.candidateIdString job managerId
+            let! headResult = PublishStages.readHead deps managerId worktreePath
 
             match headResult with
             | Error verdict -> return Error verdict
@@ -87,7 +87,7 @@ module PublishChain =
                                    CandidateId = candidateId
                                    Files = files |}
 
-                        match ReviewStages.append deps managerId conflictFact with
+                        match PublishStages.append deps managerId conflictFact with
                         | Error verdict -> return Error verdict
                         | Ok() ->
                             let prompt =
@@ -119,7 +119,7 @@ module PublishChain =
 
     let private publishStage (deps: Deps) managerId worktreePath : Task<Result<PassResult, OrchestratorVerdict>> =
         task {
-            let job = ReviewStages.currentJob deps managerId worktreePath
+            let job = PublishStages.currentJob deps managerId worktreePath
             let! targetResult = deps.GetTargetHead()
 
             match targetResult with
@@ -138,12 +138,12 @@ module PublishChain =
                         match job.PublishClaimHead = Some expected with
                         | true -> Ok()
                         | false ->
-                            ReviewStages.append
+                            PublishStages.append
                                 deps
                                 managerId
                                 (AgentFact.OrchestratorPublishClaimed
                                     {| ManagerId = managerId
-                                       CandidateId = ReviewStages.candidateIdString job managerId
+                                       CandidateId = PublishStages.candidateIdString job managerId
                                        ExpectedTargetHead = expected |})
 
                 match claimResult with
@@ -157,12 +157,12 @@ module PublishChain =
                             AgentFact.OrchestratorPublished
                                 {| ManagerId = managerId
                                    CandidateId =
-                                    ReviewStages.candidateIdString
-                                        (ReviewStages.currentJob deps managerId worktreePath)
+                                    PublishStages.candidateIdString
+                                        (PublishStages.currentJob deps managerId worktreePath)
                                         managerId
                                    CommitHash = commitHash |}
 
-                        match ReviewStages.append deps managerId publishedFact with
+                        match PublishStages.append deps managerId publishedFact with
                         | Error verdict -> return Error verdict
                         | Ok() ->
                             let! _ = deps.Git.RemoveWorktree worktreePath
@@ -177,7 +177,7 @@ module PublishChain =
             match rebaseResult with
             | Error verdict -> return Error verdict
             | Ok() ->
-                let! reviewResult = ReviewStages.postReviewStage deps managerId worktreePath
+                let! reviewResult = PublishStages.postReviewStage deps managerId worktreePath
 
                 match reviewResult with
                 | Error verdict -> return Error verdict
@@ -209,7 +209,7 @@ module PublishChain =
                 match! deps.ReconcileTarget() with
                 | Error err -> return IntegrationFailed(managerId, sprintf "Git reconcile failed: %s" err)
                 | Ok() ->
-                    let! reviewResult = ReviewStages.reviewStage deps managerId worktreePath
+                    let! reviewResult = PublishStages.reviewStage deps managerId worktreePath
 
                     match reviewResult with
                     | Error verdict -> return verdict

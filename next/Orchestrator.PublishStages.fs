@@ -6,7 +6,7 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-module ReviewStages =
+module PublishStages =
     type Deps =
         { Git: GitPort
           Manager: ManagerPort

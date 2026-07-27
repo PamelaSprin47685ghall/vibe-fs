@@ -61,8 +61,10 @@ module ArchitectureGateSupport =
         [ "idleProposals"
           "callOnce"
           "FallbackPhase"
+          "FallbackState"
           "ContinuationStage"
           "ReviewPhase"
+          "ReviewStages"
           "SessionStage"
           "JoinOwner"
           "NudgeLease"
@@ -80,7 +82,9 @@ module ArchitectureGateSupport =
           "MailboxProcessor"
           "workspace lockfile"
           "Wait(predicate)"
-          "sleepJs" ]
+          "sleepJs"
+          "type ReviewState"
+          "recordFailureForTests" ]
 
     let containsForbiddenToken (text: string) (token: string) =
         if token.Contains("(") || token.Contains(")") || token.Contains(" ") then

@@ -46,6 +46,7 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/orchestrator-restart-publish-canary.mjs",
   "testkit/opencode/tests/pty-stress-canary.mjs",
   "testkit/opencode/tests/reviewer-restart-canary.mjs",
+  "testkit/opencode/tests/inspector-oneshot-canary.mjs",
 ];
 
 // Full-suite parallel isolation is the standard gate: every canary starts under
