@@ -18,21 +18,6 @@ module CompanionTransform =
         emitJsExpr (rawOutObj?messages, List.toArray transformed) "$0.length = 0; $0.push(...$1);"
         |> ignore
 
-    let handleTransform (rawOutObj: obj) =
-        if not (isNull rawOutObj) && not (isNull rawOutObj?messages) then
-            let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
-
-            // MessageV2 WithParts shape: toModelMessages drops system-role
-            // entries and requires parts, so context synthetics are user-role.
-            let capsMsg =
-                createObj
-                    [ "info", box (createObj [ "id", box "caps-head"; "role", box "user" ])
-                      "parts",
-                      box [| createObj [ "type", box "text"; "text", box "[CAPS: coder, inspector, browser]" ] |] ]
-
-            let transformed = Projection.preserveRawTail [ capsMsg ] rawMsgs
-            replaceMessagesInPlace rawOutObj transformed
-
     /// Frozen Host budget contract: the messages.transform input is empty, so
     /// the real context budget is captured from the later
     /// experimental.chat.system.transform hook ({ sessionID, model }) of the
@@ -72,8 +57,6 @@ module CompanionTransform =
         (inObj: obj)
         (rawOutObj: obj)
         =
-        handleTransform rawOutObj
-
         let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
         let messageContext =

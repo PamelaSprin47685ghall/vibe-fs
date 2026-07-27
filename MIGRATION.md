@@ -41,6 +41,7 @@
 | ORCH-FF-ONLY | rebase 后复审与 ff-only | `tests-next/Integration/OrchestratorTests.fs` | Port proof | real Git worktree E2E |
 | TESTKIT-LANES | scenario/session/role/turn/request-kind lane；真实 session/parent 绑定 | `gate-testkit.mjs` + P0 canaries | Gate + real-host harness proof | 生产语义仍逐阶段验收 |
 | TESTKIT-CAUSAL-WATCHDOG | 2s watchdog 仅接受 blocking 因果进展 | `watchdog.js` + `watchdog-constants.js` + `gate-timeout-cases.mjs` | Gate + P0 proof | 每个新场景保持同一门槛 |
+| MSG-NO-SYNTHETIC-MARKERS | 合成 [CAPS:]/[REVIEW:]/[HINT:] 上下文标记注入移除 | `next/Tools/MessageTransform.fs`(`sanitize`/`replacePrefix`) + `next/OpenCode/CompanionTransform.fs`(去 `handleTransform`) | Obsolete 已删除 | 无——tools/permissions 保持静态角色装配，无 prompt 侧能力广告 |
 
 ## 不得迁移
 
@@ -49,6 +50,7 @@
 - 传输层 prompt 重试、Transport 侧 fallback 计数、伪造 terminal。
 - 把普通 Runner 包装成 PTY 的模型工具面。
 - fail-open Git tree、无归属 cleanup、固定 sleep、以高次数重复掩盖竞态。
+- 合成上下文标记 `[CAPS:]`/`[REVIEW:]`/`[HINT:]` 注入；提示侧能力广告已随该功能移除，tools/permissions 仍为静态角色装配。
 
 ## 近期接管顺序
 
@@ -59,6 +61,7 @@
 5. ✅ Fallback durable model wiring、attempt deduplication、A/A/B/B、restart recovery。
 6. ✅ Process bounded spool、streaming map/reduce、cancellation kill + EOF。
 7. PTY → Orchestrator。
+8. ✅ 合成 `[CAPS:]`/`[REVIEW:]`/`[HINT:]` 上下文标记移除：`MessageTransform.transform` 与 `SessionSnapshot` 删除，仅保留 `sanitize`/`replacePrefix`；Companion 去 `handleTransform`；tools/permissions 仍为静态角色装配，无 prompt 侧能力广告。
 
 ## TestKit 因果接管证据
 

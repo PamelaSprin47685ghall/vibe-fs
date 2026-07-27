@@ -27,8 +27,13 @@ test('manager permission denies global executor tool and executes mailbox path',
 
     const transformed = { messages: [{ role: 'user', text: 'hello' }] };
     hooks['chat.transform']({}, transformed);
-    assert.equal(transformed.messages[0].info?.role, 'user');
-    assert.ok(transformed.messages[0]?.parts?.some((p) => p.type === 'text' && /CAPS:/.test(p.text)));
+    const markerRe = /\[(CAPS|REVIEW|HINT):/;
+    const allText = transformed.messages.flatMap((m) => [
+      m.text ?? '',
+      ...(m.parts ?? []).map((p) => p.text ?? ''),
+    ]);
+    assert.ok(transformed.messages.some((m) => m.text === 'hello'), 'original user message preserved');
+    assert.ok(!allText.some((t) => markerRe.test(t)), 'no synthetic [CAPS]/[REVIEW]/[HINT] marker injected');
 
     const context = { sessionID: 'manager-contract' };
     const fork = JSON.parse(await hooks.tool.fork.execute({ agent: 'coder', prompt: 'work' }, context));
