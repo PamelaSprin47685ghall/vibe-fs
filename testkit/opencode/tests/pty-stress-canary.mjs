@@ -61,86 +61,97 @@ try {
   });
 
   scenario.provider.expectTitle({
-    id: 'inspector-title',
-    lane: expectationLane('pty-stress', 'inspector-title', 'title', 1, 'title'),
+    id: 'manager-title',
+    lane: expectationLane('pty-stress', 'manager-title', 'title', 1, 'title'),
   });
+
+  // Manager companion emits a Blogger request on many projection boundaries.
+  // Pre-register enough FIFO blogger turns for the full PTY tool loop.
+  for (let round = 1; round <= 6; round += 1) {
+    scenario.provider.expectText({
+      id: `manager-blogger-${round}`,
+      lane: expectationLane('pty-stress', 'manager-blogger', 'blogger', round, 'chat', 'manager'),
+      text: `manager blog paragraph ${round}.`,
+      match: { containsText: ['You are the blogger of a coding agent session.', '"agent":"manager"'] },
+    });
+  }
 
   // 1) Spawn in the session cwd.
   scenario.provider.expectToolCall({
-    id: 'inspector-fork-pty',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 1),
+    id: 'manager-fork-pty',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 1),
     tool: 'fork',
     args: { agent: 'pty', prompt: PTHRU_PROMPT },
     match: { requiredTools: ['fork', 'join'] },
   });
   // 2) Write reaches the process.
   scenario.provider.expectToolCall({
-    id: 'inspector-pty-write',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 2),
+    id: 'manager-pty-write',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 2),
     tool: 'fork',
     args: (parsed) => ({ agent: extractPtyIdFromMessages(parsed) || 'pty-unknown', prompt: 'ECHO_TEST' }),
     match: { requiredTools: ['fork', 'join'] },
   });
   // 3) Read returns the buffered output immediately.
   scenario.provider.expectToolCall({
-    id: 'inspector-pty-read',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 3),
+    id: 'manager-pty-read',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 3),
     tool: 'fork',
     args: (parsed) => ({ agent: extractPtyIdFromMessages(parsed) || 'pty-unknown', prompt: '' }),
     match: { requiredTools: ['fork', 'join'] },
   });
   // 4) TERM forwards to the backend (no premature completion).
   scenario.provider.expectToolCall({
-    id: 'inspector-pty-term',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 4),
+    id: 'manager-pty-term',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 4),
     tool: 'fork',
     args: (parsed) => ({ agent: extractPtyIdFromMessages(parsed) || 'pty-unknown', signal: 'TERM' }),
     match: { requiredTools: ['fork', 'join'] },
   });
   // 5) Join delivers the real exit (Closed).
   scenario.provider.expectToolCall({
-    id: 'inspector-join-term',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 5),
+    id: 'manager-join-term',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 5),
     tool: 'join',
     args: {},
     match: { requiredTools: ['fork', 'join'] },
   });
   // 6) Spawn a process that ignores TERM.
   scenario.provider.expectToolCall({
-    id: 'inspector-fork-pty2',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 6),
+    id: 'manager-fork-pty2',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 6),
     tool: 'fork',
     args: { agent: 'pty', prompt: TRAP_PROMPT },
     match: { requiredTools: ['fork', 'join'] },
   });
   // 7) TERM is ignored by the trapped process.
   scenario.provider.expectToolCall({
-    id: 'inspector-pty2-term',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 7),
+    id: 'manager-pty2-term',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 7),
     tool: 'fork',
     args: (parsed) => ({ agent: extractPtyIdFromMessages(parsed) || 'pty-unknown', signal: 'TERM' }),
     match: { requiredTools: ['fork', 'join'] },
   });
   // 8) KILL forces the exit.
   scenario.provider.expectToolCall({
-    id: 'inspector-pty2-kill',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 8),
+    id: 'manager-pty2-kill',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 8),
     tool: 'fork',
     args: (parsed) => ({ agent: extractPtyIdFromMessages(parsed) || 'pty-unknown', signal: 'KILL' }),
     match: { requiredTools: ['fork', 'join'] },
   });
   // 9) Join delivers the forced exit (Closed).
   scenario.provider.expectToolCall({
-    id: 'inspector-join-kill',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 9),
+    id: 'manager-join-kill',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 9),
     tool: 'join',
     args: {},
     match: { requiredTools: ['fork', 'join'] },
   });
   // 10) No pty leaks after both joins.
   scenario.provider.expectToolCall({
-    id: 'inspector-list',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 10),
+    id: 'manager-list',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 10),
     tool: 'list',
     args: {},
     match: { requiredTools: ['fork', 'join', 'list'] },
@@ -148,22 +159,22 @@ try {
 
   // Final assistant summary after the 10 tool turns.
   scenario.provider.expectText({
-    id: 'inspector-final',
-    lane: expectationLane('pty-stress', 'inspector', 'inspector', 11),
+    id: 'manager-final',
+    lane: expectationLane('pty-stress', 'manager', 'manager', 11),
     text: 'Both PTYs closed; no active pty remains.',
     match: { requiredTools: ['fork', 'join', 'list'] },
   });
 
-  const inspector = await scenario.client.createSession();
-  const inspectorId = getSessionId(inspector);
-  assert.ok(inspectorId, `inspector session creation failed: ${JSON.stringify(inspector)}`);
-  scenario.sessionIds.push(inspectorId);
-  bindLaneSession(scenario.provider, inspectorId, 'inspector-title', 'inspector');
+  const manager = await scenario.client.createSession();
+  const managerId = getSessionId(manager);
+  assert.ok(managerId, `manager session creation failed: ${JSON.stringify(manager)}`);
+  scenario.sessionIds.push(managerId);
+  bindLaneSession(scenario.provider, managerId, 'manager-title', 'manager');
 
-  const turn = scenario.turn.start(inspectorId);
-  const prompt = await scenario.client.request('POST', `/session/${inspectorId}/prompt_async`, {
+  const turn = scenario.turn.start(managerId);
+  const prompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {
     body: {
-      agent: 'inspector',
+      agent: 'manager',
       parts: [{
         type: 'text',
         text: [
@@ -184,22 +195,22 @@ try {
       model: { providerID: 'test', modelID: 'test-model' },
     },
   });
-  assert.ok(prompt.ok, `inspector prompt failed: ${JSON.stringify(prompt.data)}`);
+  assert.ok(prompt.ok, `manager prompt failed: ${JSON.stringify(prompt.data)}`);
 
   for (const id of [
-    'inspector-fork-pty',
-    'inspector-pty-write',
-    'inspector-pty-read',
-    'inspector-pty-term',
-    'inspector-join-term',
-    'inspector-fork-pty2',
-    'inspector-pty2-term',
-    'inspector-pty2-kill',
-    'inspector-join-kill',
-    'inspector-list',
+    'manager-fork-pty',
+    'manager-pty-write',
+    'manager-pty-read',
+    'manager-pty-term',
+    'manager-join-term',
+    'manager-fork-pty2',
+    'manager-pty2-term',
+    'manager-pty2-kill',
+    'manager-join-kill',
+    'manager-list',
   ]) {
     await scenario.provider.waitForExpectation(id, WATCHDOG_TIMEOUT_MS);
-    scenario.watchdog?.advance({ reason: id, lane: 'inspector', blocking: true });
+    scenario.watchdog?.advance({ reason: id, lane: 'manager', blocking: true });
   }
 
   await turn.awaitTerminal({
