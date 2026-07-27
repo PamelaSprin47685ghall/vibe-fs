@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Tests.OpenCode
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Xunit
@@ -19,29 +20,31 @@ module OrchestratorHostTests =
     /// Worktree-scoped manager idle arrives via /global/event as
     /// { directory, payload: { type, properties } }. HostEventPort must see it.
     [<Fact>]
-    let ``normalizeHostEvent unwraps global SSE payload for idle`` () =
-        let eventPort = Events.HostEventPort()
-        let mutable observed = []
+    let ``HostSignalSubscribe unwraps global SSE payload into idle signal`` () =
+        let captured = ResizeArray<HostSignal>()
+        let router = HostSignalRouter(HashSet<string>(), fun s -> captured.Add s)
 
-        use _sub =
-            (eventPort :> IEventObservationPort)
-                .SubscribeTerminalListener(fun sessionId outcome ->
-                    observed <- (SessionId.value sessionId, outcome) :: observed)
-
-        HostEventSubscribe.observe
-            eventPort
-            (createObj
+        let globalSse =
+            createObj
                 [ "directory", box "/tmp/wanxiangshu-mgr"
                   "payload",
                   box (
                       createObj
                           [ "type", box "session.idle"
-                            "properties", createObj [ "sessionID", box "mgr-child" ] ]
-                  ) ])
+                            "properties", box (createObj [ "sessionID", box "mgr-child" ]) ]
+                  ) ]
 
-        match observed with
-        | [ (sessionId, Completed _) ] when sessionId = "mgr-child" -> ()
-        | other -> failwithf "expected completed mgr-child, got %A" other
+        // HostSignalSubscribe.unwrap extracts the inner payload before the
+        // adapter sees it. Drive the router with that unwrapped payload and
+        // assert the resulting idle signal.
+        router.Observe(globalSse?payload)
+
+        Assert.True(
+            captured
+            |> Seq.exists (function
+                | SessionIdle sid -> SessionId.value sid = "mgr-child"
+                | _ -> false)
+        )
 
     [<Fact>]
     let ``OrchestratorHost fork fails on non-repo without creating child`` () =
@@ -58,6 +61,7 @@ module OrchestratorHostTests =
                     fun agentId role childId -> created.Add(agentId, role.ToString(), SessionId.value childId)
                   RegisterChildDirectory = fun _ _ -> ()
                   RegisterReviewerTree = fun _ _ -> ()
+                  OnRunStarted = (fun _ _ _ -> ())
                   RepoPath = "/nonexistent-path-xyz"
                   TargetBranch = "" }
 

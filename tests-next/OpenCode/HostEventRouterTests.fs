@@ -6,12 +6,16 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.EventDrivenHarness
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
+/// Behavioral coverage migrated from the deleted HostEventRouter to the
+/// Decide layer (TerminalPolicies) and the sole fallback writer
+/// (RetrySignalHandler). No raw-event parsing lives in tests anymore.
 module HostEventRouterTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
@@ -43,207 +47,35 @@ module HostEventRouterTests =
 
             member _.GetSessionOutput(_) = [] }
 
+    let private textPart text =
+        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
 
-    let private routerFor prompts sessionId =
-        let roles = Dictionary<string, string>()
-        roles.[sessionId] <- "coder"
+    let private applyDecide sessionPort journal git verdict nudgeSent managerGuard parents turn =
+        let eventPort = Events.HostEventPort()
 
-        HostEventRouter(
-            recordingPort prompts,
-            Dictionary<string, string>(),
-            roles,
-            HashSet<string>(),
-            HashSet<string>()
-        )
+        TerminalPolicies.apply
+            (sessionPort :> ISessionHostPort)
+            (eventPort :> IEventObservationPort)
+            journal
+            git
+            verdict
+            nudgeSent
+            managerGuard
+            parents
+            (fun _ -> ())
+            turn
 
-    let private assistantUpdated sessionId messageId =
-        createObj
-            [ "type", box "message.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "info", box (createObj [ "id", box messageId; "role", box "assistant"; "finish", box "stop" ]) ]
-              ) ]
-
-    let private assistantTextPart sessionId messageId =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "part-text"
-                                  "messageID", box messageId
-                                  "type", box "text"
-                                  "text", box "Blogger record" ]
-                        ) ]
-              ) ]
-
-    let private assistantTextPartLowerCamel sessionId messageId =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "part-text-lower-camel"
-                                  "messageId", box messageId
-                                  "type", box "text"
-                                  "text", box "Blogger record" ]
-                        ) ]
-              ) ]
-
-    let private assistantEmptyTextPart sessionId messageId =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "part-empty"
-                                  "messageID", box messageId
-                                  "type", box "text"
-                                  "text", box "" ]
-                        ) ]
-              ) ]
-
-    let private idle sessionId =
-        createObj
-            [ "type", box "session.idle"
-              "properties", box (createObj [ "sessionID", box sessionId ]) ]
-
-
-    [<Fact>]
-    let ``Assistant_text_part_prevents_zero_width_continuation`` () =
-        let sessionId = "manager-session"
-        let prompts = ResizeArray<string * string>()
-        let router = routerFor prompts sessionId
-
-        router.Observe(assistantUpdated sessionId "assistant-text", ignore)
-        router.Observe(assistantTextPart sessionId "assistant-text", ignore)
-        router.Observe(idle sessionId, ignore)
-
-        Assert.Empty(prompts)
-
-    [<Fact>]
-    let ``Lower_camel_messageId_text_part_prevents_zero_width_continuation`` () =
-        let sessionId = "manager-session"
-        let prompts = ResizeArray<string * string>()
-        let router = routerFor prompts sessionId
-
-        router.Observe(assistantUpdated sessionId "assistant-lower-camel", ignore)
-        router.Observe(assistantTextPartLowerCamel sessionId "assistant-lower-camel", ignore)
-        router.Observe(idle sessionId, ignore)
-
-        Assert.Empty(prompts)
-
-    [<Fact>]
-    let ``Missing_parts_is_unknown_not_empty`` () =
-        // An assistant message whose parts were never observed (shutdown race,
-        // SSE reorder, or already-consumed turn) is UNKNOWN, not empty: it must
-        // produce no zero-width continuation and no durable fallback fact.
-        let sessionId = "manager-session"
-        let prompts = ResizeArray<string * string>()
-        let router = routerFor prompts sessionId
-
-        router.Observe(assistantUpdated sessionId "assistant-empty", ignore)
-        router.Observe(idle sessionId, ignore)
-
-        Assert.Empty(prompts)
-
-    [<Fact>]
-    let ``Idle_without_current_assistant_is_ignored`` () =
-        // A stray/duplicate idle with no unconsumed assistant message performs
-        // no message-level side effects at all.
-        let sessionId = "manager-session"
-        let prompts = ResizeArray<string * string>()
-        let router = routerFor prompts sessionId
-
-        router.Observe(idle sessionId, ignore)
-        router.Observe(idle sessionId, ignore)
-
-        Assert.Empty(prompts)
-
-    [<Fact>]
-    let ``Successful_message_followed_by_duplicate_idle_is_consumed_once`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "dup-idle-session"
-                let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "coder"
-
-                use journal =
-                    AgentJournal.create directory (RuntimeId.create "dup-idle-runtime") 1 DateTimeOffset.UtcNow
-
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
-
-                router.Observe(assistantUpdated sessionId "assistant-dup", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-dup", ignore)
-                router.Observe(idle sessionId, ignore)
-                // Restart/shutdown re-propagates idle; the turn was already consumed.
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
-
-                Assert.Empty(prompts)
-
-                let failures =
-                    match
-                        (AgentJournal.snapshot journal)
-                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
-                    with
-                    | Some session ->
-                        session.Fallback
-                        |> Option.map (fun fb -> fb.TotalFailures)
-                        |> Option.defaultValue 0
-                    | None -> 0
-
-                Assert.Equal(0, failures)
-            })
-
-    let private userUpdated sessionId messageId =
-        createObj
-            [ "type", box "message.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "info", box (createObj [ "id", box messageId; "role", box "user" ]) ]
-              ) ]
-
-    let private statusRetry sessionId attempt reason =
-        createObj
-            [ "type", box "session.status"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "status",
-                        box (
-                            createObj
-                                [ "type", box "retry"
-                                  "attempt", box attempt
-                                  "message", box reason ]
-                        ) ]
-              ) ]
+    let private completedTurn sessionId role parts =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = parts
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnCompleted }
 
     let private fallbackFailures (journal: AgentJournal) sessionId =
         match
@@ -257,40 +89,113 @@ module HostEventRouterTests =
         | None -> 0
 
     [<Fact>]
+    let ``Completed_coder_turn_with_text_part_prevents_zero_width_continuation`` () =
+        task {
+            let sessionId = "coder-text-session"
+            let prompts = ResizeArray<string * string>()
+            let sessionPort = recordingPort prompts
+
+            applyDecide
+                sessionPort
+                None
+                None
+                (HashSet())
+                (HashSet())
+                (HashSet())
+                (Dictionary())
+                (completedTurn sessionId AgentRole.Coder [| textPart "Blogger record" |])
+
+            do! drainMicrotasks 16
+            Assert.Empty(prompts)
+        }
+
+    [<Fact>]
+    let ``Unknown_turn_without_parts_is_not_empty_and_triggers_no_decision`` () =
+        // An in-flight assistant message (no finish, no parts) reconciles to
+        // TurnUnknown. The Decide layer must treat it as UNKNOWN, not empty:
+        // no zero-width continuation and no durable fallback fact.
+        task {
+            let sessionId = "unknown-session"
+            let prompts = ResizeArray<string * string>()
+            let sessionPort = recordingPort prompts
+
+            let unknown =
+                { SessionId = SessionId.create sessionId
+                  UserMessageId = MessageId.create "u1"
+                  AssistantMessageId = MessageId.create "a1"
+                  AgentRole = Some AgentRole.Coder
+                  Directory = "/tmp/ws"
+                  Parts = [||]
+                  Finish = None
+                  ErrorName = None
+                  Model = None
+                  Outcome = TurnOutcome.TurnUnknown }
+
+            applyDecide sessionPort None None (HashSet()) (HashSet()) (HashSet()) (Dictionary()) unknown
+            do! drainMicrotasks 8
+            Assert.Empty(prompts)
+        }
+
+    [<Fact>]
     let ``Same_user_replay_keeps_assistant_id_for_provider_retry`` () =
         withTempDir (fun directory ->
             task {
                 let sessionId = "retry-identity-session"
-                let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "coder"
-
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "retry-identity-runtime") 1 DateTimeOffset.UtcNow
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
+                let recorded = HashSet<string>()
+                let userBindings = Dictionary<string, MessageId>()
+                userBindings.[sessionId] <- MessageId.create "user-1"
 
-                // OpenCode creates the assistant, then re-emits the same user
-                // message.updated while the provider call is in flight. That
-                // replay must not drop the assistant id before session.status=retry.
-                router.Observe(userUpdated sessionId "user-1", ignore)
-                router.Observe(assistantUpdated sessionId "assistant-inflight", ignore)
-                router.Observe(userUpdated sessionId "user-1", ignore)
-                router.Observe(statusRetry sessionId 1 "mock provider failure round1", ignore)
+                // Replaying the same user message must not reset the binding
+                // before the provider retry lands, so the fallback is attributed
+                // to user-1.
+                RetrySignalHandler.handle
+                    (Some journal)
+                    recorded
+                    userBindings
+                    { SessionId = SessionId.create sessionId
+                      Attempt = "1"
+                      Reason = "mock provider failure round1"
+                      MessageId = None }
+
+                // A retry with the same identity is deduplicated by
+                // (session, user, attempt) - no second failure recorded.
+                RetrySignalHandler.handle
+                    (Some journal)
+                    recorded
+                    userBindings
+                    { SessionId = SessionId.create sessionId
+                      Attempt = "1"
+                      Reason = "replay"
+                      MessageId = None }
 
                 Assert.Equal(1, fallbackFailures journal sessionId)
 
-                // A genuinely new user turn still clears the stale assistant so a
-                // later retry cannot attribute against the previous turn.
-                router.Observe(userUpdated sessionId "user-2", ignore)
-                router.Observe(statusRetry sessionId 2 "should-not-record-without-assistant", ignore)
+                // A retry with no current user/assistant identity writes nothing.
+                let orphan = Dictionary<string, MessageId>()
+                RetrySignalHandler.handle
+                    (Some journal)
+                    recorded
+                    orphan
+                    { SessionId = SessionId.create sessionId
+                      Attempt = "3"
+                      Reason = "no identity"
+                      MessageId = None }
+
                 Assert.Equal(1, fallbackFailures journal sessionId)
+
+                // A genuinely new user turn records a distinct fallback.
+                userBindings.[sessionId] <- MessageId.create "user-2"
+                RetrySignalHandler.handle
+                    (Some journal)
+                    recorded
+                    userBindings
+                    { SessionId = SessionId.create sessionId
+                      Attempt = "2"
+                      Reason = "new user turn"
+                      MessageId = None }
+
+                Assert.Equal(2, fallbackFailures journal sessionId)
             })

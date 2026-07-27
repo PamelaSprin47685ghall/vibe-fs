@@ -87,3 +87,18 @@ module ArchitectureGateSupport =
             text.Contains(token)
         else
             Regex.IsMatch(text, @"\b" + Regex.Escape(token) + @"\b", RegexOptions.IgnoreCase)
+
+    let forbiddenSseEventTokens =
+        [ "message.part.delta"
+          "message.part.updated"
+          "message.updated"
+          "session.diff"
+          "session.updated" ]
+
+    let sessionStatusAllowlist =
+        [ "next/OpenCode/HostSignalAdapter.fs"
+          "next/OpenCode/RetrySignalHandler.fs"
+          "next/OpenCode/HostSignalSubscribe.fs" ]
+
+    let isNextDocPath (file: string) : bool =
+        file.Replace("\\", "/").Contains("/next/Doc/")

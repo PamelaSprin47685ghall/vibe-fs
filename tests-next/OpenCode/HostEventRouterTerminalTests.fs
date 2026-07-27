@@ -6,12 +6,17 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.EventDrivenHarness
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
+/// Terminal (Decide) layer coverage migrated from the deleted HostEventRouter.
+/// These assertions now run directly against TerminalPolicies.apply with a
+/// constructed ReconciledTurn, the same path production wires via the
+/// SessionReconciler.
 module HostEventRouterTerminalTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
@@ -43,64 +48,58 @@ module HostEventRouterTerminalTests =
 
             member _.GetSessionOutput(_) = [] }
 
-    let private assistantUpdated sessionId messageId =
-        createObj
-            [ "type", box "message.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "info", box (createObj [ "id", box messageId; "role", box "assistant"; "finish", box "stop" ]) ]
-              ) ]
+    let private textPart text =
+        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
 
-    let private assistantTextPart sessionId messageId =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "part-text"
-                                  "messageID", box messageId
-                                  "type", box "text"
-                                  "text", box "Blogger record" ]
-                        ) ]
-              ) ]
+    let private applyDecide sessionPort journal git verdict nudgeSent managerGuard parents turn =
+        let eventPort = Events.HostEventPort()
 
-    let private assistantEmptyTextPart sessionId messageId =
-        createObj
-            [ "type", box "message.part.updated"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "part",
-                        box (
-                            createObj
-                                [ "id", box "part-empty"
-                                  "messageID", box messageId
-                                  "type", box "text"
-                                  "text", box "" ]
-                        ) ]
-              ) ]
+        TerminalPolicies.apply
+            (sessionPort :> ISessionHostPort)
+            (eventPort :> IEventObservationPort)
+            journal
+            git
+            verdict
+            nudgeSent
+            managerGuard
+            parents
+            (fun _ -> ())
+            turn
 
-    let private idle sessionId =
-        createObj
-            [ "type", box "session.idle"
-              "properties", box (createObj [ "sessionID", box sessionId ]) ]
+    let private completedTurn sessionId role parts =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = parts
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnCompleted }
 
-    let private abortError sessionId =
-        createObj
-            [ "type", box "session.error"
-              "properties",
-              box (
-                  createObj
-                      [ "sessionID", box sessionId
-                        "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
-              ) ]
+    let private abortedTurn sessionId role =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = [||]
+          Finish = Some "error"
+          ErrorName = Some "MessageAbortedError"
+          Model = None
+          Outcome = TurnOutcome.TurnAborted "aborted" }
+
+    let private fallbackFailures (journal: AgentJournal) sessionId =
+        match
+            (AgentJournal.snapshot journal)
+                .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
+        with
+        | Some session ->
+            session.Fallback
+            |> Option.map (fun fb -> fb.TotalFailures)
+            |> Option.defaultValue 0
+        | None -> 0
 
     [<Fact>]
     let ``Successful_terminal_then_shutdown_idle_records_no_fallback`` () =
@@ -108,120 +107,80 @@ module HostEventRouterTerminalTests =
             task {
                 let sessionId = "shutdown-idle-session"
                 let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "reviewer"
-
+                let sessionPort = recordingPort prompts
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "shutdown-idle-runtime") 1 DateTimeOffset.UtcNow
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
+                // Completed reviewer terminal -> exactly one reviewer missing-verdict nudge.
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sessionId AgentRole.Reviewer [| textPart "reviewed tree" |])
 
-                router.Observe(assistantUpdated sessionId "assistant-good", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-good", ignore)
-                router.Observe(idle sessionId, ignore)
-                // Host shutdown: the transport is torn down mid-turn; the aborted
-                // assistant message carries no parts and must not poison fallback.
-                router.Observe(
-                    createObj
-                        [ "type", box "message.updated"
-                          "properties",
-                          box (
-                              createObj
-                                  [ "sessionID", box sessionId
-                                    "info",
-                                    box (
-                                        createObj
-                                            [ "id", box "assistant-aborted"
-                                              "role", box "assistant"
-                                              "error",
-                                              box (
-                                                  createObj
-                                                      [ "name", box "MessageAbortedError"
-                                                        "message", box "mocking stopped" ]
-                                              ) ]
-                                    ) ]
-                          ) ],
-                    ignore
-                )
-
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
-
-                // The first good terminal (reviewer role) produces exactly one
-                // reviewer missing-verdict nudge. The second aborted terminal must
-                // produce zero additional prompts and zero fallback facts.
+                do! drainMicrotasks 16
                 Assert.Single(prompts) |> ignore
 
-                let failures =
-                    match
-                        (AgentJournal.snapshot journal)
-                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
-                    with
-                    | Some session ->
-                        session.Fallback
-                        |> Option.map (fun fb -> fb.TotalFailures)
-                        |> Option.defaultValue 0
-                    | None -> 0
+                // A later aborted assistant (shutdown mid-turn) must not poison
+                // fallback and must not add a second prompt.
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (abortedTurn sessionId AgentRole.Reviewer)
 
-                Assert.Equal(0, failures)
+                do! drainMicrotasks 16
+                Assert.Single(prompts) |> ignore
+                Assert.Equal(0, fallbackFailures journal sessionId)
             })
 
     [<Fact>]
-    let ``Abort_and_idle_in_either_order_do_not_poison_fallback`` () =
+    let ``Abort_and_completed_turns_do_not_poison_fallback`` () =
         withTempDir (fun directory ->
             task {
                 let sessionId = "abort-order-session"
                 let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "coder"
-
+                let sessionPort = recordingPort prompts
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "abort-order-runtime") 1 DateTimeOffset.UtcNow
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal
-                    )
+                // Aborted turn alone: no prompt, no fallback.
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (abortedTurn sessionId AgentRole.Coder)
 
-                // Order 1: abort error first, then idle.
-                router.Observe(abortError sessionId, ignore)
-                router.Observe(idle sessionId, ignore)
-
-                // Order 2: consumed good terminal, then abort, then idle again.
-                router.Observe(assistantUpdated sessionId "assistant-ok", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-ok", ignore)
-                router.Observe(idle sessionId, ignore)
-                router.Observe(abortError sessionId, ignore)
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
-
+                do! drainMicrotasks 16
                 Assert.Empty(prompts)
+                Assert.Equal(0, fallbackFailures journal sessionId)
 
-                let failures =
-                    match
-                        (AgentJournal.snapshot journal)
-                            .AgentProjections.Sessions.TryFind(SessionId.create sessionId)
-                    with
-                    | Some session ->
-                        session.Fallback
-                        |> Option.map (fun fb -> fb.TotalFailures)
-                        |> Option.defaultValue 0
-                    | None -> 0
+                // A completed coder terminal with text: no zero-width, no fallback.
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sessionId AgentRole.Coder [| textPart "done" |])
 
-                Assert.Equal(0, failures)
+                do! drainMicrotasks 16
+                Assert.Empty(prompts)
+                Assert.Equal(0, fallbackFailures journal sessionId)
             })
 
     [<Fact>]
@@ -230,30 +189,23 @@ module HostEventRouterTerminalTests =
             task {
                 let sessionId = "manager-guard-session"
                 let prompts = ResizeArray<string * string>()
-                let roles = Dictionary<string, string>()
-                roles.[sessionId] <- "manager"
-
+                let sessionPort = recordingPort prompts
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "manager-guard-runtime") 1 DateTimeOffset.UtcNow
 
                 let gitTreePort = { GetTreeHash = fun () -> "tree-without-review" }
 
-                let router =
-                    HostEventRouter(
-                        recordingPort prompts,
-                        Dictionary<string, string>(),
-                        roles,
-                        HashSet<string>(),
-                        HashSet<string>(),
-                        journal = journal,
-                        gitTreePort = gitTreePort
-                    )
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    (Some gitTreePort)
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sessionId AgentRole.Manager [| textPart "manager done" |])
 
-                router.Observe(assistantUpdated sessionId "assistant-manager-guard", ignore)
-                router.Observe(assistantTextPart sessionId "assistant-manager-guard", ignore)
-                router.Observe(idle sessionId, ignore)
-                do! drainMicrotasks 8
-
+                do! drainMicrotasks 16
                 Assert.Single(prompts) |> ignore
                 Assert.Contains("Review is required before completion.", snd prompts.[0])
             })
@@ -263,22 +215,19 @@ module HostEventRouterTerminalTests =
         task {
             let sessionId = "coder-session"
             let prompts = ResizeArray<string * string>()
-            let roles = Dictionary<string, string>()
-            roles.[sessionId] <- "coder"
-            let router =
-                HostEventRouter(
-                    recordingPort prompts,
-                    Dictionary<string, string>(),
-                    roles,
-                    HashSet<string>(),
-                    HashSet<string>()
-                )
+            let sessionPort = recordingPort prompts
 
-            router.Observe(assistantUpdated sessionId "assistant-empty-text", ignore)
-            router.Observe(assistantEmptyTextPart sessionId "assistant-empty-text", ignore)
-            router.Observe(idle sessionId, ignore)
-            do! drainMicrotasks 8
+            applyDecide
+                sessionPort
+                None
+                None
+                (HashSet())
+                (HashSet())
+                (HashSet())
+                (Dictionary())
+                (completedTurn sessionId AgentRole.Coder [| textPart "" |])
 
+            do! drainMicrotasks 16
             Assert.Single(prompts) |> ignore
             Assert.Equal("\u200B", snd prompts.[0])
         }

@@ -75,6 +75,34 @@ module ArchitectureGates =
                     if forbidden || not allowed then
                         violations.Add(sprintf "File '%s' in 'tests-next' contains forbidden ProjectReference" file)
 
+    let private checkNextNoLegacySseSignals (files: seq<string>) (violations: List<string>) =
+        for file in files do
+            if isNextDocPath file then
+                ()
+            else
+                let norm = file.Replace("\\", "/")
+                let text = NodeFsGatesSupport.readFileSync (file, "utf-8")
+
+                for token in forbiddenSseEventTokens do
+                    if containsForbiddenToken text token then
+                        violations.Add(
+                            sprintf
+                                "File '%s' contains forbidden legacy SSE event token '%s' (raw-event business stack removed; use HostSignal signals)"
+                                file
+                                token
+                        )
+
+                if containsForbiddenToken text "session.status" then
+                    let allowed =
+                        sessionStatusAllowlist |> List.exists (fun a -> norm.EndsWith(a))
+
+                    if not allowed then
+                        violations.Add(
+                            sprintf
+                                "File '%s' contains 'session.status' which is only permitted in HostSignal signal files (HostSignalAdapter, RetrySignalHandler, HostSignalSubscribe)"
+                                file
+                        )
+
     [<Fact>]
     let ``Next_has_no_legacy_workflow_tokens_or_src_imports`` () =
         let repoRoot = findRepoRoot ()
@@ -205,6 +233,23 @@ module ArchitectureGates =
         Assert.True(
             content.Contains("detached: true") && content.Contains("SIGKILL"),
             "runner.js must hard-stop the isolated test process tree on timeout"
+        )
+
+    [<Fact>]
+    let ``Next_has_no_legacy_sse_event_signals`` () =
+        let repoRoot = findRepoRoot ()
+        let nextDir = NodeFsGatesSupport.pathJoin (repoRoot, "next")
+        Assert.True(NodeFsGatesSupport.existsSync nextDir, sprintf "Directory 'next' does not exist at %s" nextDir)
+
+        let files = collectFsFiles nextDir
+        let violations = List<string>()
+        checkNextNoLegacySseSignals files violations
+
+        Assert.True(
+            violations.Count = 0,
+            sprintf
+                "Next_has_no_legacy_sse_event_signals violations:\n%s"
+                (String.concat "\n" (violations |> Seq.toList))
         )
 
     [<Fact>]

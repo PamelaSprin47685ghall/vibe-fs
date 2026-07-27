@@ -134,30 +134,29 @@ module PtyTests =
             equal 1 agents.Length
             equal 1 ptys.Length
 
-            let router =
-                HostEventRouter(
-                    hostPort (SessionId.create "router-child"),
-                    Dictionary<string, string>(),
-                    Dictionary<string, string>(),
-                    HashSet<string>(),
-                    HashSet<string>()
-                )
+            let abortedTurn =
+                { SessionId = parent
+                  UserMessageId = MessageId.create "u-aborted"
+                  AssistantMessageId = MessageId.create "a-aborted"
+                  AgentRole = None
+                  Directory = ""
+                  Parts = [||]
+                  Finish = Some "error"
+                  ErrorName = Some "MessageAbortedError"
+                  Model = None
+                  Outcome = TurnOutcome.TurnAborted "aborted" }
 
-            let aborted =
-                createObj
-                    [ "event",
-                      box (
-                          createObj
-                              [ "type", box "session.error"
-                                "properties",
-                                box (
-                                    createObj
-                                        [ "sessionID", box (SessionId.value parent)
-                                          "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
-                                ) ]
-                      ) ]
-
-            router.Observe(aborted, ignore)
+            TerminalPolicies.apply
+                (hostPort (SessionId.create "router-child"))
+                (Events.HostEventPort() :> IEventObservationPort)
+                None
+                None
+                (HashSet())
+                (HashSet())
+                (HashSet())
+                (Dictionary())
+                (fun _ -> ())
+                abortedTurn
 
             equal
                 1

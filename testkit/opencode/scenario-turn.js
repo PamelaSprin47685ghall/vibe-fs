@@ -1,13 +1,19 @@
 /**
  * scenario-turn.js — Strictly event-driven turn-scoped oracle.
  *
- * Uses push event notifications via `events.awaitEvent(...)`.
+ * Uses push event notifications via `events.awaitEvent(...)` to AWAIT event
+ * quiescence (a terminal message, then idle). These raw SSE signals are
+ * transport-level quiescence markers ONLY — never the product-correctness
+ * oracle. Correctness evidence is the reconciler/terminal outcome surfaced by
+ * the host API (Completed|Aborted|Failed), plus tool/git/journal assertions in
+ * the scenario; a bare SSE stream does NOT renew the silence watchdog heartbeat.
  * 100% Event-driven; ZERO polling loops.
  */
 
 import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
 
 function isIdleEvent(e) {
+  // Quiescence signal only (transport-level), not the product-correctness oracle.
   if (e.type === 'session.idle') return true;
   if (e.type === 'session.status') {
     const s = e.status ?? e.properties?.status;
@@ -101,6 +107,9 @@ class Turn {
   }
 
   async _awaitAssistantTerminal(timeoutMs) {
+    // Transport proxy: await the assistant terminal message. The authoritative
+    // turn outcome (Completed|Aborted|Failed) is the reconciler/terminal signal
+    // from the host API — not this raw `message.updated` event.
     try {
       return await this._scenario.events.awaitEvent(
         (e) => e.type === 'message.updated' && Boolean(e.finishReason) && e.seq > this._eventSeqBefore && this._matchesSession(e),
