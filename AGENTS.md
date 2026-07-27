@@ -3386,6 +3386,63 @@ README 改写为新产品语义；旧文档移入 `docs-legacy/` 或直接删除
 - reviewer REVISE/双 PERFECT。
 - orchestrator 两 worktree 串行发布。
 
+### 13.5 测试执行器（tests-next runner）
+
+[NORMATIVE] `tests-next/runner.js` 是纯 Fable 测试的执行器，设计原则：
+
+```text
+import + await 直接运行
+`__resetAssertionTimeout()` 心跳重置本地定时器
+心跳超时 → test 标记为失败，abandon 底层 async（不主动 kill）
+串行执行
+无 IPC / worker 协议
+无 spawn ledger 参与
+```
+
+**旧模型 vs 新模型**：
+
+| | 旧 | 新 |
+|---|---|---|
+| 执行 | `fork()` worker 进程 | 同进程 `import` + `await` |
+| 心跳机制 | IPC heartbeat → 父进程 | `globalThis.__resetAssertionTimeout` → 在 `Promise.race` 中重置本地 timer |
+| 超时处理 | `terminateTree()` → SIGTERM→SIGKILL | reject Promise → 忘记测试（不再等待或杀死） |
+| 进程跟踪 | `spawn-ledger` + PID 重用保护 | 无 |
+| 清理 | 确保子进程组全部终止 | 不需要——Node.js 进程退出自动清理一切 |
+
+**为什么不再需要进程隔离**：
+
+- 超时后不需要主动终止异步操作——Node.js 进程退出会清理一切。
+- 进程隔离（`fork()` + `terminateTree`）引入心跳协议、进程跟踪、PID 重用防范等复杂度，但解决的是根本不需要解决的问题。
+- 同进程串行执行 + Promise.race 已足够：测试点失败就是失败，不关心底层 async 是否还在跑。
+- 心跳保留但语义简化：不是用来防止被杀，而是用来决定测试是否失败。
+
+**设计**：
+
+```text
+discoverTestExports(file):
+    import(file) → 枚举 export 中的 async function
+
+runTest(file, name, timeoutMs=1000):
+    import(file) → mod[name]()
+    Heartbeat timer fires → reject failPromise
+    Promise.race([testPromise, failPromise])
+    heartbeat 胜出 → 抛 TIMEOUT 错误，test 失败
+    test 胜出 → clear heartbeat timer
+    不调 terminateTree，不 send SIGKILL，不清理
+
+__resetAssertionTimeout():
+    全局函数，测试调用以重置 heartbeat timer
+```
+
+[NORMATIVE]
+
+- 每个 test 只 `import` 一次（ESM module cache 确保后续同文件 import 为同一引用）。
+- Test function 必须返回 Promise（Fable 编译的 async test 天然满足）。
+- 1s 是硬上限，不可配置；`TEST_SILENCE_MS`/`TEST_ABSOLUTE_MS` 环境变量不再存在。
+- `__resetAssertionTimeout()` 不再通过 IPC 发送 heartbeat 到父进程，改为重置同进程的本地 timer。
+- 不再 fork worker 进程，不再 import `process-lifecycle.js`、`spawn-ledger.js`。
+- `worker.js` 和 `fixtures/hanging-test.js` 不再需要（保留简化的 fixture 供测试框架验证 timeout 行为）。
+
 ---
 
 ## 十四、代码门禁

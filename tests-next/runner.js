@@ -1,159 +1,63 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fork } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { terminateTree } from "../testkit/process-lifecycle.js";
-import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
-const workerPath = path.join(__dirname, "worker.js");
-const activeWorkers = new Set();
 
-async function stopWorker(worker) {
-  if (!worker || !worker.pid) return;
-  activeWorkers.delete(worker.pid);
-  try {
-    await terminateTree(worker, { termGraceMs: 300, killGraceMs: 500 });
-    recordExit(worker.pid);
-  } catch (err) {
-    console.error("  ⚠ worker " + worker.pid + " cleanup: " + err.message);
-  }
-}
-
-function cleanupAllWorkers() {
-  for (const pid of activeWorkers) {
-    try {
-      if (process.platform === "win32") {
-        process.kill(pid, "SIGKILL");
-      } else {
-        process.kill(-pid, "SIGKILL");
-      }
-    } catch {}
-  }
-  activeWorkers.clear();
-}
-
-process.on("exit", cleanupAllWorkers);
-process.on("SIGINT", () => { cleanupAllWorkers(); process.exit(130); });
-process.on("SIGTERM", () => { cleanupAllWorkers(); process.exit(143); });
-
-export function discoverTestExports(file) {
-  return new Promise((resolve, reject) => {
-    const worker = fork(workerPath, ["--discover", file], {
-      cwd: repoRoot,
-      detached: true,
-      stdio: ["ignore", "inherit", "inherit", "ipc"],
-      env: { ...process.env, WANXIANG_RUN_ID: RUN_ID }
-    });
-    if (worker.pid) {
-      activeWorkers.add(worker.pid);
-      recordSpawn(worker.pid, `worker discover ${path.basename(file)}`);
+export async function discoverTestExports(file) {
+  const mod = await import(pathToFileURL(file).href);
+  const exports = [];
+  for (const [key, value] of Object.entries(mod)) {
+    if (
+      typeof value === "function" &&
+      !key.startsWith("_") &&
+      !value.toString().startsWith("class ") &&
+      !key.endsWith("_$ctor") &&
+      !key.endsWith("_$reflection") &&
+      !key.startsWith("check") &&
+      !key.startsWith("contains")
+    ) {
+      exports.push(key);
     }
-
-    let finished = false;
-    const finish = (err, result) => {
-      if (finished) return;
-      finished = true;
-      stopWorker(worker);
-      if (err) reject(err);
-      else resolve(result);
-    };
-
-    worker.on("message", (msg) => {
-      if (msg.status === "discovered") finish(null, msg.exports);
-      else finish(new Error(msg.message || "Discovery failed"));
-    });
-    worker.on("error", (err) => finish(err));
-    worker.on("exit", (code) => {
-      if (!finished) finish(new Error("Discovery worker stopped (code " + code + ")"));
-    });
-  });
+  }
+  return exports;
 }
 
-export function runTestInWorker(file, exportName, timeoutMs = 1000) {
-  return new Promise((resolve, reject) => {
-    const worker = fork(workerPath, [file, exportName], {
-      cwd: repoRoot,
-      detached: true,
-      stdio: ["ignore", "inherit", "inherit", "ipc"],
-      env: { ...process.env, WANXIANG_RUN_ID: RUN_ID }
-    });
+export async function runTest(file, exportName, timeoutMs = 1000) {
+  const mod = await import(pathToFileURL(file).href);
+  const fn = mod[exportName];
+  if (typeof fn !== "function") {
+    throw new Error(`'${exportName}' is not a function in ${file}`);
+  }
 
-    if (worker.pid) {
-      activeWorkers.add(worker.pid);
-      recordSpawn(worker.pid, `worker ${exportName}`);
-    }
+  let heartbeatTimer;
+  let finished = false;
 
-    let finished = false;
-    let silenceTimer;
-    let absoluteTimer;
-    let assertionCount = 0;
-    let lastAssertionAt = Date.now();
-
-    const silenceMs = Number(process.env.TEST_SILENCE_MS || timeoutMs);
-    const absoluteMs = Number(process.env.TEST_ABSOLUTE_MS || 10000);
-
-    const finish = (settle, value, signal) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(silenceTimer);
-      clearTimeout(absoluteTimer);
-      stopWorker(worker);
-      settle(value);
-    };
-
-    const resetSilenceTimer = () => {
-      clearTimeout(silenceTimer);
-      silenceTimer = setTimeout(() => {
-        finish(
-          reject,
-          new Error(
-            "TIMEOUT: Assertion step in '" + exportName + "' (" + path.basename(file) + ") exceeded " + silenceMs + "ms limit; " +
-            "last assertion " + (Date.now() - lastAssertionAt) + "ms ago (" + assertionCount + " total)"
-          )
-        );
-      }, silenceMs);
-    };
-
-    absoluteTimer = setTimeout(() => {
-      finish(
-        reject,
-        new Error(
-          "TIMEOUT: Absolute cap of " + absoluteMs + "ms exceeded for '" + exportName + "' (" + path.basename(file) + "); " +
-          "last assertion " + (Date.now() - lastAssertionAt) + "ms ago (" + assertionCount + " total)"
-        )
-      );
-    }, absoluteMs);
-
-    resetSilenceTimer();
-
-    worker.on("message", (msg) => {
-      if (msg.status === "heartbeat") {
+  const failPromise = new Promise((_, reject) => {
+    const setTimer = () => {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = setTimeout(() => {
         if (!finished) {
-          assertionCount++;
-          lastAssertionAt = Date.now();
-          resetSilenceTimer();
+          finished = true;
+          reject(new Error(`TIMEOUT: '${exportName}' (${path.basename(file)}) exceeded ${timeoutMs}ms limit`));
         }
-      } else if (msg.status === "ok") {
-        finish(resolve, msg.result);
-      } else {
-        finish(reject, new Error(msg.message));
-      }
-    });
+      }, timeoutMs);
+    };
 
-    worker.on("error", (err) => {
-      finish(reject, err);
-    });
-
-    worker.on("exit", (code, signal) => {
-      if (worker.pid) activeWorkers.delete(worker.pid);
-      finish(
-        reject,
-        new Error("Worker stopped before reporting a result (exit code " + code + ", signal " + signal + ")")
-      );
-    });
+    globalThis.__resetAssertionTimeout = () => {
+      if (!finished) setTimer();
+    };
+    setTimer();
   });
+
+  try {
+    await Promise.race([fn(), failPromise]);
+    finished = true;
+    clearTimeout(heartbeatTimer);
+  } finally {
+    delete globalThis.__resetAssertionTimeout;
+  }
 }
 
 function compiledTestDir(args = process.argv.slice(2)) {
@@ -183,7 +87,7 @@ async function runTests() {
         if (file !== "fable_modules" && file !== "node_modules" && file !== "fixtures") {
           results = results.concat(findJsFiles(fullPath));
         }
-      } else if (file.endsWith(".js") && !file.endsWith("TestSupport.js") && !file.endsWith("GateSupport.js") && !file.endsWith("Signatures.js") && !file.endsWith("Assert.js") && !file.endsWith("EventDrivenHarness.js") && !file.endsWith("worker.js") && !file.includes(".nuget")) {
+      } else if (file.endsWith(".js") && !file.endsWith("TestSupport.js") && !file.endsWith("GateSupport.js") && !file.endsWith("Signatures.js") && !file.endsWith("Assert.js") && !file.endsWith("EventDrivenHarness.js") && !file.includes(".nuget")) {
         results.push(fullPath);
       }
     }
@@ -207,7 +111,7 @@ async function runTests() {
   for (const file of testFiles) {
     const rel = path.relative(__dirname, file);
     if (Date.now() - suiteStart > suiteBudgetMs) {
-      console.warn("  ⚠ Suite budget of " + suiteBudgetMs + "ms reached. Skipping remaining tests in " + rel);
+      console.warn("  \u26a0 Suite budget of " + suiteBudgetMs + "ms reached. Skipping remaining tests in " + rel);
       skipped++;
       continue;
     }
@@ -215,20 +119,20 @@ async function runTests() {
       const exportKeys = await discoverTestExports(file);
       for (const key of exportKeys) {
         if (Date.now() - suiteStart > suiteBudgetMs) {
-          console.warn("  ⚠ Suite budget reached. Skipping " + key);
+          console.warn("  \u26a0 Suite budget reached. Skipping " + key);
           skipped++;
           continue;
         }
         const start = Date.now();
         try {
-          await runTestInWorker(file, key, 1000);
+          await runTest(file, key, 1000);
           const elapsed = Date.now() - start;
           passed++;
-          console.log("  ✓ " + rel + " > " + key + " (" + elapsed + "ms)");
+          console.log("  \u2713 " + rel + " > " + key + " (" + elapsed + "ms)");
         } catch (err) {
           failed++;
           errors.push({ file: rel, test: key, error: err });
-          console.error("  ✗ " + rel + " > " + key + ":", err.message || err);
+          console.error("  \u2717 " + rel + " > " + key + ":", err.message || err);
         }
       }
     } catch (discoveryErr) {

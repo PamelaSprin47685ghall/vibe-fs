@@ -226,13 +226,13 @@ module ArchitectureGates =
         let content = NodeFsGatesSupport.readFileSync (runnerPath, "utf-8")
 
         Assert.True(
-            content.Contains("runTestInWorker") && content.Contains("1000"),
-            "runner.js must enforce rigid 1000ms (1s) process timeout limit for all tests"
+            content.Contains("runTest") && content.Contains("1000"),
+            "runner.js must enforce rigid 1000ms (1s) timeout limit for all tests"
         )
 
         Assert.True(
-            content.Contains("detached: true") && content.Contains("SIGKILL"),
-            "runner.js must hard-stop the isolated test process tree on timeout"
+            content.Contains("Promise.race"),
+            "runner.js must use simple in-process Promise.race timeout (no process isolation)"
         )
 
     [<Fact>]
