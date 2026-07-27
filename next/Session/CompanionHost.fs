@@ -5,61 +5,9 @@ open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel
-open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.Kernel.Identity
 open Fable.Core.JsInterop
-
-type AgentJournalCompanionPort(journal: AgentJournal) =
-    let append (sessionId: SessionId) (fact: AgentFact) =
-        match AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
-        | Ok _ -> Ok()
-        | Error failure -> Error(sprintf "%A" failure.Failure)
-
-    interface ICompanionDurablePort with
-        member _.Load(sessionId: SessionId) : CompanionMemory option =
-            let projection = AgentJournal.snapshot journal
-
-            projection.AgentProjections.Sessions
-            |> Map.tryFind sessionId
-            |> Option.bind (fun session ->
-                session.Companion
-                |> Option.map (fun companion ->
-                    { LastSuccessfulProjection = companion.LastSuccessfulProjection
-                      CurrentB = companion.CurrentB
-                      BloggerBusy = false
-                      ReplacementActive = companion.ReplacementActive }))
-
-        member _.AppendSuccessful(sessionId, projection, content) =
-            append
-                sessionId
-                (AgentFact.CompanionAdvanced
-                    {| SessionId = sessionId
-                       Projection = projection
-                       Content = content |})
-
-        member _.EnableReplacement(sessionId) =
-            append
-                sessionId
-                (AgentFact.CompanionReplacementActiveSet
-                    {| SessionId = sessionId
-                       Active = true |})
-
-        member _.AppendLink(sessionId, childId, targetAgent, role) =
-            append
-                sessionId
-                (AgentFact.AgentLinked
-                    {| ParentId = sessionId
-                       ChildId = childId
-                       TargetAgent = targetAgent
-                       Role = role |})
-
-        member _.AppendUnlink(sessionId, childId) =
-            append
-                sessionId
-                (AgentFact.AgentUnlinked
-                    {| ParentId = sessionId
-                       ChildId = childId |})
 
 type CompanionHost
     (
@@ -68,7 +16,8 @@ type CompanionHost
         ?durable: ICompanionDurablePort,
         ?onBloggerCreated: SessionId -> unit,
         ?bloggerModel: Result<OpencodeModel, string>,
-        ?outputBoundary: IEventOutputBoundaryPort
+        ?outputBoundary: IEventOutputBoundaryPort,
+        ?restoredBloggerId: string
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
@@ -98,6 +47,7 @@ type CompanionHost
     let mutable bloggerId: SessionId option = None
     let mutable bloggerFailed = false
     let bloggerNeedsReset = ref false
+    let mutable restoredBloggerIdOpt = restoredBloggerId
 
     let ensureBlogger () =
         lock gate (fun () ->
@@ -111,58 +61,70 @@ type CompanionHost
             match bloggerTask with
             | Some task -> task
             | None ->
-                // A restored companion already holds B; the freshly created
-                // blogger child must be re-anchored on the full context so it
-                // does not delude itself with a lost baseline.
-                // ponytail: re-association to the SAME pre-restart child session
-                // is gated on child-session liveness, which this runtime does not
-                // preserve across restart; the durable AgentLinked fact is now
-                // persisted and the reset-frame below covers the not-recoverable
-                // case (new child re-anchored on full B + projection).
-                if companion.Memory.CurrentB.IsSome then
-                    bloggerNeedsReset.Value <- true
+                // Try restored blogger ID first (one-shot, avoids infinite retry
+                // on stale sessions). If the restored session is dead, the blog
+                // will fail with SendPrompt error. On the next request,
+                // restoredBloggerIdOpt is None so we fall through to create a new
+                // child with a reset frame.
+                match restoredBloggerIdOpt, bloggerId with
+                | Some id, None ->
+                    let sid = SessionId.create id
+                    bloggerId <- Some sid
+                    bloggerFailed <- false
+                    // Register the blogger role synchronously.
+                    bloggerCreated sid
+                    // One-shot: clear the restore opt so a failure creates new
+                    restoredBloggerIdOpt <- None
+                    // No reset frame needed — session is ongoing
+                    bloggerNeedsReset.Value <- false
+                    let t = Task.FromResult(sid)
+                    bloggerTask <- Some t
+                    t
+                | _ ->
+                    // A restored companion already holds B; the freshly created
+                    // blogger child must be re-anchored on the full context so it
+                    // does not delude itself with a lost baseline.
+                    if companion.Memory.LatestB.IsSome then
+                        bloggerNeedsReset.Value <- true
 
-                let task =
-                    task {
-                        try
-                            let! created =
-                                sessions.CreateChildSession(
-                                    primaryId,
-                                    { Title = Some "blogger"
-                                      Agent = Some "blogger"
-                                      Directory = None }
-                                )
-
-                            match created with
-                            | Ok id ->
-                                bloggerId <- Some id
-                                bloggerFailed <- false
-
-                                // Register the blogger role synchronously so the
-                                // companion gate can never recurse into blogger
-                                // sessions, not even before its first event.
-                                bloggerCreated id
-
-                                durable
-                                |> Option.iter (fun port ->
-                                    port.AppendLink(
+                    let task =
+                        task {
+                            try
+                                let! created =
+                                    sessions.CreateChildSession(
                                         primaryId,
-                                        ChildId.create (SessionId.value id),
-                                        "blogger",
-                                        Some "blogger"
+                                        { Title = Some "blogger"
+                                          Agent = Some "blogger"
+                                          Directory = None }
                                     )
-                                    |> ignore)
 
-                                return id
-                            | Error error -> return raise (InvalidOperationException error)
-                        with ex ->
-                            bloggerFailed <- true
-                            bloggerId <- None
-                            return raise ex
-                    }
+                                match created with
+                                | Ok id ->
+                                    bloggerId <- Some id
+                                    bloggerFailed <- false
 
-                bloggerTask <- Some task
-                task)
+                                    bloggerCreated id
+
+                                    durable
+                                    |> Option.iter (fun port ->
+                                        port.AppendLink(
+                                            primaryId,
+                                            ChildId.create (SessionId.value id),
+                                            "blogger",
+                                            Some "blogger"
+                                        )
+                                        |> ignore)
+
+                                    return id
+                                | Error error -> return raise (InvalidOperationException error)
+                            with ex ->
+                                bloggerFailed <- true
+                                bloggerId <- None
+                                return raise ex
+                        }
+
+                    bloggerTask <- Some task
+                    task)
 
     member private this.BloggerDeps: CompanionHostBlogger.BloggerDeps =
         { Sessions = sessions
@@ -193,10 +155,10 @@ type CompanionHost
         // Y self-rebase is independent of X prefix replacement: trigger once B
         // exists. The 0.8 budget gate lives in CompanionTransform against the
         // blogger child's own (usually smaller) model limit.
-        if before.CurrentB.IsNone then
+        if before.LatestB.IsNone then
             Submitted
         else
-            let currentB = before.CurrentB.Value
+            let currentB = before.LatestB.Value
             let deps = this.BloggerDeps
 
             let started =
@@ -228,21 +190,40 @@ type CompanionHost
         companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps current delta))
         |> ignore
 
-        match before.ReplacementActive, before.CurrentB, before.LastSuccessfulProjection with
-        | true, Some b, Some _ when watermark > 0 ->
-            // MessageV2 WithParts shape (see CompanionTransform): the B head
-            // travels as a user-role synthetic with a stable id so prefix
-            // comparison keeps recognising it across projections.
+        match before.ReplacementActive, before.ActivePrefixEpoch, before.LastSuccessfulProjection with
+        | true, Some epoch, Some _ when watermark > 0 ->
+            // X-side prefix replacement: use the frozen B from ActivePrefixEpoch.
+            // This is the key cache fix — FrozenB remains stable across Blogger
+            // updates, unlike the old CurrentB which changed every blog and
+            // corrupted the provider KV-cache prefix.
             let synthetic =
                 createObj
                     [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
-                      "parts", box [| createObj [ "type", box "text"; "text", box b ] |] ]
+                      "parts", box [| createObj [ "type", box "text"; "text", box epoch.FrozenB ] |] ]
 
             synthetic :: (messages |> List.skip watermark)
+        | true, None, Some _ when watermark > 0 ->
+            // Replacement active but no epoch yet: freeze LatestB as the first epoch.
+            // This is an implicit cold-cache boundary (first and only unavoidable one
+            // for this prefix-replacement session).
+            match before.LatestB with
+            | Some b ->
+                companion.FreezeEpoch() |> ignore
+                let epoch = companion.Memory.ActivePrefixEpoch
+                match epoch with
+                | Some epoch ->
+                    let synthetic =
+                        createObj
+                            [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
+                              "parts", box [| createObj [ "type", box "text"; "text", box epoch.FrozenB ] |] ]
+
+                    synthetic :: (messages |> List.skip watermark)
+                | None -> messages
+            | None -> messages
         | _ -> messages
 
     member _.ReplacePrefix(messages: HostMessage list, watermarkIndex: int) =
-        Companion.compressPrefix messages companion.Memory.CurrentB watermarkIndex
+        Companion.compressPrefix messages companion.Memory.LatestB watermarkIndex
 
     member _.BloggerSession = lock gate (fun () -> bloggerId)
 

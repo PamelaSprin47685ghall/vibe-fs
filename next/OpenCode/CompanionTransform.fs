@@ -59,111 +59,145 @@ module CompanionTransform =
         =
         let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
-        let messageContext =
-            rawMsgs
-            |> List.tryPick (fun message ->
-                if isNull message || isNull message?info then
-                    None
+        // Idempotency guard: if companion-b-head already present, skip entirely.
+        // Prevents double-hook registration and re-entrant calls from duplicating
+        // the synthetic B head.
+        let hasBHead =
+            match rawMsgs with
+            | first :: _ when
+                not (isNull first)
+                && not (isNull first?info)
+                && not (isNull first?info?id)
+                && unbox<string> first?info?id = "companion-b-head"
+                ->
+                true
+            | _ -> false
+
+        if hasBHead then
+            ()
+        else
+            let messageContext =
+                rawMsgs
+                |> List.tryPick (fun message ->
+                    if isNull message || isNull message?info then
+                        None
+                    else
+                        let sessionId =
+                            if isNull message?info?sessionID then
+                                None
+                            else
+                                Some(unbox<string> message?info?sessionID)
+
+                        let role =
+                            if isNull message?info?agent then
+                                None
+                            else
+                                Some(unbox<string> message?info?agent)
+
+                        Some(sessionId, role))
+
+            match messageContext with
+            | Some(Some sessionId, _) when not (isNull inObj) && isNull inObj?sessionID -> inObj?sessionID <- sessionId
+            | _ -> ()
+
+            let sessionId =
+                if isNull inObj || isNull inObj?sessionID then
+                    ""
                 else
-                    let sessionId =
-                        if isNull message?info?sessionID then
-                            None
-                        else
-                            Some(unbox<string> message?info?sessionID)
+                    unbox<string> inObj?sessionID
 
-                    let role =
-                        if isNull message?info?agent then
-                            None
-                        else
-                            Some(unbox<string> message?info?agent)
+            if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
+                let rawAgentRole =
+                    match sessionRoles.TryGetValue sessionId with
+                    | true, role -> Some role
+                    | _ ->
+                        match messageContext |> Option.bind snd with
+                        | Some role -> Some role
+                        | None when not (isNull inObj) && not (isNull inObj?agent) -> Some(unbox<string> inObj?agent)
+                        | None -> None
 
-                    Some(sessionId, role))
+                let agentRole = rawAgentRole |> Option.bind HostSessionContext.canonicalRole
 
-        match messageContext with
-        | Some(Some sessionId, _) when not (isNull inObj) && isNull inObj?sessionID -> inObj?sessionID <- sessionId
-        | _ -> ()
+                if not (sessionRoles.ContainsKey sessionId) then
+                    agentRole |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
 
-        let sessionId =
-            if isNull inObj || isNull inObj?sessionID then
-                ""
-            else
-                unbox<string> inObj?sessionID
+                let allowed =
+                    match agentRole with
+                    | None -> false
+                    | Some _ -> Companion.shouldCreateForAgent agentRole
 
-        if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
-            let rawAgentRole =
-                match sessionRoles.TryGetValue sessionId with
-                | true, role -> Some role
-                | _ ->
-                    match messageContext |> Option.bind snd with
-                    | Some role -> Some role
-                    | None when not (isNull inObj) && not (isNull inObj?agent) -> Some(unbox<string> inObj?agent)
-                    | None -> None
+                if allowed then
+                    let companion =
+                        lock gate (fun () ->
+                            match companions.TryGetValue sessionId with
+                            | true, value -> value
+                            | false, _ ->
+                                let durable =
+                                    journal
+                                    |> Option.map (fun j -> AgentJournalCompanionPort j :> ICompanionDurablePort)
 
-            let agentRole = rawAgentRole |> Option.bind HostSessionContext.canonicalRole
+                                // Load the restored blogger child ID from the
+                                // journal linkage, if any. On plugin warm-reload
+                                // (host process persists), the existing blogger
+                                // session is still alive and can be reused
+                                // without a reset frame.
+                                let restoredBloggerId =
+                                    match journal with
+                                    | Some j ->
+                                        (AgentJournal.snapshot j).AgentProjections.Sessions
+                                        |> Map.tryFind (SessionId.create sessionId)
+                                        |> Option.bind (fun s -> s.Linkage)
+                                        |> Option.bind (fun linkage ->
+                                            linkage.LinkedChildren
+                                            |> Map.toSeq
+                                            |> Seq.tryPick (fun (childId, target) ->
+                                                if target = "blogger" then
+                                                    Some(ChildId.value childId)
+                                                else
+                                                    None))
+                                    | None -> None
 
-            if not (sessionRoles.ContainsKey sessionId) then
-                agentRole |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
+                                let value =
+                                    new CompanionHost(
+                                        SessionId.create sessionId,
+                                        sessionPort,
+                                        ?durable = durable,
+                                        ?bloggerModel = Some bloggerModel,
+                                        ?outputBoundary = outputBoundary,
+                                        onBloggerCreated =
+                                            (fun bloggerId -> sessionRoles.[SessionId.value bloggerId] <- "blogger"),
+                                        ?restoredBloggerId = restoredBloggerId
+                                    )
 
-            let allowed =
-                match agentRole with
-                | None -> false
-                | Some _ -> Companion.shouldCreateForAgent agentRole
+                                companions.[sessionId] <- value
+                                value)
 
-            if allowed then
-                let companion =
-                    lock gate (fun () ->
-                        match companions.TryGetValue sessionId with
-                        | true, value -> value
-                        | false, _ ->
-                            let durable =
-                                journal
-                                |> Option.map (fun j -> AgentJournalCompanionPort j :> ICompanionDurablePort)
+                    let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
-                            let value =
-                                new CompanionHost(
-                                    SessionId.create sessionId,
-                                    sessionPort,
-                                    ?durable = durable,
-                                    ?bloggerModel = Some bloggerModel,
-                                    ?outputBoundary = outputBoundary,
-                                    onBloggerCreated =
-                                        (fun bloggerId -> sessionRoles.[SessionId.value bloggerId] <- "blogger")
-                                )
+                    let tokenEstimate = estimateTokens rawMsgs
 
-                            companions.[sessionId] <- value
-                            value)
+                    if not companion.Memory.ReplacementActive then
+                        match sessionBudgets.TryGetValue sessionId with
+                        | true, budget when budget > 0 && float tokenEstimate >= float budget * activationRatio ->
+                            companion.EnablePrefixReplacement() |> ignore
+                        | _ -> ()
 
-                let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
+                    // Y self-rebase: independent of X prefix replacement. Triggers
+                    // when B's estimated tokens cross 0.8 of the BLOGGER child's own
+                    // model context budget. Uses LatestB (Y's mutable working memory),
+                    // never the FrozenB from ActivePrefixEpoch.
+                    match companion.Memory.LatestB with
+                    | Some b ->
+                        let bloggerBudget =
+                            match companion.BloggerSession with
+                            | Some bloggerId ->
+                                match sessionBudgets.TryGetValue(SessionId.value bloggerId) with
+                                | true, budget when budget > 0 -> budget
+                                | _ -> defaultBloggerBudgetTokens
+                            | None -> defaultBloggerBudgetTokens
 
-                let tokenEstimate = estimateTokens rawMsgs
+                        if bloggerSelfRebaseDue bloggerBudget b then
+                            companion.SelfRebase() |> ignore
+                    | None -> ()
 
-                if not companion.Memory.ReplacementActive then
-                    match sessionBudgets.TryGetValue sessionId with
-                    | true, budget when budget > 0 && float tokenEstimate >= float budget * activationRatio ->
-                        companion.EnablePrefixReplacement() |> ignore
-                    | _ -> ()
-
-                // Y self-rebase: independent of X prefix replacement. Triggers
-                // when B's estimated tokens cross 0.8 of the BLOGGER child's own
-                // model context budget (the cheap blogger model usually has a
-                // smaller limit than X). We use the blogger budget once the child
-                // has reported one via the system.transform hook, else a
-                // conservative default. No ReplacementActive gate: X replacement
-                // and Y self-rebase are orthogonal. Never synthesize a
-                // placeholder: if the Blogger is busy we skip; if it fails we
-                // keep the old B.
-                match companion.Memory.CurrentB with
-                | Some b ->
-                    let bloggerBudget =
-                        match companion.BloggerSession with
-                        | Some bloggerId ->
-                            match sessionBudgets.TryGetValue(SessionId.value bloggerId) with
-                            | true, budget when budget > 0 -> budget
-                            | _ -> defaultBloggerBudgetTokens
-                        | None -> defaultBloggerBudgetTokens
-
-                    if bloggerSelfRebaseDue bloggerBudget b then
-                        companion.SelfRebase() |> ignore
-                | None -> ()
-
-                replaceMessagesInPlace rawOutObj (companion.TransformRaw rawMsgs)
+                    replaceMessagesInPlace rawOutObj (companion.TransformRaw rawMsgs)

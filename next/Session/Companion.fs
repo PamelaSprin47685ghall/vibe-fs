@@ -7,51 +7,6 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Tools
 
-type BlogText = string
-
-type CompanionOutcome =
-    | Submitted
-    | SkippedBusy
-
-type CompanionMemory =
-    { LastSuccessfulProjection: ProjectionSnapshot option
-      CurrentB: BlogText option
-      BloggerBusy: bool
-      ReplacementActive: bool }
-
-    member this.PrefixReplacementEnabled = this.ReplacementActive
-
-type ICompanionDurablePort =
-    abstract Load: SessionId -> CompanionMemory option
-    abstract AppendSuccessful: SessionId * ProjectionSnapshot * BlogText -> Result<unit, string>
-    abstract EnableReplacement: SessionId -> Result<unit, string>
-    abstract AppendLink: SessionId * ChildId * string * string option -> Result<unit, string>
-    abstract AppendUnlink: SessionId * ChildId -> Result<unit, string>
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Companion =
-
-    let canCreateForRole (role: Role) : bool =
-        MessageTransform.companionAllowedRole role
-
-    let shouldCreateForAgent (agent: string option) : bool =
-        MessageTransform.shouldCreateCompanion agent
-
-    let jsonDelta = CompanionDelta.jsonDelta
-
-    /// Pure compressPrefix: delegates to MessageTransform.replacePrefix using currentB and explicit watermark index.
-    let compressPrefix
-        (messages: HostMessage list)
-        (currentB: BlogText option)
-        (watermarkIndex: int)
-        : HostMessage list =
-        match currentB with
-        | None -> messages
-        | Some b -> MessageTransform.replacePrefix messages b (Index watermarkIndex)
-
-    let compressPrefixText (messages: HostMessage list) (currentB: BlogText) (watermarkIndex: int) : HostMessage list =
-        compressPrefix messages (Some currentB) watermarkIndex
-
 /// Companion state wrapper with a single mutable in-flight Task gate.
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
     let lockObj = obj ()
@@ -67,8 +22,11 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     let mutable lastSuccessfulProjection: ProjectionSnapshot option =
         restoredMemory |> Option.bind (fun m -> m.LastSuccessfulProjection)
 
-    let mutable currentB: BlogText option =
-        restoredMemory |> Option.bind (fun m -> m.CurrentB)
+    let mutable latestB: BlogText option =
+        restoredMemory |> Option.bind (fun m -> m.LatestB)
+
+    let mutable activePrefixEpoch: ActivePrefixEpoch option =
+        restoredMemory |> Option.bind (fun m -> m.ActivePrefixEpoch)
 
     let mutable replacementActive: bool =
         restoredMemory
@@ -82,6 +40,14 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         match durable, sessionId with
         | Some port, Some sid ->
             match port.AppendSuccessful(sid, projection, content) with
+            | Ok() -> ()
+            | Error error -> raise (InvalidOperationException error)
+        | _ -> ()
+
+    let persistEpochSwitched (epoch: ActivePrefixEpoch) =
+        match durable, sessionId with
+        | Some port, Some sid ->
+            match port.AppendEpochSwitched(sid, epoch) with
             | Ok() -> ()
             | Error error -> raise (InvalidOperationException error)
         | _ -> ()
@@ -107,7 +73,8 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.Memory: CompanionMemory =
         lock lockObj (fun () ->
             { LastSuccessfulProjection = lastSuccessfulProjection
-              CurrentB = currentB
+              LatestB = latestB
+              ActivePrefixEpoch = activePrefixEpoch
               BloggerBusy = isBusyUnlocked ()
               ReplacementActive = replacementActive })
 
@@ -125,7 +92,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     /// Awaits the current in-flight task if running.
     member this.WaitInFlightAsync() : Task =
         let tOpt = lock lockObj (fun () -> inFlightTask)
-
         match tOpt with
         | Some t -> t :> Task
         | None -> Task.FromResult(()) :> Task
@@ -136,127 +102,120 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     member this.TryEnableReplacement() : bool =
         lock lockObj (fun () ->
-            if replacementActive then
-                true
+            if replacementActive then true
             else
                 match durable, sessionId with
                 | Some port, Some sid ->
                     match port.EnableReplacement sid with
-                    | Ok() ->
-                        replacementActive <- true
-                        true
+                    | Ok() -> replacementActive <- true; true
                     | Error _ -> false
-                | _ ->
-                    replacementActive <- true
-                    true)
+                | _ -> replacementActive <- true; true)
 
     member this.TryRebase(rebaseFn: unit -> Async<BlogText * ProjectionSnapshot>) : bool =
         lock lockObj (fun () ->
-            if isBusyUnlocked () then
-                false
+            if isBusyUnlocked () then false
             else
                 busy <- true
-
                 let t =
                     async {
                         try
                             let! (b, proj) = rebaseFn ()
-
                             persistSuccessful proj b
-
                             lock lockObj (fun () ->
-                                currentB <- Some b
-                                lastSuccessfulProjection <- Some proj)
-                        with _ ->
-                            ()
-                    }
-                    |> startAsTask
-
+                                latestB <- Some b
+                                lastSuccessfulProjection <- Some proj
+                                match activePrefixEpoch with
+                                | Some epoch ->
+                                    let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
+                                    let updatedEpoch = { epoch with FrozenB = b; EpochId = sprintf "%s|%d|%d" sessionStr epoch.CutoffMessageIndex (String.length b) }
+                                    persistEpochSwitched updatedEpoch
+                                    activePrefixEpoch <- Some updatedEpoch
+                                | None -> ())
+                        with _ -> ()
+                    } |> startAsTask
                 inFlightTask <- Some t
                 true)
 
     member this.TryRebase(rebaseFn: unit -> Task<BlogText * ProjectionSnapshot>) : bool =
         this.TryRebase(fun () -> rebaseFn () |> Async.AwaitTask)
 
-    /// Y self-rebase: persist ONLY a new B' and leave the projection baseline
-    /// (lastSuccessfulProjection) UNCHANGED. The Blogger child sees only the old
-    /// B when condensing — it never processes the P0→P1 projection delta — so
-    /// advancing the baseline here would silently lose the P0→P1 messages: the
-    /// next TransformRaw(P1) would see no delta vs P1 and skip. By keeping the
-    /// baseline at P0, the subsequent TransformRaw computes the full P0→P1
-    /// delta and the Blogger processes it normally. Only currentB is replaced.
+    /// Y self-rebase: persist ONLY B', keep projection baseline UNCHANGED.
+    /// IF ActivePrefixEpoch exists, its FrozenB is updated to the condensed B'.
     member this.TrySelfRebase(rebaseFn: unit -> Async<BlogText>) : bool =
         lock lockObj (fun () ->
-            if isBusyUnlocked () then
-                false
+            if isBusyUnlocked () then false
             else
                 busy <- true
-
                 let t =
                     async {
                         try
                             let! b = rebaseFn ()
-
-                            // Persist B' with the EXISTING baseline so the
-                            // durable CompanionAdvanced keeps the same projection.
-                            // If there is no baseline yet (no prior Submit), skip
-                            // the durable append — B' stays in memory only.
                             lastSuccessfulProjection |> Option.iter (fun proj -> persistSuccessful proj b)
-
-                            lock lockObj (fun () -> currentB <- Some b)
-                        with _ ->
-                            ()
-                    }
-                    |> startAsTask
-
+                            lock lockObj (fun () ->
+                                latestB <- Some b
+                                match activePrefixEpoch with
+                                | Some epoch ->
+                                    let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
+                                    let updatedEpoch = { epoch with FrozenB = b; EpochId = sprintf "%s|%d|%d" sessionStr epoch.CutoffMessageIndex (String.length b) }
+                                    persistEpochSwitched updatedEpoch
+                                    activePrefixEpoch <- Some updatedEpoch
+                                | None -> ())
+                        with _ -> ()
+                    } |> startAsTask
                 inFlightTask <- Some t
                 true)
 
     member this.TrySelfRebase(rebaseFn: unit -> Task<BlogText>) : bool =
         this.TrySelfRebase(fun () -> rebaseFn () |> Async.AwaitTask)
 
-    /// Submit: starts async blog function only when idle, returns SkippedBusy when busy, never queues.
-    /// Completion atomically updates currentB and lastSuccessfulProjection on success; failure leaves both unchanged.
-    member this.Submit
-        (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Async<BlogText>)
-        : CompanionOutcome =
+    /// Freeze LatestB as the first ActivePrefixEpoch. No-op if epoch already exists or no LatestB.
+    member this.FreezeEpoch() : bool =
         lock lockObj (fun () ->
-            if isBusyUnlocked () then
-                SkippedBusy
-            else
-                let deltaOpt = Companion.jsonDelta lastSuccessfulProjection currentProjection
+            match activePrefixEpoch, latestB with
+            | Some _, _ | _, None -> false
+            | None, Some b ->
+                let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
+                let epoch: ActivePrefixEpoch =
+                    { EpochId = sprintf "%s|0|%d" sessionStr (String.length b)
+                      FrozenB = b; CutoffMessageIndex = 0; CoveredPrefixDigest = string (String.length b) }
+                persistEpochSwitched epoch
+                activePrefixEpoch <- Some epoch; true)
 
-                match deltaOpt with
+    /// Switch to a new epoch from current LatestB. Cold-cache boundary.
+    member this.SwitchEpoch(cutoffMessageIndex: int) : bool =
+        lock lockObj (fun () ->
+            match latestB with
+            | None -> false
+            | Some b ->
+                let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
+                let epoch: ActivePrefixEpoch =
+                    { EpochId = sprintf "%s|%d|%d" sessionStr cutoffMessageIndex (String.length b)
+                      FrozenB = b; CutoffMessageIndex = cutoffMessageIndex; CoveredPrefixDigest = string (String.length b) }
+                persistEpochSwitched epoch
+                activePrefixEpoch <- Some epoch; true)
+
+    /// Submit: blog delta -> update latestB + projection. Never modifies ActivePrefixEpoch.
+    member this.Submit (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Async<BlogText>) : CompanionOutcome =
+        lock lockObj (fun () ->
+            if isBusyUnlocked () then SkippedBusy
+            else
+                match Companion.jsonDelta lastSuccessfulProjection currentProjection with
                 | None -> Submitted
                 | Some delta ->
                     busy <- true
-
                     let t =
                         async {
                             try
                                 let! content = blogFn delta
-
-                                let nextB =
-                                    match currentB with
-                                    | None -> content
-                                    | Some old -> old + "\n\n" + content
-
+                                let nextB = match latestB with None -> content | Some old -> old + "\n\n" + content
                                 persistSuccessful currentProjection nextB
-
-                                lock lockObj (fun () ->
-                                    currentB <- Some nextB
-                                    lastSuccessfulProjection <- Some currentProjection)
-                            with _ ->
-                                ()
-                        }
-                        |> startAsTask
-
+                                lock lockObj (fun () -> latestB <- Some nextB; lastSuccessfulProjection <- Some currentProjection)
+                            with _ -> ()
+                        } |> startAsTask
                     inFlightTask <- Some t
                     Submitted)
 
-    member this.Submit
-        (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Task<BlogText>)
-        : CompanionOutcome =
+    member this.Submit (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Task<BlogText>) : CompanionOutcome =
         this.Submit(currentProjection, (fun (delta: ProjectionSnapshot) -> blogFn delta |> Async.AwaitTask))
 
     member this.Submit(currentProjection: ProjectionSnapshot, blogFn: unit -> Async<BlogText>) : CompanionOutcome =

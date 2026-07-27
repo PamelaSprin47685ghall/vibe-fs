@@ -176,7 +176,7 @@ module AgentFactsTests =
 
         let comp = proj.Sessions.[sid].Companion.Value
         Assert.Equal(Some "{\"state\":\"base\"}", comp.LastSuccessfulProjection)
-        Assert.Equal(Some "Updated Blog Post", comp.CurrentB)
+        Assert.Equal(Some "Updated Blog Post", comp.LatestB)
         Assert.True(comp.ReplacementActive)
 
     [<Fact>]

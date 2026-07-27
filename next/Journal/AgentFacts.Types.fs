@@ -30,9 +30,16 @@ module CandidateId =
 type ProjectionSnapshot = string
 type BlogText = string
 
+type ActivePrefixEpochProjection =
+    { EpochId: string
+      FrozenB: BlogText
+      CutoffMessageIndex: int
+      CoveredPrefixDigest: string }
+
 type CompanionProjection =
     { LastSuccessfulProjection: ProjectionSnapshot option
-      CurrentB: BlogText option
+      LatestB: BlogText option
+      ActivePrefixEpoch: ActivePrefixEpochProjection option
       ReplacementActive: bool }
 
     member this.PrefixReplacementEnabled = this.ReplacementActive

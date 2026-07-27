@@ -65,6 +65,7 @@
     <Compile Include="Orchestrator.GitPort.fs"/>
     <Compile Include="Tools/MessageTransform.fs"/>
     <Compile Include="Session/CompanionDelta.fs"/>
+    <Compile Include="Session/CompanionTypes.fs"/>
     <Compile Include="Session/Companion.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
     <Compile Include="Tools/StaticTools.fs"/>
@@ -84,6 +85,7 @@
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
+    <Compile Include="Session/CompanionJournalPort.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>
     <Compile Include="OpenCode/HostSessionNudge.fs"/>

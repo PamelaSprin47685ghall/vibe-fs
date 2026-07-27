@@ -78,7 +78,7 @@ module CompanionHostTests =
 
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
             do! companion.WaitInFlightAsync()
-            Assert.Equal(Some "blog paragraph", companion.Memory.CurrentB)
+            Assert.Equal(Some "blog paragraph", companion.Memory.LatestB)
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":2}"))
             do! companion.WaitInFlightAsync()
             Assert.Equal(1, childCount ())
@@ -119,7 +119,7 @@ module CompanionHostTests =
                 Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":2}"))
                 do! companion.WaitInFlightAsync()
                 Assert.True(companion.EnablePrefixReplacement())
-                Assert.Equal(Some "blog paragraph\n\nblog paragraph", companion.Memory.CurrentB)
+                Assert.Equal(Some "blog paragraph\n\nblog paragraph", companion.Memory.LatestB)
                 Assert.Equal(Some "{\"step\":2}", companion.Memory.LastSuccessfulProjection)
                 (journal :> IDisposable).Dispose()
 
@@ -141,7 +141,7 @@ module CompanionHostTests =
                 let restored =
                     new CompanionHost(primaryId, restoredHost, restoredDurable, ?bloggerModel = Some(Ok bloggerModel))
 
-                Assert.Equal(Some "blog paragraph\n\nblog paragraph", restored.Memory.CurrentB)
+                Assert.Equal(Some "blog paragraph\n\nblog paragraph", restored.Memory.LatestB)
                 Assert.Equal(Some "{\"step\":2}", restored.Memory.LastSuccessfulProjection)
                 Assert.True(restored.EnablePrefixReplacement())
             })
@@ -232,7 +232,7 @@ module CompanionHostTests =
             Assert.Equal(Submitted, companion.SubmitProjection(p0))
             do! companion.WaitInFlightAsync()
             Assert.Equal(Some p0, companion.Memory.LastSuccessfulProjection)
-            Assert.Equal(Some "blog paragraph", companion.Memory.CurrentB)
+            Assert.Equal(Some "blog paragraph", companion.Memory.LatestB)
 
             // Trigger Y self-rebase. The Blogger condenses old B into B'.
             Assert.Equal(Submitted, companion.SelfRebase())
@@ -241,7 +241,7 @@ module CompanionHostTests =
             // KEY ASSERTION: baseline must still be P0, NOT advanced.
             // Only B is replaced.
             Assert.Equal(Some p0, companion.Memory.LastSuccessfulProjection)
-            Assert.Equal(Some "condensed B prime", companion.Memory.CurrentB)
+            Assert.Equal(Some "condensed B prime", companion.Memory.LatestB)
 
             // Now submit P1 (more messages). The delta P0→P1 must be computed,
             // not skipped — because the baseline is still P0.
@@ -251,7 +251,7 @@ module CompanionHostTests =
 
             // After processing P1, baseline advances to P1 and B grows.
             Assert.Equal(Some p1, companion.Memory.LastSuccessfulProjection)
-            Assert.True(companion.Memory.CurrentB.IsSome)
-            Assert.True(companion.Memory.CurrentB.Value.Contains("condensed B prime"))
-            Assert.True(companion.Memory.CurrentB.Value.Contains("blog paragraph"))
+            Assert.True(companion.Memory.LatestB.IsSome)
+            Assert.True(companion.Memory.LatestB.Value.Contains("condensed B prime"))
+            Assert.True(companion.Memory.LatestB.Value.Contains("blog paragraph"))
         }

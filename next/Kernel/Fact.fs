@@ -105,6 +105,12 @@ module Fact =
             {| EffectId: string
                SessionId: SessionId
                Result: string |}
+        | CompanionEpochSwitched of
+            {| SessionId: SessionId
+               EpochId: string
+               FrozenB: string
+               CutoffMessageIndex: int
+               CoveredPrefixDigest: string |}
 
     type Fact =
         | Runtime of RuntimeFact

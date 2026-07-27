@@ -56,7 +56,7 @@ module internal CompanionHostBlogger =
                     if reset then
                         sprintf
                             "You are the blogger of a coding agent session. This session resumed after a restart and your prior companion context was lost. Re-anchor on the FULL current companion context B and the FULL CURRENT projection, then continue. FULL B:\n%s\nFULL PROJECTION:\n%s"
-                            (deps.Companion.Memory.CurrentB |> Option.defaultValue "")
+                            (deps.Companion.Memory.LatestB |> Option.defaultValue "")
                             currentProjection
                     else
                         sprintf

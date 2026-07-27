@@ -8,7 +8,8 @@ module AgentFacts =
 
     let emptyCompanion: CompanionProjection =
         { LastSuccessfulProjection = None
-          CurrentB = None
+          LatestB = None
+          ActivePrefixEpoch = None
           ReplacementActive = false }
 
     let emptyLinkage: AgentLinkageProjection =
@@ -64,7 +65,8 @@ module AgentFacts =
                                     LastSuccessfulProjection = Some p.Projection }
                             | None ->
                                 { LastSuccessfulProjection = Some p.Projection
-                                  CurrentB = None
+                                  LatestB = None
+                                  ActivePrefixEpoch = None
                                   ReplacementActive = false }
 
                         { s with Companion = Some comp })
@@ -81,10 +83,11 @@ module AgentFacts =
                             match s.Companion with
                             | Some existing ->
                                 { existing with
-                                    CurrentB = Some p.Content }
+                                    LatestB = Some p.Content }
                             | None ->
                                 { LastSuccessfulProjection = None
-                                  CurrentB = Some p.Content
+                                  LatestB = Some p.Content
+                                  ActivePrefixEpoch = None
                                   ReplacementActive = false }
 
                         { s with Companion = Some comp })
@@ -102,11 +105,43 @@ module AgentFacts =
                             | Some existing ->
                                 { existing with
                                     LastSuccessfulProjection = Some p.Projection
-                                    CurrentB = Some p.Content }
+                                    LatestB = Some p.Content }
                             | None ->
                                 { LastSuccessfulProjection = Some p.Projection
-                                  CurrentB = Some p.Content
+                                  LatestB = Some p.Content
+                                  ActivePrefixEpoch = None
                                   ReplacementActive = false }
+
+                        { s with Companion = Some comp })
+                    proj.Sessions
+
+            { proj with Sessions = sessions }
+
+        | AgentFact.CompanionEpochSwitched p ->
+            let sessions =
+                updateSession
+                    p.SessionId
+                    (fun s ->
+                        let comp =
+                            match s.Companion with
+                            | Some existing ->
+                                { existing with
+                                    ActivePrefixEpoch =
+                                        Some
+                                            { EpochId = p.EpochId
+                                              FrozenB = p.FrozenB
+                                              CutoffMessageIndex = p.CutoffMessageIndex
+                                              CoveredPrefixDigest = p.CoveredPrefixDigest } }
+                            | None ->
+                                { LastSuccessfulProjection = None
+                                  LatestB = None
+                                  ActivePrefixEpoch =
+                                      Some
+                                          { EpochId = p.EpochId
+                                            FrozenB = p.FrozenB
+                                            CutoffMessageIndex = p.CutoffMessageIndex
+                                            CoveredPrefixDigest = p.CoveredPrefixDigest }
+                                  ReplacementActive = true }
 
                         { s with Companion = Some comp })
                     proj.Sessions
@@ -125,7 +160,8 @@ module AgentFacts =
                                     ReplacementActive = p.Active }
                             | None ->
                                 { LastSuccessfulProjection = None
-                                  CurrentB = None
+                                  LatestB = None
+                                  ActivePrefixEpoch = None
                                   ReplacementActive = p.Active }
 
                         { s with Companion = Some comp })

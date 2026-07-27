@@ -236,29 +236,30 @@ module Projection =
     /// Stable message content used by Companion prefix matching.  The
     /// message id is intentionally omitted from the content projection: it is
     /// a locator, not evidence that a message's contents are unchanged.
+    /// Stable message content used by Companion prefix matching.  The
+    /// message id is intentionally omitted from the content projection: it is
+    /// a locator, not evidence that a message's contents are unchanged.
+    /// Only includes provider-visible fields (role, text, tool call metadata)
+    /// and explicitly excludes timestamp, cost, usage, runtime ID, directory,
+    /// status, and other non-model fields that differ between requests without
+    /// affecting the cache prefix.
     let canonicalMessageJson (rawObj: obj) : string =
         match projectMessage rawObj with
         | None -> canonicalJson rawObj
         | Some message ->
-            let info =
-                infoObject rawObj
-                |> CanonicalJson.withoutKeys [| "id"; "role"; "sessionID"; "agent"; "text"; "parts" |]
-
-            let outer =
-                rawObj
-                |> CanonicalJson.withoutKeys [| "id"; "info"; "role"; "sessionID"; "agent"; "text"; "parts" |]
-
-            let agent: obj = message.Agent |> Option.map box |> Option.defaultValue null
-
+            // Provider-visible projection: only fields that actually enter the model.
+            // Explicitly excludes: timestamp, cost, usage, runtime ID, directory,
+            // status, UI metadata, and any other non-model bookkeeping fields.
             let normalized =
                 createObj
-                    [ "info", box info
-                      "outer", box outer
-                      "role", box (roleToString message.Role)
-                      "sessionID", box message.SessionId
-                      "agent", agent
+                    [ "role", box (roleToString message.Role)
                       "text", box message.Text
-                      "parts", box (message.Parts |> List.map canonicalPartValue |> List.toArray) ]
+                      "parts",
+                      box (message.Parts |> List.map canonicalPartValue |> List.toArray)
+                      // Include sessionID for Companion delta routing; it is a
+                      // routing identifier, not cache content — its stability is
+                      // guaranteed by the causal transform pipeline.
+                      "sessionID", box message.SessionId ]
 
             canonicalJson normalized
 

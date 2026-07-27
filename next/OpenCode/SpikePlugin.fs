@@ -190,6 +190,12 @@ module SpikePlugin =
                           "journal", box journal
                           "hostEventsSubscription", box subscription
                           "chat.transform", box (uncurriedExecute (box transform))
+                          // Both hooks are registered for compatibility: some
+                          // OpenCode host versions call chat.transform while
+                          // others call experimental.chat.messages.transform.
+                          // The idempotency guard in handleCompanionTransform
+                          // detects companion-b-head already present and skips
+                          // the second invocation, preventing duplicate B heads.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
