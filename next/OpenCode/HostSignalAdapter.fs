@@ -74,6 +74,7 @@ module HostSignalAdapter =
                   Reason = reason
                   MessageId = messageId }
 
+    /// SSOT signals only: session.status idle|retry and session.deleted.
     let tryAdapt (isOwned: SessionId -> bool) (rawInput: obj) : HostSignal option =
         let raw = unwrap rawInput
 
@@ -96,15 +97,13 @@ module HostSignalAdapter =
                         | "idle" -> Some(SessionIdle sessionId)
                         | "retry" -> retrySignal sessionId raw |> Option.map ProviderRetry
                         | _ -> None
-            | "session.idle" ->
-                match sessionIdOf raw with
-                | Some sessionId when isOwned sessionId -> Some(SessionIdle sessionId)
-                | _ -> None
             | "session.deleted" ->
                 match sessionIdOf raw with
                 | Some sessionId when isOwned sessionId -> Some(SessionDeleted sessionId)
                 | _ -> None
             | "session.error" ->
+                // Abort latch only: wakes reconcile / completes join. Never a
+                // durable fallback attribution path.
                 match sessionIdOf raw with
                 | None -> None
                 | Some sessionId when not (isOwned sessionId) -> None
@@ -114,6 +113,7 @@ module HostSignalAdapter =
                     let name =
                         if isNull error || isNull error?name then ""
                         else unbox<string> error?name
+
                     if name.IndexOf("Abort", StringComparison.OrdinalIgnoreCase) >= 0 then
                         Some(SessionAbort sessionId)
                     else
@@ -123,11 +123,9 @@ module HostSignalAdapter =
 type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> unit) as this =
     let sources = Dictionary<string, SessionSignalSource>()
 
-    // Empty registry means "accept all" only before the first owned session is
-    // registered; after that only explicit owned sessions pass.
+    // Fail-closed: empty registry owns nothing.
     let isOwned (sessionId: SessionId) =
-        ownedSessions.Count = 0
-        || ownedSessions.Contains(SessionId.value sessionId)
+        ownedSessions.Contains(SessionId.value sessionId)
 
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
@@ -158,8 +156,7 @@ type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> un
             | true, GlobalForeignDirectoryEvent -> ()
             | _ -> onSignal signal
 
-    /// Global SSE path. Drops sessions registered as local-only; unregistered
-    /// owned sessions still pass (legacy accept until source is set).
+    /// Global SSE path. Drops sessions registered as local-only.
     member _.ObserveGlobal(raw: obj) =
         match HostSignalAdapter.tryAdapt isOwned raw with
         | None -> ()

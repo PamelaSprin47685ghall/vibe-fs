@@ -87,7 +87,7 @@ module HostSignalBootstrap =
         let subscription =
             match HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal with
             | Error err -> raise (InvalidOperationException err)
-            | Ok sub -> sub
+            | Ok(sub, _source) -> sub
 
         let registerOwned (sessionId: string) =
             if not (String.IsNullOrWhiteSpace sessionId) then

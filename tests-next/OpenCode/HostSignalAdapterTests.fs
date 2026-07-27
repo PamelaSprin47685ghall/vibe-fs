@@ -24,8 +24,30 @@ module HostSignalAdapterTests =
                 [ "type", box "message.updated"
                   "properties", box (createObj [ "sessionID", box "s1" ]) ]
 
-        Assert.True(HostSignalAdapter.tryAdapt owned raw |> Option.isNone)
         Assert.True(HostSignalAdapter.tryAdapt owned updated |> Option.isNone)
+
+    [<Fact>]
+    let ``Drops_legacy_session_idle_keeps_abort_error_latch`` () =
+        let idle =
+            createObj
+                [ "type", box "session.idle"
+                  "properties", box (createObj [ "sessionID", box "s1" ]) ]
+
+        Assert.True(HostSignalAdapter.tryAdapt owned idle |> Option.isNone)
+
+        let err =
+            createObj
+                [ "type", box "session.error"
+                  "properties",
+                  box (
+                      createObj
+                          [ "sessionID", box "s1"
+                            "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
+                  ) ]
+
+        match HostSignalAdapter.tryAdapt owned err with
+        | Some(SessionAbort sid) -> Assert.Equal("s1", SessionId.value sid)
+        | other -> Assert.True(false, sprintf "unexpected %A" other)
 
     [<Fact>]
     let ``Idle_and_retry_and_deleted_are_signals`` () =
@@ -80,7 +102,35 @@ module HostSignalAdapterTests =
     let ``Unowned_session_is_ignored`` () =
         let idle =
             createObj
-                [ "type", box "session.idle"
-                  "properties", box (createObj [ "sessionID", box "other" ]) ]
+                [ "type", box "session.status"
+                  "properties",
+                  box (
+                      createObj
+                          [ "sessionID", box "other"
+                            "status", box (createObj [ "type", box "idle" ]) ]
+                  ) ]
 
         Assert.True(HostSignalAdapter.tryAdapt owned idle |> Option.isNone)
+
+    [<Fact>]
+    let ``Empty_owned_registry_is_fail_closed`` () =
+        let signals = ResizeArray<HostSignal>()
+        let owned = HashSet<string>()
+        let router = HostSignalRouter(owned, fun s -> signals.Add s)
+
+        let idle =
+            createObj
+                [ "type", box "session.status"
+                  "properties",
+                  box (
+                      createObj
+                          [ "sessionID", box "s1"
+                            "status", box (createObj [ "type", box "idle" ]) ]
+                  ) ]
+
+        router.Observe idle
+        Assert.Equal(0, signals.Count)
+
+        router.RegisterOwned(SessionId.create "s1")
+        router.Observe idle
+        Assert.Equal(1, signals.Count)

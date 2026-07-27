@@ -144,14 +144,20 @@ type CompanionHost
         let deps = this.BloggerDeps
         companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps projection delta))
 
-    member _.EnablePrefixReplacement() : bool =
-        let enabled = companion.TryEnableReplacement()
-        // Freeze LatestB immediately so later blog success cannot change the
-        // X-visible head. No-op if already frozen or LatestB missing.
-        if enabled then companion.FreezeEpoch() |> ignore
-        enabled
+    member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
 
     member _.FreezeEpoch() : bool = companion.FreezeEpoch()
+
+    member _.FreezeEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
+        companion.FreezeEpoch(cutoffMessageIndex, coveredPrefixDigest)
+
+    member _.SwitchEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
+        companion.SwitchEpoch(cutoffMessageIndex, coveredPrefixDigest)
+
+    member _.SwitchEpoch(cutoffMessageIndex: int) : bool =
+        companion.SwitchEpoch(cutoffMessageIndex)
+
+    member _.TakePendingEpochSwitch() : bool = companion.TakePendingEpochSwitch()
 
     /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
     /// into B' and durably persist (CompanionAdvanced with the EXISTING baseline,
@@ -185,6 +191,8 @@ type CompanionHost
         let current = CompanionDelta.jsonOfMessages Projection.canonicalJson messages
         let before = companion.Memory
 
+        // Watermark is only for Blogger baseline / first-freeze cutoff capture.
+        // Once an epoch exists, deletion range is epoch.CutoffMessageIndex only.
         let watermark =
             match before.LastSuccessfulProjection with
             | Some previous ->
@@ -201,35 +209,44 @@ type CompanionHost
         companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps current delta))
         |> ignore
 
-        match before.ReplacementActive, before.ActivePrefixEpoch, before.LastSuccessfulProjection with
-        | true, Some epoch, Some _ when watermark > 0 ->
-            // X-side prefix replacement: use the frozen B from ActivePrefixEpoch.
-            // This is the key cache fix — FrozenB remains stable across Blogger
-            // updates, unlike the old CurrentB which changed every blog and
-            // corrupted the provider KV-cache prefix.
-            let synthetic =
-                createObj
-                    [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
-                      "parts", box [| createObj [ "type", box "text"; "text", box epoch.FrozenB ] |] ]
+        let inject (frozenB: string) (cutoff: int) =
+            if cutoff <= 0 || cutoff > List.length messages then
+                // Fail closed: never delete past the message list or invent a
+                // zero-cutoff wipe of context that FrozenB does not cover.
+                messages
+            else
+                let synthetic =
+                    createObj
+                        [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
+                          "parts", box [| createObj [ "type", box "text"; "text", box frozenB ] |] ]
 
-            synthetic :: (messages |> List.skip watermark)
-        | true, None, Some _ when watermark > 0 ->
-            // Replacement active but no epoch yet: freeze LatestB as the first epoch.
-            // This is an implicit cold-cache boundary (first and only unavoidable one
-            // for this prefix-replacement session).
-            match before.LatestB with
-            | Some b ->
-                companion.FreezeEpoch() |> ignore
-                let epoch = companion.Memory.ActivePrefixEpoch
-                match epoch with
-                | Some epoch ->
-                    let synthetic =
-                        createObj
-                            [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
-                              "parts", box [| createObj [ "type", box "text"; "text", box epoch.FrozenB ] |] ]
+                synthetic :: (messages |> List.skip cutoff)
 
-                    synthetic :: (messages |> List.skip watermark)
-                | None -> messages
+        // Explicit cold boundary after Y self-rebase: adopt LatestB as FrozenB
+        // while keeping the frozen cutoff (condensed B covers the same prefix).
+        if companion.TakePendingEpochSwitch() then
+            match companion.Memory.ActivePrefixEpoch, companion.Memory.LatestB with
+            | Some epoch, Some _ ->
+                companion.SwitchEpoch(epoch.CutoffMessageIndex, epoch.CoveredPrefixDigest)
+                |> ignore
+            | _ -> ()
+
+        let memory = companion.Memory
+
+        match memory.ReplacementActive, memory.ActivePrefixEpoch with
+        | true, Some epoch ->
+            inject epoch.FrozenB epoch.CutoffMessageIndex
+        | true, None when watermark > 0 && before.LatestB.IsSome ->
+            // First freeze: capture the covered prefix at this exact watermark.
+            let digest =
+                messages
+                |> List.take watermark
+                |> CompanionDelta.jsonOfMessages Projection.canonicalJson
+
+            companion.FreezeEpoch(watermark, digest) |> ignore
+
+            match companion.Memory.ActivePrefixEpoch with
+            | Some epoch -> inject epoch.FrozenB epoch.CutoffMessageIndex
             | None -> messages
         | _ -> messages
 

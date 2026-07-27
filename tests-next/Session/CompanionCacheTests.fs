@@ -52,7 +52,14 @@ module CompanionCacheTests =
             [ "info", box (createObj [ "id", box id; "role", box "user"; "sessionID", box sessionId ])
               "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
 
-    /// P0: FrozenB stays byte-identical across blog success and Y self-rebase.
+    let private messageIds (messages: obj list) =
+        messages
+        |> List.choose (fun m ->
+            if isNull m || isNull m?info || isNull m?info?id then None
+            else Some(unbox<string> m?info?id))
+
+    /// P0: FrozenB stays byte-identical across blog success AND Y self-rebase.
+    /// Only SwitchEpoch may change the X-visible head.
     [<Fact>]
     let ``FrozenB_stable_across_blog_and_self_rebase`` () =
         task {
@@ -63,20 +70,22 @@ module CompanionCacheTests =
             let companion =
                 new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
 
-            // Establish projection baseline from real messages (not a fake step JSON).
             let baseMsgs = [ msg sid "u1" "old"; msg sid "u2" "mid" ]
             companion.TransformRaw baseMsgs |> ignore
             do! companion.WaitInFlightAsync()
             Assert.Equal(Some "B1", companion.Memory.LatestB)
 
             Assert.True(companion.EnablePrefixReplacement())
-            Assert.True(companion.Memory.ActivePrefixEpoch.IsSome)
-            Assert.Equal("B1", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
 
-            // Extended tail keeps the same prefix so watermark > 0 and b-head injects.
+            // First freeze happens on transform with watermark coverage.
             let extended = baseMsgs @ [ msg sid "u3" "tail" ]
             let t1 = companion.TransformRaw extended
             do! companion.WaitInFlightAsync()
+            Assert.True(companion.Memory.ActivePrefixEpoch.IsSome)
+            let frozen = companion.Memory.ActivePrefixEpoch.Value.FrozenB
+            let cutoff = companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex
+            Assert.Equal("B1", frozen)
+            Assert.True(cutoff > 0)
             Assert.Equal("companion-b-head", unbox<string> t1.Head?info?id)
             Assert.Equal("B1", headText t1)
 
@@ -86,17 +95,69 @@ module CompanionCacheTests =
             let t2 = companion.TransformRaw extended2
             do! companion.WaitInFlightAsync()
             Assert.True(companion.Memory.LatestB.Value.Contains("B2"))
-            Assert.Equal("B1", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+            Assert.Equal(frozen, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+            Assert.Equal(cutoff, companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex)
             Assert.Equal("B1", headText t2)
 
-// Self-rebase while replacement is active is an explicit cold epoch switch.
+            // Self-rebase updates LatestB immediately; FrozenB stays until the
+            // next Transform consumes pendingEpochSwitch as SwitchEpoch.
             Assert.Equal(Submitted, companion.SelfRebase())
             do! companion.WaitInFlightAsync()
             Assert.Equal(Some "B-condensed", companion.Memory.LatestB)
-            Assert.Equal("B-condensed", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+            Assert.Equal(frozen, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
 
             let t3 = companion.TransformRaw (extended2 @ [ msg sid "u5" "later" ])
+            Assert.Equal("B-condensed", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+            Assert.Equal(cutoff, companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex)
             Assert.Equal("B-condensed", headText t3)
+        }
+
+    /// P0: epoch cutoff is frozen. Later blogger baseline growth must not
+    /// enlarge the deleted prefix range (no context loss).
+    [<Fact>]
+    let ``Epoch_cutoff_fixed_despite_blogger_baseline_advance`` () =
+        task {
+            let nextText = ref "B1"
+            let host = makeHost nextText "x"
+            let sid = "cutoff-primary"
+
+            let companion =
+                new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
+
+            let baseMsgs = [ msg sid "u1" "old"; msg sid "u2" "mid"; msg sid "u3" "keep" ]
+            companion.TransformRaw baseMsgs |> ignore
+            do! companion.WaitInFlightAsync()
+            Assert.True(companion.EnablePrefixReplacement())
+
+            let afterFreeze = baseMsgs @ [ msg sid "u4" "tail" ]
+            let t1 = companion.TransformRaw afterFreeze
+            do! companion.WaitInFlightAsync()
+            let epoch = companion.Memory.ActivePrefixEpoch.Value
+            Assert.True(epoch.CutoffMessageIndex > 0)
+            Assert.True(epoch.CutoffMessageIndex < List.length afterFreeze)
+
+            // Advance baseline by blogging more messages.
+            nextText.Value <- "B2"
+            let longer =
+                afterFreeze
+                @ [ msg sid "u5" "extra1"; msg sid "u6" "extra2"; msg sid "u7" "extra3" ]
+
+            let t2 = companion.TransformRaw longer
+            do! companion.WaitInFlightAsync()
+
+            Assert.Equal(epoch.CutoffMessageIndex, companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex)
+            Assert.Equal(epoch.FrozenB, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+
+            // Messages at/after original cutoff must still appear in the tail.
+            let ids = messageIds t2
+            Assert.True(List.contains "companion-b-head" ids)
+            // u3 was at index 2; if cutoff was 2, u3 is first raw tail message.
+            // Regardless, u7 (new tail) must be present.
+            Assert.True(List.contains "u7" ids)
+            // Critical: if cutoff was frozen at 2, messages u3.. must remain.
+            // Dynamic watermark growth must NOT delete u3..u6 while FrozenB is B1.
+            Assert.True(List.contains "u3" ids || epoch.CutoffMessageIndex > 2)
+            Assert.Equal("B1", headText t2)
         }
 
     /// Dual-hook safety: second transform with b-head present is a no-op.
@@ -118,64 +179,25 @@ module CompanionCacheTests =
 
             companions.[sid] <- companion
 
-            let baseMsgs =
-                [| msg sid "u1" "old"
-                   msg sid "u2" "mid" |]
-
+            let baseMsgs = [| msg sid "u1" "old"; msg sid "u2" "mid" |]
             let out1 = createObj [ "messages", box baseMsgs ]
             let inObj = createObj [ "sessionID", box sid; "agent", box "manager" ]
 
-            // First pass: establish baseline + LatestB.
             CompanionTransform.handleCompanionTransform
-                companions
-                gate
-                host
-                None
-                None
-                sessionBudgets
-                sessionRoles
-                (Ok bloggerModel)
-                inObj
-                out1
-
+                companions gate host None None sessionBudgets sessionRoles (Ok bloggerModel) inObj out1
             do! companion.WaitInFlightAsync()
             Assert.True(companion.EnablePrefixReplacement())
 
-            // Second pass with longer tail activates inject of companion-b-head.
-            let extended =
-                Array.append baseMsgs [| msg sid "u3" "tail" |]
-
+            let extended = Array.append baseMsgs [| msg sid "u3" "tail" |]
             let out2 = createObj [ "messages", box extended ]
-
             CompanionTransform.handleCompanionTransform
-                companions
-                gate
-                host
-                None
-                None
-                sessionBudgets
-                sessionRoles
-                (Ok bloggerModel)
-                inObj
-                out2
-
+                companions gate host None None sessionBudgets sessionRoles (Ok bloggerModel) inObj out2
             do! companion.WaitInFlightAsync()
             let after1 = unbox<obj array> out2?messages
             Assert.Equal("companion-b-head", unbox<string> after1.[0]?info?id)
 
-            // Third pass (dual hook): already has b-head → no-op, still one head.
             CompanionTransform.handleCompanionTransform
-                companions
-                gate
-                host
-                None
-                None
-                sessionBudgets
-                sessionRoles
-                (Ok bloggerModel)
-                inObj
-                out2
-
+                companions gate host None None sessionBudgets sessionRoles (Ok bloggerModel) inObj out2
             let after2 = unbox<obj array> out2?messages
             Assert.Equal(after1.Length, after2.Length)
 

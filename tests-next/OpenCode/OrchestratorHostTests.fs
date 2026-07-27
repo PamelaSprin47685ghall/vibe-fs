@@ -22,7 +22,9 @@ module OrchestratorHostTests =
     [<Fact>]
     let ``HostSignalSubscribe unwraps global SSE payload into idle signal`` () =
         let captured = ResizeArray<HostSignal>()
-        let router = HostSignalRouter(HashSet<string>(), fun s -> captured.Add s)
+        let owned = System.Collections.Generic.HashSet<string>()
+        let router = HostSignalRouter(owned, fun s -> captured.Add s)
+        router.RegisterOwned(SessionId.create "mgr-child")
 
         let globalSse =
             createObj
@@ -30,21 +32,25 @@ module OrchestratorHostTests =
                   "payload",
                   box (
                       createObj
-                          [ "type", box "session.idle"
-                            "properties", box (createObj [ "sessionID", box "mgr-child" ]) ]
+                          [ "type", box "session.status"
+                            "properties",
+                            box (
+                                createObj
+                                    [ "sessionID", box "mgr-child"
+                                      "status", box (createObj [ "type", box "idle" ]) ]
+                            ) ]
                   ) ]
 
         // HostSignalSubscribe.unwrap extracts the inner payload before the
         // adapter sees it. Drive the router with that unwrapped payload and
         // assert the resulting idle signal.
         router.Observe(globalSse?payload)
+        Assert.True(captured.Count = 1)
 
-        Assert.True(
-            captured
-            |> Seq.exists (function
-                | SessionIdle sid -> SessionId.value sid = "mgr-child"
-                | _ -> false)
-        )
+        match captured.[0] with
+        | SessionIdle sid -> Assert.Equal("mgr-child", SessionId.value sid)
+        | other -> Assert.True(false, sprintf "unexpected %A" other)
+
 
     [<Fact>]
     let ``OrchestratorHost fork fails on non-repo without creating child`` () =

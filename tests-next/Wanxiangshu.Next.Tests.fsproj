@@ -38,6 +38,7 @@
     <Compile Include="Process/PtyLifecycleTests.fs"/>
     <Compile Include="Agent/ProgramsTests.fs"/>
     <Compile Include="Session/ForkRuntimeTests.fs"/>
+    <Compile Include="Session/ForkRuntimeJoinTests.fs"/>
     <Compile Include="Session/HostForkRuntimeTests.fs"/>
     <Compile Include="Session/HostForkRuntimeSessionDeadTests.fs"/>
     <Compile Include="Session/HostForkRuntimeLinkageTests.fs"/>

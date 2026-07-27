@@ -37,6 +37,8 @@ type ForkResult with
 [<RequireQualifiedAccess>]
 type ForkError =
     | Empty
+    | NothingToJoin
+    | Cancelled
     | NotFound of agentId: string
 
 type RunCompletion =
@@ -178,10 +180,20 @@ type ForkRuntime
         lock lockObj (fun () ->
             if mailbox.Count > 0 then
                 Task.FromResult(Ok(mailbox.Dequeue()))
+            elif isCancelled then
+                Task.FromResult(Error ForkError.Cancelled)
             else
-                let waiter = TaskCompletionSource<Result<RunCompletion, ForkError>>()
-                waiters.Enqueue(waiter)
-                waiter.Task)
+                let hasBusy =
+                    agents.Values
+                    |> Seq.exists (fun record' -> record'.Status = AgentStatus.Busy)
+                    || ptys.Count > 0
+
+                if not hasBusy then
+                    Task.FromResult(Error ForkError.NothingToJoin)
+                else
+                    let waiter = TaskCompletionSource<Result<RunCompletion, ForkError>>()
+                    waiters.Enqueue(waiter)
+                    waiter.Task)
 
     /// Enqueue an external completion (for example, a PTY) in this runtime's Join mailbox.
     member _.PublishCompletion(completion: RunCompletion) : unit =
@@ -223,10 +235,10 @@ type ForkRuntime
     member _.PendingCompletionCount = lock lockObj (fun () -> mailbox.Count)
 
     member _.Cancel() : unit =
-        let toClean =
+        let toClean, pendingWaiters =
             lock lockObj (fun () ->
                 if isCancelled then
-                    []
+                    [], []
                 else
                     isCancelled <- true
                     let agentIds = agents.Keys |> Seq.toList
@@ -242,7 +254,18 @@ type ForkRuntime
 
                     let ptyIds = ptys.Keys |> Seq.toList
                     ptys.Clear()
-                    agentIds @ ptyIds)
+
+                    let drainedWaiters =
+                        [ while waiters.Count > 0 do
+                              yield waiters.Dequeue() ]
+
+                    agentIds @ ptyIds, drainedWaiters)
+
+        for waiter in pendingWaiters do
+            try
+                waiter.SetResult(Error ForkError.Cancelled)
+            with _ ->
+                ()
 
         for id in toClean do
             try

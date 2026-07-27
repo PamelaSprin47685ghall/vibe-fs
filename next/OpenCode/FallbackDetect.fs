@@ -160,7 +160,8 @@ module FallbackDetect =
         (reason: string)
         : FallbackDecision =
         let sid = SessionId.create sessionId
-        let identity = sprintf "%s|%s|%s" sessionId assistantMessageId providerAttempt
+        // Must match AgentJournal.fallbackIdentity / fold RecentFailureIds.
+        let identity = AgentJournal.fallbackIdentity assistantMessageId providerAttempt
 
         let currentDecision (j: AgentJournal) =
             DurableFallback.nextDecision sid (AgentJournal.snapshot j)

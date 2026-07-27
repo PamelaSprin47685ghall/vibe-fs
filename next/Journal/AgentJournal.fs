@@ -66,6 +66,11 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
 
 module AgentJournal =
 
+    /// Single durable failure identity format shared by append boundary, fold,
+    /// and FallbackDetect in-memory dedupe.
+    let fallbackIdentity (assistantMessageId: string) (providerAttempt: string) =
+        sprintf "%s|%s" assistantMessageId providerAttempt
+
     let createFromProjection
         (directory: string)
         (runtimeId: RuntimeId)

@@ -4,8 +4,10 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Subscribes only coarse host signals. Message/part storms are discarded in JS
-/// before crossing into F# business code. At most one global listener per runtime.
+/// Subscribes coarse host signals from local events.listen and/or global SSE.
+/// Dual-delivery prevention is per-session (SessionSignalSource), not a
+/// process-wide exclusive transport — Orchestrator worktree children need global
+/// while root sessions use the local plugin hook.
 module HostSignalSubscribe =
 
     [<Emit("$0()")>]
@@ -27,7 +29,6 @@ module HostSignalSubscribe =
     let private isSignalEvent (raw: obj) =
         match eventTypeOf raw with
         | "session.status"
-        | "session.idle"
         | "session.deleted"
         | "session.error" -> true
         | _ -> false
@@ -144,7 +145,7 @@ module HostSignalSubscribe =
     let trySubscribe
         (input: obj)
         (onSignalEvent: obj -> unit)
-        : Result<IDisposable option, string> =
+        : Result<IDisposable option * string, string> =
         let listenTarget =
             if isNull input then
                 None
@@ -165,7 +166,7 @@ module HostSignalSubscribe =
             | None -> Ok None
             | Some events ->
                 match subscribeListen events onSignalEvent with
-                | Error err -> Error err
+                | Error _ -> Ok None // degrade; global may still work
                 | Ok sub -> Ok(Some sub)
 
         match listenSub with
@@ -181,4 +182,11 @@ module HostSignalSubscribe =
                   | Some s -> yield s
                   | None -> () ]
 
-            Ok(combine parts)
+            let source =
+                match localSub, globalSub with
+                | Some _, Some _ -> "events.listen+global.event"
+                | Some _, None -> "events.listen"
+                | None, Some _ -> "global.event"
+                | None, None -> "none"
+
+            Ok(combine parts, source)
