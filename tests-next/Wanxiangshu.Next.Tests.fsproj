@@ -53,6 +53,8 @@
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
     <Compile Include="OpenCode/HostReviewGuardTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTests.fs"/>
+    <Compile Include="OpenCode/SessionReconcilerTests.fs"/>
+    <Compile Include="OpenCode/HostSignalAdapterTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterSessionDeadTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>
