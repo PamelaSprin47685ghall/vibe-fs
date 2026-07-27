@@ -84,7 +84,8 @@ module ArchitectureGateSupport =
           "Wait(predicate)"
           "sleepJs"
           "type ReviewState"
-          "recordFailureForTests" ]
+          "recordFailureForTests"
+          "Advisor" ]
 
     let containsForbiddenToken (text: string) (token: string) =
         if token.Contains("(") || token.Contains(")") || token.Contains(" ") then
