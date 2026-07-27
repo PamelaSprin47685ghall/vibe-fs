@@ -201,6 +201,118 @@ module HostReviewGuardTests =
             })
 
     [<Fact>]
+    let ``Empty_string_tree_returns_Missing`` () =
+        withTempDir (fun directory ->
+            task {
+                use journal =
+                    AgentJournal.create
+                        directory
+                        (RuntimeId.create "empty-str-tree-runtime")
+                        1
+                        DateTimeOffset.UtcNow
+
+                let port = { GetTreeHash = fun () -> "" }
+
+                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
+                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal("", hash)
+                | other -> Assert.True(false, sprintf "Expected Missing for empty string, got %A" other)
+            })
+
+    [<Fact>]
+    let ``Whitespace_tree_returns_Missing`` () =
+        withTempDir (fun directory ->
+            task {
+                use journal =
+                    AgentJournal.create
+                        directory
+                        (RuntimeId.create "space-tree-runtime")
+                        1
+                        DateTimeOffset.UtcNow
+
+                let port = { GetTreeHash = fun () -> "   " }
+
+                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
+                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal("", hash)
+                | other -> Assert.True(false, sprintf "Expected Missing for whitespace, got %A" other)
+            })
+
+    [<Fact>]
+    let ``NO_HEAD_TREE_returns_Missing`` () =
+        withTempDir (fun directory ->
+            task {
+                use journal =
+                    AgentJournal.create
+                        directory
+                        (RuntimeId.create "no-head-tree-runtime")
+                        1
+                        DateTimeOffset.UtcNow
+
+                let port = { GetTreeHash = fun () -> "NO_HEAD_TREE" }
+
+                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
+                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal("NO_HEAD_TREE", hash)
+                | other -> Assert.True(false, sprintf "Expected Missing for NO_HEAD_TREE, got %A" other)
+            })
+
+    [<Fact>]
+    let ``Empty_tree_hash_returns_Missing`` () =
+        withTempDir (fun directory ->
+            task {
+                use journal =
+                    AgentJournal.create
+                        directory
+                        (RuntimeId.create "empty-hash-runtime")
+                        1
+                        DateTimeOffset.UtcNow
+
+                let emptyHash = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+                let port = { GetTreeHash = fun () -> emptyHash }
+
+                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
+                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal(emptyHash, hash)
+                | other -> Assert.True(false, sprintf "Expected Missing for empty tree hash, got %A" other)
+            })
+
+    [<Fact>]
+    let ``Empty_tree_triggers_manager_nudge_through_TerminalPolicies`` () =
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "manager-empty-tree"
+                let messageId = "assistant-empty-tree"
+                let prompts = ResizeArray<string * string>()
+                let nudgeSent = HashSet<string>()
+                let managerGuard = HashSet<string>()
+                let parents = Dictionary<string, string>()
+
+                use journal =
+                    AgentJournal.create
+                        directory
+                        (RuntimeId.create "empty-tree-nudge-runtime")
+                        1
+                        DateTimeOffset.UtcNow
+
+                let port =
+                    { GetTreeHash = fun () -> "" }
+
+                applyDecide
+                    (recordingPort prompts)
+                    (Some journal)
+                    (Some port)
+                    (HashSet())
+                    nudgeSent
+                    managerGuard
+                    parents
+                    (managerTurn sessionId messageId)
+
+                do! drainMicrotasks 16
+
+                // Manager with empty tree should still be nudged (Missing, not silently skipped)
+                Assert.NotEmpty(prompts)
+                let _, text = prompts.[0]
+                Assert.Contains("review", text.ToLowerInvariant())
+            })
+
+    [<Fact>]
     let ``Manager_review_guard_unavailable_fails_closed`` () =
         withTempDir (fun directory ->
             task {

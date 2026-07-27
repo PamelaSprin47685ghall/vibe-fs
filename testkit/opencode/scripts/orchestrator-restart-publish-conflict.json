@@ -1,0 +1,479 @@
+{
+  "scenario": "orch-restart-publish",
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "- orchestrator restart publish canary (rebase-conflict)\n",
+        "README.md": "# orchestrator-restart-publish project (rebase-conflict)\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "orchestrator",
+    "bind": [
+      "title",
+      "orchestrator"
+    ]
+  },
+  "prompt": {
+    "agent": "orchestrator",
+    "text": "Ship publish_proof.txt to the target branch."
+  },
+  "flow": [
+    {
+      "afterExpectation": {
+        "id": "manager-fork-coder",
+        "gitConflictProof": true
+      }
+    },
+    {
+      "afterExpectation": {
+        "id": "manager-conflict-resume",
+        "restart": true
+      }
+    },
+    {
+      "wait": "orch-fork-manager"
+    },
+    {
+      "wait": "manager-fork-coder"
+    },
+    {
+      "wait": "coder-write"
+    },
+    {
+      "wait": "manager-terminal"
+    },
+    {
+      "wait": "reviewer-perfect-1"
+    },
+    {
+      "wait": "reviewer-terminal-1"
+    },
+    {
+      "wait": "reviewer-perfect-2"
+    },
+    {
+      "wait": "reviewer-terminal-2"
+    },
+    {
+      "wait": "manager-conflict-resume"
+    },
+    {
+      "awaitRestart": true
+    },
+    {
+      "loadScripts": "orchestrator-restart-publish-conflict-recovery.json"
+    },
+    {
+      "prompt": {
+        "agent": "orchestrator",
+        "text": "Continue the publish job and join its result."
+      }
+    },
+    {
+      "wait": "manager-conflict-resume-2"
+    },
+    {
+      "wait": "reviewer-perfect-3"
+    },
+    {
+      "wait": "reviewer-terminal-3"
+    },
+    {
+      "wait": "reviewer-perfect-4"
+    },
+    {
+      "wait": "reviewer-terminal-4"
+    },
+    {
+      "wait": "orch-join-2"
+    },
+    {
+      "wait": "orch-final"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": false
+    },
+    {
+      "expectSatisfied": true
+    },
+    {
+      "assertFacts": {
+        "name": "OrchestratorPublished",
+        "eq": 1
+      }
+    },
+    {
+      "assertFacts": {
+        "name": "OrchestratorConflictDetected",
+        "gte": 1
+      }
+    },
+    {
+      "assertWorktreeClean": true
+    }
+  ],
+  "pass": "Orchestrator restart publish canary passed: crash-during-rebase-conflict recovers to exactly-once publish.",
+  "scripts": [
+    {
+      "id": "orch-title",
+      "lane": {
+        "session": "title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "orch-fork-manager",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork-manager",
+        "args": {
+          "prompt": "Ship publish_proof.txt to the target branch."
+        }
+      }
+    },
+    {
+      "id": "orch-join",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "orch-join-2",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "orch-final",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 4,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Publish completed."
+      }
+    },
+    {
+      "id": "manager-fork-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Write publish_proof.txt."
+        }
+      }
+    },
+    {
+      "id": "manager-join-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-terminal",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager finished."
+      }
+    },
+    {
+      "id": "coder-write",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "write",
+        "args": {
+          "filePath": "publish_proof.txt",
+          "content": "Published by orchestrator canary\n"
+        }
+      }
+    },
+    {
+      "id": "coder-terminal",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Coder finished."
+      }
+    },
+    {
+      "id": "manager-conflict-resume",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "userRegex": "\\[CONFLICT RESUMPTION\\]"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Resuming rebase resolution."
+      }
+    },
+    {
+      "id": "manager-conflict-resume-2",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 5,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "userRegex": "\\[CONFLICT RESUMPTION\\]"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Resolved rebase resolution."
+      }
+    },
+    {
+      "id": "reviewer-perfect-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Review round one done."
+      }
+    },
+    {
+      "id": "reviewer-perfect-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Review round two done."
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. Write one dense paragraph"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      },
+      "neverEnd": true,
+      "blocking": false
+    },
+    {
+      "id": "session-blogger-reanchor",
+      "lane": {
+        "session": "session-blogger-reanchor",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. This session resumed after a restart"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session reanchor background."
+      },
+      "neverEnd": true,
+      "blocking": false
+    }
+  ]
+}

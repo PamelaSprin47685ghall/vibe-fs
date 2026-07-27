@@ -35,9 +35,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     let mutable inFlightTask: Task<unit> option = None
     let mutable busy = false
-    /// Set when Y self-rebase produced a new LatestB while replacement is active.
-    /// Consumed by the next Transform as an explicit SwitchEpoch cold boundary.
-    let mutable pendingEpochSwitch = false
 
     let persistSuccessful (projection: ProjectionSnapshot) (content: BlogText) =
         match durable, sessionId with
@@ -164,9 +161,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                             |> Option.iter (fun proj -> persistSuccessful proj b)
 
                             lock lockObj (fun () ->
-                                latestB <- Some b
-                                if replacementActive then
-                                    pendingEpochSwitch <- true)
+                                latestB <- Some b)
                         with _ ->
                             ()
                     }
@@ -177,13 +172,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     member this.TrySelfRebase(rebaseFn: unit -> Task<BlogText>) : bool =
         this.TrySelfRebase(fun () -> rebaseFn () |> Async.AwaitTask)
-
-    /// True once after a self-rebase that should cold-switch X's FrozenB.
-    member _.TakePendingEpochSwitch() : bool =
-        lock lockObj (fun () ->
-            let value = pendingEpochSwitch
-            pendingEpochSwitch <- false
-            value)
 
     /// Freeze LatestB as the first ActivePrefixEpoch with a real cutoff/digest.
     member this.FreezeEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =

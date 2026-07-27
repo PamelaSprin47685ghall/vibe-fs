@@ -12,7 +12,6 @@ module HostReviewGuard =
     type ReviewGuardAvailability =
         | ReviewGuardMissing of treeHash: string
         | ReviewGuardConfirmed
-        | ReviewGuardNotApplicable
         | ReviewGuardUnavailable of reason: string
 
     let missingTree (journal: AgentJournal option) (gitTreePort: GitTreePort option) sessionId =
@@ -23,7 +22,6 @@ module HostReviewGuard =
             try
                 let treeHash = port.GetTreeHash()
 
-                // No review needed when the worktree is empty or has no HEAD tree.
                 let emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
                 let treeHash = treeHash.Trim()
 
@@ -33,7 +31,7 @@ module HostReviewGuard =
                     || treeHash.Equals(emptyTree, StringComparison.Ordinal)
 
                 if isEmpty then
-                    ReviewGuardNotApplicable
+                    ReviewGuardMissing treeHash
                 else
                     let snapshot = AgentJournal.snapshot journal
                     let sessionOpt = Map.tryFind (SessionId.create sessionId) snapshot.AgentProjections.Sessions

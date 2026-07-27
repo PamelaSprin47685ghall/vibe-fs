@@ -1,0 +1,449 @@
+{
+  "scenario": "orch-publish",
+  "scripts": [
+    {
+      "id": "orch-title",
+      "lane": {
+        "session": "orch-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "orch-fork-manager",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 1
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork-manager",
+        "args": {
+          "prompt": "Ship publish_proof.txt to the target branch."
+        }
+      }
+    },
+    {
+      "id": "orch-join",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 2
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "orch-final",
+      "lane": {
+        "session": "orchestrator",
+        "role": "orchestrator",
+        "turn": 3
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Publish completed."
+      }
+    },
+    {
+      "id": "manager-fork-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Write publish_proof.txt."
+        }
+      }
+    },
+    {
+      "id": "manager-join-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-terminal",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager finished."
+      }
+    },
+    {
+      "id": "coder-write",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "write",
+        "args": {
+          "filePath": "publish_proof.txt",
+          "content": "Published by orchestrator canary\n"
+        }
+      }
+    },
+    {
+      "id": "coder-terminal",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Coder finished."
+      }
+    },
+    {
+      "id": "reviewer-perfect-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Review round one done."
+      }
+    },
+    {
+      "id": "reviewer-perfect-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Review round two done."
+      }
+    },
+    {
+      "id": "reviewer-perfect-3",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 5,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-3",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 6,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Review round three done."
+      }
+    },
+    {
+      "id": "reviewer-perfect-4",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 7,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-4",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 8,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Review round four done."
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. Write one dense paragraph"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      }
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "- orchestrator publish canary\n",
+        "README.md": "# orchestrator-publish project\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "orchestrator",
+    "bind": [
+      "orch-title",
+      "orchestrator"
+    ]
+  },
+  "prompt": {
+    "agent": "orchestrator",
+    "text": "Ship publish_proof.txt to the target branch."
+  },
+  "flow": [
+    {
+      "wait": "orch-fork-manager"
+    },
+    {
+      "wait": "manager-fork-coder"
+    },
+    {
+      "wait": "coder-write"
+    },
+    {
+      "wait": "coder-terminal"
+    },
+    {
+      "wait": "manager-terminal"
+    },
+    {
+      "wait": "reviewer-perfect-1"
+    },
+    {
+      "wait": "reviewer-terminal-1"
+    },
+    {
+      "wait": "reviewer-perfect-2"
+    },
+    {
+      "wait": "reviewer-terminal-2"
+    },
+    {
+      "wait": "reviewer-perfect-3"
+    },
+    {
+      "wait": "reviewer-terminal-3"
+    },
+    {
+      "wait": "reviewer-perfect-4"
+    },
+    {
+      "wait": "reviewer-terminal-4"
+    },
+    {
+      "wait": "orch-final"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Orchestrator publish canary passed."
+}

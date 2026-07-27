@@ -1,0 +1,329 @@
+{
+  "scenario": "host-restart",
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "host restart canary\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "parent-title",
+      "manager"
+    ]
+  },
+  "prompt": {
+    "agent": "manager",
+    "text": "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews."
+  },
+  "flow": [
+    {
+      "afterExpectation": {
+        "id": "manager-reviewed",
+        "restart": true
+      }
+    },
+    {
+      "wait": "manager-fork-coder"
+    },
+    {
+      "wait": "child-a1-text"
+    },
+    {
+      "wait": "manager-join-coder"
+    },
+    {
+      "wait": "manager-created"
+    },
+    {
+      "wait": "manager-fork-reviewer"
+    },
+    {
+      "wait": "reviewer-perfect-1"
+    },
+    {
+      "wait": "reviewer-perfect-2"
+    },
+    {
+      "wait": "reviewer-terminal"
+    },
+    {
+      "wait": "manager-join-reviewer"
+    },
+    {
+      "wait": "manager-reviewed"
+    },
+    {
+      "awaitRestart": true
+    },
+    {
+      "loadScripts": "host-restart-after.json"
+    },
+    {
+      "prompt": {
+        "agent": "manager",
+        "text": "Nudge the coder child for child-a2."
+      }
+    },
+    {
+      "wait": "manager-nudge-coder"
+    },
+    {
+      "wait": "child-a2-text"
+    },
+    {
+      "wait": "manager-finished-after-restart"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Host restart reconcile canary passed: restored child retained coder tools across restart.",
+  "scripts": [
+    {
+      "id": "parent-title",
+      "lane": {
+        "session": "parent-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "manager-fork-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "user": "Fork a coder to write host_restart_proof.txt"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Write host_restart_proof.txt with OK."
+        }
+      }
+    },
+    {
+      "id": "manager-join-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-created",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Coder joined."
+      }
+    },
+    {
+      "id": "manager-fork-reviewer",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 4,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "reviewer",
+          "prompt": "Review and PERFECT twice."
+        }
+      }
+    },
+    {
+      "id": "manager-join-reviewer",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 5,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-reviewed",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 6,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Reviewed."
+      }
+    },
+    {
+      "id": "child-a1-text",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Write host_restart_proof.txt"
+      },
+      "respond": {
+        "type": "text",
+        "text": "child-a1 done."
+      }
+    },
+    {
+      "id": "reviewer-perfect-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Review done."
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. Write one dense paragraph"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      },
+      "neverEnd": true,
+      "blocking": false
+    }
+  ]
+}

@@ -16,11 +16,15 @@ function pickSessionID(parsed) {
 
 function pickParentSessionID(parsed) {
   return parsed?.properties?.info?.parentID
-    || parsed?.properties?.info?.parentId;
+    || parsed?.properties?.info?.parentId
+    || parsed?.properties?.parentSessionID
+    || parsed?.properties?.parentID;
 }
 
 function pickSessionAgent(parsed) {
-  return parsed?.properties?.info?.agent;
+  return parsed?.properties?.info?.agent
+    || parsed?.properties?.agent
+    || parsed?.properties?.sessionAgent;
 }
 
 function pickMessageID(parsed) {

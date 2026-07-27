@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Session
 
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 
@@ -104,6 +105,31 @@ module CompanionDelta =
         // Full projection baseline must be the same canonical bytes as
         // Projection.canonicalJson — not insertion-order JSON.stringify.
         canonicalJson (List.toArray messages)
+
+    [<Import("createHash", "node:crypto")>]
+    let private createHashImport: string -> obj = jsNative
+
+    let private sha256Hex (text: string) : string =
+        let hasher = createHashImport "sha256"
+        hasher?update (text) |> ignore
+        unbox<string> (hasher?digest ("hex"))
+
+    /// SHA-256 hex of the canonical JSON of messages[0..cutoff).
+    /// Used as CoveredPrefixDigest to verify prefix stability across TransformRaw calls.
+    /// Returns empty string when cutoff <= 0 (no prefix to cover).
+    let prefixDigest (canonicalJson: obj -> string) (messages: obj list) (cutoff: int) : string =
+        if cutoff <= 0 then
+            ""
+        else
+            let prefix = messages |> List.truncate cutoff
+            jsonOfMessages canonicalJson prefix |> sha256Hex
+
+    /// Deterministic synthetic B head id for companion injection.
+    /// Format: companion-b-head-<first 16 hex chars of sha256(sessionId|epochId|companion-head)>.
+    let bHeadDigest (sessionId: string) (epochId: string) : string =
+        let input = sprintf "%s|%s|companion-head" sessionId epochId
+        let hash = sha256Hex input
+        sprintf "companion-b-head-%s" (hash.Substring(0, 16))
 
     let prefixLength
         (messageId: obj -> string option)

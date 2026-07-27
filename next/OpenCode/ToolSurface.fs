@@ -128,7 +128,7 @@ module ToolSurface =
                 reviewerHosts
                 verdictSessions
 
-        let forkArgs, verdictArgs, definition =
+        let managerForkArgs, orchestratorManagerJobArgs, verdictArgs, definition =
             ToolSurfaceOrchestrator.toolDefBuilders factory
 
         let executorRuntimeFor =
@@ -149,10 +149,14 @@ module ToolSurface =
 
         let inspector = InspectorTool.create toolModule sessionPort backgroundBFor
 
+        // Manager: fork (agent/prompt/signal). Orchestrator: fork-manager (prompt only).
+        // Names differ because schemas conflict.
         let tools =
             createObj
                 [ "fork",
-                  box (applyTool factory (definition "Fork, nudge, or control an agent or PTY" forkArgs forkExecute))
+                  box (applyTool factory (definition "Fork, nudge, or control an agent or PTY" managerForkArgs forkExecute))
+                  "fork-manager",
+                  box (applyTool factory (definition "Fork a manager job" orchestratorManagerJobArgs forkExecute))
                   "join",
                   box (applyTool factory (definition "Wait for any agent or PTY completion" (createObj []) joinExecute))
                   "list", box (applyTool factory (definition "List active agents and PTYs" (createObj []) listExecute))

@@ -157,8 +157,6 @@ type CompanionHost
     member _.SwitchEpoch(cutoffMessageIndex: int) : bool =
         companion.SwitchEpoch(cutoffMessageIndex)
 
-    member _.TakePendingEpochSwitch() : bool = companion.TakePendingEpochSwitch()
-
     /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
     /// into B' and durably persist (CompanionAdvanced with the EXISTING baseline,
     /// so the projection baseline is NOT advanced — only B is replaced). The
@@ -209,44 +207,41 @@ type CompanionHost
         companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps current delta))
         |> ignore
 
-        let inject (frozenB: string) (cutoff: int) =
+        let inject (frozenB: string) (epochId: string) (cutoff: int) =
             if cutoff <= 0 || cutoff > List.length messages then
                 // Fail closed: never delete past the message list or invent a
                 // zero-cutoff wipe of context that FrozenB does not cover.
                 messages
             else
+                let sessionId = SessionId.value primaryId
+                let bHeadId = CompanionDelta.bHeadDigest sessionId epochId
+
                 let synthetic =
                     createObj
-                        [ "info", box (createObj [ "id", box "companion-b-head"; "role", box "user" ])
+                        [ "info", box (createObj [ "id", box bHeadId; "role", box "user" ])
                           "parts", box [| createObj [ "type", box "text"; "text", box frozenB ] |] ]
 
                 synthetic :: (messages |> List.skip cutoff)
-
-        // Explicit cold boundary after Y self-rebase: adopt LatestB as FrozenB
-        // while keeping the frozen cutoff (condensed B covers the same prefix).
-        if companion.TakePendingEpochSwitch() then
-            match companion.Memory.ActivePrefixEpoch, companion.Memory.LatestB with
-            | Some epoch, Some _ ->
-                companion.SwitchEpoch(epoch.CutoffMessageIndex, epoch.CoveredPrefixDigest)
-                |> ignore
-            | _ -> ()
 
         let memory = companion.Memory
 
         match memory.ReplacementActive, memory.ActivePrefixEpoch with
         | true, Some epoch ->
-            inject epoch.FrozenB epoch.CutoffMessageIndex
-        | true, None when watermark > 0 && before.LatestB.IsSome ->
-            // First freeze: capture the covered prefix at this exact watermark.
-            let digest =
+            // Coverage proof before deleting raw prefix. Fail closed on mismatch.
+            if epoch.CutoffMessageIndex <= 0 || epoch.CutoffMessageIndex > List.length messages then
                 messages
-                |> List.take watermark
-                |> CompanionDelta.jsonOfMessages Projection.canonicalJson
+            else
+                let currentDigest =
+                    CompanionDelta.prefixDigest Projection.canonicalJson messages epoch.CutoffMessageIndex
 
+                if currentDigest <> epoch.CoveredPrefixDigest then messages
+                else inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
+        | true, None when watermark > 0 && before.LatestB.IsSome ->
+            let digest = CompanionDelta.prefixDigest Projection.canonicalJson messages watermark
             companion.FreezeEpoch(watermark, digest) |> ignore
 
             match companion.Memory.ActivePrefixEpoch with
-            | Some epoch -> inject epoch.FrozenB epoch.CutoffMessageIndex
+            | Some epoch -> inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
             | None -> messages
         | _ -> messages
 

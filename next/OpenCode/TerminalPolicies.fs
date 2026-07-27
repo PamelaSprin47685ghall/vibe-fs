@@ -129,7 +129,6 @@ module TerminalPolicies =
                             treeHash
                             turn.Model
                     | HostReviewGuard.ReviewGuardConfirmed -> ()
-                    | HostReviewGuard.ReviewGuardNotApplicable -> ()
                     | HostReviewGuard.ReviewGuardUnavailable reason ->
                         raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
                 | _ -> ()

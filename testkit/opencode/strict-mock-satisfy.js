@@ -10,10 +10,18 @@ import { laneLabel, pendingExpectations } from './strict-mock-lanes.js';
 const PREVIEW_LIMIT = 5;
 
 export function checkSatisfied(state) {
+  const errors = [];
+  if (state.fatal) {
+    const kind = state.fatal.reason === 'prefix-cache-invalidated'
+      ? 'PREFIX CACHE INVALIDATED'
+      : 'FIRST SCRIPT MISMATCH';
+    errors.push(
+      `${kind} (mock stopped): reason=${state.fatal.reason} session=${state.fatal.sessionId} lastUser=${JSON.stringify(state.fatal.lastUser)} candidates=${JSON.stringify(state.fatal.candidates)}`,
+    );
+  }
   const expectations = pendingExpectations(state).filter((e) => e.blocking !== false);
   const remaining = expectations.length;
   const unexpectedCount = state.unexpected.length;
-  const errors = [];
   if (remaining > 0) {
     const detail = expectations.slice(0, PREVIEW_LIMIT).map((e) =>
       `  [${e.id}] lane=${laneLabel(e.lane)} respond=${e.respond.type} match=${JSON.stringify(e.match)}`,

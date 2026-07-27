@@ -9,7 +9,7 @@ import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const primaryRole = 'orchestrator';
-const primaryTools = ['fork', 'join'];
+const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 const contextLimit = 1000;
 // Activation: estimateTokens >= 0.8 * 1000 = 800 tokens = 3200 chars/4.
@@ -44,7 +44,7 @@ async function waitForJournal(workDir, needle) {
 
 function primaryRequests(scenario) {
   return scenario.provider.requests.filter((body) =>
-    (body.tools || []).some((t) => (t?.function?.name || t?.name) === 'fork'));
+    (body.tools || []).some((t) => (t?.function?.name || t?.name) === 'fork-manager'));
 }
 
 function messageRole(message) {
@@ -200,19 +200,12 @@ try {
   await scenario.provider.waitForExpectation('manager-blogger-restarted', WATCHDOG_TIMEOUT_MS);
   await scenario.provider.waitForIdle(WATCHDOG_TIMEOUT_MS);
 
-  // (a) B' written back: the restarted projection's synthetic B head carries B',
-  // not the old long accumulated B. ReplacementActive is reloaded from the
-  // journal, so this is the robust point to observe the rewrite.
+  // SSOT: Y self-rebase only updates LatestB; FrozenB stays until the next X
+  // context-threshold epoch switch. After restart, ReplacementActive reloads and
+  // the synthetic B head still carries the freeze-time FrozenB (not B').
+  // B' is verified via journal + blogger re-anchor frames below, not the X head.
   const restartedPrimary = primaryRequests(scenario).at(-1);
-  const restartedPrimaryText = JSON.stringify(restartedPrimary.messages || []);
-  assert.ok(
-    restartedPrimaryText.includes(condensedB),
-    `rebase must write B' back into the next projection's synthetic B head: ${restartedPrimaryText.slice(0, 200)}`,
-  );
-  assert.ok(
-    !restartedPrimaryText.includes('Blogger paragraph 1. Blogger paragraph 2.'),
-    'the rebase must replace the old long B, not accumulate it',
-  );
+  assert.ok(restartedPrimary, 'post-restart primary request must exist');
 
   // (c1) Restart reset frame re-anchors on B': its FULL B section contains B'.
   const restartedReset = resetFrames.find((body) =>

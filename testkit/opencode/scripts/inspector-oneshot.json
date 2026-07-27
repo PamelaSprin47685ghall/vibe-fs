@@ -1,0 +1,118 @@
+{
+  "scenario": "inspector-oneshot",
+  "scripts": [
+    {
+      "id": "coder-title",
+      "lane": {
+        "session": "coder-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "coder-blogger-1",
+      "lane": {
+        "session": "coder-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "coder"
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "coder blog"
+      }
+    },
+    {
+      "id": "coder-inspector",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "inspector",
+        "args": {
+          "prompt": "Inspect workspace via executor."
+        }
+      }
+    },
+    {
+      "id": "coder-final",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Inspector oneshot complete."
+      }
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "Inspector oneshot canary\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "coder",
+    "bind": [
+      "coder-title",
+      "coder"
+    ]
+  },
+  "prompt": {
+    "agent": "coder",
+    "text": "Call inspector once with prompt: Inspect workspace via executor. Then stop with a short summary."
+  },
+  "flow": [
+    {
+      "wait": "coder-title"
+    },
+    {
+      "wait": "coder-blogger-1",
+      "lane": "coder-blogger"
+    },
+    {
+      "wait": "coder-inspector"
+    },
+    {
+      "wait": "coder-final"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Inspector oneshot canary passed: coder invoked inspector tool."
+}

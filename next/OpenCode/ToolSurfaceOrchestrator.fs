@@ -68,14 +68,17 @@ module ToolSurfaceOrchestrator =
                 hosts.[sid] <- host
                 host)
 
-    /// Builds the fork/verdict tool argument objects and the shared tool
-    /// definition builder for the fork/join/verdict tool surface.
+    /// Manager fork = full agent/prompt/signal. Orchestrator fork-manager = prompt only.
+    /// Schema conflict → distinct tool names; execute path shared.
     let toolDefBuilders (factory: obj) =
-        let forkArgs =
+        let managerForkArgs =
             createObj
                 [ "agent", box (stringSchema factory)
                   "prompt", box (optionalStringSchema factory)
                   "signal", box (optionalEnumSchema factory [| PtySignal.TermName; PtySignal.KillName |]) ]
+
+        let orchestratorManagerJobArgs =
+            createObj [ "prompt", box (stringSchema factory) ]
 
         let verdictArgs =
             createObj [ "verdict", box (enumSchema factory [| "PERFECT"; "REVISE" |]) ]
@@ -86,7 +89,7 @@ module ToolSurfaceOrchestrator =
                   "args", box args
                   "execute", uncurriedExecute (box execute) ]
 
-        forkArgs, verdictArgs, definition
+        managerForkArgs, orchestratorManagerJobArgs, verdictArgs, definition
 
     /// Private mailbox runtime for the Executor summarizer: same parent session
     /// (so child sessions are real) and children ARE registered into the shared

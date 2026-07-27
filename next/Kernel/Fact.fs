@@ -43,6 +43,8 @@ module Fact =
         | ReviewVerdictRecorded of
             {| ManagerSessionId: SessionId
                ReviewerSessionId: SessionId
+               ProviderRunId: string
+               RootUserMessageId: string option
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |}

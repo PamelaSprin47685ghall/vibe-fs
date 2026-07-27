@@ -109,6 +109,8 @@ module AgentJournalTests =
                     AgentFact.ReviewVerdictRecorded
                         {| ManagerSessionId = sid
                            ReviewerSessionId = sid
+                           ProviderRunId = "pr-1"
+                           RootUserMessageId = None
                            ToolCallId = "call-123"
                            GitTreeHash = "hash123"
                            Verdict = ReviewGuardVerdict.Perfect |}

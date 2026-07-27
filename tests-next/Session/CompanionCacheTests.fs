@@ -99,17 +99,18 @@ module CompanionCacheTests =
             Assert.Equal(cutoff, companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex)
             Assert.Equal("B1", headText t2)
 
-            // Self-rebase updates LatestB immediately; FrozenB stays until the
-            // next Transform consumes pendingEpochSwitch as SwitchEpoch.
+            // Self-rebase updates LatestB immediately; FrozenB stays unchanged
+            // (no automatic SwitchEpoch — only real threshold-based SwitchEpoch
+            // may update FrozenB).
             Assert.Equal(Submitted, companion.SelfRebase())
             do! companion.WaitInFlightAsync()
             Assert.Equal(Some "B-condensed", companion.Memory.LatestB)
             Assert.Equal(frozen, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
 
             let t3 = companion.TransformRaw (extended2 @ [ msg sid "u5" "later" ])
-            Assert.Equal("B-condensed", companion.Memory.ActivePrefixEpoch.Value.FrozenB)
+            Assert.Equal(frozen, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
             Assert.Equal(cutoff, companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex)
-            Assert.Equal("B-condensed", headText t3)
+            Assert.Equal("B1", headText t3)
         }
 
     /// P0: epoch cutoff is frozen. Later blogger baseline growth must not

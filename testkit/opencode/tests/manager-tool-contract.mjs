@@ -17,8 +17,9 @@ test('manager permission denies global executor tool and executes mailbox path',
     });
     const names = Object.keys(hooks.tool).sort();
 
-    assert.deepEqual(names, ['executor', 'fork', 'inspector', 'join', 'list', 'verdict']);
+    assert.deepEqual(names, ['executor', 'fork', 'fork-manager', 'inspector', 'join', 'list', 'verdict']);
     assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt', 'signal']);
+    assert.deepEqual(Object.keys(hooks.tool['fork-manager'].args).sort(), ['prompt']);
 
     const config = {};
     hooks.config(config);
@@ -30,7 +31,10 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(config.agent.inspector.permission.fork, 'deny');
     assert.equal(config.agent.coder.permission.inspector, 'allow');
     assert.equal(config.agent.orchestrator.permission['*'], 'deny');
-    assert.equal(config.agent.orchestrator.permission.fork, 'allow');
+    assert.equal(config.agent.orchestrator.permission.fork, 'deny');
+    assert.equal(config.agent.orchestrator.permission['fork-manager'], 'allow');
+    assert.equal(config.agent.manager.permission.fork, 'allow');
+    assert.equal(config.agent.manager.permission['fork-manager'], 'deny');
     assert.equal(config.agent.orchestrator.permission.join, 'allow');
     assert.equal(config.agent.orchestrator.permission.list, 'deny');
 

@@ -107,7 +107,15 @@ module VerdictSurface =
                                     reviewerHosts.[reviewerId] <- h
                                     h)
 
-                        match host.SubmitVerdict(toolCallId, verdict) with
+                        // Prefer assistant message id as ProviderRunIdentity (one LLM run).
+                        // Fall back to toolCallId when the host context omits it.
+                        let providerRunId =
+                            contextString ctx "messageID"
+                            |> Option.orElse (contextString ctx "messageId")
+                            |> Option.orElse (contextString ctx "callID")
+                            |> Option.defaultValue toolCallId
+
+                        match host.SubmitVerdict(toolCallId, verdict, providerRunId) with
                         | Error err -> return box (stringify (createObj [ "error", box err ]))
                         | Ok result ->
                             lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)

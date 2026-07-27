@@ -16,6 +16,10 @@ export function createState() {
     responseCounter: 0,
     idCounter: 0,
     strict: true,
+    // First unmatched script stops the mock entirely (no more surprises).
+    fatal: null,
+    // sessionId -> last matched provider-visible seal (append-only prefix check).
+    sealedBySession: new Map(),
   };
 }
 
@@ -52,6 +56,7 @@ export function pushExpectation(state, respond, opts) {
     lane,
     match,
     blocking: opts.blocking !== false,
+    neverEnd: opts.neverEnd === true,
     respond: { ...respond, ...flags },
   });
   state.lastTurnByLane.set(key, lane.turn);
@@ -65,4 +70,6 @@ export function resetState(state) {
   state.requests.length = 0;
   state.responseCounter = 0;
   state.stopped = false;
+  state.fatal = null;
+  state.sealedBySession.clear();
 }

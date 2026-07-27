@@ -46,7 +46,7 @@ module PtyLifecycleTests =
         member private this.ExitPty(id: PtyId) =
             match live.TryGetValue id.Value with
             | true, (buf, closed, exitTcs) ->
-                closed := true
+                closed.Value <- true
                 let residual = buf.ToString()
                 live.Remove id.Value |> ignore
                 exitTcs.SetResult(())
@@ -57,7 +57,7 @@ module PtyLifecycleTests =
                     else
                         Ok residual
 
-                (!portRef).Complete(id, outcome) |> ignore
+                portRef.Value.Complete(id, outcome) |> ignore
             | _ -> ()
 
         member this.Handler: PtyBackendHandler =
@@ -69,7 +69,7 @@ module PtyLifecycleTests =
                         let buf = StringBuilder()
                         let closed = ref false
                         live.[id.Value] <- (buf, closed, exitTcs)
-                        (!portRef).RegisterExitTask(id, exitTcs.Task)
+                        portRef.Value.RegisterExitTask(id, exitTcs.Task)
                         spawnReady.SetResult(())
                         return Ok()
                     | PtyCommand.Write bytes ->
@@ -107,7 +107,7 @@ module PtyLifecycleTests =
 
         member this.MakePort(?mailboxSender) =
             let p = PtyPort(?mailboxSender = mailboxSender, handler = this.Handler)
-            portRef := p
+            portRef.Value <- p
             p
 
         member this.Port = this.MakePort()
@@ -128,14 +128,14 @@ module PtyLifecycleTests =
                 let text = buf.ToString()
                 buf.Clear() |> ignore
                 pendingRead <- None
-                (!portRef).ReadResult(id, text, closed.Value)
+                portRef.Value.ReadResult(id, text, closed.Value)
             | false, _ -> ()
 
         member _.TriggerSpawnFailure(id: PtyId) =
             let msg = "PTY spawn failed: boom"
-            (!portRef).FailRead(id, msg)
+            portRef.Value.FailRead(id, msg)
             live.Remove id.Value |> ignore
-            (!portRef).Complete(id, Error msg) |> ignore
+            portRef.Value.Complete(id, Error msg) |> ignore
 
     [<Fact>]
     let ``Pty_second_concurrent_read_returns_error_first_still_resolves`` () =

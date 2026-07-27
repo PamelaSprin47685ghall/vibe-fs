@@ -1,0 +1,185 @@
+{
+  "scenario": "orch-restart-publish",
+  "scripts": [
+    {
+      "id": "manager-recovery-fork-coder",
+      "lane": {
+        "session": "manager-recovery",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Write publish_proof.txt."
+        }
+      }
+    },
+    {
+      "id": "manager-recovery-join-coder",
+      "lane": {
+        "session": "manager-recovery",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-recovery-terminal",
+      "lane": {
+        "session": "manager-recovery",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager recovered."
+      }
+    },
+    {
+      "id": "coder-recovery-write",
+      "lane": {
+        "session": "coder-recovery",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager-recovery"
+      },
+      "match": {
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "write",
+        "args": {
+          "filePath": "publish_proof.txt",
+          "content": "Published by orchestrator canary\n"
+        }
+      }
+    },
+    {
+      "id": "coder-recovery-terminal",
+      "lane": {
+        "session": "coder-recovery",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager-recovery"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Coder recovered."
+      }
+    },
+    {
+      "id": "reviewer-perfect-3",
+      "lane": {
+        "session": "reviewer-recovery",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-3",
+      "lane": {
+        "session": "reviewer-recovery",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Review round three done."
+      }
+    },
+    {
+      "id": "reviewer-perfect-4",
+      "lane": {
+        "session": "reviewer-recovery",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-terminal-4",
+      "lane": {
+        "session": "reviewer-recovery",
+        "role": "reviewer",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {},
+      "respond": {
+        "type": "text",
+        "text": "Review round four done."
+      }
+    }
+  ]
+}

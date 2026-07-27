@@ -41,6 +41,8 @@ export class Scenario {
     });
     this.client._baseUrl = this.host.baseUrl;
     this.events._baseUrl = this.host.baseUrl;
+    // New host process: prior provider-visible seals are not comparable across restart.
+    this.provider?.clearPrefixSeals?.();
     this.watchdog?.advance({ reason: 'restart-connect-events', lane: 'runtime', blocking: true });
     await this.events.connect();
     this.watchdog?.advance({ reason: 'restart-complete', lane: 'runtime', blocking: true });
@@ -81,10 +83,16 @@ export async function setupScenarioParallel(opts, tmpDir) {
   try {
     const t0 = Date.now();
     const providerUrl = await provider.start();
-    const t1 = Date.now(); console.log(`[setupScenario] provider.start took ${t1 - t0}ms`);
+    const t1 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[setupScenario] provider.start took ${t1 - t0}ms`);
+    }
     // Prepare workspace before starting opencode; it reads AGENTS.md at startup.
     await prepareWorkspace(workDir, opts.project);
-    const t2 = Date.now(); console.log(`[setupScenario] prepareWorkspace took ${t2 - t1}ms`);
+    const t2 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[setupScenario] prepareWorkspace took ${t2 - t1}ms`);
+    }
     await host.start({
       scenarioDir,
       providerUrl: `${providerUrl}/v1`,
@@ -95,12 +103,19 @@ export async function setupScenarioParallel(opts, tmpDir) {
         ...(opts.extraEnv || {}),
       },
     });
-    const t3 = Date.now(); console.log(`[setupScenario] host.start took ${t3 - t2}ms`);
+    const t3 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[setupScenario] host.start took ${t3 - t2}ms`);
+    }
 
     const client = new HttpClient(host.baseUrl, host.workDir);
     const events = new EventProbe(host.baseUrl, host.workDir);
     await events.connect();
-    const t4 = Date.now(); console.log(`[setupScenario] events.connect took ${t4 - t3}ms`);
+    const t4 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[setupScenario] events.connect took ${t4 - t3}ms`);
+    }
+    console.log('[setupScenario] ready');
 
     const scenario = new Scenario({
       host,
@@ -141,6 +156,20 @@ export async function setupScenarioParallel(opts, tmpDir) {
       },
     });
     scenario.watchdog = watchdog;
+    // First mock script mismatch: stop the entire canary process (not just 500).
+    provider.onFatal = (fatal) => {
+      try {
+        console.error(`── fatal script mismatch: ${fatal.reason} ──`);
+        console.error(`session=${fatal.sessionId} lastUser=${JSON.stringify(fatal.lastUser)}`);
+        console.error(`candidates=${JSON.stringify(fatal.candidates)}`);
+        console.error(`── event tail ──\n${events.dump(20)}`);
+        for (const expectation of provider.blockedExpectations) {
+          console.error(`  pending ${expectation.blocking ? 'blocking' : 'background'} ${expectation.id} ${expectation.lane}`);
+        }
+      } catch {}
+      try { watchdog.stop(); } catch {}
+      process.exit(1);
+    };
     provider.onExpectationConsumed = ({ id, lane, blocking }) => {
       watchdog.advance({
         reason: `expectation:${id}`,

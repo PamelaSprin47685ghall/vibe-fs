@@ -13,6 +13,14 @@ function chat(content, tools = []) {
   };
 }
 
+function bloggerChat(content) {
+  return {
+    model: 'test-model',
+    messages: [{ role: 'user', content: 'You are the blogger of a coding agent session.\n' + content }],
+    tools: [],
+  };
+}
+
 async function runStrictMockLanes() {
   const provider = new StrictMockProvider();
   provider.strict = true;
@@ -138,9 +146,25 @@ async function runSessionBoundLanes() {
       'x-session-affinity': 'child-1',
       'x-parent-session-id': 'parent-1',
     };
-    const first = await postJson(`${provider.url}/v1/chat/completions`, chat('first child turn', ['write']), headers);
+    const tools = [{ type: 'function', function: { name: 'write' } }];
+    const firstBody = {
+      model: 'test-model',
+      tools,
+      messages: [{ role: 'user', content: 'first child turn' }],
+    };
+    const first = await postJson(`${provider.url}/v1/chat/completions`, firstBody, headers);
     assertTrue(first.ok, 'parent-bound child lane must accept its first request');
-    const second = await postJson(`${provider.url}/v1/chat/completions`, chat('second child turn', ['write']), headers);
+    // Same session: full provider-visible history must keep sealed prefix (append-only).
+    const secondBody = {
+      model: 'test-model',
+      tools,
+      messages: [
+        { role: 'user', content: 'first child turn' },
+        { role: 'assistant', content: 'first' },
+        { role: 'user', content: 'second child turn' },
+      ],
+    };
+    const second = await postJson(`${provider.url}/v1/chat/completions`, secondBody, headers);
     assertTrue(second.ok, 'afterExpectation must register the causal successor atomically');
     provider.expectSatisfied();
   } finally {
@@ -192,8 +216,253 @@ async function runSyntheticSessionLane() {
   }
 }
 
+// neverEnd SSE responses keep the stream open; read status without waiting for body.
+async function postJsonNoBody(url, body, headers = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  const status = res.status;
+  res.body?.cancel();
+  return { status, ok: status >= 200 && status < 300 };
+}
+
+async function runNeverEndStaysPending() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.expectText({
+      id: 'neverend-alive',
+      lane: lane('manager', 1),
+      neverEnd: true,
+      blocking: false,
+      text: 'neverend response',
+      match: { containsText: ['hello from neverend'] },
+    });
+    const first = await postJsonNoBody(`${provider.url}/v1/chat/completions`, chat('hello from neverend', ['fork', 'join', 'list']));
+    assertTrue(first.ok, 'neverEnd: first request must match');
+    assertEq(provider.remainingExpectations, 1, 'neverEnd: one expectation remains after first match');
+    const second = await postJsonNoBody(`${provider.url}/v1/chat/completions`, chat('hello from neverend', ['fork', 'join', 'list']));
+    assertTrue(second.ok, 'neverEnd: second request must match again');
+    assertEq(provider.remainingExpectations, 1, 'neverEnd: one expectation remains after second match');
+    provider.expectSatisfied();
+  } finally {
+    await provider.stop();
+  }
+}
+
+async function runNeverEndBlocksSameLaneTurn() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.expectText({
+      id: 'neverend-blocker',
+      lane: lane('manager', 1),
+      neverEnd: true,
+      blocking: false,
+      text: 'neverend',
+      match: { containsText: ['neverend content'] },
+    });
+    provider.expectText({
+      id: 'blocked-turn-2',
+      lane: lane('manager', 2),
+      text: 'turn2',
+      match: { containsText: ['turn 2 content'] },
+    });
+    // Match the neverEnd head
+    const first = await postJsonNoBody(`${provider.url}/v1/chat/completions`, chat('neverend content', ['fork', 'join', 'list']));
+    assertTrue(first.ok, 'neverEnd blocks: first request matches neverEnd head');
+    // Turn 2 is behind neverEnd head — unreachable
+    const second = await postJson(`${provider.url}/v1/chat/completions`, chat('turn 2 content', ['fork', 'join', 'list']));
+    assertEq(second.status, 500, 'neverEnd blocks: turn 2 behind neverEnd head must 500');
+    assertEq(provider.remainingExpectations, 2, 'neverEnd blocks: both expectations still remain');
+  } finally {
+    await provider.stop();
+  }
+}
+
+async function runBloggerDistinctMarkers() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    // Two unbound blogger heads in separate lane queues with different markers
+    provider.expectText({
+      id: 'blogger-orch',
+      lane: lane('blogger', 1, 'orch-blogger'),
+      neverEnd: true,
+      blocking: false,
+      text: 'orch bg',
+      match: { containsText: ['orchestrator blog activity'] },
+    });
+    provider.expectText({
+      id: 'blogger-manager',
+      lane: lane('blogger', 1, 'manager-blogger'),
+      neverEnd: true,
+      blocking: false,
+      text: 'manager bg',
+      match: { containsText: ['manager blog activity'] },
+    });
+    // Request with orch marker — only orch-blogger matches
+    const orchReq = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('orchestrator blog activity'));
+    assertTrue(orchReq.ok, 'blogger distinct: orch request matches orch blogger');
+    // Request with manager marker — only manager-blogger matches
+    const mgrReq = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('manager blog activity'));
+    assertTrue(mgrReq.ok, 'blogger distinct: manager request matches manager blogger');
+    provider.expectSatisfied();
+  } finally {
+    await provider.stop();
+  }
+}
+
+async function runBloggerAmbiguousMarkers() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    // Two unbound blogger heads with identical containsText
+    provider.expectText({
+      id: 'blogger-a',
+      lane: lane('blogger', 1, 'blogger-a'),
+      neverEnd: true,
+      blocking: false,
+      text: 'a bg',
+      match: { containsText: ['shared marker'] },
+    });
+    provider.expectText({
+      id: 'blogger-b',
+      lane: lane('blogger', 1, 'blogger-b'),
+      neverEnd: true,
+      blocking: false,
+      text: 'b bg',
+      match: { containsText: ['shared marker'] },
+    });
+    // Both match — ambiguous
+    const res = await postJson(`${provider.url}/v1/chat/completions`, bloggerChat('shared marker'));
+    assertEq(res.status, 500, 'blogger ambiguous: identical markers must 500');
+    const unexp = provider.unexpectedRequests;
+    assertTrue(unexp.length >= 1, 'blogger ambiguous: must record unexpected');
+    assertTrue(unexp.some((u) => u.reason === 'ambiguous-lane-heads'), 'blogger ambiguous: reason must be ambiguous-lane-heads');
+  } finally {
+    await provider.stop();
+  }
+}
+
+
+async function runPrefixCacheInvalidation() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.expectText({
+      id: 'turn-1',
+      lane: lane('manager', 1),
+      text: 'ok1',
+      match: { containsText: ['stable system prefix'] },
+    });
+    provider.expectText({
+      id: 'turn-2',
+      lane: lane('manager', 2),
+      text: 'ok2',
+      match: { containsText: ['appended user turn'] },
+    });
+    const body1 = {
+      model: 'test-model',
+      tools: [{ function: { name: 'fork' } }, { function: { name: 'join' } }, { function: { name: 'list' } }],
+      messages: [
+        { role: 'system', content: 'stable system prefix' },
+        { role: 'user', content: 'stable system prefix first user' },
+      ],
+      sessionId: 'prefix-session-1',
+    };
+    const first = await postJson(`${provider.url}/v1/chat/completions`, body1, {
+      'x-session-affinity': 'prefix-session-1',
+    });
+    assertTrue(first.ok, 'prefix: first request matches');
+
+    // Mutate sealed system message — must fail closed as prefix-cache-invalidated.
+    const body2 = {
+      model: 'test-model',
+      tools: [{ function: { name: 'fork' } }, { function: { name: 'join' } }, { function: { name: 'list' } }],
+      messages: [
+        { role: 'system', content: 'MUTATED system prefix' },
+        { role: 'user', content: 'stable system prefix first user' },
+        { role: 'user', content: 'appended user turn' },
+      ],
+      sessionId: 'prefix-session-1',
+    };
+    const second = await postJson(`${provider.url}/v1/chat/completions`, body2, {
+      'x-session-affinity': 'prefix-session-1',
+    });
+    assertEq(second.status, 500, 'prefix: mutated sealed prefix must 500');
+    assertTrue(
+      provider.unexpectedRequests.some((u) => u.reason === 'prefix-cache-invalidated'),
+      'prefix: reason must be prefix-cache-invalidated',
+    );
+  } finally {
+    await provider.stop();
+  }
+}
+
+async function runPrefixCacheAppendOk() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.expectText({
+      id: 'turn-1',
+      lane: lane('manager', 1),
+      text: 'ok1',
+      match: { containsText: ['append-ok first'] },
+    });
+    provider.expectText({
+      id: 'turn-2',
+      lane: lane('manager', 2),
+      text: 'ok2',
+      match: { containsText: ['append-ok second'] },
+    });
+    const tools = [
+      { type: 'function', function: { name: 'fork' } },
+      { type: 'function', function: { name: 'join' } },
+      { type: 'function', function: { name: 'list' } },
+    ];
+    const body1 = {
+      model: 'test-model',
+      tools,
+      messages: [
+        { role: 'system', content: 'append-ok system' },
+        { role: 'user', content: 'append-ok first' },
+      ],
+    };
+    const first = await postJson(`${provider.url}/v1/chat/completions`, body1, {
+      'x-session-affinity': 'prefix-session-2',
+    });
+    assertTrue(first.ok, 'prefix append: first ok');
+    const body2 = {
+      model: 'test-model',
+      tools,
+      messages: [
+        { role: 'system', content: 'append-ok system' },
+        { role: 'user', content: 'append-ok first' },
+        { role: 'assistant', content: 'ok1' },
+        { role: 'user', content: 'append-ok second' },
+      ],
+    };
+    const second = await postJson(`${provider.url}/v1/chat/completions`, body2, {
+      'x-session-affinity': 'prefix-session-2',
+    });
+    assertTrue(second.ok, 'prefix append: second ok when sealed prefix preserved');
+    provider.expectSatisfied();
+  } finally {
+    await provider.stop();
+  }
+}
+
 export const laneCases = [
   { name: 'strict mock lanes and unexpected requests', fn: runStrictMockLanes },
   { name: 'session-bound lanes and causal successors', fn: runSessionBoundLanes },
   { name: 'session-bound synthetic continuation lane', fn: runSyntheticSessionLane },
+  { name: 'neverEnd stays pending and re-matches second request', fn: runNeverEndStaysPending },
+  { name: 'neverEnd head prevents later same-lane turn from matching', fn: runNeverEndBlocksSameLaneTurn },
+  { name: 'two unbound blogger heads with different markers match distinctly', fn: runBloggerDistinctMarkers },
+  { name: 'two unbound blogger heads with identical markers produce ambiguous-lane-heads', fn: runBloggerAmbiguousMarkers },
+  { name: 'prefix cache invalidation fails closed', fn: runPrefixCacheInvalidation },
+  { name: 'prefix cache append-only succeeds', fn: runPrefixCacheAppendOk },
 ];

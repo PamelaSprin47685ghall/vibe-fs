@@ -92,9 +92,17 @@ module ToolSurfacePty =
                             return box (stringify (createObj [ "error", box "Signal target is not an active PTY" ]))
                         | None ->
                             let sid = contextString ctx "sessionID" |> Option.defaultValue ""
+                            // Narrow fork schema (orchestrator) omits agent field;
+                            // default to manager for orchestrator sessions.
+                            let effectiveAgent =
+                                if String.IsNullOrWhiteSpace agent
+                                   && ToolSurfaceOrchestrator.isOrchestratorSession deps.SessionRoles sid then
+                                    "manager"
+                                else
+                                    agent
 
                             if ToolSurfaceOrchestrator.isOrchestratorSession deps.SessionRoles sid then
-                                if agent <> "manager" then
+                                if effectiveAgent <> "manager" then
                                     return
                                         box (
                                             stringify (

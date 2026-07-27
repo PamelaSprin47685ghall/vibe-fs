@@ -1,0 +1,237 @@
+{
+  "scenario": "companion-projection",
+  "scripts": [
+    {
+      "id": "primary-title",
+      "lane": {
+        "session": "primary-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "primary-first",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 1
+      },
+      "match": {
+        "containsText": [
+          "first projection"
+        ],
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Orchestrator first projection complete."
+      }
+    },
+    {
+      "id": "blogger-b1",
+      "lane": {
+        "session": "primary-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "B1"
+      }
+    },
+    {
+      "id": "primary-second",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 2
+      },
+      "match": {
+        "containsText": [
+          "second projection"
+        ],
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Orchestrator second projection complete."
+      }
+    },
+    {
+      "id": "blogger-b2",
+      "lane": {
+        "session": "primary-blogger",
+        "role": "blogger",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "B2"
+      }
+    },
+    {
+      "id": "role-executor-title",
+      "lane": {
+        "session": "role-executor-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "role-executor",
+      "lane": {
+        "session": "role-executor",
+        "role": "executor",
+        "turn": 1
+      },
+      "match": {
+        "containsText": [
+          "Role canary: executor must answer without creating a companion."
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Role complete."
+      }
+    },
+    {
+      "id": "role-inspector-title",
+      "lane": {
+        "session": "role-inspector-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "role-inspector",
+      "lane": {
+        "session": "role-inspector",
+        "role": "inspector",
+        "turn": 1
+      },
+      "match": {
+        "containsText": [
+          "Role canary: inspector must answer without creating a companion."
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Role complete."
+      }
+    },
+    {
+      "id": "role-reviewer-title",
+      "lane": {
+        "session": "role-reviewer-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "role-reviewer",
+      "lane": {
+        "session": "role-reviewer",
+        "role": "reviewer",
+        "turn": 1
+      },
+      "match": {
+        "containsText": [
+          "Role canary: reviewer must answer without creating a companion."
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Role complete."
+      }
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {}
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "primary-title",
+      "manager"
+    ]
+  },
+  "prompt": {
+    "agent": "manager",
+    "text": "Produce the first projection for Orchestrator X."
+  },
+  "flow": [
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "companion canary passed."
+}

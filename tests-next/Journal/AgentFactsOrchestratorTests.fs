@@ -190,6 +190,8 @@ module AgentFactsOrchestratorTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "call-1"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -198,6 +200,8 @@ module AgentFactsOrchestratorTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -211,6 +215,8 @@ module AgentFactsOrchestratorTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-3"
+                   RootUserMessageId = None
                    ToolCallId = "call-3"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -219,6 +225,8 @@ module AgentFactsOrchestratorTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-4"
+                   RootUserMessageId = None
                    ToolCallId = "call-4"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -246,6 +254,8 @@ module AgentFactsOrchestratorTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "call-1"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -254,6 +264,8 @@ module AgentFactsOrchestratorTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}

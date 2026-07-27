@@ -48,8 +48,8 @@ module OrchestratorHostTestSupport =
             member _.AbortChildren(parentId) = Task.FromResult(())
 
             member _.CreateChildSession(parentId, options) =
-                incr nextChild
-                let id = sprintf "child-%d" !nextChild
+                nextChild.Value <- nextChild.Value + 1
+                let id = sprintf "child-%d" nextChild.Value
                 log.CreateChild <- (id, options.Agent, options.Directory) :: log.CreateChild
                 Task.FromResult(Ok(SessionId.create id))
 

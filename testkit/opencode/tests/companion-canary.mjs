@@ -13,7 +13,7 @@ import { requestRoleOf } from '../strict-mock-matches.js';
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
 const primaryRole = 'orchestrator';
-const primaryTools = ['fork', 'join'];
+const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 
 function bloggerRequests(provider) {

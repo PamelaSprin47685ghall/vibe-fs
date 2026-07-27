@@ -65,12 +65,14 @@ module JournalFoldTests =
                 (t0.AddSeconds 1.0)
                 (StreamId.Session sid)
                 (Fact.Agent(
-                    AgentFact.ReviewVerdictRecorded
+                    (AgentFact.ReviewVerdictRecorded
                         {| ManagerSessionId = sid
                            ReviewerSessionId = revSid
+                           ProviderRunId = "pr-1"
+                           RootUserMessageId = None
                            ToolCallId = "call-1"
                            GitTreeHash = treeHash
-                           Verdict = ReviewGuardVerdict.Perfect |}
+                           Verdict = ReviewGuardVerdict.Perfect |})
                 ))
                 rt
 

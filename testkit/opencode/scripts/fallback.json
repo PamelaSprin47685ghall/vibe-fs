@@ -1,0 +1,446 @@
+{
+  "scenario": "fallback",
+  "env": {
+    "WANXIANGSHU_MODEL_A": "test/test-model",
+    "WANXIANGSHU_MODEL_B": "test/test-model-b"
+  },
+  "scripts": [
+    {
+      "id": "coder-title",
+      "lane": {
+        "session": "coder-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "coder-blogger",
+      "lane": {
+        "session": "coder-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "coder"
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Coder background."
+      }
+    },
+    {
+      "id": "round1-failure",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 1 fallback attempt.",
+        "model": "test-model",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "error",
+        "status": 500,
+        "headers": {
+          "retry-after-ms": "0"
+        },
+        "body": {
+          "error": {
+            "message": "mock provider failure round1",
+            "type": "server_error"
+          }
+        }
+      }
+    },
+    {
+      "id": "round1-retry",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 1 fallback attempt.",
+        "model": "test-model",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round1 retry completed."
+      }
+    },
+    {
+      "id": "round2-failure",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 2 fallback attempt.",
+        "model": "test-model",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "error",
+        "status": 500,
+        "headers": {
+          "retry-after-ms": "0"
+        },
+        "body": {
+          "error": {
+            "message": "mock provider failure round2",
+            "type": "server_error"
+          }
+        }
+      }
+    },
+    {
+      "id": "round2-retry",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 4,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 2 fallback attempt.",
+        "model": "test-model",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round2 retry completed."
+      }
+    },
+    {
+      "id": "round3-failure",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 5,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 3 fallback attempt.",
+        "model": "test-model-b",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "error",
+        "status": 500,
+        "headers": {
+          "retry-after-ms": "0"
+        },
+        "body": {
+          "error": {
+            "message": "mock provider failure round3",
+            "type": "server_error"
+          }
+        }
+      }
+    },
+    {
+      "id": "round3-retry",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 6,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 3 fallback attempt.",
+        "model": "test-model-b",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round3 retry completed."
+      }
+    },
+    {
+      "id": "round4-failure",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 7,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 4 fallback attempt.",
+        "model": "test-model-b",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "error",
+        "status": 500,
+        "headers": {
+          "retry-after-ms": "0"
+        },
+        "body": {
+          "error": {
+            "message": "mock provider failure round4",
+            "type": "server_error"
+          }
+        }
+      }
+    },
+    {
+      "id": "round4-retry",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 8,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Round 4 fallback attempt.",
+        "model": "test-model-b",
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round4 retry completed."
+      }
+    }
+  ],
+  "rounds": [
+    {
+      "id": "round1",
+      "prompt": "Round 1 fallback attempt.",
+      "model": "test-model",
+      "failureId": "round1-failure",
+      "retryId": "round1-retry",
+      "facts": 1
+    },
+    {
+      "id": "round2",
+      "prompt": "Round 2 fallback attempt.",
+      "model": "test-model",
+      "failureId": "round2-failure",
+      "retryId": "round2-retry",
+      "facts": 2
+    },
+    {
+      "id": "round3",
+      "prompt": "Round 3 fallback attempt.",
+      "model": "test-model-b",
+      "failureId": "round3-failure",
+      "retryId": "round3-retry",
+      "facts": 3,
+      "afterRestart": true
+    },
+    {
+      "id": "round4",
+      "prompt": "Round 4 fallback attempt.",
+      "model": "test-model-b",
+      "failureId": "round4-failure",
+      "retryId": "round4-retry",
+      "facts": 4
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {}
+    },
+    "strict": true,
+    "env": {
+      "WANXIANGSHU_MODEL_A": "test/test-model",
+      "WANXIANGSHU_MODEL_B": "test/test-model-b"
+    }
+  },
+  "session": {
+    "agent": "coder",
+    "bind": [
+      "coder-title",
+      "coder"
+    ]
+  },
+  "flow": [
+    {
+      "prompt": {
+        "agent": "coder",
+        "text": "Round 1 fallback attempt."
+      }
+    },
+    {
+      "wait": "round1-failure"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.status",
+        "session": "self",
+        "statusType": "retry",
+        "reason": "fallback-retry"
+      }
+    },
+    {
+      "wait": "round1-retry"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.idle",
+        "session": "self",
+        "reason": "fallback-idle"
+      }
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": false
+    },
+    {
+      "assertFacts": {
+        "name": "FallbackFailureRecorded",
+        "eq": 1
+      }
+    },
+    {
+      "prompt": {
+        "agent": "coder",
+        "text": "Round 2 fallback attempt."
+      }
+    },
+    {
+      "wait": "round2-failure"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.status",
+        "session": "self",
+        "statusType": "retry",
+        "reason": "fallback-retry"
+      }
+    },
+    {
+      "wait": "round2-retry"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.idle",
+        "session": "self",
+        "reason": "fallback-idle"
+      }
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": false
+    },
+    {
+      "assertFacts": {
+        "name": "FallbackFailureRecorded",
+        "eq": 2
+      }
+    },
+    {
+      "restart": true
+    },
+    {
+      "prompt": {
+        "agent": "coder",
+        "text": "Round 3 fallback attempt."
+      }
+    },
+    {
+      "wait": "round3-failure"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.status",
+        "session": "self",
+        "statusType": "retry",
+        "reason": "fallback-retry"
+      }
+    },
+    {
+      "wait": "round3-retry"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.idle",
+        "session": "self",
+        "reason": "fallback-idle"
+      }
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": false
+    },
+    {
+      "assertFacts": {
+        "name": "FallbackFailureRecorded",
+        "eq": 3
+      }
+    },
+    {
+      "prompt": {
+        "agent": "coder",
+        "text": "Round 4 fallback attempt."
+      }
+    },
+    {
+      "wait": "round4-failure"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.status",
+        "session": "self",
+        "statusType": "retry",
+        "reason": "fallback-retry"
+      }
+    },
+    {
+      "wait": "round4-retry"
+    },
+    {
+      "awaitEvent": {
+        "type": "session.idle",
+        "session": "self",
+        "reason": "fallback-idle"
+      }
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": false
+    },
+    {
+      "assertFacts": {
+        "name": "FallbackFailureRecorded",
+        "eq": 4
+      }
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Fallback canary passed: data-driven scripts; durable A/A/B/B recorded."
+}

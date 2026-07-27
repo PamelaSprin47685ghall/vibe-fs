@@ -1,0 +1,372 @@
+{
+  "scenario": "companion-replacement",
+  "scripts": [
+    {
+      "id": "primary-title",
+      "lane": {
+        "session": "primary-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "round-1",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 1
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round 1: dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. "
+      }
+    },
+    {
+      "id": "manager-blogger-1",
+      "lane": {
+        "session": "primary-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Blogger paragraph 1. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. "
+      }
+    },
+    {
+      "id": "round-2",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 2
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round 2: dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. "
+      }
+    },
+    {
+      "id": "manager-blogger-2",
+      "lane": {
+        "session": "primary-blogger",
+        "role": "blogger",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Blogger paragraph 2. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. durable blogger detail. "
+      }
+    },
+    {
+      "id": "round-3",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 3
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round 3: dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. "
+      }
+    },
+    {
+      "id": "manager-blogger-3",
+      "lane": {
+        "session": "primary-blogger",
+        "role": "blogger",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "containsText": [
+          "Condense the following FULL companion context"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "B-prime condensed context."
+      }
+    },
+    {
+      "id": "round-4",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 4
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round 4: dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. "
+      }
+    },
+    {
+      "id": "manager-blogger-4",
+      "lane": {
+        "session": "primary-blogger",
+        "role": "blogger",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "containsText": [
+          "You are the blogger of a coding agent session.",
+          "Write one dense paragraph"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Blogger paragraph 4."
+      }
+    },
+    {
+      "id": "round-restarted",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 5
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round restarted: dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. "
+      }
+    },
+    {
+      "id": "manager-blogger-restarted",
+      "lane": {
+        "session": "primary-blogger-restarted",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "containsText": [
+          "Re-anchor on the FULL current companion context B",
+          "You are the blogger of a coding agent session."
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Blogger restart recovered."
+      }
+    },
+    {
+      "id": "round-resetfail",
+      "lane": {
+        "session": "primary",
+        "role": "orchestrator",
+        "turn": 6
+      },
+      "match": {
+        "requiredTools": [
+          "fork-manager",
+          "join"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "list",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "round resetfail: dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. dense work record sentence. "
+      }
+    },
+    {
+      "id": "manager-blogger-resetfail",
+      "lane": {
+        "session": "primary-blogger-resetfail",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "primary"
+      },
+      "blocking": false,
+      "match": {
+        "containsText": [
+          "Re-anchor on the FULL current companion context B",
+          "You are the blogger of a coding agent session."
+        ]
+      },
+      "respond": {
+        "type": "error",
+        "status": 500,
+        "headers": {
+          "retry-after-ms": "0"
+        },
+        "body": {
+          "error": {
+            "message": "mock reset frame failure",
+            "type": "server_error"
+          }
+        }
+      }
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {}
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "primary-title",
+      "manager"
+    ]
+  },
+  "flow": [
+    {
+      "wait": "primary-title"
+    },
+    {
+      "wait": "round-1"
+    },
+    {
+      "wait": "manager-blogger-1"
+    },
+    {
+      "wait": "round-2"
+    },
+    {
+      "wait": "manager-blogger-2"
+    },
+    {
+      "wait": "round-3"
+    },
+    {
+      "wait": "manager-blogger-3"
+    },
+    {
+      "wait": "round-4"
+    },
+    {
+      "wait": "manager-blogger-4"
+    },
+    {
+      "wait": "round-restarted"
+    },
+    {
+      "wait": "manager-blogger-restarted"
+    },
+    {
+      "wait": "round-resetfail"
+    },
+    {
+      "awaitTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ]
+}

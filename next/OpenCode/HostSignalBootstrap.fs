@@ -37,6 +37,7 @@ module HostSignalBootstrap =
         (userMessageBindings: Dictionary<string, MessageId>)
         (fallbackFailures: HashSet<string>)
         (disposeExecutorRuntime: string -> unit)
+        (modelConfig: ModelResolver.ModelConfig option)
         (input: obj)
         : WiredSignals =
         let snapshot =
@@ -171,7 +172,31 @@ module HostSignalBootstrap =
                     |> Option.bind HostSessionContext.canonicalRole
                     |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
 
-                    bindUserMessage sessionId messageId)
+                    bindUserMessage sessionId messageId
+
+                    // A/A/B/B: rewrite outbound model from durable Fallback projection.
+                    // HostPendingRun already does this for forked children; root sessions
+                    // need the same path so Side B is not stuck on client-supplied model.
+                    match modelConfig, journal, agent with
+                    | Some cfg, Some j, Some _ when not (String.IsNullOrWhiteSpace sessionId) ->
+                        match ModelResolver.resolveForSession cfg (SessionId.create sessionId) (AgentJournal.snapshot j) with
+                        | Some selected ->
+                            let modelObj =
+                                createObj
+                                    [ "providerID", box selected.providerID
+                                      "modelID", box selected.modelID
+                                      "id", box selected.modelID ]
+
+                            if not (isNull outputObj) then
+                                if not (isNull outputObj?message) then
+                                    outputObj?message?model <- modelObj
+                                if not (isNull outputObj?info) then
+                                    outputObj?info?model <- modelObj
+                                outputObj?model <- modelObj
+
+                            inputObj?model <- modelObj
+                        | None -> ()
+                    | _ -> ())
 
         { Reconciler = reconciler
           SignalRouter = signalRouter

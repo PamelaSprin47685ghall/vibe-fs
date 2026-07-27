@@ -53,6 +53,7 @@ module internal AgentFactsReview =
                                 ConsecutivePerfects = 0
                                 IsConfirmed = false
                                 RecentToolCallIds = []
+                                RecentProviderRunIds = []
                                 CurrentBarrierKey = Some p.BarrierKey }
                         | None ->
                             { LastGitTreeHash = None
@@ -60,6 +61,7 @@ module internal AgentFactsReview =
                               IsConfirmed = false
                               AcceptedGuardKey = None
                               RecentToolCallIds = []
+                              RecentProviderRunIds = []
                               CurrentBarrierKey = Some p.BarrierKey }
 
                     { s with ReviewGuard = Some rg })
@@ -72,6 +74,8 @@ module internal AgentFactsReview =
         (p:
             {| ManagerSessionId: SessionId
                ReviewerSessionId: SessionId
+               ProviderRunId: string
+               RootUserMessageId: string option
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |})
@@ -89,37 +93,60 @@ module internal AgentFactsReview =
                             let recentToolCallIds =
                                 appendRecentToolCallId existing.RecentToolCallIds p.ToolCallId
 
+                            let providerRunUsed =
+                                List.contains p.ProviderRunId existing.RecentProviderRunIds
+
+                            let recentProviderRunIds =
+                                if not providerRunUsed then
+                                    appendRecentToolCallId existing.RecentProviderRunIds p.ProviderRunId
+                                else
+                                    existing.RecentProviderRunIds
+
                             match existing.LastGitTreeHash with
                             | Some lastHash when lastHash = hash ->
                                 match p.Verdict with
-                                | ReviewGuardVerdict.Perfect ->
+                                | ReviewGuardVerdict.Perfect when not providerRunUsed ->
                                     let count = existing.ConsecutivePerfects + 1
 
                                     { existing with
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = count
                                         IsConfirmed = count >= 2
-                                        RecentToolCallIds = recentToolCallIds }
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
+                                | ReviewGuardVerdict.Perfect ->
+                                    { existing with
+                                        LastGitTreeHash = Some hash
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Revise ->
                                     { existing with
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
-                                        RecentToolCallIds = recentToolCallIds }
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
                             | _ ->
                                 match p.Verdict with
-                                | ReviewGuardVerdict.Perfect ->
+                                | ReviewGuardVerdict.Perfect when not providerRunUsed ->
                                     { existing with
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 1
                                         IsConfirmed = false
-                                        RecentToolCallIds = recentToolCallIds }
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
+                                | ReviewGuardVerdict.Perfect ->
+                                    { existing with
+                                        LastGitTreeHash = Some hash
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Revise ->
                                     { existing with
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
-                                        RecentToolCallIds = recentToolCallIds }
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
                         | None ->
                             match p.Verdict with
                             | ReviewGuardVerdict.Perfect ->
@@ -128,6 +155,7 @@ module internal AgentFactsReview =
                                   IsConfirmed = false
                                   AcceptedGuardKey = None
                                   RecentToolCallIds = [ p.ToolCallId ]
+                                  RecentProviderRunIds = [ p.ProviderRunId ]
                                   CurrentBarrierKey = None }
                             | ReviewGuardVerdict.Revise ->
                                 { LastGitTreeHash = Some hash
@@ -135,6 +163,7 @@ module internal AgentFactsReview =
                                   IsConfirmed = false
                                   AcceptedGuardKey = None
                                   RecentToolCallIds = [ p.ToolCallId ]
+                                  RecentProviderRunIds = [ p.ProviderRunId ]
                                   CurrentBarrierKey = None }
 
                     { s with ReviewGuard = Some rg })
@@ -164,6 +193,7 @@ module internal AgentFactsReview =
                               IsConfirmed = false
                               AcceptedGuardKey = Some p.GuardKey
                               RecentToolCallIds = []
+                              RecentProviderRunIds = []
                               CurrentBarrierKey = None }
 
                     { s with ReviewGuard = Some rg })

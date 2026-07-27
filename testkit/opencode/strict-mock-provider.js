@@ -21,6 +21,8 @@ import {
   requestRoleOf,
   requestSessionOf,
   requestParentSessionOf,
+  sealProviderVisible,
+  isProviderVisiblePrefix,
 } from './strict-mock-matches.js';
 import {
   consumeExpectation,
@@ -55,6 +57,8 @@ export class StrictMockProvider {
     this._afterExpectation = new Map();
     this.onRequest = null;
     this.onExpectationConsumed = null;
+    /** First unmatched script: canary must stop. Scenario wires process.exit. */
+    this.onFatal = null;
   }
 
   expectToolCall(opts) { pushExpectation(this._state, { type: 'tool-call', tool: opts.tool, args: opts.args || {} }, opts); }
@@ -111,6 +115,11 @@ export class StrictMockProvider {
     const bound = this._state.sessionBindings.get(alias);
     if (bound && bound !== sessionID) throw new Error(`StrictMock session alias ${alias} is already bound`);
     this._state.sessionBindings.set(alias, sessionID);
+  }
+
+  /** Host restart / new process: old provider-visible seals are not comparable. */
+  clearPrefixSeals() {
+    this._state.sealedBySession.clear();
   }
   /// Read-only: which session (if any) currently owns an alias. Lets a scenario
   /// route a second session to a distinct alias instead of throwing on rebind.
@@ -203,11 +212,55 @@ export class StrictMockProvider {
   _dispatchChat(res, parsed) {
     this.onRequest?.(parsed);
     const s = this._state;
+    // First script mismatch already happened: do not attempt further matches.
+    if (s.fatal) {
+      sendJSON(res, 503, {
+        error: 'mock stopped after first script mismatch',
+        reason: s.fatal.reason,
+        id: s.fatal.id,
+      });
+      return;
+    }
     if (process.env.MOCK_TRACE) {
       const tools = (parsed.tools || []).map((t) => t?.function?.name || t?.name || '?');
       const lastUser = JSON.stringify(extractLastUserMsg(parsed) || '').slice(0, 80);
       console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} chars=${JSON.stringify(parsed.messages || []).length} lastUser=${lastUser}`);
     }
+
+    // Prefix-cache invariant: for a given session, each chat request must keep
+    // the previous provider-visible tools+messages as a byte-prefix. Otherwise
+    // the production projection broke the sealed prefix (e.g. mutating B head).
+    // One allowed cold boundary: epoch freeze injects companion-b-head* at the
+    // front (SSOT epoch switch). That reseals; any other mutation is fatal.
+    const sessionID = requestSessionOf(parsed);
+    const kind = requestKindOf(parsed);
+    if (sessionID && kind === 'chat') {
+      const sealed = s.sealedBySession.get(sessionID);
+      if (sealed && !isProviderVisiblePrefix(sealed, parsed)) {
+        // Provider requests may strip synthetic ids. Allowed cold boundary:
+        // tools + leading system text unchanged, but body is not append-only
+        // (epoch B-head replacement). Tools/system mutation is always fatal.
+        let prev;
+        try { prev = JSON.parse(sealed); } catch { prev = null; }
+        const next = JSON.parse(sealProviderVisible(parsed));
+        const toolsSame = prev && JSON.stringify(prev.tools) === JSON.stringify(next.tools);
+        const prev0 = prev?.messages?.[0];
+        const next0 = next?.messages?.[0];
+        const systemSame = prev0 && next0
+          && prev0.role === 'system'
+          && next0.role === 'system'
+          && JSON.stringify(prev0.content) === JSON.stringify(next0.content);
+        const epochCold = toolsSame && systemSame;
+        if (epochCold) {
+          console.error(`[MOCK-PREFIX-RESEAL] session=${sessionID} tools+system stable; resealing after non-append body (epoch/B-head cold boundary)`);
+          s.sealedBySession.set(sessionID, sealProviderVisible(parsed));
+        } else {
+          this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', []);
+          return;
+        }
+      }
+    }
+
     const selection = selectExpectation(s, parsed);
     if (selection.match) return this._dispatchMatched(res, parsed, selection.match);
     this._recordUnexpected(res, parsed, selection.reason, selection.candidates);
@@ -215,11 +268,16 @@ export class StrictMockProvider {
 
   _dispatchMatched(res, parsed, match) {
     const s = this._state;
-    const exp = consumeExpectation(s, match, requestSessionOf(parsed));
+    const sessionID = requestSessionOf(parsed);
+    const exp = consumeExpectation(s, match, sessionID);
     this._signals.consume(exp);
     this._runAfterExpectation(exp.id);
     if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${exp.id} ${laneLabel(exp.lane)}`);
     s.requests.push(parsed);
+    // Seal only chat turns (title/synthetic may reshuffle without product cache).
+    if (sessionID && requestKindOf(parsed) === 'chat') {
+      s.sealedBySession.set(sessionID, sealProviderVisible(parsed));
+    }
     this.onExpectationConsumed?.({
       id: exp.id,
       lane: exp.lane,
@@ -235,6 +293,18 @@ export class StrictMockProvider {
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
     const candidateLabels = candidates.map(({ expectation }) => `${expectation.id}@${laneLabel(expectation.lane)}`);
+    const lastUser = extractLastUserMsg(parsed);
+    const fatal = {
+      id: `unexpected-${this._state.unexpected.length + 1}`,
+      reason,
+      sessionId: sessId,
+      parentSessionId,
+      lastUser: typeof lastUser === 'string' ? lastUser.slice(0, 400) : JSON.stringify(lastUser).slice(0, 400),
+      candidates: candidateLabels,
+    };
+    // First script mismatch: record once, reject all waiters, notify the test to stop.
+    const isFirst = !this._state.fatal;
+    this._state.fatal = this._state.fatal || fatal;
     this._state.unexpected.push({
       body: parsed,
       sessId,
@@ -243,9 +313,25 @@ export class StrictMockProvider {
       reason,
       candidates: candidateLabels,
     });
-    const lastUser = JSON.stringify(extractLastUserMsg(parsed));
-    console.error(`[MOCK-500] reason=${reason} session=${sessId} parent=${parentSessionId || '-'} role=${requestRoleOf(parsed)} kind=${requestKindOf(parsed)} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${lastUser.slice(0, 400)} candidates=${JSON.stringify(candidateLabels)}`);
-    return sendJSON(res, 500, { error: reason, sessionId: sessId, tools: extractToolNames(parsed) });
+    console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} role=${requestRoleOf(parsed)} kind=${requestKindOf(parsed)} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
+    if (isFirst) {
+      const err = new Error(
+        `FIRST SCRIPT MISMATCH: ${reason} session=${sessId} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`,
+      );
+      err.fatal = fatal;
+      this._signals.fail(err);
+      try { this.onFatal?.(fatal, err); } catch (hookErr) {
+        console.error(`[MOCK-FATAL] onFatal threw: ${hookErr?.stack || hookErr}`);
+      }
+    }
+    // Clean 500 for this request. Later chats see state.fatal → 503.
+    return sendJSON(res, 500, {
+      error: 'first-script-mismatch',
+      reason,
+      sessionId: sessId,
+      tools: extractToolNames(parsed),
+      candidates: candidateLabels,
+    });
   }
 
   _runAfterExpectation(id) {

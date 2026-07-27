@@ -1,0 +1,96 @@
+{
+  "scenario": "process-stress",
+  "scripts": [
+    {
+      "id": "inspector-title",
+      "lane": {
+        "session": "inspector-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "inspector-executor-sigkill",
+      "lane": {
+        "session": "inspector",
+        "role": "inspector",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "executor"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "executor",
+        "args": {
+          "command": "sh -lc 'trap \"\" TERM; sleep 1000'",
+          "estimated_output_bytes": 1024,
+          "estimated_running_secs": 0.2,
+          "estimated_mem_usage": "medium"
+        }
+      }
+    },
+    {
+      "id": "inspector-sigkill-final",
+      "lane": {
+        "session": "inspector",
+        "role": "inspector",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "executor"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "timeout observed."
+      }
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {}
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "inspector",
+    "bind": [
+      "inspector-title",
+      "inspector"
+    ]
+  },
+  "prompt": {
+    "agent": "inspector",
+    "text": "Run the command and report if it timed out."
+  },
+  "flow": [
+    {
+      "wait": "inspector-title"
+    },
+    {
+      "wait": "inspector-executor-sigkill"
+    },
+    {
+      "wait": "inspector-sigkill-final"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Process stress canary passed."
+}

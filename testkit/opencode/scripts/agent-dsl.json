@@ -1,0 +1,239 @@
+{
+  "scenario": "manager-dsl",
+  "scripts": [
+    {
+      "id": "manager-title",
+      "lane": {
+        "session": "manager-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      },
+      "match": {}
+    },
+    {
+      "id": "manager-fork-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Write canary_output.txt with exactly Coder canary slice OK\\n, then report completion."
+        }
+      }
+    },
+    {
+      "id": "coder-write",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "write",
+        "args": {
+          "filePath": "canary_output.txt",
+          "content": "Coder canary slice OK\n"
+        }
+      }
+    },
+    {
+      "id": "coder-finished",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Coder write complete."
+      }
+    },
+    {
+      "id": "manager-join-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-joined-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager joined Coder: canary complete."
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. Write one dense paragraph"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      }
+    },
+    {
+      "id": "session-blogger-reanchor",
+      "lane": {
+        "session": "session-blogger-reanchor",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. This session resumed after a restart"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session reanchor background."
+      }
+    }
+  ],
+  "setup": {
+    "project": {
+      "files": {}
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "manager-title",
+      "manager"
+    ]
+  },
+  "prompt": {
+    "agent": "manager",
+    "text": "Delegate this canary to a Coder with fork, join the Coder, and report the result."
+  },
+  "flow": [
+    {
+      "wait": "manager-fork-coder"
+    },
+    {
+      "bindChild": {
+        "agent": "coder",
+        "aliases": [
+          "coder"
+        ]
+      }
+    },
+    {
+      "wait": "coder-write"
+    },
+    {
+      "wait": "coder-finished"
+    },
+    {
+      "wait": "manager-join-coder"
+    },
+    {
+      "wait": "manager-joined-coder"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Agent DSL canary passed."
+}

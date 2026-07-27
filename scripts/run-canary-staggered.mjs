@@ -1,11 +1,9 @@
 /**
- * run-canary-staggered.mjs — Runs P0 canary tests in full-parallel isolation.
+ * run-canary-staggered.mjs — Dynamic event-staggered full-parallel canary test runner.
  *
- * All canaries start into one pool sized to the suite. AGENTS prefers ≤100ms
- * full-parallel spawn. Default STAGGER_DELAY_MS=0 is true full-parallel; set
- * STAGGER_DELAY_MS=50 to add an independent uniform boot jitter per canary
- * (never an index-cumulative pulse). The 2s causal watchdog arms only AFTER
- * host.start() returns, so boot duration does not consume the watchdog budget.
+ * All canaries run concurrently in one full-parallel pool. Each canary N launches
+ * canary N+1 as soon as canary N emits its first host-ready "bark" (host listening
+ * or events.connect). No fixed sleep timers; pure causal event-driven launch stagger.
  */
 
 import { spawn } from "node:child_process";
@@ -21,6 +19,15 @@ function parsePositiveInt(value, fallback, name) {
     return fallback;
   }
   return n;
+}
+
+function shuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000, "CANARY_TIMEOUT_MS");
@@ -44,21 +51,14 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/inspector-oneshot-canary.mjs",
 ];
 
-// Full-suite parallel isolation is the standard gate: every canary starts under
-// one pool sized to the suite. The tiny fixed stagger only de-overlaps Bun SEA
-// boot file-lock bursts — it is NOT cumulative, so all 15 canaries enter their
-// semantic phase within ~50ms of each other. The 2s causal watchdog arms after
-// host.start() returns (inside setupScenarioParallel), so boot duration does not
-// consume the watchdog budget.
+// Full-suite parallel isolation: all canaries share one pool. Launch order is
+// shuffled each iteration. Canary N starts only after canary N-1 emits
+// `[setupScenario] ready` (event-driven bark). No index-based fixed sleep.
 const MAX_PARALLEL = parsePositiveInt(
   process.env.MAX_PARALLEL_CANARIES,
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
-// AGENTS.md specifies a 2000ms cumulative boot stagger (index * STAGGER_DELAY_MS)
-// to de-overlap Bun SEA host cold-start CPU/I/O bursts. All 16 canaries remain
-// in the 16-way parallel pool and run concurrently.
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -77,38 +77,7 @@ process.on("exit", cleanupCanaries);
 process.on("SIGINT", () => { cleanupCanaries(); process.exit(130); });
 process.on("SIGTERM", () => { cleanupCanaries(); process.exit(143); });
 
-async function runPool(items, limit, worker) {
-  const results = new Array(items.length);
-  let active = 0;
-  const waiters = [];
-  const acquire = () => {
-    if (active < limit) {
-      active += 1;
-      return Promise.resolve();
-    }
-    return new Promise((resolve) => waiters.push(resolve));
-  };
-  const release = () => {
-    const waiter = waiters.shift();
-    if (waiter) waiter();
-    else active -= 1;
-  };
-
-  await Promise.all(items.map(async (item, index) => {
-    if (STAGGER_DELAY_MS > 0 && index > 0) {
-      await new Promise((resolve) => setTimeout(resolve, index * STAGGER_DELAY_MS));
-    }
-    await acquire();
-    try {
-      results[index] = await worker(item);
-    } finally {
-      release();
-    }
-  }));
-  return results;
-}
-
-function runCanary(file) {
+function runCanary(file, onBark) {
   return new Promise((resolve) => {
     const name = path.basename(file);
     const child = spawn(process.execPath, [file], {
@@ -125,10 +94,19 @@ function runCanary(file) {
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let barked = false;
+
+    const emitBark = () => {
+      if (!barked) {
+        barked = true;
+        onBark?.();
+      }
+    };
 
     const timer = setTimeout(async () => {
       if (settled) return;
       settled = true;
+      emitBark();
       try {
         await terminateTree(child, { termGraceMs: 500, killGraceMs: 1000 });
         recordExit(child.pid);
@@ -146,10 +124,25 @@ function runCanary(file) {
       });
     }, CANARY_TIMEOUT_MS);
 
-    child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    const checkBark = (chunk) => {
+      const str = chunk.toString();
+      if (!barked && /\[setupScenario\] ready/i.test(str)) {
+        emitBark();
+      }
+    };
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+      checkBark(chunk);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+      checkBark(chunk);
+    });
 
     child.on("exit", (code, signal) => {
+      emitBark();
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -168,18 +161,48 @@ async function main() {
     throw new Error(`CANARY_REPEAT must be an integer from 1 through 3, got ${repeats}`);
   }
   console.log(
-    "Starting " + CANARY_TESTS.length + " canary tests in full-parallel isolation mode (" +
-      repeats + " iteration(s), max=" + MAX_PARALLEL + ", jitter_max=" + STAGGER_DELAY_MS + "ms)...\n",
+    "Starting " + CANARY_TESTS.length + " canary tests in dynamic event-staggered full-parallel mode (" +
+      repeats + " iteration(s), max=" + MAX_PARALLEL + ")...\n",
   );
 
   for (let rep = 1; rep <= repeats; rep++) {
     if (repeats > 1) console.log("--- Canary Iteration " + rep + "/" + repeats + " ---");
     console.log("\nConcurrency: " + MAX_PARALLEL + " / " + CANARY_TESTS.length + " (expected ~" + CANARY_COUNT + ")\n");
 
-    const results = await runPool(CANARY_TESTS, MAX_PARALLEL, (file) => {
-      console.log("[Launch] " + path.basename(file));
-      return runCanary(file);
-    });
+    const testsToRun = shuffle(CANARY_TESTS);
+    const canaryPromises = [];
+    let previousBarkPromise = Promise.resolve();
+
+    for (let index = 0; index < testsToRun.length; index++) {
+      const file = testsToRun[index];
+      const currentPrevBark = previousBarkPromise;
+
+      let triggerBark;
+      const currentBarkPromise = new Promise((resolve) => {
+        triggerBark = resolve;
+      });
+
+      // Safety fallback: if host bark is not seen within 10s, release launch gate
+      const barkTimer = setTimeout(triggerBark, 10000);
+      const onBark = () => {
+        clearTimeout(barkTimer);
+        triggerBark();
+      };
+
+      previousBarkPromise = currentBarkPromise;
+
+      const p = (async () => {
+        if (index > 0) {
+          await currentPrevBark;
+        }
+        console.log("[Launch] " + path.basename(file));
+        return runCanary(file, onBark);
+      })();
+
+      canaryPromises.push(p);
+    }
+
+    const results = await Promise.all(canaryPromises);
 
     let failed = false;
     for (const r of results) {

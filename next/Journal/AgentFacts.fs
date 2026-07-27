@@ -22,6 +22,7 @@ module AgentFacts =
           IsConfirmed = false
           AcceptedGuardKey = None
           RecentToolCallIds = []
+          RecentProviderRunIds = []
           CurrentBarrierKey = None }
 
     let emptyFallback: FallbackProjection =

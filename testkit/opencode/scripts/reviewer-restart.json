@@ -1,0 +1,158 @@
+{
+  "scenario": "reviewer-restart",
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "reviewer restart reconcile canary\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": []
+  },
+  "flow": [
+    {
+      "createChild": {
+        "agent": "reviewer",
+        "bind": [
+          "reviewer-title",
+          "reviewer"
+        ],
+        "title": "reviewer restart canary"
+      }
+    },
+    {
+      "prompt": {
+        "agent": "reviewer",
+        "text": "Review the tree and submit a PERFECT verdict."
+      },
+      "session": "child"
+    },
+    {
+      "wait": "review-perfect-first"
+    },
+    {
+      "awaitTerminal": true,
+      "session": "child",
+      "requireAssistantTerminal": true,
+      "requireIdleAfterActivity": true
+    },
+    {
+      "restart": true
+    },
+    {
+      "wait": "review-perfect-restart"
+    },
+    {
+      "awaitTerminal": true,
+      "session": "child",
+      "requireAssistantTerminal": true,
+      "requireIdleAfterActivity": true
+    },
+    {
+      "custom": "oracle"
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Reviewer restart reconcile canary passed: verdict tool surface intact across restart.",
+  "scripts": [
+    {
+      "id": "reviewer-title",
+      "lane": {
+        "session": "reviewer-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "review-perfect-first",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "Review the tree and submit a PERFECT verdict."
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-first-turn",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "NEEDS_REVIEW"
+      }
+    },
+    {
+      "id": "review-perfect-restart",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "After restart, re-verify the tree with another PERFECT verdict."
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-restart-done",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 4,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "CONFIRMED"
+      }
+    }
+  ]
+}

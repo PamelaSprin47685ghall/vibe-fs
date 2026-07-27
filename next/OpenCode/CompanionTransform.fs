@@ -59,19 +59,14 @@ module CompanionTransform =
         =
         let rawMsgs = unbox<obj array> rawOutObj?messages |> Array.toList
 
-        // Idempotency guard: if companion-b-head already present, skip entirely.
-        // Prevents double-hook registration and re-entrant calls from duplicating
-        // the synthetic B head.
         let hasBHead =
-            match rawMsgs with
-            | first :: _ when
-                not (isNull first)
-                && not (isNull first?info)
-                && not (isNull first?info?id)
-                && unbox<string> first?info?id = "companion-b-head"
-                ->
-                true
-            | _ -> false
+            rawMsgs
+            |> List.exists (fun msg ->
+                if isNull msg || isNull msg?info || isNull msg?info?id then
+                    false
+                else
+                    let id = unbox<string> msg?info?id
+                    id = "companion-b-head" || id.StartsWith("companion-b-head-"))
 
         if hasBHead then
             ()

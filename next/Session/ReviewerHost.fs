@@ -17,9 +17,14 @@ type ReviewerHost
             | _ -> ReviewFinishResult.NeedsReview
         | None -> ReviewFinishResult.NeedsReview
 
+    /// providerRunId must be per-call. Prefer Host assistant message id (one run);
+    /// fall back to toolCallId only when the host does not expose a run id.
     member _.RecordVerdict
-        (toolCallId: string, treeHash: string, verdict: ReviewGuardVerdict)
+        (toolCallId: string, treeHash: string, verdict: ReviewGuardVerdict, providerRunId: string)
         : Result<ReviewFinishResult, string> =
+        let actualProviderRunId =
+            if System.String.IsNullOrWhiteSpace providerRunId then toolCallId else providerRunId
+
         lock gate (fun () ->
             let current = AgentJournal.snapshot journal
 
@@ -37,6 +42,8 @@ type ReviewerHost
                     AgentFact.ReviewVerdictRecorded
                         {| ManagerSessionId = managerSessionId
                            ReviewerSessionId = reviewerSessionId
+                           ProviderRunId = actualProviderRunId
+                           RootUserMessageId = None
                            ToolCallId = toolCallId
                            GitTreeHash = treeHash
                            Verdict = verdict |}
@@ -45,9 +52,13 @@ type ReviewerHost
                 | Ok updated -> Ok(reviewState updated treeHash)
                 | Error failure -> Error(sprintf "%A" failure.Failure))
 
-    member this.SubmitVerdict(toolCallId: string, verdict: ReviewGuardVerdict) : Result<ReviewFinishResult, string> =
+    member this.SubmitVerdict
+        (toolCallId: string, verdict: ReviewGuardVerdict, ?providerRunId: string)
+        : Result<ReviewFinishResult, string> =
+        let runId = defaultArg providerRunId toolCallId
+
         match gitTreePort with
-        | Some port -> this.RecordVerdict(toolCallId, port.GetTreeHash(), verdict)
+        | Some port -> this.RecordVerdict(toolCallId, port.GetTreeHash(), verdict, runId)
         | None -> Error "ReviewerHost.SubmitVerdict requires a GitTreePort"
 
     member _.TryFinish(currentTreeHash: string) =

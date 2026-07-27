@@ -113,6 +113,8 @@ module SpikePlugin =
                 let bloggerModel = ModelResolver.bloggerModelFromEnv ()
                 let mutable toolSurfaceRef: obj option = None
 
+                let modelConfig = ModelResolver.fromEnv ()
+
                 let disposeExecutorRuntimeCb (sid: string) =
                     match toolSurfaceRef with
                     | Some ts -> ts?disposeExecutorRuntime (sid) |> ignore
@@ -134,6 +136,7 @@ module SpikePlugin =
                         userMessageBindings
                         fallbackFailures
                         disposeExecutorRuntimeCb
+                        modelConfig
                         input
 
                 let bindRunStarted =
@@ -215,7 +218,6 @@ module SpikePlugin =
                 hooks?event <- box wired.ObserveEvent
 
                 let client = if isNull input then null else input?client
-                let modelConfig = ModelResolver.fromEnv ()
 
                 if not (isNull client) then
                     try

@@ -1,0 +1,66 @@
+{
+  "scenario": "host-restart",
+  "scripts": [
+    {
+      "id": "manager-nudge-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 7,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "userRegex": "Nudge the coder child for child-a2"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Report child-a2."
+        }
+      }
+    },
+    {
+      "id": "manager-finished-after-restart",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 8,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Finished after restart."
+      }
+    },
+    {
+      "id": "child-a2-text",
+      "lane": {
+        "session": "coder-after",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "userRegex": "Report child-a2"
+      },
+      "respond": {
+        "type": "text",
+        "text": "child-a2 done."
+      }
+    }
+  ]
+}

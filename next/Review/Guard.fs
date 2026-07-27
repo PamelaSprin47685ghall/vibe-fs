@@ -27,6 +27,7 @@ module Guard =
         (journalPort: JournalPort)
         (managerSessionId: SessionId)
         (reviewerSessionId: SessionId)
+        (providerRunId: string)
         (toolCallId: string)
         (gitTreeHash: string)
         (verdict: ReviewGuardVerdict)
@@ -35,6 +36,8 @@ module Guard =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = managerSessionId
                    ReviewerSessionId = reviewerSessionId
+                   ProviderRunId = providerRunId
+                   RootUserMessageId = None
                    ToolCallId = toolCallId
                    GitTreeHash = gitTreeHash
                    Verdict = verdict |}

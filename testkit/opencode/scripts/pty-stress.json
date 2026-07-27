@@ -1,0 +1,341 @@
+{
+  "scenario": "pty-stress",
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "PTY stress canary\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "manager-title",
+      "manager"
+    ]
+  },
+  "prompt": {
+    "agent": "manager",
+    "text": "Use the structured PTY fork DSL only (not executor): 1) fork agent=\"pty\" with command: echo CWD=$(pwd); exec cat 2) fork the returned ptyId with prompt: ECHO_TEST 3) fork the ptyId with an empty prompt to READ the buffered output 4) fork the ptyId with signal=\"TERM\" 5) join and confirm the exit was delivered 6) fork agent=\"pty\" with command: trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null 7) fork that ptyId with signal=\"TERM\" (the process ignores it) 8) fork that ptyId with signal=\"KILL\" to force exit 9) join and confirm the forced exit was delivered 10) call list and confirm no active pty remains Report the cwd printed by pwd, the echoed ECHO_TEST, and that both joins returned closed."
+  },
+  "flow": [
+    {
+      "wait": "manager-fork-pty"
+    },
+    {
+      "wait": "manager-pty-write"
+    },
+    {
+      "wait": "manager-pty-read"
+    },
+    {
+      "wait": "manager-pty-term"
+    },
+    {
+      "wait": "manager-join-term"
+    },
+    {
+      "wait": "manager-fork-pty2"
+    },
+    {
+      "wait": "manager-pty2-term"
+    },
+    {
+      "wait": "manager-pty2-kill"
+    },
+    {
+      "wait": "manager-join-kill"
+    },
+    {
+      "wait": "manager-list"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "expectSatisfied": true
+    },
+    {
+      "assertPtyEcho": true
+    }
+  ],
+  "pass": "PTY stress canary passed: cwd, write/read echo, TERM->Closed, KILL forces exit, no leak.",
+  "scripts": [
+    {
+      "id": "manager-title",
+      "lane": {
+        "session": "manager-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. Write one dense paragraph"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      },
+      "neverEnd": true,
+      "blocking": false
+    },
+    {
+      "id": "manager-fork-pty",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "pty",
+          "prompt": "echo CWD=$(pwd); exec cat"
+        }
+      }
+    },
+    {
+      "id": "manager-pty-write",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "argsFrom": "lastPtyId",
+        "args": {
+          "prompt": "ECHO_TEST"
+        }
+      }
+    },
+    {
+      "id": "manager-pty-read",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "argsFrom": "lastPtyId",
+        "args": {
+          "prompt": ""
+        }
+      }
+    },
+    {
+      "id": "manager-pty-term",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 4,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "argsFrom": "lastPtyId",
+        "args": {
+          "signal": "TERM"
+        }
+      }
+    },
+    {
+      "id": "manager-join-term",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 5,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-fork-pty2",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 6,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "pty",
+          "prompt": "trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null"
+        }
+      }
+    },
+    {
+      "id": "manager-pty2-term",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 7,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "argsFrom": "lastPtyId",
+        "args": {
+          "signal": "TERM"
+        }
+      }
+    },
+    {
+      "id": "manager-pty2-kill",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 8,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "argsFrom": "lastPtyId",
+        "args": {
+          "signal": "KILL"
+        }
+      }
+    },
+    {
+      "id": "manager-join-kill",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 9,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-list",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 10,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "list",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-final",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 11,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Both PTYs closed; no active pty remains."
+      }
+    }
+  ]
+}

@@ -52,12 +52,18 @@ module StaticTools =
     let permissionObj (role: Role) : obj =
         let allowed = Roles.permissions role |> Set.map toolName
         let known =
-            [ "fork"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
+            [ "fork"; "fork-manager"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
               "inspector"; "executor"; "network"; "verdict" ]
         let pairs =
             [ yield "*", box "deny"
               for name in known do
-                  yield name, box (if Set.contains name allowed then "allow" else "deny") ]
+                  match name, role with
+                  // Manager owns "fork"; must not see Orchestrator's narrow tool.
+                  | "fork-manager", Role.Manager -> yield name, box "deny"
+                  | "fork", Role.Orchestrator -> yield name, box "deny"
+                  // Orchestrator owns "fork-manager" (maps from ToolPermission.Fork).
+                  | "fork-manager", Role.Orchestrator -> yield name, box "allow"
+                  | _ -> yield name, box (if Set.contains name allowed then "allow" else "deny") ]
         createObj pairs
 
     let private primaryAgent (role: Role) : obj =

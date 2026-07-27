@@ -21,6 +21,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "tc1"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -29,6 +31,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "tc2"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Revise |}
@@ -53,6 +57,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "tc1"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -61,6 +67,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "tc2"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -84,6 +92,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "tc1"
                    GitTreeHash = "treeA"
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -92,6 +102,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "tc2"
                    GitTreeHash = "treeA"
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -100,6 +112,8 @@ module GuardTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
+                   ProviderRunId = "pr-3"
+                   RootUserMessageId = None
                    ToolCallId = "tc3"
                    GitTreeHash = "treeB"
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -182,7 +196,7 @@ module GuardTests =
 
                 // Record 1st verdict -> appends to journal and returns projection immediately
                 let res1 =
-                    Guard.recordVerdict journalPort sid revSid "tc-1" treeHash ReviewGuardVerdict.Perfect
+                    Guard.recordVerdict journalPort sid revSid "pr-1" "tc-1" treeHash ReviewGuardVerdict.Perfect
 
                 Assert.True(Result.isOk res1)
                 let proj1 = Result.defaultWith (fun _ -> failwith "unexpected") res1
@@ -193,7 +207,7 @@ module GuardTests =
 
                 // Record 2nd verdict on same tree -> confirmed
                 let res2 =
-                    Guard.recordVerdict journalPort sid revSid "tc-2" treeHash ReviewGuardVerdict.Perfect
+                    Guard.recordVerdict journalPort sid revSid "pr-2" "tc-2" treeHash ReviewGuardVerdict.Perfect
 
                 Assert.True(Result.isOk res2)
                 let proj2 = Result.defaultWith (fun _ -> failwith "unexpected") res2

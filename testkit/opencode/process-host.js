@@ -76,7 +76,10 @@ export class ProcessHost {
     });
     const startTimeout = opts.startTimeoutMs || 5000;
     const listenLine = await this._waitForListening(startTimeout);
-    const ht1 = Date.now(); console.log(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
+    const ht1 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
+    }
     if (!listenLine) {
       try { this._child?.kill('SIGKILL'); } catch {}
       throw new Error(
@@ -90,7 +93,10 @@ export class ProcessHost {
     this._baseUrl = `http://127.0.0.1:${this._port}`;
     opts.onProgress?.('listening');
     await this._waitForHealth(5000);
-    const ht2 = Date.now(); console.log(`[host.start] _waitForHealth took ${ht2 - ht1}ms`);
+    const ht2 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[host.start] _waitForHealth took ${ht2 - ht1}ms`);
+    }
     opts.onProgress?.('healthy');
   }
 

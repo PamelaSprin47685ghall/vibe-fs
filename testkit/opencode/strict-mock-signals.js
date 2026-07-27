@@ -4,19 +4,20 @@ export class StrictMockSignals {
     this._consumed = new Set();
     this._expectationWaiters = new Map();
     this._idleWaiters = new Set();
+    this._fatalError = null;
   }
 
   trackResponse(response) {
     this._activeResponses.add(response);
     response.on('close', () => {
       this._activeResponses.delete(response);
-      if (this._activeResponses.size === 0) this._resolve(this._idleWaiters);
+      if (this._activeResponses.size === 0) this._resolveIdle();
     });
   }
 
   consume(expectation) {
     this._consumed.add(expectation.id);
-    this._resolve(this._expectationWaiters.get(expectation.id));
+    this._resolveWaiters(this._expectationWaiters.get(expectation.id));
     this._expectationWaiters.delete(expectation.id);
   }
 
@@ -25,13 +26,29 @@ export class StrictMockSignals {
   }
 
   waitForExpectation(id, timeoutMs) {
+    if (this._fatalError) return Promise.reject(this._fatalError);
     if (this._consumed.has(id)) return Promise.resolve();
     return this._wait(this._expectationWaiters, id, timeoutMs, `expectation ${id}`);
   }
 
   waitForIdle(timeoutMs) {
+    if (this._fatalError) return Promise.reject(this._fatalError);
     if (this._activeResponses.size === 0) return Promise.resolve();
-    return this._wait({ get: () => this._idleWaiters, set: () => {} }, 'idle', timeoutMs, 'mock provider idle');
+    return this._waitIdle(timeoutMs);
+  }
+
+  /**
+   * First script mismatch: reject every waiter so the canary cannot continue
+   * waiting. Does not destroy the HTTP response that is reporting the 500.
+   */
+  fail(error) {
+    this._fatalError = error instanceof Error ? error : new Error(String(error));
+    for (const waiters of this._expectationWaiters.values()) {
+      this._rejectWaiters(waiters, this._fatalError);
+    }
+    this._expectationWaiters.clear();
+    this._rejectWaiters(this._idleWaiters, this._fatalError);
+    this._idleWaiters.clear();
   }
 
   stop() {
@@ -39,7 +56,7 @@ export class StrictMockSignals {
       try { response.destroy(); } catch {}
     }
     this._activeResponses.clear();
-    this._resolve(this._idleWaiters);
+    this._resolveIdle();
   }
 
   get activeRequestCount() {
@@ -49,22 +66,61 @@ export class StrictMockSignals {
   _wait(store, key, timeoutMs, label) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        waiters.delete(done);
+        waiters.delete(entry);
         reject(new Error(`Timed out waiting for ${label}`));
       }, timeoutMs);
-      const done = () => {
-        clearTimeout(timeout);
-        waiters.delete(done);
-        resolve();
+      const entry = {
+        resolve: () => {
+          clearTimeout(timeout);
+          waiters.delete(entry);
+          resolve();
+        },
+        reject: (err) => {
+          clearTimeout(timeout);
+          waiters.delete(entry);
+          reject(err);
+        },
       };
       const waiters = store.get(key) || new Set();
-      waiters.add(done);
+      waiters.add(entry);
       store.set(key, waiters);
     });
   }
 
-  _resolve(waiters) {
+  _waitIdle(timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this._idleWaiters.delete(entry);
+        reject(new Error('Timed out waiting for mock provider idle'));
+      }, timeoutMs);
+      const entry = {
+        resolve: () => {
+          clearTimeout(timeout);
+          this._idleWaiters.delete(entry);
+          resolve();
+        },
+        reject: (err) => {
+          clearTimeout(timeout);
+          this._idleWaiters.delete(entry);
+          reject(err);
+        },
+      };
+      this._idleWaiters.add(entry);
+    });
+  }
+
+  _resolveWaiters(waiters) {
     if (!waiters) return;
-    for (const done of [...waiters]) done();
+    for (const entry of [...waiters]) entry.resolve();
+  }
+
+  _rejectWaiters(waiters, err) {
+    if (!waiters) return;
+    for (const entry of [...waiters]) entry.reject(err);
+  }
+
+  _resolveIdle() {
+    this._resolveWaiters(this._idleWaiters);
+    this._idleWaiters.clear();
   }
 }

@@ -54,6 +54,7 @@ type ReviewGuardProjection =
       IsConfirmed: bool
       AcceptedGuardKey: string option
       RecentToolCallIds: string list
+      RecentProviderRunIds: string list
       CurrentBarrierKey: string option }
 
 type ModelSide =

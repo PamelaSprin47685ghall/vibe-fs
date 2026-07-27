@@ -32,6 +32,8 @@ module AgentFactsTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "call-1"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -40,6 +42,8 @@ module AgentFactsTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -71,6 +75,8 @@ module AgentFactsTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
                    ToolCallId = "call-1"
                    GitTreeHash = treeHash1
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -80,6 +86,8 @@ module AgentFactsTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = None
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash1
                    Verdict = ReviewGuardVerdict.Revise |}
@@ -89,6 +97,8 @@ module AgentFactsTests =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
+                   ProviderRunId = "pr-3"
+                   RootUserMessageId = None
                    ToolCallId = "call-3"
                    GitTreeHash = treeHash2
                    Verdict = ReviewGuardVerdict.Perfect |}

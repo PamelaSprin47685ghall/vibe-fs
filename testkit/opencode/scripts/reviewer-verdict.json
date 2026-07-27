@@ -1,0 +1,421 @@
+{
+  "scenario": "reviewer-verdict",
+  "setup": {
+    "project": {
+      "files": {
+        "review_target.txt": "review target\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "manager-title",
+      "manager"
+    ]
+  },
+  "prompt": {
+    "agent": "manager",
+    "text": "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report."
+  },
+  "flow": [
+    {
+      "wait": "manager-fork-reviewer"
+    },
+    {
+      "wait": "review-perfect-1"
+    },
+    {
+      "wait": "review-perfect-2"
+    },
+    {
+      "wait": "manager-join-reviewer"
+    },
+    {
+      "wait": "manager-review-complete"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "assertFacts": {
+        "name": "ReviewVerdictRecorded",
+        "eq": 2
+      }
+    },
+    {
+      "createSession": {
+        "agent": "manager",
+        "bind": [
+          "guard-manager-title",
+          "guard-manager"
+        ],
+        "as": "guard"
+      }
+    },
+    {
+      "prompt": {
+        "agent": "manager",
+        "text": "Attempt completion without review."
+      },
+      "session": "guard"
+    },
+    {
+      "wait": "guard-manager-first"
+    },
+    {
+      "wait": "guard-manager-nudged"
+    },
+    {
+      "awaitTerminal": true,
+      "session": "guard",
+      "requireAssistantTerminal": true
+    },
+    {
+      "wait": "guard-manager-nudged"
+    },
+    {
+      "assertFacts": {
+        "name": "GuardPromptAccepted",
+        "eq": 1
+      }
+    },
+    {
+      "createSession": {
+        "agent": "reviewer",
+        "bind": [
+          "reviewer-nudge-title",
+          "reviewer-nudge"
+        ],
+        "as": "nudge"
+      }
+    },
+    {
+      "prompt": {
+        "agent": "reviewer",
+        "text": "Review the tree but do not submit a verdict."
+      },
+      "session": "nudge"
+    },
+    {
+      "wait": "reviewer-without-verdict"
+    },
+    {
+      "awaitTerminal": true,
+      "session": "nudge",
+      "requireAssistantTerminal": true
+    },
+    {
+      "wait": "reviewer-nudged"
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Reviewer verdict canary passed: double PERFECT and durable Manager ReviewGuard nudge.",
+  "scripts": [
+    {
+      "id": "manager-title",
+      "lane": {
+        "session": "manager-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "manager-fork-reviewer",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ],
+        "user": "Fork a Reviewer"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "reviewer",
+          "prompt": "Review review_target.txt and submit two PERFECT verdicts."
+        }
+      }
+    },
+    {
+      "id": "manager-join-reviewer",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-review-complete",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Reviewer joined and confirmed."
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\. Write one dense paragraph"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      },
+      "neverEnd": true,
+      "blocking": false
+    },
+    {
+      "id": "review-perfect-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "review-perfect-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "review-finished",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Review confirmed."
+      }
+    },
+    {
+      "id": "guard-manager-title",
+      "lane": {
+        "session": "guard-manager-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "guard-manager-first",
+      "lane": {
+        "session": "guard-manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict"
+        ],
+        "user": "Attempt completion without review."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager attempted completion without review."
+      }
+    },
+    {
+      "id": "guard-manager-nudged",
+      "lane": {
+        "session": "guard-manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Review is required before completion."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager received the review guard."
+      },
+      "neverEnd": true,
+      "blocking": false
+    },
+    {
+      "id": "reviewer-nudge-title",
+      "lane": {
+        "session": "reviewer-nudge-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "reviewer-without-verdict",
+      "lane": {
+        "session": "reviewer-nudge",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "Review the tree but do not submit a verdict."
+      },
+      "respond": {
+        "type": "text",
+        "text": "I reviewed the tree but omitted the structured verdict."
+      }
+    },
+    {
+      "id": "reviewer-nudged",
+      "lane": {
+        "session": "reviewer-nudge",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "user": "Submit a structured verdict with the verdict tool"
+      },
+      "respond": {
+        "type": "text",
+        "text": "The structured verdict prompt was received."
+      },
+      "neverEnd": true,
+      "blocking": false
+    }
+  ]
+}
