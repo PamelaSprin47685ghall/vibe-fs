@@ -7,7 +7,33 @@ open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Orchestrator
 
 module OrchestratorSweep =
-    let sweepStaleArtifacts (git: GitPort) (activeJobs: Map<ManagerId, ManagerJob>) : Task<unit> =
+    let private removeWorktrees git paths =
+        let rec loop remaining =
+            task {
+                match remaining with
+                | [] -> return Ok()
+                | path :: tail ->
+                    match! git.RemoveWorktree path with
+                    | Ok() -> return! loop tail
+                    | Error error -> return Error(sprintf "stale worktree cleanup failed for %s: %s" path error)
+            }
+
+        loop paths
+
+    let private deleteBranches git branches =
+        let rec loop remaining =
+            task {
+                match remaining with
+                | [] -> return Ok()
+                | branch :: tail ->
+                    match! git.DeleteBranch branch with
+                    | Ok() -> return! loop tail
+                    | Error error -> return Error(sprintf "stale manager branch cleanup failed for %s: %s" branch error)
+            }
+
+        loop branches
+
+    let sweepStaleArtifacts (git: GitPort) (activeJobs: Map<ManagerId, ManagerJob>) : Task<Result<unit, string>> =
         task {
             let activeIds =
                 activeJobs
@@ -15,49 +41,49 @@ module OrchestratorSweep =
                 |> List.map (fun (id, _) -> ManagerId.value id)
                 |> Set.ofList
 
-            // Remove linked worktrees before deleting their branches. Git refuses
-            // to delete a branch that is still checked out, so the order is part
-            // of the sweep's correctness contract.
             match! git.ListWorktrees() with
+            | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)
             | Ok entries ->
-                for path, branchRef in entries do
-                    match branchRef with
-                    | Some reference when reference.StartsWith("refs/heads/manager/") ->
-                        let id = reference.Substring("refs/heads/manager/".Length)
+                let staleWorktrees =
+                    entries
+                    |> List.choose (fun (path, branchRef) ->
+                        match branchRef with
+                        | Some reference when reference.StartsWith("refs/heads/manager/") ->
+                            let id = reference.Substring("refs/heads/manager/".Length)
+                            if Set.contains id activeIds then None else Some path
+                        | _ -> None)
 
-                        if not (Set.contains id activeIds) then
-                            let! _ = git.RemoveWorktree path
-                            ()
-                    | _ -> ()
-            | Error _ -> ()
+                match! removeWorktrees git staleWorktrees with
+                | Error error -> return Error error
+                | Ok() ->
+                    match! git.ListManagerBranches() with
+                    | Error error -> return Error(sprintf "cannot list manager branches for cleanup: %s" error)
+                    | Ok branches ->
+                        let staleBranches =
+                            branches
+                            |> List.filter (fun branch ->
+                                let slash = branch.IndexOf('/')
+                                slash >= 0 && not (Set.contains (branch.Substring(slash + 1)) activeIds))
 
-            match! git.ListManagerBranches() with
-            | Ok branches ->
-                for branch in branches do
-                    let slash = branch.IndexOf('/')
-
-                    if slash >= 0 && not (Set.contains (branch.Substring(slash + 1)) activeIds) then
-                        let! _ = git.DeleteBranch branch
-                        ()
-            | Error _ -> ()
+                        return! deleteBranches git staleBranches
         }
 
-    let sweepLocked (lockPath: string) (git: GitPort) (activeJobs: Map<ManagerId, ManagerJob>) : Task<unit> =
+    let sweepLocked
+        (lockPath: string)
+        (git: GitPort)
+        (activeJobs: Map<ManagerId, ManagerJob>)
+        : Task<Result<unit, string>> =
         task {
             let! release = PublishLock.acquire lockPath
 
             let! outcome =
                 task {
                     try
-                        do! sweepStaleArtifacts git activeJobs
-                        return Choice1Of2()
+                        return! sweepStaleArtifacts git activeJobs
                     with ex ->
-                        return Choice2Of2 ex
+                        return Error ex.Message
                 }
 
             do! PublishLock.release release
-
-            match outcome with
-            | Choice1Of2() -> return ()
-            | Choice2Of2 _ -> return ()
+            return outcome
         }

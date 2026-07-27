@@ -101,7 +101,11 @@ module PtyLifecycleTests =
                                 this.ExitPty id
 
                             return Ok()
-                        | PtySignal.Interrupt -> return Ok()
+                        | PtySignal.Interrupt
+                        | PtySignal.Hangup
+                        | PtySignal.Quit
+                        | PtySignal.User1
+                        | PtySignal.User2 -> return Ok()
                     | PtyCommand.Resize _ -> return Ok()
                 }
 

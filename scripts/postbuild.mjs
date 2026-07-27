@@ -53,9 +53,8 @@ syncAssets(
 log('✓ Assets synced');
 
 // 4. Clean Fable artifacts
-const gitignore = path.join(
-  buildDir, 'fable_modules', '.gitignore'
-);
+const fableModules = path.join(buildDir, 'next', 'fable_modules');
+const gitignore = path.join(fableModules, '.gitignore');
 if (fs.existsSync(gitignore)) {
   fs.rmSync(gitignore);
   log('✓ Cleaned .gitignore');

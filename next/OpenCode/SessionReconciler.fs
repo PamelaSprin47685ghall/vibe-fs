@@ -3,12 +3,17 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 type private SessionReconcileState =
     { mutable Running: bool
       mutable Dirty: bool }
+
+module private SessionReconcilerAsync =
+    [<Emit("Promise.resolve()")>]
+    let causalYield: Task<unit> = jsNative
 
 /// Idle is only a dirty mark. Truth comes from the full-message snapshot API.
 /// Single-flight: concurrent idle collapses into at most one in-flight query
@@ -180,13 +185,11 @@ type SessionReconciler
                     let mutable attempt = 0
 
                     // Bounded causal reread (SSOT: "只要 API snapshot version 有因果
-                    // 进展即可继续"). Each snapshot.GetMessages call is itself the
-                    // real async wait (a genuine host/network round trip in
-                    // production); no artificial pause is inserted between
-                    // attempts -- a fixed wall-clock wait would be a
-                    // time-dependent anti-pattern this codebase forbids
-                    // elsewhere (see testkit/opencode/stability-checker.js) and
-                    // would make the retry loop untestable without real delays.
+                    // 进展即可继续"). Each snapshot.GetMessages call is itself an
+                    // async wait (a genuine host/network round trip in production).
+                    // Between unsuccessful attempts we yield to the event loop so
+                    // the API snapshot has a causal chance to advance; this is not
+                    // a wall-clock delay.
                     while attempt < 3 && turnFound.IsNone do
                         let cleared = lock gate (fun () -> not (states.ContainsKey key))
 
@@ -209,6 +212,9 @@ type SessionReconciler
                                     ->
                                     turnFound <- Some turn
                                 | _ -> ()
+
+                            if attempt < 3 && turnFound.IsNone then
+                                do! SessionReconcilerAsync.causalYield
 
                     match turnFound with
                     | Some turn ->

@@ -105,12 +105,21 @@ module SpikePlugin =
                     | Some projectionSessionId ->
                         wired.RegisterOwned projectionSessionId
 
-                        if
-                            not (isNull inObj)
-                            && not (isNull inObj?agent)
-                            && not (sessionRoles.ContainsKey projectionSessionId)
-                        then
-                            HostSessionContext.canonicalRole (unbox<string> inObj?agent)
+                        if not (sessionRoles.ContainsKey projectionSessionId) then
+                            let inferredRole =
+                                if not (isNull inObj) && not (isNull inObj?agent) then
+                                    HostSessionContext.canonicalRole (unbox<string> inObj?agent)
+                                elif not (isNull outObj) && not (isNull outObj?messages) then
+                                    unbox<obj array> outObj?messages
+                                    |> Array.tryPick (fun message ->
+                                        if isNull message || isNull message?info || isNull message?info?agent then
+                                            None
+                                        else
+                                            HostSessionContext.canonicalRole (unbox<string> message?info?agent))
+                                else
+                                    None
+
+                            inferredRole
                             |> Option.iter (fun role -> sessionRoles.[projectionSessionId] <- role)
 
                         if not (isNull inObj) && isNull inObj?sessionID then

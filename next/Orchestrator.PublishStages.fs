@@ -63,14 +63,11 @@ module PublishStages =
             match headResult with
             | Error verdict -> return Error verdict
             | Ok head ->
-                // Idempotent skip: the pre-rebase review is durably confirmed
-                // once OrchestratorPreRebaseReviewConfirmed is recorded. A manager
-                // re-run (crash recovery) regenerates the candidate commit hash,
-                // so comparing against the current head would wrongly re-run the
-                // review; the confirmation is content-stable, so skip on presence.
-                match job.PreRebaseReviewCommit with
-                | Some _ -> return Ok()
-                | None ->
+                // A pre-rebase review is valid only for the current candidate
+                // commit. Any later manager/coder change invalidates it.
+                match job.PreRebaseReviewCommit = Some head with
+                | true -> return Ok()
+                | false ->
                     match! deps.ReverifyTwice managerId worktreePath "pre-rebase" with
                     | Error err -> return Error(NeedsReview(managerId, err))
                     | Ok() ->

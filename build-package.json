@@ -19,6 +19,18 @@
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.17.4"
   },
+  "dependencies": {
+    "@fable-org/fable-library-js": "^2.5.1",
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "bun-pty": "^0.4.8",
+    "opencode-pty": "^0.3.4",
+    "proper-lockfile": "^4.1.2",
+    "smol-toml": "1.7.0",
+    "yaml": "^2.9.0"
+  },
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "publishConfig": {
+    "access": "restricted"
+  }
 }

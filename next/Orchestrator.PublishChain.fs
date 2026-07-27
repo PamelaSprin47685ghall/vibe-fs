@@ -54,11 +54,11 @@ module PublishChain =
                 return PublishStages.append deps managerId fact
         }
 
-    let private conflictFiles (deps: Deps) worktreePath : Task<string list> =
+    let private conflictFiles (deps: Deps) managerId worktreePath : Task<Result<string list, OrchestratorVerdict>> =
         task {
             match! deps.Git.ConflictedFiles worktreePath with
-            | Ok files -> return files
-            | Error _ -> return []
+            | Ok files -> return Ok files
+            | Error err -> return Error(IntegrationFailed(managerId, sprintf "Conflict-file lookup failed: %s" err))
         }
 
     let private rebaseStage (deps: Deps) managerId worktreePath isRedrive : Task<Result<unit, OrchestratorVerdict>> =
@@ -79,42 +79,48 @@ module PublishChain =
                     match! deps.Git.Rebase worktreePath deps.TargetBranch with
                     | Ok() -> return! recordRebased deps managerId worktreePath candidateId
                     | Error rebaseError ->
-                        let! files = conflictFiles deps worktreePath
+                        let! filesResult = conflictFiles deps managerId worktreePath
 
-                        let conflictFact =
-                            AgentFact.OrchestratorConflictDetected
-                                {| ManagerId = managerId
-                                   CandidateId = candidateId
-                                   Files = files |}
-
-                        match PublishStages.append deps managerId conflictFact with
+                        match filesResult with
                         | Error verdict -> return Error verdict
-                        | Ok() ->
-                            let prompt =
-                                match deps.Prompts.TryGetValue managerId with
-                                | true, saved -> OrchestratorPrompts.buildConflictResumePrompt saved files
-                                | false, _ -> OrchestratorPrompts.buildConflictResumePrompt "" files
+                        | Ok files ->
+                            let conflictFact =
+                                AgentFact.OrchestratorConflictDetected
+                                    {| ManagerId = managerId
+                                       CandidateId = candidateId
+                                       Files = files |}
 
-                            match! deps.Manager.RunManager managerId worktreePath prompt with
-                            | Error err ->
-                                return
-                                    Error(
-                                        IntegrationFailed(
-                                            managerId,
-                                            sprintf
-                                                "Rebase conflict (%s); manager continuation failed: %s"
-                                                rebaseError
-                                                err
-                                        )
-                                    )
+                            match PublishStages.append deps managerId conflictFact with
+                            | Error verdict -> return Error verdict
                             | Ok() ->
-                                match! deps.Git.Rebase worktreePath deps.TargetBranch with
+                                let prompt =
+                                    match deps.Prompts.TryGetValue managerId with
+                                    | true, saved -> OrchestratorPrompts.buildConflictResumePrompt saved files
+                                    | false, _ -> OrchestratorPrompts.buildConflictResumePrompt "" files
+
+                                match! deps.Manager.RunManager managerId worktreePath prompt with
                                 | Error err ->
                                     return
                                         Error(
-                                            IntegrationFailed(managerId, sprintf "Rebase continuation failed: %s" err)
+                                            IntegrationFailed(
+                                                managerId,
+                                                sprintf
+                                                    "Rebase conflict (%s); manager continuation failed: %s"
+                                                    rebaseError
+                                                    err
+                                            )
                                         )
-                                | Ok() -> return! recordRebased deps managerId worktreePath candidateId
+                                | Ok() ->
+                                    match! deps.Git.Rebase worktreePath deps.TargetBranch with
+                                    | Error err ->
+                                        return
+                                            Error(
+                                                IntegrationFailed(
+                                                    managerId,
+                                                    sprintf "Rebase continuation failed: %s" err
+                                                )
+                                            )
+                                    | Ok() -> return! recordRebased deps managerId worktreePath candidateId
         }
 
     let private publishStage (deps: Deps) managerId worktreePath : Task<Result<PassResult, OrchestratorVerdict>> =
@@ -165,9 +171,39 @@ module PublishChain =
                         match PublishStages.append deps managerId publishedFact with
                         | Error verdict -> return Error verdict
                         | Ok() ->
-                            let! _ = deps.Git.RemoveWorktree worktreePath
-                            let! _ = deps.Git.DeleteBranch(sprintf "manager/%s" managerId)
-                            return Ok(PublishedCommit commitHash)
+                            let! worktreeCleanup = deps.Git.RemoveWorktree worktreePath
+                            let! branchCleanup = deps.Git.DeleteBranch(sprintf "manager/%s" managerId)
+
+                            match worktreeCleanup, branchCleanup with
+                            | Ok(), Ok() -> return Ok(PublishedCommit commitHash)
+                            | Error worktreeError, Error branchError ->
+                                return
+                                    Error(
+                                        IntegrationFailed(
+                                            managerId,
+                                            sprintf
+                                                "Published %s but cleanup failed: worktree=%s; branch=%s"
+                                                commitHash
+                                                worktreeError
+                                                branchError
+                                        )
+                                    )
+                            | Error err, _ ->
+                                return
+                                    Error(
+                                        IntegrationFailed(
+                                            managerId,
+                                            sprintf "Published %s but worktree cleanup failed: %s" commitHash err
+                                        )
+                                    )
+                            | _, Error err ->
+                                return
+                                    Error(
+                                        IntegrationFailed(
+                                            managerId,
+                                            sprintf "Published %s but branch cleanup failed: %s" commitHash err
+                                        )
+                                    )
         }
 
     let private pass deps managerId worktreePath isRedrive : Task<Result<PassResult, OrchestratorVerdict>> =

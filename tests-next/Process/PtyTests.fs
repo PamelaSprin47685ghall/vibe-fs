@@ -260,6 +260,10 @@ module PtyTests =
             | PtyCommand.Signal PtySignal.Terminate -> "signal:terminate"
             | PtyCommand.Signal PtySignal.Kill -> "signal:kill"
             | PtyCommand.Signal PtySignal.Interrupt -> "signal:interrupt"
+            | PtyCommand.Signal PtySignal.Hangup -> "signal:hangup"
+            | PtyCommand.Signal PtySignal.Quit -> "signal:quit"
+            | PtyCommand.Signal PtySignal.User1 -> "signal:user1"
+            | PtyCommand.Signal PtySignal.User2 -> "signal:user2"
             | PtyCommand.Resize(w, h) -> sprintf "resize:%dx%d" w h
 
         equal "spawn:ls" (testCmd (PtyCommand.Spawn("ls", "")))

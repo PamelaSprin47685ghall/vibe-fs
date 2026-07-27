@@ -146,7 +146,6 @@ type CompanionHost
 
     member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
 
-    member _.FreezeEpoch() : bool = companion.FreezeEpoch()
 
     member _.FreezeEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
         companion.FreezeEpoch(cutoffMessageIndex, coveredPrefixDigest)
@@ -154,8 +153,6 @@ type CompanionHost
     member _.SwitchEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
         companion.SwitchEpoch(cutoffMessageIndex, coveredPrefixDigest)
 
-    member _.SwitchEpoch(cutoffMessageIndex: int) : bool =
-        companion.SwitchEpoch(cutoffMessageIndex)
 
     /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
     /// into B' and durably persist (CompanionAdvanced with the EXISTING baseline,
@@ -234,8 +231,10 @@ type CompanionHost
                 let currentDigest =
                     CompanionDelta.prefixDigest Projection.canonicalJson messages epoch.CutoffMessageIndex
 
-                if currentDigest <> epoch.CoveredPrefixDigest then messages
-                else inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
+                if currentDigest <> epoch.CoveredPrefixDigest then
+                    messages
+                else
+                    inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
         | true, None when watermark > 0 && before.LatestB.IsSome ->
             let digest = CompanionDelta.prefixDigest Projection.canonicalJson messages watermark
             companion.FreezeEpoch(watermark, digest) |> ignore

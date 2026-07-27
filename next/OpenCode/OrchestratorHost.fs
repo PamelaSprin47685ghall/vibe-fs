@@ -197,45 +197,49 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     let sweepLockPath =
                         PublishLock.lockPath (RuntimePath.gitCommonDir deps.RepoPath) branch
 
-                    match deps.Journal with
-                    | Some journal ->
-                        let jobs = (AgentJournal.snapshot journal).AgentProjections.Orchestrator.ManagerJobs
-                        do! OrchestratorSweep.sweepLocked sweepLockPath gitPort jobs
-                    | None -> ()
+                    let! sweepResult =
+                        match deps.Journal with
+                        | Some journal ->
+                            let jobs = (AgentJournal.snapshot journal).AgentProjections.Orchestrator.ManagerJobs
+                            OrchestratorSweep.sweepLocked sweepLockPath gitPort jobs
+                        | None -> Task.FromResult(Ok())
 
-                    // Canonicalize the repo path via git common-dir so symlinked
-                    // spellings share one cross-process publish lock.
-                    let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
+                    match sweepResult with
+                    | Error error -> return Error(sprintf "orchestrator cleanup failed: %s" error)
+                    | Ok() ->
+                        // Canonicalize the repo path via git common-dir so symlinked
+                        // spellings share one cross-process publish lock.
+                        let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
 
-                    let value =
-                        Orchestrator(
-                            gitPort,
-                            managerPort,
-                            deps.RepoPath,
-                            branch,
-                            ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
-                            ?authority = Some authorityPort,
-                            ?lockRepoPath = Some lockRepoPath
-                        )
+                        let value =
+                            Orchestrator(
+                                gitPort,
+                                managerPort,
+                                deps.RepoPath,
+                                branch,
+                                ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
+                                ?authority = Some authorityPort,
+                                ?lockRepoPath = Some lockRepoPath
+                            )
 
-                    for managerId, commitHash in reconciledPublished do
-                        value.RecoverPublished(managerId, commitHash)
+                        for managerId, commitHash in reconciledPublished do
+                            value.RecoverPublished(managerId, commitHash)
 
-                    match deps.Journal with
-                    | Some journal ->
-                        do!
-                            OrchestratorManagerJob.recoverJobs
-                                journal
-                                gitPort
-                                orchestratorId
-                                worktrees
-                                deps.RegisterChildDirectory
-                                deps.RegisterReviewerTree
-                                value
-                    | None -> ()
+                        match deps.Journal with
+                        | Some journal ->
+                            do!
+                                OrchestratorManagerJob.recoverJobs
+                                    journal
+                                    gitPort
+                                    orchestratorId
+                                    worktrees
+                                    deps.RegisterChildDirectory
+                                    deps.RegisterReviewerTree
+                                    value
+                        | None -> ()
 
-                    lock engineGate (fun () -> engineInstance <- Some value)
-                    return Ok value
+                        lock engineGate (fun () -> engineInstance <- Some value)
+                        return Ok value
         }
 
     let engine () : Task<Result<Orchestrator, string>> =

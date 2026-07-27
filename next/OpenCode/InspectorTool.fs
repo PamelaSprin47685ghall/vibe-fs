@@ -28,6 +28,14 @@ module InspectorTool =
     """)>]
     let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) = jsNative
 
+    [<Import("createHash", "node:crypto")>]
+    let private createHashImport: string -> obj = jsNative
+
+    let private sha256 (text: string) =
+        let hash = createHashImport "sha256"
+        hash?update text |> ignore
+        unbox<string> (hash?digest "hex")
+
     let private readPrompt (args: obj) : string =
         if isNull args then
             ""
@@ -78,11 +86,15 @@ module InspectorTool =
                             | Some fn -> fn parentId
                             | None -> None
 
+                        let parentB = backgroundOf parentId
+
                         let fullPrompt =
-                            match backgroundOf parentId with
+                            match parentB with
                             | Some b when not (String.IsNullOrWhiteSpace b) ->
                                 sprintf "Parent work record B (background only):\n%s\n\nInspector request:\n%s" b prompt
                             | _ -> prompt
+
+                        let parentBDigest = parentB |> Option.map sha256
 
                         let! created =
                             sessionPort.CreateChildSession(
@@ -130,8 +142,16 @@ module InspectorTool =
                                                     |> String.concat "\n"
 
                                                 finish output
-                                            | TerminalOutcome.Aborted reason -> finish (sprintf "aborted: %s" reason)
-                                            | TerminalOutcome.Failed error -> finish (sprintf "failed: %s" error)
+                                            | TerminalOutcome.Aborted reason ->
+                                                tcs.TrySetException(
+                                                    InvalidOperationException(sprintf "Inspector aborted: %s" reason)
+                                                )
+                                                |> ignore
+                                            | TerminalOutcome.Failed error ->
+                                                tcs.TrySetException(
+                                                    InvalidOperationException(sprintf "Inspector failed: %s" error)
+                                                )
+                                                |> ignore
                                     )
                                 )
 
@@ -148,10 +168,16 @@ module InspectorTool =
                             | Error err -> finish (sprintf "send failed: %s" err)
                             | Ok _ -> ()
 
-                            // Parent cancel must propagate into the Inspector wait
-                            // (KISS-N04: "Coder cancel must await Inspector abort").
-                            // Detached below so the listener never outlives this call.
-                            let detachAbort = attachAbort ctx (fun () -> finish "aborted: parent cancelled")
+                            // Parent cancellation initiates physical abort immediately;
+                            // finally awaits the same operation before this resource returns.
+                            let mutable abortTask: Task<Result<unit, string>> option = None
+
+                            let detachAbort =
+                                attachAbort ctx (fun () ->
+                                    if abortTask.IsNone then
+                                        abortTask <- Some(sessionPort.AbortSession childId)
+
+                                    finish "aborted: parent cancelled")
 
                             try
                                 let! resultText = tcs.Task
@@ -161,17 +187,26 @@ module InspectorTool =
                                         stringify (
                                             createObj
                                                 [ "inspectorId", box (SessionId.value childId)
+                                                  "parentBDigest", box (defaultArg parentBDigest "")
                                                   "output", box resultText ]
                                         )
                                     )
                             finally
                                 detachAbort ()
 
-                                try
-                                    let! _ = sessionPort.AbortSession childId
-                                    ()
-                                with _ ->
-                                    ()
+                                match abortTask with
+                                | Some task ->
+                                    try
+                                        let! _ = task
+                                        ()
+                                    with _ ->
+                                        ()
+                                | None ->
+                                    try
+                                        let! _ = sessionPort.AbortSession childId
+                                        ()
+                                    with _ ->
+                                        ()
             }
 
         let argsObj =

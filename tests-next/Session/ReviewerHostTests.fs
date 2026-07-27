@@ -92,7 +92,7 @@ module ReviewerHostTests =
 
                 Assert.Equal(
                     Ok ReviewFinishResult.NeedsReview,
-                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect)
+                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect, providerRunId = "run-1")
                 )
 
                 let firstProjection = AgentJournal.snapshot journal
@@ -105,14 +105,14 @@ module ReviewerHostTests =
 
                 Assert.Equal(
                     Ok ReviewFinishResult.NeedsReview,
-                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect)
+                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect, providerRunId = "run-1")
                 )
 
                 treeHash <- "tree-b"
 
                 Assert.Equal(
                     Ok ReviewFinishResult.NeedsReview,
-                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect)
+                    host.SubmitVerdict("call-1", ReviewGuardVerdict.Perfect, providerRunId = "run-1")
                 )
 
                 let duplicateProjection = AgentJournal.snapshot journal
@@ -137,7 +137,12 @@ module ReviewerHostTests =
 
                 Assert.Equal(
                     Ok ReviewFinishResult.Confirmed,
-                    host.SubmitVerdict("call-2", ReviewGuardVerdict.Perfect, rootUserMessageId = "confirm-a")
+                    host.SubmitVerdict(
+                        "call-2",
+                        ReviewGuardVerdict.Perfect,
+                        providerRunId = "run-2",
+                        rootUserMessageId = "confirm-a"
+                    )
                 )
 
                 Assert.Equal(ReviewFinishResult.Confirmed, host.TryFinish())

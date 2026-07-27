@@ -60,6 +60,7 @@ const MAX_PARALLEL = parsePositiveInt(
   "MAX_PARALLEL_CANARIES",
 );
 const activeCanaryPids = new Set();
+const readyGateFailures = new Set();
 
 function cleanupCanaries() {
   for (const pid of activeCanaryPids) {
@@ -105,6 +106,14 @@ function runCanary(file, onBarkSignal) {
       }
     };
 
+    const readyTimer = setTimeout(() => {
+      if (!settled && !barked) {
+        barkTimeout = true;
+        readyGateFailures.add(file);
+        emitBark(true);
+      }
+    }, 10000);
+
     const timer = setTimeout(async () => {
       if (settled) return;
       settled = true;
@@ -131,7 +140,7 @@ function runCanary(file, onBarkSignal) {
 
     const checkBark = (chunk) => {
       const str = chunk.toString();
-      if (!barked && /\[setupScenario\] ready/i.test(str)) {
+      if (!barked && /(?:^|\r?\n)\[setupScenario\] ready(?:\r?\n|$)/.test(str)) {
         emitBark(false);
       }
     };
@@ -152,6 +161,7 @@ function runCanary(file, onBarkSignal) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(readyTimer);
       if (child.pid) {
         recordExit(child.pid);
         activeCanaryPids.delete(child.pid);
@@ -198,13 +208,7 @@ async function main() {
         triggerBark = resolve;
       });
 
-      // Safety fallback: if host bark is not seen within 10s, release launch gate only.
-      // Does NOT mark the canary as passed — only unblocks canary N+1 spawn.
-      const barkTimer = setTimeout(triggerBark, 10000);
-      const onBark = () => {
-        clearTimeout(barkTimer);
-        triggerBark();
-      };
+      const onBark = () => triggerBark();
 
       previousBarkPromise = currentBarkPromise;
 
@@ -223,12 +227,13 @@ async function main() {
 
     let failed = false;
     for (const r of results) {
-      if (r.code === 0 && r.barked && !r.barkTimeout && !r.exitedBeforeBark) {
+      if (r.code === 0 && r.barked && !r.barkTimeout && !r.exitedBeforeBark && !readyGateFailures.has(r.file)) {
         console.log("  ✓ " + r.name + " passed");
       } else {
         failed = true;
         let failReason = `code ${r.code}, signal ${r.signal}`;
         if (r.exitedBeforeBark) failReason = "exited before [setupScenario] ready";
+        else if (readyGateFailures.has(r.file)) failReason = "ready timeout (failed to emit exact [setupScenario] ready within 10s)";
         else if (r.barkTimeout) failReason = "ready timeout (failed to emit [setupScenario] ready within 10s)";
         console.error("  ✗ " + r.name + " FAILED (" + failReason + ")");
         if (r.stdout) console.error("── stdout ──\n" + r.stdout);

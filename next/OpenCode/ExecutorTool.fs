@@ -50,6 +50,35 @@ module ExecutorTool =
         else
             unbox<int> args?(name)
 
+    let private runtimeArg (args: obj) name fallback =
+        if isNull args || isNull args?(name) then
+            Ok fallback
+        else
+            let value = unbox<float> args?(name)
+
+            if Double.IsNaN value || Double.IsInfinity value || value <= 0.0 then
+                Error(sprintf "%s must be a finite positive number" name)
+            else
+                Ok value
+
+    let private outputArg (args: obj) name fallback =
+        if isNull args || isNull args?(name) then
+            Ok fallback
+        else
+            let value = unbox<float> args?(name)
+
+            if
+                Double.IsNaN value
+                || Double.IsInfinity value
+                || value < 0.0
+                || value > float Int64.MaxValue
+            then
+                Error(sprintf "%s must be a finite non-negative integer" name)
+            elif value <> Math.Floor value then
+                Error(sprintf "%s must be an integer" name)
+            else
+                Ok(int64 value)
+
     let private memoryArg (args: obj) =
         match textArg args "estimated_mem_usage" with
         | "large" -> EstimatedMemory.Large
@@ -88,90 +117,97 @@ module ExecutorTool =
                     if String.IsNullOrWhiteSpace commandText then
                         return box (stringify (createObj [ "error", box "Missing command" ]))
                     else
-                        let estimate =
-                            { EstimatedRuntime = RuntimeSeconds(float (intArg args "estimated_running_secs" 30))
-                              EstimatedOutput = OutputBytes(int64 (intArg args "estimated_output_bytes" 65536))
-                              EstimatedMemory = memoryArg args }
+                        match
+                            runtimeArg args "estimated_running_secs" 30.0,
+                            outputArg args "estimated_output_bytes" 65536L
+                        with
+                        | Error error, _
+                        | _, Error error -> return box (stringify (createObj [ "error", box error ]))
+                        | Ok runtimeSeconds, Ok outputBytes ->
+                            let estimate =
+                                { EstimatedRuntime = RuntimeSeconds runtimeSeconds
+                                  EstimatedOutput = OutputBytes outputBytes
+                                  EstimatedMemory = memoryArg args }
 
-                        let command =
-                            { FileName = "sh"
-                              Arguments = [ "-lc"; commandText ]
-                              WorkingDirectory = targetDir
-                              Environment = None
-                              Stdin = None
-                              Deadline = None
-                              PtyOptions = None }
+                            let command =
+                                { FileName = "sh"
+                                  Arguments = [ "-lc"; commandText ]
+                                  WorkingDirectory = targetDir
+                                  Environment = None
+                                  Stdin = None
+                                  Deadline = None
+                                  PtyOptions = None }
 
-                        use cancellation = new CancellationTokenSource()
-                        let detachAbort = attachAbort context (fun () -> cancellation.Cancel())
+                            use cancellation = new CancellationTokenSource()
+                            let detachAbort = attachAbort context (fun () -> cancellation.Cancel())
 
-                        let procCtx: ProcessContext =
-                            { WorkingDirectory = targetDir
-                              DefaultTimeout = None }
+                            let procCtx: ProcessContext =
+                                { WorkingDirectory = targetDir
+                                  DefaultTimeout = None }
 
-                        let! result =
-                            try
-                                Runner.execute command estimate procCtx cancellation.Token
-                            finally
-                                detachAbort ()
-
-                        match result with
-                        | Error error -> return box (stringify (createObj [ "error", box (error.ToString()) ]))
-                        | Ok(RunnerOutcome.Completed(exitCode, stdout, stderr, _)) ->
-                            return
-                                box (
-                                    stringify (
-                                        createObj
-                                            [ "exitCode", box exitCode; "stdout", box stdout; "stderr", box stderr ]
-                                    )
-                                )
-                        | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
-                            try
+                            let! result =
                                 try
-                                    let execRuntime = executorRuntimeFor context
+                                    Runner.execute command estimate procCtx cancellation.Token
+                                finally
+                                    detachAbort ()
 
-                                    let! summary =
-                                        ExecutorSummarize.summarizeSpool
-                                            (ExecutorSummarize.asExecutorRuntime execRuntime)
-                                            spoolPath
+                            match result with
+                            | Error error -> return box (stringify (createObj [ "error", box (error.ToString()) ]))
+                            | Ok(RunnerOutcome.Completed(exitCode, stdout, stderr, _)) ->
+                                return
+                                    box (
+                                        stringify (
+                                            createObj
+                                                [ "exitCode", box exitCode; "stdout", box stdout; "stderr", box stderr ]
+                                        )
+                                    )
+                            | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
+                                try
+                                    try
+                                        let execRuntime = executorRuntimeFor context
+
+                                        let! summary =
+                                            ExecutorSummarize.summarizeSpool
+                                                (ExecutorSummarize.asExecutorRuntime execRuntime)
+                                                spoolPath
+
+                                        return
+                                            box (
+                                                stringify (
+                                                    createObj
+                                                        [ "exitCode", box exitCode
+                                                          "summary", box summary
+                                                          "spoolPath", box spoolPath
+                                                          "totalBytes", box totalBytes
+                                                          "chunkCount", box chunkCount ]
+                                                )
+                                            )
+                                    finally
+                                        Spool.delete spoolPath
+                                with ex ->
+                                    Spool.delete spoolPath
 
                                     return
                                         box (
                                             stringify (
                                                 createObj
-                                                    [ "exitCode", box exitCode
-                                                      "summary", box summary
-                                                      "spoolPath", box spoolPath
-                                                      "totalBytes", box totalBytes
-                                                      "chunkCount", box chunkCount ]
+                                                    [ "error", box (sprintf "Executor summarizer failed: %s" ex.Message) ]
                                             )
                                         )
-                                finally
-                                    Spool.delete spoolPath
-                            with ex ->
-                                Spool.delete spoolPath
+                            | Ok(RunnerOutcome.OutputExceeded(bytesWritten, spoolPathOpt)) ->
+                                match spoolPathOpt with
+                                | Some path -> Spool.delete path
+                                | None -> ()
 
                                 return
                                     box (
                                         stringify (
                                             createObj
-                                                [ "error", box (sprintf "Executor summarizer failed: %s" ex.Message) ]
+                                                [ "error", box "Output exceeded hard limit"
+                                                  "bytesWritten", box bytesWritten
+                                                  "spoolPath", box (defaultArg spoolPathOpt "") ]
                                         )
                                     )
-                        | Ok(RunnerOutcome.OutputExceeded(bytesWritten, spoolPathOpt)) ->
-                            match spoolPathOpt with
-                            | Some path -> Spool.delete path
-                            | None -> ()
-
-                            return
-                                box (
-                                    stringify (
-                                        createObj
-                                            [ "error", box "Output exceeded hard limit"
-                                              "bytesWritten", box bytesWritten
-                                              "spoolPath", box (defaultArg spoolPathOpt "") ]
-                                    )
-                                )
             }
 
         let args =

@@ -16,7 +16,27 @@ module CompanionTransformHelpers =
         |> ignore
 
     let defaultBloggerBudgetTokens = 32000
+
+    let bloggerBudgetOverride () =
+        match System.Environment.GetEnvironmentVariable("WANXIANGSHU_BLOGGER_CONTEXT_LIMIT") with
+        | null
+        | "" -> defaultBloggerBudgetTokens
+        | value ->
+            match System.Int32.TryParse value with
+            | true, budget when budget > 0 -> budget
+            | _ -> defaultBloggerBudgetTokens
+
     let minReservedOutputTokens = 2048
+    let private bloggerBudgetByPrimary = Dictionary<string, int>()
+
+    let rememberBloggerBudget (primarySessionId: string) (budget: int) =
+        if budget > 0 then
+            bloggerBudgetByPrimary.[primarySessionId] <- budget
+
+    let bloggerBudgetForPrimary (primarySessionId: string) =
+        match bloggerBudgetByPrimary.TryGetValue primarySessionId with
+        | true, budget -> budget
+        | _ -> bloggerBudgetOverride ()
 
     type BudgetFacts =
         { ContextLimit: int

@@ -42,12 +42,9 @@ module OrchestratorManagerJob =
             if not job.CandidateCommit.IsSome && hasRb then
                 let! conflicted = gitPort.ConflictedFiles job.WorktreePath
 
-                let files =
-                    match conflicted with
-                    | Ok fs -> fs
-                    | Error _ -> []
-
-                return OrchestratorPrompts.buildConflictResumePrompt job.Prompt files
+                match conflicted with
+                | Error err -> return sprintf "[RECOVERY BLOCKED] unable to read rebase conflicts: %s" err
+                | Ok files -> return OrchestratorPrompts.buildConflictResumePrompt job.Prompt files
             else
                 return job.Prompt
         }

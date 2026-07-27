@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Text
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Fable.Core
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
@@ -35,8 +36,16 @@ module ExecutorSummarize =
 
             member _.Join() = runtime.Join() }
 
-    [<Emit("Math.random().toString(36).slice(2, 8)")>]
-    let private newAgentId () : string = jsNative
+    [<Import("createHash", "node:crypto")>]
+    let private createHashImport: string -> obj = jsNative
+
+    let private agentId (processId: string) (level: int) (startChunk: int) (endChunk: int) =
+        let hasher = createHashImport "sha256"
+
+        hasher?update (sprintf "%s|%d|%d|%d" processId level startChunk endChunk)
+        |> ignore
+
+        sprintf "exec-%s" (unbox<string> (hasher?digest "hex"))
 
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
@@ -72,10 +81,18 @@ module ExecutorSummarize =
                 return result
         }
 
-    let runExecutorPrompt (runtime: IExecutorRuntime) (stash: Dictionary<string, RunCompletion>) (prompt: string) =
+    let runExecutorPrompt
+        (runtime: IExecutorRuntime)
+        (stash: Dictionary<string, RunCompletion>)
+        (processId: string)
+        (level: int)
+        (startChunk: int)
+        (endChunk: int)
+        (prompt: string)
+        =
         task {
-            let agentId = newAgentId ()
-            let! fork = runtime.Fork(agentId, AgentRole.Executor, prompt)
+            let id = agentId processId level startChunk endChunk
+            let! fork = runtime.Fork(id, AgentRole.Executor, prompt)
 
             match fork with
             | Error error -> return raise (InvalidOperationException error)
@@ -87,6 +104,7 @@ module ExecutorSummarize =
     let summarizeChunk
         (runtime: IExecutorRuntime)
         (stash: Dictionary<string, RunCompletion>)
+        (spoolPath: string)
         (chunk: byte[])
         (index: int)
         =
@@ -98,7 +116,12 @@ module ExecutorSummarize =
                 index
                 content
 
-        runExecutorPrompt runtime stash prompt
+        let rootDigest =
+            let hasher = createHashImport "sha256"
+            hasher?update (sprintf "%s|%d" spoolPath index) |> ignore
+            unbox<string> (hasher?digest "hex")
+
+        runExecutorPrompt runtime stash rootDigest 0 index index prompt
 
     let reduceBatch
         (runtime: IExecutorRuntime)
@@ -114,7 +137,12 @@ module ExecutorSummarize =
                 level
                 combined
 
-        runExecutorPrompt runtime stash prompt
+        let batchDigest =
+            let hasher = createHashImport "sha256"
+            hasher?update (String.concat "\n" batch) |> ignore
+            unbox<string> (hasher?digest "hex")
+
+        runExecutorPrompt runtime stash batchDigest level 0 (List.length batch - 1) prompt
 
     /// Online carry/ripple reduce: summaries fill level 0 up to ReduceFanIn-1; at
     /// fanIn they collapse immediately into one summary pushed to level 1, and so
@@ -193,7 +221,7 @@ module ExecutorSummarize =
                     task {
                         let current = index
                         index <- index + 1
-                        let! summary = summarizeChunk runtime stash chunk current
+                        let! summary = summarizeChunk runtime stash spoolPath chunk current
                         do! rippleInsert (reduceBatch runtime stash) levels summary
                         return ()
                     })

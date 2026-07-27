@@ -135,6 +135,10 @@ module PtyBackendRegistry =
         | PtySignal.Terminate -> "SIGTERM"
         | PtySignal.Kill -> "SIGKILL"
         | PtySignal.Interrupt -> "SIGINT"
+        | PtySignal.Hangup -> "SIGHUP"
+        | PtySignal.Quit -> "SIGQUIT"
+        | PtySignal.User1 -> "SIGUSR1"
+        | PtySignal.User2 -> "SIGUSR2"
 
     [<Emit("$0('sh', ['-lc', $1], $2)")>]
     let internal invokeSpawn (spawn: obj) (command: string) (options: obj) : obj = jsNative

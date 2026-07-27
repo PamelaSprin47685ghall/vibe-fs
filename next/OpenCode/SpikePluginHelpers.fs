@@ -30,12 +30,15 @@ module SpikePluginHelpers =
         (sessionOutputLimits: Dictionary<string, int>)
         : obj =
         emitJsExpr
-            (sessionBudgets, sessionOutputLimits)
+            (sessionBudgets, sessionOutputLimits, CompanionTransformHelpers.rememberBloggerBudget)
             """
           (input, output) => {
             if (input && input.sessionID && input.model && input.model.limit) {
               const lim = input.model.limit;
-              if (lim.context > 0) $0.set(input.sessionID, lim.context);
+              if (lim.context > 0) {
+                $0.set(input.sessionID, lim.context);
+                if (input.agent === 'blogger' && input.parentID) $2(input.parentID, lim.context);
+              }
               if (lim.output > 0) $1.set(input.sessionID, lim.output);
             }
           }

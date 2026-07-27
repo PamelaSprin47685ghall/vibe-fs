@@ -23,7 +23,7 @@ module OrchestratorHostTests =
     let ``HostSignalSubscribe unwraps global SSE payload into idle signal`` () =
         let captured = ResizeArray<HostSignal>()
         let owned = System.Collections.Generic.HashSet<string>()
-        let router = HostSignalRouter(owned, fun s -> captured.Add s)
+        let router = HostSignalRouter(owned, (fun s -> captured.Add s))
         router.RegisterOwned(SessionId.create "mgr-child")
 
         let globalSse =
@@ -183,7 +183,10 @@ module OrchestratorHostTests =
                         deletedBranches.Add b
                         Task.FromResult(Ok()) }
 
-            do! OrchestratorSweep.sweepStaleArtifacts git activeJobs
+            match! OrchestratorSweep.sweepStaleArtifacts git activeJobs with
+            | Error error -> Assert.True(false, error)
+            | Ok() -> ()
+
             Assert.True(removedWorktrees.Contains stalePath, "stale worktree not removed")
             Assert.False(removedWorktrees.Contains activePath, "active worktree removed")
             Assert.True(deletedBranches.Contains "manager/stale", "stale branch not removed")
@@ -194,8 +197,7 @@ module OrchestratorHostTests =
     let ``SpikePlugin_initSpikePlugin_exposes_hooks_and_ports`` () =
         task {
             let input =
-                createObj
-                    [ "events", box (createObj [ "listen", box (fun () -> box (fun () -> ())) ]) ]
+                createObj [ "events", box (createObj [ "listen", box (fun () -> box (fun () -> ())) ]) ]
 
             let! hooksObj = SpikePlugin.initSpikePlugin input
             Assert.False(isNull hooksObj)

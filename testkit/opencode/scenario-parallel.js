@@ -99,7 +99,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       pluginPaths,
       contextLimit: opts.contextLimit,
       extraEnv: {
-        WANXIANGSHU_BLOGGER_MODEL: process.env.WANXIANGSHU_BLOGGER_MODEL || 'test/test-model',
+        WANXIANGSHU_BLOGGER_CONTEXT_LIMIT: process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || '32000',
         ...(opts.extraEnv || {}),
       },
     });

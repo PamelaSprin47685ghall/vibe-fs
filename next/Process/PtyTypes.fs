@@ -9,6 +9,10 @@ type PtySignal =
     | Terminate
     | Kill
     | Interrupt
+    | Hangup
+    | Quit
+    | User1
+    | User2
 
 module PtySignal =
     [<Literal>]
@@ -17,10 +21,30 @@ module PtySignal =
     [<Literal>]
     let KillName = "KILL"
 
+    [<Literal>]
+    let IntName = "INT"
+
+    [<Literal>]
+    let HupName = "HUP"
+
+    [<Literal>]
+    let QuitName = "QUIT"
+
+    [<Literal>]
+    let User1Name = "USR1"
+
+    [<Literal>]
+    let User2Name = "USR2"
+
     let tryParse (value: string) =
         match value with
         | TermName -> Ok PtySignal.Terminate
         | KillName -> Ok PtySignal.Kill
+        | IntName -> Ok PtySignal.Interrupt
+        | HupName -> Ok PtySignal.Hangup
+        | QuitName -> Ok PtySignal.Quit
+        | User1Name -> Ok PtySignal.User1
+        | User2Name -> Ok PtySignal.User2
         | _ -> Error(sprintf "Unsupported PTY signal: %s" value)
 
 [<RequireQualifiedAccess>]
@@ -67,7 +91,7 @@ module PtyOutcome =
     let Signalled = "signalled"
 
     [<Literal>]
-    let termToKillGraceMs = 500
+    let termToKillGraceMs = 5000
 
 /// Buffered-read plan: unknown id, already in-flight, already closed, or parked.
 type ReadPlan =

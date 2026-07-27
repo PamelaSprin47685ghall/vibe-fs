@@ -75,10 +75,20 @@ module ToolSurfaceOrchestrator =
             createObj
                 [ "agent", box (stringSchema factory)
                   "prompt", box (optionalStringSchema factory)
-                  "signal", box (optionalEnumSchema factory [| PtySignal.TermName; PtySignal.KillName |]) ]
+                  "signal",
+                  box (
+                      optionalEnumSchema
+                          factory
+                          [| PtySignal.TermName
+                             PtySignal.KillName
+                             PtySignal.IntName
+                             PtySignal.HupName
+                             PtySignal.QuitName
+                             PtySignal.User1Name
+                             PtySignal.User2Name |]
+                  ) ]
 
-        let orchestratorManagerJobArgs =
-            createObj [ "prompt", box (stringSchema factory) ]
+        let orchestratorManagerJobArgs = createObj [ "prompt", box (stringSchema factory) ]
 
         let verdictArgs =
             createObj [ "verdict", box (enumSchema factory [| "PERFECT"; "REVISE" |]) ]

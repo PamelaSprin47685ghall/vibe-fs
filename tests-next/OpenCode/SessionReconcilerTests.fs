@@ -23,6 +23,25 @@ module SessionReconcilerTests =
         member _.Set(next) = messages <- next
         member _.Calls = calls
 
+    type private SequencedSnapshot(snapshots: SessionMessage list list) =
+        let calls = ResizeArray<string>()
+        let mutable remaining = snapshots
+
+        interface ISessionSnapshotPort with
+            member _.GetMessages(sessionId) =
+                calls.Add(SessionId.value sessionId)
+
+                let next =
+                    match remaining with
+                    | head :: tail ->
+                        remaining <- tail
+                        head
+                    | [] -> []
+
+                Task.FromResult(Ok next)
+
+        member _.Calls = calls
+
     let private textPart text =
         createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
 
@@ -109,6 +128,89 @@ module SessionReconcilerTests =
             do! drainMicrotasks 8
             Assert.Equal(1, turns.Count)
             Assert.Equal("a1", MessageId.value turns.[0].AssistantMessageId)
+        }
+
+    [<Fact>]
+    let ``Single_idle_rereads_until_a_terminal_turn_is_visible`` () =
+        task {
+            let turns = ResizeArray<ReconciledTurn>()
+
+            let terminal =
+                [ msg "u1" "user" None None [||] None
+                  msg "a1" "assistant" (Some "coder") (Some "stop") [| textPart "done" |] None ]
+
+            let snapshot =
+                SequencedSnapshot(
+                    [ [ msg "u1" "user" None None [||] None ]
+                      [ msg "u1" "user" None None [||] None ]
+                      terminal ]
+                )
+
+            let reconciler =
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
+
+            bind reconciler "s1" "u1" AgentRole.Coder
+            reconciler.MarkDirty(SessionId.create "s1")
+            do! drainMicrotasks 16
+
+            Assert.Equal(3, snapshot.Calls.Count)
+            Assert.Single(turns) |> ignore
+            Assert.Equal("a1", MessageId.value turns.[0].AssistantMessageId)
+        }
+
+    [<Fact>]
+    let ``Three_unknown_reads_remain_dirty_for_the_next_idle`` () =
+        task {
+            let turns = ResizeArray<ReconciledTurn>()
+
+            let terminal =
+                [ msg "u1" "user" None None [||] None
+                  msg "a1" "assistant" (Some "coder") (Some "stop") [| textPart "later" |] None ]
+
+            let snapshot =
+                SequencedSnapshot(
+                    [ [ msg "u1" "user" None None [||] None ]
+                      [ msg "u1" "user" None None [||] None ]
+                      [ msg "u1" "user" None None [||] None ]
+                      terminal ]
+                )
+
+            let reconciler =
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
+
+            bind reconciler "s1" "u1" AgentRole.Coder
+            reconciler.MarkDirty(SessionId.create "s1")
+            do! drainMicrotasks 16
+            Assert.Empty(turns)
+            Assert.Equal(3, snapshot.Calls.Count)
+
+            reconciler.MarkDirty(SessionId.create "s1")
+            do! drainMicrotasks 16
+            Assert.Single(turns) |> ignore
+            Assert.Equal(4, snapshot.Calls.Count)
+        }
+
+    [<Fact>]
+    let ``Provider_retry_does_not_enter_reconciler`` () =
+        task {
+            let turns = ResizeArray<ReconciledTurn>()
+            let snapshot = FakeSnapshot([ msg "u1" "user" None None [||] None ])
+
+            let reconciler =
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
+
+            reconciler.HandleSignal(
+                ProviderRetry
+                    { SessionId = SessionId.create "s1"
+                      Attempt = "host-attempt"
+                      Reason = "retry"
+                      MessageId = Some(MessageId.create "u1") }
+            )
+
+            do! drainMicrotasks 4
+
+            Assert.Empty(snapshot.Calls)
+            Assert.Empty(turns)
         }
 
     [<Fact>]

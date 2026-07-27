@@ -71,12 +71,11 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     let makeEpoch (cutoff: int) (digest: string) (frozenB: BlogText) : ActivePrefixEpoch =
         let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
-        let digestPart = if String.IsNullOrWhiteSpace digest then string (String.length frozenB) else digest
 
-        { EpochId = sprintf "%s|%d|%s" sessionStr cutoff digestPart
+        { EpochId = sprintf "%s|%d|%s" sessionStr cutoff digest
           FrozenB = frozenB
           CutoffMessageIndex = cutoff
-          CoveredPrefixDigest = digestPart }
+          CoveredPrefixDigest = digest }
 
     member _.Memory: CompanionMemory =
         lock lockObj (fun () ->
@@ -157,11 +156,9 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                     async {
                         try
                             let! b = rebaseFn ()
-                            lastSuccessfulProjection
-                            |> Option.iter (fun proj -> persistSuccessful proj b)
+                            lastSuccessfulProjection |> Option.iter (fun proj -> persistSuccessful proj b)
 
-                            lock lockObj (fun () ->
-                                latestB <- Some b)
+                            lock lockObj (fun () -> latestB <- Some b)
                         with _ ->
                             ()
                     }
@@ -179,30 +176,26 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             match activePrefixEpoch, latestB with
             | Some _, _
             | _, None -> false
-            | None, Some b when cutoffMessageIndex < 0 -> false
+            | None, Some _ when cutoffMessageIndex <= 0 || System.String.IsNullOrWhiteSpace coveredPrefixDigest ->
+                false
             | None, Some b ->
                 let epoch = makeEpoch cutoffMessageIndex coveredPrefixDigest b
                 persistEpochSwitched epoch
                 activePrefixEpoch <- Some epoch
                 true)
 
-    /// Backward-compatible freeze at cutoff 0 (tests / enable-path without messages).
-    member this.FreezeEpoch() : bool = this.FreezeEpoch(0, "")
-
-    /// Explicit cold-cache epoch switch from current LatestB.
+    /// Explicit cold-cache epoch switch from a coverage-validated cutoff and digest.
     member this.SwitchEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
         lock lockObj (fun () ->
             match latestB with
             | None -> false
-            | Some _ when cutoffMessageIndex < 0 -> false
+            | Some _ when cutoffMessageIndex <= 0 || System.String.IsNullOrWhiteSpace coveredPrefixDigest -> false
             | Some b ->
                 let epoch = makeEpoch cutoffMessageIndex coveredPrefixDigest b
                 persistEpochSwitched epoch
                 activePrefixEpoch <- Some epoch
                 true)
 
-    member this.SwitchEpoch(cutoffMessageIndex: int) : bool =
-        this.SwitchEpoch(cutoffMessageIndex, "")
 
     member this.Submit
         (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Async<BlogText>)
@@ -242,17 +235,10 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member this.Submit
         (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> Task<BlogText>)
         : CompanionOutcome =
-        this.Submit(
-            currentProjection,
-            (fun (delta: ProjectionSnapshot) -> blogFn delta |> Async.AwaitTask)
-        )
+        this.Submit(currentProjection, (fun (delta: ProjectionSnapshot) -> blogFn delta |> Async.AwaitTask))
 
-    member this.Submit
-        (currentProjection: ProjectionSnapshot, blogFn: unit -> Async<BlogText>)
-        : CompanionOutcome =
+    member this.Submit(currentProjection: ProjectionSnapshot, blogFn: unit -> Async<BlogText>) : CompanionOutcome =
         this.Submit(currentProjection, (fun (_: ProjectionSnapshot) -> blogFn ()))
 
-    member this.Submit
-        (currentProjection: ProjectionSnapshot, blogFn: unit -> Task<BlogText>)
-        : CompanionOutcome =
+    member this.Submit(currentProjection: ProjectionSnapshot, blogFn: unit -> Task<BlogText>) : CompanionOutcome =
         this.Submit(currentProjection, (fun (_: ProjectionSnapshot) -> blogFn () |> Async.AwaitTask))

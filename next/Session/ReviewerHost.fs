@@ -27,55 +27,59 @@ type ReviewerHost
             verdict: ReviewGuardVerdict,
             providerRunId: string,
             ?rootUserMessageId: string
-        )
-        : Result<ReviewFinishResult, string> =
-        let actualProviderRunId =
-            if System.String.IsNullOrWhiteSpace providerRunId then
-                toolCallId
-            else
-                providerRunId
+        ) : Result<ReviewFinishResult, string> =
+        if System.String.IsNullOrWhiteSpace providerRunId then
+            Error "ReviewerHost.RecordVerdict requires a real ProviderRunId"
+        else
+            let rootId =
+                match rootUserMessageId with
+                | Some id when not (System.String.IsNullOrWhiteSpace id) -> Some id
+                | _ -> None
 
-        let rootId =
-            match rootUserMessageId with
-            | Some id when not (System.String.IsNullOrWhiteSpace id) -> Some id
-            | _ -> None
+            lock gate (fun () ->
+                let current = AgentJournal.snapshot journal
 
-        lock gate (fun () ->
-            let current = AgentJournal.snapshot journal
+                let duplicate =
+                    match Map.tryFind managerSessionId current.AgentProjections.Sessions with
+                    | Some session ->
+                        session.ReviewGuard
+                        |> Option.exists (fun guard -> List.contains toolCallId guard.RecentToolCallIds)
+                    | None -> false
 
-            let duplicate =
-                match Map.tryFind managerSessionId current.AgentProjections.Sessions with
-                | Some session ->
-                    session.ReviewGuard
-                    |> Option.exists (fun guard -> List.contains toolCallId guard.RecentToolCallIds)
-                | None -> false
+                if duplicate then
+                    Ok(reviewState current treeHash)
+                else
+                    let fact =
+                        AgentFact.ReviewVerdictRecorded
+                            {| ManagerSessionId = managerSessionId
+                               ReviewerSessionId = reviewerSessionId
+                               ProviderRunId = providerRunId
+                               RootUserMessageId = rootId
+                               ToolCallId = toolCallId
+                               GitTreeHash = treeHash
+                               Verdict = verdict |}
 
-            if duplicate then
-                Ok(reviewState current treeHash)
-            else
-                let fact =
-                    AgentFact.ReviewVerdictRecorded
-                        {| ManagerSessionId = managerSessionId
-                           ReviewerSessionId = reviewerSessionId
-                           ProviderRunId = actualProviderRunId
-                           RootUserMessageId = rootId
-                           ToolCallId = toolCallId
-                           GitTreeHash = treeHash
-                           Verdict = verdict |}
-
-                match AgentJournal.appendAgent (StreamId.Session managerSessionId) None fact journal with
-                | Ok updated -> Ok(reviewState updated treeHash)
-                | Error failure -> Error(sprintf "%A" failure.Failure))
+                    match AgentJournal.appendAgent (StreamId.Session managerSessionId) None fact journal with
+                    | Ok updated -> Ok(reviewState updated treeHash)
+                    | Error failure -> Error(sprintf "%A" failure.Failure))
 
     member this.SubmitVerdict
         (toolCallId: string, verdict: ReviewGuardVerdict, ?providerRunId: string, ?rootUserMessageId: string)
         : Result<ReviewFinishResult, string> =
-        let runId = defaultArg providerRunId toolCallId
-
-        match gitTreePort with
-        | Some port ->
-            this.RecordVerdict(toolCallId, port.GetTreeHash(), verdict, runId, ?rootUserMessageId = rootUserMessageId)
-        | None -> Error "ReviewerHost.SubmitVerdict requires a GitTreePort"
+        match providerRunId with
+        | None
+        | Some "" -> Error "ReviewerHost.SubmitVerdict requires a real ProviderRunId"
+        | Some runId ->
+            match gitTreePort with
+            | Some port ->
+                this.RecordVerdict(
+                    toolCallId,
+                    port.GetTreeHash(),
+                    verdict,
+                    runId,
+                    ?rootUserMessageId = rootUserMessageId
+                )
+            | None -> Error "ReviewerHost.SubmitVerdict requires a GitTreePort"
 
     member _.TryFinish(currentTreeHash: string) =
         reviewState (AgentJournal.snapshot journal) currentTreeHash

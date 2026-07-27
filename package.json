@@ -55,5 +55,17 @@
     "es-module-lexer": "^2.1.0",
     "highlight.js": "^11.11.1",
     "tsx": "^4.22.4"
-  }
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PamelaSprin47685ghall/vibe-fs.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/PamelaSprin47685ghall/vibe-fs/issues"
+  },
+  "homepage": "https://github.com/PamelaSprin47685ghall/vibe-fs#readme"
 }

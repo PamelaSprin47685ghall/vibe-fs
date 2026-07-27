@@ -84,6 +84,7 @@ module VerdictSurface =
                             | None -> None
                             | Some j ->
                                 let child = ChildId.create reviewerId
+
                                 (AgentJournal.snapshot j).AgentProjections.Sessions
                                 |> Map.tryPick (fun parentId session ->
                                     match session.Linkage with
@@ -107,13 +108,8 @@ module VerdictSurface =
                                     reviewerHosts.[reviewerId] <- h
                                     h)
 
-                        // Prefer assistant message id as ProviderRunIdentity (one LLM run).
-                        // Fall back to toolCallId when the host context omits it.
                         let providerRunId =
-                            contextString ctx "messageID"
-                            |> Option.orElse (contextString ctx "messageId")
-                            |> Option.orElse (contextString ctx "callID")
-                            |> Option.defaultValue toolCallId
+                            contextString ctx "messageID" |> Option.orElse (contextString ctx "messageId")
 
                         // Root user message for this run (confirmation identity for 2nd PERFECT).
                         // Host may expose it under several keys; also walk ctx.message if nested.
@@ -127,29 +123,42 @@ module VerdictSurface =
                                     None
                                 elif not (isNull ctx?message?parentID) then
                                     Some(unbox<string> ctx?message?parentID)
-                                elif not (isNull ctx?message?id) && not (isNull ctx?message?role)
-                                     && unbox<string> ctx?message?role = "user" then
+                                elif
+                                    not (isNull ctx?message?id)
+                                    && not (isNull ctx?message?role)
+                                    && unbox<string> ctx?message?role = "user"
+                                then
                                     Some(unbox<string> ctx?message?id)
                                 else
                                     None
                             )
 
-                        match host.SubmitVerdict(toolCallId, verdict, providerRunId, ?rootUserMessageId = rootUserMessageId) with
-                        | Error err -> return box (stringify (createObj [ "error", box err ]))
-                        | Ok result ->
-                            lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
+                        match providerRunId with
+                        | None -> return box (stringify (createObj [ "error", box "Missing ProviderRunId" ]))
+                        | Some providerRunId ->
+                            match
+                                host.SubmitVerdict(
+                                    toolCallId,
+                                    verdict,
+                                    providerRunId,
+                                    ?rootUserMessageId = rootUserMessageId
+                                )
+                            with
+                            | Error err -> return box (stringify (createObj [ "error", box err ]))
+                            | Ok result ->
+                                lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
 
-                            let status =
-                                match result with
-                                | ReviewFinishResult.Confirmed -> "CONFIRMED"
-                                | ReviewFinishResult.NeedsReview -> "NEEDS_REVIEW"
+                                let status =
+                                    match result with
+                                    | ReviewFinishResult.Confirmed -> "CONFIRMED"
+                                    | ReviewFinishResult.NeedsReview -> "NEEDS_REVIEW"
 
-                            let vText =
-                                if verdict = ReviewGuardVerdict.Perfect then
-                                    "PERFECT"
-                                else
-                                    "REVISE"
+                                let vText =
+                                    if verdict = ReviewGuardVerdict.Perfect then
+                                        "PERFECT"
+                                    else
+                                        "REVISE"
 
-                            return box (stringify (createObj [ "verdict", box vText; "status", box status ]))
+                                return box (stringify (createObj [ "verdict", box vText; "status", box status ]))
                 | Ok _, _, _ -> return box (stringify (createObj [ "error", box "Missing reviewer tool context" ]))
             }
