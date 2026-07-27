@@ -46,11 +46,9 @@
     <Compile Include="Session/CompanionCacheTests.fs"/>
     <Compile Include="Session/CompanionResetTests.fs"/>
     <Compile Include="Session/RolesTests.fs"/>
-    <Compile Include="Session/ReviewGuardLegacy.fs"/>
     <Compile Include="Session/ReviewGuardTests.fs"/>
     <Compile Include="Session/ReviewerHostTests.fs"/>
     <Compile Include="Session/FallbackContractTests.fs"/>
-    <Compile Include="Session/DurableFallbackTestSupport.fs"/>
     <Compile Include="Session/DurableFallbackTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="OpenCode/EventsTests.fs"/>

@@ -2,10 +2,25 @@ namespace Wanxiangshu.Next.Tests
 
 open System.Threading.Tasks
 open Xunit
-open Wanxiangshu.Next.Tests.SessionTests
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Orchestrator
 open Wanxiangshu.Next.Session
+
+module private LegacyReviewGuard =
+    open Wanxiangshu.Next.Session
+    type State = { LastGitTreeHash: string option; ConsecutivePerfects: int }
+    let empty = { LastGitTreeHash = None; ConsecutivePerfects = 0 }
+    let recordVerdict (verdict: ReviewVerdict) (gitTreeHash: string) (state: State) =
+        match state.LastGitTreeHash with
+        | Some h when h = gitTreeHash && verdict = ReviewVerdict.Perfect ->
+            { state with ConsecutivePerfects = state.ConsecutivePerfects + 1 }
+        | Some h when h = gitTreeHash -> { LastGitTreeHash = Some gitTreeHash; ConsecutivePerfects = 0 }
+        | _ when verdict = ReviewVerdict.Perfect -> { LastGitTreeHash = Some gitTreeHash; ConsecutivePerfects = 1 }
+        | _ -> { LastGitTreeHash = Some gitTreeHash; ConsecutivePerfects = 0 }
+    let tryFinish state =
+        if state.ConsecutivePerfects >= 2 then ReviewFinishResult.Confirmed else ReviewFinishResult.NeedsReview
+
+
 
 module ManagerCanaryTests =
 
@@ -183,19 +198,19 @@ module ManagerCanaryTests =
     let ``Reviewer_double_perfect_guard_and_manager_reverify_integration`` () =
         task {
             // Part A: ReviewGuard unit logic
-            let g0 = ReviewGuard.empty
-            Assert.Equal(ReviewFinishResult.NeedsReview, ReviewGuard.tryFinish g0)
+            let g0 = LegacyReviewGuard.empty
+            Assert.Equal(ReviewFinishResult.NeedsReview, LegacyReviewGuard.tryFinish g0)
 
-            let g1 = ReviewGuard.recordVerdict ReviewVerdict.Perfect "tree-hash-aaa" g0
-            Assert.Equal(ReviewFinishResult.NeedsReview, ReviewGuard.tryFinish g1)
+            let g1 = LegacyReviewGuard.recordVerdict ReviewVerdict.Perfect "tree-hash-aaa" g0
+            Assert.Equal(ReviewFinishResult.NeedsReview, LegacyReviewGuard.tryFinish g1)
 
             // Second consecutive perfect on same tree hash confirms finish
-            let g2 = ReviewGuard.recordVerdict ReviewVerdict.Perfect "tree-hash-aaa" g1
-            Assert.Equal(ReviewFinishResult.Confirmed, ReviewGuard.tryFinish g2)
+            let g2 = LegacyReviewGuard.recordVerdict ReviewVerdict.Perfect "tree-hash-aaa" g1
+            Assert.Equal(ReviewFinishResult.Confirmed, LegacyReviewGuard.tryFinish g2)
 
             // Hash change invalidates confirmed state
-            let g3 = ReviewGuard.recordVerdict ReviewVerdict.Perfect "tree-hash-bbb" g2
-            Assert.Equal(ReviewFinishResult.NeedsReview, ReviewGuard.tryFinish g3)
+            let g3 = LegacyReviewGuard.recordVerdict ReviewVerdict.Perfect "tree-hash-bbb" g2
+            Assert.Equal(ReviewFinishResult.NeedsReview, LegacyReviewGuard.tryFinish g3)
 
             // Part B: Orchestrator integration returning NeedsReview when reverify fails guard
             let mgrPort =

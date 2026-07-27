@@ -32,6 +32,7 @@
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
+    <Compile Include="Session/ReviewTypes.fs"/>
     <Compile Include="Session/ReviewerHost.fs"/>
     <Compile Include="Process/ProcessTypes.fs"/>
     <Compile Include="Process/Deadline.fs"/>

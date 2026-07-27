@@ -10,6 +10,28 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.JournalTests
 open JournalTestSupport
 
+
+module private DurableFallbackTestSupport =
+    let mutable private seqCounter = 0
+
+    let recordFailure
+        (journalPort: FallbackJournalPort)
+        (sessionId: SessionId)
+        (reason: string)
+        =
+        seqCounter <- seqCounter + 1
+        let n = seqCounter
+        let fact =
+            AgentFact.FallbackFailureRecorded
+                {| SessionId = sessionId
+                   Reason = reason
+                   AssistantMessageId = sprintf "test-msg-%s-%d" (SessionId.value sessionId) n
+                   ProviderAttempt = sprintf "test-attempt-%d" n |}
+
+        match journalPort.AppendFact (StreamId.Session sessionId) fact with
+        | Ok updated -> Ok(updated, DurableFallback.nextDecision sessionId updated)
+        | Error err -> Error err
+
 module DurableFallbackTests =
 
     [<Fact>]

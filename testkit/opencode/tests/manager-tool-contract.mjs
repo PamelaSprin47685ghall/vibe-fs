@@ -19,16 +19,16 @@ test('manager permission denies global executor tool and executes mailbox path',
     const config = {};
     hooks.config(config);
     assert.equal(config.agent.manager.permission['*'], 'deny');
-    assert.equal(config.agent.manager.permission.executor, undefined);
-    assert.equal(config.agent.manager.permission.inspector, undefined);
+    assert.equal(config.agent.manager.permission.executor, 'deny');
+    assert.equal(config.agent.manager.permission.inspector, 'deny');
     assert.equal(config.agent.inspector.permission['*'], 'deny');
     assert.equal(config.agent.inspector.permission.executor, 'allow');
-    assert.equal(config.agent.inspector.permission.fork, undefined);
+    assert.equal(config.agent.inspector.permission.fork, 'deny');
     assert.equal(config.agent.coder.permission.inspector, 'allow');
     assert.equal(config.agent.orchestrator.permission['*'], 'deny');
     assert.equal(config.agent.orchestrator.permission.fork, 'allow');
     assert.equal(config.agent.orchestrator.permission.join, 'allow');
-    assert.equal(config.agent.orchestrator.permission.list, undefined);
+    assert.equal(config.agent.orchestrator.permission.list, 'deny');
 
     const transformed = { messages: [{ role: 'user', text: 'hello' }] };
     hooks['chat.transform']({}, transformed);

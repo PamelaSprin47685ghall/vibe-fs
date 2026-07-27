@@ -47,12 +47,17 @@ module StaticTools =
         | ToolPermission.Verdict -> "verdict"
 
     /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
+    /// Emits explicit allow/deny for the full known tool name set so host schema
+    /// filters and contract tests see concrete denies (not only "*").
     let permissionObj (role: Role) : obj =
-        let allowed = Roles.permissions role
+        let allowed = Roles.permissions role |> Set.map toolName
+        let known =
+            [ "fork"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
+              "inspector"; "executor"; "network"; "verdict" ]
         let pairs =
             [ yield "*", box "deny"
-              for p in allowed do
-                  yield toolName p, box "allow" ]
+              for name in known do
+                  yield name, box (if Set.contains name allowed then "allow" else "deny") ]
         createObj pairs
 
     let private primaryAgent (role: Role) : obj =
