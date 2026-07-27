@@ -110,7 +110,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             match barrierResult with
             | Error err -> return Error err
             | Ok() ->
-                let! priorState = OrchestratorReviewState.read deps.Journal orchestratorId worktree
+                let! priorState = OrchestratorReviewRead.read deps.Journal orchestratorId worktree
 
                 match priorState with
                 | Error err -> return Error err
@@ -124,7 +124,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     match ran with
                     | Error err -> return Error err
                     | Ok() ->
-                        let! state = OrchestratorReviewState.read deps.Journal orchestratorId worktree
+                        let! state = OrchestratorReviewRead.read deps.Journal orchestratorId worktree
 
                         match state with
                         | Error err -> return Error err
@@ -139,7 +139,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                             match nudged with
                             | Error err -> return Error err
                             | Ok() ->
-                                let! retry = OrchestratorReviewState.read deps.Journal orchestratorId worktree
+                                let! retry = OrchestratorReviewRead.read deps.Journal orchestratorId worktree
 
                                 match retry with
                                 | Error err -> return Error err

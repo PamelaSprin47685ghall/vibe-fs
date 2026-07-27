@@ -1,0 +1,24 @@
+{
+  "name": "wanxiangshu",
+  "version": "0.3.0",
+  "description": "Wanxiangshu.Next Structured Flow runtime (Fable build output)",
+  "type": "module",
+  "main": "next/OpenCode/Plugin.js",
+  "exports": {
+    ".": {
+      "import": "./next/OpenCode/Plugin.js",
+      "default": "./next/OpenCode/Plugin.js"
+    }
+  },
+  "files": [
+    "next"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.17.4"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

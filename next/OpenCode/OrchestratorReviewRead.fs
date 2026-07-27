@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 
-module OrchestratorReviewState =
+module OrchestratorReviewRead =
     let read
         (journal: AgentJournal option)
         (orchestratorId: SessionId)

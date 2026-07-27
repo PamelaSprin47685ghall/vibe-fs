@@ -27,7 +27,7 @@ module HostSignalAdapterTests =
         Assert.True(HostSignalAdapter.tryAdapt owned updated |> Option.isNone)
 
     [<Fact>]
-    let ``Drops_legacy_session_idle_keeps_abort_error_latch`` () =
+    let ``Drops_legacy_session_idle_and_session_error`` () =
         let idle =
             createObj
                 [ "type", box "session.idle"
@@ -45,9 +45,7 @@ module HostSignalAdapterTests =
                             "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
                   ) ]
 
-        match HostSignalAdapter.tryAdapt owned err with
-        | Some(SessionAbort sid) -> Assert.Equal("s1", SessionId.value sid)
-        | other -> Assert.True(false, sprintf "unexpected %A" other)
+        Assert.True(HostSignalAdapter.tryAdapt owned err |> Option.isNone)
 
     [<Fact>]
     let ``Idle_and_retry_and_deleted_are_signals`` () =

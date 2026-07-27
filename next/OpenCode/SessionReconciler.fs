@@ -206,5 +206,4 @@ type SessionReconciler
         match signal with
         | SessionIdle sessionId -> this.MarkDirty sessionId
         | SessionDeleted sessionId -> this.ClearSession sessionId
-        | SessionAbort sessionId -> this.MarkDirty sessionId
-        | ProviderRetry _ -> ()
+                | ProviderRetry _ -> ()

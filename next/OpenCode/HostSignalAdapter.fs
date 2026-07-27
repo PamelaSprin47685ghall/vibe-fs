@@ -101,23 +101,6 @@ module HostSignalAdapter =
                 match sessionIdOf raw with
                 | Some sessionId when isOwned sessionId -> Some(SessionDeleted sessionId)
                 | _ -> None
-            | "session.error" ->
-                // Abort latch only: wakes reconcile / completes join. Never a
-                // durable fallback attribution path.
-                match sessionIdOf raw with
-                | None -> None
-                | Some sessionId when not (isOwned sessionId) -> None
-                | Some sessionId ->
-                    let properties = raw?properties
-                    let error = if isNull properties then null else properties?error
-                    let name =
-                        if isNull error || isNull error?name then ""
-                        else unbox<string> error?name
-
-                    if name.IndexOf("Abort", StringComparison.OrdinalIgnoreCase) >= 0 then
-                        Some(SessionAbort sessionId)
-                    else
-                        None
             | _ -> None
 
 type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> unit) as this =
@@ -148,8 +131,7 @@ type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> un
             let sid =
                 match signal with
                 | SessionIdle id
-                | SessionDeleted id
-                | SessionAbort id -> id
+                | SessionDeleted id -> id
                 | ProviderRetry retry -> retry.SessionId
 
             match sources.TryGetValue(SessionId.value sid) with
@@ -164,8 +146,7 @@ type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> un
             let sid =
                 match signal with
                 | SessionIdle id
-                | SessionDeleted id
-                | SessionAbort id -> id
+                | SessionDeleted id -> id
                 | ProviderRetry retry -> retry.SessionId
 
             match sources.TryGetValue(SessionId.value sid) with

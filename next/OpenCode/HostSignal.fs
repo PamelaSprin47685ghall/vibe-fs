@@ -8,11 +8,12 @@ type RetrySignal =
       Reason: string
       MessageId: MessageId option }
 
+/// SSOT-only host signals. Abort is never a separate event type — it is
+/// classified from the full assistant snapshot after SessionIdle reconcile.
 type HostSignal =
     | SessionIdle of SessionId
     | ProviderRetry of RetrySignal
     | SessionDeleted of SessionId
-    | SessionAbort of SessionId
 
 type SessionSignalSource =
     | LocalPluginEvent

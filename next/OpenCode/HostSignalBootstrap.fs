@@ -69,16 +69,6 @@ module HostSignalBootstrap =
             match signal with
             | ProviderRetry retry ->
                 RetrySignalHandler.handle journal fallbackFailures userMessageBindings retry
-            | SessionAbort sessionId ->
-                let key = SessionId.value sessionId
-                if abortedSessions.Add key then
-                    Pty.abortParent key
-                    sessionPort.AbortChildren sessionId |> ignore
-                    disposeExecutorRuntime key
-                    eventPort.NotifyTerminal sessionId (TerminalOutcome.Aborted "host session.error abort")
-                    |> ignore
-                // Still reconcile so any later durable assistant state is observed.
-                reconciler.HandleSignal(SessionIdle sessionId)
             | SessionIdle _
             | SessionDeleted _ -> reconciler.HandleSignal signal
 

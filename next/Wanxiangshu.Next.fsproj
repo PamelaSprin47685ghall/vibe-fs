@@ -110,7 +110,7 @@
     <Compile Include="OpenCode/OrchestratorSweep.fs"/>
     <Compile Include="OpenCode/OrchestratorHost.Types.fs"/>
     <Compile Include="OpenCode/OrchestratorSessionDirectories.fs"/>
-    <Compile Include="OpenCode/OrchestratorReviewState.fs"/>
+    <Compile Include="OpenCode/OrchestratorReviewRead.fs"/>
     <Compile Include="OpenCode/OrchestratorManagerJob.fs"/>
     <Compile Include="OpenCode/OrchestratorHost.fs"/>
     <Compile Include="OpenCode/ToolSurfaceFields.fs"/>

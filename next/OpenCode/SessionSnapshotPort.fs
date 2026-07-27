@@ -61,7 +61,12 @@ module SessionSnapshotPort =
     let private errorNameOf (info: obj) (raw: obj) =
         let candidates =
             [ if not (isNull info) && not (isNull info?error) then info?error?name else null
-              if not (isNull raw) && not (isNull raw?error) then raw?error?name else null ]
+              if not (isNull info) && not (isNull info?error) then info?error?``type`` else null
+              if not (isNull raw) && not (isNull raw?error) then raw?error?name else null
+              if not (isNull raw) && not (isNull raw?error) then raw?error?``type`` else null
+              // Some host payloads put abort on the message root.
+              if not (isNull info) then info?errorName else null
+              if not (isNull raw) then raw?errorName else null ]
 
         candidates |> List.tryPick readString
 

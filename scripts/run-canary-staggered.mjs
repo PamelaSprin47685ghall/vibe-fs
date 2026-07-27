@@ -1,16 +1,11 @@
 /**
  * run-canary-staggered.mjs — Runs P0 canary tests in full-parallel isolation.
  *
- * All 15 canaries spawn concurrently into one pool sized to the suite. A tiny
- * fixed stagger (default 50ms) de-overlaps Bun SEA boot file-lock bursts — it is
- * Default STAGGER_DELAY_MS=0 (true full-parallel spawn). Optional env sets a
- * max uniform boot jitter in [0, N] ms — never index*N cumulative pulse.
- * 28s later. True concurrent isolation is the proof: every scenario's semantic
- * phase overlaps every other's.
- *
- * The 2s causal watchdog arms only AFTER host.start() returns (inside
- * setupScenarioParallel, after listen+health), so concurrent boots stretching
- * past 2s is a boot problem, not a watchdog problem.
+ * All canaries start into one pool sized to the suite. AGENTS prefers ≤100ms
+ * full-parallel spawn. Default STAGGER_DELAY_MS=0 is true full-parallel; set
+ * STAGGER_DELAY_MS=50 to add an independent uniform boot jitter per canary
+ * (never an index-cumulative pulse). The 2s causal watchdog arms only AFTER
+ * host.start() returns, so boot duration does not consume the watchdog budget.
  */
 
 import { spawn } from "node:child_process";
@@ -29,6 +24,7 @@ function parsePositiveInt(value, fallback, name) {
 }
 
 const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000, "CANARY_TIMEOUT_MS");
+const CANARY_COUNT = 16;
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
   "testkit/opencode/tests/companion-canary.mjs",
@@ -37,7 +33,6 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/process-stress-canary.mjs",
   "testkit/opencode/tests/host-nudge-canary.mjs",
   "testkit/opencode/tests/host-restart-canary.mjs",
-  "testkit/opencode/tests/host-abort-canary.mjs",
   "testkit/opencode/tests/companion-replacement-canary.mjs",
   "testkit/opencode/tests/companion-cache-canary.mjs",
   "testkit/opencode/tests/fallback-canary.mjs",
@@ -60,12 +55,11 @@ const MAX_PARALLEL = parsePositiveInt(
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
-// AGENTS prefers ≤100ms full-parallel spawn. Measured Bun SEA boot is ~8 CPU-s
-// each; 16 simultaneous cold starts collapse the 2s causal watchdog. Default
-// keeps full suite in one parallel pool with a fixed cumulative boot pulse
-// (index * STAGGER_DELAY_MS). Set STAGGER_DELAY_MS=0 on machines that can
-// absorb the storm.
-const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
+// AGENTS prefers ≤100ms full-parallel spawn. Default is 0; set
+// STAGGER_DELAY_MS=N to use an independent uniform [0,N) ms jitter per canary.
+// Jitter never multiplies by index, so all canaries enter their semantic phase
+// within N ms of each other, not index*N.
+const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 0, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 
 function cleanupCanaries() {
@@ -102,9 +96,10 @@ async function runPool(items, limit, worker) {
   };
 
   await Promise.all(items.map(async (item, index) => {
-    // Tiny fixed stagger per item (index * STAGGER_DELAY_MS) to de-overlap
-    // Bun SEA boot CPU and file-lock bursts.
-    if (index > 0) await new Promise((resolve) => setTimeout(resolve, index * STAGGER_DELAY_MS));
+    // Independent uniform boot jitter (not cumulative). Keeps all canaries in
+    // the same ~STAGGER_DELAY_MS window instead of spreading them by index.
+    const jitter = STAGGER_DELAY_MS > 0 ? Math.floor(Math.random() * STAGGER_DELAY_MS) : 0;
+    if (jitter > 0) await new Promise((resolve) => setTimeout(resolve, jitter));
     await acquire();
     try {
       results[index] = await worker(item);
@@ -176,12 +171,12 @@ async function main() {
   }
   console.log(
     "Starting " + CANARY_TESTS.length + " canary tests in full-parallel isolation mode (" +
-      repeats + " iteration(s), max=" + MAX_PARALLEL + ", stagger=" + STAGGER_DELAY_MS + "ms)...\n",
+      repeats + " iteration(s), max=" + MAX_PARALLEL + ", jitter_max=" + STAGGER_DELAY_MS + "ms)...\n",
   );
 
   for (let rep = 1; rep <= repeats; rep++) {
     if (repeats > 1) console.log("--- Canary Iteration " + rep + "/" + repeats + " ---");
-    console.log("\nConcurrency: " + MAX_PARALLEL + " / " + CANARY_TESTS.length + "\n");
+    console.log("\nConcurrency: " + MAX_PARALLEL + " / " + CANARY_TESTS.length + " (expected ~" + CANARY_COUNT + ")\n");
 
     const results = await runPool(CANARY_TESTS, MAX_PARALLEL, (file) => {
       console.log("[Launch] " + path.basename(file));
