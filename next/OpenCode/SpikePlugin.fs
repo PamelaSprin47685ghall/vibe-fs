@@ -61,6 +61,7 @@ module SpikePlugin =
         (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
+        (backgroundBFor: (string -> string option) option)
         : obj =
         ToolSurface.create
             toolModule
@@ -74,6 +75,7 @@ module SpikePlugin =
             sessionDirectories
             modelConfig
             onRunStarted
+            backgroundBFor
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
@@ -222,6 +224,15 @@ module SpikePlugin =
                         let onRunStarted =
                             Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
+                        let backgroundBFor =
+                            Some(fun sessionId ->
+                                match companions.TryGetValue sessionId with
+                                | true, host ->
+                                    match host.Memory.ActivePrefixEpoch with
+                                    | Some epoch -> Some epoch.FrozenB
+                                    | None -> host.Memory.LatestB
+                                | false, _ -> None)
+
                         let toolSurface =
                             toolHooks
                                 toolModule
@@ -235,6 +246,7 @@ module SpikePlugin =
                                 sessionDirectories
                                 modelConfig
                                 onRunStarted
+                                backgroundBFor
 
                         toolSurfaceRef <- Some toolSurface
                         hooks?tool <- toolSurface

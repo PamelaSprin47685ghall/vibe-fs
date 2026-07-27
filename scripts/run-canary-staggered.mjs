@@ -3,7 +3,8 @@
  *
  * All 15 canaries spawn concurrently into one pool sized to the suite. A tiny
  * fixed stagger (default 50ms) de-overlaps Bun SEA boot file-lock bursts — it is
- * NOT a cumulative delay, so the last canary starts ~50ms after the first, not
+ * Default STAGGER_DELAY_MS=0 (true full-parallel spawn). Optional env sets a
+ * max uniform boot jitter in [0, N] ms — never index*N cumulative pulse.
  * 28s later. True concurrent isolation is the proof: every scenario's semantic
  * phase overlaps every other's.
  *
@@ -58,6 +59,11 @@ const MAX_PARALLEL = parsePositiveInt(
   CANARY_TESTS.length,
   "MAX_PARALLEL_CANARIES",
 );
+// AGENTS prefers ≤100ms full-parallel spawn. Measured Bun SEA boot is ~8 CPU-s
+// each; 16 simultaneous cold starts collapse the 2s causal watchdog. Default
+// keeps full suite in one parallel pool with a fixed cumulative boot pulse
+// (index * STAGGER_DELAY_MS). Set STAGGER_DELAY_MS=0 on machines that can
+// absorb the storm.
 const STAGGER_DELAY_MS = parsePositiveInt(process.env.STAGGER_DELAY_MS, 2000, "STAGGER_DELAY_MS");
 const activeCanaryPids = new Set();
 

@@ -12,7 +12,6 @@ type AgentRole =
     | Browser
     | Meditator
     | Reviewer
-    | Advisor
     | Executor
 
 [<RequireQualifiedAccess>]

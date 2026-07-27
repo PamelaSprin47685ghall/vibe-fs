@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Next.Tests.ProcessTests
+open Xunit
 
 open System
 open System.Text
@@ -138,7 +139,9 @@ module ProcessRunnerTests =
                 Runner.executeWithLauncher hangingLauncher dummyCmd estimate defaultCtx CancellationToken.None
 
             match outcome with
-            | Error(RunnerError.TimeoutExceeded span) -> equal (TimeSpan.FromSeconds(0.3)) span
+            | Error(RunnerError.TimeoutExceeded span) ->
+                // 3 × 0.1s budget; float seconds may not be bit-exact.
+                Assert.True(abs (span.TotalSeconds - 0.3) < 1e-9)
             | _ -> failwith "Expected TimeoutExceeded outcome on deadline expiry"
         }
 

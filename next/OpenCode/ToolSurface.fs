@@ -34,6 +34,7 @@ module ToolSurface =
         (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
+        (backgroundBFor: (string -> string option) option)
         : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
@@ -146,6 +147,8 @@ module ToolSurface =
         let executor =
             ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory
 
+        let inspector = InspectorTool.create toolModule sessionPort backgroundBFor
+
         let tools =
             createObj
                 [ "fork",
@@ -154,7 +157,8 @@ module ToolSurface =
                   box (applyTool factory (definition "Wait for any agent or PTY completion" (createObj []) joinExecute))
                   "list", box (applyTool factory (definition "List active agents and PTYs" (createObj []) listExecute))
                   "verdict", box (applyTool factory (definition "Submit the review verdict" verdictArgs verdictExecute))
-                  "executor", executor ]
+                  "executor", executor
+                  "inspector", inspector ]
 
         defineHidden tools "disposeExecutorRuntime" (box disposeExecutorRuntime)
         tools

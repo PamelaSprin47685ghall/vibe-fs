@@ -13,13 +13,18 @@ test('manager permission denies global executor tool and executes mailbox path',
     const hooks = await SpikePlugin_initSpikePlugin({ client: {}, directory: journalDirectory });
     const names = Object.keys(hooks.tool).sort();
 
-    assert.deepEqual(names, ['executor', 'fork', 'join', 'list', 'verdict']);
+    assert.deepEqual(names, ['executor', 'fork', 'inspector', 'join', 'list', 'verdict']);
     assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt', 'signal']);
 
     const config = {};
     hooks.config(config);
     assert.equal(config.agent.manager.permission['*'], 'deny');
     assert.equal(config.agent.manager.permission.executor, undefined);
+    assert.equal(config.agent.manager.permission.inspector, undefined);
+    assert.equal(config.agent.inspector.permission['*'], 'deny');
+    assert.equal(config.agent.inspector.permission.executor, 'allow');
+    assert.equal(config.agent.inspector.permission.fork, undefined);
+    assert.equal(config.agent.coder.permission.inspector, 'allow');
     assert.equal(config.agent.orchestrator.permission['*'], 'deny');
     assert.equal(config.agent.orchestrator.permission.fork, 'allow');
     assert.equal(config.agent.orchestrator.permission.join, 'allow');

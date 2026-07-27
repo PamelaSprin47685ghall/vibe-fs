@@ -146,7 +146,9 @@ module Runner =
         : Task<Result<RunnerOutcome, RunnerError>> =
         task {
             let (RuntimeSeconds estSecs) = estimate.EstimatedRuntime
-            let budgetSpan = TimeSpan.FromMilliseconds(float (int (3.0 * estSecs * 1000.0)))
+            // Same 3× budget as production path; never int-cast milliseconds
+            // (huge legal estimates must not overflow).
+            let budgetSpan = TimeSpan.FromSeconds(3.0 * estSecs)
             let isLarge = estimate.EstimatedMemory = EstimatedMemory.Large
 
             if isLarge then

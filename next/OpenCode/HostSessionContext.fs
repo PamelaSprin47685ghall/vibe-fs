@@ -18,7 +18,6 @@ module HostSessionContext =
         | "browser" -> Some AgentRole.Browser
         | "meditator" -> Some AgentRole.Meditator
         | "reviewer" -> Some AgentRole.Reviewer
-        | "advisor" -> Some AgentRole.Advisor
         | "executor" -> Some AgentRole.Executor
         | _ -> None
 

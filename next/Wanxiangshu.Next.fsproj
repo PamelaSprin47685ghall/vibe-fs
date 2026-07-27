@@ -117,6 +117,7 @@
     <Compile Include="OpenCode/ToolSurfaceEmit.fs"/>
     <Compile Include="OpenCode/ToolSurfaceOrchestrator.fs"/>
     <Compile Include="OpenCode/ToolSurfacePty.fs"/>
+    <Compile Include="OpenCode/InspectorTool.fs"/>
     <Compile Include="OpenCode/ToolSurface.fs"/>
     <Compile Include="OpenCode/PluginHost.fs"/>
     <Compile Include="OpenCode/ManagerConfig.fs"/>
