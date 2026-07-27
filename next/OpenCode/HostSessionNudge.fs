@@ -14,7 +14,7 @@ module HostSessionNudge =
     ///
     /// Defense-in-depth: when a journal is supplied, a session already Dead (4
     /// consecutive fallback failures, SSOT §6) is skipped silently — no prompt is
-    /// sent to a dead session. Callers (HostEventRouter, HostReviewGuard) also
+    /// sent to a dead session. Callers (HostReviewGuard) also
     /// gate on sessionDead before calling, so this is a second line of defense.
     let send
         (sessionPort: ISessionHostPort)

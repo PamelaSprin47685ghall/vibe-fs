@@ -3,8 +3,6 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open System.Collections.Generic
 open Wanxiangshu.Next.Kernel.Identity
-open Fable.Core
-open Fable.Core.JsInterop
 
 type TerminalOutcome =
     | Completed of messageId: MessageId
@@ -64,10 +62,6 @@ module Events =
         let sessionOutputs =
             System.Collections.Generic.Dictionary<SessionId, ResizeArray<string>>()
 
-        let assistantMessageIds = HashSet<string>()
-        let recordedPartIds = HashSet<string>()
-        let pendingParts = Dictionary<string, SessionId * string * string option>()
-
         let lockObj = obj ()
 
         let recordOutput sessionId text =
@@ -79,147 +73,21 @@ module Events =
                     output.Add(text)
                     sessionOutputs.[sessionId] <- output)
 
-        let recordAssistantOutput (sessionId: SessionId) (partId: string option) (text: string) =
-            let meaningfulText = text.Replace("\u200B", "").Replace("\uFEFF", "")
-
-            if String.IsNullOrWhiteSpace meaningfulText then
-                ()
-            else
-                match partId with
-                | Some id when not (recordedPartIds.Add id) -> ()
-                | _ -> recordOutput sessionId text
-
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
 
             for handler in handlers do
                 handler sessionId outcome
 
-        member this.Observe(rawEvent: obj) =
-            if not (isNull rawEvent) then
-                let eventObj = if isNull rawEvent?event then rawEvent else rawEvent?event
+        member _.RecordSessionOutput (sessionId: SessionId) (text: string) =
+            if not (String.IsNullOrWhiteSpace text) then
+                recordOutput sessionId text
 
-                let properties =
-                    if not (isNull eventObj?properties) then eventObj?properties
-                    elif not (isNull eventObj?data) then eventObj?data
-                    else eventObj
-
-                let eventType =
-                    [ eventObj?``type``; eventObj?eventType ]
-                    |> MessageOriginDecoder.firstString
-                    |> Option.defaultValue ""
-                    |> fun value -> value.ToLowerInvariant()
-
-                let fallbackMessageId =
-                    MessageId.create (
-                        SessionId.value (
-                            MessageOriginDecoder.sessionIdOf properties eventObj
-                            |> Option.defaultValue (SessionId.create "unknown")
-                        )
-                    )
-
-                let messageId =
-                    MessageOriginDecoder.messageIdOf properties eventObj
-                    |> Option.map MessageId.value
-
-                let part = properties?part
-
-                let partId =
-                    if isNull part then
-                        None
-                    else
-                        MessageOriginDecoder.asString part?id
-
-                let info = properties?info
-                let message = properties?message
-
-                let roleValue value =
-                    MessageOriginDecoder.asString value
-                    |> Option.map (fun role -> role.ToLowerInvariant())
-
-                let role: string option =
-                    match roleValue properties?role with
-                    | Some value -> Some value
-                    | None when not (isNull info) -> roleValue info?role
-                    | None when not (isNull message) -> roleValue message?role
-                    | None -> None
-
-                match role, messageId with
-                | Some "assistant", Some id ->
-                    assistantMessageIds.Add id |> ignore
-
-                    match pendingParts.TryGetValue id with
-                    | true, (pendingSession, text, pendingPartId) ->
-                        recordAssistantOutput pendingSession pendingPartId text
-                        pendingParts.Remove id |> ignore
-                    | false, _ -> ()
-                | Some _, Some id -> pendingParts.Remove id |> ignore
-                | _ -> ()
-
-                match MessageOriginDecoder.sessionIdOf properties eventObj with
-                | None -> ()
-                | Some sessionId ->
-                    let assistantText = MessageOriginDecoder.assistantText properties eventObj eventType
-
-                    if eventType.StartsWith("message.part") && role.IsNone then
-                        match messageId, assistantText with
-                        | Some id, Some text when assistantMessageIds.Contains id ->
-                            recordAssistantOutput sessionId partId text
-                        | Some id, Some text -> pendingParts.[id] <- sessionId, text, partId
-                        | _ -> ()
-                    else
-                        assistantText |> Option.iter (recordAssistantOutput sessionId partId)
-
-                    let outcome =
-                        match MessageOriginDecoder.errorText properties eventObj with
-                        | Some error when
-                            eventType.Contains("abort")
-                            || error.Contains("abort", StringComparison.OrdinalIgnoreCase)
-                            ->
-                            Some(Aborted error)
-                        | Some error when eventType.Contains("error") || eventType.Contains("fail") ->
-                            Some(Failed error)
-                        | _ when eventType.Contains("abort") -> Some(Aborted "Host reported session abort")
-                        | _ when
-                            eventType = "session.idle"
-                            || (eventType = "session.status"
-                                && (MessageOriginDecoder.asString properties?status = Some "idle"))
-                            || eventType.Contains("assistant.completed")
-                            || eventType = "message.completed"
-                            ->
-                            Some(
-                                Completed(
-                                    MessageOriginDecoder.messageIdOf properties eventObj
-                                    |> Option.defaultValue fallbackMessageId
-                                )
-                            )
-                        | _ when eventType.Contains("message.updated") || eventType.Contains("assistant") ->
-                            let message = properties?message
-                            let eventTime = properties?time
-                            let messageTime = if not (isNull message) then message?time else null
-
-                            let role =
-                                [ if not (isNull message) then message?role else null
-                                  properties?role ]
-                                |> MessageOriginDecoder.firstString
-
-                            let finished =
-                                not (isNull properties?finish)
-                                || (not (isNull eventTime) && not (isNull eventTime?completed))
-                                || (not (isNull messageTime) && not (isNull messageTime?completed))
-
-                            if role = Some "assistant" && finished then
-                                Some(
-                                    Completed(
-                                        MessageOriginDecoder.messageIdOf properties eventObj
-                                        |> Option.defaultValue fallbackMessageId
-                                    )
-                                )
-                            else
-                                None
-                        | _ -> None
-
-                    outcome |> Option.iter (notify sessionId)
+        /// Terminal completions are produced by TerminalPolicies via
+        /// NotifyTerminal. Raw host event observation is handled upstream by the
+        /// signal stack (HostSignalAdapter / HostSignalSubscribe), so Observe is
+        /// a no-op.
+        member _.Observe(_rawEvent: obj) = ()
 
         interface IEventObservationPort with
             member _.SubscribeTerminalListener(listener) =

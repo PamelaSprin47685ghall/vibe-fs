@@ -144,7 +144,7 @@ module FallbackDetect =
             sprintf "anon-%s-%s" sessionId (sha256Hex canonical)
 
     /// Single attributor: the ONLY writer of FallbackFailureRecorded.
-    /// The sole caller is the provider-retry detector (HostEventRetry): a
+    /// The sole caller is the provider-retry detector (RetrySignalHandler): a
     /// durable failure fact requires an explicit host retry status carrying a
     /// stable message/attempt identity. Empty/xml terminals are interaction
     /// repair (zero-width continuation), NOT provider call failures, and never

@@ -8,6 +8,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 type SpikePluginConfig =
@@ -59,6 +60,7 @@ module SpikePlugin =
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
+        (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         : obj =
         ToolSurface.create
             toolModule
@@ -71,32 +73,34 @@ module SpikePlugin =
             verdictSessions
             sessionDirectories
             modelConfig
+            onRunStarted
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
             let portOpt = OpenCodePort.create input
             let journal = PluginHost.createJournal input
             let sessionDirectories = Dictionary<string, string>()
+            let ownedSessions = HashSet<string>()
+            let userMessageBindings = Dictionary<string, MessageId>()
+            let fallbackFailures = HashSet<string>()
 
-            let registerEventDirectory (raw: obj) =
-                let sessionId, _ = HostSessionContext.read raw
-
-                if not (String.IsNullOrWhiteSpace sessionId) then
-                    HostEventDirectory.rawDirectory raw
-                    |> Option.iter (fun directory -> sessionDirectories.[sessionId] <- directory)
-
-            match PluginHost.createHost input portOpt (Some registerEventDirectory) with
+            match PluginHost.createHost input portOpt with
             | Error err -> return raise (InvalidOperationException err)
-            | Ok(eventPort, sessionPort, subscription, observeEvent) ->
+            | Ok(eventPort, sessionPort, snapshotOpt) ->
                 let companions = Dictionary<string, CompanionHost>()
                 let companionGate = obj ()
                 let sessionRoles = Dictionary<string, string>()
                 let sessionParents = Dictionary<string, string>()
                 let verdictSessions = HashSet<string>()
                 let nudgeSent = HashSet<string>()
+                let managerGuardNudges = HashSet<string>()
 
                 PluginHost.restoreSessionRoles journal sessionRoles
                 PluginHost.restoreSessionParents journal sessionParents
+
+                for KeyValue(childId, parentId) in sessionParents do
+                    ownedSessions.Add childId |> ignore
+                    ownedSessions.Add parentId |> ignore
 
                 let gitTreePort =
                     match PluginHost.gitTreePortFromInput input with
@@ -105,7 +109,6 @@ module SpikePlugin =
 
                 let sessionBudgets = Dictionary<string, int>()
                 let bloggerModel = ModelResolver.bloggerModelFromEnv ()
-
                 let mutable toolSurfaceRef: obj option = None
 
                 let disposeExecutorRuntimeCb (sid: string) =
@@ -113,18 +116,33 @@ module SpikePlugin =
                     | Some ts -> ts?disposeExecutorRuntime (sid) |> ignore
                     | None -> ()
 
-                let eventRouter =
-                    HostEventRouter(
-                        sessionPort,
-                        sessionParents,
-                        sessionRoles,
-                        verdictSessions,
-                        nudgeSent,
-                        ?journal = journal,
-                        ?gitTreePort = gitTreePort,
-                        ?disposeExecutorRuntime = Some disposeExecutorRuntimeCb,
-                        ?onSessionDirectory = Some(fun sid directory -> sessionDirectories.[sid] <- directory)
-                    )
+                let wired =
+                    HostSignalBootstrap.wire
+                        sessionPort
+                        eventPort
+                        snapshotOpt
+                        journal
+                        gitTreePort
+                        sessionRoles
+                        sessionParents
+                        verdictSessions
+                        nudgeSent
+                        managerGuardNudges
+                        ownedSessions
+                        userMessageBindings
+                        fallbackFailures
+                        disposeExecutorRuntimeCb
+                        input
+
+                let bindRunStarted =
+                    box (fun (sessionId: string) (role: string) (directory: string) ->
+                        match AgentRoleHelpers.roleOfString role with
+                        | None -> ()
+                        | Some agentRole ->
+                            wired.BindActiveRun
+                                (SessionId.create sessionId)
+                                agentRole
+                                (if String.IsNullOrWhiteSpace directory then None else Some directory))
 
                 let transform inObj outObj =
                     let projectionSessionIdOpt =
@@ -137,26 +155,16 @@ module SpikePlugin =
                         else
                             projectionSessionIdFromMessages outObj
 
-                    match observeEvent, projectionSessionIdOpt with
-                    | Some observe, Some sid ->
-                        let evt =
-                            createObj
-                                [ "type", box "plugin.transform"
-                                  "properties", box (createObj [ "sessionID", box sid ]) ]
-
-                        observe evt
-                    | _ -> ()
-
                     match projectionSessionIdOpt with
                     | Some projectionSessionId ->
+                        wired.RegisterOwned projectionSessionId
+
                         if
                             not (isNull inObj)
                             && not (isNull inObj?agent)
                             && not (sessionRoles.ContainsKey projectionSessionId)
                         then
-                            let requestedAgent = unbox<string> inObj?agent
-
-                            HostSessionContext.canonicalRole requestedAgent
+                            HostSessionContext.canonicalRole (unbox<string> inObj?agent)
                             |> Option.iter (fun role -> sessionRoles.[projectionSessionId] <- role)
 
                         if not (isNull inObj) && isNull inObj?sessionID then
@@ -188,24 +196,25 @@ module SpikePlugin =
                           "events", box eventPort
                           "sessions", box sessionPort
                           "journal", box journal
-                          "hostEventsSubscription", box subscription
+                          "hostEventsSubscription", box wired.Subscription
+                          "bindRunStarted", bindRunStarted
+                          "chat.message", wired.ChatMessageHook
                           "chat.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform", box (systemTransformHook sessionBudgets)
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
-                hooks?event <-
-                    box (fun raw ->
-                        eventRouter.Observe(raw, ignore)
-                        observeEvent |> Option.iter (fun observe -> observe raw))
+                hooks?event <- box wired.ObserveEvent
 
                 let client = if isNull input then null else input?client
-
                 let modelConfig = ModelResolver.fromEnv ()
 
                 if not (isNull client) then
                     try
                         let! toolModule = importToolModule ()
+
+                        let onRunStarted =
+                            Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
                         let toolSurface =
                             toolHooks
@@ -219,11 +228,16 @@ module SpikePlugin =
                                 verdictSessions
                                 sessionDirectories
                                 modelConfig
+                                onRunStarted
 
                         toolSurfaceRef <- Some toolSurface
                         hooks?tool <- toolSurface
                     with ex ->
-                        raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
+                        raise (
+                            InvalidOperationException(
+                                sprintf "Failed to load OpenCode tool module: %s" ex.Message
+                            )
+                        )
 
                 return box hooks
         }

@@ -20,7 +20,8 @@ module ToolSurfaceOrchestrator =
           SessionParents: Dictionary<string, string>
           SessionRoles: Dictionary<string, string>
           SessionDirectories: Dictionary<string, string>
-          TreePorts: Dictionary<string, GitTreePort> }
+          TreePorts: Dictionary<string, GitTreePort>
+          OnRunStarted: (SessionId -> AgentRole -> string option -> unit) option }
 
     let isOrchestratorSession (sessionRoles: Dictionary<string, string>) (sid: string) =
         match sessionRoles.TryGetValue sid with
@@ -58,6 +59,7 @@ module ToolSurfaceOrchestrator =
                           RegisterChildDirectory =
                             fun childId path -> deps.SessionDirectories.[SessionId.value childId] <- path
                           RegisterReviewerTree = fun reviewerId port -> deps.TreePorts.[reviewerId] <- port
+                          OnRunStarted = defaultArg deps.OnRunStarted (fun _ _ _ -> ())
                           RepoPath = defaultArg deps.WorkspaceDirectory "."
                           TargetBranch = "" },
                         SessionId.create sid

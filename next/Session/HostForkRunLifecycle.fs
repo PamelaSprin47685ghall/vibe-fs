@@ -133,6 +133,7 @@ module HostForkRunLifecycle =
         (sessions: ISessionHostPort)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> AgentRole -> string -> Task<Result<unit, string>>)
+        (onRunStarted: SessionId -> AgentRole -> unit)
         (agentId: string)
         (childId: SessionId)
         (role: AgentRole)
@@ -155,6 +156,7 @@ module HostForkRunLifecycle =
                 | Error err -> return Error err
             | None ->
                 let run = installRun gate pendingRuns sessions agentId childId
+                onRunStarted childId role
                 let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
 
                 match result with
@@ -182,7 +184,7 @@ module HostForkRunLifecycle =
     ///
     /// Timing adjudication: unlink is driven ONLY by the parent's Cancel (the sole
     /// teardown path — HostForkRuntime has no other Dispose hook). There is no
-    /// child-normal-close host event (host docs confirm no `session.deleted`), so
+    /// child-normal-close host event (host docs confirm no durable child-close event), so
     /// a child that completes normally intentionally KEEPS its link: the child
     /// stays addressable for Reuse/nudge.
     ///

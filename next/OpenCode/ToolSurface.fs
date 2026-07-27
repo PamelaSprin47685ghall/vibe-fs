@@ -33,6 +33,7 @@ module ToolSurface =
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
+        (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
@@ -51,7 +52,8 @@ module ToolSurface =
                   SessionParents = sessionParents
                   SessionRoles = sessionRoles
                   SessionDirectories = sessionDirectories
-                  TreePorts = worktreeTreePorts }
+                  TreePorts = worktreeTreePorts
+                  OnRunStarted = onRunStarted }
                 gate
                 orchestratorHosts
                 sid
@@ -94,7 +96,8 @@ module ToolSurface =
                                         (fun _ ->
                                             match sessionDirectories.TryGetValue sid with
                                             | true, path -> Some path
-                                            | false, _ -> None)
+                                            | false, _ -> None),
+                                    ?onRunStarted = onRunStarted
                                 )
 
                             runtimes.[sid] <- r
