@@ -12,9 +12,7 @@ module TerminalPolicies =
 
     let private sessionDead (journal: AgentJournal option) (sessionId: SessionId) =
         match journal with
-        | Some j ->
-            j.IsPoisoned
-            || DurableFallback.isDead sessionId (AgentJournal.snapshot j)
+        | Some j -> j.IsPoisoned || DurableFallback.isDead sessionId (AgentJournal.snapshot j)
         | None -> false
 
     let private roleName (role: AgentRole option) =
@@ -37,6 +35,7 @@ module TerminalPolicies =
         | None -> false
         | Some j ->
             let child = ChildId.create sessionKey
+
             (AgentJournal.snapshot j).AgentProjections.Sessions
             |> Map.exists (fun _ session ->
                 match session.Linkage with
@@ -68,6 +67,25 @@ module TerminalPolicies =
                     || not (List.isEmpty guard.RecentToolCallIds)
                 | _ -> false)
 
+    /// Reviewer gave a first PERFECT on the current tree but the confirmed
+    /// double-PERFECT barrier has not landed yet. Distinct from
+    /// `reviewerSubmittedVerdict` (which is only "has said anything at all") --
+    /// this specifically detects the "awaiting confirmation" state so the guard
+    /// can send the confirm-perfect nudge instead of silently going idle.
+    let private reviewerPendingConfirmation (journal: AgentJournal option) (reviewerKey: string) =
+        match journal with
+        | None -> false
+        | Some j ->
+            let snapshot = AgentJournal.snapshot j
+            let child = ChildId.create reviewerKey
+
+            snapshot.AgentProjections.Sessions
+            |> Map.exists (fun _ session ->
+                match session.Linkage, session.ReviewGuard with
+                | Some linkage, Some guard when Map.containsKey child linkage.LinkedChildren ->
+                    guard.ConsecutivePerfects = 1 && not guard.IsConfirmed
+                | _ -> false)
+
     let apply
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -90,15 +108,17 @@ module TerminalPolicies =
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
             sessionPort.AbortChildren turn.SessionId |> ignore
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason) |> ignore
-        | TurnFailed error ->
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+
+            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+            |> ignore
+        | TurnFailed error -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
         | TurnCompleted ->
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
             let output = textOutput turn
             recordOutput eventPort turn.SessionId output
+
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed turn.AssistantMessageId)
             |> ignore
 
@@ -111,6 +131,14 @@ module TerminalPolicies =
                     && not (reviewerSubmittedVerdict journal sessionKey)
                     ->
                     HostReviewGuard.nudgeReviewer
+                        sessionPort
+                        journal
+                        nudgeSent
+                        sessionKey
+                        (MessageId.value turn.AssistantMessageId)
+                        turn.Model
+                | Some AgentRole.Reviewer when reviewerPendingConfirmation journal sessionKey ->
+                    HostReviewGuard.confirmPerfect
                         sessionPort
                         journal
                         nudgeSent

@@ -218,5 +218,14 @@ module PublishChain =
 
                         match candidateResult with
                         | Error verdict -> return verdict
-                        | Ok() -> return! loop 0
+                        | Ok() ->
+                            let autoPublishDisabled =
+                                System.Environment.GetEnvironmentVariable("WANXIANGSHU_DISABLE_AUTO_PUBLISH") = "1"
+
+                            if autoPublishDisabled then
+                                let job = PublishStages.currentJob deps managerId worktreePath
+                                let candidateHash = PublishStages.candidateIdString job managerId
+                                return OrchestratorVerdict.Published(managerId, candidateHash)
+                            else
+                                return! loop 0
         }

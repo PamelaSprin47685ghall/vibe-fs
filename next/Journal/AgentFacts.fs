@@ -23,6 +23,7 @@ module AgentFacts =
           AcceptedGuardKey = None
           RecentToolCallIds = []
           RecentProviderRunIds = []
+          ConfirmationPromptMessageId = None
           CurrentBarrierKey = None }
 
     let emptyFallback: FallbackProjection =
@@ -137,11 +138,11 @@ module AgentFacts =
                                 { LastSuccessfulProjection = None
                                   LatestB = None
                                   ActivePrefixEpoch =
-                                      Some
-                                          { EpochId = p.EpochId
-                                            FrozenB = p.FrozenB
-                                            CutoffMessageIndex = p.CutoffMessageIndex
-                                            CoveredPrefixDigest = p.CoveredPrefixDigest }
+                                    Some
+                                        { EpochId = p.EpochId
+                                          FrozenB = p.FrozenB
+                                          CutoffMessageIndex = p.CutoffMessageIndex
+                                          CoveredPrefixDigest = p.CoveredPrefixDigest }
                                   ReplacementActive = true }
 
                         { s with Companion = Some comp })
@@ -176,7 +177,7 @@ module AgentFacts =
 
         | AgentFact.ReviewVerdictRecorded p -> AgentFactsReview.foldReviewVerdictRecorded proj p
 
-        | AgentFact.FallbackFailureRecorded p -> AgentFactsReview.foldFallbackFailureRecorded proj p
+        | AgentFact.FallbackFailureRecorded p -> AgentFactsFallback.foldFallbackFailureRecorded proj p
 
         | AgentFact.OrchestratorManagerJobCreated p ->
             AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch p.Prompt

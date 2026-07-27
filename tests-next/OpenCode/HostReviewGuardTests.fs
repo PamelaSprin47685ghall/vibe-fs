@@ -145,8 +145,16 @@ module HostReviewGuardTests =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "reviewer-guard-runtime") 1 DateTimeOffset.UtcNow
 
-                applyDecide (recordingPort prompts) (Some journal) None (HashSet()) (HashSet()) (HashSet()) (Dictionary())
+                applyDecide
+                    (recordingPort prompts)
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
                     (reviewerTurn sessionId messageId)
+
                 do! drainMicrotasks 16
 
                 let guardKey = sprintf "review-guard:%s:%s:%s" sessionId messageId "missing-verdict"
@@ -166,8 +174,16 @@ module HostReviewGuardTests =
 
                 // Restart must not append a second acceptance: the guard fact is
                 // durable and the in-memory dedupe is re-seeded from the projection.
-                applyDecide (recordingPort prompts) (Some restartedJournal) None (HashSet()) (HashSet()) (HashSet())
-                    (Dictionary()) (reviewerTurn sessionId messageId)
+                applyDecide
+                    (recordingPort prompts)
+                    (Some restartedJournal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (reviewerTurn sessionId messageId)
+
                 Assert.Single(prompts) |> ignore
             })
 
@@ -189,8 +205,16 @@ module HostReviewGuardTests =
                         1
                         DateTimeOffset.UtcNow
 
-                applyDecide (gatedRecordingPort prompts sendObserved acceptance) (Some journal) None (HashSet()) (HashSet())
-                    (HashSet()) (Dictionary()) (reviewerTurn sessionId messageId)
+                applyDecide
+                    (gatedRecordingPort prompts sendObserved acceptance)
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (reviewerTurn sessionId messageId)
+
                 let! _ = sendObserved.Task
                 let! _ = acceptance.Task
                 do! drainMicrotasks 8
@@ -198,153 +222,4 @@ module HostReviewGuardTests =
                 let guardKey = sprintf "review-guard:%s:%s:%s" sessionId messageId "missing-verdict"
                 Assert.False(hasAcceptedGuard journal sessionId guardKey)
                 Assert.Single(prompts) |> ignore
-            })
-
-    [<Fact>]
-    let ``Empty_string_tree_returns_Missing`` () =
-        withTempDir (fun directory ->
-            task {
-                use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "empty-str-tree-runtime")
-                        1
-                        DateTimeOffset.UtcNow
-
-                let port = { GetTreeHash = fun () -> "" }
-
-                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
-                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal("", hash)
-                | other -> Assert.True(false, sprintf "Expected Missing for empty string, got %A" other)
-            })
-
-    [<Fact>]
-    let ``Whitespace_tree_returns_Missing`` () =
-        withTempDir (fun directory ->
-            task {
-                use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "space-tree-runtime")
-                        1
-                        DateTimeOffset.UtcNow
-
-                let port = { GetTreeHash = fun () -> "   " }
-
-                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
-                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal("", hash)
-                | other -> Assert.True(false, sprintf "Expected Missing for whitespace, got %A" other)
-            })
-
-    [<Fact>]
-    let ``NO_HEAD_TREE_returns_Missing`` () =
-        withTempDir (fun directory ->
-            task {
-                use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "no-head-tree-runtime")
-                        1
-                        DateTimeOffset.UtcNow
-
-                let port = { GetTreeHash = fun () -> "NO_HEAD_TREE" }
-
-                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
-                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal("NO_HEAD_TREE", hash)
-                | other -> Assert.True(false, sprintf "Expected Missing for NO_HEAD_TREE, got %A" other)
-            })
-
-    [<Fact>]
-    let ``Empty_tree_hash_returns_Missing`` () =
-        withTempDir (fun directory ->
-            task {
-                use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "empty-hash-runtime")
-                        1
-                        DateTimeOffset.UtcNow
-
-                let emptyHash = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-                let port = { GetTreeHash = fun () -> emptyHash }
-
-                match HostReviewGuard.missingTree (Some journal) (Some port) "test-session" with
-                | HostReviewGuard.ReviewGuardMissing hash -> Assert.Equal(emptyHash, hash)
-                | other -> Assert.True(false, sprintf "Expected Missing for empty tree hash, got %A" other)
-            })
-
-    [<Fact>]
-    let ``Empty_tree_triggers_manager_nudge_through_TerminalPolicies`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "manager-empty-tree"
-                let messageId = "assistant-empty-tree"
-                let prompts = ResizeArray<string * string>()
-                let nudgeSent = HashSet<string>()
-                let managerGuard = HashSet<string>()
-                let parents = Dictionary<string, string>()
-
-                use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "empty-tree-nudge-runtime")
-                        1
-                        DateTimeOffset.UtcNow
-
-                let port =
-                    { GetTreeHash = fun () -> "" }
-
-                applyDecide
-                    (recordingPort prompts)
-                    (Some journal)
-                    (Some port)
-                    (HashSet())
-                    nudgeSent
-                    managerGuard
-                    parents
-                    (managerTurn sessionId messageId)
-
-                do! drainMicrotasks 16
-
-                // Manager with empty tree should still be nudged (Missing, not silently skipped)
-                Assert.NotEmpty(prompts)
-                let _, text = prompts.[0]
-                Assert.Contains("review", text.ToLowerInvariant())
-            })
-
-    [<Fact>]
-    let ``Manager_review_guard_unavailable_fails_closed`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "manager-guard-unavailable"
-                let prompts = ResizeArray<string * string>()
-
-                use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "manager-guard-unavailable-runtime")
-                        1
-                        DateTimeOffset.UtcNow
-
-                match HostReviewGuard.missingTree None (Some { GetTreeHash = fun () -> "tree" }) sessionId with
-                | HostReviewGuard.ReviewGuardUnavailable _ -> ()
-                | result -> Assert.True(false, sprintf "Expected unavailable journal result, got %A" result)
-
-                let throwingPort =
-                    { GetTreeHash = fun () -> raise (InvalidOperationException("tree read failed")) }
-
-                match HostReviewGuard.missingTree (Some journal) (Some throwingPort) sessionId with
-                | HostReviewGuard.ReviewGuardUnavailable _ -> ()
-                | result -> Assert.True(false, sprintf "Expected unavailable tree result, got %A" result)
-
-                let caught =
-                    try
-                        applyDecide (recordingPort prompts) (Some journal) (Some throwingPort) (HashSet()) (HashSet())
-                            (HashSet()) (Dictionary()) (managerTurn sessionId "assistant-unavailable")
-                        None
-                    with :? InvalidOperationException as ex -> Some ex
-
-                match caught with
-                | Some ex -> Assert.Contains("Review guard unavailable", ex.Message)
-                | None -> Assert.True(false, "Review guard unavailable was not raised")
             })

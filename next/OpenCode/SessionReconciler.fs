@@ -38,6 +38,7 @@ type SessionReconciler
 
     let findAssistantAfter (messages: SessionMessage list) (userMessageId: MessageId) =
         let userId = MessageId.value userMessageId
+
         let rec skipUntilUser remaining =
             match remaining with
             | [] -> None
@@ -46,14 +47,10 @@ type SessionReconciler
 
         match skipUntilUser messages with
         | None -> None
-        | Some afterUser ->
-            afterUser
-            |> List.tryFind (fun message -> message.Role = "assistant")
+        | Some afterUser -> afterUser |> List.tryFind (fun message -> message.Role = "assistant")
 
     let findLatestUser (messages: SessionMessage list) =
-        messages
-        |> List.rev
-        |> List.tryFind (fun message -> message.Role = "user")
+        messages |> List.rev |> List.tryFind (fun message -> message.Role = "user")
 
     let findLatestBoundTurn (messages: SessionMessage list) (binding: ActiveRunBinding) =
         let userMessageId =
@@ -152,58 +149,89 @@ type SessionReconciler
             let mutable cont = true
 
             while cont do
-                lock gate (fun () ->
-                    let state = stateOf key
-                    state.Dirty <- false)
+                let isCleared = lock gate (fun () -> not (states.ContainsKey key))
 
-                let binding = lock gate (fun () -> bindingOf sessionId)
+                if isCleared then
+                    cont <- false
+                else
+                    lock gate (fun () ->
+                        let state = stateOf key
+                        state.Dirty <- false)
 
-                let active =
-                    match binding with
-                    | Some value -> Some value
-                    | None ->
-                        Some
+                    let binding = lock gate (fun () -> bindingOf sessionId)
+
+                    let active =
+                        match binding with
+                        | Some value -> value
+                        | None ->
                             { SessionId = sessionId
                               UserMessageId = None
                               AgentRole = None
                               Directory = "" }
 
-                match active with
-                | None -> ()
-                | Some active ->
-                    let! snapshotResult = snapshot.GetMessages sessionId
+                    let mutable turnFound: ReconciledTurn option = None
+                    let mutable attempt = 0
 
-                    match snapshotResult with
-                    | Error _ -> ()
-                    | Ok messages ->
-                        match findLatestBoundTurn messages active with
-                        | None -> ()
-                        | Some turn when turn.Outcome = TurnUnknown -> ()
-                        | Some turn ->
-                            let publish =
-                                lock gate (fun () ->
-                                    if alreadyConsumed turn then
-                                        false
-                                    else
-                                        markConsumed turn
-                                        true)
+                    // Bounded causal reread (SSOT: "只要 API snapshot version 有因果
+                    // 进展即可继续"). Each snapshot.GetMessages call is itself the
+                    // real async wait (a genuine host/network round trip in
+                    // production); no artificial pause is inserted between
+                    // attempts -- a fixed wall-clock wait would be a
+                    // time-dependent anti-pattern this codebase forbids
+                    // elsewhere (see testkit/opencode/stability-checker.js) and
+                    // would make the retry loop untestable without real delays.
+                    while attempt < 3 && turnFound.IsNone do
+                        let cleared = lock gate (fun () -> not (states.ContainsKey key))
 
-                            if publish then
-                                onTurn turn
-
-                cont <-
-                    lock gate (fun () ->
-                        let state = stateOf key
-
-                        if state.Dirty then
-                            true
+                        if cleared then
+                            attempt <- 3
                         else
-                            state.Running <- false
-                            false)
+                            attempt <- attempt + 1
+                            let! snapshotResult = snapshot.GetMessages sessionId
+
+                            match snapshotResult with
+                            | Error _ -> ()
+                            | Ok messages ->
+                                match findLatestBoundTurn messages active with
+                                | Some turn when turn.Outcome <> TurnUnknown -> turnFound <- Some turn
+                                | _ -> ()
+
+                    match turnFound with
+                    | Some turn ->
+                        let publish =
+                            lock gate (fun () ->
+                                if alreadyConsumed turn then
+                                    false
+                                else
+                                    markConsumed turn
+                                    true)
+
+                        if publish then
+                            onTurn turn
+
+                        lock gate (fun () ->
+                            let state = stateOf key
+                            state.Dirty <- false)
+
+                    | None ->
+                        lock gate (fun () ->
+                            let state = stateOf key
+                            state.Dirty <- true)
+
+                    cont <-
+                        lock gate (fun () ->
+                            match states.TryGetValue key with
+                            | false, _ -> false
+                            | true, state ->
+                                if state.Dirty && turnFound.IsSome then
+                                    true
+                                else
+                                    state.Running <- false
+                                    false)
         }
 
     member this.HandleSignal(signal: HostSignal) =
         match signal with
         | SessionIdle sessionId -> this.MarkDirty sessionId
         | SessionDeleted sessionId -> this.ClearSession sessionId
-                | ProviderRetry _ -> ()
+        | ProviderRetry _ -> ()

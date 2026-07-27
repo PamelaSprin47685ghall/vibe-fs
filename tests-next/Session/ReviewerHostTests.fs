@@ -35,28 +35,39 @@ module ReviewerHostTests =
 
                 expect
                     ReviewFinishResult.NeedsReview
-                    (host.RecordVerdict("call-1", "tree-a", ReviewGuardVerdict.Perfect))
+                    (host.RecordVerdict("call-1", "tree-a", ReviewGuardVerdict.Perfect, "run-1"))
 
                 expect
                     ReviewFinishResult.NeedsReview
-                    (host.RecordVerdict("call-1", "tree-a", ReviewGuardVerdict.Perfect))
+                    (host.RecordVerdict("call-1", "tree-a", ReviewGuardVerdict.Perfect, "run-1"))
+
+                // ReviewGuard's confirm-perfect nudge after the first PERFECT is the
+                // only source of a valid confirmation message id; without it the
+                // second PERFECT must not confirm (fail-closed, KISS-N07).
+                let confirmFact =
+                    AgentFact.GuardPromptAccepted
+                        {| TargetSessionId = manager
+                           GuardKey = "confirm-perfect:tree-a"
+                           HostMessageId = "confirm-a" |}
+
+                let _ = AgentJournal.appendAgent (StreamId.Session manager) None confirmFact journal
 
                 expect
                     ReviewFinishResult.Confirmed
-                    (host.RecordVerdict("call-2", "tree-a", ReviewGuardVerdict.Perfect))
+                    (host.RecordVerdict("call-2", "tree-a", ReviewGuardVerdict.Perfect, "run-2", "confirm-a"))
 
                 expect
                     ReviewFinishResult.NeedsReview
-                    (host.RecordVerdict("call-3", "tree-b", ReviewGuardVerdict.Perfect))
+                    (host.RecordVerdict("call-3", "tree-b", ReviewGuardVerdict.Perfect, "run-3"))
 
                 expect
                     ReviewFinishResult.NeedsReview
-                    (host.RecordVerdict("call-4", "tree-b", ReviewGuardVerdict.Revise))
+                    (host.RecordVerdict("call-4", "tree-b", ReviewGuardVerdict.Revise, "run-4"))
 
                 // A replay of an earlier tool call must remain a no-op even after newer verdicts.
                 expect
                     ReviewFinishResult.NeedsReview
-                    (host.RecordVerdict("call-1", "tree-b", ReviewGuardVerdict.Perfect))
+                    (host.RecordVerdict("call-1", "tree-b", ReviewGuardVerdict.Perfect, "run-5"))
             })
 
     [<Fact>]
@@ -114,7 +125,21 @@ module ReviewerHostTests =
 
                 treeHash <- "tree-a"
 
-                Assert.Equal(Ok ReviewFinishResult.Confirmed, host.SubmitVerdict("call-2", ReviewGuardVerdict.Perfect))
+                // ReviewGuard's confirm-perfect nudge is the only source of a valid
+                // confirmation message id; without it, "call-2" would not confirm.
+                let confirmFact =
+                    AgentFact.GuardPromptAccepted
+                        {| TargetSessionId = manager
+                           GuardKey = "confirm-perfect:tree-a"
+                           HostMessageId = "confirm-a" |}
+
+                let _ = AgentJournal.appendAgent (StreamId.Session manager) None confirmFact journal
+
+                Assert.Equal(
+                    Ok ReviewFinishResult.Confirmed,
+                    host.SubmitVerdict("call-2", ReviewGuardVerdict.Perfect, rootUserMessageId = "confirm-a")
+                )
+
                 Assert.Equal(ReviewFinishResult.Confirmed, host.TryFinish())
 
                 treeHash <- "tree-b"

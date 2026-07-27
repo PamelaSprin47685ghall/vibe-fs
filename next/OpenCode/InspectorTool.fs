@@ -17,6 +17,17 @@ module InspectorTool =
     let private stringify (value: obj) : string =
         if isNull value then "null" else JS.JSON.stringify value
 
+    [<Emit("""
+        (ctx, callback) => {
+          const signal = ctx && (ctx.abort || ctx.abortSignal || ctx.signal);
+          if (!signal || typeof signal.addEventListener !== "function") return () => {};
+          if (signal.aborted) callback();
+          else signal.addEventListener("abort", callback, { once: true });
+          return () => signal.removeEventListener("abort", callback);
+        }
+    """)>]
+    let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) = jsNative
+
     let private readPrompt (args: obj) : string =
         if isNull args then
             ""
@@ -25,6 +36,7 @@ module InspectorTool =
         elif not (isNull args?prompts) then
             try
                 let arr = unbox<obj array> args?prompts
+
                 arr
                 |> Array.choose (fun item -> if isNull item then None else Some(string item))
                 |> String.concat "\n"
@@ -37,6 +49,8 @@ module InspectorTool =
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
         (backgroundBFor: (string -> string option) option)
+        (directoryFor: (string -> string option) option)
+        (registerChildDirectory: (string -> string -> unit) option)
         : obj =
         let factory = toolModule?tool
         let backgroundOf = defaultArg backgroundBFor (fun _ -> None)
@@ -59,13 +73,15 @@ module InspectorTool =
                     else
                         let parentSid = SessionId.create parentId
 
+                        let parentDir =
+                            match directoryFor with
+                            | Some fn -> fn parentId
+                            | None -> None
+
                         let fullPrompt =
                             match backgroundOf parentId with
                             | Some b when not (String.IsNullOrWhiteSpace b) ->
-                                sprintf
-                                    "Parent work record B (background only):\n%s\n\nInspector request:\n%s"
-                                    b
-                                    prompt
+                                sprintf "Parent work record B (background only):\n%s\n\nInspector request:\n%s" b prompt
                             | _ -> prompt
 
                         let! created =
@@ -73,19 +89,27 @@ module InspectorTool =
                                 parentSid,
                                 { Title = Some "inspector"
                                   Agent = Some "inspector"
-                                  Directory = None }
+                                  Directory = parentDir }
                             )
 
                         match created with
                         | Error err -> return box (stringify (createObj [ "error", box err ]))
                         | Ok childId ->
+                            match parentDir, registerChildDirectory with
+                            | Some dir, Some reg -> reg (SessionId.value childId) dir
+                            | _ -> ()
+
                             let tcs = TaskCompletionSource<string>()
                             let mutable sub: IDisposable option = None
 
                             let finish (text: string) =
                                 match sub with
                                 | Some d ->
-                                    try d.Dispose() with _ -> ()
+                                    try
+                                        d.Dispose()
+                                    with _ ->
+                                        ()
+
                                     sub <- None
                                 | None -> ()
 
@@ -106,10 +130,8 @@ module InspectorTool =
                                                     |> String.concat "\n"
 
                                                 finish output
-                                            | TerminalOutcome.Aborted reason ->
-                                                finish (sprintf "aborted: %s" reason)
-                                            | TerminalOutcome.Failed error ->
-                                                finish (sprintf "failed: %s" error)
+                                            | TerminalOutcome.Aborted reason -> finish (sprintf "aborted: %s" reason)
+                                            | TerminalOutcome.Failed error -> finish (sprintf "failed: %s" error)
                                     )
                                 )
 
@@ -119,40 +141,43 @@ module InspectorTool =
                                     fullPrompt,
                                     { Model = None
                                       Agent = Some "inspector"
-                                      Directory = None }
+                                      Directory = parentDir }
                                 )
 
                             match sent with
                             | Error err -> finish (sprintf "send failed: %s" err)
                             | Ok _ -> ()
 
-                            let! resultText = tcs.Task
+                            // Parent cancel must propagate into the Inspector wait
+                            // (KISS-N04: "Coder cancel must await Inspector abort").
+                            // Detached below so the listener never outlives this call.
+                            let detachAbort = attachAbort ctx (fun () -> finish "aborted: parent cancelled")
 
                             try
-                                let! _ = sessionPort.AbortSession childId
-                                ()
-                            with _ ->
-                                ()
+                                let! resultText = tcs.Task
 
-                            return
-                                box (
-                                    stringify (
-                                        createObj
-                                            [ "inspectorId", box (SessionId.value childId)
-                                              "output", box resultText ]
+                                return
+                                    box (
+                                        stringify (
+                                            createObj
+                                                [ "inspectorId", box (SessionId.value childId)
+                                                  "output", box resultText ]
+                                        )
                                     )
-                                )
+                            finally
+                                detachAbort ()
+
+                                try
+                                    let! _ = sessionPort.AbortSession childId
+                                    ()
+                                with _ ->
+                                    ()
             }
 
         let argsObj =
             createObj
                 [ "prompt", box (createObj [ "type", box "string" ])
-                  "prompts",
-                  box (
-                      createObj
-                          [ "type", box "array"
-                            "items", box (createObj [ "type", box "string" ]) ]
-                  ) ]
+                  "prompts", box (createObj [ "type", box "array"; "items", box (createObj [ "type", box "string" ]) ]) ]
 
         applyTool
             factory

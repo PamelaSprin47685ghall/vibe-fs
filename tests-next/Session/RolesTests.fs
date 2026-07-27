@@ -67,7 +67,7 @@ module RolesTests =
                   ToolPermission.Grep
                   ToolPermission.Network ]
 
-        Assert.equal<ToolPermission Set>(allowed, Roles.permissions Role.Browser)
+        Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Browser)
         Assert.True(Roles.isAllowed Role.Browser ToolPermission.Read)
         Assert.True(Roles.isAllowed Role.Browser ToolPermission.Glob)
         Assert.True(Roles.isAllowed Role.Browser ToolPermission.Grep)

@@ -34,7 +34,9 @@ module HostReviewGuard =
                     ReviewGuardMissing treeHash
                 else
                     let snapshot = AgentJournal.snapshot journal
-                    let sessionOpt = Map.tryFind (SessionId.create sessionId) snapshot.AgentProjections.Sessions
+
+                    let sessionOpt =
+                        Map.tryFind (SessionId.create sessionId) snapshot.AgentProjections.Sessions
 
                     match sessionOpt with
                     | None -> ReviewGuardMissing treeHash
@@ -147,5 +149,31 @@ module HostReviewGuard =
             messageId
             "missing-verdict"
             "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
+            "reviewer"
+            model
+
+    /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07:
+    /// "PERFECT requires confirmation"). This is the ONLY code path that produces
+    /// a ConfirmationPromptMessageId; the resulting HostMessageId becomes the
+    /// causal proof the second PERFECT's root user message must match. Without
+    /// this nudge, two independent PERFECT calls could never be distinguished
+    /// from a genuine confirmed round-trip -- fail-closed confirmation requires
+    /// this to actually fire.
+    let confirmPerfect
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (nudgeKeys: HashSet<string>)
+        sessionId
+        messageId
+        (model: OpencodeModel option)
+        =
+        sendGuardNudge
+            sessionPort
+            journal
+            nudgeKeys
+            sessionId
+            messageId
+            "confirm-perfect"
+            "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
             "reviewer"
             model

@@ -62,13 +62,18 @@ module ModelResolver =
         | _ -> None
 
     let resolve (config: ModelConfig) (fallback: FallbackProjection option) : OpencodeModel option =
-        match fallback with
-        | None -> Some config.SideA
-        | Some fb when fb.IsDead -> None
-        | Some fb ->
-            match fb.Side with
-            | SideA -> Some config.SideA
-            | SideB -> Some config.SideB
+        let autoFallbackDisabled = envVar "WANXIANGSHU_DISABLE_AUTO_FALLBACK" = Some "1"
+
+        if autoFallbackDisabled then
+            Some config.SideA
+        else
+            match fallback with
+            | None -> Some config.SideA
+            | Some fb when fb.IsDead -> None
+            | Some fb ->
+                match fb.Side with
+                | SideA -> Some config.SideA
+                | SideB -> Some config.SideB
 
     let resolveForSession
         (config: ModelConfig)

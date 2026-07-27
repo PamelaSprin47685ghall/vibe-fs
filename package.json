@@ -35,7 +35,7 @@
     "test:full": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs && npm run test:e2e:p0:three"
   },
   "dependencies": {
-    "@fable-org/fable-library-js": "^2.4.0",
+    "@fable-org/fable-library-js": "^2.5.1",
     "@modelcontextprotocol/sdk": "^1.10.2",
     "@opencode-ai/plugin": "^1.17.4",
     "bun-pty": "^0.4.8",

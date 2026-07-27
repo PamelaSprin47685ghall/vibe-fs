@@ -60,6 +60,7 @@ module ExecutorTool =
         (runtimeFor: obj -> Result<HostForkRuntime, string>)
         (executorRuntimeFor: obj -> HostForkRuntime)
         (workspaceDirectory: string option)
+        (directoryFor: (string -> string option) option)
         : obj =
         let factory = toolModule?tool
 
@@ -68,6 +69,20 @@ module ExecutorTool =
                 match runtimeFor context with
                 | Error error -> return box (stringify (createObj [ "error", box error ]))
                 | Ok runtime ->
+                    let sid =
+                        if isNull context || isNull context?sessionID then
+                            ""
+                        else
+                            unbox<string> context?sessionID
+
+                    let targetDir =
+                        if not (String.IsNullOrWhiteSpace sid) then
+                            match directoryFor with
+                            | Some dirFn -> dirFn sid |> Option.orElse workspaceDirectory
+                            | None -> workspaceDirectory
+                        else
+                            workspaceDirectory
+
                     let commandText = textArg args "command"
 
                     if String.IsNullOrWhiteSpace commandText then
@@ -81,7 +96,7 @@ module ExecutorTool =
                         let command =
                             { FileName = "sh"
                               Arguments = [ "-lc"; commandText ]
-                              WorkingDirectory = workspaceDirectory
+                              WorkingDirectory = targetDir
                               Environment = None
                               Stdin = None
                               Deadline = None
@@ -91,7 +106,7 @@ module ExecutorTool =
                         let detachAbort = attachAbort context (fun () -> cancellation.Cancel())
 
                         let procCtx: ProcessContext =
-                            { WorkingDirectory = workspaceDirectory
+                            { WorkingDirectory = targetDir
                               DefaultTimeout = None }
 
                         let! result =

@@ -54,6 +54,7 @@ module internal AgentFactsReview =
                                 IsConfirmed = false
                                 RecentToolCallIds = []
                                 RecentProviderRunIds = []
+                                ConfirmationPromptMessageId = None
                                 CurrentBarrierKey = Some p.BarrierKey }
                         | None ->
                             { LastGitTreeHash = None
@@ -62,6 +63,7 @@ module internal AgentFactsReview =
                               AcceptedGuardKey = None
                               RecentToolCallIds = []
                               RecentProviderRunIds = []
+                              ConfirmationPromptMessageId = None
                               CurrentBarrierKey = Some p.BarrierKey }
 
                     { s with ReviewGuard = Some rg })
@@ -93,8 +95,7 @@ module internal AgentFactsReview =
                             let recentToolCallIds =
                                 appendRecentToolCallId existing.RecentToolCallIds p.ToolCallId
 
-                            let providerRunUsed =
-                                List.contains p.ProviderRunId existing.RecentProviderRunIds
+                            let providerRunUsed = List.contains p.ProviderRunId existing.RecentProviderRunIds
 
                             let recentProviderRunIds =
                                 if not providerRunUsed then
@@ -102,36 +103,40 @@ module internal AgentFactsReview =
                                 else
                                     existing.RecentProviderRunIds
 
+                            let hasValidProviderRunId = not (System.String.IsNullOrWhiteSpace p.ProviderRunId)
+
+                            // Fail-closed causal proof: the second PERFECT's root user
+                            // message must equal the confirmation prompt ReviewGuard sent
+                            // after the first PERFECT (KISS-N07 normative). A missing
+                            // ConfirmationPromptMessageId means no confirmation nudge has
+                            // landed yet (e.g. host send still in flight, or the nudge was
+                            // never wired for this session) -- that must NOT auto-pass, or
+                            // any two independent PERFECT calls on an unchanged tree would
+                            // confirm without proof of a real confirmation round-trip.
+                            let secondPerfectConfirmed =
+                                hasValidProviderRunId
+                                && not providerRunUsed
+                                && match p.RootUserMessageId, existing.ConfirmationPromptMessageId with
+                                   | Some rootId, Some confirmId -> rootId = confirmId
+                                   | _ -> false
+
                             match existing.LastGitTreeHash with
                             | Some lastHash when lastHash = hash ->
                                 match p.Verdict with
-                                | ReviewGuardVerdict.Perfect when not providerRunUsed ->
-                                    // Distinct ProviderRunId (above) + distinct ToolCallId is the
-                                    // dual-confirmation gate. RootUserMessageId is recorded for
-                                    // audit when the host exposes it; confirmation prompts often
-                                    // continue the same root user turn, so presence is not required.
-                                    let count = existing.ConsecutivePerfects + 1
-
-                                    { existing with
-                                        LastGitTreeHash = Some hash
-                                        ConsecutivePerfects = count
-                                        IsConfirmed = count >= 2
-                                        RecentToolCallIds = recentToolCallIds
-                                        RecentProviderRunIds = recentProviderRunIds }
-                                | ReviewGuardVerdict.Perfect ->
-                                    { existing with
-                                        LastGitTreeHash = Some hash
-                                        RecentToolCallIds = recentToolCallIds
-                                        RecentProviderRunIds = recentProviderRunIds }
-                                | ReviewGuardVerdict.Revise ->
-                                    { existing with
-                                        LastGitTreeHash = Some hash
-                                        ConsecutivePerfects = 0
-                                        IsConfirmed = false
-                                        RecentToolCallIds = recentToolCallIds
-                                        RecentProviderRunIds = recentProviderRunIds }
-                            | _ ->
-                                match p.Verdict with
+                                | ReviewGuardVerdict.Perfect when existing.ConsecutivePerfects >= 1 ->
+                                    if secondPerfectConfirmed then
+                                        { existing with
+                                            LastGitTreeHash = Some hash
+                                            ConsecutivePerfects = 2
+                                            IsConfirmed = true
+                                            RecentToolCallIds = recentToolCallIds
+                                            RecentProviderRunIds = recentProviderRunIds }
+                                    else
+                                        { existing with
+                                            LastGitTreeHash = Some hash
+                                            IsConfirmed = false
+                                            RecentToolCallIds = recentToolCallIds
+                                            RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Perfect when not providerRunUsed ->
                                     { existing with
                                         LastGitTreeHash = Some hash
@@ -149,6 +154,33 @@ module internal AgentFactsReview =
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
+                                        ConfirmationPromptMessageId = None
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
+                            | _ ->
+                                match p.Verdict with
+                                | ReviewGuardVerdict.Perfect when not providerRunUsed ->
+                                    { existing with
+                                        LastGitTreeHash = Some hash
+                                        ConsecutivePerfects = 1
+                                        IsConfirmed = false
+                                        // Tree changed: any confirmation prompt issued for the
+                                        // previous tree is stale and must not be reused to
+                                        // confirm a PERFECT on this new tree.
+                                        ConfirmationPromptMessageId = None
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
+                                | ReviewGuardVerdict.Perfect ->
+                                    { existing with
+                                        LastGitTreeHash = Some hash
+                                        RecentToolCallIds = recentToolCallIds
+                                        RecentProviderRunIds = recentProviderRunIds }
+                                | ReviewGuardVerdict.Revise ->
+                                    { existing with
+                                        LastGitTreeHash = Some hash
+                                        ConsecutivePerfects = 0
+                                        IsConfirmed = false
+                                        ConfirmationPromptMessageId = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                         | None ->
@@ -160,6 +192,7 @@ module internal AgentFactsReview =
                                   AcceptedGuardKey = None
                                   RecentToolCallIds = [ p.ToolCallId ]
                                   RecentProviderRunIds = [ p.ProviderRunId ]
+                                  ConfirmationPromptMessageId = None
                                   CurrentBarrierKey = None }
                             | ReviewGuardVerdict.Revise ->
                                 { LastGitTreeHash = Some hash
@@ -168,6 +201,7 @@ module internal AgentFactsReview =
                                   AcceptedGuardKey = None
                                   RecentToolCallIds = [ p.ToolCallId ]
                                   RecentProviderRunIds = [ p.ProviderRunId ]
+                                  ConfirmationPromptMessageId = None
                                   CurrentBarrierKey = None }
 
                     { s with ReviewGuard = Some rg })
@@ -190,7 +224,8 @@ module internal AgentFactsReview =
                         match s.ReviewGuard with
                         | Some existing ->
                             { existing with
-                                AcceptedGuardKey = Some p.GuardKey }
+                                AcceptedGuardKey = Some p.GuardKey
+                                ConfirmationPromptMessageId = Some p.HostMessageId }
                         | None ->
                             { LastGitTreeHash = None
                               ConsecutivePerfects = 0
@@ -198,87 +233,10 @@ module internal AgentFactsReview =
                               AcceptedGuardKey = Some p.GuardKey
                               RecentToolCallIds = []
                               RecentProviderRunIds = []
+                              ConfirmationPromptMessageId = Some p.HostMessageId
                               CurrentBarrierKey = None }
 
                     { s with ReviewGuard = Some rg })
-                proj.Sessions
-
-        { proj with Sessions = sessions }
-
-    let private failureIdentity (assistantMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s" assistantMessageId providerAttempt
-
-    let private rememberFailureId (ids: string list) (identity: string) =
-        let next = identity :: (ids |> List.filter ((<>) identity))
-        // Bounded projection: keep only the most recent identities. 4 covers
-        // the full A/A/B/B sequence (the Dead threshold is 4 failures), so a
-        // dead session's identities are retained for cross-restart dedup while
-        // live sessions never grow unbounded.
-        next |> List.truncate 4
-
-    let foldFallbackFailureRecorded
-        (proj: AgentProjectionSet)
-        (p:
-            {| SessionId: SessionId
-               Reason: string
-               AssistantMessageId: string
-               ProviderAttempt: string |})
-        : AgentProjectionSet =
-        let identity = failureIdentity p.AssistantMessageId p.ProviderAttempt
-
-        let sessions =
-            updateSession
-                p.SessionId
-                (fun s ->
-                    let fb =
-                        match s.Fallback with
-                        | Some existing when List.contains identity existing.RecentFailureIds -> existing
-                        | Some existing when existing.IsDead ->
-                            // Defense-in-depth: the append boundary already refuses
-                            // new FallbackFailureRecorded facts for dead sessions.
-                            // If a fact still reaches the fold (e.g. replayed from
-                            // a prior journal), return the existing projection
-                            // unchanged — a dead session never accumulates more.
-                            existing
-                        | Some existing ->
-                            let newTotal = existing.TotalFailures + 1
-                            let ids = rememberFailureId existing.RecentFailureIds identity
-
-                            match existing.Side with
-                            | SideA ->
-                                if existing.FailuresOnCurrentSide < 1 then
-                                    { Side = SideA
-                                      FailuresOnCurrentSide = existing.FailuresOnCurrentSide + 1
-                                      TotalFailures = newTotal
-                                      IsDead = false
-                                      RecentFailureIds = ids }
-                                else
-                                    { Side = SideB
-                                      FailuresOnCurrentSide = 0
-                                      TotalFailures = newTotal
-                                      IsDead = false
-                                      RecentFailureIds = ids }
-                            | SideB ->
-                                if existing.FailuresOnCurrentSide < 1 then
-                                    { Side = SideB
-                                      FailuresOnCurrentSide = existing.FailuresOnCurrentSide + 1
-                                      TotalFailures = newTotal
-                                      IsDead = false
-                                      RecentFailureIds = ids }
-                                else
-                                    { Side = SideB
-                                      FailuresOnCurrentSide = 2
-                                      TotalFailures = newTotal
-                                      IsDead = true
-                                      RecentFailureIds = ids }
-                        | None ->
-                            { Side = SideA
-                              FailuresOnCurrentSide = 1
-                              TotalFailures = 1
-                              IsDead = false
-                              RecentFailureIds = [ identity ] }
-
-                    { s with Fallback = Some fb })
                 proj.Sessions
 
         { proj with Sessions = sessions }

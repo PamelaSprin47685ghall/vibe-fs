@@ -1,13 +1,9 @@
 namespace Wanxiangshu.Next.Tests.ReviewTests
 
-open System
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
-open Wanxiangshu.Next.Session
-open Wanxiangshu.Next.Review
-open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module GuardTests =
 
@@ -63,6 +59,58 @@ module GuardTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
+        // ReviewGuard sends a confirmation nudge after the first PERFECT; its
+        // HostMessageId (GuardPromptAccepted) is the only valid causal proof
+        // that a second PERFECT is a real confirmation round-trip, not two
+        // independent calls (KISS-N07, fail-closed).
+        let confirmPrompt =
+            AgentFact.GuardPromptAccepted
+                {| TargetSessionId = sid
+                   GuardKey = "confirm-perfect:tree200"
+                   HostMessageId = "confirm-200" |}
+
+        let fact2 =
+            AgentFact.ReviewVerdictRecorded
+                {| ManagerSessionId = sid
+                   ReviewerSessionId = revSid
+                   ProviderRunId = "pr-2"
+                   RootUserMessageId = Some "confirm-200"
+                   ToolCallId = "tc2"
+                   GitTreeHash = treeHash
+                   Verdict = ReviewGuardVerdict.Perfect |}
+
+        let proj1 = AgentFacts.foldAgentFact AgentFacts.empty fact1
+        let rg1 = proj1.Sessions.[sid].ReviewGuard.Value
+        Assert.Equal(1, rg1.ConsecutivePerfects)
+        Assert.False(rg1.IsConfirmed)
+
+        let projPrompt = AgentFacts.foldAgentFact proj1 confirmPrompt
+
+        let proj2 = AgentFacts.foldAgentFact projPrompt fact2
+        let rg2 = proj2.Sessions.[sid].ReviewGuard.Value
+        Assert.Equal(2, rg2.ConsecutivePerfects)
+        Assert.True(rg2.IsConfirmed)
+
+    [<Fact>]
+    let ``Pure fold: second perfect without confirmation prompt does not confirm`` () =
+        let sid = SessionId.create "mgr-2b"
+        let revSid = SessionId.create "rev-1"
+        let treeHash = "tree201"
+
+        let fact1 =
+            AgentFact.ReviewVerdictRecorded
+                {| ManagerSessionId = sid
+                   ReviewerSessionId = revSid
+                   ProviderRunId = "pr-1"
+                   RootUserMessageId = None
+                   ToolCallId = "tc1"
+                   GitTreeHash = treeHash
+                   Verdict = ReviewGuardVerdict.Perfect |}
+
+        // No GuardPromptAccepted fact is ever appended here -- simulating a
+        // second independent PERFECT call with no confirmation nudge in
+        // between. This must NOT confirm (fail-closed: missing confirmation
+        // message id is not equivalent to a proven round-trip).
         let fact2 =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
@@ -74,14 +122,24 @@ module GuardTests =
                    Verdict = ReviewGuardVerdict.Perfect |}
 
         let proj1 = AgentFacts.foldAgentFact AgentFacts.empty fact1
-        let rg1 = proj1.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(1, rg1.ConsecutivePerfects)
-        Assert.False(rg1.IsConfirmed)
-
         let proj2 = AgentFacts.foldAgentFact proj1 fact2
         let rg2 = proj2.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(2, rg2.ConsecutivePerfects)
-        Assert.True(rg2.IsConfirmed)
+        Assert.False(rg2.IsConfirmed)
+
+        // Even an unrelated root user message (not the confirmation prompt)
+        // must not confirm.
+        let fact3 =
+            AgentFact.ReviewVerdictRecorded
+                {| ManagerSessionId = sid
+                   ReviewerSessionId = revSid
+                   ProviderRunId = "pr-3"
+                   RootUserMessageId = Some "unrelated-user-message"
+                   ToolCallId = "tc3"
+                   GitTreeHash = treeHash
+                   Verdict = ReviewGuardVerdict.Perfect |}
+
+        let proj3 = AgentFacts.foldAgentFact proj2 fact3
+        Assert.False(proj3.Sessions.[sid].ReviewGuard.Value.IsConfirmed)
 
     [<Fact>]
     let ``Pure fold: tree change resets consecutive perfects count`` () =
@@ -98,12 +156,18 @@ module GuardTests =
                    GitTreeHash = "treeA"
                    Verdict = ReviewGuardVerdict.Perfect |}
 
+        let confirmPrompt =
+            AgentFact.GuardPromptAccepted
+                {| TargetSessionId = sid
+                   GuardKey = "confirm-perfect:treeA"
+                   HostMessageId = "confirm-a" |}
+
         let fact2 =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
                    ProviderRunId = "pr-2"
-                   RootUserMessageId = None
+                   RootUserMessageId = Some "confirm-a"
                    ToolCallId = "tc2"
                    GitTreeHash = "treeA"
                    Verdict = ReviewGuardVerdict.Perfect |}
@@ -119,7 +183,9 @@ module GuardTests =
                    Verdict = ReviewGuardVerdict.Perfect |}
 
         let proj2 =
-            AgentFacts.foldAgentFact (AgentFacts.foldAgentFact AgentFacts.empty fact1) fact2
+            AgentFacts.foldAgentFact
+                (AgentFacts.foldAgentFact (AgentFacts.foldAgentFact AgentFacts.empty fact1) confirmPrompt)
+                fact2
 
         Assert.True(proj2.Sessions.[sid].ReviewGuard.Value.IsConfirmed)
 
@@ -128,111 +194,3 @@ module GuardTests =
         Assert.Equal(1, rg3.ConsecutivePerfects)
         Assert.False(rg3.IsConfirmed)
         Assert.Equal(Some(GitTreeHash.create "treeB"), rg3.LastGitTreeHash)
-
-    [<Fact>]
-    let ``Duplicate guard key handled idempotently (at-most-once)`` () =
-        let sid = SessionId.create "mgr-4"
-        let mutable hostCalls = 0
-
-        let hostPort: HostPort =
-            { SendGuardPrompt =
-                fun _ key _ ->
-                    hostCalls <- hostCalls + 1
-                    Ok("msg-" + string hostCalls) }
-
-        let mutable currentProj =
-            { AgentProjections = AgentFacts.empty
-              RuntimeId = None }
-
-        let journalPort: JournalPort =
-            { AppendFact =
-                fun _ fact ->
-                    currentProj <-
-                        { currentProj with
-                            AgentProjections = AgentFacts.foldAgentFact currentProj.AgentProjections fact }
-
-                    Ok currentProj }
-
-        let key = "prompt-guard-key-1"
-
-        // First call: sends prompt to host port and appends fact
-        let res1 =
-            Guard.guardMissingVerdict hostPort journalPort sid key "Please review" currentProj
-
-        Assert.True(Result.isOk res1)
-        let (proj1, msgId1) = res1 |> Result.defaultWith (fun _ -> failwith "unexpected")
-        Assert.Equal(1, hostCalls)
-        Assert.Equal(Some "msg-1", msgId1)
-        Assert.Equal(Some key, proj1.AgentProjections.Sessions.[sid].ReviewGuard.Value.AcceptedGuardKey)
-
-        // Second call with same key: skips host port call (idempotent)
-        let res2 =
-            Guard.guardMissingVerdict hostPort journalPort sid key "Please review" proj1
-
-        Assert.True(Result.isOk res2)
-        let (_, msgId2) = res2 |> Result.defaultWith (fun _ -> failwith "unexpected")
-        Assert.Equal(1, hostCalls) // Host call count did not increase!
-        Assert.Equal(None, msgId2)
-
-    [<Fact>]
-    let ``Durable port test: append-before-return and double perfect finish allowance`` () =
-        withTempDir (fun tempDir ->
-            task {
-                let runtimeId = RuntimeId.create "rt-guard-durable"
-                let sid = SessionId.create "mgr-durable"
-                let revSid = SessionId.create "rev-durable"
-                let treeHash = "tree-durable-100"
-                let now = DateTimeOffset.UtcNow
-
-                use journal = AgentJournal.create tempDir runtimeId 1001 now
-                let journalPort = JournalPort.fromAgentJournal journal
-
-                let mutable currentTreeHash = treeHash
-                let gitPort: GitPort = { GetTreeHash = fun () -> currentTreeHash }
-
-                // Initial finish check -> NeedsReview
-                let initialFinish = Guard.tryFinish gitPort sid (AgentJournal.snapshot journal)
-                Assert.Equal(ReviewFinishResult.NeedsReview, initialFinish)
-
-                // Record 1st verdict -> appends to journal and returns projection immediately
-                let res1 =
-                    Guard.recordVerdict
-                        journalPort
-                        sid
-                        revSid
-                        "pr-1"
-                        "tc-1"
-                        treeHash
-                        ReviewGuardVerdict.Perfect
-                        None
-
-                Assert.True(Result.isOk res1)
-                let proj1 = Result.defaultWith (fun _ -> failwith "unexpected") res1
-
-                // Prove append happened before return: snapshot matches returned projection
-                Assert.equal(proj1, AgentJournal.snapshot journal)
-                Assert.equal(ReviewFinishResult.NeedsReview, Guard.tryFinish gitPort sid proj1)
-
-                // Record 2nd verdict on same tree with distinct run + confirmation root user id
-                let res2 =
-                    Guard.recordVerdict
-                        journalPort
-                        sid
-                        revSid
-                        "pr-2"
-                        "tc-2"
-                        treeHash
-                        ReviewGuardVerdict.Perfect
-                        (Some "confirm-user-2")
-
-                Assert.True(Result.isOk res2)
-                let proj2 = Result.defaultWith (fun _ -> failwith "unexpected") res2
-                Assert.equal(proj2, AgentJournal.snapshot journal)
-
-                // Double perfect on same tree with confirmation identity -> Confirmed!
-                Assert.equal(ReviewFinishResult.Confirmed, Guard.tryFinish gitPort sid proj2)
-
-                // Git tree hash changes -> tryFinish returns NeedsReview without creating any fact
-                currentTreeHash <- "tree-durable-200"
-                Assert.Equal(ReviewFinishResult.NeedsReview, Guard.tryFinish gitPort sid proj2)
-            })

@@ -4,13 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
-import { SpikePlugin_initSpikePlugin } from '../../../build/next/OpenCode/SpikePlugin.js';
+import { initSpikePlugin } from '../../../build/next/OpenCode/SpikePlugin.js';
 
 test('manager permission denies global executor tool and executes mailbox path', async () => {
   const journalDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-manager-'));
   try {
     execFileSync('git', ['init', '--quiet', journalDirectory]);
-    const hooks = await SpikePlugin_initSpikePlugin({
+    const hooks = await initSpikePlugin({
       client: {},
       directory: journalDirectory,
       events: { listen: () => () => {} },

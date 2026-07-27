@@ -38,20 +38,27 @@ module AgentFactsTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
+        let confirmFact =
+            AgentFact.GuardPromptAccepted
+                {| TargetSessionId = sid
+                   GuardKey = "guard-key-1"
+                   HostMessageId = "msg-confirm-1" |}
+
         let fact2 =
             AgentFact.ReviewVerdictRecorded
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
                    ProviderRunId = "pr-2"
-                   RootUserMessageId = None
+                   RootUserMessageId = Some "msg-confirm-1"
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
         let env1 = createTestEnv 1L t0 fact1 rt (Some sid)
-        let env2 = createTestEnv 2L (t0.AddSeconds 1.0) fact2 rt (Some sid)
+        let envC = createTestEnv 2L (t0.AddSeconds 0.5) confirmFact rt (Some sid)
+        let env2 = createTestEnv 3L (t0.AddSeconds 1.0) fact2 rt (Some sid)
 
-        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
+        let proj = AgentFacts.apply AgentFacts.empty [ env1; envC; env2 ]
 
         Assert.True(proj.Sessions.ContainsKey sid)
         let sessionProj = proj.Sessions.[sid]

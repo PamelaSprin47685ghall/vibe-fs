@@ -144,17 +144,29 @@ module ToolSurface =
         let disposeExecutorRuntime =
             ToolSurfaceOrchestrator.disposeExecutorRuntime gate executorRuntimes
 
-        let executor =
-            ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory
+        let sessionDirFor (sid: string) =
+            match sessionDirectories.TryGetValue sid with
+            | true, d -> Some d
+            | false, _ -> None
 
-        let inspector = InspectorTool.create toolModule sessionPort backgroundBFor
+        let registerChildDir (childId: string) (dir: string) = sessionDirectories.[childId] <- dir
+
+        let executor =
+            ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory (Some sessionDirFor)
+
+        let inspector =
+            InspectorTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir)
 
         // Manager: fork (agent/prompt/signal). Orchestrator: fork-manager (prompt only).
         // Names differ because schemas conflict.
         let tools =
             createObj
                 [ "fork",
-                  box (applyTool factory (definition "Fork, nudge, or control an agent or PTY" managerForkArgs forkExecute))
+                  box (
+                      applyTool
+                          factory
+                          (definition "Fork, nudge, or control an agent or PTY" managerForkArgs forkExecute)
+                  )
                   "fork-manager",
                   box (applyTool factory (definition "Fork a manager job" orchestratorManagerJobArgs forkExecute))
                   "join",

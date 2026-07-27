@@ -121,7 +121,7 @@ Fallback 不需要状态图。它只需要：
 24. **SSE 只是唤醒信号**：业务事实不从碎片事件拼装。`session.status=idle` 建立 Dirty latch，触发 single-flight reconcile；`session.status=retry` 是唯一 durable fallback 入口。`message.updated`/`message.part.updated`/`part.delta`/`session.updated` 被直接丢弃。Unknown 协议：单次 idle 后最多 3 次因果重读，仍 Unknown 则保持 Dirty 等下一信号。
 25. **Host 事实通过 SDK API 读取**：completion、ReviewGuard、continuation、abort 都先从 reconcile 得到完整的 `ReconciledTurn` 再决策。Unknown（API 尚未反映当前 Run 的 assistant）= 不产生副作用，保持 PendingRun。
 26. **不修改 OpenCode 本体**：生产功能只在现有插件 Hook（`chat.message`/`experimental.chat.messages.transform`/`tool.execute.before`/`after`/`event`）和 SDK API 边界内工作。
-27. **稳定性门禁**：scenario-local 因果 Watchdog 超时 2 秒；只认因果进展。Watchdog deadline > 被测动作 deadline + cleanup allowance。P0 全套 100ms 窗口内并行 spawn，不得 stagger。Release gate 恰好运行 3 轮。最多重复 3 次。
+27. **稳定性门禁**：scenario-local 因果 Watchdog 超时 2 秒；只认因果进展。Watchdog deadline > 被测动作 deadline + cleanup allowance。Event-stagger 规则：第一个 canary 立即启动，canary N 等待 N−1 输出精确的 `[setupScenario] ready` 随后立即启动（不等待前一个 canary 结束；ready 前退出或 ready 超时 = 该 canary 失败，可以释放启动门继续收集后续诊断，但整轮不能通过）。Release gate 恰好运行 3 轮。最多重复 3 次。
 28. **Provider-visible projection**：缓存比较只使用真正进入模型的字段（role/text/reasoning/tool call/result），排除 timestamp/cost/usage/runtimeId 等非模型 metadata。
 29. **Fallback identity**：`sessionId + currentUserMessageId + providerAttempt`。`currentUserMessageId` 是 Host run root user message。Single-flight `retry` 事件到达后 append `FallbackFailureRecorded`。空/XML-only terminal 触发 InteractionRepairIdentity 去重（最多一次）。
 
@@ -3480,7 +3480,7 @@ SubsessionActor
 ## 十五、稳定性门禁
 
 ```text
-P0 全套并行启动：所有场景在 100ms 窗口内完成 spawn，不得 index-based stagger
+P0 全套动态事件 stagger 启动：第一个 canary 立即启动，canary N 等待 N−1 输出精确的 `[setupScenario] ready` 随后立即启动（不等待前一个 canary 结束；ready 前退出或 ready 超时 = 该 canary 失败，可以释放启动门继续收集后续诊断，但整轮不能通过）
 因果 Watchdog：2 秒 scenario-local，只认因果进展，不认 SSE 噪音
 Release gate 恰好运行 3 轮，每轮所有场景并行
 任一场景失败仍收割全部场景结果，再使本轮失败

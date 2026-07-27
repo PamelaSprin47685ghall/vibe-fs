@@ -77,7 +77,7 @@ process.on("exit", cleanupCanaries);
 process.on("SIGINT", () => { cleanupCanaries(); process.exit(130); });
 process.on("SIGTERM", () => { cleanupCanaries(); process.exit(143); });
 
-function runCanary(file, onBark) {
+function runCanary(file, onBarkSignal) {
   return new Promise((resolve) => {
     const name = path.basename(file);
     const child = spawn(process.execPath, [file], {
@@ -95,18 +95,20 @@ function runCanary(file, onBark) {
     let stderr = "";
     let settled = false;
     let barked = false;
+    let barkTimeout = false;
 
-    const emitBark = () => {
+    const emitBark = (isTimeout = false) => {
       if (!barked) {
         barked = true;
-        onBark?.();
+        if (isTimeout) barkTimeout = true;
+        onBarkSignal?.();
       }
     };
 
     const timer = setTimeout(async () => {
       if (settled) return;
       settled = true;
-      emitBark();
+      emitBark(true);
       try {
         await terminateTree(child, { termGraceMs: 500, killGraceMs: 1000 });
         recordExit(child.pid);
@@ -121,13 +123,16 @@ function runCanary(file, onBark) {
         signal: "TIMEOUT",
         stdout,
         stderr: stderr + "\n[CANARY TIMEOUT] Process exceeded " + CANARY_TIMEOUT_MS + "ms limit",
+        barked: false,
+        barkTimeout: true,
+        exitedBeforeBark: false,
       });
     }, CANARY_TIMEOUT_MS);
 
     const checkBark = (chunk) => {
       const str = chunk.toString();
       if (!barked && /\[setupScenario\] ready/i.test(str)) {
-        emitBark();
+        emitBark(false);
       }
     };
 
@@ -142,7 +147,8 @@ function runCanary(file, onBark) {
     });
 
     child.on("exit", (code, signal) => {
-      emitBark();
+      const exitedBeforeBark = !barked;
+      emitBark(false);
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -150,7 +156,17 @@ function runCanary(file, onBark) {
         recordExit(child.pid);
         activeCanaryPids.delete(child.pid);
       }
-      resolve({ file, name, code, signal, stdout, stderr });
+      resolve({
+        file,
+        name,
+        code,
+        signal,
+        stdout,
+        stderr,
+        barked: !exitedBeforeBark && !barkTimeout,
+        barkTimeout,
+        exitedBeforeBark,
+      });
     });
   });
 }
@@ -207,11 +223,14 @@ async function main() {
 
     let failed = false;
     for (const r of results) {
-      if (r.code === 0) {
+      if (r.code === 0 && r.barked && !r.barkTimeout && !r.exitedBeforeBark) {
         console.log("  ✓ " + r.name + " passed");
       } else {
         failed = true;
-        console.error("  ✗ " + r.name + " FAILED (code " + r.code + ", signal " + r.signal + ")");
+        let failReason = `code ${r.code}, signal ${r.signal}`;
+        if (r.exitedBeforeBark) failReason = "exited before [setupScenario] ready";
+        else if (r.barkTimeout) failReason = "ready timeout (failed to emit [setupScenario] ready within 10s)";
+        console.error("  ✗ " + r.name + " FAILED (" + failReason + ")");
         if (r.stdout) console.error("── stdout ──\n" + r.stdout);
         if (r.stderr) console.error("── stderr ──\n" + r.stderr);
       }

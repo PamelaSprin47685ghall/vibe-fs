@@ -29,7 +29,12 @@ module CompanionCacheTests =
                     member _.Dispose() = terminal <- None }
 
             member _.SendPrompt(_, prompt, _) =
-                let text = if prompt.Contains("Condense") then condenseText else nextText.Value
+                let text =
+                    if prompt.Contains("Condense") then
+                        condenseText
+                    else
+                        nextText.Value
+
                 output <- output @ [ text ]
 
                 terminal
@@ -55,8 +60,10 @@ module CompanionCacheTests =
     let private messageIds (messages: obj list) =
         messages
         |> List.choose (fun m ->
-            if isNull m || isNull m?info || isNull m?info?id then None
-            else Some(unbox<string> m?info?id))
+            if isNull m || isNull m?info || isNull m?info?id then
+                None
+            else
+                Some(unbox<string> m?info?id))
 
     /// P0: FrozenB stays byte-identical across blog success AND Y self-rebase.
     /// Only SwitchEpoch may change the X-visible head.
@@ -86,7 +93,7 @@ module CompanionCacheTests =
             let cutoff = companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex
             Assert.Equal("B1", frozen)
             Assert.True(cutoff > 0)
-            Assert.Equal("companion-b-head", unbox<string> t1.Head?info?id)
+            Assert.True((unbox<string> t1.Head?info?id).StartsWith("companion-b-head"))
             Assert.Equal("B1", headText t1)
 
             // Blogger accumulates LatestB; FrozenB and injected head stay B1.
@@ -107,7 +114,7 @@ module CompanionCacheTests =
             Assert.Equal(Some "B-condensed", companion.Memory.LatestB)
             Assert.Equal(frozen, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
 
-            let t3 = companion.TransformRaw (extended2 @ [ msg sid "u5" "later" ])
+            let t3 = companion.TransformRaw(extended2 @ [ msg sid "u5" "later" ])
             Assert.Equal(frozen, companion.Memory.ActivePrefixEpoch.Value.FrozenB)
             Assert.Equal(cutoff, companion.Memory.ActivePrefixEpoch.Value.CutoffMessageIndex)
             Assert.Equal("B1", headText t3)
@@ -139,6 +146,7 @@ module CompanionCacheTests =
 
             // Advance baseline by blogging more messages.
             nextText.Value <- "B2"
+
             let longer =
                 afterFreeze
                 @ [ msg sid "u5" "extra1"; msg sid "u6" "extra2"; msg sid "u7" "extra3" ]
@@ -151,7 +159,7 @@ module CompanionCacheTests =
 
             // Messages at/after original cutoff must still appear in the tail.
             let ids = messageIds t2
-            Assert.True(List.contains "companion-b-head" ids)
+            Assert.True(ids |> List.exists (fun id -> id.StartsWith("companion-b-head")))
             // u3 was at index 2; if cutoff was 2, u3 is first raw tail message.
             // Regardless, u7 (new tail) must be present.
             Assert.True(List.contains "u7" ids)
@@ -173,6 +181,7 @@ module CompanionCacheTests =
             sessionRoles.["primary"] <- "manager"
             let sessionBudgets = Dictionary<string, int>()
             sessionBudgets.["primary"] <- 100
+            let sessionOutputLimits = Dictionary<string, int>()
             let sid = "primary"
 
             let companion =
@@ -185,20 +194,54 @@ module CompanionCacheTests =
             let inObj = createObj [ "sessionID", box sid; "agent", box "manager" ]
 
             CompanionTransform.handleCompanionTransform
-                companions gate host None None sessionBudgets sessionRoles (Ok bloggerModel) inObj out1
+                companions
+                gate
+                host
+                None
+                None
+                sessionBudgets
+                sessionOutputLimits
+                sessionRoles
+                (Ok bloggerModel)
+                inObj
+                out1
+
             do! companion.WaitInFlightAsync()
             Assert.True(companion.EnablePrefixReplacement())
 
             let extended = Array.append baseMsgs [| msg sid "u3" "tail" |]
             let out2 = createObj [ "messages", box extended ]
-            CompanionTransform.handleCompanionTransform
-                companions gate host None None sessionBudgets sessionRoles (Ok bloggerModel) inObj out2
-            do! companion.WaitInFlightAsync()
-            let after1 = unbox<obj array> out2?messages
-            Assert.Equal("companion-b-head", unbox<string> after1.[0]?info?id)
 
             CompanionTransform.handleCompanionTransform
-                companions gate host None None sessionBudgets sessionRoles (Ok bloggerModel) inObj out2
+                companions
+                gate
+                host
+                None
+                None
+                sessionBudgets
+                sessionOutputLimits
+                sessionRoles
+                (Ok bloggerModel)
+                inObj
+                out2
+
+            do! companion.WaitInFlightAsync()
+            let after1 = unbox<obj array> out2?messages
+            Assert.True((unbox<string> after1.[0]?info?id).StartsWith("companion-b-head"))
+
+            CompanionTransform.handleCompanionTransform
+                companions
+                gate
+                host
+                None
+                None
+                sessionBudgets
+                sessionOutputLimits
+                sessionRoles
+                (Ok bloggerModel)
+                inObj
+                out2
+
             let after2 = unbox<obj array> out2?messages
             Assert.Equal(after1.Length, after2.Length)
 
@@ -208,7 +251,7 @@ module CompanionCacheTests =
                     not (isNull m)
                     && not (isNull m?info)
                     && not (isNull m?info?id)
-                    && unbox<string> m?info?id = "companion-b-head")
+                    && (unbox<string> m?info?id).StartsWith("companion-b-head"))
 
             Assert.Equal(1, heads.Length)
         }

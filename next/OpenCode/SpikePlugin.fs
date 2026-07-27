@@ -10,77 +10,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
-
-type SpikePluginConfig =
-    { Directory: string
-      Port: IOpenCodePort option }
+open SpikePluginHelpers
 
 module SpikePlugin =
-
-    [<Emit("import('@opencode-ai/plugin/tool')")>]
-    let private importToolModule () : Task<obj> = jsNative
-
-    [<Emit("(args, context) => $0(args)(context)")>]
-    let private uncurriedExecute (fn: obj) : obj = jsNative
-
-    let createSpikeHost (portOpt: IOpenCodePort option) = PluginHost.createSpikeHost portOpt
-
-    let private systemTransformHook
-        (sessionBudgets: Dictionary<string, int>)
-        (sessionOutputLimits: Dictionary<string, int>)
-        : obj =
-        emitJsExpr
-            (sessionBudgets, sessionOutputLimits)
-            """
-          (input, output) => {
-            if (input && input.sessionID && input.model && input.model.limit) {
-              const lim = input.model.limit;
-              if (lim.context > 0) $0.set(input.sessionID, lim.context);
-              if (lim.output > 0) $1.set(input.sessionID, lim.output);
-            }
-          }
-        """
-
-    let private projectionSessionIdFromMessages (output: obj) =
-        if isNull output || isNull output?messages then
-            None
-        else
-            let messages = unbox<obj array> output?messages
-
-            messages
-            |> Array.tryPick (fun msg ->
-                if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
-                    Some(unbox<string> msg?info?sessionID)
-                else
-                    None)
-
-    let private toolHooks
-        (toolModule: obj)
-        (sessionPort: ISessionHostPort)
-        (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
-        (workspaceDirectory: string option)
-        (sessionParents: Dictionary<string, string>)
-        (sessionRoles: Dictionary<string, string>)
-        (verdictSessions: HashSet<string>)
-        (sessionDirectories: Dictionary<string, string>)
-        (modelConfig: ModelResolver.ModelConfig option)
-        (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
-        (backgroundBFor: (string -> string option) option)
-        : obj =
-        ToolSurface.create
-            toolModule
-            sessionPort
-            journal
-            gitTreePort
-            workspaceDirectory
-            sessionParents
-            sessionRoles
-            verdictSessions
-            sessionDirectories
-            modelConfig
-            onRunStarted
-            backgroundBFor
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
@@ -153,7 +85,10 @@ module SpikePlugin =
                             wired.BindActiveRun
                                 (SessionId.create sessionId)
                                 agentRole
-                                (if String.IsNullOrWhiteSpace directory then None else Some directory))
+                                (if String.IsNullOrWhiteSpace directory then
+                                     None
+                                 else
+                                     Some directory))
 
                 let transform inObj outObj =
                     let projectionSessionIdOpt =
@@ -219,7 +154,8 @@ module SpikePlugin =
                           // detects companion-b-head already present and skips
                           // the second invocation, preventing duplicate B heads.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
-                          "experimental.chat.system.transform", box (systemTransformHook sessionBudgets sessionOutputLimits)
+                          "experimental.chat.system.transform",
+                          box (systemTransformHook sessionBudgets sessionOutputLimits)
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 hooks?event <- box wired.ObserveEvent
@@ -260,11 +196,7 @@ module SpikePlugin =
                         toolSurfaceRef <- Some toolSurface
                         hooks?tool <- toolSurface
                     with ex ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf "Failed to load OpenCode tool module: %s" ex.Message
-                            )
-                        )
+                        raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 
                 return box hooks
         }
