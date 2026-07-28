@@ -17,6 +17,8 @@ module HostSignalBootstrap =
           SignalRouter: HostSignalRouter
           Subscription: IDisposable option
           RegisterOwned: string -> unit
+          UnregisterOwned: string -> unit
+          CancelSignals: SessionId seq -> unit
           RegisterSource: string -> SessionSignalSource -> unit
           BindUserMessage: string -> string -> unit
           BindActiveRun: SessionId -> AgentRole -> string option -> unit
@@ -209,10 +211,15 @@ module HostSignalBootstrap =
         let chatMessageHook =
             HostSignalChatMessage.createHook journal sessionRoles bindUserMessage bindContinuationMessage registerOwned
 
+        let cancelSignals (ids: SessionId seq) =
+            ids |> Seq.iter (fun id -> signalRouter.UnregisterOwned id)
+
         { Reconciler = reconciler
           SignalRouter = signalRouter
           Subscription = subscription
           RegisterOwned = registerOwned
+          UnregisterOwned = (fun sessionId -> signalRouter.UnregisterOwned(SessionId.create sessionId))
+          CancelSignals = cancelSignals
           BindUserMessage = bindUserMessage
           BindActiveRun = bindActiveRun
           CurrentPhysicalUserMessage =

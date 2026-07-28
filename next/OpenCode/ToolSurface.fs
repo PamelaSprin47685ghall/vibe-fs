@@ -38,6 +38,7 @@ module ToolSurface =
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
+        (cancelSignals: (SessionId seq -> unit) option)
         : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
@@ -46,6 +47,7 @@ module ToolSurface =
         let worktreeTreePorts = Dictionary<string, GitTreePort>()
         let orchestratorHosts = Dictionary<string, OrchestratorHost>()
         let gate = obj ()
+        let onCancelSignals = defaultArg cancelSignals (fun _ -> ())
 
         let orchestratorHostFor (sid: string) =
             ToolSurfaceOrchestrator.hostFor
@@ -112,7 +114,8 @@ module ToolSurface =
                                             | None -> None),
                                     ?sessionSnapshot = snapshot,
                                     cancelFallbackRetries =
-                                        (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
+                                        (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor),
+                                    cancelSignals = onCancelSignals
                                 )
 
                             runtimes.[sid] <- r

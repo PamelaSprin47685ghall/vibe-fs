@@ -194,6 +194,7 @@ module SpikePlugin =
                                 onRunStarted
                                 backgroundBFor
                                 snapshotOpt
+                                (Some wired.CancelSignals)
 
                         toolSurfaceRef <- Some toolSurface
                         hooks?tool <- toolSurface

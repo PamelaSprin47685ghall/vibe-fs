@@ -151,12 +151,15 @@ module HostForkChildDispatch =
     /// Cancel parent: fail pending runs, durable-unlink children, clear maps.
     /// `cancelFallback` is invoked with parentId :: childIds to stop pending
     /// ProviderRetryAttempt flushes for the torn-down sessions.
+    /// `cancelSignals` is invoked with parentId :: childIds so the signal router
+    /// ignores further idle/retry events for the torn-down sessions.
     ///
     /// Side effects that must be visible before the call returns (ForkRuntime
     /// cancellation, fallback flush cancellation, durable unlink) run
     /// synchronously before the async block starts.
     let cancelParent
         (cancelFallback: SessionId seq -> unit)
+        (cancelSignals: SessionId seq -> unit)
         (awaitRecovery: unit -> Task<unit>)
         (runtime: ForkRuntime)
         (ptyPort: PtyPort)
@@ -175,6 +178,7 @@ module HostForkChildDispatch =
         runtime.Cancel()
 
         let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
+        cancelSignals (parentId :: childIds)
         cancelFallback (parentId :: childIds)
 
         match unlinkChildren journal parentId childIds with

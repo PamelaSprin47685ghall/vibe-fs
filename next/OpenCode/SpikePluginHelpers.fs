@@ -81,6 +81,7 @@ module SpikePluginHelpers =
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
+        (cancelSignals: (SessionId seq -> unit) option)
         : obj =
         ToolSurface.create
             toolModule
@@ -96,3 +97,4 @@ module SpikePluginHelpers =
             onRunStarted
             backgroundBFor
             snapshot
+            cancelSignals

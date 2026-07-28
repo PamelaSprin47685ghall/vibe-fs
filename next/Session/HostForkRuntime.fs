@@ -27,7 +27,8 @@ type HostForkRuntime
         ?parentWorkRecordFor: SessionId -> string option,
         ?childWorkRecordFor: SessionId -> string option,
         ?sessionSnapshot: ISessionSnapshotPort,
-        ?cancelFallbackRetries: SessionId seq -> unit
+        ?cancelFallbackRetries: SessionId seq -> unit,
+        ?cancelSignals: SessionId seq -> unit
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -42,6 +43,7 @@ type HostForkRuntime
     let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> None)
     let childWorkRecordOf = defaultArg childWorkRecordFor (fun _ -> None)
     let cancelFallback = defaultArg cancelFallbackRetries (fun _ -> ())
+    let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
@@ -131,6 +133,7 @@ type HostForkRuntime
         Async.StartImmediate(
             HostForkChildDispatch.cancelParent
                 cancelFallback
+                cancelSignals
                 (fun () -> this.AwaitRecovery())
                 runtime
                 ptyPortInstance

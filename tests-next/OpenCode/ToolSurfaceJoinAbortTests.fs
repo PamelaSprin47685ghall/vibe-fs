@@ -37,9 +37,15 @@ module ToolSurfaceJoinAbortTests =
         task {
             let parentId = SessionId.create "parent-join-abort"
             let captured = ResizeArray<SessionId>()
+            let signalCaptured = ResizeArray<SessionId>()
 
             let runtime =
-                HostForkRuntime(parentId, hostPort (), cancelFallbackRetries = (fun ids -> captured.AddRange(ids)))
+                HostForkRuntime(
+                    parentId,
+                    hostPort (),
+                    cancelFallbackRetries = (fun ids -> captured.AddRange(ids)),
+                    cancelSignals = (fun ids -> signalCaptured.AddRange(ids))
+                )
 
             let deps: PtyToolDeps =
                 { SessionRoles = Dictionary<string, string>()
@@ -66,4 +72,5 @@ module ToolSurfaceJoinAbortTests =
             Assert.True(output.Contains("CANCELLED"), output)
             Assert.True(runtime.IsCancelled, "runtime was not cancelled by abort signal")
             Assert.True(captured.Contains(parentId), "fallback cancel was not invoked for parent")
+            Assert.True(signalCaptured.Contains(parentId), "signal cancel was not invoked for parent")
         }
