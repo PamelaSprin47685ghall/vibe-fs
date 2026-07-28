@@ -90,7 +90,7 @@ module HostSignalAdapter =
         let properties = if isNull raw then null else raw?properties
         let error = if isNull properties then null else properties?error
 
-        if isNull error then
+        if isNull error || MessageOriginDecoder.isAbortedError (Some error) then
             None
         else
             let data = if isNull error?data then null else error?data
@@ -107,13 +107,20 @@ module HostSignalAdapter =
                 else
                     Some(unbox<bool> data?isRetryable)
 
-            // Only non-retryable client/provider failures without host retry.
-            // Abort / 5xx / missing status stay out of this path.
+            // Non-retryable provider failures (host is not retrying itself).
+            // - explicit isRetryable=false (any status code, including 5xx)
+            // - no retry hint: accept 4xx, or accept missing statusCode for raw
+            //   provider stream errors like "Devin stream error invalid_argument".
+            // User/host aborts are filtered out above.
             let accepted =
-                match isRetryable, statusCode with
-                | Some false, Some code when code > 0 && code < 500 -> true
-                | None, Some code when code > 0 && code < 500 -> true
-                | _ -> false
+                match isRetryable with
+                | Some true -> false
+                | Some false -> true
+                | None ->
+                    match statusCode with
+                    | Some code when code > 0 && code < 500 -> true
+                    | None -> true
+                    | _ -> false
 
             if not accepted then
                 None
