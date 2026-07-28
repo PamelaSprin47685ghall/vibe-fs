@@ -111,6 +111,8 @@ module HostSignalBootstrap =
                     let assistantId =
                         MessageId.create (sprintf "provider-error-%s-%d" sid (failuresSoFar + 1))
 
+                    // Record failure now; ProviderRetryAttempt is deferred to
+                    // SessionIdle so host prompt_async is not rejected as busy.
                     PluginFallbackRetry.handleTurnFailure
                         sessionPort
                         eventPort
@@ -123,7 +125,20 @@ module HostSignalBootstrap =
                         None
                         (Some(fun messageId -> continuationAccepted err.SessionId messageId))
                     |> ignore
-            | SessionIdle _
+            | SessionIdle sessionId ->
+                reconciler.HandleSignal signal
+
+                // Host emits multiple idle ticks while tearing down after
+                // session.error. Debounce: only the last quiet period sends
+                // ProviderRetryAttempt so prompt_async can start a real loop.
+                PluginFallbackRetry.scheduleFlushOnIdle
+                    sessionPort
+                    eventPort
+                    journal
+                    modelConfig
+                    sessionId
+                    (Some(fun messageId -> continuationAccepted sessionId messageId))
+                    250
             | SessionDeleted _ -> reconciler.HandleSignal signal
 
         let signalRouter = HostSignalRouter(ownedSessions, onSignal)

@@ -269,9 +269,14 @@ export class StrictMockProvider {
           && prev0.role === 'system'
           && next0.role === 'system'
           && JSON.stringify(prev0.content) === JSON.stringify(next0.content);
+        // Epoch B-head: tools+system stable, body not append-only.
         const epochCold = toolsSame && systemSame;
-        if (epochCold) {
-          console.error(`[MOCK-PREFIX-RESEAL] session=${sessionID} tools+system stable; resealing after non-append body (epoch/B-head cold boundary)`);
+        // Fallback A→B: host system prompt embeds the model id/name, so Side B
+        // is an expected KV-cache cold boundary when tools stay identical.
+        const modelSideCold = toolsSame && prev0?.role === 'system' && next0?.role === 'system' && !systemSame;
+        if (epochCold || modelSideCold) {
+          const why = epochCold ? 'epoch/B-head' : 'fallback-model-side';
+          console.error(`[MOCK-PREFIX-RESEAL] session=${sessionID} tools stable; resealing after ${why} cold boundary`);
           s.sealedBySession.set(sessionID, sealProviderVisible(parsed));
         } else {
           this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', []);

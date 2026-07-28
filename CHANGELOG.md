@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0-rc.7 — release candidate
+
+Provider-visible same-run A/A/B/B wire path on top of sealed rc.6.
+
+### Changes
+
+- Debounced PluginFallbackRetry after SessionIdle (host runner settle)
+- Non-retryable session.error → durable failure → EffectiveModel continue
+- Mock reseal on fallback A→B system-prompt cold boundary
+- Canary `fallback-aabb-trace` proves wire models `A → A → B → B` (no 5th attempt)
+
+### Still blocking final 0.4.0
+
+- RC observation period with event-driven exit
+- Final `0.4.0` cut + second clean-checkout gate
+- Private distribution only unless license decision changes
+
+Scope freeze: `docs/SCOPE-0.4.0-FREEZE.md`.
+
 ## 0.4.0-rc.6 — release candidate
 
 Production authority + host-signal fixes on top of sealed rc.5.

@@ -116,6 +116,7 @@
     <Compile Include="OpenCode/CompletedTurnClassifier.fs"/>
     <Compile Include="OpenCode/SessionReconciler.fs"/>
     <Compile Include="OpenCode/RetrySignalHandler.fs"/>
+    <Compile Include="OpenCode/HostSignalBootstrapTimers.fs"/>
     <Compile Include="OpenCode/PluginFallbackRetry.fs"/>
     <Compile Include="OpenCode/ReviewerGuardState.fs"/>
     <Compile Include="OpenCode/TerminalSessionA.fs"/>
