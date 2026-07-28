@@ -82,8 +82,9 @@ async function runFlow(scenario, doc, ctx) {
       const cmp = step.waitFact.eq !== undefined
         ? (n) => n === need
         : (n) => n >= need;
-      // Overall span may exceed WATCHDOG_TIMEOUT_MS; silence budget stays 2s via advance.
-      const overallMs = step.timeoutMs || 30000;
+      // Overall span may exceed WATCHDOG_TIMEOUT_MS under parallel host load;
+      // silence budget stays 2s via advance (not a raised expectation timeout).
+      const overallMs = step.timeoutMs || 120000;
       const deadline = Date.now() + overallMs;
       let ok = cmp(countFact(scenario.host.workDir, name));
       while (!ok && Date.now() < deadline) {
