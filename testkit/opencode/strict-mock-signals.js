@@ -3,8 +3,16 @@ export class StrictMockSignals {
     this._activeResponses = new Set();
     /** @type {Set<string>} permanently satisfied one-shot expectation ids */
     this._consumed = new Set();
-    /** @type {Map<string, number>} match counts (reusable edges keep rising) */
+    /** @type {Map<string, number>} total matches observed for each wait id */
     this._matchCount = new Map();
+    /**
+     * How many matches have already been claimed by waitForExpectation.
+     * Reusable / neverEnd edges keep matchCount rising; each wait claims exactly
+     * one match. If a match arrives before wait is registered, the next wait
+     * claims the buffered match (intermediate causal event, no timeout raise).
+     * @type {Map<string, number>}
+     */
+    this._claimCount = new Map();
     this._expectationWaiters = new Map();
     this._idleWaiters = new Set();
     this._fatalError = null;
@@ -20,10 +28,8 @@ export class StrictMockSignals {
 
   /**
    * Record one match of `id` and wake current waiters.
-   * - permanent: one-shot path edges. Future wait(id) returns immediately.
-   * - non-permanent (reusable): only this generation of waiters wakes; a later
-   *   wait(id) blocks until the *next* match. Used so dual-PERFECT barriers
-   *   insert intermediate causal events without raising wall-clock timeouts.
+   * permanent=true: one-shot path edge; future wait(id) returns immediately.
+   * permanent=false: reusable / neverEnd / pathless; each wait claims one match.
    */
   consume(expectation) {
     const id = expectation.id;
@@ -31,6 +37,7 @@ export class StrictMockSignals {
     this._matchCount.set(id, (this._matchCount.get(id) || 0) + 1);
     if (permanent) this._consumed.add(id);
     this._resolveWaiters(this._expectationWaiters.get(id));
+    // Do not delete the waiter set before resolve — _resolveWaiters iterates a copy.
     this._expectationWaiters.delete(id);
   }
 
@@ -42,16 +49,30 @@ export class StrictMockSignals {
     return this._matchCount.get(id) || 0;
   }
 
+  claimCount(id) {
+    return this._claimCount.get(id) || 0;
+  }
+
   /**
-   * Wait for the next match of `id`.
-   * One-shot (already permanently consumed): resolve immediately.
-   * Reusable: always wait for a new match after this call is registered
-   * (prior matches do not satisfy a later wait).
+   * Claim the next match of `id`.
+   * - One-shot already permanent: resolve immediately.
+   * - Buffered reusable match (matchCount > claimCount): claim one and resolve.
+   * - Otherwise wait for the next match, then claim one.
    */
   waitForExpectation(id, timeoutMs) {
     if (this._fatalError) return Promise.reject(this._fatalError);
     if (this._consumed.has(id)) return Promise.resolve();
-    return this._wait(this._expectationWaiters, id, timeoutMs, `expectation ${id}`);
+    if (this.matchCount(id) > this.claimCount(id)) {
+      this._claimCount.set(id, this.claimCount(id) + 1);
+      return Promise.resolve();
+    }
+    return this._wait(this._expectationWaiters, id, timeoutMs, `expectation ${id}`).then(() => {
+      // Match may have been permanent-consumed while we waited.
+      if (this._consumed.has(id)) return;
+      if (this.matchCount(id) > this.claimCount(id)) {
+        this._claimCount.set(id, this.claimCount(id) + 1);
+      }
+    });
   }
 
   waitForIdle(timeoutMs) {

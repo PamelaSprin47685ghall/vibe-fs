@@ -289,12 +289,13 @@ export class StrictMockProvider {
     const s = this._state;
     const sessionID = requestSessionOf(parsed);
     const exp = consumeExpectation(s, match, sessionID);
-    // Reusable templates (dual PERFECT) must wake only the primary wait id once
-    // per match. Resolving every alias (perfect-1..perfect-8) would pre-satisfy
-    // post-rebase waits and leave no intermediate causal events for the 2s budget.
-    // One-shot path edges still resolve every alias id permanently.
-    const waitIds = exp.reusable ? [exp.id] : edgeWaitIds(exp);
-    const permanent = !exp.reusable && !exp.neverEnd && !exp.pathless;
+    // Dual-PERFECT reusable templates (reusable && !neverEnd) wake only the
+    // primary wait id once per match so later waits claim the next occurrence.
+    // neverEnd / pathless / one-shot edges permanently satisfy every alias wait
+    // id (busy hang, blogger, title, guard nudge absorb forever).
+    const multiWaitReusable = exp.reusable === true && exp.neverEnd !== true;
+    const waitIds = multiWaitReusable ? [exp.id] : edgeWaitIds(exp);
+    const permanent = !multiWaitReusable;
     for (const wid of waitIds) {
       this._signals.consume({ id: wid, permanent });
       // afterExpectation may be registered on primary or (one-shot) alias ids.
