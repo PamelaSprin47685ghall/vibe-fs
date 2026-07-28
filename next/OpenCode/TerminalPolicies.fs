@@ -19,14 +19,6 @@ module TerminalPolicies =
     let private roleName (role: AgentRole option) =
         role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
 
-    let private textOutput (turn: ReconciledTurn) =
-        CompletedTurnClassifier.partsText turn.Parts
-
-    let private recordOutput (eventPort: IEventObservationPort) (sessionId: SessionId) (text: string) =
-        match eventPort with
-        | :? Events.HostEventPort as hostPort -> hostPort.RecordSessionOutput sessionId text
-        | _ -> ()
-
     /// True when this session is a linked child of some parent in the durable
     /// journal projection. Used when the in-memory sessionParents map is empty
     /// (worktree plugin instance) so Orchestrator managers never receive the
@@ -167,13 +159,17 @@ module TerminalPolicies =
                 |> Option.map (fun r -> r.ToString().ToLowerInvariant())
                 |> Option.defaultValue "coder"
 
+            // Session-wide A: append this turn's formal text, then expose the full
+            // Session accumulation. Empty intermediate turns do not wipe prior A.
+            let finalA = TerminalSessionA.accumulateTurn eventPort turn
+
             let runResult: AgentRunResult =
                 { SessionId = turn.SessionId
                   RootUserMessageId = turn.RootUserMessageId
                   AssistantMessageId = turn.AssistantMessageId
                   Role = roleStr
                   Directory = turn.Directory
-                  FinalText = textOutput turn
+                  FinalText = finalA
                   Parts = turn.Parts }
 
             // A first PERFECT is not a child completion. Keep the reviewer's
@@ -185,11 +181,14 @@ module TerminalPolicies =
                 && ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey
 
             if not awaitingReviewerConfirmation then
+                // Gate on session-wide A. An empty intermediate turn does not wipe prior
+                // formal text; only a Session with no formal assistant text fails empty.
                 if String.IsNullOrWhiteSpace runResult.FinalText then
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
                     |> ignore
                 else
                     // Completion fact path only: ReconciledTurn → AgentRunResult → TerminalOutcome.
+                    // FinalText is full Session A, not the last-turn slice alone.
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
 

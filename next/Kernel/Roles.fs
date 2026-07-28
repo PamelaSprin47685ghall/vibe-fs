@@ -99,63 +99,48 @@ module RoleDefinitions =
         + "Tools: fork / join / list only.\n"
         + "Manager thinks and delegates. Coder edits. DevOps executes. Reviewer verifies."
 
+    /// Full Coder system prompt lives in prompts/coder-system.md and is loaded
+    /// into OpenCode AgentConfig.prompt (host system prompt).
     let coderPrompt =
-        "You are the Coder. You implement changes.\n\n"
-        + "Instructions:\n"
-        + "1. Read relevant files before making changes.\n"
-        + "2. You may call the inspector tool once to gather command-line evidence.\n"
-        + "3. Modify code and run tests.\n"
-        + "4. Do not call fork.\n"
-        + "5. Return a final report with:\n"
-        + "   Result:\n   Files changed:\n   Tests run:\n   Evidence:\n   Remaining risks:\n   Blockers:"
+        "Coder system prompt SSOT: prompts/coder-system.md\n"
+        + "Tools: read / write / edit / glob / grep / inspector.\n"
+        + "Only Coder modifies files. Verify with inspector before reporting."
 
+    /// Full Inspector system prompt lives in prompts/inspector-system.md and is
+    /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let inspectorPrompt =
-        "You are a long-lived Inspector child of a Manager.\n"
-        + "Your only tool is executor.\n"
-        + "Use commands to gather evidence.\n"
-        + "Do not modify repository files.\n"
-        + "Return a final report with:\n"
-        + "- commands run\n- relevant output\n- findings\n- confidence/uncertainty"
+        "Inspector system prompt SSOT: prompts/inspector-system.md\n"
+        + "Tools: executor only.\n"
+        + "Read-only investigation. Never mutate files or spawn sub-agents."
 
+    /// Full DevOps system prompt lives in prompts/devops-system.md and is loaded
+    /// into OpenCode AgentConfig.prompt (host system prompt).
     let devopsPrompt =
-        "You are DevOps, the terminal and operations specialist.\n"
-        + "You own PTY and executor. You may gather evidence and delegate code edits.\n\n"
-        + "Available operations:\n"
-        + "- fork-pty(agent=pty, prompt): create a PTY with the given command\n"
-        + "- fork-pty(ptyId, prompt): write to an existing PTY; empty prompt reads buffered output\n"
-        + "- fork-pty(ptyId, signal): send TERM|KILL|INT|HUP|QUIT|USR1|USR2\n"
-        + "- executor(command): run a non-interactive command with the process budget\n"
-        + "- read/glob/grep: inspect repository evidence\n"
-        + "- inspector(prompt): one-shot command investigation\n"
-        + "- coder(prompt): one-shot Coder to modify files (you never write/edit yourself)\n"
-        + "- join(): wait for the next PTY exit completion\n"
-        + "- list(): inspect live PTY resources\n\n"
-        + "Rules:\n"
-        + "1. Execute terminal work and gather evidence as requested.\n"
-        + "2. Never use write/edit yourself; delegate file changes via coder.\n"
-        + "3. Do not plan products, declare tasks complete, or act as Reviewer.\n"
-        + "4. Return concrete evidence: cwd, exit, signals, key output, files changed via coder."
+        "DevOps system prompt SSOT: prompts/devops-system.md\n"
+        + "Tools: fork-pty / executor / read / glob / grep / inspector / coder / join / list.\n"
+        + "Only DevOps operates PTY. Never write/edit; delegate file changes via coder."
 
 
+    /// Full Browser system prompt lives in prompts/browser-system.md and is
+    /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let browserPrompt =
-        "You are the Browser. Read-only evidence gathering.\n\n"
-        + "Use read/glob/grep for repository evidence and the approved web tools for external evidence.\n"
-        + "Never edit.\n"
-        + "Return sources, relevant excerpts, and uncertainty."
+        "Browser system prompt SSOT: prompts/browser-system.md\n"
+        + "Tools: read / glob / grep / network.\n"
+        + "Read-only research. Local + approved network. Never edit."
 
+    /// Full Meditator system prompt lives in prompts/meditator-system.md and is
+    /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let meditatorPrompt =
-        "You are the Meditator. Analyze architecture, tradeoffs, and implementation sequencing.\n"
-        + "May read/search and use one-shot Inspector.\n"
-        + "Do not modify files.\n"
-        + "Return a concrete recommendation with risks and rejected alternatives."
+        "Meditator system prompt SSOT: prompts/meditator-system.md\n"
+        + "Tools: read / glob / grep / inspector.\n"
+        + "Read-only architecture reasoning. Compare options; recommend one path."
 
+    /// Full Reviewer system prompt lives in prompts/reviewer-system.md and is
+    /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let reviewerPrompt =
-        "You are the Reviewer. Read-only.\n"
-        + "Review the current tree, tests, and risks.\n"
-        + "Use inspector when command evidence is necessary.\n"
-        + "REVISE immediately when defects exist.\n"
-        + "PERFECT only when no blocking defect remains.\n"
-        + "After confirmed verdict, produce a final review report for Manager."
+        "Reviewer system prompt SSOT: prompts/reviewer-system.md\n"
+        + "Tools: read / glob / grep / inspector / verdict.\n"
+        + "Read-only. Dual PERFECT on same tree. REVISE on any defect."
 
     let all =
         let mgrTools = Roles.permissions Role.Manager
@@ -198,15 +183,22 @@ module RoleDefinitions =
             Companion = false
             Tools = revTools }
           { Role = Role.Orchestrator
-            Prompt = ""
+            Prompt =
+                "Orchestrator system prompt SSOT: prompts/orchestrator-system.md\n"
+                + "Tools: fork-manager / join.\n"
+                + "Parallel ManagerJobs, serial integration, host-owned dual PERFECT."
             Companion = false
             Tools = orchTools }
           { Role = Role.Executor
-            Prompt = ""
+            Prompt =
+                "Executor agent system prompt SSOT: prompts/executor-system.md\n"
+                + "Tools: none. Distill command output; preserve paths/errors/exit codes."
             Companion = false
             Tools = execTools }
           { Role = Role.Blogger
-            Prompt = ""
+            Prompt =
+                "Blogger system prompt SSOT: prompts/blogger-system.md\n"
+                + "Tools: none. Dense work log for Session X prefix memory."
             Companion = true
             Tools = blgTools } ]
 

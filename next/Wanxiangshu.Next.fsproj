@@ -118,6 +118,7 @@
     <Compile Include="OpenCode/RetrySignalHandler.fs"/>
     <Compile Include="OpenCode/PluginFallbackRetry.fs"/>
     <Compile Include="OpenCode/ReviewerGuardState.fs"/>
+    <Compile Include="OpenCode/TerminalSessionA.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
     <Compile Include="OpenCode/HostSignalChatMessage.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
