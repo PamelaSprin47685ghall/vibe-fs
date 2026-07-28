@@ -24,6 +24,9 @@ test('manager permission denies global executor tool and executes mailbox path',
 
     const config = {};
     hooks.config(config);
+    assert.equal(typeof config.agent.manager.prompt, 'string');
+    assert.match(config.agent.manager.prompt, /Manager thinks and delegates/);
+    assert.match(config.agent.manager.prompt, /fork\(agent, prompt\)/);
     assert.equal(config.agent.manager.permission['*'], 'deny');
     assert.equal(config.agent.manager.permission.executor, 'deny');
     assert.equal(config.agent.manager.permission['fork-pty'], 'deny');

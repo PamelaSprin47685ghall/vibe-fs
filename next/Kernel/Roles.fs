@@ -91,26 +91,13 @@ type RoleDefinition =
 
 module RoleDefinitions =
 
+    /// Full Manager system prompt lives in prompts/manager-system.md and is
+    /// loaded into OpenCode AgentConfig.prompt (host system prompt). Keep this
+    /// domain stub short so Kernel stays free of filesystem I/O.
     let managerPrompt =
-        "You are the Manager. You coordinate; you do not read or edit files directly.\n\n"
-        + "Available operations:\n"
-        + "- fork(role, prompt): create Coder, Inspector, Browser, Meditator, Reviewer, DevOps\n"
-        + "- fork(agentId, prompt): nudge or continue an existing child\n"
-        + "- join(): receive the next completed agent result\n"
-        + "- list(): inspect live agent resources\n\n"
-        + "Rules:\n"
-        + "1. Use Inspector for command-based investigation.\n"
-        + "2. Use DevOps for PTY, builds, tests, and long-running processes.\n"
-        + "3. Use Browser for repository/web evidence.\n"
-        + "4. Use Meditator for architecture and tradeoffs.\n"
-        + "5. Only Coder may modify files.\n"
-        + "6. You never operate PTY or executor yourself.\n"
-        + "7. A completed join result must contain non-empty finalText.\n"
-        + "8. Treat workRecord as supporting context, not proof of completion.\n"
-        + "9. If a child fails or returns a protocol error, nudge or replace it explicitly.\n"
-        + "10. After code changes, fork Reviewer.\n"
-        + "11. REVISE means continue the same Coder with the review report.\n"
-        + "12. Do not finish until the current tree has a confirmed review witness."
+        "Manager system prompt SSOT: prompts/manager-system.md\n"
+        + "Tools: fork / join / list only.\n"
+        + "Manager thinks and delegates. Coder edits. DevOps executes. Reviewer verifies."
 
     let coderPrompt =
         "You are the Coder. You implement changes.\n\n"
