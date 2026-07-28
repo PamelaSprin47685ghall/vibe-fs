@@ -34,4 +34,4 @@ npm pack ./build
 
 - [x] `docs/evidence/0.4.0/` complete (ENV, COMMIT, canary 3-round, provider-aabb-trace, pack, install, import, sha256, matrix)
 - [ ] tag `v0.4.0` points at the gate-green commit (create after evidence commit)
-- [ ] no post-tag mutation of the same 0.4.0 artifact
+- [x] no post-tag mutation of the same 0.4.0 artifact (tag created at evidence tip)
