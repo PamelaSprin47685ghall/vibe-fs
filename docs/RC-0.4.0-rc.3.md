@@ -4,38 +4,44 @@
 |---|---|
 | Version | `0.4.0-rc.3` |
 | Date | 2026-07-28 |
-| Base commit (pre-cutover) | `b987b4967cf3bd2fa22608d0f321bc6b269569b9` |
-| Status | Release candidate for controlled distribution. Not final `0.4.0`. |
+| Commit | `bfb130dbc771de14a146a56347e6ea387cf11b18` |
+| Status | Release candidate for controlled distribution. **Not** final `0.4.0`. |
+| Package | private commercial (`private: true`, `SEE LICENSE IN LICENSE`) |
 
-## Gate requirements (PR11)
+Evidence: `docs/evidence/0.4.0-rc.3/`
 
-```bash
-git clean -xfd
-npm ci
-npm run format
-npm run build
-npm run test:compile
-npm run test:next
-npm run test:manager-tools
-node testkit/opencode/tests/gate-testkit.mjs
-CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
-npm pack ./build
-# empty-dir install of resulting tarball + import('wanxiangshu')
-```
+## Clean gate evidence (this commit lineage)
 
-## Product claims covered by this RC
+| Gate | Result |
+|---|---|
+| `git clean -xfd && npm ci` | pass |
+| `npm run build` | pass |
+| `tests-next` | 276 passed / 0 failed |
+| `test:manager-tools` | pass |
+| `gate-testkit` | 29 passed |
+| `CANARY_REPEAT=3` staggered P0 (17 canaries) | pass |
+| `npm pack ./build` | `wanxiangshu-0.4.0-rc.3.tgz` |
+| empty-dir install + `import('wanxiangshu')` | pass |
+
+## Product claims covered
 
 - Prompt Authority single runtime service + stable LogicalRunId + AgentOwnerRoot two-phase send
 - Typed join/list JSON without F# Result arrays
 - Manager full-loop Host canary
-- Companion eligibility from ActiveLogicalRun only
+- Companion eligibility from ActiveLogicalRun only (basic/cache/replacement)
 - Review physical confirmation path
 - Fallback Logical-Run epoch; omit-model inherits BaseModel only
-- Process/PTY stress, restart recovery, Orchestrator publish crash-safe canaries
+- Process/PTY stress; host/reviewer restart recovery
+- Orchestrator publish / restart-publish crash-safe canaries
+
+## Fixes required for clean gate stability
+
+- testkit: classify `devops` before bare `executor→inspector` role heuristic
+- companion-replacement: renew scenario watchdog and re-prompt when Y busy-skips self-rebase/delta under parallel load
 
 ## Still not final 0.4.0
 
 - RC observation period
-- Second clean-checkout gate after promotion
-- Optional real-provider A/A/B/B request traces
+- Second clean-checkout gate after promotion to `0.4.0`
+- Optional real-provider same-run A/A/B/B request traces
 - Commercial license / private package policy for external distribution

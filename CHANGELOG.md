@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 — final release
+
+Promoted from `0.4.0-rc.3` after clean-checkout three-round P0 gate, empty-dir install, and committed evidence package.
+
+### Gates
+
+- clean `npm ci` rebuild
+- tests-next green
+- manager-tools + gate-testkit green
+- `CANARY_REPEAT=3` 17-canary staggered suite green
+- pack + empty-dir install green
+
+### Remaining non-blocking follow-ups
+
+- Optional real-provider same-run A/A/B/B request traces
+- Commercial distribution policy if publishing outside private license terms
+
 ## 0.4.0-rc.3 — release candidate after PR0–PR11
 
 First real release candidate for the 0.4.0 track. Cut only after clean-checkout `npm ci` + `test:release` (three-round canaries) and empty-dir install evidence.
