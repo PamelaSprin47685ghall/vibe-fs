@@ -1,5 +1,33 @@
 # Wanxiangshu.Next 语义内聚重构清单
 
+## 实施进度（自动更新）
+
+### 2026-07-29 当前状态
+
+- **P1 Correctness 已完成**：
+  - Fallback 统一为单一 cursor：`next/Domain/AgentPairCursor.fs` 拥有 `ModelSide`、`FallbackCursor`、`advance`、`effectiveAgent`、`failureIdentity`；删除 `Session/Fallback.fs` 与 `OpenCode/EffectiveAgentResolver.fs`。
+  - Prompt Authority 收敛为四模块：`next/Domain/PromptAuthority.fs`（类型与纯规则）、`next/Domain/PromptAuthorityRun.fs`（claim/run/projection 纯操作）、`next/Journal/PromptAuthorityLedger.fs`（durable fold）、`next/OpenCode/PromptIngress.fs`（chat.message 分类）、`next/OpenCode/PromptDispatcher.fs`（runtime/claim/accept）+ `next/OpenCode/PromptDispatcherSend.fs`（claim→send 扩展）。
+  - Host Event/Reconcile 三层拆分：`HostEventCodec.fs` 唯一 raw `session.status` 解码点，`TurnBinding.fs` 管理 root/physical/continuation 绑定，`TurnReconcile.fs` 纯 snapshot 分类，`ReconcileSupervisor.fs` 每 session single-flight（dirty latch + ≤3 causal yields），`TurnCompletionProgram.fs` 连续可读 terminal 主程序。
+- **修复与门禁**：
+  - `PromptDispatcher.fs` 从 395 行拆至 267 行，`Domain/PromptAuthority.fs` 从 345 行拆至 231 行，重新满足 300 行硬门禁。
+  - `HostEventCodec.fs` 加入 `sessionStatusAllowlist`，SSE 门禁通过。
+  - `ProcessRunner` 取消分类改为 token-based，`Runner_launcher_cancellation` 通过。
+  - `DurableFallbackTests` 改为显式 `ProviderAttempt`，不再共享可变计数器。
+  - `PromptDispatcher.SendContinuation` 不再在 send-admission 时接受 synthetic id；claim 保持 pending，等待 `chat.message` 接受真实 HostMessageId；`TurnReconcile` 将 admission root/continuation 重新绑定到 SDK snapshot 中的真实 physical user message。
+  - Host 停止原生 retry 时，`ProviderErrorFallback` 只在后续 settled-idle 因果边界发送 `ProviderRetryAttempt`；无 debounce/timeout。Cursor 仍仅经 `RetrySignalHandler` 写入，真实 canary 已证明同一 Logical Run 的 `A→A→B→B` provider request 轨迹且无第五次请求。
+  - Process 横切文件已收敛为 `ProcessRequest`、`ProcessOutput`、`NodeProcessHost`、`ProcessRunner` 四个纵向职责；删除旧 `ProcessTypes/Command/ProcessBudget/Pump/RunnerCore/RunnerPrimitives`，`Runner.fs` 仅保留兼容 facade。
+- **验证（当前通过）**：
+  - `dotnet build next/Wanxiangshu.Next.fsproj`
+  - `dotnet build tests-next/Wanxiangshu.Next.Tests.fsproj`
+  - `npm run build`（Fable 150 源文件）
+  - `npm run test:compile`（70 测试源文件）
+  - `npm run test:next`：269 passed, 0 failed
+  - `npm run test:manager-tools`：1 passed, 0 failed
+  - `node testkit/opencode/tests/gate-testkit.mjs`：29 passed, 0 failed
+  - `npm run test:e2e:p0:three`：18 个 canary × 3 轮全部通过
+  - `npm run test:release`：完整 release gate 通过
+- **下一步**：P2 ChildRun/Review、P3 Companion、P4 Process/PTY、P5 Tools/Orchestrator/Journal、P6 清理与文档。
+
 ## 一、重构目标
 
 本轮重构不是简单减少文件数量，也不是把若干小文件重新拼成接近 300 行的大文件。目标是：

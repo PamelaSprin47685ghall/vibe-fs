@@ -1,6 +1,11 @@
 namespace Wanxiangshu.Next.Kernel
 
 [<RequireQualifiedAccess>]
+type AgentTier =
+    | Fast
+    | Deep
+
+[<RequireQualifiedAccess>]
 type Role =
     | Manager
     | Orchestrator
@@ -184,21 +189,21 @@ module RoleDefinitions =
             Tools = revTools }
           { Role = Role.Orchestrator
             Prompt =
-                "Orchestrator system prompt SSOT: prompts/orchestrator-system.md\n"
-                + "Tools: fork-manager / join.\n"
-                + "Parallel ManagerJobs, serial integration, host-owned dual PERFECT."
+              "Orchestrator system prompt SSOT: prompts/orchestrator-system.md\n"
+              + "Tools: fork-manager / join.\n"
+              + "Parallel ManagerJobs, serial integration, host-owned dual PERFECT."
             Companion = false
             Tools = orchTools }
           { Role = Role.Executor
             Prompt =
-                "Executor agent system prompt SSOT: prompts/executor-system.md\n"
-                + "Tools: none. Distill command output; preserve paths/errors/exit codes."
+              "Executor agent system prompt SSOT: prompts/executor-system.md\n"
+              + "Tools: none. Distill command output; preserve paths/errors/exit codes."
             Companion = false
             Tools = execTools }
           { Role = Role.Blogger
             Prompt =
-                "Blogger system prompt SSOT: prompts/blogger-system.md\n"
-                + "Tools: none. Dense work log for Session X prefix memory."
+              "Blogger system prompt SSOT: prompts/blogger-system.md\n"
+              + "Tools: none. Dense work log for Session X prefix memory."
             Companion = true
             Tools = blgTools } ]
 

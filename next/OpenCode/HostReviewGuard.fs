@@ -89,9 +89,10 @@ module HostReviewGuard =
         then
             let continuationKind =
                 match agent, reason with
-                | "reviewer", r when r.Contains("confirm-perfect") -> PromptAuthority.ReviewConfirmation
-                | "reviewer", _ -> PromptAuthority.ReviewerGuard
-                | _ -> PromptAuthority.ManagerGuard
+                | "reviewer", r when r.Contains("confirm-perfect") ->
+                    PromptAuthority.ContinuationKind.ReviewConfirmation
+                | "reviewer", _ -> PromptAuthority.ContinuationKind.ReviewerGuard
+                | _ -> PromptAuthority.ContinuationKind.ManagerGuard
 
             // 0.5.0: Model=None; HostSessionNudge binds Agent from Authority.
             HostSessionNudge.sendContinuation
@@ -99,10 +100,7 @@ module HostReviewGuard =
                 targetSessionId
                 prompt
                 continuationKind
-                { Model = None
-                  Agent = Some agent
-                  Directory = None
-                  Metadata = None }
+                None
                 (Some journal)
                 (Some(fun hostMessageId ->
                     nudgeKeys.Add guardKey |> ignore

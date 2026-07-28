@@ -6,11 +6,6 @@ open Wanxiangshu.Next.Kernel
 /// 0.5.0 Managed Agent identity: fast-ROLE / deep-ROLE.
 /// Canonical Role stays unprefixed; Host Agent identity is always tier-prefixed.
 [<RequireQualifiedAccess>]
-type AgentTier =
-    | Fast
-    | Deep
-
-[<RequireQualifiedAccess>]
 type AgentVisibility =
     | Public
     | Internal

@@ -6,6 +6,7 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Domain
 
 module AgentFactsTests =
 
@@ -152,32 +153,32 @@ module AgentFactsTests =
         let proj1 = AgentFacts.apply AgentFacts.empty [ env1 ]
         let fb1 = proj1.Sessions.[sid].Fallback.Value
         Assert.Equal(1uy, fb1.Offset)
-        Assert.Equal(SideA, FallbackProjection.currentSide fb1)
+        Assert.Equal(AgentPairCursor.SideA, AgentPairCursor.side fb1.Offset)
 
         // Step 2: Offset 2 → SideB
         let proj2 = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
         let fb2 = proj2.Sessions.[sid].Fallback.Value
         Assert.Equal(2uy, fb2.Offset)
-        Assert.Equal(SideB, FallbackProjection.currentSide fb2)
+        Assert.Equal(AgentPairCursor.SideB, AgentPairCursor.side fb2.Offset)
 
         // Step 3: Offset 3 → SideB
         let proj3 = AgentFacts.apply AgentFacts.empty [ env1; env2; env3 ]
         let fb3 = proj3.Sessions.[sid].Fallback.Value
         Assert.Equal(3uy, fb3.Offset)
-        Assert.Equal(SideB, FallbackProjection.currentSide fb3)
+        Assert.Equal(AgentPairCursor.SideB, AgentPairCursor.side fb3.Offset)
 
         // Step 4: Offset 0 → SideA (wrap; never dead)
         let proj4 = AgentFacts.apply AgentFacts.empty [ env1; env2; env3; env4 ]
         let fb4 = proj4.Sessions.[sid].Fallback.Value
         Assert.Equal(0uy, fb4.Offset)
-        Assert.Equal(SideA, FallbackProjection.currentSide fb4)
+        Assert.Equal(AgentPairCursor.SideA, AgentPairCursor.side fb4.Offset)
 
         // Step 5: continue wrap cycle → Offset 1 / SideA
         let env5 = createTestEnv 5L (t0.AddSeconds 4.0) (failFact 5) rt (Some sid)
         let proj5 = AgentFacts.apply AgentFacts.empty [ env1; env2; env3; env4; env5 ]
         let fb5 = proj5.Sessions.[sid].Fallback.Value
         Assert.equal (1uy, fb5.Offset)
-        Assert.Equal(SideA, FallbackProjection.currentSide fb5)
+        Assert.Equal(AgentPairCursor.SideA, AgentPairCursor.side fb5.Offset)
 
     [<Fact>]
     let Companion_advanced_and_replacement () =

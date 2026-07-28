@@ -90,7 +90,7 @@ module HostSignalAdapter =
         let properties = if isNull raw then null else raw?properties
         let error = if isNull properties then null else properties?error
 
-        if isNull error || MessageOriginDecoder.isAbortedError (Some error) then
+        if isNull error || HostEventCodec.isAbortedError error then
             None
         else
             let data = if isNull error?data then null else error?data
@@ -207,6 +207,18 @@ type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> un
     /// ProviderError is an exception: host often emits it only on global SSE even
     /// for local sessions, so both paths accept it for owned sessions.
     member _.ObserveLocal(raw: obj) =
+        let decoded = HostEventCodec.unwrap raw
+
+        if HostEventCodec.eventTypeOf decoded = "session.error" then
+            match HostEventCodec.trySessionId decoded with
+            | Some sessionId when not (isOwned sessionId) ->
+                // The plugin event hook is directory-scoped. Admit its local
+                // provider error so full-snapshot authority reconciliation can
+                // prove or reject the session before any retry side effect.
+                this.RegisterOwned sessionId
+                this.RegisterSource(sessionId, SessionSignalSource.LocalPluginEvent)
+            | _ -> ()
+
         match HostSignalAdapter.tryAdapt isOwned raw with
         | None -> ()
         | Some(ProviderError _ as signal) -> onSignal signal

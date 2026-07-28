@@ -258,20 +258,23 @@ module HostEventRouterTerminalTests =
                     Assert.equal (
                         Some "u1",
                         projection.LastAuthorityProfile
-                        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+                        |> Option.map (fun profile -> MessageId.value profile.AuthorityRootUserMessageId)
                     )
 
                     Assert.equal (
                         Some "u1",
                         projection.ActiveLogicalRun
-                        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+                        |> Option.map (fun profile -> MessageId.value profile.AuthorityRootUserMessageId)
                     )
 
                     // prompt_async returns synthetic accepted-* ids; durable
                     // PluginPromptAccepted is deferred to chat.message with the
                     // real HostMessageId. Claim must remain pending, not mapped
                     // under the synthetic admission id.
-                    Assert.False(projection.AcceptedContinuationIds.ContainsKey("accepted-" + sessionId))
+                    Assert.False(
+                        projection.AcceptedContinuationIds.ContainsKey(MessageId.create ("accepted-" + sessionId))
+                    )
+
                     Assert.True(not (Map.isEmpty projection.PendingClaims))
                 | None -> Assert.True(false, "zero-width continuation lost authority projection")
             })

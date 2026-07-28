@@ -1,8 +1,7 @@
 namespace Wanxiangshu.Next.Tests.MockOpenCode
 
 open System.Threading.Tasks
-open Wanxiangshu.Next.OpenCode
-open Wanxiangshu.Next.OpenCode.EffectiveAgentResolver
+open Wanxiangshu.Next.Domain
 
 module FallbackModelSelectionTests =
 
@@ -15,27 +14,27 @@ module FallbackModelSelectionTests =
     let ``EffectiveAgent follows A A B B then wraps to A`` () =
         task {
             let authority =
-                { SelectedAgent = "fast-inspector"
-                  PeerAgent = "deep-inspector" }
+                { AgentPairCursor.AuthorityAgentPair.SelectedAgent = "fast-inspector"
+                  AgentPairCursor.AuthorityAgentPair.PeerAgent = "deep-inspector" }
 
-            let mutable cursor = EffectiveAgentResolver.initialCursor
+            let mutable cursor = AgentPairCursor.initial
 
             let selected () =
-                EffectiveAgentResolver.effectiveAgent authority cursor
+                AgentPairCursor.effectiveAgent authority cursor
 
             equal "fast-inspector" (selected ())
 
-            cursor <- EffectiveAgentResolver.advanceCursor cursor 1L
+            cursor <- AgentPairCursor.advanceCursor cursor 1L
             equal "fast-inspector" (selected ())
 
-            cursor <- EffectiveAgentResolver.advanceCursor cursor 2L
+            cursor <- AgentPairCursor.advanceCursor cursor 2L
             equal "deep-inspector" (selected ())
 
-            cursor <- EffectiveAgentResolver.advanceCursor cursor 3L
+            cursor <- AgentPairCursor.advanceCursor cursor 3L
             equal "deep-inspector" (selected ())
 
-            // 4th advance wraps offset 3→1.0 (A again — infinite A/A/B/B cycle).
-            cursor <- EffectiveAgentResolver.advanceCursor cursor 4L
+            // 4th advance wraps offset 3→0 (A again — infinite A/A/B/B cycle).
+            cursor <- AgentPairCursor.advanceCursor cursor 4L
             equal "fast-inspector" (selected ())
 
             return ()

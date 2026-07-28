@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
@@ -9,65 +10,19 @@ open Wanxiangshu.Next.Session
 
 module HostSessionNudge =
 
-    let private service (journal: AgentJournal option) =
+    let private runtime (journal: AgentJournal option) =
         match journal with
         | Some j -> PromptDispatcher.forJournal j
         | None -> PromptDispatcher.ephemeral ()
 
-    let private toProfile (sessionId: SessionId) (durable: AuthorityProfileProjection) =
-        let authorityKind =
-            match durable.AuthorityKind with
-            | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
-            | _ -> PromptAuthority.HumanRoot
+    let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =
+        match journal with
+        | None -> None
+        | Some j ->
+            let snapshot = AgentJournal.snapshot j
+            PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
 
-        match ManagedAgent.parse durable.SelectedAgent with
-        | Error _ -> None
-        | Ok selected ->
-            let peer =
-                if String.IsNullOrWhiteSpace durable.PeerAgent then
-                    (ManagedAgent.peer selected).Name
-                else
-                    durable.PeerAgent
-
-            let canonicalRole =
-                match PromptAuthority.tryParseRole durable.CanonicalRole with
-                | Some role -> role
-                | None -> selected.Role
-
-            let selectedTier =
-                match PromptAuthority.tryParseTier durable.SelectedTier with
-                | Some tier -> tier
-                | None -> selected.Tier
-
-            Some(
-                { SessionId = sessionId
-                  LogicalRunId = durable.LogicalRunId
-                  AuthorityRootUserMessageId = MessageId.create durable.AuthorityRootUserMessageId
-                  AuthorityKind = authorityKind
-                  SelectedAgent = selected.Name
-                  PeerAgent = peer
-                  CanonicalRole = canonicalRole
-                  SelectedTier = selectedTier }
-                : PromptAuthority.AuthorityExecutionProfile
-            )
-
-    let private tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =
-        let svc = service journal
-
-        match svc.ActiveProfile sessionId with
-        | Some profile -> Some profile
-        | None ->
-            match journal with
-            | None -> None
-            | Some j ->
-                match Map.tryFind sessionId (AgentJournal.snapshot j).AgentProjections.Sessions with
-                | None -> None
-                | Some session ->
-                    session.PromptAuthority
-                    |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                    |> Option.bind (toProfile sessionId)
-
-    let private effectiveAgentOf
+    let private effectiveAgent
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (profile: PromptAuthority.AuthorityExecutionProfile)
@@ -75,12 +30,8 @@ module HostSessionNudge =
         match journal with
         | None -> profile.SelectedAgent
         | Some j ->
-            match Map.tryFind sessionId (AgentJournal.snapshot j).AgentProjections.Sessions with
-            | Some session ->
-                match session.Fallback with
-                | Some fb -> PromptAuthority.effectiveAgentAt profile fb.Offset
-                | None -> profile.SelectedAgent
-            | None -> profile.SelectedAgent
+            let cursor = DurableFallback.currentState sessionId (AgentJournal.snapshot j)
+            PromptAuthority.effectiveAgentAt profile cursor.Offset
 
     /// Reconciled linked children have a host-proven root user message even when
     /// the host omitted agent metadata from `chat.message`. Register that real
@@ -95,19 +46,38 @@ module HostSessionNudge =
         match tryActiveProfile journal sessionId with
         | Some _ -> ()
         | None ->
-            let svc = service journal
-            let runtimeId = svc.RuntimeId
+            let rt = runtime journal
 
             match
-                PromptAuthority.createAuthorityRoot
-                    runtimeId
+                PromptAuthorityRun.createAuthorityRoot
+                    PromptAuthority.sha256Hex
+                    rt.RuntimeId
                     sessionId
-                    PromptAuthority.AgentOwnerRoot
+                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
                     rootUserMessageId
                     agent
             with
-            | Ok profile -> svc.RegisterAuthority profile
+            | Ok profile -> rt.RegisterAuthority profile
             | Error _ -> ()
+
+    let sendContinuationResult
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (kind: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (onAccepted: (MessageId -> unit) option)
+        =
+        task {
+            match tryActiveProfile journal sessionId with
+            | None -> return Error "No active authority profile"
+            | Some profile ->
+                let agent = effectiveAgent journal sessionId profile
+                let rt = runtime journal
+
+                return! rt.SendContinuation sessionPort sessionId prompt kind profile agent directory onAccepted
+        }
 
     /// Sends a continuation only when a durable Authority Root exists. Unknown
     /// physical user messages fail closed rather than manufacturing a new root.
@@ -116,37 +86,18 @@ module HostSessionNudge =
         (sessionId: SessionId)
         (prompt: string)
         (kind: PromptAuthority.ContinuationKind)
-        (options: SessionPromptOptions)
+        (directory: string option)
         (journal: AgentJournal option)
         (onAccepted: (MessageId -> unit) option)
         =
-        match tryActiveProfile journal sessionId with
-        | None -> ()
-        | Some profile ->
-            let svc = service journal
-            let effectiveAgent = effectiveAgentOf journal sessionId profile
-
-            task {
-                let! _ =
-                    svc.SendContinuation
-                        sessionPort
-                        sessionId
-                        prompt
-                        kind
-                        profile
-                        effectiveAgent
-                        options.Directory
-                        onAccepted
-
-                ()
-            }
-            |> ignore
+        sendContinuationResult sessionPort sessionId prompt kind directory journal onAccepted
+        |> ignore
 
     let trySendInteractionRepair
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
         (prompt: string)
-        (options: SessionPromptOptions)
+        (directory: string option)
         (journal: AgentJournal option)
         (terminalAssistantMessageId: MessageId)
         (repairKind: string)
@@ -155,23 +106,23 @@ module HostSessionNudge =
         match tryActiveProfile journal sessionId with
         | None -> false
         | Some profile ->
-            let svc = service journal
+            let rt = runtime journal
 
-            if not (svc.TryClaimInteractionRepair profile terminalAssistantMessageId repairKind) then
+            if not (rt.TryClaimInteractionRepair profile terminalAssistantMessageId repairKind) then
                 false
             else
-                let effectiveAgent = effectiveAgentOf journal sessionId profile
+                let agent = effectiveAgent journal sessionId profile
 
                 task {
                     let! _ =
-                        svc.SendContinuation
+                        rt.SendContinuation
                             sessionPort
                             sessionId
                             prompt
                             PromptAuthority.InteractionRepair
                             profile
-                            effectiveAgent
-                            options.Directory
+                            agent
+                            directory
                             onAccepted
 
                     ()

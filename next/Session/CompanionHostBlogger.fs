@@ -41,7 +41,7 @@ module internal CompanionHostBlogger =
                 let! outcome = svc.SendAgentOwnerRoot deps.Sessions childId prompt agent None None
 
                 match outcome with
-                | Ok(messageId, _) -> return Ok messageId
+                | Ok messageId -> return Ok messageId
                 | Error err -> return Error err
             | None ->
                 return!

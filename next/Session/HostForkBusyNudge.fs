@@ -2,57 +2,12 @@ namespace Wanxiangshu.Next.Session
 
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
-open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-/// Busy-agent nudge via PromptAuthorityService (KISS-N12 Continuation).
+/// Busy-agent nudge via PromptDispatcher (KISS-N12 Continuation).
 module HostForkBusyNudge =
-
-    let private service (journal: AgentJournal option) =
-        match journal with
-        | Some j -> PromptDispatcher.forJournal j
-        | None -> PromptDispatcher.ephemeral ()
-
-    let private toProfile
-        (sessionId: SessionId)
-        (durable: AuthorityProfileProjection)
-        : PromptAuthority.AuthorityExecutionProfile option =
-        match ManagedAgent.parse durable.SelectedAgent with
-        | Error _ -> None
-        | Ok selected ->
-            let peer = ManagedAgent.peer selected
-
-            let kind =
-                match durable.AuthorityKind with
-                | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
-                | _ -> PromptAuthority.HumanRoot
-
-            let canonicalRole =
-                match PromptAuthority.tryParseRole durable.CanonicalRole with
-                | Some role -> role
-                | None -> selected.Role
-
-            let selectedTier =
-                match PromptAuthority.tryParseTier durable.SelectedTier with
-                | Some tier -> tier
-                | None -> selected.Tier
-
-            let peerAgent =
-                if System.String.IsNullOrWhiteSpace durable.PeerAgent then
-                    peer.Name
-                else
-                    durable.PeerAgent
-
-            Some
-                { SessionId = sessionId
-                  LogicalRunId = durable.LogicalRunId
-                  AuthorityRootUserMessageId = MessageId.create durable.AuthorityRootUserMessageId
-                  AuthorityKind = kind
-                  SelectedAgent = selected.Name
-                  PeerAgent = peerAgent
-                  CanonicalRole = canonicalRole
-                  SelectedTier = selectedTier }
 
     /// Continuation of the child's active Logical Run. Never creates a new
     /// Authority Root / RunId / completion.
@@ -62,7 +17,7 @@ module HostForkBusyNudge =
         (journal: AgentJournal option)
         (childId: SessionId)
         (_role: AgentRole)
-        (agent: string)
+        (_agent: string)
         (directory: string option)
         (prompt: string)
         : Task<Result<unit, string>> =
@@ -75,41 +30,26 @@ module HostForkBusyNudge =
                         childId,
                         prompt,
                         { Model = None
-                          Agent = Some agent
+                          Agent = None
                           Directory = directory
                           Metadata = None }
                     )
             | Some j ->
-                let svc = service (Some j)
+                let snapshot = AgentJournal.snapshot j
 
-                let profileOpt =
-                    match svc.ActiveProfile childId with
-                    | Some profile -> Some profile
-                    | None ->
-                        match Map.tryFind childId (AgentJournal.snapshot j).AgentProjections.Sessions with
-                        | None -> None
-                        | Some session ->
-                            session.PromptAuthority
-                            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                            |> Option.bind (toProfile childId)
-
-                match profileOpt with
+                match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
-                    let offset =
-                        match Map.tryFind childId (AgentJournal.snapshot j).AgentProjections.Sessions with
-                        | Some session ->
-                            session.Fallback |> Option.map (fun fb -> fb.Offset) |> Option.defaultValue 0uy
-                        | None -> 0uy
-
-                    let effectiveAgent = PromptAuthority.effectiveAgentAt profile offset
+                    let cursor = DurableFallback.currentState childId snapshot
+                    let effectiveAgent = PromptAuthority.effectiveAgentAt profile cursor.Offset
+                    let rt = PromptDispatcher.forJournal j
 
                     let! sent =
-                        svc.SendContinuation
+                        rt.SendContinuation
                             sessions
                             childId
                             prompt
-                            PromptAuthority.BusyAgentNudge
+                            PromptAuthority.ContinuationKind.BusyAgentNudge
                             profile
                             effectiveAgent
                             directory

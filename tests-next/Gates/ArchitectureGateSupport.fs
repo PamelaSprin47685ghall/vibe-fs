@@ -101,7 +101,8 @@ module ArchitectureGateSupport =
           "session.updated" ]
 
     let sessionStatusAllowlist =
-        [ "next/OpenCode/HostSignalAdapter.fs"
+        [ "next/OpenCode/HostEventCodec.fs"
+          "next/OpenCode/HostSignalAdapter.fs"
           "next/OpenCode/RetrySignalHandler.fs"
           "next/OpenCode/HostSignalSubscribe.fs" ]
 

@@ -21,6 +21,7 @@
     <Compile Include="EventDrivenHarness.fs"/>
     <Compile Include="Flow/FlowTests.fs"/>
     <Compile Include="Flow/FlowDisposalTests.fs"/>
+    <Compile Include="Domain/AgentPairCursorTests.fs"/>
     <Compile Include="Journal/JournalTestSupport.fs"/>
     <Compile Include="Journal/JournalWriterTests.fs"/>
     <Compile Include="Journal/JournalBootFoldTests.fs"/>
@@ -28,12 +29,9 @@
     <Compile Include="Journal/FactCodecTests.fs"/>
     <Compile Include="Journal/JournalIsolationTests.fs"/>
     <Compile Include="Journal/AgentFactsTests.fs"/>
-    <Compile Include="Journal/PromptAuthorityFactTests.fs"/>
     <Compile Include="Journal/AgentFactsOrchestratorTests.fs"/>
     <Compile Include="Journal/AgentFactsOrchestratorBarrierTests.fs"/>
     <Compile Include="Journal/AgentJournalTests.fs"/>
-    <Compile Include="Process/ProcessBudgetTests.fs"/>
-    <Compile Include="Process/ProcessRunnerTests.fs"/>
     <Compile Include="Process/ProcessBoundedTests.fs"/>
     <Compile Include="Process/DeadlineTests.fs"/>
     <Compile Include="Process/PtyTests.fs"/>
@@ -51,7 +49,6 @@
     <Compile Include="Session/RolesTests.fs"/>
     <Compile Include="Session/ReviewGuardTests.fs"/>
     <Compile Include="Session/ReviewerHostTests.fs"/>
-    <Compile Include="Session/FallbackContractTests.fs"/>
     <Compile Include="Session/DurableFallbackTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="Review/GuardDurableTests.fs"/>
@@ -63,11 +60,8 @@
     <Compile Include="OpenCode/HostReviewGuardMissingTreeTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTests.fs"/>
     <Compile Include="OpenCode/SessionReconcilerTests.fs"/>
+    <Compile Include="OpenCode/TurnReconcileAdmissionTests.fs"/>
     <Compile Include="OpenCode/HostSignalAdapterTests.fs"/>
-    <Compile Include="OpenCode/PromptAuthorityTests.fs"/>
-    <Compile Include="OpenCode/PromptAuthoritySendTests.fs"/>
-    <Compile Include="OpenCode/PromptAuthorityChatMessageTests.fs"/>
-    <Compile Include="OpenCode/MessageOriginDecoderTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterSessionDeadTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>

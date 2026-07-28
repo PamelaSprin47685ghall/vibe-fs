@@ -1,138 +1,127 @@
 namespace Wanxiangshu.Next.Journal
 
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open AgentFactsFoldHelpers
 
 module AgentFactsAuthority =
 
-    let private empty =
-        { LastAuthorityProfile = None
-          ActiveLogicalRun = None
-          PendingClaims = Map.empty
-          AcceptedContinuationIds = Map.empty
-          RepairClaims = [] }
-
     let foldAuthorityRootAccepted
         (proj: AgentProjectionSet)
-        (sessionId: SessionId)
-        logicalRunId
-        hostMessageId
-        authorityKind
-        selectedAgent
-        peerAgent
-        canonicalRole
-        selectedTier
+        (p:
+            {| SessionId: SessionId
+               LogicalRunId: string
+               HostMessageId: string
+               AuthorityKind: string
+               SelectedAgent: string
+               PeerAgent: string
+               CanonicalRole: string
+               SelectedTier: string |})
         =
-        let profile: AuthorityProfileProjection =
-            { LogicalRunId = logicalRunId
-              AuthorityRootUserMessageId = hostMessageId
-              AuthorityKind = authorityKind
-              SelectedAgent = selectedAgent
-              PeerAgent = peerAgent
-              CanonicalRole = canonicalRole
-              SelectedTier = selectedTier }
+        let promptAuthority =
+            let authority =
+                defaultArg
+                    (Map.tryFind p.SessionId proj.Sessions
+                     |> Option.bind (fun s -> s.PromptAuthority))
+                    PromptAuthorityLedger.empty
+
+            PromptAuthorityLedger.foldAuthorityRootAccepted authority p
 
         let sessions =
             updateSession
-                sessionId
+                p.SessionId
                 (fun s ->
                     { s with
                         // New Authority Root creates a new Fallback epoch.
                         Fallback =
                             Some
-                                { LogicalRunId = logicalRunId
-                                  AuthorityRootUserMessageId = hostMessageId
+                                { LogicalRunId = p.LogicalRunId
+                                  AuthorityRootUserMessageId = p.HostMessageId
                                   Offset = 0uy
                                   LastProviderAttempt = None
                                   RecentFailureIds = [] }
-                        PromptAuthority =
-                            Some
-                                { LastAuthorityProfile = Some profile
-                                  ActiveLogicalRun = Some profile
-                                  PendingClaims = Map.empty
-                                  AcceptedContinuationIds = Map.empty
-                                  RepairClaims = [] } })
+                        PromptAuthority = Some promptAuthority })
                 proj.Sessions
 
         { proj with Sessions = sessions }
 
-    let foldPluginPromptClaimed (proj: AgentProjectionSet) sessionId promptKey continuationKind =
+    let foldPluginPromptClaimed
+        (proj: AgentProjectionSet)
+        (p:
+            {| PromptKey: string
+               SessionId: SessionId
+               LogicalRunId: string
+               AuthorityRootUserMessageId: string
+               ContinuationKind: string
+               EffectiveAgent: string option |})
+        =
         let sessions =
             updateSession
-                sessionId
+                p.SessionId
                 (fun s ->
-                    let authority = defaultArg s.PromptAuthority empty
+                    let authority = defaultArg s.PromptAuthority PromptAuthorityLedger.empty
 
                     { s with
-                        PromptAuthority =
-                            Some
-                                { authority with
-                                    PendingClaims = Map.add promptKey continuationKind authority.PendingClaims } })
+                        PromptAuthority = Some(PromptAuthorityLedger.foldPluginPromptClaimed authority p) })
                 proj.Sessions
 
         { proj with Sessions = sessions }
 
-    let foldPluginPromptAccepted (proj: AgentProjectionSet) sessionId promptKey hostMessageId =
+    let foldPluginPromptAccepted
+        (proj: AgentProjectionSet)
+        (p:
+            {| PromptKey: string
+               SessionId: SessionId
+               HostMessageId: string |})
+        =
         let sessions =
             updateSession
-                sessionId
+                p.SessionId
                 (fun s ->
-                    let authority = defaultArg s.PromptAuthority empty
-                    let kind = defaultArg (Map.tryFind promptKey authority.PendingClaims) "unknown"
+                    let authority = defaultArg s.PromptAuthority PromptAuthorityLedger.empty
 
                     { s with
-                        PromptAuthority =
-                            Some
-                                { authority with
-                                    PendingClaims = Map.remove promptKey authority.PendingClaims
-                                    AcceptedContinuationIds =
-                                        Map.add hostMessageId kind authority.AcceptedContinuationIds } })
+                        PromptAuthority = Some(PromptAuthorityLedger.foldPluginPromptAccepted authority p) })
                 proj.Sessions
 
         { proj with Sessions = sessions }
 
-    let foldPluginPromptAbandoned (proj: AgentProjectionSet) sessionId promptKey =
+    let foldPluginPromptAbandoned
+        (proj: AgentProjectionSet)
+        (p:
+            {| PromptKey: string
+               SessionId: SessionId
+               Reason: string |})
+        =
         let sessions =
             updateSession
-                sessionId
+                p.SessionId
                 (fun s ->
-                    let authority = defaultArg s.PromptAuthority empty
+                    let authority = defaultArg s.PromptAuthority PromptAuthorityLedger.empty
 
                     { s with
-                        PromptAuthority =
-                            Some
-                                { authority with
-                                    PendingClaims = Map.remove promptKey authority.PendingClaims } })
+                        PromptAuthority = Some(PromptAuthorityLedger.foldPluginPromptAbandoned authority p) })
                 proj.Sessions
 
         { proj with Sessions = sessions }
-
 
     let foldInteractionRepairClaimed
         (proj: AgentProjectionSet)
-        (sessionId: SessionId)
-        logicalRunId
-        authorityRootUserMessageId
-        terminalAssistantMessageId
-        repairKind
+        (p:
+            {| SessionId: SessionId
+               LogicalRunId: string
+               AuthorityRootUserMessageId: string
+               TerminalAssistantMessageId: string
+               RepairKind: string |})
         =
-        let identity =
-            sprintf "%s|%s|%s|%s" logicalRunId authorityRootUserMessageId terminalAssistantMessageId repairKind
-
         let sessions =
             updateSession
-                sessionId
+                p.SessionId
                 (fun s ->
-                    let authority = defaultArg s.PromptAuthority empty
+                    let authority = defaultArg s.PromptAuthority PromptAuthorityLedger.empty
 
-                    if List.contains identity authority.RepairClaims then
-                        s
-                    else
-                        { s with
-                            PromptAuthority =
-                                Some
-                                    { authority with
-                                        RepairClaims = identity :: authority.RepairClaims } })
+                    { s with
+                        PromptAuthority = Some(PromptAuthorityLedger.foldInteractionRepairClaimed authority p) })
                 proj.Sessions
 
         { proj with Sessions = sessions }

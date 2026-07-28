@@ -69,15 +69,11 @@ module VerdictSurface =
         match journal with
         | None -> None
         | Some j ->
-            let svc = PromptDispatcher.forJournal j
+            let sid = SessionId.create sessionId
+            let snapshot = AgentJournal.snapshot j
 
-            match svc.ActiveProfile(SessionId.create sessionId) with
-            | Some profile -> Some(PromptAuthority.roleLabel profile.CanonicalRole)
-            | None ->
-                Map.tryFind (SessionId.create sessionId) (AgentJournal.snapshot j).AgentProjections.Sessions
-                |> Option.bind (fun session -> session.PromptAuthority)
-                |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                |> Option.map (fun run -> run.CanonicalRole)
+            PromptAuthorityLedger.activeProfile sid snapshot.AgentProjections
+            |> Option.map (fun profile -> PromptAuthority.roleLabel profile.CanonicalRole)
 
     let create
         (sessionParents: Dictionary<string, string>)

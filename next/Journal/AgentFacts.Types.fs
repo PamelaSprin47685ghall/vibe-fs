@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Journal
 
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Domain
 
 type ManagerId = private ManagerId of string
 
@@ -64,10 +65,6 @@ type ReviewGuardProjection =
         CurrentBarrierKey: string option
     }
 
-type ModelSide =
-    | SideA
-    | SideB
-
 type FallbackProjection =
     {
         /// Logical Run that owns this Fallback cursor. New Authority Root resets.
@@ -79,20 +76,6 @@ type FallbackProjection =
         /// Bounded durable identities for restart-safe failure dedupe.
         RecentFailureIds: string list
     }
-
-module FallbackProjection =
-
-    let side (offset: byte) : ModelSide =
-        match offset with
-        | 0uy
-        | 1uy -> SideA
-        | 2uy
-        | 3uy -> SideB
-        | _ -> invalidOp "Fallback offset must be in range 0..3"
-
-    let advance (offset: byte) : byte = byte ((int offset + 1) % 4)
-
-    let currentSide (fb: FallbackProjection) : ModelSide = side fb.Offset
 
 type CandidateStatus =
     | Registered of candidateId: CandidateId * branch: string * commitHash: string
@@ -128,28 +111,12 @@ type EffectStatus =
 type DurableEffectProjection =
     { Current: (EffectId * EffectStatus) option }
 
-type AuthorityProfileProjection =
-    { LogicalRunId: string
-      AuthorityRootUserMessageId: string
-      AuthorityKind: string
-      SelectedAgent: string
-      PeerAgent: string
-      CanonicalRole: string
-      SelectedTier: string }
-
-type PromptAuthorityProjection =
-    { LastAuthorityProfile: AuthorityProfileProjection option
-      ActiveLogicalRun: AuthorityProfileProjection option
-      PendingClaims: Map<string, string>
-      AcceptedContinuationIds: Map<string, string>
-      RepairClaims: string list }
-
 type SessionAgentProjection =
     { Companion: CompanionProjection option
       Linkage: AgentLinkageProjection option
       ReviewGuard: ReviewGuardProjection option
       Fallback: FallbackProjection option
-      PromptAuthority: PromptAuthorityProjection option
+      PromptAuthority: PromptAuthority.PromptAuthorityProjection option
       Effects: DurableEffectProjection option }
 
 type AgentProjectionSet =

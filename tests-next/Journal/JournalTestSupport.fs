@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -42,12 +43,12 @@ module JournalTestSupport =
                 | Some canonicalRole ->
                     let fast =
                         Wanxiangshu.Next.OpenCode.ManagedAgent.nameOf
-                            Wanxiangshu.Next.OpenCode.AgentTier.Fast
+                            Wanxiangshu.Next.Kernel.AgentTier.Fast
                             canonicalRole
 
                     let deep =
                         Wanxiangshu.Next.OpenCode.ManagedAgent.nameOf
-                            Wanxiangshu.Next.OpenCode.AgentTier.Deep
+                            Wanxiangshu.Next.Kernel.AgentTier.Deep
                             canonicalRole
 
                     fast, deep, Wanxiangshu.Next.OpenCode.PromptAuthority.roleLabel canonicalRole, "Fast"

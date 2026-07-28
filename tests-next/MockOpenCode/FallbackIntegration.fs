@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Journal
@@ -34,9 +35,9 @@ module FallbackIntegration =
     let private fallbackSide journal sessionId =
         fbOf journal sessionId
         |> Option.map (fun fb ->
-            match FallbackProjection.currentSide fb with
-            | ModelSide.SideB -> "B"
-            | ModelSide.SideA -> "A")
+            match AgentPairCursor.side fb.Offset with
+            | AgentPairCursor.ModelSide.SideB -> "B"
+            | AgentPairCursor.ModelSide.SideA -> "A")
 
     let private retrySignal sessionId attempt reason : RetrySignal =
         { SessionId = SessionId.create sessionId
@@ -114,8 +115,7 @@ module FallbackIntegration =
                 equal (Some 0uy) (fallbackOffset journal sid)
                 equal (Some "A") (fallbackSide journal sid)
 
-                if Wanxiangshu.Next.Session.DurableFallback.isDead sid (AgentJournal.snapshot journal) then
-                    failwith "Session must remain alive after 4 failures"
+            // 0.5.0: there is no Dead state; the cursor is still alive at offset 0.
             })
 
     let ``Duplicate retry signals are deduplicated`` () =

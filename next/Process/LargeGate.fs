@@ -1,58 +1,42 @@
 namespace Wanxiangshu.Next.Process
 
+open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel.AsyncSupport
 
-/// Single-holder large-process gate with cancelable FIFO waiters (Fable-safe).
+/// Single-holder large-process gate with cancelable FIFO waiters.
 module LargeGate =
 
-    type private Waiter(ct: CancellationToken, onCancel: unit -> unit) =
-        let completion = TaskCompletionSource<unit>()
-        let mutable cancelled = false
-        let mutable granted = false
+    type private Waiter(ct: CancellationToken) =
+        let tcs = TaskCompletionSource<unit>()
+        let mutable canceled = ct.IsCancellationRequested
 
         do
-            // Poll cancellation without CancellationTokenRegistration.Dispose
-            // (unsupported under Fable). Cheap while parked on the large gate.
-            let rec poll () =
-                emitJsExpr
-                    (fun () ->
-                        if granted || cancelled then
-                            ()
-                        elif ct.IsCancellationRequested then
-                            cancelled <- true
-                            completion.TrySetCanceled() |> ignore
-                            onCancel ()
-                        else
-                            emitJsExpr (poll, 15) "setTimeout($0, $1)" |> ignore)
-                    "$0()"
+            if canceled then
+                trySetCanceled tcs |> ignore
+            else
+                ct.Register(fun () ->
+                    canceled <- true
+                    trySetCanceled tcs |> ignore)
                 |> ignore
 
-            if ct.IsCancellationRequested then
-                cancelled <- true
-                completion.TrySetCanceled() |> ignore
-            else
-                poll ()
-
-        member _.Completion = completion.Task
-        member _.IsCancelled = cancelled
+        member _.Task = tcs.Task
+        member _.IsCanceled = canceled
 
         member _.TryGrant() =
-            if cancelled || granted then
+            if canceled then
                 false
             else
-                granted <- true
-                completion.TrySetResult(()) |> ignore
+                trySetResult tcs () |> ignore
                 true
 
     let private waiters = Queue<Waiter>()
     let mutable private held = false
     let private gate = obj ()
 
-    let getCount () : int =
+    let getCount () =
         lock gate (fun () -> if held then 0 else 1)
 
     let private pumpUnlocked () =
@@ -64,26 +48,19 @@ module LargeGate =
 
     let acquire (ct: CancellationToken) : Task =
         if ct.IsCancellationRequested then
-            let done' = TaskCompletionSource<unit>()
-            done'.SetCanceled()
-            done'.Task
+            let tcs = TaskCompletionSource<unit>()
+            trySetCanceled tcs |> ignore
+            tcs.Task
         else
             lock gate (fun () ->
                 if not held && waiters.Count = 0 then
                     held <- true
-                    Task.FromResult(()) :> Task
+                    Task.FromResult() :> Task
                 else
-                    let waiter =
-                        Waiter(
-                            ct,
-                            fun () ->
-                                lock gate (fun () ->
-                                    if not held then
-                                        pumpUnlocked ())
-                        )
-
+                    let waiter = Waiter ct
                     waiters.Enqueue waiter
-                    waiter.Completion)
+                    pumpUnlocked ()
+                    waiter.Task)
 
     let release () : unit =
         lock gate (fun () ->

@@ -3,12 +3,10 @@ namespace Wanxiangshu.Next.Journal
 open System
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Domain
 open AgentFactsFoldHelpers
 
 module internal AgentFactsFallback =
-
-    let private failureIdentity (logicalRunId: string) (authorityRootUserMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     let private rememberFailureId (ids: string list) (identity: string) =
         let next = identity :: (ids |> List.filter ((<>) identity))
@@ -49,7 +47,10 @@ module internal AgentFactsFallback =
             else
                 p.AuthorityRootUserMessageId
 
-        let identity = failureIdentity logicalRunId authorityRoot p.ProviderAttempt
+        let identity =
+            AgentPairCursor.failureIdentity (
+                AgentPairCursor.attemptIdentity logicalRunId authorityRoot p.ProviderAttempt
+            )
 
         let sessions =
             updateSession
@@ -62,16 +63,12 @@ module internal AgentFactsFallback =
 
                     let fb =
                         if List.contains identity baseline.RecentFailureIds then
-                            // Duplicate retry identity: do not advance cursor.
                             baseline
                         else
-                            let ids = rememberFailureId baseline.RecentFailureIds identity
-                            let nextOffset = FallbackProjection.advance baseline.Offset
-
                             { baseline with
-                                Offset = nextOffset
+                                Offset = AgentPairCursor.advance baseline.Offset
                                 LastProviderAttempt = tryParseAttempt p.ProviderAttempt
-                                RecentFailureIds = ids }
+                                RecentFailureIds = rememberFailureId baseline.RecentFailureIds identity }
 
                     { s with Fallback = Some fb })
                 proj.Sessions

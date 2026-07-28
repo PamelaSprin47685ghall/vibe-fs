@@ -192,7 +192,7 @@ module CoderTool =
                                                     None
 
                                             match outcome with
-                                            | Ok(messageId, _) -> return Ok messageId
+                                            | Ok messageId -> return Ok messageId
                                             | Error err -> return Error err
                                         }
                                     | None ->

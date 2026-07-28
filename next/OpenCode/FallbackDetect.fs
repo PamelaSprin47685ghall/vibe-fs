@@ -9,6 +9,8 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Session.DurableFallback
+open Wanxiangshu.Next.Domain
 
 /// Detects failed assistant turns when a session reaches IDLE status.
 /// Does NOT rely on remote error fields or raw SSE streaming chunks.
@@ -143,14 +145,10 @@ module FallbackDetect =
             let canonical = stringifyMessage msg
             sprintf "anon-%s-%s" sessionId (sha256Hex canonical)
 
-    /// Single attributor: the ONLY writer of FallbackFailureRecorded.
-    /// The sole caller is the provider-retry detector (RetrySignalHandler): a
-    /// durable failure fact requires an explicit host retry status carrying a
-    /// stable message/attempt identity. Empty/xml terminals are interaction
-    /// repair (zero-width continuation), NOT provider call failures, and never
-    /// reach this function. The in-memory set mirrors the durable fold's
-    /// identity (assistantMessageId|providerAttempt) so one process run never
-    /// double-appends; the fold is the cross-restart idempotency boundary.
+    /// Builds and appends the durable FallbackFailureRecorded fact. The sole
+    /// caller is RetrySignalHandler; terminal/idle paths must not reach this.
+    /// Returns the updated cursor after the append so callers can see the next
+    /// EffectiveAgent, but the journal fold is the single source of truth.
     let recordFallbackFailure
         (journal: AgentJournal option)
         (recorded: HashSet<string>)
@@ -160,18 +158,20 @@ module FallbackDetect =
         (assistantMessageId: string)
         (providerAttempt: string)
         (reason: string)
-        : FallbackDecision =
+        : AgentPairCursor.FallbackCursor =
         let sid = SessionId.create sessionId
-        // Must match AgentJournal.fallbackIdentity / fold RecentFailureIds.
-        let identity =
-            AgentJournal.fallbackIdentity logicalRunId authorityRootUserMessageId providerAttempt
 
-        let currentDecision (j: AgentJournal) =
+        let identity =
+            AgentPairCursor.failureIdentity (
+                AgentPairCursor.attemptIdentity logicalRunId authorityRootUserMessageId providerAttempt
+            )
+
+        let currentCursor (j: AgentJournal) =
             DurableFallback.nextDecision sid (AgentJournal.snapshot j)
 
-        let append () : FallbackDecision =
+        let append () : AgentPairCursor.FallbackCursor =
             match journal with
-            | None -> FallbackDecision.NextAttempt Fallback.initial
+            | None -> AgentPairCursor.initial
             | Some j ->
                 let fact =
                     AgentFact.FallbackFailureRecorded
@@ -183,17 +183,12 @@ module FallbackDetect =
                            ProviderAttempt = providerAttempt |}
 
                 match AgentJournal.appendAgent (StreamId.Session sid) None fact j with
-                | Ok _ -> currentDecision j
+                | Ok _ -> currentCursor j
                 | Error _ ->
-                    // Append failed (e.g. duplicate race): keep current cursor decision.
-                    currentDecision j
+                    // Append failed (e.g. duplicate race): keep current cursor.
+                    currentCursor j
 
         if recorded.Add identity then
-            // In-memory fast path passed. Check the durable projection — the
-            // cross-restart boundary — and skip the append if this identity was
-            // already recorded in a prior process run. Uses the BOUNDED
-            // per-session RecentFailureIds (not a global HashSet) so memory is
-            // O(sessions), not O(history).
             match journal with
             | None -> append ()
             | Some j ->
@@ -205,9 +200,8 @@ module FallbackDetect =
                     |> Option.bind (fun session -> session.Fallback)
                     |> Option.exists (fun fb -> List.contains identity fb.RecentFailureIds)
 
-                if alreadyRecorded then currentDecision j else append ()
+                if alreadyRecorded then currentCursor j else append ()
         else
-            // Already seen this process run; return the current projection decision.
             match journal with
-            | None -> FallbackDecision.NextAttempt Fallback.initial
-            | Some j -> currentDecision j
+            | None -> AgentPairCursor.initial
+            | Some j -> currentCursor j

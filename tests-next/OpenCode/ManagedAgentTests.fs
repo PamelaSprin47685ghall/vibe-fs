@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Tests.OpenCode
 
 open Xunit
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.OpenCode
 
 module ManagedAgentTests =
@@ -82,21 +83,27 @@ module ManagedAgentTests =
     [<Fact>]
     let ``effective_agent_follows_infinite_AABB_from_selected_tier`` () =
         let seq12 =
-            EffectiveAgentResolver.sideSequence 12
+            AgentPairCursor.sideSequence 12
             |> List.map (function
-                | EffectiveAgentResolver.ModelSide.SideA -> "A"
-                | EffectiveAgentResolver.ModelSide.SideB -> "B")
+                | AgentPairCursor.ModelSide.SideA -> "A"
+                | AgentPairCursor.ModelSide.SideB -> "B")
 
         Assert.equal ([ "A"; "A"; "B"; "B"; "A"; "A"; "B"; "B"; "A"; "A"; "B"; "B" ], seq12)
 
         let selected = ManagedAgent.make AgentTier.Deep Role.Inspector
-        let cursor0 = EffectiveAgentResolver.initialCursor
-        Assert.equal ("deep-inspector", EffectiveAgentResolver.effectiveAgentFromManaged selected cursor0)
+        let cursor0 = AgentPairCursor.initial
+        Assert.equal ("deep-inspector", PromptAuthority.effectiveAgentFromManaged selected cursor0)
 
-        let cursor2 = { cursor0 with Offset = 2uy }
-        Assert.equal ("fast-inspector", EffectiveAgentResolver.effectiveAgentFromManaged selected cursor2)
+        let cursor2: AgentPairCursor.FallbackCursor =
+            { Offset = 2uy
+              LastProviderAttempt = None }
 
-        let cursor3 = { cursor0 with Offset = 3uy }
-        let after = EffectiveAgentResolver.advanceCursor cursor3 99L
+        Assert.equal ("fast-inspector", PromptAuthority.effectiveAgentFromManaged selected cursor2)
+
+        let cursor3: AgentPairCursor.FallbackCursor =
+            { Offset = 3uy
+              LastProviderAttempt = None }
+
+        let after = AgentPairCursor.advanceCursor cursor3 99L
         Assert.equal (0uy, after.Offset)
-        Assert.equal ("deep-inspector", EffectiveAgentResolver.effectiveAgentFromManaged selected after)
+        Assert.equal ("deep-inspector", PromptAuthority.effectiveAgentFromManaged selected after)

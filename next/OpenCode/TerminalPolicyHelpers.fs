@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System.Collections.Generic
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
@@ -10,10 +11,10 @@ module TerminalPolicyHelpers =
 
     let sessionDead (journal: AgentJournal option) (sessionId: SessionId) =
         match journal with
-        | Some j -> j.IsPoisoned || DurableFallback.isDead sessionId (AgentJournal.snapshot j)
+        | Some j -> j.IsPoisoned
         | None -> false
 
-    let roleName (role: AgentRole option) =
+    let roleName (role: Wanxiangshu.Next.Session.AgentRole option) =
         role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
 
     /// True when this session is a linked child of some parent in the durable

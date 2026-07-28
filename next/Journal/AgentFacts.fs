@@ -27,12 +27,7 @@ module AgentFacts =
           AuthorityRootUserMessageId = None
           CurrentBarrierKey = None }
 
-    let emptyPromptAuthority: PromptAuthorityProjection =
-        { LastAuthorityProfile = None
-          ActiveLogicalRun = None
-          PendingClaims = Map.empty
-          AcceptedContinuationIds = Map.empty
-          RepairClaims = [] }
+    let emptyPromptAuthority = PromptAuthorityLedger.empty
 
     let emptyFallback: FallbackProjection =
         { LogicalRunId = ""
@@ -188,31 +183,11 @@ module AgentFacts =
 
         | AgentFact.FallbackFailureRecorded p -> AgentFactsFallback.foldFallbackFailureRecorded proj p
 
-        | AgentFact.AuthorityRootAccepted p ->
-            AgentFactsAuthority.foldAuthorityRootAccepted
-                proj
-                p.SessionId
-                p.LogicalRunId
-                p.HostMessageId
-                p.AuthorityKind
-                p.SelectedAgent
-                p.PeerAgent
-                p.CanonicalRole
-                p.SelectedTier
-        | AgentFact.PluginPromptClaimed p ->
-            AgentFactsAuthority.foldPluginPromptClaimed proj p.SessionId p.PromptKey p.ContinuationKind
-        | AgentFact.PluginPromptAccepted p ->
-            AgentFactsAuthority.foldPluginPromptAccepted proj p.SessionId p.PromptKey p.HostMessageId
-        | AgentFact.PluginPromptAbandoned p ->
-            AgentFactsAuthority.foldPluginPromptAbandoned proj p.SessionId p.PromptKey
-        | AgentFact.InteractionRepairClaimed p ->
-            AgentFactsAuthority.foldInteractionRepairClaimed
-                proj
-                p.SessionId
-                p.LogicalRunId
-                p.AuthorityRootUserMessageId
-                p.TerminalAssistantMessageId
-                p.RepairKind
+        | AgentFact.AuthorityRootAccepted p -> AgentFactsAuthority.foldAuthorityRootAccepted proj p
+        | AgentFact.PluginPromptClaimed p -> AgentFactsAuthority.foldPluginPromptClaimed proj p
+        | AgentFact.PluginPromptAccepted p -> AgentFactsAuthority.foldPluginPromptAccepted proj p
+        | AgentFact.PluginPromptAbandoned p -> AgentFactsAuthority.foldPluginPromptAbandoned proj p
+        | AgentFact.InteractionRepairClaimed p -> AgentFactsAuthority.foldInteractionRepairClaimed proj p
 
         | AgentFact.OrchestratorManagerJobCreated p ->
             AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch p.Prompt
