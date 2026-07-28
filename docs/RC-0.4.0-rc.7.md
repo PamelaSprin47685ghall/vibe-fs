@@ -37,5 +37,14 @@ production changes:
 
 ## Gate
 
-Requires clean `npm ci` + `test:release` (`CANARY_REPEAT=3`) including the new
-AABB canary, plus pack + empty-dir install. Evidence: `docs/evidence/0.4.0-rc.7/`.
+Sealed on clean `git clean -xfd` + `npm ci` + `test:release` (`CANARY_REPEAT=3`, 18 canaries) + pack + empty-dir install.
+Evidence: `docs/evidence/0.4.0-rc.7/` (includes `provider-aabb-trace.txt`).
+
+| Gate | Result |
+|---|---|
+| clean `npm ci` | pass |
+| tests-next | 281 |
+| gate-testkit | 29 |
+| canaries ×3 (18 scenarios) | pass |
+| pack + import | pass |
+| provider A/A/B/B wire models | pass |

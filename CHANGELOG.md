@@ -11,6 +11,12 @@ Provider-visible same-run A/A/B/B wire path on top of sealed rc.6.
 - Mock reseal on fallback A→B system-prompt cold boundary
 - Canary `fallback-aabb-trace` proves wire models `A → A → B → B` (no 5th attempt)
 
+### Sealed
+
+- Evidence: `docs/evidence/0.4.0-rc.7/`
+- tests-next 281, gate-testkit 29, 18 canaries ×3, pack+import
+- `provider-aabb-trace.txt`: models `[test-model, test-model, test-model-b, test-model-b]`
+
 ### Still blocking final 0.4.0
 
 - RC observation period with event-driven exit
