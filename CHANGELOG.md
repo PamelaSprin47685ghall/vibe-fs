@@ -11,9 +11,13 @@ Merge `worktree-0-branch` role system prompts and session-wide A semantics on to
 - A/B defined as full-session formal text / work log (not last-turn only)
 - Manager tool-contract coverage for DevOps / role surfaces
 
+### Sealed
+
+- Clean-checkout three-round gate evidence: `docs/evidence/0.4.0-rc.5/`
+- tests-next 277, gate-testkit 29, CANARY_REPEAT=3 17 canaries, pack + empty-dir import
+
 ### Still blocking final 0.4.0
 
-- Clean-checkout three-round gate on this merge commit (`docs/evidence/0.4.0-rc.5/`)
 - RC observation period with event-driven exit (no open P0/P1)
 - **Blocking**: provider-visible same-run A/A/B/B request trajectory (`A → A → B → B`, no 5th request) plus omit-model BaseModel inheritance reset
 - Private distribution only unless a separate license decision replaces `LICENSE`

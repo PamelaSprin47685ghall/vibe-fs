@@ -1,0 +1,58 @@
+338:tests-next Results: 277 passed, 0 failed, 0 skipped, Total 277
+407:29 passed, 0 failed
+410:Starting 17 canary tests in dynamic event-staggered full-parallel mode (3 iteration(s), max=17)...
+412:--- Canary Iteration 1/3 ---
+433:  ✓ companion-canary.mjs passed
+434:  ✓ orchestrator-restart-publish-canary.mjs passed
+435:  ✓ fallback-canary.mjs passed
+436:  ✓ host-nudge-canary.mjs passed
+437:  ✓ host-restart-canary.mjs passed
+438:  ✓ manager-full-loop-canary.mjs passed
+439:  ✓ companion-replacement-canary.mjs passed
+440:  ✓ executor-canary.mjs passed
+441:  ✓ reviewer-verdict-canary.mjs passed
+442:  ✓ process-stress-canary.mjs passed
+443:  ✓ agent-dsl-canary.mjs passed
+444:  ✓ orchestrator-publish-canary.mjs passed
+445:  ✓ orchestrator-canary.mjs passed
+446:  ✓ reviewer-restart-canary.mjs passed
+447:  ✓ inspector-oneshot-canary.mjs passed
+448:  ✓ companion-cache-canary.mjs passed
+449:  ✓ pty-stress-canary.mjs passed
+450:--- Canary Iteration 2/3 ---
+471:  ✓ companion-canary.mjs passed
+472:  ✓ host-restart-canary.mjs passed
+473:  ✓ orchestrator-publish-canary.mjs passed
+474:  ✓ orchestrator-canary.mjs passed
+475:  ✓ inspector-oneshot-canary.mjs passed
+476:  ✓ agent-dsl-canary.mjs passed
+477:  ✓ fallback-canary.mjs passed
+478:  ✓ orchestrator-restart-publish-canary.mjs passed
+479:  ✓ executor-canary.mjs passed
+480:  ✓ pty-stress-canary.mjs passed
+481:  ✓ reviewer-restart-canary.mjs passed
+482:  ✓ companion-cache-canary.mjs passed
+483:  ✓ companion-replacement-canary.mjs passed
+484:  ✓ manager-full-loop-canary.mjs passed
+485:  ✓ process-stress-canary.mjs passed
+486:  ✓ host-nudge-canary.mjs passed
+487:  ✓ reviewer-verdict-canary.mjs passed
+488:--- Canary Iteration 3/3 ---
+509:  ✓ executor-canary.mjs passed
+510:  ✓ reviewer-restart-canary.mjs passed
+511:  ✓ orchestrator-canary.mjs passed
+512:  ✓ orchestrator-restart-publish-canary.mjs passed
+513:  ✓ host-restart-canary.mjs passed
+514:  ✓ reviewer-verdict-canary.mjs passed
+515:  ✓ agent-dsl-canary.mjs passed
+516:  ✓ pty-stress-canary.mjs passed
+517:  ✓ inspector-oneshot-canary.mjs passed
+518:  ✓ process-stress-canary.mjs passed
+519:  ✓ fallback-canary.mjs passed
+520:  ✓ manager-full-loop-canary.mjs passed
+521:  ✓ companion-replacement-canary.mjs passed
+522:  ✓ orchestrator-publish-canary.mjs passed
+523:  ✓ host-nudge-canary.mjs passed
+524:  ✓ companion-cache-canary.mjs passed
+525:  ✓ companion-canary.mjs passed
+527:All staggered parallel canary tests passed cleanly across 3 iteration(s).

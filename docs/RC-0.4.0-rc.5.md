@@ -18,11 +18,19 @@
 
 ## Gate
 
-Requires clean `npm ci` + `test:release` (`CANARY_REPEAT=3`) on this version cut, plus pack + empty-dir install, before distribution claims. Evidence target: `docs/evidence/0.4.0-rc.5/`.
+Sealed on clean `git clean -xfd` + `npm ci` + `test:release` (`CANARY_REPEAT=3`) + pack + empty-dir install.
+Evidence: `docs/evidence/0.4.0-rc.5/`.
+
+| Gate | Result |
+|---|---|
+| clean `npm ci` | pass |
+| `tests-next` | 277 passed |
+| manager-tools + gate-testkit | pass (29) |
+| `CANARY_REPEAT=3` 17 canaries | pass |
+| pack + empty-dir install/import | pass |
 
 ## Still blocking final 0.4.0
 
-- Sealed rc.5 (or later RC) evidence on an immutable commit
 - Observation period with no open P0/P1
 - **Blocking** provider-visible same-run A/A/B/B request trajectory
 - Second clean-checkout gate after promotion to version `0.4.0`
