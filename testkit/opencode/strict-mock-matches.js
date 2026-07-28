@@ -115,6 +115,9 @@ export function requestRoleOf(body) {
 
   const tools = extractToolNames(body);
   if (tools.includes('verdict')) return 'reviewer';
+  // DevOps owns fork-pty and may also see executor/inspector/coder tools.
+  // Must be classified before the bare executor→inspector heuristic.
+  if (tools.includes('fork-pty')) return 'devops';
   if (tools.includes('executor')) return 'inspector';
   if (tools.includes('write') || tools.includes('edit')) return 'coder';
   if (tools.includes('fork') && tools.includes('join') && tools.includes('list')) return 'manager';
