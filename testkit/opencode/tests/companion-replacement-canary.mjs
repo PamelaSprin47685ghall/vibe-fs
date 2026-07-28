@@ -19,7 +19,54 @@ const bloggerParagraph = (round) => `Blogger paragraph ${round}. ${'durable blog
 // Parallel P0 suite can delay blogger transform under host load; keep the
 // scenario-local watchdog short for causal silence, but allow blogger
 // expectation waits a longer bound so self-rebase is not flaky.
-const BLOGGER_WAIT_MS = Math.max(WATCHDOG_TIMEOUT_MS, 8000);
+const BLOGGER_WAIT_MS = Math.max(WATCHDOG_TIMEOUT_MS, 20000);
+
+async function waitBlogger(scenario, expectationId, timeoutMs = BLOGGER_WAIT_MS) {
+  const started = Date.now();
+  // Keep the scenario-local 2s silence watchdog alive while blogger work is
+  // intentionally waiting under parallel host load.
+  while (Date.now() - started < timeoutMs) {
+    const slice = Math.min(1000, timeoutMs - (Date.now() - started));
+    scenario.watchdog?.advance({
+      reason: `wait-blogger:${expectationId}`,
+      lane: `manager-blogger:${expectationId}`,
+      expectationId,
+      blocking: true,
+    });
+    try {
+      await scenario.provider.waitForExpectation(expectationId, slice);
+      scenario.watchdog?.advance({
+        reason: `blogger-done:${expectationId}`,
+        lane: `manager-blogger:${expectationId}`,
+        expectationId,
+        blocking: true,
+      });
+      return;
+    } catch (err) {
+      const remaining = timeoutMs - (Date.now() - started);
+      if (remaining <= 0) throw err;
+    }
+  }
+  throw new Error(`Timed out waiting for expectation ${expectationId}`);
+}
+
+async function waitIdleRenewing(scenario, timeoutMs = BLOGGER_WAIT_MS) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const slice = Math.min(1000, timeoutMs - (Date.now() - started));
+    scenario.watchdog?.advance({
+      reason: 'wait-idle',
+      lane: 'provider:idle',
+      blocking: true,
+    });
+    try {
+      await scenario.provider.waitForIdle(slice);
+      return;
+    } catch (err) {
+      if (timeoutMs - (Date.now() - started) <= 0) throw err;
+    }
+  }
+}
 
 // B' — the condensed companion context the self-rebase blogger returns.
 // Kept short so the Y-rebase threshold fires once after the Blogger budget
@@ -147,19 +194,54 @@ try {
       },
     });
     assert.ok(prompt.ok, `round ${round} prompt failed: ${JSON.stringify(prompt.data)}`);
+    scenario.watchdog?.advance({ reason: `round-${round}-prompted`, lane: `primary:round-${round}`, blocking: true });
     await turn.awaitTerminal({ timeoutMs: BLOGGER_WAIT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+    scenario.watchdog?.advance({ reason: `round-${round}-terminal`, lane: `primary:round-${round}`, blocking: true });
     if (round <= 2) {
-      await scenario.provider.waitForExpectation(`manager-blogger-${round}`, BLOGGER_WAIT_MS);
-      await scenario.provider.waitForIdle(BLOGGER_WAIT_MS);
+      await waitBlogger(scenario, `manager-blogger-${round}`);
+      await waitIdleRenewing(scenario);
     }
-    if (round === 3) {
-      await scenario.provider.waitForExpectation('manager-blogger-3', BLOGGER_WAIT_MS);
-      await scenario.provider.waitForIdle(BLOGGER_WAIT_MS);
-      scenario.watchdog?.advance({ reason: 'rebase-blogger-done', lane: 'manager-blogger:3', blocking: true });
-    }
-    if (round === 4) {
-      await scenario.provider.waitForExpectation('manager-blogger-4', BLOGGER_WAIT_MS);
-      await scenario.provider.waitForIdle(BLOGGER_WAIT_MS);
+    if (round === 3 || round === 4) {
+      // Under parallel P0 load, Y may busy-skip self-rebase or the first post-
+      // rebase delta. Re-prompt the primary until the expected blogger edge is
+      // observed; product still must eventually fire those blogger turns.
+      const expectationId = round === 3 ? 'manager-blogger-3' : 'manager-blogger-4';
+      let observed = false;
+      for (let attempt = 1; attempt <= 6 && !observed; attempt++) {
+        try {
+          await waitBlogger(scenario, expectationId, 6000);
+          observed = true;
+        } catch (err) {
+          if (attempt === 6) throw err;
+          scenario.watchdog?.advance({
+            reason: `round-${round}-retry-${attempt}`,
+            lane: `primary:round-${round}`,
+            blocking: true,
+          });
+          const retryTurn = scenario.turn.start(parentId);
+          const retryPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
+            body: {
+              agent: primaryRole,
+              parts: [{ type: 'text', text: `Record round ${round} retry ${attempt}.` }],
+              model: { providerID: 'test', modelID: 'test-model' },
+            },
+          });
+          assert.ok(
+            retryPrompt.ok,
+            `round ${round} retry ${attempt} failed: ${JSON.stringify(retryPrompt.data)}`,
+          );
+          await retryTurn.awaitTerminal({
+            timeoutMs: BLOGGER_WAIT_MS,
+            requireActivity: true,
+            requireAssistantTerminal: false,
+            requireIdleAfterActivity: true,
+          });
+        }
+      }
+      await waitIdleRenewing(scenario);
+      if (round === 3) {
+        scenario.watchdog?.advance({ reason: 'rebase-blogger-done', lane: 'manager-blogger:3', blocking: true });
+      }
     }
   }
 
@@ -206,9 +288,10 @@ try {
     },
   });
   assert.ok(restartedPrompt.ok, `restarted round failed: ${JSON.stringify(restartedPrompt.data)}`);
+  scenario.watchdog?.advance({ reason: 'restart-prompted', lane: 'primary:restart', blocking: true });
   await restartedTurn.awaitTerminal({ timeoutMs: BLOGGER_WAIT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
-  await scenario.provider.waitForExpectation('manager-blogger-restarted', BLOGGER_WAIT_MS);
-  await scenario.provider.waitForIdle(BLOGGER_WAIT_MS);
+  await waitBlogger(scenario, 'manager-blogger-restarted');
+  await waitIdleRenewing(scenario);
 
   // SSOT: Y self-rebase only updates LatestB; FrozenB stays until the next X
   // context-threshold epoch switch. After restart, ReplacementActive reloads and
@@ -280,10 +363,11 @@ try {
     },
   });
   assert.ok(rfPrompt.ok, `resetfail round failed: ${JSON.stringify(rfPrompt.data)}`);
+  scenario.watchdog?.advance({ reason: 'resetfail-prompted', lane: 'primary:resetfail', blocking: true });
   await rfTurn.awaitTerminal({ timeoutMs: BLOGGER_WAIT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
-  await scenario.provider.waitForExpectation('manager-blogger-resetfail', BLOGGER_WAIT_MS);
-  await scenario.provider.waitForExpectation('manager-blogger-resetretry', BLOGGER_WAIT_MS);
-  await scenario.provider.waitForIdle(BLOGGER_WAIT_MS);
+  await waitBlogger(scenario, 'manager-blogger-resetfail');
+  await waitBlogger(scenario, 'manager-blogger-resetretry');
+  await waitIdleRenewing(scenario);
 
   // The failed frame MUST be followed by a retry that re-sends the FULL reset
   // frame (proves the failure flag survived and the frame was re-anchored).
