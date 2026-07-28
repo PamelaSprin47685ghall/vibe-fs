@@ -23,7 +23,8 @@ type HostForkRuntime
         ?directoryFor: string -> string option,
         ?onRunStarted: SessionId -> AgentRole -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> string option,
-        ?childWorkRecordFor: SessionId -> string option
+        ?childWorkRecordFor: SessionId -> string option,
+        ?sessionSnapshot: ISessionSnapshotPort
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -43,8 +44,6 @@ type HostForkRuntime
         HostForkRunLifecycle.childPromptSender sessions parentId modelResolver journal directoryOf
     let sendBusyNudge =
         HostForkBusyNudge.sender sessions parentId modelResolver journal directoryOf
-    // Fire-and-forget: the parent-abort callback is synchronous (unit -> unit)
-    // but cancellation is best-effort async work, so we discard the Task.
     let parentAbortToken =
         Pty.registerParentAbort parentKey (fun () -> this.Cancel() |> ignore)
     do
@@ -52,25 +51,25 @@ type HostForkRuntime
             lock gate (fun () -> ptyRuns.Add completion.RunId |> ignore)
             runtime.UnregisterPty completion.RunId
             runtime.PublishCompletion completion)
+    let completedTask () : Task = task { return () } :> Task
+    let mutable recoveryTask: Task = completedTask ()
+
     let restoreChildren () =
         match journal with
-        | None -> ()
-        | Some journal ->
-            let snapshot = AgentJournal.snapshot journal
-            match Map.tryFind parentId snapshot.AgentProjections.Sessions with
-            | Some session when session.Linkage.IsSome ->
-                let linkage = session.Linkage.Value
-                for KeyValue(childId, agentId) in linkage.LinkedChildren do
-                    let role = linkage.LinkedRoles |> Map.tryFind childId |> Option.bind roleOfString
-                    match role with
-                    | Some role ->
-                        let childSessionId = SessionId.create (ChildId.value childId)
-                        children.[agentId] <- childSessionId
-                        runtime.Restore(agentId, role)
-                        childCreatedDir agentId childSessionId (directoryOf agentId)
-                    | None -> ()
-            | _ -> ()
-    do restoreChildren ()
+        | None -> completedTask ()
+        | Some j ->
+            HostForkRestart.restoreLinkedChildren
+                runtime sessionSnapshot j parentId children childCreatedDir directoryOf
+
+    do recoveryTask <- restoreChildren ()
+
+    let awaitRecovery () =
+        task {
+            try
+                do! recoveryTask
+            with _ ->
+                ()
+        }
     let complete run outcome =
         let workRecord =
             match outcome with
@@ -90,10 +89,7 @@ type HostForkRuntime
 
     member _.Fork(agentId: string, role: AgentRole, prompt: string) : Task<Result<ForkResult, string>> =
         task {
-            // Restart recovery: linkage restore repopulates the child map from
-            // the journal; Fork reuses the SAME child session (OpenCode is the
-            // external authority on child identity; plugin runtime restart does
-            // not invalidate it). Dead state is checked before any send below.
+            do! awaitRecovery ()
             let existing =
                 lock gate (fun () ->
                     match children.TryGetValue agentId with
@@ -165,7 +161,6 @@ type HostForkRuntime
                         | _ ->
                             markReady run
 
-                            // Inject parent work record (LatestB) as background context
                             let enrichedPrompt =
                                 match parentWorkRecordOf parentId with
                                 | Some workRecord when not (System.String.IsNullOrWhiteSpace workRecord) ->
@@ -177,15 +172,14 @@ type HostForkRuntime
 %s
 
 [Required final report]
-%s"
-                                        workRecord
-                                        prompt
-                                        "Result:
+Result:
 Files changed:
 Tests run:
 Evidence:
 Remaining risks:
 Blockers:"
+                                        workRecord
+                                        prompt
                                 | _ -> prompt
 
                             let! sent =
@@ -207,6 +201,7 @@ Blockers:"
 
     member _.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
         task {
+            do! awaitRecovery ()
             let existing =
                 lock gate (fun () ->
                     match children.TryGetValue agentId with
@@ -228,9 +223,6 @@ Blockers:"
                     match roleOpt with
                     | None -> return Error(sprintf "Unknown agent id: %s" agentId)
                     | Some role ->
-                        // The prompt must carry the role: after a host restart
-                        // OpenCode resolves an agent-less child prompt to the
-                        // default build agent, not the session's original role.
                         return!
                             HostForkChildDispatch.sendToExistingChild
                                 gate
@@ -261,21 +253,22 @@ Blockers:"
         lock gate (fun () -> ptyRuns.Contains runId)
 
     member _.PtyPort = ptyPort
-    member _.Join() : Task<Result<RunCompletion, ForkError>> = runtime.Join()
-    member _.List() = runtime.List()
+    member _.Join() : Task<Result<RunCompletion, ForkError>> =
+        task {
+            do! awaitRecovery ()
+            return! runtime.Join()
+        }
+
+    member _.List() =
+        runtime.List()
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
     member this.Cancel() : Task<unit> =
         task {
-            // Reject new runs before awaiting owner cleanup; cancellation is the
-            // synchronization boundary for concurrent Fork/Reuse callers.
             runtime.Cancel()
-            // Await PTY owner cleanup before tearing down sessions.
             do! ptyPort.CloseAll()
             Pty.unregisterParentAbort parentKey parentAbortToken
 
-            // Complete every pending run as Cancelled before clearing tables so
-            // join waiters never hang after parent abort.
             let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
 
             for run in pending do
@@ -285,9 +278,6 @@ Blockers:"
 
             match teardown with
             | Ok() ->
-                // Drop stale linkage/run bookkeeping so a re-entrant Fork/Reuse
-                // after Cancel cannot re-resolve an already-aborted child. Cleared
-                // only after teardown has persisted the unlink facts and aborted.
                 lock gate (fun () ->
                     children.Clear()
                     pendingRuns.Clear())

@@ -64,6 +64,20 @@ module VerdictSurface =
                                 if String.IsNullOrWhiteSpace text then None else Some text)
         }
 
+    let private authorityAgent (journal: AgentJournal option) (sessionId: string) : string option =
+        match journal with
+        | None -> None
+        | Some j ->
+            let svc = PromptDispatcher.forJournal j
+
+            match svc.ActiveProfile(SessionId.create sessionId) with
+            | Some profile when not (String.IsNullOrWhiteSpace profile.Agent) -> Some profile.Agent
+            | _ ->
+                Map.tryFind (SessionId.create sessionId) (AgentJournal.snapshot j).AgentProjections.Sessions
+                |> Option.bind (fun session -> session.PromptAuthority)
+                |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+                |> Option.map (fun run -> run.Agent)
+
     let create
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
@@ -80,14 +94,12 @@ module VerdictSurface =
             task {
                 let sid = contextString ctx "sessionID"
 
+                // Authority is SSOT for role gating. Host tool context agent is the only
+                // non-authority input; sessionRoles is never consulted.
                 let role =
-                    contextString ctx "agent"
-                    |> Option.orElseWith (fun () ->
-                        sid
-                        |> Option.bind (fun id ->
-                            match sessionRoles.TryGetValue id with
-                            | true, v -> Some v
-                            | false, _ -> None))
+                    match sid with
+                    | Some id -> authorityAgent journal id |> Option.orElse (contextString ctx "agent")
+                    | None -> contextString ctx "agent"
 
                 let callId =
                     contextString ctx "toolCallId" |> Option.orElse (contextString ctx "callID")

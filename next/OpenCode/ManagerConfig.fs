@@ -33,6 +33,5 @@ module ManagerConfig =
             // host only honors it via cfg.compaction.auto === false (host-docs 05.md:331),
             // so emit it explicitly on the mutated config object.
             config?compaction <- createObj [ "auto" ==> false ]
-            // Plugin owns same Logical-Run A/A/B/B via ProviderRetryAttempt
-            // continuations; host built-in retries must not race that path.
-            config?chatMaxRetries <- 0
+            // Do not write unknown host config keys here: an invalid field can
+            // prevent the whole agent registration map from loading.

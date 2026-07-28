@@ -15,20 +15,16 @@ module ExecutorSummarize =
     [<Literal>]
     let ReduceFanIn = 8
 
-    /// Minimal runtime surface the summarizer needs: fork an Executor agent and
-    /// await one completion. Decoupled from HostForkRuntime so the summarizer can
-    /// run on a PRIVATE mailbox (never the Manager's Join) — bug #1.
+    /// Private mailbox surface: fork Executor + Join. Never Manager Join.
     type IExecutorRuntime =
         abstract Fork: string * AgentRole * string -> Task<Result<ForkResult, string>>
         abstract Join: unit -> Task<Result<RunCompletion, ForkError>>
 
-    /// Wrap a HostForkRuntime as the summarizer's private mailbox (production path).
     let asExecutorRuntime (runtime: HostForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
             member _.Fork(agentId, role, prompt) = runtime.Fork(agentId, role, prompt)
             member _.Join() = runtime.Join() }
 
-    /// Wrap a bare ForkRuntime as the summarizer mailbox (tests / fakes).
     let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
             member _.Fork(agentId, role, prompt) =
@@ -54,17 +50,19 @@ module ExecutorSummarize =
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAborted payload -> raise (InvalidOperationException payload.Message)
 
-    /// Join until the target Executor completes; stash foreign (other Executor)
-    /// completions so a concurrent reduce cannot be mistaken for a map result.
-    /// Only sees completions on THIS private mailbox, so the Manager mailbox is
-    /// never starved.
     let awaitAgent (runtime: IExecutorRuntime) (agentId: string) (stash: Dictionary<string, RunCompletion>) =
         task {
-            match stash.TryGetValue agentId with
-            | true, completion ->
-                stash.Remove agentId |> ignore
-                return completion
-            | false, _ ->
+            let fromStash =
+                lock stash (fun () ->
+                    match stash.TryGetValue agentId with
+                    | true, completion ->
+                        stash.Remove agentId |> ignore
+                        Some completion
+                    | false, _ -> None)
+
+            match fromStash with
+            | Some completion -> return completion
+            | None ->
                 let mutable result: RunCompletion = Unchecked.defaultof<_>
                 let mutable done' = false
 
@@ -78,7 +76,8 @@ module ExecutorSummarize =
                     | Ok completion when completion.AgentId = agentId ->
                         result <- completion
                         done' <- true
-                    | Ok completion -> stash.[completion.AgentId] <- completion
+                    | Ok completion ->
+                        lock stash (fun () -> stash.[completion.AgentId] <- completion)
 
                 return result
         }
@@ -146,9 +145,6 @@ module ExecutorSummarize =
 
         runExecutorPrompt runtime stash batchDigest level 0 (List.length batch - 1) prompt
 
-    /// Online carry/ripple reduce: summaries fill level 0 up to ReduceFanIn-1; at
-    /// fanIn they collapse immediately into one summary pushed to level 1, and so
-    /// on. Memory stays O(fanIn * log chunks) — never holds all summaries at once.
     let private rippleInsert
         (reduceBatch: int -> string list -> Task<string>)
         (levels: ResizeArray<ResizeArray<string>>)
@@ -173,7 +169,6 @@ module ExecutorSummarize =
                 lvl <- lvl + 1
         }
 
-    /// Fold remaining level arrays bottom-up into a single summary.
     let private foldLevels
         (reduceBatch: int -> string list -> Task<string>)
         (levels: ResizeArray<ResizeArray<string>>)
@@ -199,7 +194,6 @@ module ExecutorSummarize =
                 | _ -> return ""
         }
 
-    /// Testable core: reduce an already-materialized summary list online.
     let reduceOnline (reduceBatch: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
         task {
             let levels = ResizeArray<ResizeArray<string>>()
@@ -210,23 +204,91 @@ module ExecutorSummarize =
             return! foldLevels reduceBatch levels
         }
 
-    /// Maps each bounded spool chunk sequentially, reducing online so memory stays
-    /// bounded; never holds more than ReduceFanIn * log(chunks) summaries.
+    /// Maps bounded spool chunks concurrently (results sorted by chunk index),
+    /// then reduces online. Map/reduce failures yield partial summary plus the
+    /// last 200KB raw tail instead of dropping ProcessResult.
     let summarizeSpool (runtime: IExecutorRuntime) (spoolPath: string) =
         task {
             let stash = Dictionary<string, RunCompletion>()
-            let levels = ResizeArray<ResizeArray<string>>()
+            let chunks = ResizeArray<int * byte[]>()
             let mutable index = 0
 
             do!
                 Spool.readChunks spoolPath (fun chunk ->
                     task {
-                        let current = index
+                        chunks.Add(index, Array.copy chunk)
                         index <- index + 1
-                        let! summary = summarizeChunk runtime stash spoolPath chunk current
-                        do! rippleInsert (reduceBatch runtime stash) levels summary
-                        return ()
                     })
 
-            return! foldLevels (reduceBatch runtime stash) levels
+            // Start all map tasks first (concurrent), then await in index order.
+            let mapTasks =
+                [| for (chunkIndex, chunk) in chunks do
+                       task {
+                           try
+                               let! summary = summarizeChunk runtime stash spoolPath chunk chunkIndex
+                               return Choice1Of2(chunkIndex, summary)
+                           with ex ->
+                               return Choice2Of2(chunkIndex, chunk, ex.Message)
+                       } |]
+
+            let mapped = Array.zeroCreate mapTasks.Length
+
+            for i in 0 .. mapTasks.Length - 1 do
+                let! result = mapTasks.[i]
+                mapped.[i] <- result
+
+            let successes =
+                mapped
+                |> Array.choose (function
+                    | Choice1Of2 value -> Some value
+                    | Choice2Of2 _ -> None)
+                |> Array.sortBy fst
+
+            let failures =
+                mapped
+                |> Array.choose (function
+                    | Choice2Of2 value -> Some value
+                    | Choice1Of2 _ -> None)
+
+            let levels = ResizeArray<ResizeArray<string>>()
+
+            try
+                for _, summary in successes do
+                    do! rippleInsert (reduceBatch runtime stash) levels summary
+
+                let! reduced = foldLevels (reduceBatch runtime stash) levels
+
+                if failures.Length = 0 then
+                    return reduced
+                else
+                    let lastChunk =
+                        if chunks.Count = 0 then
+                            [||]
+                        else
+                            snd chunks.[chunks.Count - 1]
+
+                    let rawTail = Encoding.UTF8.GetString lastChunk
+
+                    if String.IsNullOrWhiteSpace reduced then
+                        return sprintf "partial summary unavailable\n--- raw tail ---\n%s" rawTail
+                    else
+                        return
+                            sprintf
+                                "%s\n--- partial: map/reduce incomplete ---\n--- raw tail ---\n%s"
+                                reduced
+                                rawTail
+            with ex ->
+                let lastChunk =
+                    if chunks.Count = 0 then
+                        [||]
+                    else
+                        snd chunks.[chunks.Count - 1]
+
+                let rawTail = Encoding.UTF8.GetString lastChunk
+
+                return
+                    sprintf
+                        "partial summary (reduce failed: %s)\n--- raw tail ---\n%s"
+                        ex.Message
+                        rawTail
         }

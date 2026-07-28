@@ -166,45 +166,72 @@ module ToolSurfacePty =
                                         |> box)
                                     |> Option.defaultValue null
 
-                                createObj
-                                    [ "kind", box (if isPty then "pty" else "agent")
-                                      "status", box "completed"
-                                      "agentId", box p.AgentId
-                                      "childSessionId", box p.ChildSessionId
-                                      "runId", box p.RunId
-                                      "role", box (p.Role.ToString().ToLowerInvariant())
-                                      "rootUserMessageId", box p.RootUserMessageId
-                                      "assistantMessageId", box p.AssistantMessageId
-                                      "finalText", box p.FinalText
-                                      "workRecord", work
-                                      "directory", box p.Directory
-                                      "ptyId", box (if isPty then c.RunId else null) ]
+                                // PTY exit is backend onExit only. Surface both typed agent fields and the
+                                // PTY-facing closed/outcome contract used by join consumers.
+                                if isPty then
+                                    createObj
+                                        [ "kind", box "pty"
+                                          "status", box "completed"
+                                          "agentId", box p.AgentId
+                                          "runId", box p.RunId
+                                          "finalText", box p.FinalText
+                                          "outcome", box p.FinalText
+                                          "closed", box true
+                                          "ptyId", box c.RunId ]
+                                else
+                                    createObj
+                                        [ "kind", box "agent"
+                                          "status", box "completed"
+                                          "agentId", box p.AgentId
+                                          "childSessionId", box p.ChildSessionId
+                                          "runId", box p.RunId
+                                          "role", box (p.Role.ToString().ToLowerInvariant())
+                                          "rootUserMessageId", box p.RootUserMessageId
+                                          "assistantMessageId", box p.AssistantMessageId
+                                          "finalText", box p.FinalText
+                                          "workRecord", work
+                                          "directory", box p.Directory ]
                             | AgentFailed p
                             | AgentAborted p ->
-                                createObj
-                                    [ "kind", box (if isPty then "pty" else "agent")
-                                      "status",
-                                      box (
-                                          match c.Outcome with
-                                          | AgentAborted _ -> "aborted"
-                                          | _ -> "failed"
-                                      )
-                                      "agentId", box p.AgentId
-                                      "childSessionId", box (defaultArg p.ChildSessionId null)
-                                      "runId", box p.RunId
-                                      "role",
-                                      box (
-                                          p.Role
-                                          |> Option.map (fun r -> r.ToString().ToLowerInvariant())
-                                          |> Option.defaultValue null
-                                      )
-                                      "error",
-                                      box (
-                                          createObj
-                                              [ "code", box p.Code
-                                                "message", box p.Message ]
-                                      )
-                                      "ptyId", box (if isPty then c.RunId else null) ]
+                                if isPty then
+                                    createObj
+                                        [ "kind", box "pty"
+                                          "status", box "failed"
+                                          "agentId", box p.AgentId
+                                          "runId", box p.RunId
+                                          "outcome", box p.Message
+                                          "closed", box true
+                                          "error",
+                                          box (
+                                              createObj
+                                                  [ "code", box p.Code
+                                                    "message", box p.Message ]
+                                          )
+                                          "ptyId", box c.RunId ]
+                                else
+                                    createObj
+                                        [ "kind", box "agent"
+                                          "status",
+                                          box (
+                                              match c.Outcome with
+                                              | AgentAborted _ -> "aborted"
+                                              | _ -> "failed"
+                                          )
+                                          "agentId", box p.AgentId
+                                          "childSessionId", box (defaultArg p.ChildSessionId null)
+                                          "runId", box p.RunId
+                                          "role",
+                                          box (
+                                              p.Role
+                                              |> Option.map (fun r -> r.ToString().ToLowerInvariant())
+                                              |> Option.defaultValue null
+                                          )
+                                          "error",
+                                          box (
+                                              createObj
+                                                  [ "code", box p.Code
+                                                    "message", box p.Message ]
+                                          ) ]
 
                         return box (stringify payload)
                     | Error e ->

@@ -1,0 +1,7 @@
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'ini@7.0.0',
+npm warn EBADENGINE   required: { node: '^22.22.2 || ^24.15.0 || >=26.0.0' },
+npm warn EBADENGINE   current: { node: 'v25.9.0', npm: '11.12.1' }
+npm warn EBADENGINE }
+
+added 135 packages in 2s
