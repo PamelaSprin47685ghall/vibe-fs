@@ -12,12 +12,12 @@ Use only after RC observation exit criteria pass.
 
 ## Version cut (docs/version only preferred)
 
-- [ ] `package.json` → `0.4.0`
-- [ ] `build-package.json` → `0.4.0`
-- [ ] `next/package.json` → `0.4.0`
-- [ ] No residual `0.4.0-rc.x` in ship path
-- [ ] `CHANGELOG.md` final section
-- [ ] `MIGRATION.md` / `README.md` / `docs/RELEASE-0.4.0.md`
+- [x] `package.json` → `0.4.0`
+- [x] `build-package.json` → `0.4.0`
+- [x] `next/package.json` → `0.4.0`
+- [x] No residual `0.4.0-rc.x` in ship path (RC strings only in historical changelog/evidence)
+- [x] `CHANGELOG.md` final section
+- [x] `MIGRATION.md` / `README.md` / `docs/RELEASE-0.4.0.md`
 
 ## Second clean gate on `0.4.0`
 
@@ -32,6 +32,6 @@ npm pack ./build
 
 ## Evidence
 
-- [ ] `docs/evidence/0.4.0/` complete (ENV, COMMIT, canary 3-round, provider-aabb-trace, pack, install, import, sha256, matrix)
-- [ ] tag `v0.4.0` points at gate-green commit
+- [x] `docs/evidence/0.4.0/` complete (ENV, COMMIT, canary 3-round, provider-aabb-trace, pack, install, import, sha256, matrix)
+- [ ] tag `v0.4.0` points at the gate-green commit (create after evidence commit)
 - [ ] no post-tag mutation of the same 0.4.0 artifact

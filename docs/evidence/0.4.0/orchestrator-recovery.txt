@@ -1,0 +1,6 @@
+Orchestrator crash recovery / ff-only publish (final gate canaries):
+- orchestrator-canary.mjs
+- orchestrator-publish-canary.mjs
+- orchestrator-restart-publish-canary.mjs (×3 rounds)
+Unit: OrchestratorIntegrationTests, OrchestratorRecoveryTests, AgentFactsOrchestrator*
+See full log: test-release.txt / canary-3round-clean.txt

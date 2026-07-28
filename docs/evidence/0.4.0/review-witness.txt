@@ -1,0 +1,7 @@
+Review dual-PERFECT / physical confirmation coverage (final gate canaries):
+- reviewer-verdict-canary.mjs (×3 rounds)
+- manager-full-loop-canary.mjs
+- orchestrator-canary.mjs / orchestrator-publish-canary.mjs
+- reviewer-restart-canary.mjs
+Unit: PromptAuthorityChatMessageTests, HostReviewGuard*, GuardTests, ReviewerHostTests
+See full log: test-release.txt / canary-3round-clean.txt
