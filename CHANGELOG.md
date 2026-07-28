@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.4.0-rc.3-dev — development gate after PR0–PR9
+## 0.4.0-rc.3 — release candidate after PR0–PR11
 
-This is still a **development marker**, not a distribution RC. It records that the 0.4.0 critical path through Manager dogfood + restart + Orchestrator publish has green evidence on this tree.
+First real release candidate for the 0.4.0 track. Cut only after clean-checkout `npm ci` + `test:release` (three-round canaries) and empty-dir install evidence.
 
 ### Verified on this tree
 
@@ -29,14 +29,11 @@ This is still a **development marker**, not a distribution RC. It records that t
 - PTY completion is backend onExit only.
 - Orchestrator publish is ff-only under integration lock with crash recovery facts.
 
-### Still blocking a distributed 0.4.0-rc.3 / 0.4.0
+### Still blocking final 0.4.0
 
-- Commit dirty worktree (PR7–PR11 fixes currently uncommitted)
-- Clean-checkout rebuild on that commit: `git clean -xfd && npm ci && npm run test:release`
-- Version cutover `0.4.0-rc.3-dev` → `0.4.0-rc.3` only after clean-checkout green
 - Optional: same-run provider request traces proving strict A/A/B/B under real provider retries
 - Commercial distribution license/private package policy review
-- Final `0.4.0` only after RC observation + second clean-checkout gate
+- Final `0.4.0` only after RC observation + second clean-checkout gate on this RC tag
 
 ## 0.4.0-rc.2 / 0.4.0-rc.1 — historical development markers
 

@@ -1,3 +1,5 @@
+# SUPERSEDED by docs/RC-0.4.0-rc.3.md
+
 # 0.4.0-rc.3-dev status (not distribution RC)
 
 | Field | Value |
