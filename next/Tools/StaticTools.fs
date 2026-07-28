@@ -42,7 +42,9 @@ module StaticTools =
         | ToolPermission.Glob -> "glob"
         | ToolPermission.Grep -> "grep"
         | ToolPermission.Inspector -> "inspector"
+        | ToolPermission.Coder -> "coder"
         | ToolPermission.Exec -> "executor"
+        | ToolPermission.Pty -> "fork-pty"
         | ToolPermission.Network -> "network"
         | ToolPermission.Verdict -> "verdict"
 
@@ -52,8 +54,8 @@ module StaticTools =
     let permissionObj (role: Role) : obj =
         let allowed = Roles.permissions role |> Set.map toolName
         let known =
-            [ "fork"; "fork-manager"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
-              "inspector"; "executor"; "network"; "verdict" ]
+            [ "fork"; "fork-manager"; "fork-pty"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
+              "inspector"; "coder"; "executor"; "network"; "verdict" ]
         let pairs =
             [ yield "*", box "deny"
               for name in known do
@@ -63,6 +65,12 @@ module StaticTools =
                   | "fork", Role.Orchestrator -> yield name, box "deny"
                   // Orchestrator owns "fork-manager" (maps from ToolPermission.Fork).
                   | "fork-manager", Role.Orchestrator -> yield name, box "allow"
+                  // DevOps owns "fork-pty"; Manager/others never see PTY through fork.
+                  | "fork-pty", Role.DevOps -> yield name, box "allow"
+                  | "fork", Role.DevOps -> yield name, box "deny"
+                  // DevOps may inspect and delegate edits, never write/edit directly.
+                  | "write", Role.DevOps
+                  | "edit", Role.DevOps -> yield name, box "deny"
                   | _ -> yield name, box (if Set.contains name allowed then "allow" else "deny") ]
         createObj pairs
 
@@ -96,6 +104,8 @@ module StaticTools =
     let browserAgentConfig () : obj = primaryAgent Role.Browser
 
     let inspectorAgentConfig () : obj = primaryAgent Role.Inspector
+
+    let devopsAgentConfig () : obj = primaryAgent Role.DevOps
 
     let executorTool () : Tool =
         { Name = "executor"

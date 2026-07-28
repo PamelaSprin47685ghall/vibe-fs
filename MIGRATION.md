@@ -22,5 +22,5 @@
 - **prompt authority**: Logical Run / PromptDispatcher 事实已出现；runtime 单例与 AgentOwnerRoot 两阶段发送为当前关键路径。
 - **companion**: B-head 缓存保护与 ActivePrefixEpoch 隔离；eligibility 目标态仅 Authority。
 - **review guard**: 必须具有相同当前 tree 的双 PERFECT 确认，确认链绑定 physical message id。
-- **PTY**: 仅 Manager 可见；TERM/KILL/INT/HUP/QUIT/USR1/USR2，TERM 默认五秒 grace。
+- **PTY**: 仅 DevOps 经 `fork-pty` 可见；Manager 无终端权限。Inspector 仍可 `executor`。DevOps 可用 read/glob/grep/inspector，文件修改经同步 `coder` 工具。TERM/KILL/INT/HUP/QUIT/USR1/USR2，TERM 默认五秒 grace。
 - **Orchestrator**: Git 错误 fail-closed；review witness 必须匹配当前 candidate/tree。

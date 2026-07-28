@@ -17,38 +17,55 @@
   },
   "prompt": {
     "agent": "manager",
-    "text": "Use the structured PTY fork DSL only (not executor): 1) fork agent=\"pty\" with command: echo CWD=$(pwd); exec cat 2) fork the returned ptyId with prompt: ECHO_TEST 3) fork the ptyId with an empty prompt to READ the buffered output 4) fork the ptyId with signal=\"TERM\" 5) join and confirm the exit was delivered 6) fork agent=\"pty\" with command: trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null 7) fork that ptyId with signal=\"TERM\" (the process ignores it) 8) fork that ptyId with signal=\"KILL\" to force exit 9) join and confirm the forced exit was delivered 10) call list and confirm no active pty remains Report the cwd printed by pwd, the echoed ECHO_TEST, and that both joins returned closed."
+    "text": "Fork DevOps to exercise the structured PTY DSL only (not executor): create, write, read, TERM, join, then TERM-ignored process + KILL, join, list empty, and return the evidence."
   },
   "flow": [
     {
-      "wait": "manager-fork-pty"
+      "wait": "manager-fork-devops"
     },
     {
-      "wait": "manager-pty-write"
+      "bindChild": {
+        "agent": "devops",
+        "aliases": [
+          "devops"
+        ]
+      }
     },
     {
-      "wait": "manager-pty-read"
+      "wait": "devops-fork-pty"
     },
     {
-      "wait": "manager-pty-term"
+      "wait": "devops-pty-write"
     },
     {
-      "wait": "manager-join-term"
+      "wait": "devops-pty-read"
     },
     {
-      "wait": "manager-fork-pty2"
+      "wait": "devops-pty-term"
     },
     {
-      "wait": "manager-pty2-term"
+      "wait": "devops-join-term"
     },
     {
-      "wait": "manager-pty2-kill"
+      "wait": "devops-fork-pty2"
     },
     {
-      "wait": "manager-join-kill"
+      "wait": "devops-pty2-term"
     },
     {
-      "wait": "manager-list"
+      "wait": "devops-pty2-kill"
+    },
+    {
+      "wait": "devops-join-kill"
+    },
+    {
+      "wait": "devops-list"
+    },
+    {
+      "wait": "devops-final"
+    },
+    {
+      "wait": "manager-join"
     },
     {
       "awaitTerminal": true,
@@ -61,7 +78,7 @@
       "assertPtyEcho": true
     }
   ],
-  "pass": "PTY stress canary passed: cwd, write/read echo, TERM->Closed, KILL forces exit, no leak.",
+  "pass": "PTY stress canary passed: DevOps owns fork-pty; cwd, write/read echo, TERM->Closed, KILL forces exit, no leak.",
   "scripts": [
     {
       "id": "manager-title",
@@ -96,7 +113,7 @@
       "blocking": false
     },
     {
-      "id": "manager-fork-pty",
+      "id": "manager-fork-devops",
       "lane": {
         "session": "manager",
         "role": "manager",
@@ -106,12 +123,59 @@
       "match": {
         "requiredTools": [
           "fork",
-          "join"
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "fork-pty",
+          "executor",
+          "inspector",
+          "read",
+          "write",
+          "edit"
         ]
       },
       "respond": {
         "type": "tool-call",
         "tool": "fork",
+        "args": {
+          "agent": "devops",
+          "prompt": "Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat 2) fork-pty the returned ptyId with prompt: ECHO_TEST 3) fork-pty the ptyId with empty prompt to READ 4) fork-pty the ptyId with signal=\"TERM\" 5) join and confirm exit 6) fork-pty agent=\"pty\" with command: trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null 7) fork-pty that ptyId with signal=\"TERM\" 8) fork-pty that ptyId with signal=\"KILL\" 9) join 10) list and confirm no active pty remains. Report cwd, ECHO_TEST, and both joins closed."
+        }
+      }
+    },
+    {
+      "id": "devops-fork-pty",
+      "lane": {
+        "session": "devops",
+        "role": "devops",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
+          "fork",
+          "write",
+          "edit",
+          "verdict"
+        ],
+        "userRegex": "Use fork-pty only"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork-pty",
         "args": {
           "agent": "pty",
           "prompt": "echo CWD=$(pwd); exec cat"
@@ -119,22 +183,36 @@
       }
     },
     {
-      "id": "manager-pty-write",
+      "id": "devops-pty-write",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 2,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
         "type": "tool-call",
-        "tool": "fork",
+        "tool": "fork-pty",
         "argsFrom": "lastPtyId",
         "args": {
           "prompt": "ECHO_TEST"
@@ -142,22 +220,36 @@
       }
     },
     {
-      "id": "manager-pty-read",
+      "id": "devops-pty-read",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 3,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
         "type": "tool-call",
-        "tool": "fork",
+        "tool": "fork-pty",
         "argsFrom": "lastPtyId",
         "args": {
           "prompt": ""
@@ -165,22 +257,36 @@
       }
     },
     {
-      "id": "manager-pty-term",
+      "id": "devops-pty-term",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 4,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
         "type": "tool-call",
-        "tool": "fork",
+        "tool": "fork-pty",
         "argsFrom": "lastPtyId",
         "args": {
           "signal": "TERM"
@@ -188,17 +294,31 @@
       }
     },
     {
-      "id": "manager-join-term",
+      "id": "devops-join-term",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 5,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
@@ -208,22 +328,36 @@
       }
     },
     {
-      "id": "manager-fork-pty2",
+      "id": "devops-fork-pty2",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 6,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
         "type": "tool-call",
-        "tool": "fork",
+        "tool": "fork-pty",
         "args": {
           "agent": "pty",
           "prompt": "trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null"
@@ -231,22 +365,36 @@
       }
     },
     {
-      "id": "manager-pty2-term",
+      "id": "devops-pty2-term",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 7,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
         "type": "tool-call",
-        "tool": "fork",
+        "tool": "fork-pty",
         "argsFrom": "lastPtyId",
         "args": {
           "signal": "TERM"
@@ -254,22 +402,36 @@
       }
     },
     {
-      "id": "manager-pty2-kill",
+      "id": "devops-pty2-kill",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 8,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
         "type": "tool-call",
-        "tool": "fork",
+        "tool": "fork-pty",
         "argsFrom": "lastPtyId",
         "args": {
           "signal": "KILL"
@@ -277,17 +439,31 @@
       }
     },
     {
-      "id": "manager-join-kill",
+      "id": "devops-join-kill",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 9,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
           "fork",
-          "join"
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
@@ -297,18 +473,31 @@
       }
     },
     {
-      "id": "manager-list",
+      "id": "devops-list",
       "lane": {
-        "session": "manager",
-        "role": "manager",
+        "session": "devops",
+        "role": "devops",
         "turn": 10,
-        "requestKind": "chat"
+        "requestKind": "chat",
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
-          "fork",
+          "fork-pty",
           "join",
-          "list"
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
+          "fork",
+          "write",
+          "edit",
+          "verdict"
         ]
       },
       "respond": {
@@ -318,11 +507,44 @@
       }
     },
     {
-      "id": "manager-final",
+      "id": "devops-final",
+      "lane": {
+        "session": "devops",
+        "role": "devops",
+        "turn": 11,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "fork-pty",
+          "join",
+          "list",
+          "executor",
+          "read",
+          "glob",
+          "grep",
+          "inspector",
+          "coder"
+        ],
+        "forbiddenTools": [
+          "fork",
+          "write",
+          "edit",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "DevOps report: both PTYs closed; ECHO_TEST observed; no active pty remains."
+      }
+    },
+    {
+      "id": "manager-join",
       "lane": {
         "session": "manager",
         "role": "manager",
-        "turn": 11,
+        "turn": 2,
         "requestKind": "chat"
       },
       "match": {
@@ -330,11 +552,44 @@
           "fork",
           "join",
           "list"
+        ],
+        "forbiddenTools": [
+          "fork-pty",
+          "executor",
+          "inspector",
+          "read",
+          "write",
+          "edit"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-final",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "fork-pty",
+          "executor"
         ]
       },
       "respond": {
         "type": "text",
-        "text": "Both PTYs closed; no active pty remains."
+        "text": "Manager finished: DevOps completed PTY stress with both joins closed and no active pty."
       }
     }
   ]

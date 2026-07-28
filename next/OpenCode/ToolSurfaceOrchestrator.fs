@@ -68,10 +68,15 @@ module ToolSurfaceOrchestrator =
                 hosts.[sid] <- host
                 host)
 
-    /// Manager fork = full agent/prompt/signal. Orchestrator fork-manager = prompt only.
-    /// Schema conflict → distinct tool names; execute path shared.
+    /// Manager fork = agent/prompt. DevOps fork-pty = PTY agent/prompt/signal.
+    /// Orchestrator fork-manager = prompt only. Schema conflict → distinct names.
     let toolDefBuilders (factory: obj) =
         let managerForkArgs =
+            createObj
+                [ "agent", box (stringSchema factory)
+                  "prompt", box (optionalStringSchema factory) ]
+
+        let devopsPtyArgs =
             createObj
                 [ "agent", box (stringSchema factory)
                   "prompt", box (optionalStringSchema factory)
@@ -99,7 +104,7 @@ module ToolSurfaceOrchestrator =
                   "args", box args
                   "execute", uncurriedExecute (box execute) ]
 
-        managerForkArgs, orchestratorManagerJobArgs, verdictArgs, definition
+        managerForkArgs, devopsPtyArgs, orchestratorManagerJobArgs, verdictArgs, definition
 
     /// Private mailbox runtime for the Executor summarizer: same parent session
     /// (so child sessions are real) and children ARE registered into the shared

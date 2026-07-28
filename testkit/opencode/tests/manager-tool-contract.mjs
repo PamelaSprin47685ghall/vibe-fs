@@ -17,18 +17,35 @@ test('manager permission denies global executor tool and executes mailbox path',
     });
     const names = Object.keys(hooks.tool).sort();
 
-    assert.deepEqual(names, ['executor', 'fork', 'fork-manager', 'inspector', 'join', 'list', 'verdict']);
-    assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt', 'signal']);
+    assert.deepEqual(names, ['coder', 'executor', 'fork', 'fork-manager', 'fork-pty', 'inspector', 'join', 'list', 'verdict']);
+    assert.deepEqual(Object.keys(hooks.tool.fork.args).sort(), ['agent', 'prompt']);
+    assert.deepEqual(Object.keys(hooks.tool['fork-pty'].args).sort(), ['agent', 'prompt', 'signal']);
     assert.deepEqual(Object.keys(hooks.tool['fork-manager'].args).sort(), ['prompt']);
 
     const config = {};
     hooks.config(config);
     assert.equal(config.agent.manager.permission['*'], 'deny');
     assert.equal(config.agent.manager.permission.executor, 'deny');
+    assert.equal(config.agent.manager.permission['fork-pty'], 'deny');
     assert.equal(config.agent.manager.permission.inspector, 'deny');
+    assert.equal(config.agent.manager.permission.coder, 'deny');
     assert.equal(config.agent.inspector.permission['*'], 'deny');
     assert.equal(config.agent.inspector.permission.executor, 'allow');
+    assert.equal(config.agent.inspector.permission['fork-pty'], 'deny');
     assert.equal(config.agent.inspector.permission.fork, 'deny');
+    assert.equal(config.agent.devops.permission['*'], 'deny');
+    assert.equal(config.agent.devops.permission['fork-pty'], 'allow');
+    assert.equal(config.agent.devops.permission.executor, 'allow');
+    assert.equal(config.agent.devops.permission.join, 'allow');
+    assert.equal(config.agent.devops.permission.list, 'allow');
+    assert.equal(config.agent.devops.permission.read, 'allow');
+    assert.equal(config.agent.devops.permission.glob, 'allow');
+    assert.equal(config.agent.devops.permission.grep, 'allow');
+    assert.equal(config.agent.devops.permission.inspector, 'allow');
+    assert.equal(config.agent.devops.permission.coder, 'allow');
+    assert.equal(config.agent.devops.permission.write, 'deny');
+    assert.equal(config.agent.devops.permission.edit, 'deny');
+    assert.equal(config.agent.devops.permission.fork, 'deny');
     assert.equal(config.agent.coder.permission.inspector, 'allow');
     assert.equal(config.agent.orchestrator.permission['*'], 'deny');
     assert.equal(config.agent.orchestrator.permission.fork, 'deny');

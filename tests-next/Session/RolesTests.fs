@@ -19,17 +19,48 @@ module RolesTests =
     let ``Manager_role_permission_matrix`` () =
         let allowed = set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.List ]
 
-        Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Manager)
+        Assert.equal<ToolPermission Set>(allowed, Roles.permissions Role.Manager)
         Assert.True(Roles.isAllowed Role.Manager ToolPermission.Fork)
         Assert.True(Roles.isAllowed Role.Manager ToolPermission.Join)
         Assert.True(Roles.isAllowed Role.Manager ToolPermission.List)
 
         Assert.False(Roles.isAllowed Role.Manager ToolPermission.Exec)
+        Assert.False(Roles.isAllowed Role.Manager ToolPermission.Pty)
         Assert.False(Roles.isAllowed Role.Manager ToolPermission.Read)
         Assert.False(Roles.isAllowed Role.Manager ToolPermission.Network)
         Assert.False(Roles.isAllowed Role.Manager ToolPermission.Glob)
         Assert.False(Roles.isAllowed Role.Manager ToolPermission.Grep)
         Assert.False(Roles.isAllowed Role.Manager ToolPermission.Inspector)
+
+    [<Fact>]
+    let ``DevOps_role_permission_matrix`` () =
+        let allowed =
+            set
+                [ ToolPermission.Pty
+                  ToolPermission.Exec
+                  ToolPermission.Join
+                  ToolPermission.List
+                  ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Inspector
+                  ToolPermission.Coder ]
+
+        Assert.equal<ToolPermission Set>(allowed, Roles.permissions Role.DevOps)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Pty)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Exec)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Join)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.List)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Read)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Glob)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Grep)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Inspector)
+        Assert.True(Roles.isAllowed Role.DevOps ToolPermission.Coder)
+
+        Assert.False(Roles.isAllowed Role.DevOps ToolPermission.Fork)
+        Assert.False(Roles.isAllowed Role.DevOps ToolPermission.Write)
+        Assert.False(Roles.isAllowed Role.DevOps ToolPermission.Edit)
+        Assert.False(Roles.isAllowed Role.DevOps ToolPermission.Verdict)
 
     [<Fact>]
     let ``Coder_role_permission_matrix`` () =
@@ -52,11 +83,12 @@ module RolesTests =
     [<Fact>]
     let ``Inspector_role_permission_matrix`` () =
         let allowed = set [ ToolPermission.Exec ]
-        Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Inspector)
+        Assert.equal<ToolPermission Set>(allowed, Roles.permissions Role.Inspector)
         Assert.True(Roles.isAllowed Role.Inspector ToolPermission.Exec)
 
         Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Read)
         Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Fork)
+        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Pty)
 
     [<Fact>]
     let ``Browser_role_permission_matrix`` () =

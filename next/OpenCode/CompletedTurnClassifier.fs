@@ -98,6 +98,7 @@ module CompletedTurnClassifier =
         | TurnNeedsContinuation _, Some AgentRole.Coder
         | TurnNeedsContinuation _, Some AgentRole.Reviewer
         | TurnNeedsContinuation _, Some AgentRole.Inspector
+        | TurnNeedsContinuation _, Some AgentRole.DevOps
         | TurnNeedsContinuation _, Some AgentRole.Browser
         | TurnNeedsContinuation _, Some AgentRole.Meditator -> true
         | TurnCompleted, Some AgentRole.Manager
@@ -105,6 +106,7 @@ module CompletedTurnClassifier =
         | TurnCompleted, Some AgentRole.Coder
         | TurnCompleted, Some AgentRole.Reviewer
         | TurnCompleted, Some AgentRole.Inspector
+        | TurnCompleted, Some AgentRole.DevOps
         | TurnCompleted, Some AgentRole.Browser
         | TurnCompleted, Some AgentRole.Meditator ->
             let text = partsText parts

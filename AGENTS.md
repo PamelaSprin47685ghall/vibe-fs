@@ -304,19 +304,20 @@ Companion 从 sessionRoles 决定 eligibility
 4. X 的 ProjectedInputTokens + ReservedOutputTokens 超过 ContextLimit 且 BlogBase coverage proof 通过后，投影层用 B 等价替换已被 B 覆盖的前缀；此后每次投影继续替换。Cutoff 必须位于完整 semantic turn 边界；CoveredPrefixDigest 必须在投影前重新验证。Estimator 不可用时不切换 epoch。
 5. Delta 在 canonical JSON 投影层计算；Y 忙时不打断、不排插件队列、不推进 delta 基线，下一次自然包含跳过期间的全部变化。
 6. Y 自身接近上限时，把旧 B 作为唯一正文输入重投影；Y 新输出 B' 替代旧 B。
-7. Manager 无 read/write/edit/grep/glob 等普通工具；只有 `fork / join / list`。
+7. Manager 无 read/write/edit/grep/glob 等普通工具；只有 `fork / join / list`。无 PTY、无 executor。
 8. `fork(role, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。Nudge 成功 = Host 已确认接受 prompt。Busy→idle 竞态以 Host AcceptPrompt 返回的 run identity 为归属依据。若 Host 不支持 busy append，返回 BusyNudgeUnsupported。
 9. `join()` 等任意一个完成项；不指定对象。每个 RunIdentity 对应 single-assignment completion cell。Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。join 消费后永久删除 completed handle。
 10. `list()` 统一显示 Agent 与 PTY，但内部资源实现保持独立。
 11. Inspector 同步调用 Executor Tool；Coder 每次同步 Inspector 调用创建一次性 Inspector Session，并可并行。
 12. Executor Agent 只负责命令输出摘要；无工具、无伴随。Executor Tool 负责真实进程。
+12b. **DevOps** 独占 `fork-pty`，并可 `executor` / `read` / `glob` / `grep` / `inspector` / 同步 `coder` / `join` / `list`。不得直接 write/edit。Manager 通过 `fork(devops, prompt)` 委派终端操作。
 13. `3 × estimated_running_secs` 是进程唯一时限；无其他 timeout 层。模型允许用巨大 estimate 主动申请巨大预算。
 14. `actual_output_bytes > 3 × estimated_output_bytes` 时触发 spool；摘要按 200KB 块做在线 ripple-carry reduce（fan-in=8，按 chunk index 排序，Executor ID 由 processId+level+range hash 生成），不积存全部 map summary。
 15. `estimated_mem_usage=large` 全 OpenCode 进程同时最多一个；medium 不限并发。
 16. Fallback 属于 Logical Run：retry event #1 → A 重试；#2 → 切 B；#3 → B 重试；#4 → 当前 Logical Run 真死。成功不把 Side 切回 A。新 Authority Root 始终新 epoch（Failures=0, Side=A）；真人省略 model 只继承 LastAuthorityProfile.BaseModel，不继承旧 Side B。唯一写 durable fallback 事实的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 AuthorityRootUserMessageId，不包括插件 synthetic 消息。
 17. Review：REVISE 一次立即生效；PERFECT 必须来自不同 ProviderRunIdentity 且第二次的 user 输入包含第一次后的确认请求。每个审查屏障要求两个不同的 ProviderRunIdentity。
 18. ReviewGuard 同时守 Manager 结束和 Reviewer 未给出有效 verdict。
-19. PTY 仍复用 `fork` 表面，但 signal 使用结构化 enum，不使用魔法字符串。PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
+19. PTY 使用独立工具 `fork-pty`（仅 DevOps），signal 使用结构化 enum，不使用魔法字符串。PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
 20. Orchestrator 只有 `fork / join`；fork Manager 自动建 worktree、进入 ReviewGuard；发布前 rebase、复审、串行 ff。Rebase 后的审查必须是全新的双 PERFECT（两个新 ToolCallId），不得复用 rebase 前的确认。
 21. 用户向 Orchestrator 发消息时，目标工作区 dirty 则拒绝。
 22. 万象阵、todowrite SSOT、select_methodology、通用 nudge、fuzzy 工具与同步 subagent 伪工具全部删除。
@@ -335,6 +336,7 @@ User → Orchestrator DSL
           └─ fork ManagerJob ── worktree ── Manager DSL
                                   ├─ fork Coder
                                   ├─ fork Inspector
+                                  ├─ fork DevOps
                                   ├─ fork Browser
                                   ├─ fork Meditator
                                   ├─ fork Reviewer
@@ -425,6 +427,7 @@ agent {
 
 ```text
 Manager:      fork / join / list
+DevOps:       fork-pty / executor / read / glob / grep / inspector / coder / join / list
 Orchestrator: fork / join
 Reviewer:     verdict(PERFECT|REVISE) + 角色允许的只读工具
 ```
@@ -1367,7 +1370,16 @@ let projectSession (s: CompanionScript) hostInput =
 
 ```json
 {
-  "agent": "coder | inspector | browser | meditator | reviewer | executor | manager | <hex6>",
+  "agent": "coder | inspector | browser | meditator | reviewer | devops | <hex6>",
+  "prompt": "string"
+}
+```
+
+`fork-pty`（仅 DevOps）：
+
+```json
+{
+  "agent": "pty | <ptyId>",
   "prompt": "string",
   "signal": "TERM | KILL | INT | HUP | ... (optional)"
 }
@@ -1375,7 +1387,8 @@ let projectSession (s: CompanionScript) hostInput =
 
 约束：
 
-- `signal` 仅当 `agent` 指向 PTY handle 时合法。
+- Manager `fork` 不再接受 PTY/`signal`。
+- `fork-pty` 的 `signal` 仅当 `agent` 指向 PTY handle 时合法。
 - 新建普通 agent 时 `prompt` 非空。
 - 已有 agent ID + prompt = nudge/continue。
 - PTY ID + prompt 非空 = write。
@@ -1646,9 +1659,10 @@ let executeFork input =
 |角色|伴随 Blogger|可用工具|说明|
 |---|---:|---|---|
 |`orchestrator`|是|`fork`, `join`|只 fork ManagerJob|
-|`manager`|是|`fork`, `join`, `list`|不直接读写仓库|
+|`manager`|是|`fork`, `join`, `list`|不直接读写仓库；无终端|
 |`coder`|是|`read`, `write`, `edit`, `glob`, `grep`, `inspector`|真正修改代码|
 |`inspector`|否|`executor`|命令调查；无直接 Python/JS execute|
+|`devops`|否|`fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list`|终端操作员；文件改动仅经 coder 工具|
 |`browser`|否|`read`, web tools|仓库读取与上网|
 |`meditator`|否|`read`, `glob`, `grep`, `inspector`|推理、方案、权衡|
 |`reviewer`|否|`read`, `glob`, `grep`, `inspector`, `verdict`|只读审查；verdict 结构化|
@@ -1662,6 +1676,7 @@ let executeFork input =
 ```text
 Coder      = read, write, edit, glob, grep, inspector
 Inspector  = executor
+DevOps     = fork-pty, executor, read, glob, grep, inspector, coder, join, list
 Browser    = read, glob, grep, web tools
 Meditator  = read, glob, grep, inspector
 Reviewer   = read, glob, grep, inspector, verdict
@@ -1685,26 +1700,30 @@ Blogger    = （无）
 executor
 ```
 
-2. **只有 Manager 可以创建和操作 PTY。**
-   * Manager 通过 `fork` 的结构化 PTY 变体创建 PTY。
-   * Manager 通过 `fork(existingPtyId, operation)` 对已有 PTY 执行输入、读取、Signal 或 Close。
-   * PTY handle 出现在 Manager 的 `list()` 中。
-   * PTY completion 进入 Manager 的统一 `join()` 邮箱。
+2. **只有 DevOps 可以创建和操作 PTY。**
+   * DevOps 通过独立工具 `fork-pty` 创建 PTY（`agent=pty`）。
+   * DevOps 通过 `fork-pty(existingPtyId, operation)` 对已有 PTY 执行输入、读取、Signal 或 Close。
+   * PTY handle 出现在 DevOps 的 `list()` 中。
+   * PTY completion 进入 DevOps 的 `join()` 邮箱。
+   * Manager 只 `fork(devops, prompt)` 委派终端操作，自身无 `fork-pty`/`executor`。
    * Orchestrator、Coder、Inspector、Browser、Meditator、Reviewer、Executor、Blogger 均不得直接操作 PTY。
+   * DevOps 不得直接 write/edit；文件修改经同步 `coder` 工具委派。
 
-3. **`fork` 的可见语义按角色静态收窄。**
+3. **`fork` / `fork-pty` 的可见语义按角色静态收窄。**
 
 ```text
 Manager 的 fork 支持：
-  fork(role, prompt)
+  fork(role, prompt)   # coder|inspector|browser|meditator|reviewer|devops
   fork(existingAgentId, prompt)
-  fork(ptyRequest)
-  fork(existingPtyId, ptyOperation)
+
+DevOps 的 fork-pty 支持：
+  fork-pty(agent=pty, prompt)
+  fork-pty(existingPtyId, prompt|signal)
 
 Orchestrator 的 fork 只支持：
-  fork(managerPrompt)
+  fork-manager(managerPrompt)
 
-其他角色不得看到 fork 工具。
+其他角色不得看到 fork / fork-pty。
 ```
 
 4. **权限必须在工具 Schema 层隐藏。**
