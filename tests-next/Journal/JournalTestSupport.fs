@@ -27,6 +27,43 @@ module private NodeFsTestSupport =
 module JournalTestSupport =
 
     let registerAuthorityRoot (journal: AgentJournal) sessionId agent =
+        let selected, peer, role, tier =
+            match Wanxiangshu.Next.OpenCode.ManagedAgent.tryParse agent with
+            | Some managed ->
+                managed.Name,
+                (Wanxiangshu.Next.OpenCode.ManagedAgent.peer managed).Name,
+                Wanxiangshu.Next.OpenCode.PromptAuthority.roleLabel managed.Role,
+                Wanxiangshu.Next.OpenCode.PromptAuthority.tierLabel managed.Tier
+            | None ->
+                // Bare canonical role fallback for older fixtures that still pass
+                // unprefixed names into journal helpers during migration.
+                // Map to the fast managed agent by default; derive the peer.
+                match Wanxiangshu.Next.OpenCode.PromptAuthority.tryParseRole agent with
+                | Some canonicalRole ->
+                    let fast =
+                        Wanxiangshu.Next.OpenCode.ManagedAgent.nameOf
+                            Wanxiangshu.Next.OpenCode.AgentTier.Fast
+                            canonicalRole
+
+                    let deep =
+                        Wanxiangshu.Next.OpenCode.ManagedAgent.nameOf
+                            Wanxiangshu.Next.OpenCode.AgentTier.Deep
+                            canonicalRole
+
+                    fast, deep, Wanxiangshu.Next.OpenCode.PromptAuthority.roleLabel canonicalRole, "Fast"
+                | None ->
+                    let peer =
+                        if agent.StartsWith("fast-") then
+                            "deep-" + agent.Substring(5)
+                        elif agent.StartsWith("deep-") then
+                            "fast-" + agent.Substring(5)
+                        else
+                            agent
+
+                    let tier = if agent.StartsWith("deep-") then "Deep" else "Fast"
+
+                    agent, peer, agent, tier
+
         AgentJournal.appendAgent
             (StreamId.Session(SessionId.create sessionId))
             (Some(TurnId.ofMessageId (MessageId.create "u1")))
@@ -35,10 +72,10 @@ module JournalTestSupport =
                    LogicalRunId = "run-" + sessionId
                    HostMessageId = "u1"
                    AuthorityKind = "HumanRoot"
-                   Agent = agent
-                   BaseProviderID = None
-                   BaseModelID = None
-                   Variant = None |})
+                   SelectedAgent = selected
+                   PeerAgent = peer
+                   CanonicalRole = role
+                   SelectedTier = tier |})
             journal
         |> ignore
 

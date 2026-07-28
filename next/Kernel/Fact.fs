@@ -65,20 +65,17 @@ module Fact =
                LogicalRunId: string
                HostMessageId: string
                AuthorityKind: string
-               Agent: string
-               BaseProviderID: string option
-               BaseModelID: string option
-               Variant: string option |}
+               SelectedAgent: string
+               PeerAgent: string
+               CanonicalRole: string
+               SelectedTier: string |}
         | PluginPromptClaimed of
             {| PromptKey: string
                SessionId: SessionId
                LogicalRunId: string
                AuthorityRootUserMessageId: string
                ContinuationKind: string
-               Agent: string option
-               EffectiveProviderID: string option
-               EffectiveModelID: string option
-               Variant: string option |}
+               EffectiveAgent: string option |}
         | PluginPromptAccepted of
             {| PromptKey: string
                SessionId: SessionId

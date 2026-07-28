@@ -91,8 +91,7 @@ module CompanionResetTests =
                 let durable = AgentJournalCompanionPort(journal) :> ICompanionDurablePort
                 let seedHost, _, _, _, _, _, _ = makeFake ()
 
-                let seed =
-                    new CompanionHost(primaryId, seedHost, durable, ?bloggerModel = Some(Ok bloggerModel))
+                let seed = new CompanionHost(primaryId, seedHost, durable)
 
                 Assert.Equal(Submitted, seed.SubmitProjection("{\"seed\":1}"))
                 do! seed.WaitInFlightAsync()
@@ -113,8 +112,7 @@ module CompanionResetTests =
                 let host, _, _, prompts, setSendError, _, _ = makeFake ()
                 setSendError true
 
-                let restored =
-                    new CompanionHost(primaryId, host, restoredDurable, ?bloggerModel = Some(Ok bloggerModel))
+                let restored = new CompanionHost(primaryId, host, restoredDurable)
 
                 Assert.Equal(Submitted, restored.SubmitProjection("{\"reset\":2}"))
                 do! restored.WaitInFlightAsync()
@@ -141,8 +139,7 @@ module CompanionResetTests =
                 let durable = AgentJournalCompanionPort(journal) :> ICompanionDurablePort
                 let host1, _, _, _, _, _, _ = makeFake ()
 
-                let seed =
-                    new CompanionHost(primaryId, host1, durable, ?bloggerModel = Some(Ok bloggerModel))
+                let seed = new CompanionHost(primaryId, host1, durable)
 
                 Assert.Equal(Submitted, seed.SubmitProjection("{\"seed\":1}"))
                 do! seed.WaitInFlightAsync()
@@ -161,8 +158,7 @@ module CompanionResetTests =
                 let host2, _, _, prompts, _, setTerminal, setGrowOutput = makeFake ()
                 setTerminal (TerminalOutcome.Aborted "cancelled")
 
-                let restored =
-                    new CompanionHost(primaryId, host2, durable2, ?bloggerModel = Some(Ok bloggerModel))
+                let restored = new CompanionHost(primaryId, host2, durable2)
 
                 Assert.Equal(Submitted, restored.SubmitProjection("{\"abort\":2}"))
                 do! restored.WaitInFlightAsync()

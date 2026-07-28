@@ -9,14 +9,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "manager-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Fork DevOps to exercise the structured PTY DSL only (not executor): create, write, read, TERM, join, then TERM-ignored process + KILL, join, list empty, and return the evidence."
   },
   "flow": [
@@ -25,9 +25,9 @@
     },
     {
       "bindChild": {
-        "agent": "devops",
+        "agent": "fast-devops",
         "aliases": [
-          "devops"
+          "fast-devops"
         ]
       }
     },
@@ -115,7 +115,7 @@
     {
       "id": "manager-fork-devops",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat"
@@ -139,7 +139,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "devops",
+          "agent": "fast-devops",
           "prompt": "Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat 2) fork-pty the returned ptyId with prompt: ECHO_TEST 3) fork-pty the ptyId with empty prompt to READ 4) fork-pty the ptyId with signal=\"TERM\" 5) join and confirm exit 6) fork-pty agent=\"pty\" with command: trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null 7) fork-pty that ptyId with signal=\"TERM\" 8) fork-pty that ptyId with signal=\"KILL\" 9) join 10) list and confirm no active pty remains. Report cwd, ECHO_TEST, and both joins closed."
         }
       }
@@ -147,7 +147,7 @@
     {
       "id": "devops-fork-pty",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 1,
         "requestKind": "chat",
@@ -185,7 +185,7 @@
     {
       "id": "devops-pty-write",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 2,
         "requestKind": "chat",
@@ -222,7 +222,7 @@
     {
       "id": "devops-pty-read",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 3,
         "requestKind": "chat",
@@ -259,7 +259,7 @@
     {
       "id": "devops-pty-term",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 4,
         "requestKind": "chat",
@@ -296,7 +296,7 @@
     {
       "id": "devops-join-term",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 5,
         "requestKind": "chat",
@@ -330,7 +330,7 @@
     {
       "id": "devops-fork-pty2",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 6,
         "requestKind": "chat",
@@ -367,7 +367,7 @@
     {
       "id": "devops-pty2-term",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 7,
         "requestKind": "chat",
@@ -404,7 +404,7 @@
     {
       "id": "devops-pty2-kill",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 8,
         "requestKind": "chat",
@@ -441,7 +441,7 @@
     {
       "id": "devops-join-kill",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 9,
         "requestKind": "chat",
@@ -475,7 +475,7 @@
     {
       "id": "devops-list",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 10,
         "requestKind": "chat",
@@ -509,7 +509,7 @@
     {
       "id": "devops-final",
       "lane": {
-        "session": "devops",
+        "session": "fast-devops",
         "role": "devops",
         "turn": 11,
         "requestKind": "chat",
@@ -542,7 +542,7 @@
     {
       "id": "manager-join",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat"
@@ -571,7 +571,7 @@
     {
       "id": "manager-final",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 3,
         "requestKind": "chat"

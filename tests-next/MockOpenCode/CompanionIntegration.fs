@@ -52,7 +52,7 @@ module CompanionIntegration =
                     })
 
             let sid = SessionId.create "comp-primary"
-            let companion = new CompanionHost(sid, sessionPort, ?bloggerModel = Some blogModel)
+            let companion = new CompanionHost(sid, sessionPort)
 
             // SubmitProjection — the first call (no baseline) returns Submitted
             // but does not trigger the blogger. The baseline is set implicitly.

@@ -37,10 +37,8 @@ module AgentFacts =
     let emptyFallback: FallbackProjection =
         { LogicalRunId = ""
           AuthorityRootUserMessageId = ""
-          Side = SideA
-          FailuresOnCurrentSide = 0
-          TotalFailures = 0
-          IsDead = false
+          Offset = 0uy
+          LastProviderAttempt = None
           RecentFailureIds = [] }
 
     let emptyOrchestrator: OrchestratorProjection =
@@ -197,10 +195,10 @@ module AgentFacts =
                 p.LogicalRunId
                 p.HostMessageId
                 p.AuthorityKind
-                p.Agent
-                p.BaseProviderID
-                p.BaseModelID
-                p.Variant
+                p.SelectedAgent
+                p.PeerAgent
+                p.CanonicalRole
+                p.SelectedTier
         | AgentFact.PluginPromptClaimed p ->
             AgentFactsAuthority.foldPluginPromptClaimed proj p.SessionId p.PromptKey p.ContinuationKind
         | AgentFact.PluginPromptAccepted p ->

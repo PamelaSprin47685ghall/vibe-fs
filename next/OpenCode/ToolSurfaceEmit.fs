@@ -12,14 +12,49 @@ module ToolSurfaceEmit =
     [<Emit("$0.schema.string()")>]
     let stringSchema (tool: obj) : obj = jsNative
 
+    [<Emit("$0.schema.string().describe($1)")>]
+    let describedStringSchema (tool: obj) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.enum($1)")>]
     let enumSchema (tool: obj) (values: string array) : obj = jsNative
 
     [<Emit("$0.schema.enum($1).optional()")>]
     let optionalEnumSchema (tool: obj) (values: string array) : obj = jsNative
 
+    /// Creatable managed agents as enum, plus plain string for existing handle IDs.
+    [<Emit("$0.schema.union([$0.schema.enum($1), $0.schema.string()])")>]
+    let managedAgentOrHandleSchema (tool: obj) (values: string array) : obj = jsNative
+
     [<Emit("$0.schema.string().optional()")>]
     let optionalStringSchema (tool: obj) : obj = jsNative
+
+    let looksLikeHandleId (value: string) =
+        if String.IsNullOrWhiteSpace value then
+            false
+        else
+            let trimmed = value.Trim()
+
+            trimmed.Length = 6
+            && trimmed
+               |> Seq.forall (fun c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+
+    let forkResultPayload (agentId: string) (managed: ManagedAgent) =
+        let peer = ManagedAgent.peer managed
+
+        createObj
+            [ "agentId", box agentId
+              "agent", box managed.Name
+              "role", box (ManagedAgent.roleName managed.Role)
+              "tier", box (ManagedAgent.tierName managed.Tier)
+              "fallbackPeer", box peer.Name ]
+
+    let managedMetaPayload (managed: ManagedAgent) =
+        let peer = ManagedAgent.peer managed
+
+        [ "agent", box managed.Name
+          "role", box (ManagedAgent.roleName managed.Role)
+          "tier", box (ManagedAgent.tierName managed.Tier)
+          "fallbackPeer", box peer.Name ]
 
     [<Emit("$0($1)")>]
     let applyTool (factory: obj) (definition: obj) : obj = jsNative

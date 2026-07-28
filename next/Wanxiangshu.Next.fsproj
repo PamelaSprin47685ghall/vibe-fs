@@ -18,6 +18,7 @@
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Kernel/Roles.fs"/>
+    <Compile Include="OpenCode/ManagedAgent.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/AgentFacts.Types.fs"/>
@@ -77,8 +78,9 @@
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/ManagedAgentConfig.fs"/>
+    <Compile Include="OpenCode/EffectiveAgentResolver.fs"/>
     <Compile Include="OpenCode/PromptAuthority.fs"/>
-    <Compile Include="OpenCode/ModelResolver.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
     <Compile Include="OpenCode/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Projection.fs"/>
@@ -126,6 +128,7 @@
     <Compile Include="OpenCode/HostSignalChatMessage.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
+    <Compile Include="OpenCode/ExecutorSummarizeRuntime.fs"/>
     <Compile Include="OpenCode/ExecutorSummarize.fs"/>
     <Compile Include="OpenCode/ExecutorTool.fs"/>
     <Compile Include="OpenCode/VerdictSurface.fs"/>

@@ -10,9 +10,8 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
-/// SessionDead gate (SSOT §6): a linked child dead after 4 consecutive fallback
-/// failures must be refused by Fork/Reuse with zero prompt sends, and the decision
-/// must survive a journal rebuild.
+/// SessionDead gate: 0.5.0 fallback never kills on retry count. Kept to prove
+/// Fork/Reuse still work after many fallback advances, and BaseModel inheritance.
 module HostForkRuntimeSessionDeadTests =
 
     let private noopDisposable () =
@@ -74,7 +73,7 @@ module HostForkRuntimeSessionDeadTests =
                 {| ParentId = parentId
                    ChildId = ChildId.create (SessionId.value childId)
                    TargetAgent = agentId
-                   Role = Some "Coder" |})
+                   Role = Some "fast-coder" |})
             journal
         |> ignore
 
@@ -94,7 +93,7 @@ module HostForkRuntimeSessionDeadTests =
             |> ignore
 
     [<Fact>]
-    let ``Fork_and_Reuse_refuse_dead_linked_child_without_sending`` () =
+    let ``Fork_and_Reuse_still_ok_after_four_fallback_advances`` () =
         withTempDir (fun d ->
             task {
                 let p = SessionId.create "p-dead"
@@ -110,51 +109,35 @@ module HostForkRuntimeSessionDeadTests =
                 let! f = b.Fork(a, AgentRole.Coder, "w")
                 let! r = b.Reuse(a, "w")
 
-                let chk =
-                    function
-                    | Error e -> Assert.Contains("dead", e)
-                    | Ok _ -> Assert.True(false, "expected dead refusal")
-
-                chk f
-                chk r
-                Assert.Equal(0, cc ())
-                Assert.Equal(0, pc ())
+                Assert.True(Result.isOk f, sprintf "expected Fork Ok after 4 advances, got %A" f)
+                Assert.True(Result.isOk r, sprintf "expected Reuse Ok after 4 advances, got %A" r)
+                Assert.True(cc () + pc () >= 1, "expected at least one prompt send")
             })
 
     [<Fact>]
-    let ``Fork_new_AgentOwnerRoot_uses_BaseModel_not_previous_SideB`` () =
+    let ``Fork_new_AgentOwnerRoot_sends_Agent_with_Model_None`` () =
         withTempDir (fun d ->
             task {
                 let p = SessionId.create "p-3"
                 let c = SessionId.create "child-1"
                 let a = "a-3"
 
-                let cfg: ModelResolver.ModelConfig =
-                    { SideA =
-                        { providerID = "t"
-                          modelID = "m-a"
-                          variant = None }
-                      SideB =
-                        { providerID = "t"
-                          modelID = "m-b"
-                          variant = None } }
-
                 use j = AgentJournal.create d (RuntimeId.create "r-3") 1 DateTimeOffset.UtcNow
                 link j p c a
-                // Three failures leave durable Side B on the previous Logical Run.
-                // A new AgentOwnerRoot must still start from BaseModel/SideA.
+                // Prior fallback advances must not inject Model into a new AgentOwnerRoot.
                 fail j c 3
 
                 let host, captured = capturingFake ()
-                let b = HostForkRuntime(p, host, journal = j, modelResolver = cfg)
+                let b = HostForkRuntime(p, host, journal = j)
                 let! r = b.Fork(a, AgentRole.Coder, "w")
 
                 Assert.True(Result.isOk r, sprintf "expected Ok, got %A" r)
-                Assert.Equal(Some cfg.SideA, captured.[0].Model)
+                Assert.True(captured.[0].Model.IsNone)
+                Assert.True(captured.[0].Agent.IsSome)
             })
 
     [<Fact>]
-    let ``Dead_decision_survives_journal_rebuild`` () =
+    let ``Four_advances_survive_journal_rebuild_without_dead_refusal`` () =
         withTempDir (fun d ->
             task {
                 let p = SessionId.create "p-reb"
@@ -172,13 +155,8 @@ module HostForkRuntimeSessionDeadTests =
                 use j2 =
                     AgentJournal.createFromBoot d (RuntimeId.create "r-reb2") 2 DateTimeOffset.UtcNow (Boot.boot d)
 
-                let host2, cc2, pc2 = makeCountingFake ()
+                let host2, _, _ = makeCountingFake ()
                 let! r = (HostForkRuntime(p, host2, journal = j2)).Fork(a, AgentRole.Coder, "w")
 
-                match r with
-                | Error e -> Assert.Contains("dead", e)
-                | Ok _ -> Assert.True(false, "expected dead refusal after rebuild")
-
-                Assert.Equal(0, cc2 ())
-                Assert.Equal(0, pc2 ())
+                Assert.True(Result.isOk r, sprintf "expected Fork Ok after rebuild, got %A" r)
             })

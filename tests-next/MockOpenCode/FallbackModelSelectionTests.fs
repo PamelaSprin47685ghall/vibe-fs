@@ -1,11 +1,8 @@
 namespace Wanxiangshu.Next.Tests.MockOpenCode
 
-open System
-open System.Collections.Generic
-open Wanxiangshu.Next.Kernel.Identity
+open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
-open Wanxiangshu.Next.Journal
-open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
+open Wanxiangshu.Next.OpenCode.EffectiveAgentResolver
 
 module FallbackModelSelectionTests =
 
@@ -13,50 +10,33 @@ module FallbackModelSelectionTests =
         if not (Unchecked.equals expected actual) then
             failwithf "Expected %A, got %A" expected actual
 
-    let private retrySignal (sessionId: string) (attempt: string) (reason: string) : RetrySignal =
-        { SessionId = SessionId.create sessionId
-          Attempt = attempt
-          Reason = reason
-          MessageId = None }
+    /// 0.5.0: model IDs are not resolved by Wanxiangshu. Effective agent
+    /// selection from a SelectedAgent/PeerAgent pair follows A/A/B/B forever.
+    let ``EffectiveAgent follows A A B B then wraps to A`` () =
+        task {
+            let authority =
+                { SelectedAgent = "fast-inspector"
+                  PeerAgent = "deep-inspector" }
 
-    /// Same-run provider model selection is A after 0/1 failures and B after 2/3.
-    let ``resolveForSession follows A A B B before dead`` () =
-        withTempDir (fun directory ->
-            task {
-                let sessionId = "fallback-models"
-                let sid = SessionId.create sessionId
-                let recorded = HashSet<string>()
-                let userBindings = Dictionary<string, MessageId>()
-                userBindings.[sessionId] <- MessageId.create "user-1"
+            let mutable cursor = EffectiveAgentResolver.initialCursor
 
-                use journal =
-                    AgentJournal.create directory (RuntimeId.create "fallback-models-runtime") 1 DateTimeOffset.UtcNow
+            let selected () =
+                EffectiveAgentResolver.effectiveAgent authority cursor
 
-                let cfg =
-                    { ModelResolver.SideA =
-                        { providerID = "test"
-                          modelID = "model-a"
-                          variant = None }
-                      ModelResolver.SideB =
-                        { providerID = "test"
-                          modelID = "model-b"
-                          variant = None } }
+            equal "fast-inspector" (selected ())
 
-                let selected () =
-                    ModelResolver.resolveForSession cfg sid (AgentJournal.snapshot journal)
-                    |> Option.map (fun m -> m.modelID)
+            cursor <- EffectiveAgentResolver.advanceCursor cursor 1L
+            equal "fast-inspector" (selected ())
 
-                equal (Some "model-a") (selected ())
+            cursor <- EffectiveAgentResolver.advanceCursor cursor 2L
+            equal "deep-inspector" (selected ())
 
-                RetrySignalHandler.handle (Some journal) recorded userBindings (retrySignal sessionId "1" "f1")
-                equal (Some "model-a") (selected ())
+            cursor <- EffectiveAgentResolver.advanceCursor cursor 3L
+            equal "deep-inspector" (selected ())
 
-                RetrySignalHandler.handle (Some journal) recorded userBindings (retrySignal sessionId "2" "f2")
-                equal (Some "model-b") (selected ())
+            // 4th advance wraps offset 3→1.0 (A again — infinite A/A/B/B cycle).
+            cursor <- EffectiveAgentResolver.advanceCursor cursor 4L
+            equal "fast-inspector" (selected ())
 
-                RetrySignalHandler.handle (Some journal) recorded userBindings (retrySignal sessionId "3" "f3")
-                equal (Some "model-b") (selected ())
-
-                RetrySignalHandler.handle (Some journal) recorded userBindings (retrySignal sessionId "4" "f4")
-                equal None (selected ())
-            })
+            return ()
+        }

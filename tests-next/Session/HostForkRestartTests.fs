@@ -17,11 +17,7 @@ module HostForkRestartTests =
           Finish = finish
           ErrorName = None
           Model = None
-          Parts =
-            [| box (
-                   {| ``type`` = "text"
-                      text = text |}
-               ) |]
+          Parts = [| box ({| ``type`` = "text"; text = text |}) |]
           Raw = null }
 
     let private snapshotOf (messages: Map<string, SessionMessage list>) =
@@ -48,7 +44,7 @@ module HostForkRestartTests =
                             msg "a1" "assistant" (Some "stop") "A version complete" ] ]
                 )
 
-            do! HostForkRestart.recoverChild runtime (Some snapshot) agentId childId AgentRole.Coder
+            do! HostForkRestart.recoverChild runtime (Some snapshot) agentId childId AgentRole.Coder "fast-coder"
             let! joined = runtime.Join()
 
             match joined with
@@ -58,7 +54,7 @@ module HostForkRestartTests =
             | Error e -> Assert.True(false, sprintf "expected completion, got %A" e)
 
             // Before join, list may still show pending; after join the mailbox is empty.
-            Assert.equal(0, runtime.PendingCompletionCount)
+            Assert.equal (0, runtime.PendingCompletionCount)
         }
 
     [<Fact>]
@@ -76,16 +72,26 @@ module HostForkRestartTests =
                             msg "a1" "assistant" (Some "tool-calls") "still working" ] ]
                 )
 
-            do! HostForkRestart.recoverChild runtime (Some snapshot) agentId childId AgentRole.Inspector
+            do!
+                HostForkRestart.recoverChild
+                    runtime
+                    (Some snapshot)
+                    agentId
+                    childId
+                    AgentRole.Inspector
+                    "fast-inspector"
+
             let agents, _ = runtime.List()
             let record = agents |> List.find (fun a -> a.AgentId = agentId)
-            Assert.equal(AgentStatus.Interrupted, record.Status)
+            Assert.equal (AgentStatus.Interrupted, record.Status)
+
             Assert.True(
                 record.LastCompletionStatus
                 |> Option.exists (fun s -> s.StartsWith("interrupted:")),
                 sprintf "expected interrupted status, got %A" record.LastCompletionStatus
             )
-            Assert.equal(0, runtime.PendingCompletionCount)
+
+            Assert.equal (0, runtime.PendingCompletionCount)
         }
 
     [<Fact>]
@@ -95,8 +101,8 @@ module HostForkRestartTests =
             let childId = SessionId.create "child-3"
             let agentId = "aabbcc"
 
-            do! HostForkRestart.recoverChild runtime None agentId childId AgentRole.Browser
+            do! HostForkRestart.recoverChild runtime None agentId childId AgentRole.Browser "fast-browser"
             let agents, _ = runtime.List()
             let record = agents |> List.find (fun a -> a.AgentId = agentId)
-            Assert.equal(AgentStatus.Interrupted, record.Status)
+            Assert.equal (AgentStatus.Interrupted, record.Status)
         }

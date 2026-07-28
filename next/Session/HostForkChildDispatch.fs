@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -22,13 +23,14 @@ module HostForkChildDispatch =
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (sessions: ISessionHostPort)
         (runtime: ForkRuntime)
-        (sendChildPrompt: string -> SessionId -> AgentRole -> string -> Task<Result<unit, string>>)
-        (sendBusyNudge: string -> SessionId -> AgentRole -> string -> Task<Result<unit, string>>)
+        (sendChildPrompt: string -> SessionId -> AgentRole -> string -> string -> Task<Result<unit, string>>)
+        (sendBusyNudge: string -> SessionId -> AgentRole -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> AgentRole -> unit)
         (agentId: string)
         (childId: SessionId)
         (role: AgentRole)
         (prompt: string)
+        (agent: string)
         : Task<Result<ForkResult, string>> =
         task {
             let activeRun =
@@ -41,16 +43,20 @@ module HostForkChildDispatch =
             | Some _ when runtime.IsCancelled -> return Error "Fork runtime is cancelled"
             | Some _ ->
                 // Active run: BusyAgentNudge continuation (same LogicalRun).
-                let! sent = sendBusyNudge agentId childId role prompt
+                let! sent = sendBusyNudge agentId childId role agent prompt
 
                 match sent with
                 | Ok() -> return Ok(ForkResult.Nudged agentId)
                 | Error err -> return Error err
             | None ->
                 // Idle existing child: new AgentOwnerRoot work via ordinary send.
-                let run = HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId role
+                let run =
+                    HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId role
+
                 onRunStarted childId role
-                let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))
+
+                let result =
+                    runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task), agent = agent)
 
                 match result with
                 | ForkResult.NotFound _ ->
@@ -58,12 +64,18 @@ module HostForkChildDispatch =
                     return Error "Fork runtime is cancelled"
                 | _ ->
                     HostForkRunLifecycle.markReady gate run
-                    let! sent = sendChildPrompt agentId childId role prompt
+                    let! sent = sendChildPrompt agentId childId role agent prompt
 
                     match sent, result with
                     | Ok(), ForkResult.Nudged _ -> return Ok result
                     | Ok(), _ ->
-                        HostForkRunLifecycle.failRun gate pendingRuns sessions run "Existing agent did not accept a new run"
+                        HostForkRunLifecycle.failRun
+                            gate
+                            pendingRuns
+                            sessions
+                            run
+                            "Existing agent did not accept a new run"
+
                         return Error "Existing agent did not accept a new run"
                     | Error err, _ ->
                         HostForkRunLifecycle.failRun gate pendingRuns sessions run err
@@ -137,4 +149,42 @@ module HostForkChildDispatch =
                 match firstError with
                 | Some err -> return Error err
                 | None -> return Ok()
+        }
+
+    /// Cancel parent: fail pending runs, durable-unlink children, clear maps.
+    let cancelParent
+        (awaitRecovery: unit -> Task<unit>)
+        (runtime: ForkRuntime)
+        (ptyPort: PtyPort)
+        (parentKey: string)
+        (parentAbortToken: int)
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (children: Dictionary<string, SessionId>)
+        (sessions: ISessionHostPort)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (complete: PendingHostRun -> TerminalOutcome -> unit)
+        : Task<unit> =
+        task {
+            runtime.Cancel()
+            do! ptyPort.CloseAll()
+            Pty.unregisterParentAbort parentKey parentAbortToken
+
+            let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
+
+            for run in pending do
+                complete run (TerminalOutcome.Failed "cancelled")
+
+            do! awaitRecovery ()
+            let! teardown = teardownChildren sessions journal parentId children gate
+
+            match teardown with
+            | Ok() ->
+                lock gate (fun () ->
+                    children.Clear()
+                    pendingRuns.Clear())
+
+                return ()
+            | Error err -> return raise (InvalidOperationException(sprintf "Parent teardown failed: %s" err))
         }

@@ -9,6 +9,7 @@ import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const primaryRole = 'orchestrator';
+const primaryAgent = 'fast-orchestrator';
 const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 const contextLimit = 1000;
@@ -121,7 +122,6 @@ try {
     // 32k budget and leave round-3 expecting a condense request that never fires.
     extraEnv: {
       WANXIANGSHU_BLOGGER_CONTEXT_LIMIT: String(contextLimit),
-      WANXIANGSHU_BLOGGER_MODEL: 'test/test-model',
     },
   });
   scenario.provider.expectTitle({
@@ -139,7 +139,7 @@ try {
   };
 
   const parent = await scenario.client.request('POST', '/api/session', {
-    body: { agent: primaryRole, model: { providerID: 'test', id: 'test-model' } },
+    body: { agent: primaryAgent, model: { providerID: 'test', id: 'test-model' } },
   });
   const parentId = getSessionId(parent);
   assert.ok(parentId, `parent creation failed: ${JSON.stringify(parent)}`);
@@ -159,7 +159,7 @@ try {
         lane: expectationLane('companion-replacement', 'primary-blogger', 'blogger', round, 'chat', 'primary'),
         text: bloggerParagraph(round),
         match: {
-          containsText: ['You are the blogger of a coding agent session.', '"agent":"orchestrator"'],
+          containsText: ['You are the blogger of a coding agent session.', '"agent":"fast-orchestrator"'],
         },
       });
     }
@@ -188,7 +188,7 @@ try {
     const turn = scenario.turn.start(parentId);
     const prompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
       body: {
-        agent: primaryRole,
+        agent: primaryAgent,
         parts: [{ type: 'text', text: `Record round ${round}.` }],
         model: { providerID: 'test', modelID: 'test-model' },
       },
@@ -221,7 +221,7 @@ try {
           const retryTurn = scenario.turn.start(parentId);
           const retryPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
             body: {
-              agent: primaryRole,
+              agent: primaryAgent,
               parts: [{ type: 'text', text: `Record round ${round} retry ${attempt}.` }],
               model: { providerID: 'test', modelID: 'test-model' },
             },
@@ -282,7 +282,7 @@ try {
   const restartedTurn = scenario.turn.start(parentId);
   const restartedPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
     body: {
-      agent: primaryRole,
+      agent: primaryAgent,
       parts: [{ type: 'text', text: 'Record round restarted.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
@@ -357,7 +357,7 @@ try {
   const rfTurn = scenario.turn.start(parentId);
   const rfPrompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
     body: {
-      agent: primaryRole,
+      agent: primaryAgent,
       parts: [{ type: 'text', text: 'Record round resetfail.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },

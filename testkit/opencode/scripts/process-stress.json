@@ -17,7 +17,7 @@
     {
       "id": "inspector-executor-sigkill",
       "lane": {
-        "session": "inspector",
+        "session": "fast-inspector",
         "role": "inspector",
         "turn": 1,
         "requestKind": "chat"
@@ -41,7 +41,7 @@
     {
       "id": "inspector-sigkill-final",
       "lane": {
-        "session": "inspector",
+        "session": "fast-inspector",
         "role": "inspector",
         "turn": 2,
         "requestKind": "chat"
@@ -64,14 +64,14 @@
     "strict": true
   },
   "session": {
-    "agent": "inspector",
+    "agent": "fast-inspector",
     "bind": [
       "inspector-title",
-      "inspector"
+      "fast-inspector"
     ]
   },
   "prompt": {
-    "agent": "inspector",
+    "agent": "fast-inspector",
     "text": "Run the command and report if it timed out."
   },
   "flow": [

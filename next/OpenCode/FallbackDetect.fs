@@ -184,7 +184,9 @@ module FallbackDetect =
 
                 match AgentJournal.appendAgent (StreamId.Session sid) None fact j with
                 | Ok _ -> currentDecision j
-                | Error _ -> FallbackDecision.Dead
+                | Error _ ->
+                    // Append failed (e.g. duplicate race): keep current cursor decision.
+                    currentDecision j
 
         if recorded.Add identity then
             // In-memory fast path passed. Check the durable projection — the

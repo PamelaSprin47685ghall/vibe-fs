@@ -23,38 +23,20 @@ module DurableFallback =
         match Map.tryFind sessionId projSet.AgentProjections.Sessions with
         | Some sessionProj ->
             match sessionProj.Fallback with
-            | Some fb ->
-                let side =
-                    match fb.Side with
-                    | Wanxiangshu.Next.Journal.ModelSide.SideA -> ModelSide.A
-                    | Wanxiangshu.Next.Journal.ModelSide.SideB -> ModelSide.B
-
-                { Side = side
-                  Failures = fb.TotalFailures }
+            | Some fb -> { Offset = fb.Offset }
             | None -> Fallback.initial
         | None -> Fallback.initial
 
-    let isDead (sessionId: SessionId) (projSet: ProjectionSet) : bool =
-        match Map.tryFind sessionId projSet.AgentProjections.Sessions with
-        | Some session -> session.Fallback |> Option.exists (fun fallback -> fallback.IsDead)
-        | None -> false
+    /// 0.5.0: provider retry count never kills a Logical Run.
+    let isDead (_sessionId: SessionId) (_projSet: ProjectionSet) : bool = false
 
+    /// Always NextAttempt with the projection Offset (upcoming request cursor).
+    /// Fold advances Offset on each recorded failure; this does not advance again.
+    /// After a recorded failure, Offset is already the advanced cursor for the
+    /// next request (e.g. 4th/8th/12th → Offset 0 / A). Never Dead.
     let nextDecision (sessionId: SessionId) (projSet: ProjectionSet) : FallbackDecision =
-        // SSOT §6: A(0) → A retry(1) → permanent switch B(2) → B retry(3) → Dead(4).
-        // nextDecision returns the model to use for the NEXT attempt given the
-        // current cumulative failure count. A gets two attempts (original + retry);
-        // B gets two attempts (original + retry); the 5th failure is Dead.
-        // The returned Failures = current count + 1 (the count if this attempt fails).
-        // ModelResolver reads the fold's Side directly for production model
-        // selection; nextDecision is the decision contract for callers and tests.
-        if isDead sessionId projSet then
-            FallbackDecision.Dead
-        else
-            let state = currentState sessionId projSet
+        FallbackDecision.NextAttempt(currentState sessionId projSet)
 
-            match state.Failures with
-            | 0 -> FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 1 }
-            | 1 -> FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 2 }
-            | 2 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }
-            | 3 -> FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 4 }
-            | _ -> FallbackDecision.Dead
+    let currentSide (sessionId: SessionId) (projSet: ProjectionSet) : Wanxiangshu.Next.Session.ModelSide =
+        let state = currentState sessionId projSet
+        Fallback.currentSide state

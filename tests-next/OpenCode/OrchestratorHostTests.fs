@@ -62,7 +62,6 @@ module OrchestratorHostTests =
             let deps =
                 { Sessions = port :> ISessionHostPort
                   Journal = None
-                  ModelConfig = None
                   OnChildCreated =
                     fun agentId role childId -> created.Add(agentId, role.ToString(), SessionId.value childId)
                   RegisterChildDirectory = fun _ _ -> ()
@@ -72,7 +71,7 @@ module OrchestratorHostTests =
                   TargetBranch = "" }
 
             let host = OrchestratorHost(deps, mkSid "orch-1")
-            let! result = host.ForkManagerJob("m1", "task")
+            let! result = host.ForkManagerJob("m1", "fast-manager", "task")
 
             match result with
             | Ok _ -> failwith "ForkManagerJob should fail on a non-existent repo path"

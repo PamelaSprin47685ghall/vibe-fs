@@ -14,11 +14,6 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 /// Provider-prefix cache gates for Companion epoch freeze.
 module CompanionCacheTests =
-    let private bloggerModel =
-        { providerID = "cheap-provider"
-          modelID = "cheap-blogger"
-          variant = Some "fast" }
-
     let private makeHost (nextText: string ref) (condenseText: string) =
         let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
         let mutable output = [ "history" ]
@@ -88,8 +83,7 @@ module CompanionCacheTests =
             let host = makeHost nextText "B-condensed"
             let sid = "freeze-primary"
 
-            let companion =
-                new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
+            let companion = new CompanionHost(SessionId.create sid, host)
 
             let baseMsgs = [ msg sid "u1" "old"; msg sid "u2" "mid" ]
             companion.TransformRaw baseMsgs |> ignore
@@ -143,8 +137,7 @@ module CompanionCacheTests =
             let host = makeHost nextText "x"
             let sid = "cutoff-primary"
 
-            let companion =
-                new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
+            let companion = new CompanionHost(SessionId.create sid, host)
 
             let baseMsgs = [ msg sid "u1" "old"; msg sid "u2" "mid"; msg sid "u3" "keep" ]
             companion.TransformRaw baseMsgs |> ignore
@@ -192,7 +185,7 @@ module CompanionCacheTests =
                     AgentJournal.create directory (RuntimeId.create "rt-companion-cache") 1 DateTimeOffset.UtcNow
 
                 let sid = "primary"
-                registerAuthorityRoot journal sid "manager"
+                registerAuthorityRoot journal sid "fast-manager"
 
                 let nextText = ref "blog paragraph"
                 let host = makeHost nextText "x"
@@ -203,14 +196,13 @@ module CompanionCacheTests =
                 sessionBudgets.["primary"] <- 100
                 let sessionOutputLimits = Dictionary<string, int>()
 
-                let companion =
-                    new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
+                let companion = new CompanionHost(SessionId.create sid, host)
 
                 companions.[sid] <- companion
 
                 let baseMsgs = [| msg sid "u1" "old"; msg sid "u2" "mid" |]
                 let out1 = createObj [ "messages", box baseMsgs ]
-                let inObj = createObj [ "sessionID", box sid; "agent", box "manager" ]
+                let inObj = createObj [ "sessionID", box sid; "agent", box "fast-manager" ]
 
                 CompanionTransform.handleCompanionTransform
                     companions
@@ -221,7 +213,6 @@ module CompanionCacheTests =
                     sessionBudgets
                     sessionOutputLimits
                     sessionRoles
-                    (Ok bloggerModel)
                     None
                     inObj
                     out1
@@ -241,7 +232,6 @@ module CompanionCacheTests =
                     sessionBudgets
                     sessionOutputLimits
                     sessionRoles
-                    (Ok bloggerModel)
                     None
                     inObj
                     out2
@@ -259,13 +249,12 @@ module CompanionCacheTests =
                     sessionBudgets
                     sessionOutputLimits
                     sessionRoles
-                    (Ok bloggerModel)
                     None
                     inObj
                     out2
 
                 let after2 = unbox<obj array> out2?messages
-                Assert.equal(after1.Length, after2.Length)
+                Assert.equal (after1.Length, after2.Length)
 
                 let heads =
                     after2
@@ -275,5 +264,5 @@ module CompanionCacheTests =
                         && not (isNull m?info?id)
                         && (unbox<string> m?info?id).StartsWith("companion-b-head"))
 
-                Assert.equal(1, heads.Length)
+                Assert.equal (1, heads.Length)
             })

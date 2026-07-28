@@ -14,14 +14,14 @@ module internal CompanionHostBlogger =
 
     type BloggerDeps =
         { Sessions: ISessionHostPort
-          Model: Result<OpencodeModel, string>
           EnsureBlogger: unit -> Task<SessionId>
           Gate: obj
           BloggerNeedsReset: bool ref
           Companion: Companion
           OutputWatermark: SessionId -> int
           AssistantOutput: SessionId -> int -> string
-          Journal: AgentJournal option }
+          Journal: AgentJournal option
+          EffectiveAgent: string }
 
     let failBlog (message: string) : string =
         raise (InvalidOperationException message)
@@ -30,34 +30,26 @@ module internal CompanionHostBlogger =
         (deps: BloggerDeps)
         (childId: SessionId)
         (prompt: string)
-        (model: OpencodeModel)
         : Task<Result<MessageId, string>> =
         task {
+            let agent = deps.EffectiveAgent
+
             match deps.Journal with
             | Some journal ->
                 let svc = PromptDispatcher.forJournal journal
 
-                let! outcome =
-                    svc.SendAgentOwnerRoot
-                        deps.Sessions
-                        childId
-                        prompt
-                        "blogger"
-                        (Some model)
-                        None
-                        None
-                        None
+                let! outcome = svc.SendAgentOwnerRoot deps.Sessions childId prompt agent None None
 
                 match outcome with
-                | Ok (messageId, _) -> return Ok messageId
+                | Ok(messageId, _) -> return Ok messageId
                 | Error err -> return Error err
             | None ->
                 return!
                     deps.Sessions.SendPrompt(
                         childId,
                         prompt,
-                        { Model = Some model
-                          Agent = Some "blogger"
+                        { Model = None
+                          Agent = Some agent
                           Directory = None
                           Metadata = None }
                     )
@@ -65,127 +57,111 @@ module internal CompanionHostBlogger =
 
     let blog (deps: BloggerDeps) (currentProjection: ProjectionSnapshot) (delta: ProjectionSnapshot) : Task<BlogText> =
         task {
-            match deps.Model with
+            let! childId = deps.EnsureBlogger()
+
+            let completion =
+                TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let watermark = deps.OutputWatermark childId
+
+            let mutable terminalDelivered = false
+
+            let onTerminal _ outcome =
+                if not terminalDelivered then
+                    terminalDelivered <- true
+                    completion.SetResult outcome
+
+            use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
+
+            // Read pending-reset WITHOUT clearing: the flag is cleared only
+            // after a terminal (Completed with non-empty output), so any
+            // failure (send Error, Aborted, Failed, empty) leaves it set and
+            // the next blog call re-sends the FULL reset frame.
+            let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
+
+            let prompt =
+                if reset then
+                    sprintf
+                        "You are the blogger of a coding agent session. This session resumed after a restart and your prior companion context was lost. Re-anchor on the FULL current companion context B and the FULL CURRENT projection, then continue. FULL B:\n%s\nFULL PROJECTION:\n%s"
+                        (deps.Companion.Memory.LatestB |> Option.defaultValue "")
+                        currentProjection
+                else
+                    sprintf
+                        "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
+                        delta
+
+            let! sent = sendBloggerPrompt deps childId prompt
+
+            match sent with
             | Error error -> return failBlog error
-            | Ok model ->
-                let! childId = deps.EnsureBlogger()
+            | Ok _ ->
+                let! outcome = completion.Task
 
-                let completion =
-                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+                match outcome with
+                | Completed result ->
+                    let streamed = deps.AssistantOutput childId watermark
 
-                let watermark = deps.OutputWatermark childId
-
-                let mutable terminalDelivered = false
-
-                let onTerminal _ outcome =
-                    if not terminalDelivered then
-                        terminalDelivered <- true
-                        completion.SetResult outcome
-
-                use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
-
-                // Read pending-reset WITHOUT clearing: the flag is cleared only
-                // after a terminal (Completed with non-empty output), so any
-                // failure (send Error, Aborted, Failed, empty) leaves it set and
-                // the next blog call re-sends the FULL reset frame.
-                let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
-
-                let prompt =
-                    if reset then
-                        sprintf
-                            "You are the blogger of a coding agent session. This session resumed after a restart and your prior companion context was lost. Re-anchor on the FULL current companion context B and the FULL CURRENT projection, then continue. FULL B:\n%s\nFULL PROJECTION:\n%s"
-                            (deps.Companion.Memory.LatestB |> Option.defaultValue "")
-                            currentProjection
-                    else
-                        sprintf
-                            "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
-                            delta
-
-                let! sent = sendBloggerPrompt deps childId prompt model
-
-                match sent with
-                | Error error -> return failBlog error
-                | Ok _ ->
-                    let! outcome = completion.Task
-
-                    match outcome with
-                    | Completed result ->
-                        // Prefer watermarked session output first (the durable
-                        // A-text stream used by fork/join consumers). Fall back
-                        // to TerminalOutcome.FinalText when the output port is
-                        // empty — production records FinalText before notify.
-                        // If the host marks Completed with empty FinalText and
-                        // no streamed bytes, treat it as failure so pending
-                        // reset / empty-output contracts stay fail-closed.
-                        let streamed = deps.AssistantOutput childId watermark
-
-                        let text =
-                            if not (String.IsNullOrWhiteSpace streamed) then
-                                streamed
-                            elif not (String.IsNullOrWhiteSpace result.FinalText) then
-                                result.FinalText
-                            else
-                                ""
-
-                        if String.IsNullOrWhiteSpace text then
-                            return failBlog "Blogger returned no assistant text"
+                    let text =
+                        if not (String.IsNullOrWhiteSpace streamed) then
+                            streamed
+                        elif not (String.IsNullOrWhiteSpace result.FinalText) then
+                            result.FinalText
                         else
-                            // Success-after-clear: the blogger confirmed the
-                            // anchor, so drop the pending-reset flag and let
-                            // Companion.Submit re-base on currentProjection.
-                            lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
-                            return text
-                    | Aborted reason -> return failBlog reason
-                    | Failed error -> return failBlog error
+                            ""
+
+                    if String.IsNullOrWhiteSpace text then
+                        return failBlog "Blogger returned no assistant text"
+                    else
+                        lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
+                        return text
+                | Aborted reason -> return failBlog reason
+                | Failed error -> return failBlog error
         }
 
     let selfRebaseBlog (deps: BloggerDeps) (currentB: BlogText) : Task<BlogText> =
         task {
-            match deps.Model with
+            let! childId = deps.EnsureBlogger()
+
+            let completion =
+                TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let watermark = deps.OutputWatermark childId
+
+            let mutable terminalDelivered = false
+
+            let onTerminal _ outcome =
+                if not terminalDelivered then
+                    terminalDelivered <- true
+                    completion.SetResult outcome
+
+            use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
+
+            let prompt =
+                sprintf
+                    "You are the blogger of a coding agent session. Condense the following FULL companion context into a single dense paragraph that preserves every durable fact, decision, and instruction. Output ONLY the condensed paragraph.\n%s"
+                    currentB
+
+            let! sent = sendBloggerPrompt deps childId prompt
+
+            match sent with
             | Error error -> return failBlog error
-            | Ok model ->
-                let! childId = deps.EnsureBlogger()
+            | Ok _ ->
+                let! outcome = completion.Task
 
-                let completion =
-                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+                match outcome with
+                | Completed result ->
+                    let streamed = deps.AssistantOutput childId watermark
 
-                let watermark = deps.OutputWatermark childId
-
-                let mutable terminalDelivered = false
-
-                let onTerminal _ outcome =
-                    if not terminalDelivered then
-                        terminalDelivered <- true
-                        completion.SetResult outcome
-
-                use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
-
-                let prompt =
-                    sprintf
-                        "You are the blogger of a coding agent session. Condense the following FULL companion context into a single dense paragraph that preserves every durable fact, decision, and instruction. Output ONLY the condensed paragraph.\n%s"
-                        currentB
-
-                let! sent = sendBloggerPrompt deps childId prompt model
-
-                match sent with
-                | Error error -> return failBlog error
-                | Ok _ ->
-                    let! outcome = completion.Task
-
-                    match outcome with
-                    | Completed result ->
-                        let streamed = deps.AssistantOutput childId watermark
-
-                        let text =
-                            if not (String.IsNullOrWhiteSpace streamed) then
-                                streamed
-                            else
-                                result.FinalText
-
-                        if String.IsNullOrWhiteSpace text then
-                            return failBlog "Blogger returned no assistant text"
+                    let text =
+                        if not (String.IsNullOrWhiteSpace streamed) then
+                            streamed
                         else
-                            return text
-                    | Aborted reason -> return failBlog reason
-                    | Failed error -> return failBlog error
+                            result.FinalText
+
+                    if String.IsNullOrWhiteSpace text then
+                        return failBlog "Blogger returned no assistant text"
+                    else
+                        return text
+                | Aborted reason -> return failBlog reason
+                | Failed error -> return failBlog error
         }

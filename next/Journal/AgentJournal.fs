@@ -16,13 +16,9 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
     let mutable proj = initialProjection
 
     /// Durable dedupe identity for a fallback failure. Matches the identity the
-    /// fold stores in the per-session bounded `RecentFailureIds` (max 4 — the
-    /// Dead threshold), so dedupe is O(sessions), not O(history).
-    let fallbackIdentity
-        (logicalRunId: string)
-        (authorityRootUserMessageId: string)
-        (providerAttempt: string)
-        =
+    /// fold stores in the per-session bounded `RecentFailureIds`, so dedupe is
+    /// O(sessions), not O(history).
+    let fallbackIdentity (logicalRunId: string) (authorityRootUserMessageId: string) (providerAttempt: string) =
         sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     member _.Writer = writer
@@ -37,23 +33,20 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
         (fact: AgentFact)
         : Result<ProjectionSet, JournalAppendFailure> =
         lock gate (fun () ->
-            // Fallback append boundary (SSOT §6): dedupe and Dead-refusal read
-            // the bounded per-session projection — never a global history set.
+            // Fallback append boundary: dedupe only. 0.5.0 never refuses for Dead.
             let refuseFallback =
                 match fact with
                 | AgentFact.FallbackFailureRecorded p ->
                     match Map.tryFind p.SessionId proj.AgentProjections.Sessions with
                     | Some { Fallback = Some fb } ->
-                        fb.IsDead
-                        || List.contains
+                        List.contains
                             (fallbackIdentity p.LogicalRunId p.AuthorityRootUserMessageId p.ProviderAttempt)
                             fb.RecentFailureIds
                     | _ -> false
                 | _ -> false
 
             if refuseFallback then
-                // Duplicate identity, or the session is already Dead (4 failures):
-                // idempotent no-op, no new envelope.
+                // Duplicate identity: idempotent no-op, no new envelope.
                 Ok proj
             else
                 match writer.Append stream turnId (Fact.Agent fact) with
@@ -74,11 +67,7 @@ module AgentJournal =
 
     /// Single durable failure identity format shared by append boundary, fold,
     /// and FallbackDetect in-memory dedupe.
-    let fallbackIdentity
-        (logicalRunId: string)
-        (authorityRootUserMessageId: string)
-        (providerAttempt: string)
-        =
+    let fallbackIdentity (logicalRunId: string) (authorityRootUserMessageId: string) (providerAttempt: string) =
         sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     let createFromProjection

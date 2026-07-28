@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 
 /// A physical `role=user` message is transport, not authorization.
@@ -28,14 +29,25 @@ module PromptAuthority =
         | HostInternal
         | UnknownOrigin
 
+    /// Durable Authority Root execution archive. Stores Managed Agent pair only —
+    /// never model IDs. Host resolves models from opencode.json agent bindings.
     type AuthorityExecutionProfile =
         { SessionId: SessionId
           LogicalRunId: string
           AuthorityRootUserMessageId: MessageId
           AuthorityKind: RootAuthorityKind
-          Agent: string
-          BaseModel: OpencodeModel option
-          Variant: string option }
+          SelectedAgent: string
+          PeerAgent: string
+          CanonicalRole: Role
+          SelectedTier: AgentTier }
+
+    /// Same-run attempt layer. Fallback may change EffectiveAgent only.
+    type AttemptExecutionProfile =
+        { Authority: AuthorityExecutionProfile
+          PhysicalUserMessageId: MessageId
+          ProviderAttempt: int64
+          EffectiveAgent: string
+          Origin: PromptOrigin }
 
     type PromptClaim =
         { PromptKey: PromptKeyRef
@@ -43,9 +55,7 @@ module PromptAuthority =
           Origin: PromptOrigin
           LogicalRunId: string
           AuthorityRootUserMessageId: MessageId option
-          Agent: string option
-          EffectiveModel: OpencodeModel option
-          Variant: string option }
+          EffectiveAgent: string option }
 
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option
@@ -72,59 +82,110 @@ module PromptAuthority =
         unbox<string> (hash?digest "hex")
 
     let stableLogicalRunId (runtimeId: string) (sessionId: SessionId) (rootUserMessageId: MessageId) =
-        sha256Hex (String.Concat([| runtimeId; "\n"; SessionId.value sessionId; "\n"; MessageId.value rootUserMessageId |]))
+        sha256Hex (
+            String.Concat(
+                [| runtimeId
+                   "\n"
+                   SessionId.value sessionId
+                   "\n"
+                   MessageId.value rootUserMessageId |]
+            )
+        )
 
     let newPromptKey () =
         PromptKeyRef.create (Guid.NewGuid().ToString("N"))
 
+    let tierLabel (tier: AgentTier) =
+        match tier with
+        | AgentTier.Fast -> "Fast"
+        | AgentTier.Deep -> "Deep"
+
+    let tryParseTier (value: string) =
+        match value with
+        | "Fast"
+        | "fast" -> Some AgentTier.Fast
+        | "Deep"
+        | "deep" -> Some AgentTier.Deep
+        | _ -> None
+
+    let roleLabel (role: Role) = ManagedAgent.roleName role
+
+    let tryParseRole (value: string) =
+        ManagedAgent.tryParse ("fast-" + value) |> Option.map (fun agent -> agent.Role)
+
+    let agentPair (profile: AuthorityExecutionProfile) : EffectiveAgentResolver.AuthorityAgentPair =
+        { SelectedAgent = profile.SelectedAgent
+          PeerAgent = profile.PeerAgent }
+
+    let effectiveAgentAt (profile: AuthorityExecutionProfile) (offset: byte) : string =
+        EffectiveAgentResolver.effectiveAgent
+            (agentPair profile)
+            { Offset = offset
+              LastProviderAttempt = None }
+
+    /// Default EffectiveAgent for a new root / offset-0 attempt is SelectedAgent.
+    let selectedEffectiveAgent (profile: AuthorityExecutionProfile) = profile.SelectedAgent
+
+    let createAuthorityRootFromManaged
+        (runtimeId: string)
+        (sessionId: SessionId)
+        (rootKind: RootAuthorityKind)
+        (messageId: MessageId)
+        (selected: ManagedAgent)
+        : AuthorityExecutionProfile =
+        let peer = ManagedAgent.peer selected
+
+        { SessionId = sessionId
+          LogicalRunId = stableLogicalRunId runtimeId sessionId messageId
+          AuthorityRootUserMessageId = messageId
+          AuthorityKind = rootKind
+          SelectedAgent = selected.Name
+          PeerAgent = peer.Name
+          CanonicalRole = selected.Role
+          SelectedTier = selected.Tier }
+
+    /// New Authority Root requires an explicit Managed Agent name (fast-* / deep-*).
+    /// Peer is derived via ManagedAgent.peer — never guessed from model IDs.
     let createAuthorityRoot
         (runtimeId: string)
         (sessionId: SessionId)
         (rootKind: RootAuthorityKind)
         (messageId: MessageId)
-        (agent: string)
-        (baseModel: OpencodeModel option)
-        (variant: string option)
-        : AuthorityExecutionProfile =
-        { SessionId = sessionId
-          LogicalRunId = stableLogicalRunId runtimeId sessionId messageId
-          AuthorityRootUserMessageId = messageId
-          AuthorityKind = rootKind
-          Agent = agent
-          BaseModel = baseModel
-          Variant = variant }
+        (selectedAgentName: string)
+        : Result<AuthorityExecutionProfile, string> =
+        match ManagedAgent.parse selectedAgentName with
+        | Error err -> Error(ManagedAgent.formatParseError err)
+        | Ok selected -> Ok(createAuthorityRootFromManaged runtimeId sessionId rootKind messageId selected)
 
     let claimContinuation
         (key: PromptKeyRef)
         (sessionId: SessionId)
         (continuation: ContinuationKind)
         (profile: AuthorityExecutionProfile)
-        (effectiveModel: OpencodeModel option)
+        (effectiveAgent: string)
         : PromptClaim =
         { PromptKey = key
           SessionId = sessionId
           Origin = Continuation continuation
           LogicalRunId = profile.LogicalRunId
           AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
-          Agent = Some profile.Agent
-          EffectiveModel = effectiveModel
-          Variant = profile.Variant }
+          EffectiveAgent = Some effectiveAgent }
 
     let claimAgentOwnerRoot
         (key: PromptKeyRef)
         (sessionId: SessionId)
-        (agent: string)
-        (baseModel: OpencodeModel option)
-        (variant: string option)
-        : PromptClaim =
-        { PromptKey = key
-          SessionId = sessionId
-          Origin = AuthorityRoot AgentOwnerRoot
-          LogicalRunId = ""
-          AuthorityRootUserMessageId = None
-          Agent = Some agent
-          EffectiveModel = baseModel
-          Variant = variant }
+        (selectedAgentName: string)
+        : Result<PromptClaim, string> =
+        match ManagedAgent.parse selectedAgentName with
+        | Error err -> Error(ManagedAgent.formatParseError err)
+        | Ok selected ->
+            Ok
+                { PromptKey = key
+                  SessionId = sessionId
+                  Origin = AuthorityRoot AgentOwnerRoot
+                  LogicalRunId = ""
+                  AuthorityRootUserMessageId = None
+                  EffectiveAgent = Some selected.Name }
 
     let registerAuthority profile projection =
         { projection with
@@ -160,15 +221,13 @@ module PromptAuthority =
         (repairKind: string)
         =
         String.Concat(
-            [|
-                logicalRunId
-                "|"
-                MessageId.value authorityRootUserMessageId
-                "|"
-                MessageId.value terminalAssistantMessageId
-                "|"
-                repairKind
-            |]
+            [| logicalRunId
+               "|"
+               MessageId.value authorityRootUserMessageId
+               "|"
+               MessageId.value terminalAssistantMessageId
+               "|"
+               repairKind |]
         )
 
     let tryClaimRepair identity projection =

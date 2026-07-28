@@ -1,4 +1,4 @@
-参见 /AGENTS.md 卷 **Prompt Authority、Logical Run 与 Synthetic Continuation**（完整规范性条文）。
+参见 /AGENTS.md 卷 **Prompt Authority、Logical Run 与 Synthetic Continuation**（完整规范性条文）与仓库根目录 `0.5.0.md`。
 
 ## Prompt Authority、Logical Run 与 Synthetic Continuation [NORMATIVE]
 
@@ -10,21 +10,84 @@ PhysicalUserMessage ≠ AuthorityTurn
 
 Host `role=user` 只是运输格式。零宽、空白、固定模板、时间与文本长度都不是身份。
 
-只有 **Authority Root** 可以：创建 Logical Run；选择/改变 agent、BaseModel、variant；成为 Fallback root；重置 Interaction Repair 预算；更新 LastAuthorityProfile；决定 Companion eligibility。
+只有 **Authority Root** 可以：创建 Logical Run；选择/改变 SelectedAgent（准确的 `fast-*` / `deep-*`）；成为 Fallback root；重置 Interaction Repair 预算；更新 LastAuthorityProfile；决定 Companion eligibility。
 
-**Continuation**（InteractionRepair / ManagerGuard / ReviewerGuard / ReviewConfirmation / BusyAgentNudge / ProviderRetryAttempt / HostCompactionContinue）一律不得执行以上操作。B retry 只覆盖当前 Attempt 的 EffectiveModel，绝不得成为下一真人 root 的默认 model。
+**Continuation**（InteractionRepair / ManagerGuard / ReviewerGuard / ReviewConfirmation / BusyAgentNudge / ProviderRetryAttempt / HostCompactionContinue）一律不得执行以上操作。Fallback 只覆盖当前 Attempt 的 **EffectiveAgent**，绝不得改写 AuthorityExecutionProfile.SelectedAgent 或 LastAuthorityProfile。
+
+### 0.5.0 冻结文本
+
+> Wanxiangshu 0.5.0 使用 OpenCode Managed Agent identity 作为模型选择的唯一入口。每个公开工作角色必须拥有两个准确命名的 Agent：`fast-ROLE` 与 `deep-ROLE`。用户和 LLM 创建新工作时必须显式选择其中之一；无前缀旧名称、`build`、`plan` 以及任何隐式默认均不受支持。
+>
+> OpenCode 宿主最终解析后的 `opencode.json.agent` 是 Agent inventory 和 Agent→Model 绑定的唯一事实源。Wanxiangshu 不读取模型环境变量，不维护模型 catalog，不持久化模型 ID，不覆盖 Prompt 的 model 字段。Wanxiangshu 只向 Host 提供 EffectiveAgent，实际模型由 Host 根据该 Agent 的配置解析。
+>
+> 对公开 Agent，用户选择的 Agent 为 Side A，其同角色相反 tier Agent 为 Side B。选择 `fast-ROLE` 时，`A=fast-ROLE, B=deep-ROLE`；选择 `deep-ROLE` 时，`A=deep-ROLE, B=fast-ROLE`。Fallback cursor 按 `A/A/B/B/A/A/B/B/...` 无限循环。Provider retry 只推进 modulo-4 cursor，不存在因累计 retry 数而产生的 Dead 状态。
+>
+> `fast-blogger/deep-blogger` 与 `fast-executor/deep-executor` 是 Host 内部 Agent，不向任何 LLM 工具 schema 暴露。每个新的 Blogger 或 Executor summary Logical Run 固定从 fast Agent 开始，以 deep Agent 为 B，并使用相同的无限 AABBAABB 循环。
+>
+> Fast 与 Deep 只改变 OpenCode Agent identity 及其在 `opencode.json` 中绑定的模型。它们不改变 Canonical Role、system prompt、工具权限、Review 协议、Companion eligibility、Logical Run、Authority Root 或 completion 语义。Fallback 只能改变 AttemptExecutionProfile.EffectiveAgent，不能改写 AuthorityExecutionProfile.SelectedAgent 或 LastAuthorityProfile。
+
+最终不变量：
+
+```text
+Agent 决定模型。
+配置决定 Agent 的模型。
+万象术不决定模型。
+
+新工作必须显式选择 fast 或 deep。
+Continuation 不改变用户选择。
+Fallback 只改变当前 EffectiveAgent。
+
+AABBAABB 永久循环。
+没有 retry 次数死亡。
+
+公开工作 Agent 可选择 fast/deep。
+Blogger 和 Executor 内部固定 fast 起步。
+
+角色权限仍然由静态源码控制。
+模型绑定只由 opencode.json 控制。
+```
 
 ### Authority Root
 
-- `HumanRoot`：外部 prompt-acceptance 边界已证明的真人输入。
-- `AgentOwnerRoot`：插件显式创建的新逻辑工作（fork new / idle continue / one-shot Inspector）。必须显式 agent/model/variant（或明确 None）。
+- `HumanRoot`：外部 prompt-acceptance 边界已证明的真人输入。必须携带准确公开 Managed Agent（`fast-*` / `deep-*`）。省略 Agent → `HostContractUnsupported`。
+- `AgentOwnerRoot`：插件显式创建的新逻辑工作（fork new / idle continue / one-shot Inspector）。必须显式 Managed Agent；新 Logical Run 与 completion。
 
 ### Continuation
 
 - 复用 `LogicalRunId` 与 `AuthorityRootUserMessageId`
 - 不建新 completion/run；不更新 LastAuthorityProfile；不重置 Fallback/repair；不改变 Companion eligibility
+- 物理请求使用当前 fallback cursor 对应的 EffectiveAgent
 - Busy nudge：同 RunId、同 completion、同 AuthorityRoot
-- Idle existing agent 的新任务：`AgentOwnerRoot`（新 Run）
+- Idle existing agent 的新任务：`AgentOwnerRoot`（新 Run，cursor=0，SelectedAgent=该 session 原本准确 Agent）
+
+### 执行档案
+
+```fsharp
+type AuthorityExecutionProfile =
+    { SessionId
+      LogicalRunId
+      AuthorityRootUserMessageId
+      AuthorityKind
+      SelectedAgent   // e.g. deep-reviewer
+      PeerAgent       // e.g. fast-reviewer
+      CanonicalRole
+      SelectedTier }
+
+type AttemptExecutionProfile =
+    { Authority
+      PhysicalUserMessageId
+      ProviderAttempt
+      EffectiveAgent  // cursor side → SelectedAgent or PeerAgent
+      Origin }
+```
+
+发送 Prompt：
+
+```fsharp
+{ Agent = Some effectiveAgent; Model = None; ... }
+```
+
+禁止设置 `Model`。Host 按 `config.agent[effectiveAgent].model` 解析。
 
 ### PromptAuthorityService / PromptDispatcher 两阶段协议
 
@@ -32,121 +95,62 @@ Host `role=user` 只是运输格式。零宽、空白、固定模板、时间与
 
 所有插件 user-shaped message 必须经该服务：
 
-1. `PluginPromptClaimed(PromptKey, Origin, LogicalRunId, AuthorityRoot, Agent, EffectiveModel, Variant)`
+1. `PluginPromptClaimed(PromptKey, Origin, LogicalRunId, AuthorityRoot, SelectedAgent/EffectiveAgent, …)`
 2. 带 metadata 发送：`wanxiangshu_prompt_key` / `wanxiangshu_origin` / `wanxiangshu_logical_run` / `wanxiangshu_authority_root`
-3. Host 接受 → `PluginPromptAccepted(PromptKey, HostMessageId)`；Authority Root 还写 `AuthorityRootAccepted`
+3. Host 接受 → `PluginPromptAccepted(PromptKey, HostMessageId)`；Authority Root 还写 `AuthorityRootAccepted`（持久化 SelectedAgent/PeerAgent/CanonicalRole/SelectedTier，**不**持久化 model ID）
 4. 失败 → `PluginPromptAbandoned`
 5. Host 无法关联 acceptance → fail-closed `HostContractUnsupported`（禁止当 HumanRoot）
 
-`logicalRunId = hash(runtimeId + sessionId + authorityRootUserMessageId)`；同一 Host message 重放只产生一个 root。
-
-AgentOwnerRoot 必须两阶段：
-
-```text
-create child
-→ claim AgentOwnerRoot
-→ SendPrompt（显式 agent/model/variant + PromptKey metadata）
-→ Host 接受
-→ AuthorityRootAccepted
-→ 才允许 run 进入 active
-```
-
-禁止任何模块直接 `prompt_async` 发送 Guard / repair / nudge / confirmation / 新 child 首 prompt。
-
-### 来源解析优先级
-
-```text
-accepted HostMessageId
-→ claimed PromptKey
-→ Host compaction / synthetic provenance
-→ registered AgentOwnerRoot
-→ proven external prompt acceptance (HumanRoot)
-→ UnknownOrigin
-```
-
-`UnknownOrigin` fail-closed：不更新 profile、不启动 fallback、不改变 Companion、不发送 continuation、不完成/替换 Logical Run。
-
-**禁止** `if text = "\u200B" then Plugin else Human` 及任何按空白/固定英文/长度猜来源。
+AgentOwnerRoot 必须两阶段：claim → SendPrompt（显式 Agent，`Model=None`）→ Host 接受 → AuthorityRootAccepted → 才允许 run 进入 active。
 
 ### LastAuthorityProfile
 
-- 真人显式 agent/model/variant 永远优先并开启新 Authority + 新 Fallback epoch（Failures=0, Side=A）
-- 真人省略字段只从 `LastAuthorityProfile` 继承：agent / BaseModel / variant
-- 省略 model 绝不从旧 Run 的 Side B EffectiveModel 继承
+- 真人/Owner 显式 SelectedAgent 永远优先并开启新 Authority + 新 Fallback cursor（Offset=0, Side=A）
+- 禁止省略 Agent 后默认 fast、继承 LastAuthority、或从 session role / last assistant 推断
 - Continuation 不得写回 LastAuthorityProfile
 
 ### Fallback
 
 ```text
 Fallback 属于 Logical Run。
-新 Authority Root 创建新 Fallback epoch：Failures=0, Side=A。
-Continuation 不创建新 epoch。
-B attempt 不成为未来真人 prompt 的默认模型。
-
-FallbackAttemptIdentity =
-  logicalRunId + AuthorityRootUserMessageId + providerAttempt
+新 Authority Root：Offset=0 → A。
+Cursor Offset ∈ {0,1,2,3} → A,A,B,B；retry → (offset+1) mod 4。
+无限循环：不存在第四次失败 Dead。
+成功不推进、不重置 cursor。
+唯一 durable writer：session.status=retry。
+identity = logicalRunId + AuthorityRootUserMessageId + providerAttempt
 ```
 
-当前 Run attempt 映射：1→A, 2→A, 3→B, 4→B, 5→禁止。唯一 durable writer：`session.status=retry`。
+若 Host 自身停止 retry，必须用 `ProviderRetryAttempt` continuation 延续同一 Logical Run（不新建 completion、不重置 cursor）。
 
-禁止：
+### Interaction Repair / Review witness / Companion
 
-```text
-每 Session 永久 Side B
-下一 Authority Root 省略 model 时继承旧 Run 的 Side B
-Session 自身拥有 A/B model 作为 authority 来源
-```
-
-### Interaction Repair
-
-```text
-InteractionRepairClaimed {
-  LogicalRunId
-  AuthorityRootUserMessageId
-  TerminalAssistantMessageId
-  RepairKind
-}
-```
-
-同一 identity 最多一次。第二次仍空输出→ `MISSING_FINAL_REPORT`，禁止继续零宽自激励。
-
-### Review witness
-
-同时记录：
-
-- `PhysicalUserMessageId` = confirmation Host message
-- `AuthorityRootUserMessageId` = 原 Reviewer task root
-
-不得混为一个字段；不得仅以确认文本 marker 作为授权证明。
-
-### Companion
-
-- eligibility **唯一** 读 `ActiveLogicalRun.Profile.Agent`
-- 缺 ActiveLogicalRun：不创建 Blogger，记录 MissingAuthorityProfile
-- 禁止生产备用：`sessionRoles`、最后物理 user agent、transform input agent、child linkage、历史最早带 agent 消息
-- bare synthetic continuation ≠ semantic delta；其后正式 assistant 输出才可能构成 delta
+- Interaction Repair：同一 identity 最多一次；第二次仍空 → `MISSING_FINAL_REPORT`
+- Review witness：同时记录 PhysicalUserMessageId（confirmation）与 AuthorityRootUserMessageId；双 PERFECT + tree witness 不变
+- Companion eligibility **唯一** 读 `ActiveLogicalRun` 的 CanonicalRole / SelectedAgent；缺 ActiveLogicalRun → 不创建 Blogger
 
 ### 删除清单（语义层）
 
 ```text
-Session 永久 agent/model 作为 authority 来源
-从最后物理 user 推导 authority
-按零宽文本识别 synthetic
-synthetic 更新 currentUserMessageId / Fallback root
-sessionRoles 推导 Companion eligibility
-新真人省略 model 时注入旧 Side B
-多个 PromptDispatcher 实例各自缓存 authority
+BaseModel / EffectiveModel / ModelA / ModelB 作为 Authority 选择输入
+WANXIANGSHU_MODEL_* 环境变量作为模型 SSOT
+无前缀 Host Agent 名称与 build/plan alias
+第四次失败 LogicalRunDead / SessionDead
+成功后擅自重置 fallback cursor
+省略 agent → 默认 fast / 继承 LastAuthority
+journal 持久化 model ID 并在恢复时覆盖 opencode.json
 ```
 
-### 发布阻断
+### 发布阻断（摘录）
 
 ```text
-零宽 repair 可更新 LastAuthority
-synthetic 可重置 repair 预算或成为 Fallback root
-无法识别来源时默认 Human
-模块绕过 PromptAuthorityService 发 continuation
-sessionRoles 决定 Companion eligibility
-用户显式 model 被旧 Fallback side 覆盖
+仍支持 manager/coder/reviewer/build/plan 等旧 Agent 名称
+公开创建可省略 fast/deep
+仍从环境变量读模型或 Prompt 仍设置 Model
+Fallback 第四次失败仍判死
+12 次 retry 后不再继续物理请求
+Blogger/Executor 名称进入 LLM tool schema
+旧 journal 被猜测性迁移
 ```
 
 ## Event-Stagger 规则

@@ -232,6 +232,7 @@ module PtyTests =
     let ``Pty_mixed_list_returns_agent_and_pty_snapshots`` () =
         let mockAgents () : AgentRecord list =
             [ { AgentId = "agent-alpha"
+                Agent = "fast-coder"
                 Role = AgentRole.Coder
                 Status = AgentStatus.Busy
                 CurrentRunId = Some "run-1"

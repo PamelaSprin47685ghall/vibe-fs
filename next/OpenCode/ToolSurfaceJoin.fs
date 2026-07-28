@@ -43,6 +43,14 @@ module ToolSurfaceJoin =
                                         |> box)
                                     |> Option.defaultValue null
 
+                                let managed =
+                                    runtime.TryFindAgent p.AgentId
+                                    |> Option.bind (fun record ->
+                                        if String.IsNullOrWhiteSpace record.Agent then
+                                            None
+                                        else
+                                            ManagedAgent.tryParse record.Agent)
+
                                 // PTY exit is backend onExit only. Surface both typed agent fields and the
                                 // PTY-facing closed/outcome contract used by join consumers.
                                 if isPty then
@@ -58,18 +66,29 @@ module ToolSurfaceJoin =
                                 else
                                     // finalText = session-wide A (all formal assistant text).
                                     // workRecord = session-wide B (LatestB companion work log).
-                                    createObj
+                                    let baseFields =
                                         [ "kind", box "agent"
                                           "status", box "completed"
                                           "agentId", box p.AgentId
                                           "childSessionId", box p.ChildSessionId
                                           "runId", box p.RunId
-                                          "role", box (p.Role.ToString().ToLowerInvariant())
                                           "rootUserMessageId", box p.RootUserMessageId
                                           "assistantMessageId", box p.AssistantMessageId
                                           "finalText", box p.FinalText
                                           "workRecord", work
                                           "directory", box p.Directory ]
+
+                                    let fields =
+                                        match managed with
+                                        | Some m ->
+                                            baseFields
+                                            @ [ "agent", box m.Name
+                                                "role", box (ManagedAgent.roleName m.Role)
+                                                "tier", box (ManagedAgent.tierName m.Tier)
+                                                "fallbackPeer", box (ManagedAgent.peer m).Name ]
+                                        | None -> baseFields @ [ "role", box (p.Role.ToString().ToLowerInvariant()) ]
+
+                                    createObj fields
                             | AgentFailed p
                             | AgentAborted p ->
                                 if isPty then
@@ -80,12 +99,7 @@ module ToolSurfaceJoin =
                                           "runId", box p.RunId
                                           "outcome", box p.Message
                                           "closed", box true
-                                          "error",
-                                          box (
-                                              createObj
-                                                  [ "code", box p.Code
-                                                    "message", box p.Message ]
-                                          )
+                                          "error", box (createObj [ "code", box p.Code; "message", box p.Message ])
                                           "ptyId", box c.RunId ]
                                 else
                                     createObj
@@ -105,12 +119,7 @@ module ToolSurfaceJoin =
                                               |> Option.map (fun r -> r.ToString().ToLowerInvariant())
                                               |> Option.defaultValue null
                                           )
-                                          "error",
-                                          box (
-                                              createObj
-                                                  [ "code", box p.Code
-                                                    "message", box p.Message ]
-                                          ) ]
+                                          "error", box (createObj [ "code", box p.Code; "message", box p.Message ]) ]
 
                         return box (stringify payload)
                     | Error e ->
@@ -125,12 +134,7 @@ module ToolSurfaceJoin =
                             box (
                                 stringify (
                                     createObj
-                                        [ "error",
-                                          box (
-                                              createObj
-                                                  [ "code", box code
-                                                    "message", box (e.ToString()) ]
-                                          ) ]
+                                        [ "error", box (createObj [ "code", box code; "message", box (e.ToString()) ]) ]
                                 )
                             )
         }
@@ -146,15 +150,31 @@ module ToolSurfaceJoin =
                     agents
                     |> List.sortBy (fun a -> a.AgentId)
                     |> List.map (fun a ->
-                        createObj
+                        let managed = ManagedAgent.tryParse a.Agent
+
+                        let baseFields =
                             [ "kind", box ToolSurfaceFields.ListKind.Agent
                               "agentId", box a.AgentId
                               "childSessionId", box (defaultArg a.ChildSessionId null)
-                              "role", box (a.Role.ToString().ToLowerInvariant())
                               "status", box (a.Status.ToString().ToLowerInvariant())
                               "currentRunId", box (defaultArg a.CurrentRunId null)
                               "hasPendingCompletion", box a.HasPendingCompletion
-                              "lastCompletionStatus", box (defaultArg a.LastCompletionStatus null) ])
+                              "lastCompletionStatus", box (defaultArg a.LastCompletionStatus null) ]
+
+                        let fields =
+                            match managed with
+                            | Some m ->
+                                baseFields
+                                @ [ "agent", box m.Name
+                                    "role", box (ManagedAgent.roleName m.Role)
+                                    "tier", box (ManagedAgent.tierName m.Tier)
+                                    "fallbackPeer", box (ManagedAgent.peer m).Name ]
+                            | None when not (String.IsNullOrWhiteSpace a.Agent) ->
+                                baseFields
+                                @ [ "agent", box a.Agent; "role", box (a.Role.ToString().ToLowerInvariant()) ]
+                            | None -> baseFields @ [ "role", box (a.Role.ToString().ToLowerInvariant()) ]
+
+                        createObj fields)
 
                 let ptyEntries =
                     ptys

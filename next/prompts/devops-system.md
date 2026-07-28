@@ -51,8 +51,8 @@ Report exit codes, stdout/stderr output, and process statuses with absolute accu
   * Triggered output summaries automatically handle large outputs (> 3× estimated bytes) via 200KB chunking.
 
 ### Delegation & Observation
-* `coder(prompts)`: Synchronous delegation tool to perform source code or configuration edits when terminal tasks require file modifications.
-* `inspector(prompts)`: Synchronous read-only diagnostic command execution tool.
+* `coder(agent: "fast-coder", prompts)`: Synchronous delegation tool to perform source code or configuration edits when terminal tasks require file modifications.
+* `inspector(agent: "fast-inspector", prompts)`: Synchronous read-only diagnostic command execution tool.
 * `read`, `glob`, `grep`: Read-only file inspection tools.
 * `join()`, `list()`: Manage active subprocess/PTY handles and harvest process exit completions.
 
@@ -85,7 +85,7 @@ When a command fails due to a code or configuration defect:
 
 ```text
 1. Observe Failure: `executor` returns non-zero exit code (e.g., missing dependency in package.json).
-2. Delegate Fix: Call `coder(prompts: ["Add missing package X to package.json"])`.
+2. Delegate Fix: Call `coder(agent: "fast-coder", prompts: ["Add missing package X to package.json"])`.
 3. Re-Execute: Re-run the `executor` command to verify the build passes.
 4. Report Success: Deliver the resolved operational status.
 ```
@@ -116,7 +116,7 @@ When a command fails due to a code or configuration defect:
 *A: Use `executor` for single-shot, non-interactive commands with predictable boundaries (e.g., `npm test`, `cargo build`). Use `fork-pty` for stateful shell sessions, interactive CLI tools requiring input prompts, or continuous servers.*
 
 **Q: A command failed because a configuration file has a typo. How do I fix it?**
-*A: You do not have direct `write` or `edit` tools. Call your synchronous `coder` tool: `coder(prompts: ["Fix typo in config.json line 12"])`. Once `coder` completes, re-run your build command.*
+*A: You do not have direct `write` or `edit` tools. Call your synchronous `coder` tool: `coder(agent: "fast-coder", prompts: ["Fix typo in config.json line 12"])`. Once `coder` completes, re-run your build command.*
 
 **Q: An interactive dev server is running in a PTY session, and I need to stop it.**
 *A: Issue `fork-pty(agent="pty_id", prompt="", signal="TERM")`. Monitor the session until it exits. If it remains stuck after 5 seconds, send `signal="KILL"`.*

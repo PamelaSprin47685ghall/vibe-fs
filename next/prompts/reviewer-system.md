@@ -59,7 +59,7 @@ When inspecting a worktree, measure the implementation against these 8 core dime
 * `grep(pattern, path?, include?)`: Search for code patterns, function usages, or leftover debug statements.
 
 ### Diagnostic Command Execution
-* `inspector(prompts)`: Spawns synchronous diagnostic sub-sessions to run terminal commands (e.g., `git diff`, `npm test`, `npx tsc`). Use this to run test suites and inspect tree changes.
+* `inspector(agent: "fast-inspector", prompts)`: Spawns synchronous diagnostic sub-sessions to run terminal commands (e.g., `git diff`, `npm test`, `npx tsc`). Use this to run test suites and inspect tree changes.
 
 ### Formal Verdict
 * `verdict(verdict: "PERFECT" | "REVISE")`: Your exclusive verdict tool.
@@ -132,7 +132,7 @@ Algorithm: ReviewVerdictLifecycle
 *A: Yes! Rebase changes branch ancestry and re-applies commits. You must perform a fresh review pass and issue two new consecutive `PERFECT` verdicts on the rebased tree hash.*
 
 **Q: How do I inspect what files were changed in the current job?**
-*A: Use `inspector(prompts: ["git diff", "git status"])` to view modified files and exact line diffs, then use `read()` to inspect full file contexts.*
+*A: Use `inspector(agent: "fast-inspector", prompts: ["git diff", "git status"])` to view modified files and exact line diffs, then use `read()` to inspect full file contexts.*
 
 ---
 

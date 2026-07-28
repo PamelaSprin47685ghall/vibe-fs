@@ -26,12 +26,22 @@ module CompanionTransform =
         (sessionBudgets: Dictionary<string, int>)
         (sessionOutputLimits: Dictionary<string, int>)
         (sessionRoles: Dictionary<string, string>)
-        (bloggerModel: Result<OpencodeModel, string>)
         (onBloggerCreated: (SessionId -> unit) option)
         (inObj: obj)
         (rawOutObj: obj)
         =
         let rawMessages = unbox<obj array> rawOutObj?messages |> Array.toList
+
+        // Dual-hook safety: chat.transform and experimental.chat.messages.transform
+        // both invoke this path. Skip when companion-b-head is already present so a
+        // second invocation never stacks another synthetic head.
+        let alreadyHasBHead =
+            rawMessages
+            |> List.exists (fun message ->
+                not (isNull message)
+                && not (isNull message?info)
+                && not (isNull message?info?id)
+                && (unbox<string> message?info?id).StartsWith("companion-b-head"))
 
         let messageContext =
             rawMessages
@@ -64,8 +74,12 @@ module CompanionTransform =
             else
                 unbox<string> inObj?sessionID
 
-        if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
-            // Eligibility source of truth: ActiveLogicalRun.Agent only.
+        if
+            not alreadyHasBHead
+            && not (String.IsNullOrWhiteSpace sessionId)
+            && not (isNull rawOutObj?messages)
+        then
+            // Eligibility source of truth: ActiveLogicalRun.SelectedAgent only.
             // No production fallback to sessionRoles / message agent / transform input.
             let authorityAgent =
                 match journal with
@@ -75,7 +89,7 @@ module CompanionTransform =
                     |> Map.tryFind (SessionId.create sessionId)
                     |> Option.bind (fun s -> s.PromptAuthority)
                     |> Option.bind (fun auth -> auth.ActiveLogicalRun)
-                    |> Option.map (fun run -> run.Agent)
+                    |> Option.map (fun run -> run.SelectedAgent)
 
             let agentRole = authorityAgent |> Option.bind HostSessionContext.canonicalRole
 
@@ -92,7 +106,7 @@ module CompanionTransform =
                     sprintf "[MissingAuthorityProfile] session=%s companion eligibility denied" sessionId
                 )
 
-            if Companion.shouldCreateForAgent agentRole then
+            if Companion.shouldCreateForAgent authorityAgent then
                 let companion =
                     lock gate (fun () ->
                         match companions.TryGetValue sessionId with
@@ -123,7 +137,6 @@ module CompanionTransform =
                                     SessionId.create sessionId,
                                     sessionPort,
                                     ?durable = durable,
-                                    ?bloggerModel = Some bloggerModel,
                                     ?outputBoundary = outputBoundary,
                                     onBloggerCreated =
                                         (fun bloggerId ->

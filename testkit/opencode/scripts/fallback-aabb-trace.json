@@ -1,9 +1,5 @@
 {
   "scenario": "fallback-aabb-trace",
-  "env": {
-    "WANXIANGSHU_MODEL_A": "test/test-model",
-    "WANXIANGSHU_MODEL_B": "test/test-model-b"
-  },
   "scripts": [
     {
       "id": "title",
@@ -119,14 +115,10 @@
     "project": {
       "files": {}
     },
-    "strict": true,
-    "env": {
-      "WANXIANGSHU_MODEL_A": "test/test-model",
-      "WANXIANGSHU_MODEL_B": "test/test-model-b"
-    }
+    "strict": true
   },
   "session": {
-    "agent": "meditator",
+    "agent": "fast-meditator",
     "bind": [
       "title",
       "med"
@@ -135,7 +127,7 @@
   "flow": [
     {
       "prompt": {
-        "agent": "meditator",
+        "agent": "fast-meditator",
         "text": "Prove same-run provider AABB trajectory.",
         "model": {
           "providerID": "test",
@@ -172,5 +164,5 @@
       "expectSatisfied": true
     }
   ],
-  "pass": "Provider-visible same-run A→A→B→B request trajectory proven; no fifth chat request."
+  "pass": "Provider-visible same-run A\u2192A\u2192B\u2192B request trajectory proven; no fifth chat request."
 }

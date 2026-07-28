@@ -94,22 +94,6 @@ module HostEventRouterTerminalTests =
           Model = None
           Outcome = TurnOutcome.TurnAborted "aborted" }
 
-    let private registerAuthority (journal: AgentJournal) sessionId agent =
-        AgentJournal.appendAgent
-            (StreamId.Session(SessionId.create sessionId))
-            (Some(TurnId.ofMessageId (MessageId.create "u1")))
-            (AgentFact.AuthorityRootAccepted
-                {| SessionId = SessionId.create sessionId
-                   LogicalRunId = "run-" + sessionId
-                   HostMessageId = "u1"
-                   AuthorityKind = "HumanRoot"
-                   Agent = agent
-                   BaseProviderID = None
-                   BaseModelID = None
-                   Variant = None |})
-            journal
-        |> ignore
-
     let private fallbackFailures (journal: AgentJournal) sessionId =
         match
             (AgentJournal.snapshot journal)
@@ -117,7 +101,7 @@ module HostEventRouterTerminalTests =
         with
         | Some session ->
             session.Fallback
-            |> Option.map (fun fb -> fb.TotalFailures)
+            |> Option.map (fun fb -> List.length fb.RecentFailureIds)
             |> Option.defaultValue 0
         | None -> 0
 
@@ -132,7 +116,7 @@ module HostEventRouterTerminalTests =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "shutdown-idle-runtime") 1 DateTimeOffset.UtcNow
 
-                registerAuthority journal sessionId "reviewer"
+                registerAuthorityRoot journal sessionId "reviewer"
 
                 // Completed reviewer terminal -> exactly one reviewer missing-verdict nudge.
                 applyDecide
@@ -218,7 +202,7 @@ module HostEventRouterTerminalTests =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "manager-guard-runtime") 1 DateTimeOffset.UtcNow
 
-                registerAuthority journal sessionId "manager"
+                registerAuthorityRoot journal sessionId "manager"
                 let gitTreePort = { GetTreeHash = fun () -> "tree-without-review" }
 
                 applyDecide
@@ -247,7 +231,7 @@ module HostEventRouterTerminalTests =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "coder-runtime") 1 DateTimeOffset.UtcNow
 
-                registerAuthority journal sessionId "coder"
+                registerAuthorityRoot journal sessionId "coder"
 
                 applyDecide
                     sessionPort
@@ -261,7 +245,7 @@ module HostEventRouterTerminalTests =
 
                 do! drainMicrotasks 16
                 Assert.Single(prompts) |> ignore
-                Assert.equal("\u200B", snd prompts.[0])
+                Assert.equal ("\u200B", snd prompts.[0])
 
                 let authority =
                     (AgentJournal.snapshot journal).AgentProjections.Sessions
@@ -271,13 +255,13 @@ module HostEventRouterTerminalTests =
                 match authority with
                 | Some projection ->
                     // Zero-width is Continuation: LastAuthority stays the human root.
-                    Assert.equal(
+                    Assert.equal (
                         Some "u1",
                         projection.LastAuthorityProfile
                         |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
                     )
 
-                    Assert.equal(
+                    Assert.equal (
                         Some "u1",
                         projection.ActiveLogicalRun
                         |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)

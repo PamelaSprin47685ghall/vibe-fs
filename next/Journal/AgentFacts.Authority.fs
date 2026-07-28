@@ -18,19 +18,19 @@ module AgentFactsAuthority =
         logicalRunId
         hostMessageId
         authorityKind
-        agent
-        baseProviderId
-        baseModelId
-        variant
+        selectedAgent
+        peerAgent
+        canonicalRole
+        selectedTier
         =
         let profile: AuthorityProfileProjection =
             { LogicalRunId = logicalRunId
               AuthorityRootUserMessageId = hostMessageId
               AuthorityKind = authorityKind
-              Agent = agent
-              BaseProviderID = baseProviderId
-              BaseModelID = baseModelId
-              Variant = variant }
+              SelectedAgent = selectedAgent
+              PeerAgent = peerAgent
+              CanonicalRole = canonicalRole
+              SelectedTier = selectedTier }
 
         let sessions =
             updateSession
@@ -42,10 +42,8 @@ module AgentFactsAuthority =
                             Some
                                 { LogicalRunId = logicalRunId
                                   AuthorityRootUserMessageId = hostMessageId
-                                  Side = SideA
-                                  FailuresOnCurrentSide = 0
-                                  TotalFailures = 0
-                                  IsDead = false
+                                  Offset = 0uy
+                                  LastProviderAttempt = None
                                   RecentFailureIds = [] }
                         PromptAuthority =
                             Some
@@ -119,12 +117,7 @@ module AgentFactsAuthority =
         repairKind
         =
         let identity =
-            sprintf
-                "%s|%s|%s|%s"
-                logicalRunId
-                authorityRootUserMessageId
-                terminalAssistantMessageId
-                repairKind
+            sprintf "%s|%s|%s|%s" logicalRunId authorityRootUserMessageId terminalAssistantMessageId repairKind
 
         let sessions =
             updateSession

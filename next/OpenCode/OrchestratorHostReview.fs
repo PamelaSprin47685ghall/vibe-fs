@@ -1,10 +1,14 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 
 module OrchestratorHostReview =
+
+    /// Host-owned post-rebase reviewer identity. Explicit deep tier; never inferred.
+    let DeepReviewerAgent = ManagedAgent.nameOf AgentTier.Deep Role.Reviewer
 
     let reverify
         (journal: AgentJournal option)
@@ -20,6 +24,8 @@ module OrchestratorHostReview =
             // lands on the Orchestrator session. Barriers and reads must use that
             // same durable session — managerId is only a job alias, not a Host
             // session id.
+            //
+            // Reviewer identity is always DeepReviewerAgent (deep-reviewer).
             let reviewOwnerSessionId = orchestratorId
             let! barrierResult = OrchestratorManagerJob.emitReviewBarrier journal reviewOwnerSessionId barrierKey
 

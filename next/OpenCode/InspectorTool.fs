@@ -15,6 +15,9 @@ module InspectorTool =
 
     open ToolSurfaceEmit
 
+    [<Emit("$0.schema.enum($1)")>]
+    let private enumSchema (tool: obj) (values: string array) : obj = jsNative
+
     let private stringify (value: obj) : string =
         if isNull value then "null" else JS.JSON.stringify value
 
@@ -93,142 +96,179 @@ module InspectorTool =
                         let fullPrompt =
                             match parentB with
                             | Some b when not (String.IsNullOrWhiteSpace b) ->
-                                sprintf "Parent work record (background only; B preferred, else session A):\n%s\n\nInspector request:\n%s" b prompt
+                                sprintf
+                                    "Parent work record (background only; B preferred, else session A):\n%s\n\nInspector request:\n%s"
+                                    b
+                                    prompt
                             | _ -> prompt
 
                         let parentBDigest = parentB |> Option.map sha256
 
-                        let! created =
-                            sessionPort.CreateChildSession(
-                                parentSid,
-                                { Title = Some "inspector"
-                                  Agent = Some "inspector"
-                                  Directory = parentDir }
-                            )
+                        let agentArg = textArg args "agent"
 
-                        match created with
-                        | Error err -> return box (stringify (createObj [ "error", box err ]))
-                        | Ok childId ->
-                            match parentDir, registerChildDirectory with
-                            | Some dir, Some reg -> reg (SessionId.value childId) dir
-                            | _ -> ()
-
-                            let tcs = TaskCompletionSource<string>()
-                            let mutable sub: IDisposable option = None
-
-                            let finish (text: string) =
-                                match sub with
-                                | Some d ->
-                                    try
-                                        d.Dispose()
-                                    with _ ->
-                                        ()
-
-                                    sub <- None
-                                | None -> ()
-
-                                tcs.TrySetResult text |> ignore
-
-                            sub <-
-                                Some(
-                                    sessionPort.SubscribeTerminal(
-                                        childId,
-                                        fun _ outcome ->
-                                            match outcome with
-                                            | TerminalOutcome.Completed result ->
-                                                finish result.FinalText
-                                            | TerminalOutcome.Aborted reason ->
-                                                tcs.TrySetException(
-                                                    InvalidOperationException(sprintf "Inspector aborted: %s" reason)
-                                                )
-                                                |> ignore
-                                            | TerminalOutcome.Failed error ->
-                                                tcs.TrySetException(
-                                                    InvalidOperationException(sprintf "Inspector failed: %s" error)
-                                                )
-                                                |> ignore
+                        match ManagedAgent.tryParse agentArg with
+                        | None ->
+                            return
+                                box (
+                                    stringify (
+                                        createObj
+                                            [ "error",
+                                              box (
+                                                  if String.IsNullOrWhiteSpace agentArg then
+                                                      "agent is required; use fast-inspector or deep-inspector"
+                                                  else
+                                                      ManagedAgent.formatParseError (
+                                                          match ManagedAgent.parse agentArg with
+                                                          | Error err -> err
+                                                          | Ok _ -> ManagedAgentParseError.UnknownManagedAgent agentArg
+                                                      )
+                                              ) ]
                                     )
                                 )
-
-                            let! sent =
-                                match journal with
-                                | Some j ->
-                                    task {
-                                        let svc = PromptDispatcher.forJournal j
-
-                                        let! outcome =
-                                            svc.SendAgentOwnerRoot
-                                                sessionPort
-                                                childId
-                                                fullPrompt
-                                                "inspector"
-                                                None
-                                                None
-                                                parentDir
-                                                None
-
-                                        match outcome with
-                                        | Ok (messageId, _) -> return Ok messageId
-                                        | Error err -> return Error err
-                                    }
-                                | None ->
-                                    sessionPort.SendPrompt(
-                                        childId,
-                                        fullPrompt,
-                                        { Model = None
-                                          Agent = Some "inspector"
-                                          Directory = parentDir
-                                          Metadata = None }
+                        | Some managed when not (List.contains managed.Name ManagedAgent.inspectorToolNames) ->
+                            return
+                                box (
+                                    stringify (
+                                        createObj
+                                            [ "error",
+                                              box "inspector tool requires agent fast-inspector or deep-inspector" ]
                                     )
+                                )
+                        | Some managed ->
+                            let! created =
+                                sessionPort.CreateChildSession(
+                                    parentSid,
+                                    { Title = Some managed.Name
+                                      Agent = Some managed.Name
+                                      Directory = parentDir }
+                                )
 
-                            match sent with
-                            | Error err -> finish (sprintf "send failed: %s" err)
-                            | Ok _ -> ()
+                            match created with
+                            | Error err -> return box (stringify (createObj [ "error", box err ]))
+                            | Ok childId ->
+                                match parentDir, registerChildDirectory with
+                                | Some dir, Some reg -> reg (SessionId.value childId) dir
+                                | _ -> ()
 
-                            // Parent cancellation initiates physical abort immediately;
-                            // finally awaits the same operation before this resource returns.
-                            let mutable abortTask: Task<Result<unit, string>> option = None
+                                let tcs = TaskCompletionSource<string>()
+                                let mutable sub: IDisposable option = None
 
-                            let detachAbort =
-                                attachAbort ctx (fun () ->
-                                    if abortTask.IsNone then
-                                        abortTask <- Some(sessionPort.AbortSession childId)
+                                let finish (text: string) =
+                                    match sub with
+                                    | Some d ->
+                                        try
+                                            d.Dispose()
+                                        with _ ->
+                                            ()
 
-                                    finish "aborted: parent cancelled")
+                                        sub <- None
+                                    | None -> ()
 
-                            try
-                                let! resultText = tcs.Task
+                                    tcs.TrySetResult text |> ignore
 
-                                return
-                                    box (
-                                        stringify (
-                                            createObj
-                                                [ "inspectorId", box (SessionId.value childId)
-                                                  "parentBDigest", box (defaultArg parentBDigest "")
-                                                  "output", box resultText ]
+                                sub <-
+                                    Some(
+                                        sessionPort.SubscribeTerminal(
+                                            childId,
+                                            fun _ outcome ->
+                                                match outcome with
+                                                | TerminalOutcome.Completed result -> finish result.FinalText
+                                                | TerminalOutcome.Aborted reason ->
+                                                    tcs.TrySetException(
+                                                        InvalidOperationException(
+                                                            sprintf "Inspector aborted: %s" reason
+                                                        )
+                                                    )
+                                                    |> ignore
+                                                | TerminalOutcome.Failed error ->
+                                                    tcs.TrySetException(
+                                                        InvalidOperationException(sprintf "Inspector failed: %s" error)
+                                                    )
+                                                    |> ignore
                                         )
                                     )
-                            finally
-                                detachAbort ()
 
-                                match abortTask with
-                                | Some task ->
-                                    try
-                                        let! _ = task
-                                        ()
-                                    with _ ->
-                                        ()
-                                | None ->
-                                    try
-                                        let! _ = sessionPort.AbortSession childId
-                                        ()
-                                    with _ ->
-                                        ()
+                                let! sent =
+                                    match journal with
+                                    | Some j ->
+                                        task {
+                                            let svc = PromptDispatcher.forJournal j
+
+                                            let! outcome =
+                                                svc.SendAgentOwnerRoot
+                                                    sessionPort
+                                                    childId
+                                                    fullPrompt
+                                                    managed.Name
+                                                    parentDir
+                                                    None
+
+                                            match outcome with
+                                            | Ok(messageId, _) -> return Ok messageId
+                                            | Error err -> return Error err
+                                        }
+                                    | None ->
+                                        sessionPort.SendPrompt(
+                                            childId,
+                                            fullPrompt,
+                                            { Model = None
+                                              Agent = Some managed.Name
+                                              Directory = parentDir
+                                              Metadata = None }
+                                        )
+
+                                match sent with
+                                | Error err -> finish (sprintf "send failed: %s" err)
+                                | Ok _ -> ()
+
+                                // Parent cancellation initiates physical abort immediately;
+                                // finally awaits the same operation before this resource returns.
+                                let mutable abortTask: Task<Result<unit, string>> option = None
+
+                                let detachAbort =
+                                    attachAbort ctx (fun () ->
+                                        if abortTask.IsNone then
+                                            abortTask <- Some(sessionPort.AbortSession childId)
+
+                                        finish "aborted: parent cancelled")
+
+                                try
+                                    let! resultText = tcs.Task
+
+                                    return
+                                        box (
+                                            stringify (
+                                                createObj
+                                                    [ "inspectorId", box (SessionId.value childId)
+                                                      "agent", box managed.Name
+                                                      "tier", box (ManagedAgent.tierName managed.Tier)
+                                                      "fallbackPeer", box (ManagedAgent.peer managed).Name
+                                                      "parentBDigest", box (defaultArg parentBDigest "")
+                                                      "output", box resultText ]
+                                            )
+                                        )
+                                finally
+                                    detachAbort ()
+
+                                    match abortTask with
+                                    | Some task ->
+                                        try
+                                            let! _ = task
+                                            ()
+                                        with _ ->
+                                            ()
+                                    | None ->
+                                        try
+                                            let! _ = sessionPort.AbortSession childId
+                                            ()
+                                        with _ ->
+                                            ()
             }
 
         let argsObj =
             createObj
-                [ "prompt", box (createObj [ "type", box "string" ])
+                [ "agent", box (enumSchema factory (ManagedAgent.inspectorToolNames |> List.toArray))
+                  "prompt", box (createObj [ "type", box "string" ])
                   "prompts", box (createObj [ "type", box "array"; "items", box (createObj [ "type", box "string" ]) ]) ]
 
         applyTool

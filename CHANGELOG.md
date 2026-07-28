@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0-rc.1 — docs freeze / RC development
+
+Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infinite AABB agent-pair fallback and explicit `fast-*`/`deep-*` Managed Agents. Runtime code, tests, and evidence folders are still catching up under RC development (`0.5.0-rc.1` → `0.5.0-rc.N` → `0.5.0`).
+
+### Breaking changes
+
+- All Wanxiangshu agents now require explicit `fast-*` or `deep-*` names.
+- Unprefixed agent names are no longer supported.
+- `build` and `plan` aliases have been removed.
+- Agent-to-model bindings are read exclusively from OpenCode `opencode.json`.
+- All Wanxiangshu model environment variables have been removed.
+- Wanxiangshu no longer persists or overrides model IDs.
+- Provider fallback now cycles A/A/B/B indefinitely.
+- Provider retry count no longer kills a Logical Run.
+- Blogger and Executor Agent are now internal fast/deep pairs.
+- Pre-0.5.0 runtime journals are not supported.
+
+### Docs freeze
+
+- Normative freeze text: `next/Doc/SSOT.md` and `0.5.0.md` §23
+- Migration steps: `MIGRATION.md`
+- E2E gate retarget: `docs/E2E_RELEASE_GUIDE.md`
+- Surgical AGENTS.md updates for Prompt Authority / Fallback Host contract
+
+### Not in this RC cut
+
+- No F#/JS production code delta yet for Managed Agent / infinite AABB
+- No test rewrite or `docs/evidence/0.5.0/` folder yet
+
 ## 0.4.0 — final (private delivery)
 
 Final 0.4.0 on sealed `0.4.0-rc.7` after observation exit.

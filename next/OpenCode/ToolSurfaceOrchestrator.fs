@@ -15,7 +15,6 @@ module ToolSurfaceOrchestrator =
     type HostFactoryDeps =
         { Sessions: ISessionHostPort
           Journal: AgentJournal option
-          ModelConfig: ModelResolver.ModelConfig option
           WorkspaceDirectory: string option
           SessionParents: Dictionary<string, string>
           SessionRoles: Dictionary<string, string>
@@ -53,7 +52,6 @@ module ToolSurfaceOrchestrator =
                     OrchestratorHost(
                         { Sessions = deps.Sessions
                           Journal = deps.Journal
-                          ModelConfig = deps.ModelConfig
                           OnChildCreated =
                             fun _ role childId -> registerChild deps.SessionParents deps.SessionRoles sid role childId
                           RegisterChildDirectory =
@@ -69,11 +67,11 @@ module ToolSurfaceOrchestrator =
                 host)
 
     /// Manager fork = agent/prompt. DevOps fork-pty = PTY agent/prompt/signal.
-    /// Orchestrator fork-manager = prompt only. Schema conflict → distinct names.
+    /// Orchestrator fork-manager = explicit fast/deep manager + prompt.
     let toolDefBuilders (factory: obj) =
         let managerForkArgs =
             createObj
-                [ "agent", box (stringSchema factory)
+                [ "agent", box (managedAgentOrHandleSchema factory (ManagedAgent.publicForkableNames |> List.toArray))
                   "prompt", box (optionalStringSchema factory) ]
 
         let devopsPtyArgs =
@@ -93,7 +91,10 @@ module ToolSurfaceOrchestrator =
                              PtySignal.User2Name |]
                   ) ]
 
-        let orchestratorManagerJobArgs = createObj [ "prompt", box (stringSchema factory) ]
+        let orchestratorManagerJobArgs =
+            createObj
+                [ "agent", box (enumSchema factory (ManagedAgent.orchestratorForkableNames |> List.toArray))
+                  "prompt", box (stringSchema factory) ]
 
         let verdictArgs =
             createObj [ "verdict", box (enumSchema factory [| "PERFECT"; "REVISE" |]) ]
@@ -118,7 +119,6 @@ module ToolSurfaceOrchestrator =
         (sessionPort: ISessionHostPort)
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
-        (modelConfig: ModelResolver.ModelConfig option)
         (ctx: obj)
         : HostForkRuntime =
         let sid =
@@ -137,8 +137,7 @@ module ToolSurfaceOrchestrator =
                         sessionPort,
                         ?journal = None,
                         onChildCreated =
-                            (fun _ role childId -> registerChild sessionParents sessionRoles sid role childId),
-                        ?modelResolver = modelConfig
+                            (fun _ role childId -> registerChild sessionParents sessionRoles sid role childId)
                     )
 
                 executorRuntimes.[sid] <- r

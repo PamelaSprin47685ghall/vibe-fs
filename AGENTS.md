@@ -2,11 +2,29 @@
 
 | Field | Value |
 | :--- | :--- |
-| **Status** | 最终批准 · 新实现唯一蓝图 |
+| **Status** | 最终批准 · 新实现唯一蓝图 · **0.5.0 文档冻结中** |
 | **Scope** | OpenCode first；关闭官方 compaction；不兼容旧控制状态 |
 | **核心** | 结构化程序 + 极小工具 DSL + 投影式伴随博客 + 异步 fork/join |
+| **0.5.0 SSOT** | `next/Doc/SSOT.md` · 蓝图 `0.5.0.md` §23 |
 
 > 源码直接表达过程。`let!/do!/use!/while/尾递归` 负责控制流；运行时只保存真实资源、少量缓存和外部事实，不把程序计数器人工展开成 Stage/Phase/Lease/Owner/Generation。
+
+## 0.5.0 冻结块 [NORMATIVE]
+
+完整冻结文本见 `next/Doc/SSOT.md`（来源：`0.5.0.md` §23）。摘要：
+
+> Wanxiangshu 0.5.0 使用 OpenCode Managed Agent identity 作为模型选择的唯一入口。每个公开工作角色必须拥有两个准确命名的 Agent：`fast-ROLE` 与 `deep-ROLE`。用户和 LLM 创建新工作时必须显式选择其中之一；无前缀旧名称、`build`、`plan` 以及任何隐式默认均不受支持。
+>
+> OpenCode 宿主最终解析后的 `opencode.json.agent` 是 Agent inventory 和 Agent→Model 绑定的唯一事实源。Wanxiangshu 不读取模型环境变量，不维护模型 catalog，不持久化模型 ID，不覆盖 Prompt 的 model 字段。Wanxiangshu 只向 Host 提供 EffectiveAgent，实际模型由 Host 根据该 Agent 的配置解析。
+>
+> 对公开 Agent，用户选择的 Agent 为 Side A，其同角色相反 tier Agent 为 Side B。Fallback cursor 按 `A/A/B/B/A/A/B/B/...` 无限循环。Provider retry 只推进 modulo-4 cursor，不存在因累计 retry 数而产生的 Dead 状态。
+>
+> `fast-blogger/deep-blogger` 与 `fast-executor/deep-executor` 是 Host 内部 Agent，不向任何 LLM 工具 schema 暴露。每个新的 Blogger 或 Executor summary Logical Run 固定从 fast Agent 开始。Fast 与 Deep 不改变 Canonical Role、system prompt、工具权限或 Authority Root；Fallback 只能改变 `AttemptExecutionProfile.EffectiveAgent`。
+
+```text
+Agent 决定模型。AABBAABB 永久循环。显式 fast 或 deep。Blogger/Executor 内部 fast 起步。
+已删除：BaseModel / EffectiveModel / omit-model 继承 / 第四次失败判死 / WANXIANGSHU_MODEL_*。
+```
 
 ## 零、设计精神
 
@@ -41,23 +59,26 @@ Manager 只有 `fork/join/list` 不是为了让 Manager "更专业"，而是为�
 
 ### 0.5 局部状态可接受，全局状态机不可接受
 
-允许的局部状态：正在运行的 `Task`、完成 `Channel`、累计失败计数 `int`、模型选择 `A|B`。这些是**真实资源的引用或简单计数器**。
+允许的局部状态：正在运行的 `Task`、完成 `Channel`、FallbackCursor.Offset `byte`、SelectedAgent/PeerAgent。这些是**真实资源的引用或简单计数器**。
 
 禁止的全局状态：`ReviewPhase`、`FallbackStage`、`NudgeLease`、`JoinOwner`。这些是**人工展开的程序计数器**。
 
 区别在于：前者直接对应物理事实（有没有进程在跑、信箱里有没有信、总共失败了几次），后者只回答"代码执行到了第几步"。
 
-### 0.6 A/A/B/B 不是状态机，是计数器 + 映射表
+### 0.6 A/A/B/B 不是状态机，是 modulo-4 cursor + 映射表
 
 Fallback 不需要状态图。它只需要：
 
 ```text
-累加失败数 F
-当前侧 S ∈ {A, B}
-映射：F<2→A, F=2→切B, F<4→B, F≥4→Dead
+FallbackCursor.Offset ∈ {0,1,2,3}
+映射：0→A, 1→A, 2→B, 3→B
+advance = (offset + 1) mod 4   // 仅在 session.status=retry 时推进
+成功不推进、不重置；永久 AABBAABB 循环；retry 次数永不单独判死
+A = SelectedAgent；B = PeerAgent（同角色相反 tier）
+EffectiveAgent 由 Offset 决定；Model = None（Host 按 opencode.json 解析）
 ```
 
-这就是全部。`F` 和 `S` 加上 `match` 就是 Fallback。没有任何 Stage/Phase。
+这就是全部。`Offset` 加上 `match` 就是 Fallback。没有任何 Stage/Phase，也没有因 retry 次数产生的 Dead。
 
 ### 0.7 Review 双 PERFECT 是避免假阳性确认
 
@@ -81,9 +102,10 @@ Fallback 不需要状态图。它只需要：
 
 | Field | Value |
 | --- | --- |
-| Status | NORMATIVE · 冻结语义 |
-| Scope | 所有 OpenCode user-shaped message、模型选择、agent 选择、Fallback、Companion、Guard、repair、nudge |
-| 核心原则 | 物理 user message 不自动拥有语义授权；只有 Authority Root 可以改变执行档案 |
+| Status | NORMATIVE · 冻结语义 · **0.5.0 Agent-pair SSOT** |
+| Scope | 所有 OpenCode user-shaped message、Managed Agent 选择、Fallback、Companion、Guard、repair、nudge |
+| 核心原则 | 物理 user message 不自动拥有语义授权；只有 Authority Root 可以改变执行档案；模型由 Host+opencode.json 决定 |
+| 冻结全文 | `next/Doc/SSOT.md` · `0.5.0.md` §23 |
 
 ### 一、顶层不变量
 
@@ -96,13 +118,13 @@ OpenCode 可以用 `role=user` 承载：真人输入、Manager 新任务/nudge�
 只有 **Authority Root** 可以：
 
 1. 创建新的 Logical Run；
-2. 选择或改变 agent；
-3. 选择或改变基础 model；
-4. 选择或改变 variant；
-5. 成为新的 Fallback root；
-6. 重置 Interaction Repair 预算；
-7. 改变 Companion 当前角色 eligibility；
-8. 成为后续缺省 agent/model 的延续来源。
+2. 选择或改变 `SelectedAgent`（并由此确定 `PeerAgent` / CanonicalRole / SelectedTier）；
+3. 成为新的 Fallback root；
+4. 重置 Interaction Repair 预算；
+5. 改变 Companion 当前角色 eligibility；
+6. 成为后续缺省 SelectedAgent 的延续来源。
+
+Authority Root **不得**选择或覆盖 model ID；发送 Prompt 时始终 `Model = None`。
 
 所有 **Continuation** 均不得执行以上操作。
 
@@ -135,43 +157,46 @@ type PromptOrigin =
     | UnknownOrigin
 ```
 
-- **HumanRoot**：真实用户新任务。用户显式 agent/model/variant 永远优先；显式 model 建立新基础档案并覆盖旧 Fallback side。
-- **AgentOwnerRoot**：Manager fork(new)/Idle 新任务/Coder one-shot Inspector 等。必须显式 agent/model/variant（或明确 None）；新 Logical Run 与 completion。
-- **Continuation**：只延续已有 Logical Run。不建新 RunId/completion；不改 AuthorityRoot/BaseAgent/BaseModel/variant；不更新 LastAuthorityProfile；不重置 Fallback/repair；不改变 Companion eligibility。
+- **HumanRoot**：真实用户新任务。必须显式 `fast-*` 或 `deep-*`；无前缀旧名称 / `build` / `plan` / 隐式默认 fail-closed。
+- **AgentOwnerRoot**：Manager fork(new)/Idle 新任务/Coder one-shot Inspector 等。必须显式准确 Agent；新 Logical Run 与 completion。
+- **Continuation**：只延续已有 Logical Run。不建新 RunId/completion；不改 AuthorityRoot/SelectedAgent/PeerAgent/CanonicalRole/SelectedTier；不更新 LastAuthorityProfile；不重置 Fallback/repair；不改变 Companion eligibility。物理请求使用当前 cursor 的 `EffectiveAgent`。
 
 ### 四、执行档案
 
 ```fsharp
 type AuthorityExecutionProfile =
     { SessionId; LogicalRunId; AuthorityRootUserMessageId
-      AuthorityKind; Agent; BaseModel; Variant }
+      AuthorityKind
+      SelectedAgent; PeerAgent; CanonicalRole; SelectedTier }
 
 type AttemptExecutionProfile =
     { Authority; PhysicalUserMessageId; ProviderAttempt
-      EffectiveModel; Origin }
+      EffectiveAgent; Origin }
 ```
 
-Fallback A→B 只改 `AttemptExecutionProfile.EffectiveModel`，不得改 `AuthorityExecutionProfile.BaseModel` 或 `LastAuthorityProfile`。
+Fallback A→B 只改 `AttemptExecutionProfile.EffectiveAgent`，不得改 `AuthorityExecutionProfile.SelectedAgent` / `PeerAgent` 或 `LastAuthorityProfile`。**已删除** `BaseModel` / `EffectiveModel`。
 
 ### 五、Last Authority
 
 每个 Session 的 `LastAuthorityProfile` 是**最后一次有权决定执行档案的 root**，不是最后一条物理 user message。
 
-- 新真人显式字段：用用户值。
-- 新真人省略字段：只从 LastAuthorityProfile 继承；无 profile 时才接受 Host `output.message` 初始缺省。
-- Continuation：显式携带继承档案（agent / attempt EffectiveModel / variant）；Host 内部 Session cache 变化不得写回 LastAuthorityProfile。
+- 新真人/Owner：必须显式 `fast-*` 或 `deep-*`；由此写入 SelectedAgent/PeerAgent/CanonicalRole/SelectedTier。
+- **禁止** omit-model → LastAuthority.BaseModel 继承（该路径已删除）；也禁止省略 Agent 时静默继承旧 PeerAgent。
+- Continuation：显式携带继承档案（SelectedAgent / attempt EffectiveAgent / CanonicalRole / SelectedTier）；Host 内部 Session cache 变化不得写回 LastAuthorityProfile。
 
 ### 六、禁止自激励
 
 ```text
 零宽 continuation → HumanRoot
 repair continuation → 新 repair 预算
-Review confirmation → 改 Reviewer model
-Manager Guard → 改 Manager agent
+Review confirmation → 改 Reviewer SelectedAgent
+Manager Guard → 改 Manager SelectedAgent
 Busy nudge → 新 RunId
-synthetic → 重置 Failures / 成为 currentUserMessageId / 改 Companion eligibility
-B retry → 下一真人 root 默认 model
+synthetic → 重置 Offset / 成为 currentUserMessageId / 改 Companion eligibility
+B retry → 下一真人 root 默认 Agent
 按 text="\u200B" / 空白 / 固定提示 / 长度判断来源
+omit-model / 无前缀旧名称 / build|plan 作为合法 Host identity
+向 Host Prompt 覆盖 Model
 ```
 
 `"\u200B"` 只是运输载荷，不是身份标记。
@@ -181,7 +206,7 @@ B retry → 下一真人 root 默认 model
 所有插件 user-shaped message 必须经 `PromptDispatcher.Send`。禁止模块直接 `prompt_async` 发 Guard/repair/nudge/confirmation。
 
 1. 先持久化 `PluginPromptClaimed`；
-2. 再调 Host，metadata 至少含 `wanxiangshu_prompt_key` / `wanxiangshu_origin` / `wanxiangshu_logical_run` / `wanxiangshu_authority_root`；
+2. 再调 Host，metadata 至少含 `wanxiangshu_prompt_key` / `wanxiangshu_origin` / `wanxiangshu_logical_run` / `wanxiangshu_authority_root`；发送形状为 `{ Agent = Some effectiveAgent; Model = None; ... }`；
 3. Host 返回 PhysicalUserMessageId → `PluginPromptAccepted`；
 4. 失败 → `PluginPromptAbandoned`（不得改变 Active Logical Run）；
 5. Host 丢弃 metadata 且无法 correlation → **禁止发送**，`HostContractUnsupported`。
@@ -197,16 +222,16 @@ accepted HostMessageId
 → UnknownOrigin
 ```
 
-`UnknownOrigin` fail-closed：不更新 profile、不启动 Fallback epoch、不触发 Companion、不发 continuation、不完成/替换 Logical Run；记录 HostContractViolation。
+`UnknownOrigin` fail-closed：不更新 profile、不启动 Fallback cursor、不触发 Companion、不发 continuation、不完成/替换 Logical Run；记录 HostContractViolation。
 
 不得把“不是 synthetic”直接等价为 Human。
 
 ### 九、Logical Run
 
-- 新 Authority Root：新 LogicalRunId、更新 LastAuthorityProfile、清空旧 continuation set、新 repair budget、新 Fallback epoch。
+- 新 Authority Root：新 LogicalRunId、更新 LastAuthorityProfile、清空旧 continuation set、新 repair budget、新 Fallback cursor（`Offset=0`）。
 - Continuation：复用 LogicalRunId 与 AuthorityRootUserMessageId，加入 ContinuationMessageIds。
 - Busy nudge：同 Run、同 completion、同 AuthorityRoot。
-- Idle existing agent 新任务：AgentOwnerRoot（新 Run/completion/显式 profile）。
+- Idle existing agent 新任务：AgentOwnerRoot（新 Run/completion/显式 fast-*/deep-*）。
 
 ### 十、Fallback
 
@@ -217,7 +242,7 @@ FallbackAttemptIdentity =
 
 文档与代码中的 `currentUserMessageId` 语义必须是 **AuthorityRootUserMessageId**。Continuation 的 PhysicalUserMessageId 永远不得替代它。
 
-真人显式选模 → 新 Fallback epoch（BaseModel=用户选择, Failures=0, Side=A）。Continuation 沿用同一 epoch。A/A/B/B 只影响当前 Logical Run 的物理请求 attempt。
+新 Authority Root → 新 Fallback cursor（`Offset=0`，A=SelectedAgent，B=PeerAgent）。Continuation 沿用同一 cursor。`session.status=retry` 仅推进 `(offset+1) mod 4`：永久 `A/A/B/B/...`。成功不推进、不重置。**不存在**因累计 retry 数而产生的 Dead 出口；后续物理 request 必须继续。若 Host 停 retry，用 `ProviderRetryAttempt` continuation 延续同一 Logical Run。
 
 ### 十一、Interaction Repair
 
@@ -231,12 +256,13 @@ repair continuation 自己的 PhysicalUserMessageId **不进入** identity。同
 ### 十二、Review 与 Guard
 
 - Review confirmation：`Origin=ReviewConfirmation`，AuthorityRoot=原 Reviewer task root。Witness 同时记 Physical confirmation id 与 AuthorityRootUserMessageId。
-- Manager/Reviewer Guard：不建新任务、不改 agent/model、不更新 LastAuthority、不重置 Fallback/completion，只延续原 Logical Run。
+- Manager/Reviewer Guard：不建新任务、不改 SelectedAgent、不更新 LastAuthority、不重置 Fallback/completion，只延续原 Logical Run。
 
 ### 十三、Companion
 
-- eligibility 只读 `ActiveLogicalRun.Profile.Agent`。
+- eligibility 只读 ActiveLogicalRun 的 Canonical Role / SelectedAgent。
 - 不得读 Session 永久 role、最后物理 user 的 agent、synthetic 临时 agent、linkage 推导 role。
+- Blogger/Executor 为内部 `fast-*/deep-*` pair；新 Blog/Executor summary Logical Run 固定 fast 起步；名称不进入 LLM tool schema。
 - bare synthetic continuation ≠ semantic delta；其后正式 assistant 输出才可能构成 delta。
 
 ### 十四、持久事实（最小）
@@ -245,15 +271,16 @@ repair continuation 自己的 PhysicalUserMessageId **不进入** identity。同
 AuthorityRootAccepted
 PluginPromptClaimed / PluginPromptAccepted / PluginPromptAbandoned
 LogicalRunClosed
+FallbackCursorAdvanced（PreviousOffset → NextOffset = +1 mod 4）
 ```
 
-Session 有界投影：`LastAuthorityProfile`、`ActiveLogicalRun`、`PendingClaims`、`AcceptedContinuationIds`。
+Session 有界投影：`LastAuthorityProfile`、`ActiveLogicalRun`、`PendingClaims`、`AcceptedContinuationIds`、`FallbackCursor`。
 
 ### 十五、实现修改清单（目标态）
 
-删除：`sessionRoles` 作为 authority/Companion 来源、从 AgentLinked 推导 parent role、从最后物理 user 推导 authority、按零宽文本识别 synthetic、synthetic 更新 currentUserMessageId。
+删除：`BaseModel`/`EffectiveModel`、模型环境变量 SSOT、omit-model 继承、第四次失败判死、`sessionRoles` 作为 authority/Companion 来源、从 AgentLinked 推导 parent role、从最后物理 user 推导 authority、按零宽文本识别 synthetic、synthetic 更新 currentUserMessageId、向 Host 覆盖 Model。
 
-新增/保持：`PromptAuthorityProjection`、`AuthorityExecutionProfile`、`AttemptExecutionProfile`、`LogicalRunBinding`、`PromptDispatcher`、claim/accept/abandon facts。
+新增/保持：`PromptAuthorityProjection`、`AuthorityExecutionProfile`（SelectedAgent/PeerAgent/…）、`AttemptExecutionProfile`（EffectiveAgent）、`LogicalRunBinding`、`PromptDispatcher`、claim/accept/abandon facts、modulo-4 FallbackCursor。
 
 `chat.message`：解码 origin → AuthorityRoot 建档案 / Continuation 强制继承 profile / Unknown fail-closed。
 
@@ -261,7 +288,7 @@ Session 有界投影：`LastAuthorityProfile`、`ActiveLogicalRun`、`PendingCla
 
 ### 十六、必须通过的 E2E（摘要）
 
-A 零宽不能变权 · B 零宽不能无限 repair · C 真人可切模型 · D 真人省略 model 继承 LastAuthority 而非 B retry · E Busy nudge 同 Run · F Idle continue 新 OwnerRoot · G Review confirmation 双 id · H Companion 不被 synthetic 切换 · I restart 恢复 profile/run/claims/repair/fallback root。
+A 零宽不能变权 · B 零宽不能无限 repair · C 真人必须显式 fast/deep · D 禁止 omit-model BaseModel 继承 · E Busy nudge 同 Run · F Idle continue 新 OwnerRoot · G Review confirmation 双 id · H Companion 不被 synthetic 切换 · I restart 恢复 profile/run/claims/repair/fallback cursor · J 12 次 retry 后仍继续物理 request。
 
 ### 十七、发布阻断
 
@@ -269,14 +296,18 @@ A 零宽不能变权 · B 零宽不能无限 repair · C 真人可切模型 · D
 零宽 repair 可更新 LastAuthority
 synthetic 可重置 repair 预算或成为 Fallback root
 Companion 从 sessionRoles 决定 eligibility
-用户显式 model 被旧 Fallback side 覆盖
+用户显式 SelectedAgent 被旧 Fallback side 覆盖
 无法识别来源时默认 Human
 模块绕过 PromptDispatcher 直接发 continuation
+无前缀旧名称 / build|plan / 省略 fast|deep
+Fallback 第四次失败仍判死
+向 Host Prompt 设置 Model
+12 次 retry 后不再继续物理请求
 ```
 
 最终冻结表述：
 
-> Session 没有固定 agent 或 model。Authority Root 拥有 ExecutionProfile。真人 User Root 天然拥有改变 agent/model/variant 的最高权限。Agent Owner 可以为其拥有的子代理创建显式 Root。Guard、repair、确认、Busy nudge 与 Host continuation 虽然以 user message 形式运输，但没有授权能力；它们只能继承既有 Logical Run，永远不能通过自身存在改变后续执行语义。
+> Session 没有固定 agent 或 model。Authority Root 拥有 SelectedAgent/PeerAgent/CanonicalRole/SelectedTier。真人 User Root 与 Agent Owner 必须显式选择 `fast-*` 或 `deep-*`；不得覆盖 model ID。Guard、repair、确认、Busy nudge 与 Host continuation 虽然以 user message 形式运输，但没有授权能力；它们只能继承既有 Logical Run，永远不能通过自身存在改变后续执行语义。Fallback 只改变当前 EffectiveAgent，按 AABBAABB 永久循环。
 
 ## 一、卷表
 
@@ -288,7 +319,7 @@ Companion 从 sessionRoles 决定 eligibility
 |`KISS-N03.md`|异步 `fork / join / list` 与完成邮箱|
 |`KISS-N04.md`|角色、能力矩阵与同步局部子程序|
 |`KISS-N05.md`|Executor / Process / Output Summary / PTY|
-|`KISS-N06.md`|每 Session 四次失败的 A/B 角 Fallback|
+|`KISS-N06.md`|Logical Run 无限 AABBAABB Agent-pair Fallback|
 |`KISS-N07.md`|Manager Guard、Reviewer Guard、双 PERFECT|
 |`KISS-N08.md`|Orchestrator / Worktree / Rebase / Review / FF|
 |`KISS-N09.md`|OpenCode Host Adapter、投影管线、工具 Schema|
@@ -305,16 +336,16 @@ Companion 从 sessionRoles 决定 eligibility
 5. Delta 在 canonical JSON 投影层计算；Y 忙时不打断、不排插件队列、不推进 delta 基线，下一次自然包含跳过期间的全部变化。
 6. Y 自身接近上限时，把旧 B 作为唯一正文输入重投影；Y 新输出 B' 替代旧 B。
 7. Manager 无 read/write/edit/grep/glob 等普通工具；只有 `fork / join / list`。无 PTY、无 executor。
-8. `fork(role, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。Nudge 成功 = Host 已确认接受 prompt。Busy→idle 竞态以 Host AcceptPrompt 返回的 run identity 为归属依据。若 Host 不支持 busy append，返回 BusyNudgeUnsupported。
+8. `fork(fast-*|deep-* agent, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。Nudge 成功 = Host 已确认接受 prompt。Busy→idle 竞态以 Host AcceptPrompt 返回的 run identity 为归属依据。若 Host 不支持 busy append，返回 BusyNudgeUnsupported。
 9. `join()` 等任意一个完成项；不指定对象。每个 RunIdentity 对应 single-assignment completion cell。Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。join 消费后永久删除 completed handle。
 10. `list()` 统一显示 Agent 与 PTY，但内部资源实现保持独立。
 11. Inspector 同步调用 Executor Tool；Coder 每次同步 Inspector 调用创建一次性 Inspector Session，并可并行。
 12. Executor Agent 只负责命令输出摘要；无工具、无伴随。Executor Tool 负责真实进程。
-12b. **DevOps** 独占 `fork-pty`，并可 `executor` / `read` / `glob` / `grep` / `inspector` / 同步 `coder` / `join` / `list`。不得直接 write/edit。Manager 通过 `fork(devops, prompt)` 委派终端操作。
+12b. **DevOps** 独占 `fork-pty`，并可 `executor` / `read` / `glob` / `grep` / `inspector` / 同步 `coder` / `join` / `list`。不得直接 write/edit。Manager 通过 `fork(fast-devops|deep-devops, prompt)` 委派终端操作。
 13. `3 × estimated_running_secs` 是进程唯一时限；无其他 timeout 层。模型允许用巨大 estimate 主动申请巨大预算。
 14. `actual_output_bytes > 3 × estimated_output_bytes` 时触发 spool；摘要按 200KB 块做在线 ripple-carry reduce（fan-in=8，按 chunk index 排序，Executor ID 由 processId+level+range hash 生成），不积存全部 map summary。
 15. `estimated_mem_usage=large` 全 OpenCode 进程同时最多一个；medium 不限并发。
-16. Fallback 属于 Logical Run：retry event #1 → A 重试；#2 → 切 B；#3 → B 重试；#4 → 当前 Logical Run 真死。成功不把 Side 切回 A。新 Authority Root 始终新 epoch（Failures=0, Side=A）；真人省略 model 只继承 LastAuthorityProfile.BaseModel，不继承旧 Side B。唯一写 durable fallback 事实的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 AuthorityRootUserMessageId，不包括插件 synthetic 消息。
+16. Fallback 属于 Logical Run：A/B 是 SelectedAgent/PeerAgent 对。`session.status=retry` 推进 `FallbackCursor.Offset`：`(offset+1) mod 4` → 永久 `A/A/B/B/...`，**不存在**因累计 retry 数而产生的 Dead。成功不推进、不重置 cursor。新 Authority Root 始终新 cursor（`Offset=0`，A=SelectedAgent）。公开创建必须显式 `fast-*`/`deep-*`；发送 Prompt 时 `Agent=EffectiveAgent`、`Model=None`。唯一写 durable cursor advance 的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 AuthorityRootUserMessageId，不包括插件 synthetic 消息。
 17. Review：REVISE 一次立即生效；PERFECT 必须来自不同 ProviderRunIdentity 且第二次的 user 输入包含第一次后的确认请求。每个审查屏障要求两个不同的 ProviderRunIdentity。
 18. ReviewGuard 同时守 Manager 结束和 Reviewer 未给出有效 verdict。
 19. PTY 使用独立工具 `fork-pty`（仅 DevOps），signal 使用结构化 enum，不使用魔法字符串。PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
@@ -327,7 +358,7 @@ Companion 从 sessionRoles 决定 eligibility
 26. **不修改 OpenCode 本体**：生产功能只在现有插件 Hook（`chat.message`/`experimental.chat.messages.transform`/`tool.execute.before`/`after`/`event`）和 SDK API 边界内工作。
 27. **稳定性门禁**：scenario-local 因果 Watchdog 超时 2 秒；只认因果进展。Watchdog deadline > 被测动作 deadline + cleanup allowance。Event-stagger 规则：第一个 canary 立即启动，canary N 等待 N−1 输出精确的 `[setupScenario] ready` 随后立即启动（不等待前一个 canary 结束；ready 前退出或 ready 超时 = 该 canary 失败，可以释放启动门继续收集后续诊断，但整轮不能通过）。Release gate 恰好运行 3 轮。最多重复 3 次。
 28. **Provider-visible projection**：缓存比较只使用真正进入模型的字段（role/text/reasoning/tool call/result），排除 timestamp/cost/usage/runtimeId 等非模型 metadata。
-29. **Fallback identity**：`logicalRunId + AuthorityRootUserMessageId + providerAttempt`。Single-flight `retry` 事件到达后 append `FallbackFailureRecorded`。空/XML-only terminal 触发 InteractionRepairIdentity 去重（最多一次）。
+29. **Fallback identity**：`logicalRunId + AuthorityRootUserMessageId + providerAttempt`。Single-flight `retry` 事件到达后 append `FallbackCursorAdvanced`（`NextOffset = (PreviousOffset + 1) mod 4`）。空/XML-only terminal 触发 InteractionRepairIdentity 去重（最多一次）。
 
 ## 三、总形状
 
@@ -1585,9 +1616,9 @@ let list filter =
 示例：
 
 ```text
-a1b2c3  coder      busy
-91ff02  reviewer   idle
-0304aa  pty        running
+a1b2c3  fast-coder      busy
+91ff02  deep-reviewer   idle
+0304aa  pty             running
 ```
 
 `busy/idle/running/exited` 是展示层瞬时派生值，不进入持久化领域。
@@ -1718,7 +1749,7 @@ executor
 
 ```text
 Manager 的 fork 支持：
-  fork(role, prompt)   # coder|inspector|browser|meditator|reviewer|devops
+  fork(agent, prompt)   # fast-coder|deep-coder|fast-inspector|deep-inspector|fast-browser|deep-browser|fast-meditator|deep-meditator|fast-reviewer|deep-reviewer|fast-devops|deep-devops
   fork(existingAgentId, prompt)
 
 DevOps 的 fork-pty 支持：
@@ -1726,9 +1757,10 @@ DevOps 的 fork-pty 支持：
   fork-pty(existingPtyId, prompt|signal)
 
 Orchestrator 的 fork 只支持：
-  fork-manager(managerPrompt)
+  fork-manager(explicitFastOrDeepManagerAgent, managerPrompt)
 
 其他角色不得看到 fork / fork-pty。
+无前缀 coder/reviewer/... 以及 build/plan 不是合法 Host identity。
 ```
 
 4. **权限必须在工具 Schema 层隐藏。**
@@ -1758,12 +1790,12 @@ Orchestrator 的 fork 只支持：
 
 ```fsharp
 type RoleDefinition =
-    { Role: AgentRole
+    { Role: AgentRole              // Canonical Role（源码 SSOT）
       Prompt: string
       Companion: bool
-      Tools: ToolId list
-      ModelA: ModelRef
-      ModelB: ModelRef }
+      Tools: ToolId list }
+// 0.5.0：不再在 RoleDefinition 内保存 ModelA/ModelB。
+// Host identity = fast-ROLE / deep-ROLE；模型只在 opencode.json.agent[*].model。
 
 let roles : Map<AgentRole, RoleDefinition> =
     [ orchestratorDefinition
@@ -2225,77 +2257,87 @@ Close = stdin EOF（不是 SIGKILL）。
 
 ---
 
-# KISS-N06 — A/B 角 Fallback
+# KISS-N06 — A/B 角 Fallback（0.5.0：无限 AABBAABB Agent pair）
 
-Fallback 是每个 Session 调用模型时的一段递归函数，不是独立状态机。
+Fallback 是每个 Logical Run 上的 modulo-4 cursor + 映射，不是独立状态机，也不是累计失败预算。
+
+完整冻结：`next/Doc/SSOT.md` · `0.5.0.md` §23。
 
 ---
 
 ## 一、冻结语义 [NORMATIVE]
 
-Fallback 属于 **Logical Run**，不属于 Session 永久状态。每个 Logical Run 有：
+Fallback 属于 **Logical Run**，不属于 Session 永久状态。A/B 是一对 OpenCode Agent（SelectedAgent / PeerAgent），不是模型槽位。每个 Logical Run 有：
 
 ```fsharp
-type ModelSide = A | B
+type ModelSide = SideA | SideB
 
-type FallbackMemory =
-    { mutable Side: ModelSide
-      mutable Failures: int }
+type FallbackCursor =
+    { Offset: byte                 // 仅 0|1|2|3
+      LastProviderAttempt: int64 option }
 ```
 
-规则：
+映射与推进：
 
-|失败序号|动作|
-|---:|---|
-|1|仍用 A，立即重试|
-|2|切换 B，并立即尝试 B|
-|3|仍用 B，立即重试|
-|4|当前 Logical Run 真死|
+```fsharp
+let side offset =
+    match offset with
+    | 0uy | 1uy -> ModelSide.SideA
+    | 2uy | 3uy -> ModelSide.SideB
+    | _ -> invalidOp "Fallback offset must be in range 0..3"
 
-成功不会把 Side 切回 A，也不会减少 Failures。
-新 Authority Root 始终新 epoch（Failures=0, Side=A）。
-真人省略 model 只继承 `LastAuthorityProfile.BaseModel`，不继承旧 Run 的 Side B。
-B attempt 不得成为下一真人 root 的默认 model。
+let advance offset = byte ((int offset + 1) % 4)
+
+let effectiveAgent authority cursor =
+    match side cursor.Offset with
+    | ModelSide.SideA -> authority.SelectedAgent
+    | ModelSide.SideB -> authority.PeerAgent
+```
+
+|Offset|Side|EffectiveAgent|
+|---:|---|---|
+|0|A|SelectedAgent|
+|1|A|SelectedAgent|
+|2|B|PeerAgent|
+|3|B|PeerAgent|
+|下一 retry|`(Offset+1) mod 4`|循环回到 0→A|
+
+成功不推进、不重置 cursor。
+新 Authority Root 始终新 cursor（`Offset=0`，A=SelectedAgent，B=PeerAgent）。
+公开创建必须显式 `fast-*`/`deep-*`；禁止 omit-model / 无前缀 / `build`/`plan`。
+发送 Prompt：`Agent=EffectiveAgent`，`Model=None`。
+B attempt 不得成为下一真人 root 的默认 Agent，也不得改写 SelectedAgent / LastAuthorityProfile。
+**不存在** `FallbackDead` / 因 retry 次数产生的 `LogicalRunDead` /「禁止第五 request」。
 
 ---
 
 ## 二、结构化实现
 
 ```fsharp
-let rec invokeWithFallback (s: ModelSession) request =
+let invokeWithCursor (authority: AuthorityExecutionProfile) (cursor: FallbackCursor) request =
     agent {
-        if s.Fallback.Failures >= 4 then
-            return! agent.fail (SessionDead s.Id)
-
-        let model =
-            match s.Fallback.Side with
-            | A -> s.Role.ModelA
-            | B -> s.Role.ModelB
-
-        match! s.Host.TryInvoke(model, request) with
+        let effective = effectiveAgent authority cursor
+        // Host 按 opencode.json.agent[effective].model 解析；万象术不传 Model
+        match! s.Host.TryInvoke(agent = effective, model = None, request) with
         | InvocationSucceeded output ->
-            return output
+            return output          // 成功：cursor 不变
 
-        | InvocationFailed error ->
-            s.Fallback.Failures <- s.Fallback.Failures + 1
-
-            match s.Fallback.Failures with
-            | 1 ->
-                return! invokeWithFallback s request
-
-            | 2 ->
-                s.Fallback.Side <- B
-                return! invokeWithFallback s request
-
-            | 3 ->
-                return! invokeWithFallback s request
-
-            | _ ->
-                return! agent.fail (SessionDead error)
+        | InvocationFailed _ ->
+            // 真实推进只发生在 session.status=retry 的 durable path
+            return! agent.fail (ProviderRetryPending effective)
     }
+
+// durable retry path（唯一写入口）
+let onProviderRetry identity cursor =
+    if alreadyRecorded identity then cursor
+    else
+        append (FallbackCursorAdvanced {| PreviousOffset = cursor.Offset
+                                          NextOffset = advance cursor.Offset |})
+        { cursor with Offset = advance cursor.Offset
+                      LastProviderAttempt = Some identity.ProviderAttempt }
 ```
 
-控制流完全可见：一个 side、一个计数、一个递归函数。
+控制流完全可见：一个 Offset、一个映射表、一次 modulo-4 推进。没有死亡分支。
 
 ---
 
@@ -2305,33 +2347,32 @@ let rec invokeWithFallback (s: ModelSession) request =
 
 - Phase enum；
 - RemainingModels；
-- Attempt record；
+- 累计 Failures 预算；
+- Dead / 第四次判死；
 - Retry owner；
-- fallback journal；
 - recovery transition table；
 - Governor；
 - Coordinator；
 - Lease。
 
-`Side` 是当前 Logical Run 的模型侧事实，`Failures` 是该 Run 的预算计数。程序下一步由普通模式匹配决定：
+程序下一步由普通模式匹配决定：
 
 ```fsharp
-match failures with
-| 0 | 1 -> A
-| 2 -> permanent_switch_to_B
-| 3 -> B
-| _ -> Dead
+match offset % 4uy with
+| 0uy | 1uy -> SelectedAgent
+| 2uy | 3uy -> PeerAgent
+| _ -> invalidOp "unreachable"
 ```
 
-这不需要状态图，不需要持久化"执行到第几步"。只需要从一个简单的事实（累计失败数）推导出当前策略。
+这不需要状态图。只需要从一个简单的事实（cursor Offset）推导出当前 EffectiveAgent。
 
 ### 为什么不需要 RemainingModels 列表？
 
-因为只有 A 和 B 两种模型。切到 B 后不切回 A。所以不需要列表、不需要索引、不需要"下一个候选"。
+因为只有 SelectedAgent 与 PeerAgent 两个 Agent。循环是无限的，不需要"下一个候选"列表，也不需要死亡出口。
 
-### 为什么不需要 FallbackPhase？
+### 为什么不需要 FallbackPhase / Failures 计数器？
 
-因为 Fallback 的"下一步"完全由 `failures` 和 `side` 决定。`failures` 是事实（写死的），`side` 是事实（写死的）。不需要中间阶段。
+因为 Fallback 的"下一步"完全由 `Offset mod 4` 决定。`Offset` 是事实（写死的）。不需要中间阶段，也不需要把累计失败数当成预算上限。
 
 ### 失败定义
 
@@ -2339,57 +2380,50 @@ match failures with
 
 [NORMATIVE]
 
-- provider/transport/model invocation failure：计一次。
-- 用户取消/父取消：不计失败，直接取消。
-- 正常 assistant 输出内容质量差：不计模型调用失败；由 Manager/Reviewer 处理。
+- provider/transport invocation failure 且 Host 发出 `session.status=retry`：推进 cursor 一次。
+- 用户取消/父取消：不计 retry，直接取消。
+- 正常 assistant 输出内容质量差：不计 provider retry；由 Manager/Reviewer 处理。
 - Reviewer 未调用 verdict：不是 provider failure；由 Reviewer Guard nudge。
 - Executor command 非零退出：不是模型 failure。
 
 ### 适用范围
 
-每个 LLM Session 独立拥有 FallbackMemory：
+每个 LLM Logical Run 独立拥有 FallbackCursor：
 
-- Orchestrator；
-- Manager；
-- Coder；
-- Inspector；
-- Browser；
-- Meditator；
-- Reviewer；
-- Blogger；
-- Executor Agent。
+- Orchestrator / Manager / Coder / Inspector / Browser / Meditator / Reviewer（公开 `fast-*`/`deep-*`）；
+- Blogger / Executor Agent（内部 `fast-*`/`deep-*`，新 summary Logical Run 固定 fast 起步）。
 
 ---
 
 ## 四、持久化
 
-`Side` 与 `Failures` 写入宿主 Session metadata。运行时可通过 Journal 持久化。
+只持久化 `FallbackCursor.Offset`（0..3）与 `LastProviderAttempt`。不持久化 Side 枚举副本、Failures 预算或 model ID。
 
 ### Fallback identity
 
-每个 failure 的稳定身份：
+每个 retry 的稳定身份：
 
 ```text
-sessionId + currentUserMessageId + providerAttempt
+logicalRunId + AuthorityRootUserMessageId + providerAttempt
 
-currentUserMessageId =
+AuthorityRootUserMessageId =
   当前 provider attempt 所属的 Host run root user message，
   不包括插件 synthetic continuation/background/reset frame。
 
-Adapter 必须从 typed Host API 获得 currentUserMessageId，
+Adapter 必须从 typed Host API 获得 AuthorityRootUserMessageId，
 禁止通过"最后一条 user message"猜测。
 ```
 
 `session.status=retry` 事件到达后，提取上述 identity，检查是否已记录：
 
-- 未记录 → append `FallbackFailureRecorded`，Fold 更新计数
-- 已记录 → 跳过（去重）
+- 未记录 → append `FallbackCursorAdvanced`，Fold 验证 `NextOffset = (PreviousOffset + 1) mod 4`
+- 已记录 → 跳过（去重）；不重复推进、不重复发 continuation
 
 ### 唯一写入口
 
-[NORMATIVE] 唯一允许写 `FallbackFailureRecorded` 的入口：`session.status=retry`。
+[NORMATIVE] 唯一允许推进 FallbackCursor 的入口：`session.status=retry`。
 
-以下情况**不写** durable fallback：
+以下情况**不写** durable cursor advance：
 
 - `observeIdle` 发现空/XML-only assistant
 - 重复 idle
@@ -2397,7 +2431,7 @@ Adapter 必须从 typed Host API 获得 currentUserMessageId，
 - user cancel / parent abort
 - 零宽 continuation
 
-空/XML-only terminal 最多触发一次 continuation，不进入 A/B 计数。
+空/XML-only terminal 最多触发一次 continuation，不进入 A/B cursor。
 
 [NORMATIVE] 空/XML-only continuation identity：
 
@@ -2419,37 +2453,39 @@ XML-only = 输出只包含 <tag>...</tag>，没有可见正文。
 Tool call XML 计入 XML-only（因为它不是自然语言）。
 ```
 
-[NORMATIVE] OpenCode 原生 retry 与 A/A/B/B 轨迹：
+[NORMATIVE] OpenCode 原生 retry 与无限 AABBAABB 轨迹：
 
 ```text
-git retry event #1 → Failures=1，下一 provider request 仍 A
-git retry event #2 → Failures=2，下一 provider request B
-git retry event #3 → Failures=3，下一 provider request B
-git retry event #4 → SessionDead，禁止下一 request
+retry #1 → Offset=1，下一 provider request 仍 A（SelectedAgent）
+retry #2 → Offset=2，下一 provider request B（PeerAgent）
+retry #3 → Offset=3，下一 provider request B
+retry #4 → Offset=0，下一 provider request A   // 回到 A，不死
+retry #5 → Offset=1，A
+...
+retry #12 → Offset=0，A；必须仍继续产生下一物理 request
 
-同一 user turn 可能产生多次 retry，每次独立计数。
-providerAttempt 是插件自增编号（不是宿主原始编号）。
+同一 Logical Run 内永久循环。providerAttempt 是插件自增编号。
 
-宿主在发下一 request 前，插件必须有能力确定模型。
-若 Hook 做不到，则这套语义在"不修改 OpenCode 本体"约束下不可实现，
-必须先证明 Host contract。
+发送时 Agent=EffectiveAgent，Model=None；宿主按 opencode.json 解析模型。
+若 Host 自身在某次数停止 retry，不得伪称无限 AABB 已实现；
+必须用 ProviderRetryAttempt continuation 延续同一 Logical Run。
 ```
 
 ---
 
 ## 五、测试
 
-1. A 首次成功。
-2. A 失败一次，A 重试成功。
-3. A 两次失败，永久切 B，B 成功。
-4. 同一 Logical Run 内后续 attempt 仍使用 B；新 Authority Root 重置为 A。
-5. B 第三次累计失败后重试 B。
-6. 第四次累计失败 LogicalRunDead；新真人 root 仍可开始新 Run。
-7. 成功不清零 Failures。
-8. 用户取消不计数。
-9. 每个 child Logical Run 计数独立。
-10. Blogger 死亡不杀 X；仅停止 B 更新。
-11. 真人省略 model 继承 LastAuthority.BaseModel，不继承旧 Side B。
+1. A（SelectedAgent）首次成功；cursor 保持 Offset=0。
+2. A 失败一次（retry→Offset=1），A 重试成功。
+3. 两次 retry 后切 B（PeerAgent），B 成功；成功不推进 cursor。
+4. 同一 Logical Run 内后续 attempt 仍使用当前 Offset 对应 Agent；新 Authority Root 重置 Offset=0。
+5. 第三次 retry 后仍 B；第四次 retry 后回到 A（不死）。
+6. 至少 12 次 durable retry 后仍 alive，EffectiveAgent 严格 `A A B B A A B B …`。
+7. 成功不重置 cursor。
+8. 用户取消不推进 cursor。
+9. 每个 child Logical Run cursor 独立。
+10. Blogger 失败不杀 X；仅停止 B 更新；Blogger 自身也走无限 AABBAABB。
+11. 禁止 omit-model / 无前缀 / `build`/`plan`；显式 `fast-*`/`deep-*` 才能建 Authority Root。
 
 
 ---
@@ -3471,19 +3507,19 @@ tests-next/
 
 ### 步骤
 
-1. Side A/B。
-2. Failures 计数。
-3. A retry。
-4. permanent B switch。
-5. B retry。
-6. fourth failure SessionDead。
+1. FallbackCursor.Offset（0..3）+ SelectedAgent/PeerAgent。
+2. `session.status=retry` 推进 `(offset+1) mod 4`。
+3. A/A/B/B 永久循环；EffectiveAgent 映射。
+4. 成功不推进、不重置。
+5. 新 Authority Root → Offset=0。
+6. 第四次及之后的 retry 继续循环（回到 A），不杀 Logical Run（见 KISS-N06 / `next/Doc/SSOT.md`）。
 7. cancellation excluded。
-8. Role metadata/config 接线。
+8. Role metadata/config 接线改为显式 `fast-*`/`deep-*`（Model=None）。
 
 ### 出口
 
-- 表驱动的 0～4 failure 轨迹全部通过。
-- 仓库无 FallbackPhase/RemainingModels/Governor。
+- 表驱动的无限 AABBAABB 轨迹（含 12-round）全部通过。
+- 仓库无 FallbackPhase/RemainingModels/Governor/因 retry 次数判死。
 
 ---
 

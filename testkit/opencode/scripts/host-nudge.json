@@ -18,7 +18,7 @@
     {
       "id": "manager-fork-busy",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat"
@@ -43,7 +43,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "first busy run: stay streaming until nudged"
         }
       }
@@ -51,7 +51,7 @@
     {
       "id": "coder-busy-hang",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat"
@@ -71,7 +71,7 @@
     {
       "id": "manager-fork-nudge",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat"
@@ -96,7 +96,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "nudge continue second run while first is busy"
         }
       }
@@ -127,14 +127,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "parent-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Fork a busy coder and nudge it while streaming."
   },
   "flow": [
@@ -143,9 +143,9 @@
     },
     {
       "bindChild": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "aliases": [
-          "coder"
+          "fast-coder"
         ]
       }
     },

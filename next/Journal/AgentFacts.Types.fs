@@ -70,16 +70,29 @@ type ModelSide =
 
 type FallbackProjection =
     {
-        /// Logical Run that owns this Fallback epoch. New Authority Root resets.
+        /// Logical Run that owns this Fallback cursor. New Authority Root resets.
         LogicalRunId: string
         AuthorityRootUserMessageId: string
-        Side: ModelSide
-        FailuresOnCurrentSide: int
-        TotalFailures: int
-        IsDead: bool
+        /// Modulo-4 cursor: 0→A, 1→A, 2→B, 3→B. Infinite cycle; never Dead.
+        Offset: byte
+        LastProviderAttempt: int64 option
         /// Bounded durable identities for restart-safe failure dedupe.
         RecentFailureIds: string list
     }
+
+module FallbackProjection =
+
+    let side (offset: byte) : ModelSide =
+        match offset with
+        | 0uy
+        | 1uy -> SideA
+        | 2uy
+        | 3uy -> SideB
+        | _ -> invalidOp "Fallback offset must be in range 0..3"
+
+    let advance (offset: byte) : byte = byte ((int offset + 1) % 4)
+
+    let currentSide (fb: FallbackProjection) : ModelSide = side fb.Offset
 
 type CandidateStatus =
     | Registered of candidateId: CandidateId * branch: string * commitHash: string
@@ -119,10 +132,10 @@ type AuthorityProfileProjection =
     { LogicalRunId: string
       AuthorityRootUserMessageId: string
       AuthorityKind: string
-      Agent: string
-      BaseProviderID: string option
-      BaseModelID: string option
-      Variant: string option }
+      SelectedAgent: string
+      PeerAgent: string
+      CanonicalRole: string
+      SelectedTier: string }
 
 type PromptAuthorityProjection =
     { LastAuthorityProfile: AuthorityProfileProjection option

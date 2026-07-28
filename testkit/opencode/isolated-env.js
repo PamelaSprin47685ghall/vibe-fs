@@ -52,6 +52,28 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
     id: 'test-model-b',
     name: 'Test Model B',
   };
+  const managedAgents = {
+    'fast-orchestrator': { model: 'test/test-model' },
+    'deep-orchestrator': { model: 'test/test-model-b' },
+    'fast-manager': { model: 'test/test-model' },
+    'deep-manager': { model: 'test/test-model-b' },
+    'fast-coder': { model: 'test/test-model' },
+    'deep-coder': { model: 'test/test-model-b' },
+    'fast-inspector': { model: 'test/test-model' },
+    'deep-inspector': { model: 'test/test-model-b' },
+    'fast-devops': { model: 'test/test-model' },
+    'deep-devops': { model: 'test/test-model-b' },
+    'fast-browser': { model: 'test/test-model' },
+    'deep-browser': { model: 'test/test-model-b' },
+    'fast-meditator': { model: 'test/test-model' },
+    'deep-meditator': { model: 'test/test-model-b' },
+    'fast-reviewer': { model: 'test/test-model' },
+    'deep-reviewer': { model: 'test/test-model-b' },
+    'fast-blogger': { model: 'test/test-model' },
+    'deep-blogger': { model: 'test/test-model-b' },
+    'fast-executor': { model: 'test/test-model' },
+    'deep-executor': { model: 'test/test-model-b' },
+  };
   return {
     formatter: false,
     lsp: false,
@@ -75,6 +97,7 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
         options: { apiKey: opts.apiKey || 'test-key', baseURL: `${llmUrl}` },
       },
     },
+    agent: managedAgents,
     plugin: pluginPaths,
   };
 }

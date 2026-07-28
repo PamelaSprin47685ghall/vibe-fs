@@ -8,6 +8,7 @@ import { requestRoleOf } from '../strict-mock-matches.js';
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
 const primaryRole = 'orchestrator';
+const primaryAgent = 'fast-orchestrator';
 const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 const contextLimit = 1000;
@@ -61,7 +62,7 @@ try {
   });
 
   const parent = await scenario.client.request('POST', '/api/session', {
-    body: { agent: primaryRole, model: { providerID: 'test', id: 'test-model' } },
+    body: { agent: primaryAgent, model: { providerID: 'test', id: 'test-model' } },
   });
   const parentId = getSessionId(parent);
   assert.ok(parentId, `parent creation failed: ${JSON.stringify(parent)}`);
@@ -94,7 +95,7 @@ try {
     const turn = scenario.turn.start(parentId);
     const prompt = await scenario.client.request('POST', `/session/${parentId}/prompt_async`, {
       body: {
-        agent: primaryRole,
+        agent: primaryAgent,
         parts: [{ type: 'text', text: `Record round ${round}.` }],
         model: { providerID: 'test', modelID: 'test-model' },
       },

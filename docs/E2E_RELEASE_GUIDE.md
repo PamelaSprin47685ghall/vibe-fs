@@ -1,6 +1,8 @@
-# 0.4.0 E2E 加强与发布操作指南
+# 0.5.0 E2E 加强与发布操作指南
 
 本指南是发布门禁，不是愿望清单。任一阻断场景没有直接证据即为 **No-Go**；不得以单元测试或旧 `build/` 产物替代真实 Host 证据。
+
+当前开发标记：**`0.5.0-rc.1`**（文档冻结 / RC 开发）。规范 SSOT：`next/Doc/SSOT.md`、`0.5.0.md` §23。
 
 ## 0. 前置条件
 
@@ -14,7 +16,9 @@ node testkit/opencode/tests/gate-testkit.mjs
 CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 ```
 
-每次运行须从干净 checkout 开始，记录：commit SHA、Node/.NET/OpenCode 版本、模型 A/B/Blogger 配置、随机 seed、每个 scenario 的临时目录和完整日志。任何失败先收割所有 scenario 的 diagnostics，再判整轮失败。
+每次运行须从干净 checkout 开始，记录：commit SHA、Node/.NET/OpenCode 版本、`opencode.json` Managed Agent 绑定（脱敏）、随机 seed、每个 scenario 的临时目录和完整日志。任何失败先收割所有 scenario 的 diagnostics，再判整轮失败。
+
+**Config Gate（发行阻断）**：启动前 `opencode.json` 必须具备完整 20 个 Managed Agent（公开角色的 `fast-ROLE`/`deep-ROLE` + 内部 `fast-blogger`/`deep-blogger`/`fast-executor`/`deep-executor`），每个 Agent 有非空 model，peer 完整，无 legacy 无前缀名称 / `build` / `plan`。缺一 → fail-closed。
 
 ## 1. Canary 启动链
 
@@ -42,7 +46,9 @@ CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 
 ## 3. Companion
 
-**Authority gate.** Companion eligibility reads only `ActiveLogicalRun.Profile.Agent`. Missing ActiveLogicalRun means no Blogger and a `MissingAuthorityProfile` diagnostic. Do not infer role from `sessionRoles`, last physical user agent, transform input agent, or child linkage.
+**Authority gate.** Companion eligibility reads only `ActiveLogicalRun.Profile` Canonical Role / SelectedAgent. Missing ActiveLogicalRun means no Blogger and a `MissingAuthorityProfile` diagnostic. Do not infer role from `sessionRoles`, last physical user agent, transform input agent, or child linkage.
+
+Blogger 为内部 `fast-blogger`/`deep-blogger`；每个新 Blog step Logical Run 固定 fast 起步、deep 为 B，无限 AABBAABB。不向任何 LLM 工具 schema 暴露。
 
 每项必须比较实际送到 provider 的 provider-visible bytes，而非 Host timestamp/runtime metadata：
 
@@ -54,29 +60,38 @@ CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 6. 旧/外来 `companion-b-head-*` fixture 不得被视为当前 epoch 的幂等命中；必须 fail closed 或走明确清理路径。
 7. 重启后恢复同一个 Blogger；若 Blogger 不存在，发送 full reset，不得将 delta 发给空白 Blogger。
 
-## 4. Fallback A/A/B/B（Logical Run attempt，非 Session 永久 Side）
+## 4. Fallback 无限 AABBAABB（Logical Run cursor，非 Session 永久 Side）
 
-Fallback 属于 **Logical Run**，不属于 Session 永久状态。
+Fallback 属于 **Logical Run**，不属于 Session 永久状态。A/B 是一对 OpenCode Agent（SelectedAgent / PeerAgent），不是模型槽位。
 
 冻结规则：
 
-1. `session.status=retry` 写 durable `FallbackFailureRecorded`（唯一写入口）；
-2. 同一 Logical Run attempt 映射：1→A，2→A，3→B，4→B，5→禁止；
-3. identity = `logicalRunId + AuthorityRootUserMessageId + providerAttempt`；
-4. 新 Authority Root 始终新 epoch：`Failures=0, Side=A`；
-5. 真人显式 model 永远优先；
-6. 真人省略 model 只继承 `LastAuthorityProfile.BaseModel`，**绝不**继承旧 Run 的 Side B EffectiveModel；
-7. Continuation / B retry 不写回 LastAuthorityProfile。
+1. `session.status=retry` 写 durable cursor advance（唯一写入口）；
+2. cursor `Offset ∈ {0,1,2,3}`；`side(0|1)=A=SelectedAgent`，`side(2|3)=B=PeerAgent`；`advance=(Offset+1) mod 4`；
+3. 序列永久循环：`A → A → B → B → A → A → B → B → …`；**不存在**因累计 retry 数而产生的 Dead；
+4. identity = `logicalRunId + AuthorityRootUserMessageId + providerAttempt`；
+5. 新 Authority Root 始终新 cursor：`Offset=0`，Side A = SelectedAgent；
+6. 公开创建必须显式 `fast-*` 或 `deep-*`；禁止无前缀旧名称、`build`/`plan`、独立 model override；
+7. 发送 Prompt：`Agent=EffectiveAgent`，`Model=None`；模型由 Host 按 `opencode.json` 解析；
+8. Continuation / B retry 不写回 LastAuthorityProfile；成功不推进、不重置 cursor。
 
-可接受 canary 轨迹（`fallback-canary`）：
+可接受 canary 轨迹：
 
 ```text
-Authority Root A → fail → same-run A retry → fail → same-run B → fail → same-run B → Dead
-new Authority Root（omit model）→ inherits BaseModel，epoch resets to Side=A
-new Authority Root（explicit model C）→ BaseModel=C，epoch resets
+Authority Root SelectedAgent=fast-ROLE
+  → fail → same-run A (fast) → fail → same-run B (deep)
+  → fail → same-run B (deep) → fail → same-run A (fast)   # 第 4 次 retry 回到 A，不死
+  → … → 至少证明 12 次 retry 后仍 alive，且 EffectiveAgent 按 modulo-4 循环
+
+Authority Root SelectedAgent=deep-ROLE
+  → A=deep, B=fast；同样无限 AABBAABB
+
+new Authority Root（显式另一 Agent）→ 新 cursor Offset=0，Side A = 新 SelectedAgent
 ```
 
-**仍是发行阻断**：必须证明同一 Logical Run 内真实 provider request 为严格 `A A B B`，且没有第五个 request。不能用「下一真人 prompt 才切 B」冒充同 Run A/A/B/B。
+**发行阻断（12-retry alive）**：必须证明同一 Logical Run 内真实 provider request 轨迹在至少 **12 次** durable retry 后仍继续产生下一 request，且 EffectiveAgent 序列严格为无限 `A A B B A A B B …`。不能用「第四次判死」或「下一真人 prompt 才切 B」冒充同 Run 无限 AABB。若 Host 自身停止 retry，必须用 `ProviderRetryAttempt` continuation 延续同一 Logical Run，否则 No-Go。
+
+**Explicit agents**：所有 Manager/Orchestrator fork、HumanRoot、AgentOwnerRoot 必须显式 Accurate Agent。无前缀 / `build` / `plan` / omit-model 继承 → fail-closed。
 
 ## 5. Review witness
 
@@ -102,10 +117,11 @@ new Authority Root（explicit model C）→ BaseModel=C，epoch resets
 - 对相同 `processId|level|start|end`，Executor ID 必须稳定为 SHA-256 派生值。
 - map/reduce 乱序完成时，以 chunk index 还原顺序；map/reduce 失败时返回 partial summary、已完成摘要和最后 200KB raw tail，不丢 ProcessResult。
 - 输入拒绝 NaN、Infinity、负数；巨大有限 estimate 仅受 cancellation 限制，不能在 int/TimeSpan 转换处溢出。
+- Executor Agent 为内部 `fast-executor`/`deep-executor`；新 summary Logical Run 固定 fast 起步，无限 AABBAABB；不向 LLM schema 暴露。
 
 ## 7. PTY
 
-仅 DevOps schema 可见 `fork-pty`。Manager 只 `fork(devops)` 委派。逐个验证 `TERM,KILL,INT,HUP,QUIT,USR1,USR2`：
+仅 DevOps schema 可见 `fork-pty`。Manager 只 `fork(fast-devops|deep-devops)` 委派。逐个验证 `TERM,KILL,INT,HUP,QUIT,USR1,USR2`：
 
 - TERM 默认；5 秒后无 exit 才 KILL。
 - Signal/Close 不发布 completion；只有 backend `onExit` 发布。
@@ -124,6 +140,7 @@ new Authority Root（explicit model C）→ BaseModel=C，epoch resets
 5. rebase 后新 barrier + 两次新的 PERFECT，再 `--ff-only`。
 6. 注入崩溃：candidate、pre-review、rebase、conflict、post-review、ff、Published fact、worktree cleanup、branch cleanup 的前后各一次。
 7. 重启后由 Git authority 识别已发布；不得重复 ff；已发布但 cleanup 失败必须报告 cleanup pending 并完成清理。
+8. 只能 fork 显式 Manager Agent（`fast-manager` / `deep-manager`）；无前缀 `manager` fail-closed。
 
 每场景 dispose 后检查：child PID、port、SSE、pending request/session、PTY、spool、worktree、manager branch、rebase state、publish lock 全为空。
 
@@ -141,4 +158,28 @@ npm install /absolute/path/to/wanxiangshu-<version>.tgz
 node -e "import('wanxiangshu')"
 ```
 
-当前默认最终分发为**私有交付**：manifest 保持 `private: true`，`license` 为 `SEE LICENSE IN LICENSE`，生成 tarball 但不公开发布到 npm。仅在完成正式许可证与商业授权审查后，才允许将 manifest 改为 `private: false` 并公开发布。最终版本升为 `0.4.0` 前，在新的干净 checkout 重跑整套门禁，不能复用 RC build。
+当前默认最终分发为**私有交付**：manifest 保持 `private: true`，`license` 为 `SEE LICENSE IN LICENSE`，生成 tarball 但不公开发布到 npm。仅在完成正式许可证与商业授权审查后，才允许将 manifest 改为 `private: false` 并公开发布。最终版本升为 `0.5.0` 前，在新的干净 checkout 重跑整套门禁（含 12-retry alive + explicit-agent-only），不能复用 RC build。证据目录：`docs/evidence/0.5.0/`（见 `0.5.0.md` §21.4）。
+
+## 10. 0.5.0 No-Go（出现任一项不得发布）
+
+```text
+仍支持 manager/coder/reviewer 等旧 Agent 名称
+仍支持 build 或 plan alias
+任意公开创建操作可以省略 fast/deep
+万象术仍从环境变量读取模型
+万象术发送 Prompt 时仍设置 Model
+Authority journal 仍保存 model ID
+Fallback 第四次失败仍判死
+Fallback 在成功后擅自重置
+fast/deep 同角色工具权限不同
+fast/deep 使用不同 system prompt
+Blogger 或 Executor 名称进入 LLM tool schema
+Blogger 不是从 fast-blogger 开始
+Executor summary 不是从 fast-executor 开始
+重启后 fallback cursor 丢失
+重启后 journal 旧 model 覆盖新 opencode.json
+Host 收到 Agent 后没有使用该 Agent 对应的模型
+12 次 retry 后不再继续物理请求
+拼错 Agent 被静默当作新 handle
+旧 journal 被猜测性迁移
+```

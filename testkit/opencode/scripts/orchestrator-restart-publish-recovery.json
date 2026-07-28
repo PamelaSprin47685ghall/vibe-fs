@@ -4,7 +4,7 @@
     {
       "id": "manager-recovery-fork-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 4,
         "requestKind": "chat",
@@ -21,7 +21,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Write publish_proof.txt."
         }
       }
@@ -29,7 +29,7 @@
     {
       "id": "manager-recovery-join-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 5,
         "requestKind": "chat",
@@ -51,7 +51,7 @@
     {
       "id": "manager-recovery-terminal",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 6,
         "requestKind": "chat",
@@ -72,7 +72,7 @@
     {
       "id": "coder-recovery-write",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 3,
         "requestKind": "chat",
@@ -95,7 +95,7 @@
     {
       "id": "coder-recovery-terminal",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 4,
         "requestKind": "chat",

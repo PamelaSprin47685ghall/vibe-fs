@@ -10,14 +10,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "manager-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork coder with one-shot inspector, join coder, fork reviewer, handle REVISE, get dual PERFECT, join reviewer report, finish."
   },
   "flow": [
@@ -26,9 +26,9 @@
     },
     {
       "bindChild": {
-        "agent": "inspector",
+        "agent": "fast-inspector",
         "aliases": [
-          "inspector"
+          "fast-inspector"
         ]
       }
     },
@@ -46,9 +46,9 @@
     },
     {
       "bindChild": {
-        "agent": "browser",
+        "agent": "fast-browser",
         "aliases": [
-          "browser"
+          "fast-browser"
         ]
       }
     },
@@ -66,9 +66,9 @@
     },
     {
       "bindChild": {
-        "agent": "meditator",
+        "agent": "fast-meditator",
         "aliases": [
-          "meditator"
+          "fast-meditator"
         ]
       }
     },
@@ -86,9 +86,9 @@
     },
     {
       "bindChild": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "aliases": [
-          "coder"
+          "fast-coder"
         ]
       }
     },
@@ -109,9 +109,9 @@
     },
     {
       "bindChild": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "aliases": [
-          "reviewer"
+          "fast-reviewer"
         ]
       }
     },
@@ -129,9 +129,9 @@
     },
     {
       "bindChild": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "aliases": [
-          "coder"
+          "fast-coder"
         ]
       }
     },
@@ -149,9 +149,9 @@
     },
     {
       "bindChild": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "aliases": [
-          "reviewer"
+          "fast-reviewer"
         ]
       }
     },
@@ -206,7 +206,7 @@
     {
       "id": "manager-fork-inspector",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat"
@@ -234,7 +234,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "inspector",
+          "agent": "fast-inspector",
           "prompt": "Run executor investigation and return a formal report."
         }
       }
@@ -242,7 +242,7 @@
     {
       "id": "manager-fork-browser",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat"
@@ -270,7 +270,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "browser",
+          "agent": "fast-browser",
           "prompt": "Read AGENTS.md and report architecture constraints."
         }
       }
@@ -278,7 +278,7 @@
     {
       "id": "manager-fork-meditator",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 3,
         "requestKind": "chat"
@@ -306,7 +306,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "meditator",
+          "agent": "fast-meditator",
           "prompt": "Propose a plan without changing the worktree."
         }
       }
@@ -314,7 +314,7 @@
     {
       "id": "inspector-report",
       "lane": {
-        "session": "inspector",
+        "session": "fast-inspector",
         "role": "inspector",
         "turn": 1,
         "requestKind": "chat",
@@ -348,7 +348,7 @@
     {
       "id": "inspector-finished",
       "lane": {
-        "session": "inspector",
+        "session": "fast-inspector",
         "role": "inspector",
         "turn": 2,
         "requestKind": "chat",
@@ -368,7 +368,7 @@
     {
       "id": "browser-report",
       "lane": {
-        "session": "browser",
+        "session": "fast-browser",
         "role": "browser",
         "turn": 1,
         "requestKind": "chat",
@@ -399,7 +399,7 @@
     {
       "id": "browser-finished",
       "lane": {
-        "session": "browser",
+        "session": "fast-browser",
         "role": "browser",
         "turn": 2,
         "requestKind": "chat",
@@ -419,7 +419,7 @@
     {
       "id": "meditator-report",
       "lane": {
-        "session": "meditator",
+        "session": "fast-meditator",
         "role": "meditator",
         "turn": 1,
         "requestKind": "chat",
@@ -450,7 +450,7 @@
     {
       "id": "meditator-finished",
       "lane": {
-        "session": "meditator",
+        "session": "fast-meditator",
         "role": "meditator",
         "turn": 2,
         "requestKind": "chat",
@@ -470,7 +470,7 @@
     {
       "id": "manager-join-1",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 4,
         "requestKind": "chat"
@@ -503,7 +503,7 @@
     {
       "id": "manager-join-2",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 5,
         "requestKind": "chat"
@@ -536,7 +536,7 @@
     {
       "id": "manager-join-3",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 6,
         "requestKind": "chat"
@@ -569,7 +569,7 @@
     {
       "id": "manager-fork-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 7,
         "requestKind": "chat"
@@ -597,7 +597,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Use inspector once, edit src/main.txt to 'patched', report final A."
         }
       }
@@ -605,7 +605,7 @@
     {
       "id": "coder-inspector",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat",
@@ -686,7 +686,7 @@
     {
       "id": "coder-edit",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 2,
         "requestKind": "chat",
@@ -711,7 +711,7 @@
     {
       "id": "coder-finished",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 3,
         "requestKind": "chat",
@@ -732,7 +732,7 @@
     {
       "id": "manager-join-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 8,
         "requestKind": "chat"
@@ -765,7 +765,7 @@
     {
       "id": "manager-fork-reviewer",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 9,
         "requestKind": "chat"
@@ -793,7 +793,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "reviewer",
+          "agent": "fast-reviewer",
           "prompt": "Review current worktree and submit structured verdicts."
         }
       }
@@ -801,7 +801,7 @@
     {
       "id": "review-revise",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -828,7 +828,7 @@
     {
       "id": "reviewer-revise-report",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -848,7 +848,7 @@
     {
       "id": "manager-join-reviewer-revise",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 10,
         "requestKind": "chat"
@@ -881,7 +881,7 @@
     {
       "id": "manager-nudge-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 11,
         "requestKind": "chat"
@@ -909,7 +909,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Apply reviewer REVISE: write CHANGELOG.md with fixed."
         }
       }
@@ -917,7 +917,7 @@
     {
       "id": "coder-fix",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 4,
         "requestKind": "chat",
@@ -942,7 +942,7 @@
     {
       "id": "coder-fix-finished",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 5,
         "requestKind": "chat",
@@ -963,7 +963,7 @@
     {
       "id": "manager-join-coder-fix",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 12,
         "requestKind": "chat"
@@ -996,7 +996,7 @@
     {
       "id": "manager-fork-reviewer-2",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 13,
         "requestKind": "chat"
@@ -1024,7 +1024,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "reviewer",
+          "agent": "fast-reviewer",
           "prompt": "Re-review the fixed tree and submit dual PERFECT."
         }
       }
@@ -1032,7 +1032,7 @@
     {
       "id": "review-perfect-1",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 3,
         "requestKind": "chat",
@@ -1060,7 +1060,7 @@
     {
       "id": "reviewer-after-first-perfect",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 4,
         "requestKind": "chat",
@@ -1084,7 +1084,7 @@
     {
       "id": "review-perfect-confirmed",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 5,
         "requestKind": "chat",
@@ -1108,7 +1108,7 @@
     {
       "id": "reviewer-final-report",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 6,
         "requestKind": "chat",
@@ -1130,7 +1130,7 @@
     {
       "id": "manager-join-reviewer-final",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 14,
         "requestKind": "chat"
@@ -1163,7 +1163,7 @@
     {
       "id": "manager-complete",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 15,
         "requestKind": "chat"

@@ -70,10 +70,11 @@ export class HttpClient {
       return { status: 0, ok: false, data: err.message };
     }
   }
-  async createSession(model = { id: 'test-model', providerID: 'test' }) {
-    const body = typeof model === 'object' && model !== null && (model.model || model.providerID)
-      ? { model }
-      : { model: { id: 'test-model', providerID: 'test' } };
+  async createSession(opts = { model: { id: 'test-model', providerID: 'test' } }) {
+    const model = opts.model || { id: 'test-model', providerID: 'test' };
+    const agent = opts.agent;
+    const body = { model };
+    if (agent) body.agent = agent;
     const res = await this.request('POST', '/api/session', { body });
     if (res.ok && this.onSessionCreated) {
       const sid = res.data?.data?.data?.id || res.data?.data?.id;

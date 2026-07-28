@@ -76,7 +76,7 @@ module HostForkRuntimeTests =
             let! joined = bridge.Join()
 
             match joined with
-            | Ok completion -> Assert.equal("A version output", AgentCompletion.text completion.Outcome)
+            | Ok completion -> Assert.equal ("A version output", AgentCompletion.text completion.Outcome)
             | Error error -> Assert.True(false, sprintf "Expected completion, got %A" error)
 
             let! second = bridge.Reuse("agent-1", "continue")
@@ -142,7 +142,7 @@ module HostForkRuntimeTests =
                         {| ParentId = parentId
                            ChildId = childId
                            TargetAgent = "agent-restored"
-                           Role = Some "Coder" |}
+                           Role = Some "fast-coder" |}
 
                 Assert.True(Result.isOk (AgentJournal.appendAgent (StreamId.Session parentId) None linkFact journal))
 
@@ -173,7 +173,7 @@ module HostForkRuntimeTests =
             let! joined = bridge.Join()
 
             match joined with
-            | Ok completion -> Assert.equal("A version output", AgentCompletion.text completion.Outcome)
+            | Ok completion -> Assert.equal ("A version output", AgentCompletion.text completion.Outcome)
             | Error error -> Assert.True(false, sprintf "Expected completion, got %A" error)
 
             Assert.Equal(0, bridge.PendingRunCount)
@@ -181,23 +181,13 @@ module HostForkRuntimeTests =
         }
 
     [<Fact>]
-    let ``HostForkRuntime_resolves_child_model_from_durable_fallback_projection`` () =
+    let ``HostForkRuntime_sends_agent_without_model_override`` () =
         withTempDir (fun tempDir ->
             task {
                 let parentId = SessionId.create "parent-model"
                 let childId = SessionId.create "child-model"
                 let captured = ResizeArray<OpenCodePromptOptions>()
                 let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
-
-                let config: ModelResolver.ModelConfig =
-                    { SideA =
-                        { providerID = "test"
-                          modelID = "test-model"
-                          variant = None }
-                      SideB =
-                        { providerID = "test"
-                          modelID = "test-model-b"
-                          variant = None } }
 
                 let host =
                     { new ISessionHostPort with
@@ -238,37 +228,17 @@ module HostForkRuntimeTests =
                 use journal =
                     AgentJournal.create tempDir (RuntimeId.create "runtime-model") 1 DateTimeOffset.UtcNow
 
-                let bridge =
-                    HostForkRuntime(parentId, host, journal = journal, modelResolver = config)
+                let bridge = HostForkRuntime(parentId, host, journal = journal)
 
-                let! first = bridge.Fork("agent-model", AgentRole.Coder, "first")
-                Assert.Equal(Ok(ForkResult.Created "agent-model"), first)
-                Assert.Equal(Some config.SideA, captured.[0].Model)
+                let! first = bridge.Fork("agent-model", AgentRole.Coder, "first", agent = "fast-coder")
+                Assert.equal (Ok(ForkResult.Created "agent-model"), first)
+                Assert.equal (None, captured.[0].Model)
+                Assert.equal (Some "fast-coder", captured.[0].Agent)
                 trigger ()
 
-                let appendFailure reason attempt =
-                    AgentJournal.appendAgent
-                        (StreamId.Session childId)
-                        None
-                        (AgentFact.FallbackFailureRecorded
-                            {| SessionId = childId
-                               LogicalRunId = "run-test"
-                               AuthorityRootUserMessageId = "root-test"
-                               Reason = reason
-                               AssistantMessageId = sprintf "test-msg-%s" attempt
-                               ProviderAttempt = attempt |})
-                        journal
-                    |> Result.isOk
-
-                Assert.True(appendFailure "first failure" "1")
                 let! second = bridge.Reuse("agent-model", "second")
-                Assert.Equal(Ok(ForkResult.Nudged "agent-model"), second)
-                Assert.Equal(Some config.SideA, captured.[1].Model)
-                trigger ()
-
-                Assert.True(appendFailure "second failure" "2")
-                let! third = bridge.Reuse("agent-model", "third")
-                Assert.Equal(Ok(ForkResult.Nudged "agent-model"), third)
-                Assert.Equal(Some config.SideB, captured.[2].Model)
+                Assert.equal (Ok(ForkResult.Nudged "agent-model"), second)
+                Assert.True(captured.Count >= 2)
+                Assert.equal (None, captured.[1].Model)
                 trigger ()
             })

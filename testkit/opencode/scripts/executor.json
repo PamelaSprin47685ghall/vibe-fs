@@ -18,7 +18,7 @@
     {
       "id": "inspector-executor",
       "lane": {
-        "session": "inspector",
+        "session": "fast-inspector",
         "role": "inspector",
         "turn": 1,
         "requestKind": "chat"
@@ -61,7 +61,7 @@
     {
       "id": "inspector-final",
       "lane": {
-        "session": "inspector",
+        "session": "fast-inspector",
         "role": "inspector",
         "turn": 2,
         "requestKind": "chat"
@@ -84,14 +84,14 @@
     "strict": true
   },
   "session": {
-    "agent": "inspector",
+    "agent": "fast-inspector",
     "bind": [
       "inspector-title",
-      "inspector"
+      "fast-inspector"
     ]
   },
   "prompt": {
-    "agent": "inspector",
+    "agent": "fast-inspector",
     "text": "Run a large command via executor and summarize."
   },
   "flow": [

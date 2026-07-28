@@ -9,25 +9,25 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
-      "manager"
+      "fast-manager"
     ]
   },
   "flow": [
     {
       "createChild": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "bind": [
           "reviewer-title",
-          "reviewer"
+          "fast-reviewer"
         ],
         "title": "reviewer restart canary"
       }
     },
     {
       "prompt": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "text": "Review the tree and submit a PERFECT verdict."
       },
       "session": "child"
@@ -49,7 +49,7 @@
     },
     {
       "prompt": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "text": "After restart, re-verify the tree with another PERFECT verdict."
       },
       "session": "child"
@@ -92,7 +92,7 @@
     {
       "id": "review-perfect-first",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat"
@@ -114,7 +114,7 @@
     {
       "id": "reviewer-first-turn",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat"
@@ -132,7 +132,7 @@
     {
       "id": "review-perfect-restart",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 3,
         "requestKind": "chat"
@@ -154,7 +154,7 @@
     {
       "id": "reviewer-restart-done",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 4,
         "requestKind": "chat"

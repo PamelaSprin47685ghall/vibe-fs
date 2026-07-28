@@ -50,7 +50,9 @@ module AgentFactsTests =
                 {| ManagerSessionId = sid
                    ReviewerSessionId = sid
                    ProviderRunId = "pr-2"
-                   UserPromptText = Some "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                   UserPromptText =
+                    Some
+                        "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
                    UserMessageId = None
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash
@@ -127,7 +129,7 @@ module AgentFactsTests =
         Assert.Equal(Some(GitTreeHash.create treeHash2), rg.LastGitTreeHash)
 
     [<Fact>]
-    let ``Fallback_cumulative_side_selection_and_death`` () =
+    let ``Fallback_modulo4_cursor_advances_without_death`` () =
         let rt = RuntimeId.create "rt-fallback-1"
         let sid = SessionId.create "session-fallback"
         let t0 = DateTimeOffset.UtcNow
@@ -146,37 +148,36 @@ module AgentFactsTests =
         let env3 = createTestEnv 3L (t0.AddSeconds 2.0) (failFact 3) rt (Some sid)
         let env4 = createTestEnv 4L (t0.AddSeconds 3.0) (failFact 4) rt (Some sid)
 
-        // Step 1: 1st failure -> SideA, 1 failure on current side, total 1, not dead
+        // Step 1: Offset 1 → SideA
         let proj1 = AgentFacts.apply AgentFacts.empty [ env1 ]
         let fb1 = proj1.Sessions.[sid].Fallback.Value
-        Assert.Equal(SideA, fb1.Side)
-        Assert.Equal(1, fb1.FailuresOnCurrentSide)
-        Assert.Equal(1, fb1.TotalFailures)
-        Assert.False(fb1.IsDead)
+        Assert.Equal(1uy, fb1.Offset)
+        Assert.Equal(SideA, FallbackProjection.currentSide fb1)
 
-        // Step 2: 2nd failure -> SideB, 0 failures on SideB, total 2, not dead
+        // Step 2: Offset 2 → SideB
         let proj2 = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
         let fb2 = proj2.Sessions.[sid].Fallback.Value
-        Assert.Equal(SideB, fb2.Side)
-        Assert.Equal(0, fb2.FailuresOnCurrentSide)
-        Assert.Equal(2, fb2.TotalFailures)
-        Assert.False(fb2.IsDead)
+        Assert.Equal(2uy, fb2.Offset)
+        Assert.Equal(SideB, FallbackProjection.currentSide fb2)
 
-        // Step 3: 3rd failure -> SideB, 1 failure on SideB, total 3, not dead
+        // Step 3: Offset 3 → SideB
         let proj3 = AgentFacts.apply AgentFacts.empty [ env1; env2; env3 ]
         let fb3 = proj3.Sessions.[sid].Fallback.Value
-        Assert.Equal(SideB, fb3.Side)
-        Assert.Equal(1, fb3.FailuresOnCurrentSide)
-        Assert.Equal(3, fb3.TotalFailures)
-        Assert.False(fb3.IsDead)
+        Assert.Equal(3uy, fb3.Offset)
+        Assert.Equal(SideB, FallbackProjection.currentSide fb3)
 
-        // Step 4: 4th failure -> SideB, 2 failures on SideB, total 4, IS DEAD!
+        // Step 4: Offset 0 → SideA (wrap; never dead)
         let proj4 = AgentFacts.apply AgentFacts.empty [ env1; env2; env3; env4 ]
         let fb4 = proj4.Sessions.[sid].Fallback.Value
-        Assert.Equal(SideB, fb4.Side)
-        Assert.Equal(2, fb4.FailuresOnCurrentSide)
-        Assert.Equal(4, fb4.TotalFailures)
-        Assert.True(fb4.IsDead)
+        Assert.Equal(0uy, fb4.Offset)
+        Assert.Equal(SideA, FallbackProjection.currentSide fb4)
+
+        // Step 5: continue wrap cycle → Offset 1 / SideA
+        let env5 = createTestEnv 5L (t0.AddSeconds 4.0) (failFact 5) rt (Some sid)
+        let proj5 = AgentFacts.apply AgentFacts.empty [ env1; env2; env3; env4; env5 ]
+        let fb5 = proj5.Sessions.[sid].Fallback.Value
+        Assert.equal (1uy, fb5.Offset)
+        Assert.Equal(SideA, FallbackProjection.currentSide fb5)
 
     [<Fact>]
     let Companion_advanced_and_replacement () =

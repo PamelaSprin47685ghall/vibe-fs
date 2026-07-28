@@ -10,14 +10,14 @@
     "strict": true
   },
   "session": {
-    "agent": "orchestrator",
+    "agent": "fast-orchestrator",
     "bind": [
       "title",
-      "orchestrator"
+      "fast-orchestrator"
     ]
   },
   "prompt": {
-    "agent": "orchestrator",
+    "agent": "fast-orchestrator",
     "text": "Ship publish_proof.txt to the target branch."
   },
   "flow": [
@@ -74,7 +74,7 @@
     },
     {
       "prompt": {
-        "agent": "orchestrator",
+        "agent": "fast-orchestrator",
         "text": "Continue the publish job and join its result."
       }
     },
@@ -126,7 +126,7 @@
     {
       "id": "orch-fork-manager",
       "lane": {
-        "session": "orchestrator",
+        "session": "fast-orchestrator",
         "role": "orchestrator",
         "turn": 1,
         "requestKind": "chat"
@@ -144,14 +144,15 @@
         "type": "tool-call",
         "tool": "fork-manager",
         "args": {
-          "prompt": "Ship publish_proof.txt to the target branch."
+          "prompt": "Ship publish_proof.txt to the target branch.",
+          "agent": "fast-manager"
         }
       }
     },
     {
       "id": "orch-join",
       "lane": {
-        "session": "orchestrator",
+        "session": "fast-orchestrator",
         "role": "orchestrator",
         "turn": 2,
         "requestKind": "chat"
@@ -174,7 +175,7 @@
     {
       "id": "orch-join-2",
       "lane": {
-        "session": "orchestrator",
+        "session": "fast-orchestrator",
         "role": "orchestrator",
         "turn": 3,
         "requestKind": "chat"
@@ -197,7 +198,7 @@
     {
       "id": "orch-final",
       "lane": {
-        "session": "orchestrator",
+        "session": "fast-orchestrator",
         "role": "orchestrator",
         "turn": 4,
         "requestKind": "chat"
@@ -219,7 +220,7 @@
     {
       "id": "manager-fork-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat",
@@ -236,7 +237,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Write publish_proof.txt."
         }
       }
@@ -244,7 +245,7 @@
     {
       "id": "manager-join-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat",
@@ -266,7 +267,7 @@
     {
       "id": "manager-terminal",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 3,
         "requestKind": "chat",
@@ -287,7 +288,7 @@
     {
       "id": "coder-write",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat",
@@ -310,7 +311,7 @@
     {
       "id": "coder-terminal",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 2,
         "requestKind": "chat",
@@ -325,7 +326,7 @@
     {
       "id": "manager-conflict-resume",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 4,
         "requestKind": "chat",
@@ -342,7 +343,7 @@
     {
       "id": "manager-conflict-resume-2",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 5,
         "requestKind": "chat",
@@ -419,7 +420,7 @@
     {
       "id": "reviewer-perfect-1",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -444,7 +445,7 @@
     {
       "id": "reviewer-perfect-2",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -469,7 +470,7 @@
     {
       "id": "reviewer-perfect-3",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -494,7 +495,7 @@
     {
       "id": "reviewer-perfect-4",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -519,7 +520,7 @@
     {
       "id": "reviewer-perfect-5",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -544,7 +545,7 @@
     {
       "id": "reviewer-perfect-6",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -569,7 +570,7 @@
     {
       "id": "reviewer-perfect-7",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -594,7 +595,7 @@
     {
       "id": "reviewer-perfect-8",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -619,7 +620,7 @@
     {
       "id": "reviewer-perfect-9",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -644,7 +645,7 @@
     {
       "id": "reviewer-perfect-10",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -669,7 +670,7 @@
     {
       "id": "reviewer-perfect-11",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -694,7 +695,7 @@
     {
       "id": "reviewer-perfect-12",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",

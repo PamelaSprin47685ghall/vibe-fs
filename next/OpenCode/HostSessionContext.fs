@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel
@@ -7,21 +8,13 @@ open Wanxiangshu.Next.Session
 
 module HostSessionContext =
 
+    /// Resolve AgentRole from Host Agent identity (fast-ROLE / deep-ROLE) or Canonical Role.
+    /// build/plan aliases remain rejected.
     let roleOf (agent: string) =
-        match if isNull agent then "" else agent.Trim().ToLowerInvariant() with
-        | "manager"
-        | "build"
-        | "plan" -> Some AgentRole.Manager
-        | "orchestrator" -> Some AgentRole.Orchestrator
-        | "coder" -> Some AgentRole.Coder
-        | "inspector" -> Some AgentRole.Inspector
-        | "browser" -> Some AgentRole.Browser
-        | "meditator" -> Some AgentRole.Meditator
-        | "reviewer" -> Some AgentRole.Reviewer
-        | "devops" -> Some AgentRole.DevOps
-        | "executor" -> Some AgentRole.Executor
-        | "blogger" -> Some AgentRole.Blogger
-        | _ -> None
+        if isNull agent || String.IsNullOrWhiteSpace agent then
+            None
+        else
+            AgentRoleHelpers.roleOfString agent
 
     let canonicalRole (agent: string) =
         roleOf agent |> Option.map (fun role -> role.ToString().ToLowerInvariant())

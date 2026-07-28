@@ -214,14 +214,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "primary-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Produce the first projection for Orchestrator X."
   },
   "flow": [

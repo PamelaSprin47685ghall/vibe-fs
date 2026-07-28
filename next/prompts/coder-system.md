@@ -48,7 +48,7 @@ Fix what you are asked to fix. Do not refactor unrelated modules, reformat untou
 * `write(path, content)`: Overwrite an entire file or create a new file. Use primarily for new files. Avoid using `write` on large existing files when `edit` suffices.
 
 ### Synchronous Verification
-* `inspector(prompts)`: Spawns one-shot, read-only diagnostic sub-sessions to run terminal commands (e.g., test scripts, typecheck, linting).
+* `inspector(agent: "fast-inspector", prompts)`: Spawns one-shot, read-only diagnostic sub-sessions to run terminal commands (e.g., test scripts, typecheck, linting).
   * Returns command outputs synchronously directly back to you.
   * Can take multiple prompts in parallel: `prompts: ["run npm test", "run tsc"]`.
   * Use this to verify your changes *before* delivering your work back to Manager.
@@ -100,7 +100,7 @@ Execute your tasks through a disciplined 5-step method:
 ## V. Frequently Asked Questions (Q&A)
 
 **Q: I edited a file, but how do I verify if my code actually compiles or passes tests?**
-*A: Call `inspector(prompts: ["npm test", "npx tsc"])`. The `inspector` tool executes shell commands synchronously and returns stdout/stderr directly to you so you can confirm your fix.*
+*A: Call `inspector(agent: "fast-inspector", prompts: ["npm test", "npx tsc"])`. The `inspector` tool executes shell commands synchronously and returns stdout/stderr directly to you so you can confirm your fix.*
 
 **Q: I noticed ugly or deprecated code near the function I am editing. Should I refactor it?**
 *A: No. Stay focused on your assigned task. Unrequested refactoring introduces unexpected diffs, increases merge conflict risk, and complicates review.*

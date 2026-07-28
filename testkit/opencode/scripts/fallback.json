@@ -1,9 +1,5 @@
 {
   "scenario": "fallback",
-  "env": {
-    "WANXIANGSHU_MODEL_A": "test/test-model",
-    "WANXIANGSHU_MODEL_B": "test/test-model-b"
-  },
   "scripts": [
     {
       "id": "coder-title",
@@ -40,7 +36,7 @@
     {
       "id": "round1-failure",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat"
@@ -69,7 +65,7 @@
     {
       "id": "round1-retry",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 2,
         "requestKind": "chat"
@@ -89,7 +85,7 @@
     {
       "id": "round2-failure",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 3,
         "requestKind": "chat"
@@ -118,7 +114,7 @@
     {
       "id": "round2-retry",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 4,
         "requestKind": "chat"
@@ -138,7 +134,7 @@
     {
       "id": "round3-failure",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 5,
         "requestKind": "chat"
@@ -167,7 +163,7 @@
     {
       "id": "round3-retry",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 6,
         "requestKind": "chat"
@@ -187,7 +183,7 @@
     {
       "id": "round4-failure",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 7,
         "requestKind": "chat"
@@ -216,7 +212,7 @@
     {
       "id": "round4-retry",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 8,
         "requestKind": "chat"
@@ -238,23 +234,19 @@
     "project": {
       "files": {}
     },
-    "strict": true,
-    "env": {
-      "WANXIANGSHU_MODEL_A": "test/test-model",
-      "WANXIANGSHU_MODEL_B": "test/test-model-b"
-    }
+    "strict": true
   },
   "session": {
-    "agent": "coder",
+    "agent": "fast-coder",
     "bind": [
       "coder-title",
-      "coder"
+      "fast-coder"
     ]
   },
   "flow": [
     {
       "prompt": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "text": "Round 1 fallback attempt.",
         "model": {
           "providerID": "test",
@@ -295,7 +287,7 @@
     },
     {
       "prompt": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "text": "Round 2 fallback attempt.",
         "model": {
           "providerID": "test",
@@ -339,7 +331,7 @@
     },
     {
       "prompt": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "text": "Round 3 fallback attempt.",
         "omitModel": true
       }
@@ -377,7 +369,7 @@
     },
     {
       "prompt": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "text": "Round 4 fallback attempt.",
         "omitModel": true
       }
@@ -417,5 +409,5 @@
       "expectSatisfied": true
     }
   ],
-  "pass": "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root. Same-run provider-visible A→A→B→B remains final No-Go evidence (see docs/evidence)."
+  "pass": "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root. Same-run provider-visible A\u2192A\u2192B\u2192B remains final No-Go evidence (see docs/evidence)."
 }

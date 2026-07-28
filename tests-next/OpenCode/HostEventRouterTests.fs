@@ -86,7 +86,7 @@ module HostEventRouterTests =
         with
         | Some session ->
             session.Fallback
-            |> Option.map (fun fb -> fb.TotalFailures)
+            |> Option.map (fun fb -> List.length fb.RecentFailureIds)
             |> Option.defaultValue 0
         | None -> 0
 
@@ -192,7 +192,7 @@ module HostEventRouterTests =
                 Assert.Equal(1, fallbackFailures journal sessionId)
 
                 // A genuinely new user turn is a new Logical Run / Fallback epoch.
-                // Projection TotalFailures resets to 1 (not session-cumulative).
+                // RecentFailureIds for the new epoch starts at 1 (not session-cumulative).
                 userBindings.[sessionId] <- MessageId.create "user-2"
 
                 RetrySignalHandler.handle

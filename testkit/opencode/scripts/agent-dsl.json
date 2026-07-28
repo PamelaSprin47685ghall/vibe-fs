@@ -18,7 +18,7 @@
     {
       "id": "manager-fork-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat"
@@ -43,7 +43,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Write canary_output.txt with exactly Coder canary slice OK\\n, then report completion."
         }
       }
@@ -51,7 +51,7 @@
     {
       "id": "coder-write",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat",
@@ -74,7 +74,7 @@
     {
       "id": "coder-finished",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 2,
         "requestKind": "chat",
@@ -93,7 +93,7 @@
     {
       "id": "manager-join-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat"
@@ -123,7 +123,7 @@
     {
       "id": "manager-joined-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 3,
         "requestKind": "chat"
@@ -193,14 +193,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "manager-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Delegate this canary to a Coder with fork, join the Coder, and report the result."
   },
   "flow": [
@@ -209,9 +209,9 @@
     },
     {
       "bindChild": {
-        "agent": "coder",
+        "agent": "fast-coder",
         "aliases": [
-          "coder"
+          "fast-coder"
         ]
       }
     },

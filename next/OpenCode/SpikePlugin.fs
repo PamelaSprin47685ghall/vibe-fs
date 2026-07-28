@@ -48,10 +48,7 @@ module SpikePlugin =
 
                 let sessionBudgets = Dictionary<string, int>()
                 let sessionOutputLimits = Dictionary<string, int>()
-                let bloggerModel = ModelResolver.bloggerModelFromEnv ()
                 let mutable toolSurfaceRef: obj option = None
-
-                let modelConfig = ModelResolver.fromEnv ()
 
                 let disposeExecutorRuntimeCb (sid: string) =
                     match toolSurfaceRef with
@@ -74,7 +71,6 @@ module SpikePlugin =
                         userMessageBindings
                         fallbackFailures
                         disposeExecutorRuntimeCb
-                        modelConfig
                         input
 
                 let bindRunStarted =
@@ -120,7 +116,6 @@ module SpikePlugin =
                         sessionBudgets
                         sessionOutputLimits
                         sessionRoles
-                        bloggerModel
                         (Some(fun bloggerId ->
                             // Register ownership + ActiveRun so idle→reconcile
                             // emits TerminalOutcome.Completed for this child.
@@ -129,7 +124,7 @@ module SpikePlugin =
                         inObj
                         outObj
 
-                let chatParams = ChatParamsHook.create journal modelConfig
+                let chatParams = ChatParamsHook.create journal
 
                 let hooks =
                     createObj
@@ -140,8 +135,8 @@ module SpikePlugin =
                           "hostEventsSubscription", box wired.Subscription
                           "bindRunStarted", bindRunStarted
                           "chat.message", box (uncurriedExecute wired.ChatMessageHook)
-                          // Host built-in retry reuses the same user message; inject
-                          // DurableFallback EffectiveModel on every provider attempt.
+                          // Host built-in retry reuses the same user message;
+                          // 0.5.0 relies on Agent bindings — chat.params is a no-op.
                           "chat.params", box (uncurriedExecute chatParams)
                           "chat.transform", box (uncurriedExecute (box transform))
                           // Both hooks are registered for compatibility: some
@@ -196,7 +191,6 @@ module SpikePlugin =
                                 wired.CurrentPhysicalUserMessage
                                 verdictSessions
                                 sessionDirectories
-                                modelConfig
                                 onRunStarted
                                 backgroundBFor
                                 snapshotOpt

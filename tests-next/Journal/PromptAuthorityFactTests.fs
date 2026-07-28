@@ -17,10 +17,10 @@ module PromptAuthorityFactTests =
                    LogicalRunId = "run-1"
                    HostMessageId = "human-root"
                    AuthorityKind = "HumanRoot"
-                   Agent = "manager"
-                   BaseProviderID = Some "provider"
-                   BaseModelID = Some "model-a"
-                   Variant = None |}
+                   SelectedAgent = "fast-manager"
+                   PeerAgent = "deep-manager"
+                   CanonicalRole = "manager"
+                   SelectedTier = "Fast" |}
 
         let claim =
             AgentFact.PluginPromptClaimed
@@ -29,10 +29,7 @@ module PromptAuthorityFactTests =
                    LogicalRunId = "run-1"
                    AuthorityRootUserMessageId = "human-root"
                    ContinuationKind = "InteractionRepair"
-                   Agent = Some "manager"
-                   EffectiveProviderID = Some "provider"
-                   EffectiveModelID = Some "model-b"
-                   Variant = None |}
+                   EffectiveAgent = Some "fast-manager" |}
 
         let accepted =
             AgentFact.PluginPromptAccepted
@@ -54,5 +51,28 @@ module PromptAuthorityFactTests =
             |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
         )
 
-        Assert.Equal(Some "InteractionRepair", Map.tryFind "repair-physical" authority.AcceptedContinuationIds)
+        Assert.equal (
+            Some "fast-manager",
+            authority.LastAuthorityProfile
+            |> Option.map (fun profile -> profile.SelectedAgent)
+        )
+
+        Assert.equal (
+            Some "deep-manager",
+            authority.LastAuthorityProfile |> Option.map (fun profile -> profile.PeerAgent)
+        )
+
+        Assert.equal (
+            Some "manager",
+            authority.LastAuthorityProfile
+            |> Option.map (fun profile -> profile.CanonicalRole)
+        )
+
+        Assert.equal (
+            Some "Fast",
+            authority.LastAuthorityProfile
+            |> Option.map (fun profile -> profile.SelectedTier)
+        )
+
+        Assert.equal (Some "InteractionRepair", Map.tryFind "repair-physical" authority.AcceptedContinuationIds)
         Assert.Empty(authority.PendingClaims)

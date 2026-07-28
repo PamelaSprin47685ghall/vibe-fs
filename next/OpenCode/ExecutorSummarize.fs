@@ -6,6 +6,7 @@ open System.Text
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Fable.Core
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
@@ -15,22 +16,10 @@ module ExecutorSummarize =
     [<Literal>]
     let ReduceFanIn = 8
 
-    /// Private mailbox surface: fork Executor + Join. Never Manager Join.
-    type IExecutorRuntime =
-        abstract Fork: string * AgentRole * string -> Task<Result<ForkResult, string>>
-        abstract Join: unit -> Task<Result<RunCompletion, ForkError>>
+    type IExecutorRuntime = ExecutorSummarizeRuntime.IExecutorRuntime
 
-    let asExecutorRuntime (runtime: HostForkRuntime) : IExecutorRuntime =
-        { new IExecutorRuntime with
-            member _.Fork(agentId, role, prompt) = runtime.Fork(agentId, role, prompt)
-            member _.Join() = runtime.Join() }
-
-    let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
-        { new IExecutorRuntime with
-            member _.Fork(agentId, role, prompt) =
-                task { return Ok(runtime.Fork(agentId, role, prompt = prompt)) }
-
-            member _.Join() = runtime.Join() }
+    let asExecutorRuntime = ExecutorSummarizeRuntime.asExecutorRuntime
+    let ofForkRuntime = ExecutorSummarizeRuntime.ofForkRuntime
 
     [<Import("createHash", "node:crypto")>]
     let private createHashImport: string -> obj = jsNative
@@ -76,8 +65,7 @@ module ExecutorSummarize =
                     | Ok completion when completion.AgentId = agentId ->
                         result <- completion
                         done' <- true
-                    | Ok completion ->
-                        lock stash (fun () -> stash.[completion.AgentId] <- completion)
+                    | Ok completion -> lock stash (fun () -> stash.[completion.AgentId] <- completion)
 
                 return result
         }
@@ -273,10 +261,7 @@ module ExecutorSummarize =
                         return sprintf "partial summary unavailable\n--- raw tail ---\n%s" rawTail
                     else
                         return
-                            sprintf
-                                "%s\n--- partial: map/reduce incomplete ---\n--- raw tail ---\n%s"
-                                reduced
-                                rawTail
+                            sprintf "%s\n--- partial: map/reduce incomplete ---\n--- raw tail ---\n%s" reduced rawTail
             with ex ->
                 let lastChunk =
                     if chunks.Count = 0 then
@@ -286,9 +271,5 @@ module ExecutorSummarize =
 
                 let rawTail = Encoding.UTF8.GetString lastChunk
 
-                return
-                    sprintf
-                        "partial summary (reduce failed: %s)\n--- raw tail ---\n%s"
-                        ex.Message
-                        rawTail
+                return sprintf "partial summary (reduce failed: %s)\n--- raw tail ---\n%s" ex.Message rawTail
         }

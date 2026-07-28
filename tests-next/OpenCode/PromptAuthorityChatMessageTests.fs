@@ -29,16 +29,19 @@ module PromptAuthorityChatMessageTests =
             member _.CreateChildSession(_, _) = Task.FromResult(Error "not used")
             member _.GetSessionOutput(_) = []
 
+    let private expectAuthorityRoot runtime session kind messageId selectedAgent =
+        match PromptAuthority.createAuthorityRoot runtime session kind messageId selectedAgent with
+        | Ok profile -> profile
+        | Error error ->
+            Assert.True(false, sprintf "createAuthorityRoot failed: %s" error)
+            failwith error
+
     let private seedReviewer (journal: AgentJournal) runtime sessionId humanRoot =
         let profile =
-            PromptAuthority.createAuthorityRoot
-                runtime
-                sessionId
-                PromptAuthority.HumanRoot
-                humanRoot
-                "reviewer"
-                None
-                None
+            expectAuthorityRoot runtime sessionId PromptAuthority.HumanRoot humanRoot "deep-reviewer"
+
+        Assert.equal ("deep-reviewer", profile.SelectedAgent)
+        Assert.equal ("fast-reviewer", profile.PeerAgent)
 
         let svc = PromptDispatcher.forJournal journal
         svc.RegisterAuthority profile
@@ -51,7 +54,7 @@ module PromptAuthorityChatMessageTests =
                     "PERFECT requires confirmation."
                     PromptAuthority.ReviewConfirmation
                     profile
-                    None
+                    (PromptAuthority.selectedEffectiveAgent profile)
                     None
                     None
 
@@ -81,6 +84,10 @@ module PromptAuthorityChatMessageTests =
                 Some(MessageId.value humanRoot),
                 proj.LastAuthorityProfile |> Option.map (fun p -> p.AuthorityRootUserMessageId)
             )
+
+            Assert.equal (Some "deep-reviewer", proj.LastAuthorityProfile |> Option.map (fun p -> p.SelectedAgent))
+
+            Assert.equal (Some "fast-reviewer", proj.LastAuthorityProfile |> Option.map (fun p -> p.PeerAgent))
 
             Assert.True(proj.AcceptedContinuationIds.ContainsKey messageId)
             Assert.True(bound.Exists(fun (kind, _) -> kind = "cont"))
@@ -114,12 +121,11 @@ module PromptAuthorityChatMessageTests =
                             (fun sid mid -> bound.Add(("root", sid + ":" + mid)))
                             (fun sid mid -> bound.Add(("cont", sid + ":" + mid)))
                             (fun _ -> ())
-                            None
                     )
 
                 let output =
                     createObj
-                        [ "message", createObj [ "id", box "physical-confirm-1"; "agent", box "reviewer" ]
+                        [ "message", createObj [ "id", box "physical-confirm-1"; "agent", box "deep-reviewer" ]
                           "parts",
                           box
                               [| createObj
@@ -134,7 +140,7 @@ module PromptAuthorityChatMessageTests =
                     (createObj
                         [ "sessionID", box "s-reviewer"
                           "messageID", box "physical-confirm-1"
-                          "agent", box "reviewer" ])
+                          "agent", box "deep-reviewer" ])
                     output
 
                 assertContinuation journal session humanRoot "physical-confirm-1" bound
@@ -162,16 +168,15 @@ module PromptAuthorityChatMessageTests =
                             (fun sid mid -> bound.Add(("root", sid + ":" + mid)))
                             (fun sid mid -> bound.Add(("cont", sid + ":" + mid)))
                             (fun _ -> ())
-                            None
                     )
 
                 hook
                     (createObj
                         [ "sessionID", box "s-confirm"
                           "messageID", box "physical-confirm-bare"
-                          "agent", box "reviewer" ])
+                          "agent", box "deep-reviewer" ])
                     (createObj
-                        [ "message", createObj [ "id", box "physical-confirm-bare"; "agent", box "reviewer" ]
+                        [ "message", createObj [ "id", box "physical-confirm-bare"; "agent", box "deep-reviewer" ]
                           "parts",
                           box [| createObj [ "type", box "text"; "text", box "PERFECT requires confirmation." ] |] ])
 

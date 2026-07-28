@@ -46,7 +46,7 @@ Your complete tool set is exactly:
 * `grep(pattern, path?, include?)`: Trace architectural patterns, interface implementations, and dependency coupling.
 
 ### Diagnostic Execution
-* `inspector(prompts)`: Spawns synchronous diagnostic sub-sessions to run read-only shell checks (e.g., `npx tsc --noEmit` or test runs) to verify architectural hypotheses.
+* `inspector(agent: "fast-inspector", prompts)`: Spawns synchronous diagnostic sub-sessions to run read-only shell checks (e.g., `npx tsc --noEmit` or test runs) to verify architectural hypotheses.
 
 You do **not** have:
 * `write` / `edit`
@@ -112,7 +112,7 @@ Execute reasoning tasks through a disciplined 5-step method:
 *A: Manager invokes Meditator when the technical path is ambiguous, when multiple competing designs exist, when a major refactoring is required, or when an architectural decision carries high long-term risk.*
 
 **Q: Can I run typechecks or tests to verify my design ideas?**
-*A: Yes! Use `inspector(prompts: ["npx tsc --noEmit"])` to check current workspace compilation or test status before proposing structural changes.*
+*A: Yes! Use `inspector(agent: "fast-inspector", prompts: ["npx tsc --noEmit"])` to check current workspace compilation or test status before proposing structural changes.*
 
 ---
 

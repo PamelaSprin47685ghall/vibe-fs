@@ -70,7 +70,6 @@ module HostReviewGuard =
         (reason: string)
         (prompt: string)
         (agent: string)
-        (model: OpencodeModel option)
         (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         let journal =
@@ -94,12 +93,13 @@ module HostReviewGuard =
                 | "reviewer", _ -> PromptAuthority.ReviewerGuard
                 | _ -> PromptAuthority.ManagerGuard
 
+            // 0.5.0: Model=None; HostSessionNudge binds Agent from Authority.
             HostSessionNudge.sendContinuation
                 sessionPort
                 targetSessionId
                 prompt
                 continuationKind
-                { Model = model
+                { Model = None
                   Agent = Some agent
                   Directory = None
                   Metadata = None }
@@ -135,7 +135,6 @@ module HostReviewGuard =
         sessionId
         messageId
         treeHash
-        (model: OpencodeModel option)
         (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         sendGuardNudge
@@ -147,7 +146,6 @@ module HostReviewGuard =
             (sprintf "missing-review:%s" treeHash)
             "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
             "manager"
-            model
             onContinuationAccepted
 
     let nudgeReviewer
@@ -156,7 +154,6 @@ module HostReviewGuard =
         (nudgeKeys: HashSet<string>)
         sessionId
         messageId
-        (model: OpencodeModel option)
         (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         sendGuardNudge
@@ -168,7 +165,6 @@ module HostReviewGuard =
             "missing-verdict"
             "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
             "reviewer"
-            model
             onContinuationAccepted
 
     /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07).
@@ -180,7 +176,6 @@ module HostReviewGuard =
         (nudgeKeys: HashSet<string>)
         sessionId
         messageId
-        (model: OpencodeModel option)
         (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         sendGuardNudge
@@ -192,5 +187,4 @@ module HostReviewGuard =
             "confirm-perfect"
             "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
             "reviewer"
-            model
             onContinuationAccepted

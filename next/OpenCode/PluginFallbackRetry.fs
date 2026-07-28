@@ -39,19 +39,11 @@ module PluginFallbackRetry =
 
     let private nextProviderAttempt (fallback: FallbackProjection option) =
         match fallback with
-        | Some fb -> string (fb.TotalFailures + 1)
+        | Some fb ->
+            match fb.LastProviderAttempt with
+            | Some n -> string (n + 1L)
+            | None -> string (int fb.Offset + 1)
         | None -> "1"
-
-    let private effectiveModel
-        (modelConfig: ModelResolver.ModelConfig option)
-        (sessionId: SessionId)
-        (journal: AgentJournal)
-        =
-        match modelConfig with
-        | None ->
-            ModelResolver.fromEnv ()
-            |> Option.bind (fun cfg -> ModelResolver.resolveForSession cfg sessionId (AgentJournal.snapshot journal))
-        | Some cfg -> ModelResolver.resolveForSession cfg sessionId (AgentJournal.snapshot journal)
 
     let private tryRemovePending (key: string) =
         lock pendingGate (fun () ->
@@ -73,7 +65,6 @@ module PluginFallbackRetry =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recorded: HashSet<string>)
-        (modelConfig: ModelResolver.ModelConfig option)
         (sessionId: SessionId)
         (assistantMessageId: MessageId)
         (error: string)
@@ -81,7 +72,6 @@ module PluginFallbackRetry =
         (onAccepted: (MessageId -> unit) option)
         : bool =
         let _ = sessionPort
-        let _ = modelConfig
         let _ = onAccepted
 
         if autoFallbackDisabled () then
@@ -105,13 +95,6 @@ module PluginFallbackRetry =
                         error
 
                 match decision with
-                | FallbackDecision.Dead ->
-                    tryRemovePending (SessionId.value sessionId) |> ignore
-
-                    eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed "LOGICAL_RUN_DEAD")
-                    |> ignore
-
-                    true
                 | FallbackDecision.NextAttempt _ ->
                     setPending
                         (SessionId.value sessionId)
@@ -125,37 +108,32 @@ module PluginFallbackRetry =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (modelConfig: ModelResolver.ModelConfig option)
         (sessionId: SessionId)
         (onAccepted: (MessageId -> unit) option)
         (pendingRetry: PendingRetry)
         : bool =
+        let _ = eventPort
+
         if autoFallbackDisabled () then
             false
         else
             match journal with
             | None -> false
-            | Some j ->
-                match effectiveModel modelConfig sessionId j with
-                | None ->
-                    eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed "LOGICAL_RUN_DEAD")
-                    |> ignore
+            | Some _ ->
+                // 0.5.0: Agent=Some effectiveAgent via HostSessionNudge; Model=None.
+                HostSessionNudge.sendContinuation
+                    sessionPort
+                    sessionId
+                    "Continue after provider failure."
+                    PromptAuthority.ProviderRetryAttempt
+                    { Model = None
+                      Agent = None
+                      Directory = pendingRetry.Directory
+                      Metadata = None }
+                    journal
+                    onAccepted
 
-                    true
-                | Some model ->
-                    HostSessionNudge.sendContinuation
-                        sessionPort
-                        sessionId
-                        "Continue after provider failure."
-                        PromptAuthority.ProviderRetryAttempt
-                        { Model = Some model
-                          Agent = None
-                          Directory = pendingRetry.Directory
-                          Metadata = None }
-                        journal
-                        onAccepted
-
-                    true
+                true
 
     /// Debounced flush: each SessionIdle reschedules. Only the last quiet period
     /// after host teardown removes pending and sends ProviderRetryAttempt.
@@ -163,7 +141,6 @@ module PluginFallbackRetry =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (modelConfig: ModelResolver.ModelConfig option)
         (sessionId: SessionId)
         (onAccepted: (MessageId -> unit) option)
         (settleMs: int)
@@ -187,7 +164,7 @@ module PluginFallbackRetry =
                         match tryRemovePending key with
                         | None -> ()
                         | Some pendingRetry ->
-                            sendPending sessionPort eventPort journal modelConfig sessionId onAccepted pendingRetry
+                            sendPending sessionPort eventPort journal sessionId onAccepted pendingRetry
                             |> ignore)
 
                 flushTimers.[key] <- timer)
@@ -197,9 +174,8 @@ module PluginFallbackRetry =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (modelConfig: ModelResolver.ModelConfig option)
         (sessionId: SessionId)
         (onAccepted: (MessageId -> unit) option)
         : bool =
-        scheduleFlushOnIdle sessionPort eventPort journal modelConfig sessionId onAccepted 250
+        scheduleFlushOnIdle sessionPort eventPort journal sessionId onAccepted 250
         hasPending (SessionId.value sessionId)

@@ -6,19 +6,37 @@ open Wanxiangshu.Next.Kernel.Fact
 
 module PromptAuthorityAccept =
 
+    let private persistAuthorityRoot
+        (persist: SessionId -> TurnId option -> AgentFact -> Result<unit, string>)
+        (sessionId: SessionId)
+        (messageId: MessageId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (authorityKind: string)
+        =
+        persist
+            sessionId
+            (Some(TurnId.ofMessageId messageId))
+            (AgentFact.AuthorityRootAccepted
+                {| SessionId = sessionId
+                   LogicalRunId = profile.LogicalRunId
+                   HostMessageId = MessageId.value messageId
+                   AuthorityKind = authorityKind
+                   SelectedAgent = profile.SelectedAgent
+                   PeerAgent = profile.PeerAgent
+                   CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
+                   SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |})
+
     let acceptHumanRoot
         (runtimeId: string)
         (persist: SessionId -> TurnId option -> AgentFact -> Result<unit, string>)
         (update: (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection) -> unit)
-        (read: (PromptAuthority.PromptAuthorityProjection -> Result<PromptAuthority.AuthorityExecutionProfile, string>) -> Result<PromptAuthority.AuthorityExecutionProfile, string>)
+        (read:
+            (PromptAuthority.PromptAuthorityProjection -> Result<PromptAuthority.AuthorityExecutionProfile, string>)
+                -> Result<PromptAuthority.AuthorityExecutionProfile, string>)
         (sessionId: SessionId)
         (messageId: MessageId)
         (explicitAgent: string option)
-        (explicitModel: OpencodeModel option)
-        (explicitVariant: string option)
         (hostAgent: string option)
-        (hostModel: OpencodeModel option)
-        (hostVariant: string option)
         : Result<PromptAuthority.AuthorityExecutionProfile, string> =
         let built =
             read (fun auth ->
@@ -26,52 +44,27 @@ module PromptAuthorityAccept =
 
                 let agent =
                     explicitAgent
-                    |> Option.orElse (last |> Option.map (fun p -> p.Agent))
+                    |> Option.orElse (last |> Option.map (fun p -> p.SelectedAgent))
                     |> Option.orElse hostAgent
 
                 match agent with
-                | None -> Error "HumanRoot requires agent from explicit input, LastAuthority, or host default"
+                | None ->
+                    Error
+                        "HumanRoot requires explicit managed agent (fast-* / deep-*) from input, LastAuthority, or host default"
                 | Some agentValue ->
-                    let model =
-                        explicitModel
-                        |> Option.orElse (last |> Option.bind (fun p -> p.BaseModel))
-                        |> Option.orElse hostModel
-
-                    let variant =
-                        explicitVariant
-                        |> Option.orElse (last |> Option.bind (fun p -> p.Variant))
-                        |> Option.orElse hostVariant
-
-                    Ok(
-                        PromptAuthority.createAuthorityRoot
-                            runtimeId
-                            sessionId
-                            PromptAuthority.HumanRoot
-                            messageId
-                            agentValue
-                            model
-                            variant
-                    ))
+                    PromptAuthority.createAuthorityRoot
+                        runtimeId
+                        sessionId
+                        PromptAuthority.HumanRoot
+                        messageId
+                        agentValue)
 
         match built with
         | Error e -> Error e
         | Ok profile ->
             update (PromptAuthority.registerAuthority profile)
 
-            match
-                persist
-                    sessionId
-                    (Some(TurnId.ofMessageId messageId))
-                    (AgentFact.AuthorityRootAccepted
-                        {| SessionId = sessionId
-                           LogicalRunId = profile.LogicalRunId
-                           HostMessageId = MessageId.value messageId
-                           AuthorityKind = "HumanRoot"
-                           Agent = profile.Agent
-                           BaseProviderID = profile.BaseModel |> Option.map (fun m -> m.providerID)
-                           BaseModelID = profile.BaseModel |> Option.map (fun m -> m.modelID)
-                           Variant = profile.Variant |})
-            with
+            match persistAuthorityRoot persist sessionId messageId profile "HumanRoot" with
             | Error e -> Error e
             | Ok() -> Ok profile
 
@@ -79,7 +72,9 @@ module PromptAuthorityAccept =
         (runtimeId: string)
         (persist: SessionId -> TurnId option -> AgentFact -> Result<unit, string>)
         (update: (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection) -> unit)
-        (read: (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptClaim option) -> PromptAuthority.PromptClaim option)
+        (read:
+            (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptClaim option)
+                -> PromptAuthority.PromptClaim option)
         (promptKey: string)
         (sessionId: SessionId)
         (hostMessageId: MessageId)
@@ -89,57 +84,46 @@ module PromptAuthorityAccept =
         match read (fun auth -> Map.tryFind key auth.PendingClaims) with
         | None -> Error(sprintf "Unknown AgentOwnerRoot claim: %s" promptKey)
         | Some claim ->
-            match claim.Origin, claim.Agent with
+            match claim.Origin, claim.EffectiveAgent with
             | PromptAuthority.AuthorityRoot PromptAuthority.AgentOwnerRoot, Some agent ->
-                let profile =
+                match
                     PromptAuthority.createAuthorityRoot
                         runtimeId
                         sessionId
                         PromptAuthority.AgentOwnerRoot
                         hostMessageId
                         agent
-                        claim.EffectiveModel
-                        claim.Variant
-
-                match
-                    persist
-                        sessionId
-                        None
-                        (AgentFact.PluginPromptAccepted
-                            {| PromptKey = promptKey
-                               SessionId = sessionId
-                               HostMessageId = MessageId.value hostMessageId |})
                 with
                 | Error error -> Error error
-                | Ok() ->
+                | Ok profile ->
                     match
                         persist
                             sessionId
-                            (Some(TurnId.ofMessageId hostMessageId))
-                            (AgentFact.AuthorityRootAccepted
-                                {| SessionId = sessionId
-                                   LogicalRunId = profile.LogicalRunId
-                                   HostMessageId = MessageId.value hostMessageId
-                                   AuthorityKind = "AgentOwnerRoot"
-                                   Agent = agent
-                                   BaseProviderID = profile.BaseModel |> Option.map (fun m -> m.providerID)
-                                   BaseModelID = profile.BaseModel |> Option.map (fun m -> m.modelID)
-                                   Variant = profile.Variant |})
+                            None
+                            (AgentFact.PluginPromptAccepted
+                                {| PromptKey = promptKey
+                                   SessionId = sessionId
+                                   HostMessageId = MessageId.value hostMessageId |})
                     with
                     | Error error -> Error error
                     | Ok() ->
-                        update (fun auth ->
-                            auth
-                            |> PromptAuthority.acceptClaim key hostMessageId
-                            |> PromptAuthority.registerAuthority profile)
+                        match persistAuthorityRoot persist sessionId hostMessageId profile "AgentOwnerRoot" with
+                        | Error error -> Error error
+                        | Ok() ->
+                            update (fun auth ->
+                                auth
+                                |> PromptAuthority.acceptClaim key hostMessageId
+                                |> PromptAuthority.registerAuthority profile)
 
-                        Ok profile
+                            Ok profile
             | _ -> Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" promptKey)
 
     let acceptContinuation
         (persist: SessionId -> TurnId option -> AgentFact -> Result<unit, string>)
         (update: (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection) -> unit)
-        (read: (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.ContinuationKind option) -> PromptAuthority.ContinuationKind option)
+        (read:
+            (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.ContinuationKind option)
+                -> PromptAuthority.ContinuationKind option)
         (promptKey: string)
         (sessionId: SessionId)
         (hostMessageId: MessageId)

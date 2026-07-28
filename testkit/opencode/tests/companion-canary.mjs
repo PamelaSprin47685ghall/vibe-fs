@@ -13,6 +13,7 @@ import { requestRoleOf } from '../strict-mock-matches.js';
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
 const primaryRole = 'orchestrator';
+const primaryAgent = 'fast-orchestrator';
 const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 
@@ -74,7 +75,7 @@ async function runProjectionScenario(scenario) {
   });
 
   const primaryResponse = await scenario.client.request('POST', '/api/session', {
-    body: { agent: primaryRole, model: { providerID: 'test', id: 'test-model' } },
+    body: { agent: primaryAgent, model: { providerID: 'test', id: 'test-model' } },
   });
   const primaryId = getSessionId(primaryResponse);
   assert.ok(primaryId, `primary session creation failed: ${JSON.stringify(primaryResponse)}`);
@@ -84,7 +85,7 @@ async function runProjectionScenario(scenario) {
   const firstTurn = scenario.turn.start(primaryId);
   const firstPrompt = await scenario.client.request('POST', `/session/${primaryId}/prompt_async`, {
     body: {
-      agent: primaryRole,
+      agent: primaryAgent,
       parts: [{ type: 'text', text: 'Produce the first projection for Orchestrator X.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
@@ -110,7 +111,7 @@ async function runProjectionScenario(scenario) {
   const secondTurn = scenario.turn.start(primaryId);
   const secondPrompt = await scenario.client.request('POST', `/session/${primaryId}/prompt_async`, {
     body: {
-      agent: primaryRole,
+      agent: primaryAgent,
       parts: [{ type: 'text', text: 'Produce the second projection for Orchestrator X.' }],
       model: { providerID: 'test', modelID: 'test-model' },
     },
@@ -139,7 +140,7 @@ async function runProjectionScenario(scenario) {
 
 async function assertRoleHasNoSidecar(scenario, role, prompt) {
   const sessionResponse = await scenario.client.request('POST', '/api/session', {
-    body: { agent: role, model: { providerID: 'test', id: 'test-model' } },
+    body: { agent: `fast-${role}`, model: { providerID: 'test', id: 'test-model' } },
   });
   const sessionId = getSessionId(sessionResponse);
   assert.ok(sessionId, `${role} session creation failed: ${JSON.stringify(sessionResponse)}`);
@@ -163,7 +164,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
   const turn = scenario.turn.start(sessionId);
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
-      agent: role,
+      agent: `fast-${role}`,
       parts: [{ type: 'text', text: prompt }],
       model: { providerID: 'test', modelID: 'test-model' },
     },

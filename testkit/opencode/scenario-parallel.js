@@ -107,9 +107,6 @@ export async function setupScenarioParallel(opts, tmpDir) {
           opts.contextLimit != null
             ? String(opts.contextLimit)
             : (process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || '32000'),
-        // Every companion-enabled canary needs a concrete cheap-model identity;
-        // production still fails closed when operators omit this setting.
-        WANXIANGSHU_BLOGGER_MODEL: process.env.WANXIANGSHU_BLOGGER_MODEL || 'test/test-model',
         ...(opts.extraEnv || {}),
       },
     });
@@ -134,6 +131,11 @@ export async function setupScenarioParallel(opts, tmpDir) {
       client,
       fs: new FsOracle(host.workDir),
       scenarioDir,
+    });
+    events.onEvent((e) => {
+      if (e.type === 'session.created' && e.sessionAgent && e.sessionID) {
+        try { provider.bindSession(e.sessionAgent, e.sessionID); } catch {}
+      }
     });
     client.onSessionCreated = (sid) => {
       if (!scenario.sessionIds.includes(sid)) scenario.sessionIds.push(sid);

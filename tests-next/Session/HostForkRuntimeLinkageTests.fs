@@ -50,7 +50,7 @@ module HostForkRuntimeLinkageTests =
                 {| ParentId = parentId
                    ChildId = ChildId.create (SessionId.value childId)
                    TargetAgent = agentId
-                   Role = Some "Coder" |})
+                   Role = Some "fast-coder" |})
             journal
         |> ignore
 
@@ -148,7 +148,7 @@ module HostForkRuntimeLinkageTests =
                             {| ParentId = p
                                ChildId = c
                                TargetAgent = "agent-idem"
-                               Role = Some "Coder" |}
+                               Role = Some "fast-coder" |}
                     ) }
 
         let unlink seq =

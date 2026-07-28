@@ -155,6 +155,10 @@ export class EventProbe {
     this._seq = 0;
   }
 
+  onEvent(callback) {
+    this._onEventCallbacks.push(callback);
+  }
+
   get allEvents() { return this._events; }
 }
 

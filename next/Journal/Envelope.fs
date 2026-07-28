@@ -44,6 +44,10 @@ module Envelope =
         Encode.Auto.toString (0, env, extra = extra)
 
     let deserialize (json: string) : Result<Envelope, string> =
-        match Decode.Auto.fromString<Envelope> (json, extra = extra) with
-        | Ok env -> Ok env
-        | Error err -> Error err
+        // §15.4: never guess a migration from pre-0.5.0 Dead/Failures fields.
+        if FactCodec.containsLegacyFallbackFields json then
+            Error FactCodec.pre050MigrationMessage
+        else
+            match Decode.Auto.fromString<Envelope> (json, extra = extra) with
+            | Ok env -> Ok env
+            | Error err -> Error err

@@ -72,7 +72,7 @@ const scenario = await setupScenario({
 
 try {
   loadScripts(scenario.provider, abs);
-  const created = await scenario.client.createSession();
+  const created = await scenario.client.createSession({ agent: doc.session?.agent });
   const sessionId = getSessionId(created);
   assert.ok(sessionId);
   scenario.sessionIds.push(sessionId);

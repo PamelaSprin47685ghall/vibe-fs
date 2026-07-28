@@ -39,7 +39,6 @@ module HostSignalBootstrap =
         (userMessageBindings: Dictionary<string, MessageId>)
         (fallbackFailures: HashSet<string>)
         (disposeExecutorRuntime: string -> unit)
-        (modelConfig: ModelResolver.ModelConfig option)
         (input: obj)
         : WiredSignals =
         let snapshot =
@@ -71,7 +70,6 @@ module HostSignalBootstrap =
                 abortedSessions
                 continuationAccepted
                 fallbackFailures
-                modelConfig
                 turn
 
         let reconciler = SessionReconciler(snapshot, onTurn)
@@ -104,7 +102,7 @@ module HostSignalBootstrap =
                             match Map.tryFind err.SessionId (AgentJournal.snapshot j).AgentProjections.Sessions with
                             | Some session ->
                                 session.Fallback
-                                |> Option.map (fun fb -> fb.TotalFailures)
+                                |> Option.map (fun fb -> int fb.Offset + 1)
                                 |> Option.defaultValue 0
                             | None -> 0
 
@@ -118,7 +116,6 @@ module HostSignalBootstrap =
                         eventPort
                         journal
                         fallbackFailures
-                        modelConfig
                         err.SessionId
                         assistantId
                         err.Reason
@@ -135,7 +132,6 @@ module HostSignalBootstrap =
                     sessionPort
                     eventPort
                     journal
-                    modelConfig
                     sessionId
                     (Some(fun messageId -> continuationAccepted sessionId messageId))
                     250
@@ -211,13 +207,7 @@ module HostSignalBootstrap =
                   Directory = defaultArg directory "" }
 
         let chatMessageHook =
-            HostSignalChatMessage.createHook
-                journal
-                sessionRoles
-                bindUserMessage
-                bindContinuationMessage
-                registerOwned
-                modelConfig
+            HostSignalChatMessage.createHook journal sessionRoles bindUserMessage bindContinuationMessage registerOwned
 
         { Reconciler = reconciler
           SignalRouter = signalRouter

@@ -21,17 +21,14 @@ module HostForkRunLifecycle =
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (role: AgentRole)
-        (model: OpencodeModel option)
+        (agent: string)
         (directory: string option)
         (prompt: string)
         : Task<Result<unit, string>> =
         task {
             let svc = authorityService journal
-            let agent = role.ToString().ToLowerInvariant()
 
-            let! sent =
-                svc.SendAgentOwnerRoot sessions childId prompt agent model None directory None
+            let! sent = svc.SendAgentOwnerRoot sessions childId prompt agent directory None
 
             match sent with
             | Ok _ -> return Ok()
@@ -43,36 +40,27 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (role: AgentRole)
-        (model: OpencodeModel option)
+        (agent: string)
         (directory: string option)
         (prompt: string)
         =
         // Prefer two-phase AgentOwnerRoot. Fallback only when no journal is present.
         match journal with
-        | Some _ -> sendAgentOwnerRoot sessions journal childId role model directory prompt
+        | Some _ -> sendAgentOwnerRoot sessions journal childId agent directory prompt
         | None ->
             sessions.SendChildPromptFireAndForget(
                 parentId,
                 childId,
                 prompt,
-                { Model = model
-                  Agent = Some(role.ToString().ToLowerInvariant())
+                { Model = None
+                  Agent = Some agent
                   Directory = directory
                   Metadata = None }
             )
 
-    let childPromptSender sessions parentId modelResolver journal directoryOf =
-        fun agentId childId role prompt ->
-            sendChildPrompt
-                sessions
-                parentId
-                journal
-                childId
-                role
-                (HostPendingRun.resolveAuthorityDefault modelResolver journal childId)
-                (directoryOf agentId)
-                prompt
+    let childPromptSender sessions parentId journal directoryOf =
+        fun agentId childId (_role: AgentRole) agent prompt ->
+            sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt
 
     let complete
         (gate: obj)
@@ -127,13 +115,7 @@ module HostForkRunLifecycle =
                     )
             | Aborted reason ->
                 run.Source.SetResult(
-                    AgentCompletion.aborted
-                        run.AgentId
-                        runId
-                        (Some run.Role)
-                        (Some childId)
-                        "ABORTED"
-                        reason
+                    AgentCompletion.aborted run.AgentId runId (Some run.Role) (Some childId) "ABORTED" reason
                 )
             | Failed error ->
                 let code =
@@ -144,15 +126,7 @@ module HostForkRunLifecycle =
                     else
                         "ERROR"
 
-                run.Source.SetResult(
-                    AgentCompletion.failed
-                        run.AgentId
-                        runId
-                        (Some run.Role)
-                        (Some childId)
-                        code
-                        error
-                )
+                run.Source.SetResult(AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error)
 
     let installRun
         (gate: obj)
@@ -175,10 +149,7 @@ module HostForkRunLifecycle =
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
         let subscription =
-            sessions.SubscribeTerminal(
-                childId,
-                (fun _ outcome -> complete gate pendingRuns sessions run outcome None)
-            )
+            sessions.SubscribeTerminal(childId, (fun _ outcome -> complete gate pendingRuns sessions run outcome None))
 
         let disposeImmediately =
             lock gate (fun () ->
@@ -201,4 +172,3 @@ module HostForkRunLifecycle =
         complete gate pendingRuns sessions run (TerminalOutcome.Failed error) None
 
     let markReady (gate: obj) (run: PendingHostRun) = lock gate (fun () -> run.Ready <- true)
-

@@ -15,7 +15,6 @@ type CompanionHost
         sessions: ISessionHostPort,
         ?durable: ICompanionDurablePort,
         ?onBloggerCreated: SessionId -> unit,
-        ?bloggerModel: Result<OpencodeModel, string>,
         ?outputBoundary: IEventOutputBoundaryPort,
         ?restoredBloggerId: string,
         ?journal: AgentJournal
@@ -24,8 +23,7 @@ type CompanionHost
     let gate = obj ()
     let bloggerCreated = defaultArg onBloggerCreated (fun _ -> ())
 
-    let configuredBloggerModel =
-        defaultArg bloggerModel (Error "WANXIANGSHU_BLOGGER_MODEL is not configured")
+    let bloggerEffectiveAgent = ManagedAgent.nameOf AgentTier.Fast Role.Blogger
 
     let outputWatermark (sessionId: SessionId) =
         match outputBoundary with
@@ -98,8 +96,8 @@ type CompanionHost
                                 let! created =
                                     sessions.CreateChildSession(
                                         primaryId,
-                                        { Title = Some "blogger"
-                                          Agent = Some "blogger"
+                                        { Title = Some bloggerEffectiveAgent
+                                          Agent = Some bloggerEffectiveAgent
                                           Directory = None }
                                     )
 
@@ -116,7 +114,7 @@ type CompanionHost
                                             primaryId,
                                             ChildId.create (SessionId.value id),
                                             "blogger",
-                                            Some "blogger"
+                                            Some bloggerEffectiveAgent
                                         )
                                         |> ignore)
 
@@ -133,14 +131,14 @@ type CompanionHost
 
     member private this.BloggerDeps: CompanionHostBlogger.BloggerDeps =
         { Sessions = sessions
-          Model = configuredBloggerModel
           EnsureBlogger = ensureBlogger
           Gate = gate
           BloggerNeedsReset = bloggerNeedsReset
           Companion = companion
           OutputWatermark = outputWatermark
           AssistantOutput = assistantOutput
-          Journal = journal }
+          Journal = journal
+          EffectiveAgent = bloggerEffectiveAgent }
 
     member this.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome =
         let deps = this.BloggerDeps

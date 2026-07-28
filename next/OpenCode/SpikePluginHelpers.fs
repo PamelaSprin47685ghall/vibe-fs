@@ -43,9 +43,9 @@ module SpikePluginHelpers =
                 // host populating blogger parentID on every child request.
                 const override = Number(process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || 0);
                 const budget = override > 0 ? Math.min(lim.context, override) : lim.context;
-                if (input.agent === 'blogger' && input.parentID) {
-                  $2(input.parentID, budget);
-                } else if (input.agent && input.agent !== 'blogger' && input.agent !== 'title') {
+                if (input.agent === 'blogger' || input.agent === 'fast-blogger' || input.agent === 'deep-blogger') {
+                  if (input.parentID) $2(input.parentID, budget);
+                } else if (input.agent && input.agent !== 'blogger' && input.agent !== 'fast-blogger' && input.agent !== 'deep-blogger' && input.agent !== 'title') {
                   $2(input.sessionID, budget);
                 }
               }
@@ -78,7 +78,6 @@ module SpikePluginHelpers =
         (currentPhysicalUserMessage: string -> string option)
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
-        (modelConfig: ModelResolver.ModelConfig option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
@@ -94,7 +93,6 @@ module SpikePluginHelpers =
             currentPhysicalUserMessage
             verdictSessions
             sessionDirectories
-            modelConfig
             onRunStarted
             backgroundBFor
             snapshot

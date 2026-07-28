@@ -14,41 +14,6 @@ module HostSignalChatMessage =
         | Some j -> PromptDispatcher.forJournal j
         | None -> PromptDispatcher.ephemeral ()
 
-    let private parseModel (inputObj: obj) : OpencodeModel option =
-        if isNull inputObj?model then
-            None
-        elif not (isNull inputObj?model?providerID) && not (isNull inputObj?model?modelID) then
-            Some
-                { providerID = unbox<string> inputObj?model?providerID
-                  modelID = unbox<string> inputObj?model?modelID
-                  variant =
-                    if isNull inputObj?model?variant then
-                        None
-                    else
-                        Some(unbox<string> inputObj?model?variant) }
-        else
-            None
-
-    let private injectModel (inputObj: obj) (outputObj: obj) (model: OpencodeModel) =
-        let modelObj =
-            match model.variant with
-            | Some variant ->
-                createObj
-                    [ "providerID", box model.providerID
-                      "modelID", box model.modelID
-                      "id", box model.modelID
-                      "variant", box variant ]
-            | None ->
-                createObj
-                    [ "providerID", box model.providerID
-                      "modelID", box model.modelID
-                      "id", box model.modelID ]
-
-        inputObj?model <- modelObj
-
-        if not (isNull outputObj) && not (isNull outputObj?message) then
-            outputObj?message?model <- modelObj
-
     let private acceptKeyedPrompt
         (svc: PromptAuthorityService)
         (sessionRoles: Dictionary<string, string>)
@@ -66,7 +31,7 @@ module HostSignalChatMessage =
         | Some "AgentOwnerRoot" ->
             match svc.AcceptAgentOwnerRoot key sid mid with
             | Ok profile ->
-                sessionRoles.[sessionId] <- profile.Agent
+                sessionRoles.[sessionId] <- PromptAuthority.roleLabel profile.CanonicalRole
                 bindUserMessage sessionId messageId
             | Error failure -> raise (InvalidOperationException(sprintf "AgentOwnerRoot acceptance failed: %s" failure))
         | _ ->
@@ -84,7 +49,6 @@ module HostSignalChatMessage =
         (bindUserMessage: string -> string -> unit)
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
-        (modelConfig: ModelResolver.ModelConfig option)
         : obj =
         box (fun (inputObj: obj) (outputObj: obj) ->
             if not (isNull inputObj) then
@@ -132,22 +96,13 @@ module HostSignalChatMessage =
                 let promptKey, continuationOrigin =
                     ChatMessageOrigin.extractPromptKey inputObj outputObj svc sessionId
 
-                let explicitModel = parseModel inputObj
-                let hostModel = parseModel outputObj
-
-                let hostVariant =
-                    if isNull outputObj || isNull outputObj?message || isNull outputObj?message?variant then
-                        None
-                    else
-                        Some(unbox<string> outputObj?message?variant)
-
                 let hostAgent =
                     if
                         not (isNull outputObj)
                         && not (isNull outputObj?message)
                         && not (isNull outputObj?message?agent)
                     then
-                        HostSessionContext.canonicalRole (unbox<string> outputObj?message?agent)
+                        Some(unbox<string> outputObj?message?agent)
                     else
                         None
 
@@ -173,31 +128,9 @@ module HostSignalChatMessage =
                     let sid = SessionId.create sessionId
                     let mid = MessageId.create messageId
 
-                    let selectedModel =
-                        match explicitModel with
-                        | Some model -> Some model
-                        | None ->
-                            match journal with
-                            | Some j -> ModelResolver.resolveAuthorityDefault modelConfig sid (AgentJournal.snapshot j)
-                            | None -> modelConfig |> Option.map (fun c -> c.SideA)
-
-                    match selectedModel, explicitModel with
-                    | Some model, None -> injectModel inputObj outputObj model
-                    | _ -> ()
-
-                    match
-                        svc.AcceptHumanRoot
-                            sid
-                            mid
-                            canonicalAgent
-                            explicitModel
-                            None
-                            hostAgent
-                            (selectedModel |> Option.orElse hostModel)
-                            hostVariant
-                    with
+                    match svc.AcceptHumanRoot sid mid explicitAgent hostAgent with
                     | Ok profile ->
-                        sessionRoles.[sessionId] <- profile.Agent
+                        sessionRoles.[sessionId] <- PromptAuthority.roleLabel profile.CanonicalRole
                         bindUserMessage sessionId messageId
                     | Error _ when journal.IsNone -> bindUserMessage sessionId messageId
                     | Error failure ->

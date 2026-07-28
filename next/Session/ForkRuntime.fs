@@ -11,10 +11,8 @@ type ForkRuntime
     ) =
 
     let childRunner =
-        defaultArg
-            runner
-            (fun agentId role prompt ->
-                Task.FromResult(AgentCompletion.ofSimpleText agentId "run-local" role (defaultArg prompt "ok")))
+        defaultArg runner (fun agentId role prompt ->
+            Task.FromResult(AgentCompletion.ofSimpleText agentId "run-local" role (defaultArg prompt "ok")))
 
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
@@ -89,20 +87,31 @@ type ForkRuntime
         runId, launch
 
     member this.Fork
-        (agentId: string, role: AgentRole, ?prompt: string, ?runWork: unit -> Task<AgentCompletionOutcome>)
-        : ForkResult =
+        (
+            agentId: string,
+            role: AgentRole,
+            ?prompt: string,
+            ?runWork: unit -> Task<AgentCompletionOutcome>,
+            ?agent: string
+        ) : ForkResult =
+        let agentName = defaultArg agent (role.ToString().ToLowerInvariant())
+
         lock lockObj (fun () ->
             if isCancelled then
                 ForkResult.NotFound agentId
             else
                 match agents.TryGetValue agentId with
-                | true, rec' when rec'.Status = AgentStatus.Busy ->
-                    ForkResult.Nudged agentId
+                | true, rec' when rec'.Status = AgentStatus.Busy -> ForkResult.Nudged agentId
                 | true, rec' ->
                     let runId, launch = startRun agentId role prompt runWork
 
                     agents.[agentId] <-
                         { rec' with
+                            Agent =
+                                if String.IsNullOrWhiteSpace agentName then
+                                    rec'.Agent
+                                else
+                                    agentName
                             Role = role
                             Status = AgentStatus.Busy
                             CurrentRunId = Some runId
@@ -115,6 +124,7 @@ type ForkRuntime
 
                     agents.[agentId] <-
                         { AgentId = agentId
+                          Agent = agentName
                           Role = role
                           Status = AgentStatus.Busy
                           CurrentRunId = Some runId
@@ -163,11 +173,14 @@ type ForkRuntime
     member _.RegisterPty(pty: PtyRecord) : unit =
         lock lockObj (fun () -> ptys.[pty.PtyId] <- pty)
 
-    member _.Restore(agentId: string, role: AgentRole) : unit =
+    member _.Restore(agentId: string, role: AgentRole, ?agent: string) : unit =
+        let agentName = defaultArg agent (role.ToString().ToLowerInvariant())
+
         lock lockObj (fun () ->
             if not (agents.ContainsKey agentId) then
                 agents.[agentId] <-
                     { AgentId = agentId
+                      Agent = agentName
                       Role = role
                       Status = AgentStatus.Idle
                       CurrentRunId = None
@@ -183,7 +196,7 @@ type ForkRuntime
                     { rec' with
                         Status = AgentStatus.Interrupted
                         CurrentRunId = None
-                        LastCompletionStatus = Some ("interrupted:" + reason)
+                        LastCompletionStatus = Some("interrupted:" + reason)
                         HasPendingCompletion = false }
             | false, _ -> ())
 

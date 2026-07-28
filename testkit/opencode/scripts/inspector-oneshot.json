@@ -36,7 +36,7 @@
     {
       "id": "coder-inspector",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat"
@@ -57,7 +57,7 @@
     {
       "id": "coder-final",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 2,
         "requestKind": "chat"
@@ -82,14 +82,14 @@
     "strict": true
   },
   "session": {
-    "agent": "coder",
+    "agent": "fast-coder",
     "bind": [
       "coder-title",
-      "coder"
+      "fast-coder"
     ]
   },
   "prompt": {
-    "agent": "coder",
+    "agent": "fast-coder",
     "text": "Call inspector once with prompt: Inspect workspace via executor. Then stop with a short summary."
   },
   "flow": [

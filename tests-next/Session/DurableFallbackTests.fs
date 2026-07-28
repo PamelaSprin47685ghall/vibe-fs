@@ -14,13 +14,10 @@ open JournalTestSupport
 module private DurableFallbackTestSupport =
     let mutable private seqCounter = 0
 
-    let recordFailure
-        (journalPort: FallbackJournalPort)
-        (sessionId: SessionId)
-        (reason: string)
-        =
+    let recordFailure (journalPort: FallbackJournalPort) (sessionId: SessionId) (reason: string) =
         seqCounter <- seqCounter + 1
         let n = seqCounter
+
         let fact =
             AgentFact.FallbackFailureRecorded
                 {| SessionId = sessionId
@@ -41,14 +38,14 @@ module DurableFallbackTests =
         let sid = SessionId.create "s-empty"
         let proj = Fold.empty
         let state = DurableFallback.currentState sid proj
-        Assert.Equal(ModelSide.A, state.Side)
-        Assert.Equal(0, state.Failures)
+        Assert.equal (0uy, state.Offset)
 
         let decision = DurableFallback.nextDecision sid proj
-        Assert.Equal(FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 1 }, decision)
+        Assert.equal (FallbackDecision.NextAttempt { Offset = 0uy }, decision)
+        Assert.False(DurableFallback.isDead sid proj)
 
     [<Fact>]
-    let ``recordFailure_progresses_through_A_retry_A_retry_switch_B_B_retry_and_dead`` () =
+    let ``recordFailure_cycles_modulo_4_never_dead`` () =
         withTempDir (fun tempDir ->
             task {
                 let runtimeId = RuntimeId.create "rt-df-1"
@@ -56,106 +53,34 @@ module DurableFallbackTests =
                 use journal = AgentJournal.create tempDir runtimeId 100 DateTimeOffset.UtcNow
                 let port = FallbackJournalPort.fromAgentJournal journal
 
-                // SSOT §6: A(0) → A retry(1) → permanent switch B(2) → B retry(3) → Dead(4).
-                // After each failure, nextDecision returns the NEXT attempt's (Side, Failures).
+                let expectedAfter1to4 =
+                    [ (1uy, ModelSide.A)
+                      (2uy, ModelSide.B)
+                      (3uy, ModelSide.B)
+                      (0uy, ModelSide.A) ]
 
-                // 1st failure: Side=A, TotalFailures=1. Next attempt is A retry (still A).
-                let res1 = DurableFallbackTestSupport.recordFailure port sid "Model A Timeout"
+                for i in 1..12 do
+                    match DurableFallbackTestSupport.recordFailure port sid (sprintf "err-%d" i) with
+                    | Ok(proj, decision) ->
+                        let state = DurableFallback.currentState sid proj
+                        let expectedOffset = byte (i % 4)
 
-                match res1 with
-                | Ok(proj1, decision1) ->
-                    let state1 = DurableFallback.currentState sid proj1
-                    Assert.Equal(ModelSide.A, state1.Side)
-                    Assert.Equal(1, state1.Failures)
-                    // nextDecision for a live session with 1 failure = A retry
-                    Assert.Equal(FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 2 }, decision1)
-                | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
+                        Assert.equal (expectedOffset, state.Offset)
+                        Assert.equal (Fallback.currentSide state, DurableFallback.currentSide sid proj)
+                        Assert.equal (FallbackDecision.NextAttempt { Offset = expectedOffset }, decision)
+                        Assert.False(DurableFallback.isDead sid proj)
 
-                // 2nd failure: Side=A exhausted, switches to B. TotalFailures=2.
-                let res2 = DurableFallbackTestSupport.recordFailure port sid "Model A Timeout"
+                        if i <= 4 then
+                            let expOff, expSide = expectedAfter1to4.[i - 1]
+                            Assert.equal (expOff, state.Offset)
+                            Assert.equal (expSide, DurableFallback.currentSide sid proj)
 
-                match res2 with
-                | Ok(proj2, decision2) ->
-                    let state2 = DurableFallback.currentState sid proj2
-                    Assert.Equal(ModelSide.B, state2.Side)
-                    Assert.Equal(2, state2.Failures)
-                    // nextDecision for a live session with 2 failures = B (first B attempt)
-                    Assert.Equal(FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }, decision2)
-                | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
-
-                // 3rd failure: Side=B, TotalFailures=3. Next attempt is B retry.
-                let res3 = DurableFallbackTestSupport.recordFailure port sid "Model B RateLimit"
-
-                match res3 with
-                | Ok(proj3, decision3) ->
-                    let state3 = DurableFallback.currentState sid proj3
-                    Assert.Equal(ModelSide.B, state3.Side)
-                    Assert.Equal(3, state3.Failures)
-                    // nextDecision for a live session with 3 failures = B retry
-                    Assert.Equal(FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 4 }, decision3)
-                | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
-
-                // 4th failure: Side=B exhausted → Dead. TotalFailures=4.
-                let res4 = DurableFallbackTestSupport.recordFailure port sid "Model B ServerError"
-
-                match res4 with
-                | Ok(proj4, decision4) ->
-                    let state4 = DurableFallback.currentState sid proj4
-                    Assert.Equal(ModelSide.B, state4.Side)
-                    Assert.Equal(4, state4.Failures)
-                    Assert.Equal(FallbackDecision.Dead, decision4)
-                | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
-            })
-
-    [<Fact>]
-    let ``nextDecision_covers_all_5_SSOT_steps`` () =
-        withTempDir (fun tempDir ->
-            task {
-                let runtimeId = RuntimeId.create "rt-df-steps"
-                let sid = SessionId.create "s-fb-steps"
-                use journal = AgentJournal.create tempDir runtimeId 101 DateTimeOffset.UtcNow
-                let port = FallbackJournalPort.fromAgentJournal journal
-
-                // failures=0 → nextDecision = A (first attempt is A)
-                let proj0 = AgentJournal.snapshot journal
-
-                Assert.Equal(
-                    FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 1 },
-                    DurableFallback.nextDecision sid proj0
-                )
-
-                // Drive through the sequence and assert nextDecision at each step.
-                // failures=1 → A retry (still A, NOT switch to B)
-                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-1")
-                let proj1 = AgentJournal.snapshot journal
-
-                Assert.Equal(
-                    FallbackDecision.NextAttempt { Side = ModelSide.A; Failures = 2 },
-                    DurableFallback.nextDecision sid proj1
-                )
-
-                // failures=2 → switch to B
-                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-2")
-                let proj2 = AgentJournal.snapshot journal
-
-                Assert.Equal(
-                    FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 },
-                    DurableFallback.nextDecision sid proj2
-                )
-
-                // failures=3 → B retry
-                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-3")
-                let proj3 = AgentJournal.snapshot journal
-
-                Assert.Equal(
-                    FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 4 },
-                    DurableFallback.nextDecision sid proj3
-                )
-
-                // failures=4 → Dead
-                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port sid "err-4")
-                let proj4 = AgentJournal.snapshot journal
-                Assert.Equal(FallbackDecision.Dead, DurableFallback.nextDecision sid proj4)
+                        if i = 4 || i = 8 || i = 12 then
+                            Assert.equal (0uy, state.Offset)
+                            Assert.equal (ModelSide.A, DurableFallback.currentSide sid proj)
+                            Assert.equal (FallbackDecision.NextAttempt { Offset = 0uy }, decision)
+                            Assert.False(DurableFallback.isDead sid proj)
+                    | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
             })
 
     [<Fact>]
@@ -167,9 +92,10 @@ module DurableFallbackTests =
                 let journal1 = AgentJournal.create tempDir runtimeId 200 DateTimeOffset.UtcNow
                 let port1 = FallbackJournalPort.fromAgentJournal journal1
 
-                // Append 2 failures in first process run
+                // Append 3 failures in first process run → Offset 3 / B
                 let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port1 sid "Err 1")
                 let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port1 sid "Err 2")
+                let! _ = Task.FromResult(DurableFallbackTestSupport.recordFailure port1 sid "Err 3")
 
                 // Dispose journal (simulating process exit)
                 (journal1 :> IDisposable).Dispose()
@@ -179,66 +105,55 @@ module DurableFallbackTests =
                 let bootedProj = Fold.apply Fold.empty bootSnap.Envelopes
 
                 let bootedState = DurableFallback.currentState sid bootedProj
-                Assert.Equal(ModelSide.B, bootedState.Side)
-                Assert.Equal(2, bootedState.Failures)
+                Assert.equal (3uy, bootedState.Offset)
+                Assert.equal (ModelSide.B, DurableFallback.currentSide sid bootedProj)
 
                 let bootedDecision = DurableFallback.nextDecision sid bootedProj
-                Assert.Equal(FallbackDecision.NextAttempt { Side = ModelSide.B; Failures = 3 }, bootedDecision)
+                Assert.equal (FallbackDecision.NextAttempt { Offset = 3uy }, bootedDecision)
+
+                use journal2 =
+                    AgentJournal.createFromBoot
+                        tempDir
+                        (RuntimeId.create "rt-df-2-reopen")
+                        201
+                        DateTimeOffset.UtcNow
+                        bootSnap
+
+                let port2 = FallbackJournalPort.fromAgentJournal journal2
+
+                match DurableFallbackTestSupport.recordFailure port2 sid "Err 4" with
+                | Ok(proj4, _) -> Assert.equal (0uy, (DurableFallback.currentState sid proj4).Offset)
+                | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
             })
 
     [<Fact>]
-    let ``dead_session_refuses_new_fallback_failures_at_append_boundary`` () =
+    let ``after_four_failures_fifth_unique_attempt_still_appends_and_advances`` () =
         withTempDir (fun tempDir ->
             task {
-                let sid = SessionId.create "s-fb-dead-refuse"
+                let sid = SessionId.create "s-fb-continue"
 
                 use journal =
-                    AgentJournal.create tempDir (RuntimeId.create "rt-dead-1") 401 DateTimeOffset.UtcNow
+                    AgentJournal.create tempDir (RuntimeId.create "rt-continue-1") 401 DateTimeOffset.UtcNow
 
-                // Drive the session to Dead: A(1) → A retry → switch B(2) → B retry(3) → Dead(4).
+                let port = FallbackJournalPort.fromAgentJournal journal
+
                 for i in 1..4 do
-                    AgentJournal.appendAgent
-                        (StreamId.Session sid)
-                        None
-                        (AgentFact.FallbackFailureRecorded
-                            {| SessionId = sid
-                               LogicalRunId = "run-test"
-                               AuthorityRootUserMessageId = "root-test"
-                               Reason = sprintf "err-%d" i
-                               AssistantMessageId = sprintf "msg-%d" i
-                               ProviderAttempt = sprintf "attempt-%d" i |})
-                        journal
-                    |> ignore
+                    match DurableFallbackTestSupport.recordFailure port sid (sprintf "err-%d" i) with
+                    | Ok _ -> ()
+                    | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
 
                 let beforeProj = AgentJournal.snapshot journal
-                Assert.True(DurableFallback.isDead sid beforeProj, "session should be Dead after 4 failures")
+                Assert.equal (0uy, (DurableFallback.currentState sid beforeProj).Offset)
+                Assert.False(DurableFallback.isDead sid beforeProj)
 
-                // A 5th failure must be refused: no new envelope is appended.
                 let beforeCount = (Boot.boot tempDir).Envelopes.Length
 
-                let result =
-                    AgentJournal.appendAgent
-                        (StreamId.Session sid)
-                        None
-                        (AgentFact.FallbackFailureRecorded
-                            {| SessionId = sid
-                               LogicalRunId = "run-test"
-                               AuthorityRootUserMessageId = "root-test"
-                               Reason = "post-dead"
-                               AssistantMessageId = "msg-5"
-                               ProviderAttempt = "attempt-5" |})
-                        journal
-
-                let afterCount = (Boot.boot tempDir).Envelopes.Length
-
-                Assert.True(Result.isOk result, "append to dead session should return Ok (idempotent no-op)")
-                Assert.Equal(beforeCount, afterCount)
-
-                // The projection is unchanged: still Dead with 4 failures.
-                let afterProj = AgentJournal.snapshot journal
-                let afterState = DurableFallback.currentState sid afterProj
-                Assert.Equal(4, afterState.Failures)
-                Assert.True(DurableFallback.isDead sid afterProj)
+                match DurableFallbackTestSupport.recordFailure port sid "err-5" with
+                | Ok(proj5, _) ->
+                    let afterCount = (Boot.boot tempDir).Envelopes.Length
+                    Assert.True(afterCount > beforeCount, "5th unique attempt should append")
+                    Assert.equal (1uy, (DurableFallback.currentState sid proj5).Offset)
+                | Error err -> Assert.True(false, sprintf "Expected Ok, got %s" err)
             })
 
     [<Fact>]
@@ -254,10 +169,11 @@ module DurableFallbackTests =
                 let snap1 = AgentJournal.snapshot journal
 
                 let state1 = DurableFallback.currentState sid snap1
-                Assert.Equal(1, state1.Failures)
+                Assert.equal (1uy, state1.Offset)
 
                 // No facts are cleared on success; querying snapshot returns identical durable facts
                 let snap2 = AgentJournal.snapshot journal
                 let state2 = DurableFallback.currentState sid snap2
-                Assert.Equal(state1, state2)
+                Assert.equal (state1, state2)
+                Assert.equal (1uy, state2.Offset)
             })

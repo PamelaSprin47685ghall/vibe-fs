@@ -7,25 +7,25 @@ open AgentFactsFoldHelpers
 
 module internal AgentFactsFallback =
 
-    let private failureIdentity
-        (logicalRunId: string)
-        (authorityRootUserMessageId: string)
-        (providerAttempt: string)
-        =
+    let private failureIdentity (logicalRunId: string) (authorityRootUserMessageId: string) (providerAttempt: string) =
         sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     let private rememberFailureId (ids: string list) (identity: string) =
         let next = identity :: (ids |> List.filter ((<>) identity))
-        next |> List.truncate 4
+        // Keep enough recent identities for restart-safe dedupe across long runs.
+        next |> List.truncate 32
 
     let private emptyEpoch logicalRunId authorityRoot =
         { LogicalRunId = logicalRunId
           AuthorityRootUserMessageId = authorityRoot
-          Side = SideA
-          FailuresOnCurrentSide = 0
-          TotalFailures = 0
-          IsDead = false
+          Offset = 0uy
+          LastProviderAttempt = None
           RecentFailureIds = [] }
+
+    let private tryParseAttempt (providerAttempt: string) : int64 option =
+        match Int64.TryParse providerAttempt with
+        | true, n -> Some n
+        | _ -> None
 
     let foldFallbackFailureRecorded
         (proj: AgentProjectionSet)
@@ -62,44 +62,16 @@ module internal AgentFactsFallback =
 
                     let fb =
                         if List.contains identity baseline.RecentFailureIds then
-                            baseline
-                        elif baseline.IsDead then
+                            // Duplicate retry identity: do not advance cursor.
                             baseline
                         else
-                            let newTotal = baseline.TotalFailures + 1
                             let ids = rememberFailureId baseline.RecentFailureIds identity
+                            let nextOffset = FallbackProjection.advance baseline.Offset
 
-                            match baseline.Side with
-                            | SideA ->
-                                if baseline.FailuresOnCurrentSide < 1 then
-                                    { baseline with
-                                        Side = SideA
-                                        FailuresOnCurrentSide = baseline.FailuresOnCurrentSide + 1
-                                        TotalFailures = newTotal
-                                        IsDead = false
-                                        RecentFailureIds = ids }
-                                else
-                                    { baseline with
-                                        Side = SideB
-                                        FailuresOnCurrentSide = 0
-                                        TotalFailures = newTotal
-                                        IsDead = false
-                                        RecentFailureIds = ids }
-                            | SideB ->
-                                if baseline.FailuresOnCurrentSide < 1 then
-                                    { baseline with
-                                        Side = SideB
-                                        FailuresOnCurrentSide = baseline.FailuresOnCurrentSide + 1
-                                        TotalFailures = newTotal
-                                        IsDead = false
-                                        RecentFailureIds = ids }
-                                else
-                                    { baseline with
-                                        Side = SideB
-                                        FailuresOnCurrentSide = 2
-                                        TotalFailures = newTotal
-                                        IsDead = true
-                                        RecentFailureIds = ids }
+                            { baseline with
+                                Offset = nextOffset
+                                LastProviderAttempt = tryParseAttempt p.ProviderAttempt
+                                RecentFailureIds = ids }
 
                     { s with Fallback = Some fb })
                 proj.Sessions

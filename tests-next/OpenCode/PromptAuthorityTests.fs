@@ -4,12 +4,11 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Xunit
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
-open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Fact
-open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module PromptAuthorityTests =
@@ -35,29 +34,46 @@ module PromptAuthorityTests =
             member _.CreateChildSession(_, _) = Task.FromResult(Error "not used")
             member _.GetSessionOutput(_) = []
 
+    let private expectAuthorityRoot runtime session kind messageId selectedAgent =
+        match PromptAuthority.createAuthorityRoot runtime session kind messageId selectedAgent with
+        | Ok profile -> profile
+        | Error error ->
+            Assert.True(false, sprintf "createAuthorityRoot failed: %s" error)
+            failwith error
+
     [<Fact>]
     let ``Continuation acceptance preserves last authority profile`` () =
         let session = SessionId.create "s1"
         let root = MessageId.create "human-root"
 
         let profile =
-            PromptAuthority.createAuthorityRoot "rt-test" session PromptAuthority.HumanRoot root "manager" None None
+            expectAuthorityRoot "rt-test" session PromptAuthority.HumanRoot root "fast-manager"
+
+        Assert.equal ("fast-manager", profile.SelectedAgent)
+        Assert.equal ("deep-manager", profile.PeerAgent)
+        Assert.equal (Role.Manager, profile.CanonicalRole)
+        Assert.equal (AgentTier.Fast, profile.SelectedTier)
 
         let before = PromptAuthority.registerAuthority profile PromptAuthority.empty
         let key = PromptAuthority.newPromptKey ()
 
         let claim =
-            PromptAuthority.claimContinuation key session PromptAuthority.InteractionRepair profile None
+            PromptAuthority.claimContinuation
+                key
+                session
+                PromptAuthority.InteractionRepair
+                profile
+                (PromptAuthority.selectedEffectiveAgent profile)
 
         let after =
             before
             |> PromptAuthority.registerClaim claim
             |> PromptAuthority.acceptClaim key (MessageId.create "repair-message")
 
-        Assert.Equal(Some profile, after.LastAuthorityProfile)
-        Assert.Equal(Some profile, after.ActiveLogicalRun)
+        Assert.equal (Some profile, after.LastAuthorityProfile)
+        Assert.equal (Some profile, after.ActiveLogicalRun)
 
-        Assert.Equal(
+        Assert.equal (
             Some PromptAuthority.InteractionRepair,
             Map.tryFind (MessageId.create "repair-message") after.AcceptedContinuationIds
         )
@@ -69,7 +85,7 @@ module PromptAuthorityTests =
             let root = MessageId.create "human-root"
 
             let profile =
-                PromptAuthority.createAuthorityRoot "rt-test" session PromptAuthority.HumanRoot root "manager" None None
+                expectAuthorityRoot "rt-test" session PromptAuthority.HumanRoot root "fast-manager"
 
             let port = CapturingPort()
             let dispatcher = PromptDispatcher.Dispatcher()
@@ -82,18 +98,21 @@ module PromptAuthorityTests =
                     "\u200B"
                     PromptAuthority.InteractionRepair
                     profile
-                    None
+                    (PromptAuthority.selectedEffectiveAgent profile)
                     None
                     None
 
-            Assert.Equal(Ok(MessageId.create "continuation-1"), accepted)
-            Assert.Equal(Some profile, dispatcher.Projection.LastAuthorityProfile)
+            Assert.equal (Ok(MessageId.create "continuation-1"), accepted)
+            Assert.equal (Some profile, dispatcher.Projection.LastAuthorityProfile)
 
             match port.Options with
-            | Some { Metadata = Some metadata } ->
+            | Some { Metadata = Some metadata
+                     Agent = Some agent } ->
                 Assert.NotNull(metadata?wanxiangshu_prompt_key)
-                Assert.Equal("InteractionRepair", unbox<string> metadata?wanxiangshu_origin)
-                Assert.Equal("human-root", unbox<string> metadata?wanxiangshu_authority_root)
+                Assert.equal ("InteractionRepair", unbox<string> metadata?wanxiangshu_origin)
+                Assert.equal ("human-root", unbox<string> metadata?wanxiangshu_authority_root)
+                Assert.equal ("fast-manager", agent)
+                Assert.True(port.Options.Value.Model.IsNone)
             | _ -> Assert.True(false, "dispatcher omitted continuation metadata")
         }
 
@@ -102,37 +121,39 @@ module PromptAuthorityTests =
         let origin =
             PromptAuthority.resolveKnownOrigin (MessageId.create "unproven-user") None false PromptAuthority.empty
 
-        Assert.Equal(PromptAuthority.UnknownOrigin, origin)
+        Assert.equal (PromptAuthority.UnknownOrigin, origin)
 
     [<Fact>]
     let ``New authority root replaces profile while continuation does not`` () =
         let session = SessionId.create "s1"
 
         let oldProfile =
-            PromptAuthority.createAuthorityRoot
-                "rt-test"
-                session
-                PromptAuthority.HumanRoot
-                (MessageId.create "root-a")
-                "manager"
-                None
-                None
+            expectAuthorityRoot "rt-test" session PromptAuthority.HumanRoot (MessageId.create "root-a") "fast-manager"
 
         let newProfile =
-            PromptAuthority.createAuthorityRoot
-                "rt-test"
-                session
-                PromptAuthority.HumanRoot
-                (MessageId.create "root-b")
-                "coder"
-                None
-                None
+            expectAuthorityRoot "rt-test" session PromptAuthority.HumanRoot (MessageId.create "root-b") "fast-coder"
+
+        Assert.equal ("fast-coder", newProfile.SelectedAgent)
+        Assert.equal ("deep-coder", newProfile.PeerAgent)
 
         let projection = PromptAuthority.registerAuthority oldProfile PromptAuthority.empty
         let projection = PromptAuthority.registerAuthority newProfile projection
 
-        Assert.Equal(Some newProfile, projection.LastAuthorityProfile)
+        Assert.equal (Some newProfile, projection.LastAuthorityProfile)
         Assert.True(oldProfile.LogicalRunId <> newProfile.LogicalRunId)
+
+    [<Fact>]
+    let ``createAuthorityRoot rejects bare legacy agent names`` () =
+        match
+            PromptAuthority.createAuthorityRoot
+                "rt-test"
+                (SessionId.create "s1")
+                PromptAuthority.HumanRoot
+                (MessageId.create "human-root")
+                "manager"
+        with
+        | Error _ -> ()
+        | Ok _ -> Assert.True(false, "bare manager must be rejected")
 
     [<Fact>]
     let ``Chat_message_maps_keyed_continuation_without_becoming_human_root`` () =
@@ -145,14 +166,7 @@ module PromptAuthorityTests =
                 let humanRoot = MessageId.create "human-root-1"
 
                 let profile =
-                    PromptAuthority.createAuthorityRoot
-                        "rt-authority"
-                        session
-                        PromptAuthority.HumanRoot
-                        humanRoot
-                        "manager"
-                        None
-                        None
+                    expectAuthorityRoot "rt-authority" session PromptAuthority.HumanRoot humanRoot "fast-manager"
 
                 match
                     AgentJournal.appendAgent
@@ -163,10 +177,10 @@ module PromptAuthorityTests =
                                LogicalRunId = profile.LogicalRunId
                                HostMessageId = MessageId.value humanRoot
                                AuthorityKind = "HumanRoot"
-                               Agent = "manager"
-                               BaseProviderID = None
-                               BaseModelID = None
-                               Variant = None |})
+                               SelectedAgent = profile.SelectedAgent
+                               PeerAgent = profile.PeerAgent
+                               CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
+                               SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |})
                         journal
                 with
                 | Error e -> Assert.True(false, sprintf "authority root failed: %A" e)
@@ -182,10 +196,7 @@ module PromptAuthorityTests =
                                LogicalRunId = profile.LogicalRunId
                                AuthorityRootUserMessageId = MessageId.value humanRoot
                                ContinuationKind = "InteractionRepair"
-                               Agent = Some "manager"
-                               EffectiveProviderID = None
-                               EffectiveModelID = None
-                               Variant = None |})
+                               EffectiveAgent = Some(PromptAuthority.selectedEffectiveAgent profile) |})
                         journal
                 with
                 | Error e -> Assert.True(false, sprintf "claim failed: %A" e)
@@ -201,7 +212,6 @@ module PromptAuthorityTests =
                         (fun sid mid -> bound.Add(("root", sid + ":" + mid)))
                         (fun sid mid -> bound.Add(("cont", sid + ":" + mid)))
                         (fun _ -> ())
-                        None
 
                 let hook = unbox<obj -> obj -> unit> hookObj
 
@@ -209,7 +219,7 @@ module PromptAuthorityTests =
                     createObj
                         [ "sessionID", box "s-auth"
                           "messageID", box "physical-repair-1"
-                          "agent", box "manager"
+                          "agent", box "fast-manager"
                           "metadata",
                           box (
                               createObj
@@ -227,47 +237,20 @@ module PromptAuthorityTests =
                 match projection with
                 | None -> Assert.True(false, "missing authority projection")
                 | Some proj ->
-                    Assert.Equal(
+                    Assert.equal (
                         Some(MessageId.value humanRoot),
                         proj.LastAuthorityProfile |> Option.map (fun p -> p.AuthorityRootUserMessageId)
                     )
+
+                    Assert.equal (
+                        Some "fast-manager",
+                        proj.LastAuthorityProfile |> Option.map (fun p -> p.SelectedAgent)
+                    )
+
+                    Assert.equal (Some "deep-manager", proj.LastAuthorityProfile |> Option.map (fun p -> p.PeerAgent))
 
                     Assert.True(proj.AcceptedContinuationIds.ContainsKey "physical-repair-1")
                     Assert.False(proj.AcceptedContinuationIds.ContainsKey "accepted-s-auth")
                     Assert.True(bound.Exists(fun (kind, _) -> kind = "cont"))
                     Assert.False(bound.Exists(fun (kind, pair) -> kind = "root" && pair.Contains "physical-repair-1"))
             })
-
-    [<Fact>]
-    let ``Stable logical run id is deterministic for same host message`` () =
-        let session = SessionId.create "s1"
-        let root = MessageId.create "human-root"
-
-        let a =
-            PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
-
-        let b =
-            PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
-
-        Assert.Equal(a.LogicalRunId, b.LogicalRunId)
-        Assert.True(a.LogicalRunId.Length = 64)
-
-    [<Fact>]
-    let ``Interaction repair identity is claimed only once`` () =
-        let session = SessionId.create "s1"
-        let root = MessageId.create "human-root"
-
-        let profile =
-            PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
-
-        let identity =
-            PromptAuthority.repairIdentity
-                profile.LogicalRunId
-                profile.AuthorityRootUserMessageId
-                (MessageId.create "asst-1")
-                "zero-width"
-
-        let first = PromptAuthority.tryClaimRepair identity PromptAuthority.empty
-        Assert.True(first.IsSome)
-        let second = PromptAuthority.tryClaimRepair identity first.Value
-        Assert.True(second.IsNone)

@@ -9,14 +9,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "parent-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews."
   },
   "flow": [
@@ -61,7 +61,7 @@
     },
     {
       "prompt": {
-        "agent": "manager",
+        "agent": "fast-manager",
         "text": "Nudge the coder child for child-a2."
       }
     },
@@ -104,7 +104,7 @@
     {
       "id": "manager-fork-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat"
@@ -121,7 +121,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Write host_restart_proof.txt with OK."
         }
       }
@@ -129,7 +129,7 @@
     {
       "id": "manager-join-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat"
@@ -150,7 +150,7 @@
     {
       "id": "manager-created",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 3,
         "requestKind": "chat"
@@ -170,7 +170,7 @@
     {
       "id": "manager-fork-reviewer",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 4,
         "requestKind": "chat"
@@ -186,7 +186,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "reviewer",
+          "agent": "fast-reviewer",
           "prompt": "Review and PERFECT twice."
         }
       }
@@ -194,7 +194,7 @@
     {
       "id": "manager-join-reviewer",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 5,
         "requestKind": "chat"
@@ -215,7 +215,7 @@
     {
       "id": "manager-reviewed",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 6,
         "requestKind": "chat"
@@ -235,7 +235,7 @@
     {
       "id": "child-a1-text",
       "lane": {
-        "session": "coder",
+        "session": "fast-coder",
         "role": "coder",
         "turn": 1,
         "requestKind": "chat"
@@ -251,7 +251,7 @@
     {
       "id": "reviewer-perfect-1",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -276,7 +276,7 @@
     {
       "id": "reviewer-after-tool-text",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -300,7 +300,7 @@
     {
       "id": "reviewer-perfect-2",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 3,
         "requestKind": "chat",

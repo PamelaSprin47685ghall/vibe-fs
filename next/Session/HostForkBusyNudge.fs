@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Session
 
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
@@ -13,6 +14,46 @@ module HostForkBusyNudge =
         | Some j -> PromptDispatcher.forJournal j
         | None -> PromptDispatcher.ephemeral ()
 
+    let private toProfile
+        (sessionId: SessionId)
+        (durable: AuthorityProfileProjection)
+        : PromptAuthority.AuthorityExecutionProfile option =
+        match ManagedAgent.parse durable.SelectedAgent with
+        | Error _ -> None
+        | Ok selected ->
+            let peer = ManagedAgent.peer selected
+
+            let kind =
+                match durable.AuthorityKind with
+                | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
+                | _ -> PromptAuthority.HumanRoot
+
+            let canonicalRole =
+                match PromptAuthority.tryParseRole durable.CanonicalRole with
+                | Some role -> role
+                | None -> selected.Role
+
+            let selectedTier =
+                match PromptAuthority.tryParseTier durable.SelectedTier with
+                | Some tier -> tier
+                | None -> selected.Tier
+
+            let peerAgent =
+                if System.String.IsNullOrWhiteSpace durable.PeerAgent then
+                    peer.Name
+                else
+                    durable.PeerAgent
+
+            Some
+                { SessionId = sessionId
+                  LogicalRunId = durable.LogicalRunId
+                  AuthorityRootUserMessageId = MessageId.create durable.AuthorityRootUserMessageId
+                  AuthorityKind = kind
+                  SelectedAgent = selected.Name
+                  PeerAgent = peerAgent
+                  CanonicalRole = canonicalRole
+                  SelectedTier = selectedTier }
+
     /// Continuation of the child's active Logical Run. Never creates a new
     /// Authority Root / RunId / completion.
     let send
@@ -20,22 +61,21 @@ module HostForkBusyNudge =
         (parentId: SessionId)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (role: AgentRole)
-        (model: OpencodeModel option)
+        (_role: AgentRole)
+        (agent: string)
         (directory: string option)
         (prompt: string)
         : Task<Result<unit, string>> =
         task {
             match journal with
             | None ->
-                // Unit-host / no journal: fire-and-forget without inventing AuthorityRoot.
                 return!
                     sessions.SendChildPromptFireAndForget(
                         parentId,
                         childId,
                         prompt,
-                        { Model = model
-                          Agent = Some(role.ToString().ToLowerInvariant())
+                        { Model = None
+                          Agent = Some agent
                           Directory = directory
                           Metadata = None }
                     )
@@ -51,34 +91,19 @@ module HostForkBusyNudge =
                         | Some session ->
                             session.PromptAuthority
                             |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                            |> Option.map (fun durable ->
-                                let baseModel =
-                                    match durable.BaseProviderID, durable.BaseModelID with
-                                    | Some providerID, Some modelID ->
-                                        Some
-                                            { providerID = providerID
-                                              modelID = modelID
-                                              variant = durable.Variant }
-                                    | _ -> model
-
-                                let authorityKind =
-                                    match durable.AuthorityKind with
-                                    | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
-                                    | _ -> PromptAuthority.HumanRoot
-
-                                ({ SessionId = childId
-                                   LogicalRunId = durable.LogicalRunId
-                                   AuthorityRootUserMessageId =
-                                       MessageId.create durable.AuthorityRootUserMessageId
-                                   AuthorityKind = authorityKind
-                                   Agent = durable.Agent
-                                   BaseModel = baseModel
-                                   Variant = durable.Variant }
-                                 : PromptAuthority.AuthorityExecutionProfile))
+                            |> Option.bind (toProfile childId)
 
                 match profileOpt with
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
+                    let offset =
+                        match Map.tryFind childId (AgentJournal.snapshot j).AgentProjections.Sessions with
+                        | Some session ->
+                            session.Fallback |> Option.map (fun fb -> fb.Offset) |> Option.defaultValue 0uy
+                        | None -> 0uy
+
+                    let effectiveAgent = PromptAuthority.effectiveAgentAt profile offset
+
                     let! sent =
                         svc.SendContinuation
                             sessions
@@ -86,7 +111,7 @@ module HostForkBusyNudge =
                             prompt
                             PromptAuthority.BusyAgentNudge
                             profile
-                            (model |> Option.orElse profile.BaseModel)
+                            effectiveAgent
                             directory
                             None
 
@@ -95,14 +120,6 @@ module HostForkBusyNudge =
                     | Error err -> return Error err
         }
 
-    let sender sessions parentId modelResolver journal directoryOf =
-        fun agentId childId role prompt ->
-            send
-                sessions
-                parentId
-                journal
-                childId
-                role
-                (HostPendingRun.resolveModel modelResolver journal childId)
-                (directoryOf agentId)
-                prompt
+    let sender sessions parentId journal directoryOf =
+        fun agentId childId (role: AgentRole) agent prompt ->
+            send sessions parentId journal childId role agent (directoryOf agentId) prompt

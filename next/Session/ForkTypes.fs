@@ -49,10 +49,14 @@ type PtyRecord =
       StartedAt: DateTimeOffset }
 
 type AgentRecord =
-    { AgentId: string
-      Role: AgentRole
-      Status: AgentStatus
-      CurrentRunId: string option
-      LastCompletionStatus: string option
-      HasPendingCompletion: bool
-      ChildSessionId: string option }
+    {
+        AgentId: string
+        /// Exact managed agent name when known (fast-ROLE / deep-ROLE); may be empty for legacy records.
+        Agent: string
+        Role: AgentRole
+        Status: AgentStatus
+        CurrentRunId: string option
+        LastCompletionStatus: string option
+        HasPendingCompletion: bool
+        ChildSessionId: string option
+    }

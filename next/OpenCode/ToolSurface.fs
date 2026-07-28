@@ -35,7 +35,6 @@ module ToolSurface =
         (currentPhysicalUserMessage: string -> string option)
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
-        (modelConfig: ModelResolver.ModelConfig option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
@@ -52,7 +51,6 @@ module ToolSurface =
             ToolSurfaceOrchestrator.hostFor
                 { Sessions = sessionPort
                   Journal = journal
-                  ModelConfig = modelConfig
                   WorkspaceDirectory = workspaceDirectory
                   SessionParents = sessionParents
                   SessionRoles = sessionRoles
@@ -96,7 +94,6 @@ module ToolSurface =
                                             dirOpt
                                             |> Option.iter (fun d ->
                                                 sessionDirectories.[SessionId.value childId] <- d)),
-                                    ?modelResolver = modelConfig,
                                     directoryFor =
                                         (fun _ ->
                                             match sessionDirectories.TryGetValue sid with
@@ -157,7 +154,6 @@ module ToolSurface =
                 sessionPort
                 sessionParents
                 sessionRoles
-                modelConfig
 
         let disposeExecutorRuntime =
             ToolSurfaceOrchestrator.disposeExecutorRuntime gate executorRuntimes
@@ -173,7 +169,13 @@ module ToolSurface =
             ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory (Some sessionDirFor)
 
         let inspector =
-            InspectorTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir) journal
+            InspectorTool.create
+                toolModule
+                sessionPort
+                backgroundBFor
+                (Some sessionDirFor)
+                (Some registerChildDir)
+                journal
 
         let coder =
             CoderTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir) journal
@@ -182,17 +184,10 @@ module ToolSurface =
         // Names differ because schemas conflict.
         let tools =
             createObj
-                [ "fork",
-                  box (
-                      applyTool
-                          factory
-                          (definition "Fork or nudge an agent" managerForkArgs forkExecute)
-                  )
+                [ "fork", box (applyTool factory (definition "Fork or nudge an agent" managerForkArgs forkExecute))
                   "fork-pty",
                   box (
-                      applyTool
-                          factory
-                          (definition "Create, write, read, or signal a PTY" devopsPtyArgs forkPtyExecute)
+                      applyTool factory (definition "Create, write, read, or signal a PTY" devopsPtyArgs forkPtyExecute)
                   )
                   "fork-manager",
                   box (applyTool factory (definition "Fork a manager job" orchestratorManagerJobArgs forkExecute))

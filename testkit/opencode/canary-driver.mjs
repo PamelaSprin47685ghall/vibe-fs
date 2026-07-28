@@ -182,7 +182,7 @@ async function runFlow(scenario, doc, ctx) {
       continue;
     }
     if (step.createSession) {
-      const created = await scenario.client.createSession();
+      const created = await scenario.client.createSession({ agent: step.createSession.agent });
       const sid = getSessionId(created);
       assert.ok(sid, `createSession failed: ${JSON.stringify(created)}`);
       scenario.sessionIds.push(sid);
@@ -362,7 +362,7 @@ export async function runCanary(scriptPath, { customs } = {}) {
 
     const agent = doc.session?.agent || doc.prompt?.agent || doc.prompts?.[0]?.agent;
     if (agent || doc.session) {
-      const created = await scenario.client.createSession();
+      const created = await scenario.client.createSession({ agent: doc.session?.agent });
       ctx.sessionId = getSessionId(created);
       assert.ok(ctx.sessionId, `session creation failed: ${JSON.stringify(created)}`);
       scenario.sessionIds.push(ctx.sessionId);

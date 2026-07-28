@@ -4,7 +4,7 @@
     {
       "id": "manager-nudge-coder",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 7,
         "requestKind": "chat"
@@ -21,7 +21,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "coder",
+          "agent": "fast-coder",
           "prompt": "Report child-a2."
         }
       }
@@ -29,7 +29,7 @@
     {
       "id": "manager-finished-after-restart",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 8,
         "requestKind": "chat"

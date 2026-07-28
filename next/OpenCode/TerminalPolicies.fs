@@ -29,7 +29,6 @@ module TerminalPolicies =
         (abortedSessions: HashSet<string>)
         (continuationAccepted: SessionId -> MessageId -> unit)
         (fallbackFailures: HashSet<string>)
-        (modelConfig: ModelResolver.ModelConfig option)
         (turn: ReconciledTurn)
         =
         let sessionKey = SessionId.value turn.SessionId
@@ -37,7 +36,11 @@ module TerminalPolicies =
 
         match turn.AgentRole with
         | Some agent when isLinkedChild journal sessionKey || sessionParents.ContainsKey sessionKey ->
-            HostSessionNudge.ensureAgentOwnerAuthority journal turn.SessionId turn.RootUserMessageId agent turn.Model
+            HostSessionNudge.ensureAgentOwnerAuthority
+                journal
+                turn.SessionId
+                turn.RootUserMessageId
+                (AgentRoleHelpers.defaultFastManagedName agent)
         | _ -> ()
 
         match turn.Outcome with
@@ -51,7 +54,7 @@ module TerminalPolicies =
                         sessionPort
                         turn.SessionId
                         "\u200B"
-                        { Model = turn.Model
+                        { Model = None
                           Agent = roleName turn.AgentRole
                           Directory =
                             if String.IsNullOrWhiteSpace turn.Directory then
@@ -65,9 +68,7 @@ module TerminalPolicies =
                         (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
 
                 if not sent then
-                    eventPort.NotifyTerminal
-                        turn.SessionId
-                        (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
                     |> ignore
         | TurnNeedsContinuation reason ->
             // Absorb text+reasoning into session-wide A even when this turn is
@@ -90,7 +91,7 @@ module TerminalPolicies =
                     sessionPort
                     turn.SessionId
                     repairPrompt
-                    { Model = turn.Model
+                    { Model = None
                       Agent = roleName
                       Directory =
                         if String.IsNullOrWhiteSpace turn.Directory then
@@ -104,9 +105,7 @@ module TerminalPolicies =
                     (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
 
             if not sent then
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
                 |> ignore
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
@@ -117,12 +116,21 @@ module TerminalPolicies =
             |> ignore
         | TurnFailed error ->
             let directory =
-                if String.IsNullOrWhiteSpace turn.Directory then None else Some turn.Directory
+                if String.IsNullOrWhiteSpace turn.Directory then
+                    None
+                else
+                    Some turn.Directory
 
             let handled =
                 PluginFallbackRetry.handleTurnFailure
-                    sessionPort eventPort journal fallbackFailures modelConfig
-                    turn.SessionId turn.AssistantMessageId error directory
+                    sessionPort
+                    eventPort
+                    journal
+                    fallbackFailures
+                    turn.SessionId
+                    turn.AssistantMessageId
+                    error
+                    directory
                     (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
 
             if not handled then
@@ -187,7 +195,6 @@ module TerminalPolicies =
                         nudgeSent
                         sessionKey
                         (MessageId.value turn.AssistantMessageId)
-                        turn.Model
                         continuationAccepted
                 | Some AgentRole.Reviewer when
                     not (verdictSessions.Remove sessionKey)
@@ -199,7 +206,6 @@ module TerminalPolicies =
                         nudgeSent
                         sessionKey
                         (MessageId.value turn.AssistantMessageId)
-                        turn.Model
                         continuationAccepted
                 | Some AgentRole.Manager when isTopLevelManager sessionParents journal sessionKey ->
                     match HostReviewGuard.missingTree journal gitTreePort sessionKey with
@@ -211,7 +217,6 @@ module TerminalPolicies =
                             sessionKey
                             (MessageId.value turn.AssistantMessageId)
                             treeHash
-                            turn.Model
                             continuationAccepted
                     | HostReviewGuard.ReviewGuardConfirmed -> ()
                     | HostReviewGuard.ReviewGuardUnavailable reason ->
@@ -238,9 +243,7 @@ module TerminalPolicies =
                             (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
 
                     if not sent then
-                        eventPort.NotifyTerminal
-                            turn.SessionId
-                            (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
                         |> ignore
 
     let apply
@@ -269,5 +272,4 @@ module TerminalPolicies =
             abortedSessions
             (fun _ _ -> ())
             (HashSet<string>())
-            None
             turn

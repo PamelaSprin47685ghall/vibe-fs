@@ -65,6 +65,7 @@
     <Compile Include="OpenCode/SessionReconcilerTests.fs"/>
     <Compile Include="OpenCode/HostSignalAdapterTests.fs"/>
     <Compile Include="OpenCode/PromptAuthorityTests.fs"/>
+    <Compile Include="OpenCode/PromptAuthoritySendTests.fs"/>
     <Compile Include="OpenCode/PromptAuthorityChatMessageTests.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoderTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
@@ -73,6 +74,7 @@
     <Compile Include="OpenCode/OrchestratorHostTestSupport.fs"/>
     <Compile Include="OpenCode/OrchestratorHostTests.fs"/>
     <Compile Include="OpenCode/ManagerConfigTests.fs"/>
+    <Compile Include="OpenCode/ManagedAgentTests.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeTests.fs"/>
     <Compile Include="MockOpenCode/MockOpenCode.fs"/>
     <Compile Include="MockOpenCode/ForkRuntimeIntegration.fs"/>

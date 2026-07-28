@@ -8,10 +8,8 @@ open Wanxiangshu.Next.Journal
 
 type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
     let gate = obj ()
-    let journal = journal
-    let runtimeId = runtimeId
 
-    let mutable authority: PromptAuthority.PromptAuthorityProjection =
+    let mutable authority =
         match journal with
         | Some j -> PromptAuthorityRestore.fromJournal j
         | None -> PromptAuthority.empty
@@ -19,11 +17,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
     member _.RuntimeId = runtimeId
     member _.Projection = lock gate (fun () -> authority)
 
-    member private _.Persist
-        (sessionId: SessionId)
-        (turnId: TurnId option)
-        (fact: AgentFact)
-        : Result<unit, string> =
+    member private _.Persist (sessionId: SessionId) (turnId: TurnId option) (fact: AgentFact) : Result<unit, string> =
         match journal with
         | None -> Ok()
         | Some j ->
@@ -34,8 +28,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
     member private _.Update(f: PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection) =
         lock gate (fun () -> authority <- f authority)
 
-    member private _.Read(f: PromptAuthority.PromptAuthorityProjection -> 'a) : 'a =
-        lock gate (fun () -> f authority)
+    member private _.Read(f: PromptAuthority.PromptAuthorityProjection -> 'a) : 'a = lock gate (fun () -> f authority)
 
     member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) =
         this.Update(PromptAuthority.registerAuthority profile)
@@ -48,24 +41,15 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
                    LogicalRunId = profile.LogicalRunId
                    HostMessageId = MessageId.value profile.AuthorityRootUserMessageId
                    AuthorityKind = string profile.AuthorityKind
-                   Agent = profile.Agent
-                   BaseProviderID = profile.BaseModel |> Option.map (fun m -> m.providerID)
-                   BaseModelID = profile.BaseModel |> Option.map (fun m -> m.modelID)
-                   Variant = profile.Variant |})
+                   SelectedAgent = profile.SelectedAgent
+                   PeerAgent = profile.PeerAgent
+                   CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
+                   SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |})
         |> function
             | Ok() -> ()
             | Error error -> raise (InvalidOperationException error)
 
-    member this.AcceptHumanRoot
-        sessionId
-        messageId
-        explicitAgent
-        explicitModel
-        explicitVariant
-        hostAgent
-        hostModel
-        hostVariant
-        =
+    member this.AcceptHumanRoot sessionId messageId explicitAgent hostAgent =
         PromptAuthorityAccept.acceptHumanRoot
             runtimeId
             this.Persist
@@ -74,11 +58,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
             sessionId
             messageId
             explicitAgent
-            explicitModel
-            explicitVariant
             hostAgent
-            hostModel
-            hostVariant
 
     member this.AcceptAgentOwnerRoot promptKey sessionId hostMessageId =
         PromptAuthorityAccept.acceptAgentOwnerRoot
@@ -124,7 +104,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
                 this.Update(fun _ -> next)
                 true
 
-    member private this.ClaimOps : PromptAuthoritySend.ClaimOps =
+    member private this.ClaimOps: PromptAuthoritySend.ClaimOps =
         { ClaimAndPersist =
             fun sessionId turnId fact claim ->
                 match this.Persist sessionId turnId fact with
@@ -172,10 +152,10 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
                                        LogicalRunId = p.LogicalRunId
                                        HostMessageId = MessageId.value messageId
                                        AuthorityKind = string p.AuthorityKind
-                                       Agent = p.Agent
-                                       BaseProviderID = p.BaseModel |> Option.map (fun m -> m.providerID)
-                                       BaseModelID = p.BaseModel |> Option.map (fun m -> m.modelID)
-                                       Variant = p.Variant |})
+                                       SelectedAgent = p.SelectedAgent
+                                       PeerAgent = p.PeerAgent
+                                       CanonicalRole = PromptAuthority.roleLabel p.CanonicalRole
+                                       SelectedTier = PromptAuthority.tierLabel p.SelectedTier |})
                         with
                         | Error e -> Error e
                         | Ok() ->
@@ -186,20 +166,10 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
 
                             Ok() }
 
-    member this.SendAgentOwnerRoot port sessionId text agent baseModel variant directory onAccepted =
-        PromptAuthoritySend.sendAgentOwnerRoot
-            this.ClaimOps
-            runtimeId
-            port
-            sessionId
-            text
-            agent
-            baseModel
-            variant
-            directory
-            onAccepted
+    member this.SendAgentOwnerRoot port sessionId text agent directory onAccepted =
+        PromptAuthoritySend.sendAgentOwnerRoot this.ClaimOps runtimeId port sessionId text agent directory onAccepted
 
-    member this.SendContinuation port sessionId text continuation profile effectiveModel directory onAccepted =
+    member this.SendContinuation port sessionId text continuation profile effectiveAgent directory onAccepted =
         PromptAuthoritySend.sendContinuation
             this.ClaimOps
             port
@@ -207,7 +177,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
             text
             continuation
             profile
-            effectiveModel
+            effectiveAgent
             directory
             onAccepted
 
@@ -215,7 +185,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
         this.Read(fun auth -> PromptAuthority.resolveKnownOrigin messageId promptKey hostCompaction auth)
 
     member this.ActiveProfile(sessionId: SessionId) =
-        this.Read (fun (auth: PromptAuthority.PromptAuthorityProjection) ->
+        this.Read(fun (auth: PromptAuthority.PromptAuthorityProjection) ->
             match auth.ActiveLogicalRun with
             | Some profile when profile.SessionId = sessionId -> Some profile
             | _ ->

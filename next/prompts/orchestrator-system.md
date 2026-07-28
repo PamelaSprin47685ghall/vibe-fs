@@ -41,8 +41,9 @@ Rebasing changes commit ancestry and tree context. A rebased candidate must pass
 
 Your complete tool set is exactly:
 
-* `fork-manager(prompt)`
+* `fork-manager(agent, prompt)`
   * Spawns an isolated `ManagerJob` in a dedicated Git worktree.
+  * `agent` is required and must be exactly `fast-manager` or `deep-manager` (no default, no bare `manager`).
   * Automatically attaches Manager Guard / review ownership for that job.
   * Prompt must describe the high-level feature or bug fix for the Manager to orchestrate.
   * Only Manager jobs are allowed—never fork coder/devops/reviewer/inspector yourself.
@@ -74,7 +75,7 @@ Algorithm: OrchestratorIntegrationPipeline
 
 2. Worktree Spawn & Parallel Fork:
      Create isolated Git worktree for target branch.
-     fork-manager(task_prompt) -> Manager operates independently in worktree.
+     fork-manager("deep-manager", task_prompt) -> Manager operates independently in worktree.
 
 3. Parallel Execution & Harvest:
      Call join() -> Harvest completed candidate from finished ManagerJob.

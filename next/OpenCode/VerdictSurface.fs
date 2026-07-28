@@ -26,10 +26,13 @@ module VerdictSurface =
 
     let private mkSid (s: string) = SessionId.create s
 
-    let private textFromParts (parts: obj array) =
-        CompletedTurnClassifier.partsText parts
+    let private textFromParts (parts: obj array) = CompletedTurnClassifier.partsText parts
 
-    let private latestUserPromptText (snapshot: ISessionSnapshotPort option) (sessionId: string) (preferredMessageId: string option) =
+    let private latestUserPromptText
+        (snapshot: ISessionSnapshotPort option)
+        (sessionId: string)
+        (preferredMessageId: string option)
+        =
         task {
             match snapshot with
             | None -> return None
@@ -39,9 +42,7 @@ module VerdictSurface =
                 match messagesResult with
                 | Error _ -> return None
                 | Ok messages ->
-                    let users =
-                        messages
-                        |> List.filter (fun message -> message.Role = "user")
+                    let users = messages |> List.filter (fun message -> message.Role = "user")
 
                     let preferred =
                         match preferredMessageId with
@@ -71,12 +72,12 @@ module VerdictSurface =
             let svc = PromptDispatcher.forJournal j
 
             match svc.ActiveProfile(SessionId.create sessionId) with
-            | Some profile when not (String.IsNullOrWhiteSpace profile.Agent) -> Some profile.Agent
-            | _ ->
+            | Some profile -> Some(PromptAuthority.roleLabel profile.CanonicalRole)
+            | None ->
                 Map.tryFind (SessionId.create sessionId) (AgentJournal.snapshot j).AgentProjections.Sessions
                 |> Option.bind (fun session -> session.PromptAuthority)
                 |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                |> Option.map (fun run -> run.Agent)
+                |> Option.map (fun run -> run.CanonicalRole)
 
     let create
         (sessionParents: Dictionary<string, string>)
@@ -98,8 +99,10 @@ module VerdictSurface =
                 // non-authority input; sessionRoles is never consulted.
                 let role =
                     match sid with
-                    | Some id -> authorityAgent journal id |> Option.orElse (contextString ctx "agent")
-                    | None -> contextString ctx "agent"
+                    | Some id ->
+                        authorityAgent journal id
+                        |> Option.orElse (contextString ctx "agent" |> Option.bind HostSessionContext.canonicalRole)
+                    | None -> contextString ctx "agent" |> Option.bind HostSessionContext.canonicalRole
 
                 let callId =
                     contextString ctx "toolCallId" |> Option.orElse (contextString ctx "callID")
@@ -188,8 +191,7 @@ module VerdictSurface =
                                     |> Option.orElse (contextString ctx "input")
                                 with
                                 | Some text -> return Some text
-                                | None ->
-                                    return! latestUserPromptText snapshot reviewerId physicalUserMessageId
+                                | None -> return! latestUserPromptText snapshot reviewerId physicalUserMessageId
                             }
 
                         match providerRunId with

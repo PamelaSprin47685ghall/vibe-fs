@@ -320,10 +320,10 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "primary-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "flow": [

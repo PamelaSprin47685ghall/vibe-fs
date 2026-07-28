@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -14,6 +15,7 @@ open Wanxiangshu.Next.Orchestrator
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let orchestratorKey = SessionId.value orchestratorId
     let worktrees = Dictionary<string, string>()
+    let managerAgents = Dictionary<string, string>()
     let stash = Dictionary<string, RunCompletion>()
 
     let gitPort = ProcessGitPort.createWithRepo deps.RepoPath OrchestratorGit.run
@@ -35,7 +37,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             onChildCreated = onChildCreated,
             onChildCreatedDir =
                 (fun _ childId dirOpt -> dirOpt |> Option.iter (fun path -> deps.RegisterChildDirectory childId path)),
-            ?modelResolver = deps.ModelConfig,
             directoryFor =
                 (fun agentId ->
                     match worktrees.TryGetValue agentId with
@@ -69,7 +70,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             if not (worktrees.ContainsKey managerId) then
                 worktrees.[managerId] <- worktree
 
-            let! forked = runtime.Fork(managerId, AgentRole.Manager, prompt)
+            let managerAgent =
+                match managerAgents.TryGetValue managerId with
+                | true, name when not (String.IsNullOrWhiteSpace name) -> name
+                | _ -> ManagedAgent.nameOf AgentTier.Fast Role.Manager
+
+            let! forked = runtime.Fork(managerId, AgentRole.Manager, prompt, agent = managerAgent)
 
             match forked with
             | Error err -> return Error err
@@ -80,7 +86,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | Error err -> return Error err
                 | Ok run ->
                     match run.Outcome with
-                    | AgentCompleted _ -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
+                    | AgentCompleted _ ->
+                        return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
                     | AgentFailed payload -> return Error payload.Message
                     | AgentAborted payload -> return Error payload.Message
         }
@@ -88,8 +95,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let runReviewerOnce (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
         task {
             let reviewerId = sprintf "%s-reviewer" managerId
+            // Host-owned post-rebase policy: always deep-reviewer (0.5.0 §10.3).
+            let reviewerAgent = ManagedAgent.nameOf AgentTier.Deep Role.Reviewer
             worktrees.[reviewerId] <- worktree
-            let! forked = runtime.Fork(reviewerId, AgentRole.Reviewer, prompt)
+            let! forked = runtime.Fork(reviewerId, AgentRole.Reviewer, prompt, agent = reviewerAgent)
 
             match forked with
             | Error err -> return Error err
@@ -106,13 +115,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         }
 
     let reverify (managerId: string) (worktree: string) (barrierKey: string) : Task<Result<unit, string>> =
-        OrchestratorHostReview.reverify
-            deps.Journal
-            orchestratorId
-            runReviewerOnce
-            managerId
-            worktree
-            barrierKey
+        OrchestratorHostReview.reverify deps.Journal orchestratorId runReviewerOnce managerId worktree barrierKey
 
     let managerPort: ManagerPort =
         { RunManager = runManager
@@ -221,8 +224,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     engineTask <- Some task
                     task)
 
-    member _.ForkManagerJob(managerId: string, prompt: string) : Task<Result<string, string>> =
+    member _.ForkManagerJob(managerId: string, managerAgent: string, prompt: string) : Task<Result<string, string>> =
         task {
+            managerAgents.[managerId] <- managerAgent
             let! engineResult = engine ()
 
             match engineResult with

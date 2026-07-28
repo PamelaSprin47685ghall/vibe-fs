@@ -20,28 +20,6 @@ module HostPendingRun =
     let completionSource () =
         TaskCompletionSource<AgentCompletionOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-    let resolveModel resolver journal childId =
-        match resolver, journal with
-        | Some resolver, Some journal ->
-            ModelResolver.resolveForSession resolver childId (AgentJournal.snapshot journal)
-        | _ -> None
-
-    /// New AgentOwnerRoot / omit-model default. Never inherits previous Side B.
-    let resolveAuthorityDefault resolver journal childId =
-        match resolver, journal with
-        | Some resolver, Some journal ->
-            ModelResolver.resolveAuthorityDefault
-                (Some resolver)
-                childId
-                (AgentJournal.snapshot journal)
-        | Some resolver, None -> Some resolver.SideA
-        | _ -> None
-
-    /// Fail-closed gate: a session is dead after 4 consecutive fallback failures
-    /// (DurableFallback.nextDecision = FallbackDecision.Dead). Returns a refusal
-    /// reason when the linked child is dead so callers can skip installs and sends.
-    let sessionDeadRefusal (journal: AgentJournal option) (childId: SessionId) : string option =
-        match journal with
-        | Some j when DurableFallback.isDead childId (AgentJournal.snapshot j) ->
-            Some(sprintf "Session %s is dead after 4 consecutive fallback failures" (SessionId.value childId))
-        | _ -> None
+    /// 0.5.0: provider retry count never kills a Logical Run. Kept for call-site
+    /// compatibility; always returns None for retry-count death.
+    let sessionDeadRefusal (_journal: AgentJournal option) (_childId: SessionId) : string option = None

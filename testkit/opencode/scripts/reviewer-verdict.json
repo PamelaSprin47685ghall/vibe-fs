@@ -9,14 +9,14 @@
     "strict": true
   },
   "session": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "bind": [
       "manager-title",
-      "manager"
+      "fast-manager"
     ]
   },
   "prompt": {
-    "agent": "manager",
+    "agent": "fast-manager",
     "text": "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report."
   },
   "flow": [
@@ -50,7 +50,7 @@
     },
     {
       "createSession": {
-        "agent": "manager",
+        "agent": "fast-manager",
         "bind": [
           "guard-manager-title",
           "guard-manager"
@@ -60,7 +60,7 @@
     },
     {
       "prompt": {
-        "agent": "manager",
+        "agent": "fast-manager",
         "text": "Attempt completion without review."
       },
       "session": "guard"
@@ -87,7 +87,7 @@
     },
     {
       "createSession": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "bind": [
           "reviewer-nudge-title",
           "reviewer-nudge"
@@ -97,7 +97,7 @@
     },
     {
       "prompt": {
-        "agent": "reviewer",
+        "agent": "fast-reviewer",
         "text": "Review the tree but do not submit a verdict."
       },
       "session": "nudge"
@@ -136,7 +136,7 @@
     {
       "id": "manager-fork-reviewer",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 1,
         "requestKind": "chat"
@@ -162,7 +162,7 @@
         "type": "tool-call",
         "tool": "fork",
         "args": {
-          "agent": "reviewer",
+          "agent": "fast-reviewer",
           "prompt": "Review review_target.txt and submit two PERFECT verdicts."
         }
       }
@@ -170,7 +170,7 @@
     {
       "id": "manager-join-reviewer",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 2,
         "requestKind": "chat"
@@ -200,7 +200,7 @@
     {
       "id": "manager-review-complete",
       "lane": {
-        "session": "manager",
+        "session": "fast-manager",
         "role": "manager",
         "turn": 3,
         "requestKind": "chat"
@@ -246,7 +246,7 @@
     {
       "id": "review-perfect-1",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 1,
         "requestKind": "chat",
@@ -271,7 +271,7 @@
     {
       "id": "reviewer-after-first-perfect",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 2,
         "requestKind": "chat",
@@ -295,7 +295,7 @@
     {
       "id": "review-perfect-confirmed",
       "lane": {
-        "session": "reviewer",
+        "session": "fast-reviewer",
         "role": "reviewer",
         "turn": 3,
         "requestKind": "chat",

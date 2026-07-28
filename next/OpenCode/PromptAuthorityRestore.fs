@@ -2,33 +2,51 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
 module PromptAuthorityRestore =
 
-    let private toProfile (sessionId: SessionId) (p: AuthorityProfileProjection) : PromptAuthority.AuthorityExecutionProfile =
-        let model =
-            match p.BaseProviderID, p.BaseModelID with
-            | Some providerID, Some modelID ->
-                Some
-                    { providerID = providerID
-                      modelID = modelID
-                      variant = p.Variant }
-            | _ -> None
-
+    let private toProfile
+        (sessionId: SessionId)
+        (p: AuthorityProfileProjection)
+        : Result<PromptAuthority.AuthorityExecutionProfile, string> =
         let kind =
             match p.AuthorityKind with
             | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
             | _ -> PromptAuthority.HumanRoot
 
-        { SessionId = sessionId
-          LogicalRunId = p.LogicalRunId
-          AuthorityRootUserMessageId = MessageId.create p.AuthorityRootUserMessageId
-          AuthorityKind = kind
-          Agent = p.Agent
-          BaseModel = model
-          Variant = p.Variant }
+        match ManagedAgent.parse p.SelectedAgent with
+        | Error err -> Error(ManagedAgent.formatParseError err)
+        | Ok selected ->
+            let peer = ManagedAgent.peer selected
+
+            let canonicalRole =
+                match PromptAuthority.tryParseRole p.CanonicalRole with
+                | Some role -> role
+                | None -> selected.Role
+
+            let selectedTier =
+                match PromptAuthority.tryParseTier p.SelectedTier with
+                | Some tier -> tier
+                | None -> selected.Tier
+
+            let peerAgent =
+                if String.IsNullOrWhiteSpace p.PeerAgent then
+                    peer.Name
+                else
+                    p.PeerAgent
+
+            Ok
+                { SessionId = sessionId
+                  LogicalRunId = p.LogicalRunId
+                  AuthorityRootUserMessageId = MessageId.create p.AuthorityRootUserMessageId
+                  AuthorityKind = kind
+                  SelectedAgent = selected.Name
+                  PeerAgent = peerAgent
+                  CanonicalRole = canonicalRole
+                  SelectedTier = selectedTier }
 
     /// Rebuild the in-memory authority projection from durable journal facts.
     /// Pending claims only reconstruct continuation kinds that still have an active run.
@@ -39,8 +57,19 @@ module PromptAuthorityRestore =
             match session.PromptAuthority with
             | None -> ()
             | Some durable ->
-                let last = durable.LastAuthorityProfile |> Option.map (toProfile sessionId)
-                let active = durable.ActiveLogicalRun |> Option.map (toProfile sessionId)
+                let last =
+                    durable.LastAuthorityProfile
+                    |> Option.bind (fun p ->
+                        match toProfile sessionId p with
+                        | Ok profile -> Some profile
+                        | Error _ -> None)
+
+                let active =
+                    durable.ActiveLogicalRun
+                    |> Option.bind (fun p ->
+                        match toProfile sessionId p with
+                        | Ok profile -> Some profile
+                        | Error _ -> None)
 
                 let pending =
                     durable.PendingClaims
@@ -52,12 +81,7 @@ module PromptAuthorityRestore =
 
                             Some(
                                 key,
-                                PromptAuthority.claimContinuation
-                                    key
-                                    sessionId
-                                    kind
-                                    profile
-                                    profile.BaseModel
+                                PromptAuthority.claimContinuation key sessionId kind profile profile.SelectedAgent
                             )
                         | _ -> None)
                     |> Map.ofList
@@ -73,8 +97,6 @@ module PromptAuthorityRestore =
 
                 let repair = durable.RepairClaims |> Set.ofList
 
-                // Last session wins for single-runtime restore of the shared service cache.
-                // Multi-session values still live in journal folds; ActiveProfile filters by session.
                 projection <-
                     { LastAuthorityProfile = last |> Option.orElse projection.LastAuthorityProfile
                       ActiveLogicalRun = active |> Option.orElse projection.ActiveLogicalRun

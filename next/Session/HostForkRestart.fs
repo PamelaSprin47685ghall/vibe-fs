@@ -21,7 +21,11 @@ module HostForkRestart =
             |> Array.choose (fun part ->
                 if isNull part then
                     None
-                elif not (isNull part?``type``) && unbox<string> part?``type`` = "text" && not (isNull part?text) then
+                elif
+                    not (isNull part?``type``)
+                    && unbox<string> part?``type`` = "text"
+                    && not (isNull part?text)
+                then
                     Some(unbox<string> part?text)
                 else
                     None)
@@ -44,17 +48,17 @@ module HostForkRestart =
         (agentId: string)
         (childSessionId: SessionId)
         (role: AgentRole)
+        (agent: string)
         : Task<unit> =
         task {
-            runtime.Restore(agentId, role)
+            runtime.Restore(agentId, role, agent = agent)
             runtime.BindChildSession(agentId, SessionId.value childSessionId)
 
             match snapshot with
             | None -> runtime.MarkInterrupted(agentId, "host restart: no session snapshot")
             | Some port ->
                 match! port.GetMessages childSessionId with
-                | Error reason ->
-                    runtime.MarkInterrupted(agentId, sprintf "host restart: snapshot failed: %s" reason)
+                | Error reason -> runtime.MarkInterrupted(agentId, sprintf "host restart: snapshot failed: %s" reason)
                 | Ok messages ->
                     match lastByRole messages "assistant" with
                     | None -> ()
@@ -87,20 +91,18 @@ module HostForkRestart =
                     | Some assistant ->
                         runtime.MarkInterrupted(
                             agentId,
-                            sprintf
-                                "host restart: child not terminal (finish=%s)"
-                                (defaultArg assistant.Finish "none")
+                            sprintf "host restart: child not terminal (finish=%s)" (defaultArg assistant.Finish "none")
                         )
         }
 
     let recoverAll
         (runtime: ForkRuntime)
         (snapshot: ISessionSnapshotPort option)
-        (children: IDictionary<string, SessionId * AgentRole>)
+        (children: IDictionary<string, SessionId * AgentRole * string>)
         : Task<unit> =
         task {
-            for KeyValue(agentId, (childSessionId, role)) in children do
-                do! recoverChild runtime snapshot agentId childSessionId role
+            for KeyValue(agentId, (childSessionId, role, agent)) in children do
+                do! recoverChild runtime snapshot agentId childSessionId role agent
         }
 
     let restoreLinkedChildren
@@ -117,19 +119,20 @@ module HostForkRestart =
         match Map.tryFind parentId projection.AgentProjections.Sessions with
         | Some session when session.Linkage.IsSome ->
             let linkage = session.Linkage.Value
-            let recovered = Dictionary<string, SessionId * AgentRole>()
+            let recovered = Dictionary<string, SessionId * AgentRole * string>()
 
             for KeyValue(childId, agentId) in linkage.LinkedChildren do
-                let role =
-                    linkage.LinkedRoles
-                    |> Map.tryFind childId
-                    |> Option.bind roleOfString
+                let managedName =
+                    linkage.LinkedRoles |> Map.tryFind childId |> Option.defaultValue ""
+
+                let role = AgentRoleHelpers.roleOfString managedName
 
                 match role with
                 | Some role ->
                     let childSessionId = SessionId.create (ChildId.value childId)
+                    let agent = AgentRoleHelpers.defaultFastManagedName role
                     children.[agentId] <- childSessionId
-                    recovered.[agentId] <- (childSessionId, role)
+                    recovered.[agentId] <- (childSessionId, role, agent)
                     childCreatedDir agentId childSessionId (directoryOf agentId)
                 | None -> ()
 

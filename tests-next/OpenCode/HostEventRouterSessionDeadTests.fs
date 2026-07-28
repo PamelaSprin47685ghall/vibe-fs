@@ -13,10 +13,8 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.EventDrivenHarness
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
-/// SessionDead gate at the Decide (TerminalPolicies) path: a dead session must
-/// not receive a ReviewGuard guard prompt or a zero-width continuation nudge.
-/// A non-dead session (fewer than 4 failures) must still receive its guard
-/// prompt (no over-blocking).
+/// SessionDead gate removed for retry-count death in 0.5.0 (infinite A/A/B/B).
+/// These tests prove four fallback advances do not suppress Decide nudges.
 module HostEventRouterSessionDeadTests =
 
     let private recordingPort (prompts: ResizeArray<string * string>) =
@@ -109,13 +107,14 @@ module HostEventRouterSessionDeadTests =
             |> ignore
 
     [<Fact>]
-    let ``Dead_manager_session_receives_no_guard_prompt_at_terminal`` () =
+    let ``Four_failures_do_not_block_manager_guard_prompt`` () =
         withTempDir (fun d ->
             task {
-                let sid = "dead-mgr"
+                let sid = "wrap-mgr"
                 let prompts = ResizeArray<string * string>()
                 let sessionPort = recordingPort prompts
                 use j = AgentJournal.create d (RuntimeId.create "r-dm") 1 DateTimeOffset.UtcNow
+                registerAuthorityRoot j sid "manager"
                 recordFailures j sid 4
 
                 applyDecide
@@ -129,17 +128,20 @@ module HostEventRouterSessionDeadTests =
                     (completedTurn sid AgentRole.Manager [| textPart "manager done" |])
 
                 do! drainMicrotasks 16
-                Assert.Empty(prompts)
+                // 0.5.0: isDead is always false — retry count does not suppress guard.
+                Assert.Single(prompts) |> ignore
+                Assert.Contains("Review is required before completion.", snd prompts.[0])
             })
 
     [<Fact>]
-    let ``Dead_session_receives_no_zero_width_continuation_at_terminal`` () =
+    let ``Four_failures_do_not_block_zero_width_continuation`` () =
         withTempDir (fun d ->
             task {
-                let sid = "dead-cont"
+                let sid = "wrap-cont"
                 let prompts = ResizeArray<string * string>()
                 let sessionPort = recordingPort prompts
                 use j = AgentJournal.create d (RuntimeId.create "r-dc") 1 DateTimeOffset.UtcNow
+                registerAuthorityRoot j sid "coder"
                 recordFailures j sid 4
 
                 applyDecide
@@ -153,11 +155,12 @@ module HostEventRouterSessionDeadTests =
                     (completedTurn sid AgentRole.Coder [| textPart "" |])
 
                 do! drainMicrotasks 16
-                Assert.Empty(prompts)
+                // Infinite cycle: empty coder terminal may still nudge; must not be gated by Dead.
+                Assert.NotEmpty(prompts)
             })
 
     [<Fact>]
-    let ``Non_dead_manager_with_prior_failures_still_receives_guard`` () =
+    let ``Manager_with_prior_failures_still_receives_guard`` () =
         withTempDir (fun d ->
             task {
                 let sid = "non-dead-mgr"

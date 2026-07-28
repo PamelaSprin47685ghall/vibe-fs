@@ -22,6 +22,7 @@ module CompanionHostTests =
         let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
         let mutable childCount = 0
         let mutable sentModel: OpencodeModel option = None
+        let mutable sentAgent: string option = None
         let mutable output = [ "history" ]
         let mutable prompts: string list = []
         let mutable sendError = false
@@ -51,6 +52,7 @@ module CompanionHostTests =
                 member _.SendPrompt(_, prompt, options) =
                     prompts <- prompts @ [ prompt ]
                     sentModel <- options.Model
+                    sentAgent <- options.Agent
 
                     if sendError then
                         Task.FromResult(Error "send failed")
@@ -84,8 +86,7 @@ module CompanionHostTests =
         task {
             let host, childCount, sentModel, _, _, _, _ = makeFake ()
 
-            let companion =
-                new CompanionHost(SessionId.create "primary", host, ?bloggerModel = Some(Ok bloggerModel))
+            let companion = new CompanionHost(SessionId.create "primary", host)
 
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
             do! companion.WaitInFlightAsync()
@@ -93,7 +94,7 @@ module CompanionHostTests =
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":2}"))
             do! companion.WaitInFlightAsync()
             Assert.Equal(1, childCount ())
-            Assert.Equal(Some bloggerModel, sentModel ())
+            Assert.True((sentModel ()).IsNone)
             Assert.True(companion.EnablePrefixReplacement())
 
             let messages =
@@ -122,8 +123,7 @@ module CompanionHostTests =
                 let durable = AgentJournalCompanionPort(journal) :> ICompanionDurablePort
                 let host, _, _, _, _, _, _ = makeFake ()
 
-                let companion =
-                    new CompanionHost(primaryId, host, durable, ?bloggerModel = Some(Ok bloggerModel))
+                let companion = new CompanionHost(primaryId, host, durable)
 
                 Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
                 do! companion.WaitInFlightAsync()
@@ -149,8 +149,7 @@ module CompanionHostTests =
 
                 let restoredHost, _, _, _, _, _, _ = makeFake ()
 
-                let restored =
-                    new CompanionHost(primaryId, restoredHost, restoredDurable, ?bloggerModel = Some(Ok bloggerModel))
+                let restored = new CompanionHost(primaryId, restoredHost, restoredDurable)
 
                 Assert.Equal(Some "blog paragraph\n\nblog paragraph", restored.Memory.LatestB)
                 Assert.Equal(Some "{\"step\":2}", restored.Memory.LastSuccessfulProjection)
@@ -162,8 +161,7 @@ module CompanionHostTests =
         task {
             let host, _, _, _, _, _, _ = makeFake ()
 
-            let companion =
-                new CompanionHost(SessionId.create "canonical-primary", host, ?bloggerModel = Some(Ok bloggerModel))
+            let companion = new CompanionHost(SessionId.create "canonical-primary", host)
 
             let first =
                 [ createObj
@@ -246,8 +244,7 @@ module CompanionHostTests =
                     member _.CreateChildSession(_, _) = Task.FromResult(Ok childId)
                     member _.GetSessionOutput(_) = output }
 
-            let companion =
-                new CompanionHost(SessionId.create "rebase-primary", host, ?bloggerModel = Some(Ok bloggerModel))
+            let companion = new CompanionHost(SessionId.create "rebase-primary", host)
 
             // P0: submit a projection to establish baseline + B.
             let p0 = """{"step":1}"""
