@@ -48,6 +48,12 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.deepEqual(Object.keys(hooks.tool.inspector.args).sort(), ['agent', 'prompt', 'prompts']);
     assert.deepEqual(Object.keys(hooks.tool.coder.args).sort(), ['agent', 'prompt', 'prompts']);
 
+    for (const [toolName, definition] of Object.entries(hooks.tool)) {
+      for (const [argName, schema] of Object.entries(definition.args)) {
+        assert.equal(typeof schema?.safeParse, 'function', `${toolName}.${argName} must use the host schema builder`);
+      }
+    }
+
     const forkAgentSchema = schemaText(hooks.tool.fork.args.agent);
     assert.match(forkAgentSchema, /fast-coder/);
     assert.match(forkAgentSchema, /deep-coder/);
@@ -76,6 +82,11 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.match(coderSchema, /fast-coder/);
     assert.match(coderSchema, /deep-coder/);
     assert.equal(hooks.tool.coder.args.agent.isOptional?.() ?? false, false);
+
+    for (const name of ['inspector', 'coder']) {
+      assert.equal(hooks.tool[name].args.prompt.isOptional?.() ?? false, true);
+      assert.equal(hooks.tool[name].args.prompts.isOptional?.() ?? false, true);
+    }
 
     const omitFork = hooks.tool.fork.args.agent.safeParse?.(undefined)
       ?? hooks.tool.fork.args.agent.safeParseAsync?.(undefined);

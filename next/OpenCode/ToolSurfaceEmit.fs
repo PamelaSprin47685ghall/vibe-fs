@@ -28,6 +28,9 @@ module ToolSurfaceEmit =
     [<Emit("$0.schema.string().optional()")>]
     let optionalStringSchema (tool: obj) : obj = jsNative
 
+    [<Emit("$0.schema.array($0.schema.string()).optional()")>]
+    let optionalStringArraySchema (tool: obj) : obj = jsNative
+
     let looksLikeHandleId (value: string) =
         if String.IsNullOrWhiteSpace value then
             false

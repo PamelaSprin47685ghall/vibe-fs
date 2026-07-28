@@ -16,9 +16,6 @@ module CoderTool =
 
     open ToolSurfaceEmit
 
-    [<Emit("$0.schema.enum($1)")>]
-    let private enumSchema (tool: obj) (values: string array) : obj = jsNative
-
     let private stringify (value: obj) : string =
         if isNull value then "null" else JS.JSON.stringify value
 
@@ -254,8 +251,8 @@ module CoderTool =
         let argsObj =
             createObj
                 [ "agent", box (enumSchema factory (ManagedAgent.coderToolNames |> List.toArray))
-                  "prompt", box (createObj [ "type", box "string" ])
-                  "prompts", box (createObj [ "type", box "array"; "items", box (createObj [ "type", box "string" ]) ]) ]
+                  "prompt", box (optionalStringSchema factory)
+                  "prompts", box (optionalStringArraySchema factory) ]
 
         applyTool
             factory

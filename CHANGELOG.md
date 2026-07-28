@@ -24,6 +24,10 @@ Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infi
 - E2E gate retarget: `docs/E2E_RELEASE_GUIDE.md`
 - Surgical AGENTS.md updates for Prompt Authority / Fallback Host contract
 
+### Runtime fixes
+
+- Fixed `coder`/`inspector` argument schemas leaking Zod internals into provider JSON, which made DevOps requests fail immediately with `invalid_request_error`; all custom tool arguments are now guarded against raw-schema mixing.
+
 ### Not in this RC cut
 
 - No F#/JS production code delta yet for Managed Agent / infinite AABB
