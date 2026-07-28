@@ -1,0 +1,90 @@
+{
+  "formatter": false,
+  "lsp": false,
+  "permission": {
+    "*": "allow"
+  },
+  "model": "[REDACTED]",
+  "provider": {
+    "test": {
+      "name": "Test",
+      "id": "test",
+      "env": [],
+      "baseURL": "[REDACTED]",
+      "apiKey": "[REDACTED]",
+      "models": {
+        "test-model": {
+          "id": "test-model"
+        },
+        "test-model-b": {
+          "id": "test-model-b"
+        }
+      }
+    }
+  },
+  "agent": {
+    "fast-orchestrator": {
+      "model": "test/test-model"
+    },
+    "deep-orchestrator": {
+      "model": "test/test-model-b"
+    },
+    "fast-manager": {
+      "model": "test/test-model"
+    },
+    "deep-manager": {
+      "model": "test/test-model-b"
+    },
+    "fast-coder": {
+      "model": "test/test-model"
+    },
+    "deep-coder": {
+      "model": "test/test-model-b"
+    },
+    "fast-inspector": {
+      "model": "test/test-model"
+    },
+    "deep-inspector": {
+      "model": "test/test-model-b"
+    },
+    "fast-devops": {
+      "model": "test/test-model"
+    },
+    "deep-devops": {
+      "model": "test/test-model-b"
+    },
+    "fast-browser": {
+      "model": "test/test-model"
+    },
+    "deep-browser": {
+      "model": "test/test-model-b"
+    },
+    "fast-meditator": {
+      "model": "test/test-model"
+    },
+    "deep-meditator": {
+      "model": "test/test-model-b"
+    },
+    "fast-reviewer": {
+      "model": "test/test-model"
+    },
+    "deep-reviewer": {
+      "model": "test/test-model-b"
+    },
+    "fast-blogger": {
+      "model": "test/test-model"
+    },
+    "deep-blogger": {
+      "model": "test/test-model-b"
+    },
+    "fast-executor": {
+      "model": "test/test-model"
+    },
+    "deep-executor": {
+      "model": "test/test-model-b"
+    }
+  },
+  "plugin": [
+    "[REDACTED]"
+  ]
+}

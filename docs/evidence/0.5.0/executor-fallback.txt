@@ -1,0 +1,8 @@
+Executor fast-start AABB pair evidence
+=======================================
+- fast-executor / deep-executor are internal Managed Agents.
+- Each new Executor Agent summary Logical Run starts from the fast tier.
+- PeerAgent for a fast-executor is deep-executor; AABB cursor applies.
+- Source: next/OpenCode/ExecutorSummarize.fs, next/OpenCode/ExecutorSummarizeRuntime.fs
+- Canary: executor-canary.mjs passed (see canary-3round-clean.txt).
+- Unit: FallbackContractTests cover modulo-4 AABB for all managed agents.

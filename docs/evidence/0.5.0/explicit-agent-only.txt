@@ -1,0 +1,14 @@
+const REQUIRED_AGENTS = [
+  'fast-orchestrator', 'deep-orchestrator',
+  'fast-manager', 'deep-manager',
+  'fast-coder', 'deep-coder',
+  'fast-inspector', 'deep-inspector',
+  'fast-devops', 'deep-devops',
+  'fast-browser', 'deep-browser',
+  'fast-meditator', 'deep-meditator',
+  'fast-reviewer', 'deep-reviewer',
+  'fast-blogger', 'deep-blogger',
+  'fast-executor', 'deep-executor',
+];
+
+Manager tool schema rejects bare canonical and build/plan aliases.

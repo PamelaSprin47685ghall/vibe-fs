@@ -1,0 +1,8 @@
+Blogger fast-start AABB pair evidence
+======================================
+- fast-blogger / deep-blogger are internal Managed Agents (not in LLM tool schemas).
+- Each new Blogger Logical Run starts from the fast tier (offset 0).
+- PeerAgent for a fast-blogger is deep-blogger; fallback cursor cycles modulo-4.
+- Source: next/Session/CompanionHostBlogger.fs, next/OpenCode/ExecutorSummarizeRuntime.fs pattern.
+- Canary: companion-canary.mjs passed (see canary-3round-clean.txt).
+- Unit: FallbackContractTests, EffectiveAgentResolverTests cover AABB for all managed agents.

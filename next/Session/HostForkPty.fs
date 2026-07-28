@@ -8,6 +8,21 @@ open Wanxiangshu.Next.Kernel.Identity
 [<AutoOpen>]
 module HostForkRuntimePty =
     type HostForkRuntime with
+        member this.TrackPtyRun(id: PtyId) =
+            lock this.Gate (fun () -> this.PtyRuns.Add id.Value |> ignore)
+
+        member this.RegisterPtySnapshot (id: PtyId) (command: string) =
+            this.Runtime.RegisterPty
+                { PtyId = id.Value
+                  AgentId = id.Value
+                  Command = command
+                  StartedAt = DateTimeOffset.UtcNow }
+
+        member this.UntrackPtyRun(id: string) = this.Runtime.UnregisterPty id
+
+        member this.IsPtyCompletion(runId: string) =
+            lock this.Gate (fun () -> this.PtyRuns.Contains runId)
+
         member this.ForkPty(command: string, ?cwd: string) : Task<Result<PtyId, string>> =
             task {
                 if String.IsNullOrWhiteSpace command then

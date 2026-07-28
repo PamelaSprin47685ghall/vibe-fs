@@ -105,6 +105,7 @@
     <Compile Include="Session/HostForkAgentOwner.fs"/>
     <Compile Include="Session/HostForkRestart.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
+    <Compile Include="Session/HostForkRuntimeFork.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
     <Compile Include="Session/CompanionJournalPort.fs"/>
