@@ -100,6 +100,7 @@
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
     <Compile Include="Session/HostForkChildDispatch.fs"/>
     <Compile Include="Session/HostForkAgentOwner.fs"/>
+    <Compile Include="Session/HostForkRestart.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>

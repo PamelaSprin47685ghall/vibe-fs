@@ -112,7 +112,8 @@ module ToolSurface =
                                         (fun sessionId ->
                                             match backgroundBFor with
                                             | Some fn -> fn (SessionId.value sessionId)
-                                            | None -> None)
+                                            | None -> None),
+                                    ?sessionSnapshot = snapshot
                                 )
 
                             runtimes.[sid] <- r

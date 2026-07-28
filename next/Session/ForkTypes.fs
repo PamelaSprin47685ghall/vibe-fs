@@ -19,6 +19,7 @@ type AgentRole =
 type AgentStatus =
     | Idle
     | Busy
+    | Interrupted
     | Closed
 
 [<RequireQualifiedAccess>]

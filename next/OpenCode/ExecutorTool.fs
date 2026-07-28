@@ -163,37 +163,27 @@ module ExecutorTool =
                                     )
                             | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                                 try
-                                    try
-                                        let execRuntime = executorRuntimeFor context
+                                    let execRuntime = executorRuntimeFor context
 
-                                        let! summary =
-                                            ExecutorSummarize.summarizeSpool
-                                                (ExecutorSummarize.asExecutorRuntime execRuntime)
-                                                spoolPath
+                                    let! summary =
+                                        ExecutorSummarize.summarizeSpool
+                                            (ExecutorSummarize.asExecutorRuntime execRuntime)
+                                            spoolPath
 
-                                        return
-                                            box (
-                                                stringify (
-                                                    createObj
-                                                        [ "exitCode", box exitCode
-                                                          "summary", box summary
-                                                          "spoolPath", box spoolPath
-                                                          "totalBytes", box totalBytes
-                                                          "chunkCount", box chunkCount ]
-                                                )
-                                            )
-                                    finally
-                                        Spool.delete spoolPath
-                                with ex ->
-                                    Spool.delete spoolPath
-
+                                    // Partial summary still preserves ProcessResult metadata.
                                     return
                                         box (
                                             stringify (
                                                 createObj
-                                                    [ "error", box (sprintf "Executor summarizer failed: %s" ex.Message) ]
+                                                    [ "exitCode", box exitCode
+                                                      "summary", box summary
+                                                      "spoolPath", box spoolPath
+                                                      "totalBytes", box totalBytes
+                                                      "chunkCount", box chunkCount ]
                                             )
                                         )
+                                finally
+                                    Spool.delete spoolPath
                             | Ok(RunnerOutcome.OutputExceeded(bytesWritten, spoolPathOpt)) ->
                                 match spoolPathOpt with
                                 | Some path -> Spool.delete path

@@ -150,17 +150,14 @@ module ExecutorSummarizeTests =
             System.IO.File.Delete(spool.Path)
         }
 
-    // --- 2. summarizer failure propagates and the spool is cleaned up --------
+    // --- 2. summarizer failure returns partial summary + raw tail ---------------
 
     [<Fact>]
-    let ``ExecutorSummarize_failed_summarizer_propagates_and_spool_is_deleted`` () =
+    let ``ExecutorSummarize_failed_summarizer_returns_partial_and_raw_tail`` () =
         task {
-            // The production ExecutorTool path deletes the spool in a `finally`
-            // on both success and failure. ExecutorTool.create cannot be
-            // constructed without a live JS tool module, so we exercise the same
-            // contract at the ExecutorSummarize + Spool level: a failing
-            // summarizer must propagate its exception AND the spool file must be
-            // removed (see report for the seam rationale).
+            // Map/reduce failure must not drop ProcessResult: return partial
+            // summary plus last 200KB raw tail. Spool cleanup remains the
+            // tool-layer finally contract.
             let spool = Spool.startStreamingSpool ()
             Spool.appendStreamingSpool spool (Array.init 5000 (fun i -> byte (i % 251)))
             Assert.True(System.IO.File.Exists(spool.Path), "spool should exist before summarization")
@@ -171,20 +168,20 @@ module ExecutorSummarizeTests =
                         Task.FromResult(Ok(ForkResult.Created "x"))
 
                     member _.Join() =
-                        Task.FromResult(Ok(mkCompletion "x" (AgentCompletion.ofSimpleError "x" "run-x" AgentRole.Executor "summarizer boom"))) }
+                        Task.FromResult(
+                            Ok(
+                                mkCompletion
+                                    "x"
+                                    (AgentCompletion.ofSimpleError "x" "run-x" AgentRole.Executor "summarizer boom")
+                            )
+                        ) }
 
-            let! propagated =
-                task {
-                    try
-                        let! _ = ExecutorSummarize.summarizeSpool failingRuntime spool.Path
-                        return false
-                    with _ ->
-                        return true
-                }
-
+            let! summary = ExecutorSummarize.summarizeSpool failingRuntime spool.Path
             Spool.delete spool.Path
-            Assert.True(propagated, "a failing summarizer must propagate its exception")
-            Assert.False(System.IO.File.Exists(spool.Path), "spool must be deleted on the failure path")
+
+            Assert.True(summary.Contains("raw tail"), sprintf "expected raw tail, got: %s" summary)
+            Assert.True(summary.Contains("partial"), sprintf "expected partial marker, got: %s" summary)
+            Assert.False(System.IO.File.Exists(spool.Path), "spool must be deleted by caller")
         }
 
     // --- 3. mailbox isolation --------------------------------------------------
