@@ -37,7 +37,7 @@ Evidence directory: `docs/evidence/0.4.0-rc.3-dev/`
 2. Clean checkout rebuild: `git clean -xfd && npm ci && npm run test:release` on that commit.
 3. Version cutover only after clean-checkout green:
    `0.4.0-rc.3-dev` → `0.4.0-rc.3` in package manifests + CHANGELOG.
-4. Optional: provider request-trace proof of same-run A/A/B/B under real retries.
+4. **Blocking for final 0.4.0**: provider request-trace proof of same-run A/A/B/B under real retries.
 5. Final `0.4.0` only after RC observation period and a second clean-checkout gate.
 
 ## No-Go still checked

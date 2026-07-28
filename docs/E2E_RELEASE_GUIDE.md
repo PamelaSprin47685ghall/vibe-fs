@@ -141,4 +141,4 @@ npm install /absolute/path/to/wanxiangshu-<version>.tgz
 node -e "import('wanxiangshu')"
 ```
 
-发布 manifest 必须 `private: false`；公开发布必须有选择后的许可证文件与一致的 `license` 字段。最终版本升为 `0.4.0` 前，在新的干净 checkout 重跑整套门禁，不能复用 RC build。
+当前默认最终分发为**私有交付**：manifest 保持 `private: true`，`license` 为 `SEE LICENSE IN LICENSE`，生成 tarball 但不公开发布到 npm。仅在完成正式许可证与商业授权审查后，才允许将 manifest 改为 `private: false` 并公开发布。最终版本升为 `0.4.0` 前，在新的干净 checkout 重跑整套门禁，不能复用 RC build。

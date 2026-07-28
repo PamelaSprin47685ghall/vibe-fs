@@ -13,9 +13,13 @@ Merge `worktree-0-branch` role system prompts and session-wide A semantics on to
 
 ### Still blocking final 0.4.0
 
-- Clean-checkout three-round gate on this merge commit
-- Observation period
-- Optional real-provider same-run A/A/B/B request traces
+- Clean-checkout three-round gate on this merge commit (`docs/evidence/0.4.0-rc.5/`)
+- RC observation period with event-driven exit (no open P0/P1)
+- **Blocking**: provider-visible same-run A/A/B/B request trajectory (`A → A → B → B`, no 5th request) plus omit-model BaseModel inheritance reset
+- Private distribution only unless a separate license decision replaces `LICENSE`
+- Final `0.4.0` cut requires a second clean-checkout gate on the real version number
+
+Scope freeze: `docs/SCOPE-0.4.0-FREEZE.md`.
 
 ## 0.4.0-rc.4 — release candidate
 
@@ -32,7 +36,7 @@ Amended from a premature `0.4.0` final cut. Current ship marker is **`0.4.0-rc.4
 ### Still blocking final 0.4.0
 
 - Observation period on this RC
-- Optional real-provider same-run A/A/B/B request traces
+- **Blocking** provider-visible same-run A/A/B/B request trajectory (policy aligned 2026-07-28)
 - Commercial distribution policy if publishing outside private license terms
 - Final promotion requires a later clean-checkout gate on a true `0.4.0` version cut
 
@@ -67,8 +71,8 @@ First real release candidate for the 0.4.0 track. Cut only after clean-checkout 
 
 ### Still blocking final 0.4.0
 
-- Optional: same-run provider request traces proving strict A/A/B/B under real provider retries
-- Commercial distribution license/private package policy review
+- **Blocking**: same-run provider request traces proving strict A/A/B/B under real provider retries
+- Commercial distribution license/private package policy review (default remains private)
 - Final `0.4.0` only after RC observation + second clean-checkout gate on this RC tag
 
 ## 0.4.0-rc.2 / 0.4.0-rc.1 — historical development markers

@@ -43,5 +43,5 @@ Evidence: `docs/evidence/0.4.0-rc.3/`
 
 - RC observation period
 - Second clean-checkout gate after promotion to `0.4.0`
-- Optional real-provider same-run A/A/B/B request traces
+- **Blocking for final 0.4.0**: real-provider same-run A/A/B/B request traces (policy aligned 2026-07-28)
 - Commercial license / private package policy for external distribution

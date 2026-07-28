@@ -7,7 +7,7 @@
 ## 发行阻断
 
 - **Prompt Authority**：所有插件 user-shaped message 必须经 runtime 单例 `PromptAuthorityService`。未识别来源默认 UnknownOrigin fail-closed，绝不可默认 Human。AgentOwnerRoot 必须两阶段 claim→send→AuthorityRootAccepted，禁止事后补登记。
-- **Fallback Host contract**：Fallback 属于 Logical Run。新 Authority Root 创建新 epoch（Failures=0, Side=A）。真人省略 model 只继承 `LastAuthorityProfile.BaseModel`，永不继承旧 Run Side B。同 Run A/A/B/B 以 durable retry writer + 插件 EffectiveModel 路径落地；真实 provider request-trace 仍建议在 RC 观察期补强。
+- **Fallback Host contract**：Fallback 属于 Logical Run。新 Authority Root 创建新 epoch（Failures=0, Side=A）。真人省略 model 只继承 `LastAuthorityProfile.BaseModel`，永不继承旧 Run Side B。同 Run A/A/B/B 以 durable retry writer + 插件 EffectiveModel 路径落地。**发行阻断**：最终 `0.4.0` 必须具备同一 Logical Run 内 provider-visible 请求轨迹 `A → A → B → B` 且无第五次 request 的直接证据；mock canary alone 不足。
 - **Companion eligibility**：只读 `ActiveLogicalRun.Profile.Agent`。禁止 `sessionRoles`、最后物理 user agent、transform input agent、child linkage 作为生产后备来源。
 - **Review witness**：第二次 PERFECT 优先 physical confirmation Host message ID + AuthorityRoot；缺真实 ProviderRunId fail-closed。
 - **Companion projection**：epoch 只能替换 `LastSuccessfulProjection` 已证明覆盖的完整 semantic-turn 前缀，必须保留 Blogger 未覆盖 raw tail。

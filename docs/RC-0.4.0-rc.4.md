@@ -28,4 +28,4 @@ Evidence: `docs/evidence/0.4.0-rc.4/`
 
 - This supersedes an accidental premature `0.4.0` final cut.
 - Final `0.4.0` still requires a later clean-checkout promotion after observation.
-- Optional real-provider same-run A/A/B/B request traces remain non-blocking follow-up.
+- Real-provider same-run A/A/B/B request traces are **blocking for final 0.4.0** (policy aligned 2026-07-28); historical rc.4 notes that called them optional are superseded by `docs/SCOPE-0.4.0-FREEZE.md`.
