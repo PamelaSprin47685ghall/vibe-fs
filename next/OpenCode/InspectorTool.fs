@@ -230,8 +230,28 @@ module InspectorTool =
 
                                         finish "aborted: parent cancelled")
 
+                                let cleanup () =
+                                    task {
+                                        detachAbort ()
+
+                                        match abortTask with
+                                        | Some task ->
+                                            try
+                                                let! _ = task
+                                                ()
+                                            with _ ->
+                                                ()
+                                        | None ->
+                                            try
+                                                let! _ = sessionPort.AbortSession childId
+                                                ()
+                                            with _ ->
+                                                ()
+                                    }
+
                                 try
                                     let! resultText = tcs.Task
+                                    do! cleanup ()
 
                                     return
                                         box (
@@ -245,22 +265,9 @@ module InspectorTool =
                                                       "output", box resultText ]
                                             )
                                         )
-                                finally
-                                    detachAbort ()
-
-                                    match abortTask with
-                                    | Some task ->
-                                        try
-                                            let! _ = task
-                                            ()
-                                        with _ ->
-                                            ()
-                                    | None ->
-                                        try
-                                            let! _ = sessionPort.AbortSession childId
-                                            ()
-                                        with _ ->
-                                            ()
+                                with ex ->
+                                    do! cleanup ()
+                                    return raise ex
             }
 
         let argsObj =

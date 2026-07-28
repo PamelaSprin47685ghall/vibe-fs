@@ -3,7 +3,7 @@ namespace Wanxiangshu.Next.Process
 open System
 open System.Threading.Tasks
 
-/// Pure spool facade. File I/O is delegated to NodeProcessHost so this file
+/// Pure spool facade. File I/O is delegated to SpoolHost so this file
 /// contains no JS interop.
 module Spool =
 
@@ -21,20 +21,20 @@ module Spool =
             int (((bytes - 1L) / int64 ChunkSizeBytes) + 1L)
 
     let startStreamingSpool () : StreamingSpool =
-        let path = NodeProcessHost.tempPath ()
-        NodeProcessHost.writeFile path [||]
+        let path = SpoolHost.tempPath ()
+        SpoolHost.writeFile path [||]
         { Path = path; BytesWritten = 0L }
 
     let appendStreamingSpool (spool: StreamingSpool) (bytes: byte[]) : unit =
         if not (isNull bytes) && bytes.Length > 0 then
-            NodeProcessHost.appendFile spool.Path bytes
+            SpoolHost.appendFile spool.Path bytes
             spool.BytesWritten <- spool.BytesWritten + int64 bytes.Length
 
     let readChunksSync (path: string) (consume: byte[] -> unit) : unit =
-        NodeProcessHost.readFileSyncChunks path ChunkSizeBytes consume
+        SpoolHost.readFileSyncChunks path ChunkSizeBytes consume
 
     let readChunks (path: string) (consume: byte[] -> Task<unit>) : Task<unit> =
-        NodeProcessHost.readFileAsyncChunks path ChunkSizeBytes consume
+        SpoolHost.readFileAsyncChunks path ChunkSizeBytes consume
 
     let streamChunks (path: string) (consume: byte[] -> Task<unit>) : Task<unit> = readChunks path consume
 
@@ -57,4 +57,4 @@ module Spool =
         appendStreamingSpool spool bytes
         spool.Path, spool.BytesWritten, chunkCount spool.BytesWritten
 
-    let delete (path: string) : unit = NodeProcessHost.deleteFile path
+    let delete (path: string) : unit = SpoolHost.deleteFile path

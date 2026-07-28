@@ -49,6 +49,7 @@
     <Compile Include="Process/ProcessRequest.fs"/>
     <Compile Include="Process/LargeGate.fs"/>
     <Compile Include="Process/NodeProcessHost.fs"/>
+    <Compile Include="Process/SpoolHost.fs"/>
     <Compile Include="Process/Spool.fs"/>
     <Compile Include="Process/ProcessOutput.fs"/>
     <Compile Include="Process/ProcessRunner.fs"/>
@@ -68,7 +69,6 @@
     <Compile Include="Orchestrator.PublishChain.fs"/>
     <Compile Include="Orchestrator.PublishLock.fs"/>
     <Compile Include="Orchestrator.fs"/>
-    <Compile Include="Orchestrator.Engine.fs"/>
     <Compile Include="Orchestrator.GitPortHelpers.fs"/>
     <Compile Include="Orchestrator.GitPortWorktree.fs"/>
     <Compile Include="Orchestrator.GitPort.fs"/>
