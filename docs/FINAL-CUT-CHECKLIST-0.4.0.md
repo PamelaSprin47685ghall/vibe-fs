@@ -4,11 +4,11 @@ Use only after RC observation exit criteria pass.
 
 ## Pre-cut
 
-- [ ] Scope freeze unchanged (`docs/SCOPE-0.4.0-FREEZE.md`)
-- [ ] Sealed RC evidence present (`docs/evidence/0.4.0-rc.5/` or later)
-- [ ] Observation exit satisfied (`docs/RC-OBSERVATION-0.4.0.md`)
-- [ ] Provider-visible A/A/B/B direct evidence attached
-- [ ] Private distribution policy still desired (`private: true`)
+- [x] Scope freeze unchanged (`docs/SCOPE-0.4.0-FREEZE.md`)
+- [x] Sealed RC evidence present (`docs/evidence/0.4.0-rc.7/`)
+- [x] Observation exit satisfied (`docs/evidence/0.4.0-rc.7/OBSERVATION-EXIT.md`)
+- [x] Provider-visible A/A/B/B direct evidence attached (`provider-aabb-trace.txt`)
+- [x] Private distribution policy still desired (`private: true`)
 
 ## Version cut (docs/version only preferred)
 

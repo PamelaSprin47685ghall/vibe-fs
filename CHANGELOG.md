@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.4.0 — final (private delivery)
+
+Final 0.4.0 on sealed `0.4.0-rc.7` after observation exit.
+
+### Scope
+
+- Structured Agent DSL (OpenCode plugin): Manager/Orchestrator fork-join, static roles
+- Prompt Authority / Logical Run / synthetic continuation fail-closed
+- Companion Blogger + ActivePrefixEpoch prefix cache protection
+- Session-wide formal A; `join.finalText` = session-wide A; B = Companion LatestB
+- Logical-Run Fallback with provider-visible same-run A→A→B→B wire path
+- ReviewGuard dual PERFECT with physical confirmation binding
+- Inspector `{executor}` only; DevOps `fork-pty`; Process 3× estimate + large gate
+- Orchestrator clean gate, worktree, serial publish, rebase, re-review, ff-only
+
+### vs rc.7
+
+- Version number only: `0.4.0-rc.7` → `0.4.0` (no product code delta)
+- Observation exit recorded: `docs/evidence/0.4.0-rc.7/OBSERVATION-EXIT.md`
+
+### Release gates
+
+- Sealed RC: `docs/evidence/0.4.0-rc.7/` (281 tests-next, 29 gate-testkit, 18 canaries ×3)
+- Provider AABB wire: `docs/evidence/0.4.0-rc.7/provider-aabb-trace.txt`
+- Final version gate: `docs/evidence/0.4.0/` (second clean-checkout `test:release`)
+
+### Known limits
+
+- Host may double-fire the first user prompt under some APIError paths; Logical Run still A→A→B→B for four durable failures
+- PluginFallbackRetry waits ~250ms after SessionIdle for host runner settle
+- Package remains **private** under provisional commercial `LICENSE`
+
+### Distribution
+
+- `private: true`, `license: SEE LICENSE IN LICENSE`
+- Deliver `wanxiangshu-0.4.0.tgz` only under written commercial agreement
+- No public npm publish
+
+### Migration
+
+See `MIGRATION.md` and `docs/RELEASE-0.4.0.md`.
+
 ## 0.4.0-rc.7 — release candidate
 
 Provider-visible same-run A/A/B/B wire path on top of sealed rc.6.

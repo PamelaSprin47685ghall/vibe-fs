@@ -2,6 +2,8 @@
 
 OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
 
+**当前版本：`0.4.0`（私有最终版）** — 见 [`docs/RELEASE-0.4.0.md`](docs/RELEASE-0.4.0.md)、[`docs/evidence/0.4.0/`](docs/evidence/0.4.0/)。包保持 `private: true`，按 `LICENSE` 仅限书面商业协议分发。
+
 产品语义：[`next/Doc/SSOT.md`](next/Doc/SSOT.md)。工程执行状态与纠偏顺序：[`AGENTS.md`](AGENTS.md)。
 
 ## 当前边界
