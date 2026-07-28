@@ -30,7 +30,9 @@ function shuffle(array) {
   return arr;
 }
 
-const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000, "CANARY_TIMEOUT_MS");
+// Dual-script restart canaries (e.g. orchestrator-restart-publish) need ~45s solo;
+// leave headroom for parallel host load. Override with CANARY_TIMEOUT_MS if needed.
+const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 90000, "CANARY_TIMEOUT_MS");
 const CANARY_COUNT = 16;
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
@@ -118,7 +120,10 @@ function runCanary(file, onBarkSignal) {
     const timer = setTimeout(async () => {
       if (settled) return;
       settled = true;
-      emitBark(true);
+      // Process timeout is not a ready-gate failure if bark already arrived.
+      // Only force-release the launch gate when the child never barked.
+      const hadBark = barked;
+      if (!hadBark) emitBark(true);
       try {
         await terminateTree(child, { termGraceMs: 500, killGraceMs: 1000 });
         recordExit(child.pid);
@@ -133,9 +138,10 @@ function runCanary(file, onBarkSignal) {
         signal: "TIMEOUT",
         stdout,
         stderr: stderr + "\n[CANARY TIMEOUT] Process exceeded " + CANARY_TIMEOUT_MS + "ms limit",
-        barked: false,
-        barkTimeout: true,
-        exitedBeforeBark: false,
+        barked: hadBark,
+        barkTimeout: !hadBark,
+        processTimeout: true,
+        exitedBeforeBark: !hadBark,
       });
     }, CANARY_TIMEOUT_MS);
 
@@ -176,6 +182,7 @@ function runCanary(file, onBarkSignal) {
         stderr,
         barked: !exitedBeforeBark && !barkTimeout,
         barkTimeout,
+        processTimeout: false,
         exitedBeforeBark,
       });
     });
@@ -228,12 +235,13 @@ async function main() {
 
     let failed = false;
     for (const r of results) {
-      if (r.code === 0 && r.barked && !r.barkTimeout && !r.exitedBeforeBark && !readyGateFailures.has(r.file)) {
+      if (r.code === 0 && r.barked && !r.barkTimeout && !r.processTimeout && !r.exitedBeforeBark && !readyGateFailures.has(r.file)) {
         console.log("  ✓ " + r.name + " passed");
       } else {
         failed = true;
         let failReason = `code ${r.code}, signal ${r.signal}`;
-        if (r.exitedBeforeBark) failReason = "exited before [setupScenario] ready";
+        if (r.processTimeout) failReason = `process timeout (>${CANARY_TIMEOUT_MS}ms)` + (r.barked ? " after ready" : " before ready");
+        else if (r.exitedBeforeBark) failReason = "exited before [setupScenario] ready";
         else if (readyGateFailures.has(r.file)) failReason = "ready timeout (failed to emit exact [setupScenario] ready within 10s)";
         else if (r.barkTimeout) failReason = "ready timeout (failed to emit [setupScenario] ready within 10s)";
         console.error("  ✗ " + r.name + " FAILED (" + failReason + ")");
