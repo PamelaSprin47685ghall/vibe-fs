@@ -12,7 +12,7 @@
 - **Review witness**：第二次 PERFECT 优先 physical confirmation Host message ID + AuthorityRoot；缺真实 ProviderRunId fail-closed。
 - **Companion projection**：epoch 只能替换 `LastSuccessfulProjection` 已证明覆盖的完整 semantic-turn 前缀，必须保留 Blogger 未覆盖 raw tail。
 - **Inspector**：仅 Executor 工具；继承 caller worktree；父取消必须 await child abort。
-- **Release**：当前开发标记 `0.4.0-rc.3-dev`。切到可分发 `0.4.0-rc.3` 前必须：提交脏工作区 → 干净 checkout `npm ci` → `test:release`（含 `CANARY_REPEAT=3`）→ pack + 空目录安装 → 证据包。许可证为 `LICENSE` 中的临时商业许可证；包保持 private，任何外部分发须另有签署的商业协议。
+- **Release**：当前版本 `0.4.0`。晋级路径已完成：`0.4.0-rc.3-dev` → 提交 → clean `npm ci`/`test:release` → `0.4.0-rc.3` 证据包 → 再 clean 重建晋级 `0.4.0` 并二次三轮 canary + pack/install。许可证为 `LICENSE` 中的临时商业许可证；包保持 private，任何外部分发须另有签署的商业协议。
 
 ## 架构迁移状态
 
