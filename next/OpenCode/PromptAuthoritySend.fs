@@ -73,35 +73,21 @@ module PromptAuthoritySend =
                         | Ok messageId ->
                             let hostId = MessageId.value messageId
 
-                            if hostId.StartsWith("accepted-") then
-                                onAccepted |> Option.iter (fun callback -> callback messageId)
-
-                                match
-                                    PromptAuthority.createAuthorityRoot
-                                        runtimeId
-                                        sessionId
-                                        PromptAuthority.AgentOwnerRoot
-                                        messageId
-                                        agent
-                                with
+                            match
+                                PromptAuthority.createAuthorityRoot
+                                    runtimeId
+                                    sessionId
+                                    PromptAuthority.AgentOwnerRoot
+                                    messageId
+                                    agent
+                            with
+                            | Error error -> return Error error
+                            | Ok profile ->
+                                match ops.AcceptPhysicalClaim sessionId key messageId (Some profile) with
                                 | Error error -> return Error error
-                                | Ok provisional -> return Ok(messageId, provisional)
-                            else
-                                match
-                                    PromptAuthority.createAuthorityRoot
-                                        runtimeId
-                                        sessionId
-                                        PromptAuthority.AgentOwnerRoot
-                                        messageId
-                                        agent
-                                with
-                                | Error error -> return Error error
-                                | Ok profile ->
-                                    match ops.AcceptPhysicalClaim sessionId key messageId (Some profile) with
-                                    | Error error -> return Error error
-                                    | Ok() ->
-                                        onAccepted |> Option.iter (fun callback -> callback messageId)
-                                        return Ok(messageId, profile)
+                                | Ok() ->
+                                    onAccepted |> Option.iter (fun callback -> callback messageId)
+                                    return Ok(messageId, profile)
                         | Error error ->
                             match ops.AbandonClaim sessionId key error with
                             | Ok() -> return Error error

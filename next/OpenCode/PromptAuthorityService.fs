@@ -66,6 +66,7 @@ type PromptAuthorityService(runtimeId: string, ?journal: AgentJournal) =
             this.Persist
             this.Update
             this.Read
+            (fun () -> this.Read(fun auth -> auth.ActiveLogicalRun))
             promptKey
             sessionId
             hostMessageId

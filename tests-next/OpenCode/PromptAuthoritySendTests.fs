@@ -117,3 +117,78 @@ module PromptAuthoritySendTests =
         Assert.True(first.IsSome)
         let second = PromptAuthority.tryClaimRepair identity first.Value
         Assert.True(second.IsNone)
+
+    [<Fact>]
+    let ``SendAgentOwnerRoot with accepted-* still accepts authority and sets ActiveLogicalRun`` () =
+        task {
+            let session = SessionId.create "s-owner-accepted"
+            let port = CapturingPort("accepted-s-owner-accepted")
+            let svc = PromptDispatcher.Dispatcher()
+
+            let! accepted =
+                svc.SendAgentOwnerRoot
+                    (port :> ISessionHostPort)
+                    session
+                    "owner task accepted"
+                    "fast-reviewer"
+                    None
+                    None
+
+            match accepted with
+            | Error error -> Assert.True(false, sprintf "SendAgentOwnerRoot failed: %s" error)
+            | Ok(messageId, profile) ->
+                Assert.equal (MessageId.create "accepted-s-owner-accepted", messageId)
+                Assert.equal ("fast-reviewer", profile.SelectedAgent)
+                Assert.equal ("deep-reviewer", profile.PeerAgent)
+                Assert.equal (Role.Reviewer, profile.CanonicalRole)
+                Assert.equal (AgentTier.Fast, profile.SelectedTier)
+
+                Assert.True(svc.Projection.ActiveLogicalRun.IsSome, "ActiveLogicalRun missing after accepted-*")
+                Assert.equal (Some profile, svc.Projection.ActiveLogicalRun)
+                Assert.True(svc.Projection.PendingClaims |> Map.isEmpty, "PendingClaims should be consumed")
+
+                match port.Options with
+                | Some { Agent = Some agent; Model = model } ->
+                    Assert.equal ("fast-reviewer", agent)
+                    Assert.True(model.IsNone)
+                | _ -> Assert.True(false, "SendAgentOwnerRoot omitted Agent=Some / Model=None shape")
+        }
+
+    [<Fact>]
+    let ``AcceptAgentOwnerRoot is idempotent after SendAgentOwnerRoot accepted-*`` () =
+        task {
+            let session = SessionId.create "s-owner-accepted-2"
+            let port = CapturingPort("accepted-s-owner-accepted-2")
+            let svc = PromptDispatcher.Dispatcher()
+
+            let! accepted =
+                svc.SendAgentOwnerRoot
+                    (port :> ISessionHostPort)
+                    session
+                    "owner task accepted"
+                    "fast-reviewer"
+                    None
+                    None
+
+            match accepted with
+            | Error error -> Assert.True(false, sprintf "SendAgentOwnerRoot failed: %s" error)
+            | Ok(_, profile) ->
+                let promptKey =
+                    match port.Options with
+                    | Some { Metadata = Some metadata } ->
+                        if isNull metadata?wanxiangshu_prompt_key then
+                            failwith "missing wanxiangshu_prompt_key in metadata"
+                        else
+                            unbox<string> metadata?wanxiangshu_prompt_key
+                    | _ -> failwith "missing metadata in prompt options"
+
+                let realId = MessageId.create "real-owner-2"
+
+                match svc.AcceptAgentOwnerRoot promptKey session realId with
+                | Error error -> Assert.True(false, sprintf "AcceptAgentOwnerRoot should be idempotent: %s" error)
+                | Ok profile2 ->
+                    Assert.equal (profile.SelectedAgent, profile2.SelectedAgent)
+                    Assert.equal (profile.PeerAgent, profile2.PeerAgent)
+                    Assert.equal (profile.CanonicalRole, profile2.CanonicalRole)
+                    Assert.True(svc.Projection.ActiveLogicalRun.IsSome, "ActiveLogicalRun missing after re-accept")
+        }

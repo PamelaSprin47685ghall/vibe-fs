@@ -75,6 +75,7 @@ module PromptAuthorityAccept =
         (read:
             (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptClaim option)
                 -> PromptAuthority.PromptClaim option)
+        (tryActiveProfile: unit -> PromptAuthority.AuthorityExecutionProfile option)
         (promptKey: string)
         (sessionId: SessionId)
         (hostMessageId: MessageId)
@@ -82,7 +83,10 @@ module PromptAuthorityAccept =
         let key = PromptKeyRef.create promptKey
 
         match read (fun auth -> Map.tryFind key auth.PendingClaims) with
-        | None -> Error(sprintf "Unknown AgentOwnerRoot claim: %s" promptKey)
+        | None ->
+            match tryActiveProfile () with
+            | Some profile -> Ok profile
+            | None -> Error(sprintf "Unknown AgentOwnerRoot claim: %s" promptKey)
         | Some claim ->
             match claim.Origin, claim.EffectiveAgent with
             | PromptAuthority.AuthorityRoot PromptAuthority.AgentOwnerRoot, Some agent ->
