@@ -1,6 +1,6 @@
 {
   "name": "wanxiangshu",
-  "version": "0.4.0",
+  "version": "0.4.0-rc.4",
   "description": "Wanxiangshu.Next Structured Flow runtime (Fable build output)",
   "type": "module",
   "main": "next/OpenCode/Plugin.js",
