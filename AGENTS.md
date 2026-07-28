@@ -300,7 +300,7 @@ Companion 从 sessionRoles 决定 eligibility
 
 1. OpenCode 官方 compaction 关闭。
 2. 每个有伴随的 Session `X` 拥有廉价 Blogger Session `Y`。
-3. `A` = X 的正式模型输出，不含 reasoning；`B` = Y 当前投影中所有正式 assistant 输出，不含 Y 输入和 reasoning。
+3. `A` = X 的 session-wide 模型输出累积，**含正式正文与 reasoning/thinking**，不含 tool raw stream；`B` = Y 当前投影中所有正式 assistant 输出，不含 Y 输入和 reasoning。
 4. X 的 ProjectedInputTokens + ReservedOutputTokens 超过 ContextLimit 且 BlogBase coverage proof 通过后，投影层用 B 等价替换已被 B 覆盖的前缀；此后每次投影继续替换。Cutoff 必须位于完整 semantic turn 边界；CoveredPrefixDigest 必须在投影前重新验证。Estimator 不可用时不切换 epoch。
 5. Delta 在 canonical JSON 投影层计算；Y 忙时不打断、不排插件队列、不推进 delta 基线，下一次自然包含跳过期间的全部变化。
 6. Y 自身接近上限时，把旧 B 作为唯一正文输入重投影；Y 新输出 B' 替代旧 B。
@@ -957,7 +957,7 @@ type OrchestratorError =
 
 - `X`：主 Session。
 - `Y`：X 的伴随 Blogger Session，使用便宜模型，无工具。
-- `A(X)`：**整个 Session X 生命周期**内所有正式 assistant 正文的累积（不含 reasoning、不含 tool raw stream）。不是某一轮，也不是最后一轮。
+- `A(X)`：**整个 Session X 生命周期**内 assistant 正式正文 + reasoning/thinking 的累积（不含 tool raw stream）。不是某一轮，也不是最后一轮。
 - `B(X)`：**整个 Companion Session Y 生命周期**内当前有效工作日志的累积（`LatestB` / 自压缩后的 `B'`），不含 Y 的输入和 reasoning。不是某一轮 delta 段落。
 - `CanonicalProjection`：Host transcript 经纯规范化后的 JSON。
 - `BlogBase`：最近一次成功被 Y 消化的 CanonicalProjection。
@@ -980,7 +980,7 @@ Do not call tools.
 Do not reproduce raw code or stream of consciousness.
 ```
 
-新建 X 的 Y 时，再提供父 Session 的 B 作为背景；若无 B，省略。
+新建 X 的 Y 时，再提供父 Session 的工作记录作为背景；优先父 B，若无 B 则用父 session-wide formal A；B 与 A 皆空则省略。
 
 ### 2.2 普通增量轮
 
@@ -1291,22 +1291,27 @@ let currentB yProjection =
 - Epoch 切换：`FrozenB = LatestB`（冻结），之前 rawTail 中的旧内容不再向前传递。
 - 自压缩：`LatestB` 替换为自压缩后的 B′，但 `FrozenB` 保持不变，直到下次 epoch 切换才搬过去。
 
-创建有伴随子代理时：
+创建子代理（含有/无伴随）时：
 
 ```text
 System role prompt
-Parent B background
+Parent work record background (B preferred, else session-wide A)
 Current fork prompt
 ```
 
-[NORMATIVE] ChildBackgroundB =
-  fork 动词开始时，父 session durable LatestB 的不可变快照。
+[NORMATIVE] ChildBackground =
+  fork 动词开始时的不可变快照，优先级：
+  1. 父 session durable B（有 ActivePrefixEpoch 时用 FrozenB，否则 LatestB）
+  2. 若无 B（无 companion、LatestB 空、或尚未产生 B）：父 session-wide formal A
+  3. B 与 A 皆空：省略背景
+
+任何需要「父工作记录背景」的路径（fork child、one-shot Inspector/Coder、新建 Y）都遵循该优先级；不得在无 B 时默默省略而可用 A 仍存在。
 
 它只是背景，不声称父模型已经见过；
-必须记录 ParentBDigest；
+必须记录 ParentBackgroundDigest（实际注入文本的 hash；兼容字段名 ParentBDigest）；
 创建失败重试时复用同一快照，不重新读取最新值。
 
-父 B 是背景，不要求 Manager 重复解释仓库历史。
+父工作记录是背景，不要求 Manager 重复解释仓库历史。
 
 ---
 
@@ -1495,8 +1500,8 @@ let forkNew role prompt =
 
 - fork 返回得快；child 在后台自然运行。
 - 有伴随角色自动创建 Y。
-- child 初始上下文自动含 parent B。
-- terminal 提取 **session-wide A**（整个子 Session 正式 assistant 正文累积），不含 reasoning。
+- child 初始上下文自动含父工作记录（优先 B，无 B 则 session-wide A）。
+- terminal 提取 **session-wide A**（整个子 Session 正式正文 + reasoning/thinking 累积），不含 tool raw stream。
 - completion 写入 Channel；Manager 下一次 `join()` 获取。
 
 ---
@@ -1640,8 +1645,8 @@ let executeFork input =
 6. list 同时显示 agent/pty。
 7. join 无活跃资源返回 NothingToJoin。
 8. 父取消关闭所有 owned handles。
-9. session-wide A 不含 reasoning/tool raw stream；`finalText` 必须是完整 A 而非最后一轮。
-10. parent B 自动进入新 child 背景。
+9. session-wide A **含 reasoning/thinking**，不含 tool raw stream；`finalText` 必须是完整 A 而非最后一轮。
+10. 父工作记录自动进入新 child 背景（B 优先；无 B 则 session-wide A）。
 11. Busy agent → nudge → RunId 不变 → completion 恰好一次（不重复、不丢失）。
 12. Executor summarizer 使用私有 mailbox，不从 Manager mailbox 偷 completion。
 
@@ -1900,7 +1905,7 @@ Prompt 不携带内部程序计数器。
 
 ```text
 Role system prompt
-Parent B work record (if any)
+Parent work record (B preferred, else session-wide A; omit if both empty)
 Fork prompt / local request
 ```
 
@@ -1916,7 +1921,7 @@ Fork prompt / local request
 4. Blogger/Executor Agent 无工具。
 5. Coder `inspectMany` 确实并发且每项独立 session。
 6. Inspector only Executor Tool。
-7. 新 child 背景来自父 B。
+7. 新 child 背景：父 B 优先；无 B 则父 session-wide A。
 8. 未注册工具在 schema 层不可见。
 
 
@@ -3098,20 +3103,21 @@ type ReconciledTurn =
       Outcome: TurnOutcome }  // Completed / Failed / Aborted
 ```
 
-A 版是 **session-wide 正式 assistant 正文累积**（不含 reasoning / tool raw stream）：
+A 版是 **session-wide assistant 输出累积**（正式正文 + reasoning/thinking；不含 tool raw stream）：
 
 ```fsharp
 type ARecord =
-    { Text: string          // 整个 Session 所有正式 assistant 正文的拼接，非单轮
+    { Text: string          // 整个 Session 正式正文与 reasoning/thinking 的拼接，非单轮
       Model: string option
       Error: string option }
 ```
 
 [NORMATIVE]
-- `join()` 的 `finalText` = 子 Session 当前完整 A（session-wide）。
+- `join()` 的 `finalText` = 子 Session 当前完整 A（session-wide，含思考过程）。
 - `join()` 的 `workRecord` = 子 Session 当前完整 B（`LatestB`，session-wide companion work log）。
-- terminal 完成时必须把本轮正式正文并入 Session 的 A 累积，再对外暴露完整 A。
-- 单轮空正文不得把已有 A 抹成空；空轮不写入 A。
+- terminal 完成时必须把本轮正式正文与 reasoning/thinking 并入 Session 的 A 累积，再对外暴露完整 A。
+- 单轮既无正文也无 reasoning 不得把已有 A 抹成空；空轮不写入 A。
+- 空/XML-only / reasoning-only 的 **interaction repair 分类**仍只看正式 text part（不含 reasoning）；repair 预算与 A 累积字段分离。
 
 ---
 
@@ -3211,7 +3217,7 @@ next_action
 4. role tool filter 静态正确。
 5. session association 可恢复同 Blogger（不复用时不发 delta 给空白 Y）。
 6. terminal 重复事件不会重复拼 A（Reconcile 是 idempotent）。
-7. reasoning 不进 A，但可进 canonical delta。
+7. reasoning 进入 A 与 canonical delta；不进入 B。
 8. fire-and-forget 不建插件队列。
 9. hook 无长等待。
 10. 日志不出现旧控制字段。

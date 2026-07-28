@@ -165,7 +165,7 @@ type HostForkRuntime
                                 match parentWorkRecordOf parentId with
                                 | Some workRecord when not (System.String.IsNullOrWhiteSpace workRecord) ->
                                     sprintf
-                                        "[Parent work record — background only]
+                                        "[Parent work record — background only; B preferred, else session A]
 %s
 
 [Assignment]

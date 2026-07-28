@@ -25,7 +25,7 @@ type AgentCompletionPayload =
       Role: AgentRole
       RootUserMessageId: string
       AssistantMessageId: string
-      /// Session-wide formal assistant text (A) for the child Session.
+      /// Session-wide A for the child Session: formal text + reasoning/thinking.
       FinalText: string
       /// Session-wide companion work log (B / LatestB) when available.
       WorkRecord: WorkRecordSnapshot option

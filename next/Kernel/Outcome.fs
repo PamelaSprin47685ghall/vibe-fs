@@ -10,8 +10,8 @@ type AgentRunResult =
       AssistantMessageId: MessageId
       Role: string // AgentRole serialized as string (avoid Kernel→Session dep)
       Directory: string
-      /// Session-wide formal assistant text (A): cumulative across the whole
-      /// Session, not the last turn alone. Excludes reasoning / tool raw streams.
+      /// Session-wide A: cumulative formal text + reasoning/thinking across the
+      /// whole Session, not the last turn alone. Excludes tool raw streams.
       FinalText: string
       Parts: obj array }
 

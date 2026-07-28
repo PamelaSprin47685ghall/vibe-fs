@@ -93,7 +93,7 @@ module InspectorTool =
                         let fullPrompt =
                             match parentB with
                             | Some b when not (String.IsNullOrWhiteSpace b) ->
-                                sprintf "Parent work record B (background only):\n%s\n\nInspector request:\n%s" b prompt
+                                sprintf "Parent work record (background only; B preferred, else session A):\n%s\n\nInspector request:\n%s" b prompt
                             | _ -> prompt
 
                         let parentBDigest = parentB |> Option.map sha256

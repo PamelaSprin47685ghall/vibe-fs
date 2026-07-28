@@ -11,37 +11,10 @@ open Wanxiangshu.Next.Session
 /// Business decisions on a fully reconciled turn. Never sees raw host events.
 module TerminalPolicies =
 
-    let private sessionDead (journal: AgentJournal option) (sessionId: SessionId) =
-        match journal with
-        | Some j -> j.IsPoisoned || DurableFallback.isDead sessionId (AgentJournal.snapshot j)
-        | None -> false
-
-    let private roleName (role: AgentRole option) =
-        role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
-
-    /// True when this session is a linked child of some parent in the durable
-    /// journal projection. Used when the in-memory sessionParents map is empty
-    /// (worktree plugin instance) so Orchestrator managers never receive the
-    /// top-level ReviewGuard nudge.
-    let private isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
-        match journal with
-        | None -> false
-        | Some j ->
-            let child = ChildId.create sessionKey
-
-            (AgentJournal.snapshot j).AgentProjections.Sessions
-            |> Map.exists (fun _ session ->
-                match session.Linkage with
-                | Some linkage -> Map.containsKey child linkage.LinkedChildren
-                | None -> false)
-
-    let private isTopLevelManager
-        (sessionParents: Dictionary<string, string>)
-        (journal: AgentJournal option)
-        (sessionKey: string)
-        =
-        not (sessionParents.ContainsKey sessionKey)
-        && not (isLinkedChild journal sessionKey)
+    let private sessionDead = TerminalPolicyHelpers.sessionDead
+    let private roleName = TerminalPolicyHelpers.roleName
+    let private isLinkedChild = TerminalPolicyHelpers.isLinkedChild
+    let private isTopLevelManager = TerminalPolicyHelpers.isTopLevelManager
 
     let applyWithContinuation
         (sessionPort: ISessionHostPort)
@@ -97,8 +70,12 @@ module TerminalPolicies =
                         (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
                     |> ignore
         | TurnNeedsContinuation reason ->
-            // No final text or length limit. Do NOT complete the run. Send a
-            // repair prompt to get the final report.
+            // Absorb text+reasoning into session-wide A even when this turn is
+            // not yet completable (e.g. reasoning-only / empty formal text).
+            TerminalSessionA.accumulateTurn eventPort turn |> ignore
+
+            // No final formal report yet or length limit. Do NOT complete the run.
+            // Send a repair prompt to get the final report.
             let roleName =
                 turn.AgentRole |> Option.map (fun r -> r.ToString().ToLowerInvariant())
 
@@ -159,8 +136,9 @@ module TerminalPolicies =
                 |> Option.map (fun r -> r.ToString().ToLowerInvariant())
                 |> Option.defaultValue "coder"
 
-            // Session-wide A: append this turn's formal text, then expose the full
-            // Session accumulation. Empty intermediate turns do not wipe prior A.
+            // Session-wide A: append this turn's text + reasoning/thinking, then
+            // expose the full Session accumulation. Empty intermediate turns do
+            // not wipe prior A.
             let finalA = TerminalSessionA.accumulateTurn eventPort turn
 
             let runResult: AgentRunResult =
@@ -181,14 +159,14 @@ module TerminalPolicies =
                 && ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey
 
             if not awaitingReviewerConfirmation then
-                // Gate on session-wide A. An empty intermediate turn does not wipe prior
-                // formal text; only a Session with no formal assistant text fails empty.
+                // Gate on session-wide A (text + reasoning). An empty intermediate
+                // turn does not wipe prior A; only a Session with no A fails empty.
                 if String.IsNullOrWhiteSpace runResult.FinalText then
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
                     |> ignore
                 else
                     // Completion fact path only: ReconciledTurn → AgentRunResult → TerminalOutcome.
-                    // FinalText is full Session A, not the last-turn slice alone.
+                    // FinalText is full Session A (incl. reasoning), not last-turn only.
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
 

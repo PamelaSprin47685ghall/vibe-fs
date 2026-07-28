@@ -161,14 +161,24 @@ module SpikePlugin =
                         let onRunStarted =
                             Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
+                        // Child background SSOT: parent B first; if no B, whole session A.
                         let backgroundBFor =
                             Some(fun sessionId ->
-                                match companions.TryGetValue sessionId with
-                                | true, host ->
-                                    match host.Memory.ActivePrefixEpoch with
-                                    | Some epoch -> Some epoch.FrozenB
-                                    | None -> host.Memory.LatestB
-                                | false, _ -> None)
+                                let fromB =
+                                    match companions.TryGetValue sessionId with
+                                    | true, host ->
+                                        match host.Memory.ActivePrefixEpoch with
+                                        | Some epoch when not (String.IsNullOrWhiteSpace epoch.FrozenB) ->
+                                            Some epoch.FrozenB
+                                        | _ ->
+                                            host.Memory.LatestB
+                                            |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
+                                    | false, _ -> None
+
+                                match fromB with
+                                | Some text -> Some text
+                                | None ->
+                                    TerminalSessionA.fullText eventPort (SessionId.create sessionId))
 
                         let toolSurface =
                             toolHooks

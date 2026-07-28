@@ -20,6 +20,8 @@ module CompletedTurnClassifier =
             let text = unbox<string> value
             if String.IsNullOrWhiteSpace text then None else Some text
 
+    /// Formal visible assistant text only (no reasoning/thinking).
+    /// Used for empty/XML-only repair classification and finish=stop emptiness.
     let partsText (parts: obj array) : string =
         if isNull parts then
             ""
@@ -33,6 +35,27 @@ module CompletedTurnClassifier =
                     | Some "text" -> asString part?text
                     | _ -> None)
             |> String.concat ""
+
+    /// Session A material: formal text + host-visible reasoning/thinking.
+    /// Still excludes tool raw streams / tool results.
+    let partsSessionA (parts: obj array) : string =
+        if isNull parts then
+            ""
+        else
+            parts
+            |> Array.choose (fun part ->
+                if isNull part then
+                    None
+                else
+                    match asString part?``type`` with
+                    | Some "text" -> asString part?text
+                    | Some "reasoning"
+                    | Some "thinking" ->
+                        asString part?text
+                        |> Option.orElse (asString part?reasoning)
+                        |> Option.orElse (asString part?thinking)
+                    | _ -> None)
+            |> String.concat "\n\n"
 
     let hasToolCallPart (parts: obj array) : bool =
         if isNull parts then
