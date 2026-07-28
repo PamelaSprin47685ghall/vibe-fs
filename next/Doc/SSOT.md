@@ -159,14 +159,17 @@ Blogger/Executor 名称进入 LLM tool schema
 
 1. 调用 `HostForkRuntime.Cancel()`，后者立即设置 `ForkRuntime.IsCancelled`，使 `runtime.Join()` 返回 `Cancelled` 而不是 `NothingToJoin`。
 2. 计算当前 `HostForkRuntime` 的 parent session 与所有已链接 child session 的 ID 集合。
-3. 调用 `cancelFallbackRetries` callback，移除 `PluginFallbackRetry` 中为这些 session 排队的所有 `ProviderRetryAttempt` flush，防止取消后继续 AABB 重试。
-4. 同步写 `AgentUnlinked` 事实，保证崩溃恢复后这些子 session 不再被当作仍链接。
+3. 调用 `cancelSignals` callback，对 `parentId :: childIds` 调用 `HostSignalRouter.UnregisterOwned`；这样 `HostSignalAdapter` 会丢弃这些 session 后续到达的 `session.status=idle`/`retry` 事件，从来源上阻止新的 `ProviderRetryAttempt` flush 产生。
+4. 调用 `cancelFallbackRetries` callback，移除 `PluginFallbackRetry` 中已经为这些 session 排队的 `ProviderRetryAttempt` flush。
+5. 同步写 `AgentUnlinked` 事实，保证崩溃恢复后这些子 session 不再被当作仍链接。
 
 `HostForkChildDispatch.cancelParent` 把上述同步部分放在 `async { ... }` 块**之前**执行；异步清理（`ptyPort.CloseAll`、子 session `AbortSession`、清空映射表）由 `Async.StartImmediate` 启动，不阻塞 `Cancel()` 的同步返回。
 
-`cancelFallbackRetries` callback 由 `HostForkRuntime` 构造点传入，避免 `Session` 层直接引用 `OpenCode` 的 `PluginFallbackRetry`，从而打破循环文件依赖。
+`cancelFallbackRetries` 与 `cancelSignals` 两个 callback 均由 `HostForkRuntime` 构造点传入，避免 `Session` 层直接引用 `OpenCode` 的 `PluginFallbackRetry`/`HostSignalRouter`，从而打破循环文件依赖。
 
-`HostForkRuntime.Cancel()` 为 `unit` 返回；调用者不应 await 它。需要等待清理完成的测试/代码路径应通过观察 `AgentJournal`、`PluginFallbackRetry` 状态或子 session 的副作用间接确认。
+`HostForkRuntime.Cancel()` 为 `unit` 返回；调用者不应 await 它。需要等待清理完成的测试/代码路径应通过观察 `AgentJournal`、`HostSignalRouter` 拥有集合、`PluginFallbackRetry` 状态或子 session 的副作用间接确认。
+
+E2E 验收：parent 收到 abort 后，继续向 child session 发送 `session.status=retry` 或 `session.status=idle` 不会触发 `RetrySignalHandler.handle` 也不会进入 `PluginFallbackRetry.scheduleFlushOnIdle`。
 
 ## Event-Stagger 规则
 
