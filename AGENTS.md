@@ -957,8 +957,8 @@ type OrchestratorError =
 
 - `X`：主 Session。
 - `Y`：X 的伴随 Blogger Session，使用便宜模型，无工具。
-- `A(X)`：X 的 assistant 正式输出正文，不含 reasoning。
-- `B(X)`：Y 当前有效投影中所有 assistant 正式输出正文，不含 Y 的输入和 reasoning。
+- `A(X)`：**整个 Session X 生命周期**内所有正式 assistant 正文的累积（不含 reasoning、不含 tool raw stream）。不是某一轮，也不是最后一轮。
+- `B(X)`：**整个 Companion Session Y 生命周期**内当前有效工作日志的累积（`LatestB` / 自压缩后的 `B'`），不含 Y 的输入和 reasoning。不是某一轮 delta 段落。
 - `CanonicalProjection`：Host transcript 经纯规范化后的 JSON。
 - `BlogBase`：最近一次成功被 Y 消化的 CanonicalProjection。
 - `Delta`：`JsonDelta(BlogBase, CurrentCanonicalProjection)`。
@@ -1274,7 +1274,7 @@ Companion delta、prefix equality 和缓存门禁测试必须使用同一份 Pro
 
 ## 六、B 的读取
 
-`B(X)` 只读取 Y 当前有效投影中的 assistant 正文：
+`B(X)` 是 **Y 整个 session** 的正式工作日志累积，不是单轮 delta 段落：
 
 ```fsharp
 let currentB yProjection =
@@ -1285,7 +1285,7 @@ let currentB yProjection =
 
 不读取 Y 的 user 输入，因此旧 B 在自压缩时作为输入出现，不会混入新 B。
 
-`LatestB` 是 Y 的完整累积输出。`ActivePrefixEpoch.FrozenB` 是冻结的快照版本。两者关系：
+`LatestB` 是 Y 的 **session-wide 完整累积输出**。`ActivePrefixEpoch.FrozenB` 是冻结的快照版本。两者关系：
 
 - 平常回合：`FrozenB` 不变，`LatestB` 增长。
 - Epoch 切换：`FrozenB = LatestB`（冻结），之前 rawTail 中的旧内容不再向前传递。
@@ -1496,7 +1496,7 @@ let forkNew role prompt =
 - fork 返回得快；child 在后台自然运行。
 - 有伴随角色自动创建 Y。
 - child 初始上下文自动含 parent B。
-- terminal 提取 A 版正文，不含 reasoning。
+- terminal 提取 **session-wide A**（整个子 Session 正式 assistant 正文累积），不含 reasoning。
 - completion 写入 Channel；Manager 下一次 `join()` 获取。
 
 ---
@@ -1640,7 +1640,7 @@ let executeFork input =
 6. list 同时显示 agent/pty。
 7. join 无活跃资源返回 NothingToJoin。
 8. 父取消关闭所有 owned handles。
-9. A 版不含 reasoning/tool raw stream。
+9. session-wide A 不含 reasoning/tool raw stream；`finalText` 必须是完整 A 而非最后一轮。
 10. parent B 自动进入新 child 背景。
 11. Busy agent → nudge → RunId 不变 → completion 恰好一次（不重复、不丢失）。
 12. Executor summarizer 使用私有 mailbox，不从 Manager mailbox 偷 completion。
@@ -3098,14 +3098,20 @@ type ReconciledTurn =
       Outcome: TurnOutcome }  // Completed / Failed / Aborted
 ```
 
-A 版只含正式 assistant text：
+A 版是 **session-wide 正式 assistant 正文累积**（不含 reasoning / tool raw stream）：
 
 ```fsharp
 type ARecord =
-    { Text: string
+    { Text: string          // 整个 Session 所有正式 assistant 正文的拼接，非单轮
       Model: string option
       Error: string option }
 ```
+
+[NORMATIVE]
+- `join()` 的 `finalText` = 子 Session 当前完整 A（session-wide）。
+- `join()` 的 `workRecord` = 子 Session 当前完整 B（`LatestB`，session-wide companion work log）。
+- terminal 完成时必须把本轮正式正文并入 Session 的 A 累积，再对外暴露完整 A。
+- 单轮空正文不得把已有 A 抹成空；空轮不写入 A。
 
 ---
 

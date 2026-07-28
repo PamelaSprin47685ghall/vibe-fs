@@ -56,6 +56,8 @@ module ToolSurfaceJoin =
                                           "closed", box true
                                           "ptyId", box c.RunId ]
                                 else
+                                    // finalText = session-wide A (all formal assistant text).
+                                    // workRecord = session-wide B (LatestB companion work log).
                                     createObj
                                         [ "kind", box "agent"
                                           "status", box "completed"

@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Threading.Tasks
 
+/// Companion work log snapshot (session-wide B / LatestB), not a single turn.
 type WorkRecordSnapshot =
     { Text: string
       Digest: string
@@ -24,7 +25,9 @@ type AgentCompletionPayload =
       Role: AgentRole
       RootUserMessageId: string
       AssistantMessageId: string
+      /// Session-wide formal assistant text (A) for the child Session.
       FinalText: string
+      /// Session-wide companion work log (B / LatestB) when available.
       WorkRecord: WorkRecordSnapshot option
       Directory: string }
 

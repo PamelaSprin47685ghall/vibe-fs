@@ -39,3 +39,21 @@ module PromptAssets =
         readFileSync(full, "utf8").Trim()
 
     let managerSystemPrompt: string = load "manager-system.md"
+
+    let coderSystemPrompt: string = load "coder-system.md"
+
+    let devopsSystemPrompt: string = load "devops-system.md"
+
+    let inspectorSystemPrompt: string = load "inspector-system.md"
+
+    let reviewerSystemPrompt: string = load "reviewer-system.md"
+
+    let browserSystemPrompt: string = load "browser-system.md"
+
+    let meditatorSystemPrompt: string = load "meditator-system.md"
+
+    let orchestratorSystemPrompt: string = load "orchestrator-system.md"
+
+    let executorSystemPrompt: string = load "executor-system.md"
+
+    let bloggerSystemPrompt: string = load "blogger-system.md"

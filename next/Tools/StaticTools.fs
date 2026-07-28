@@ -100,21 +100,37 @@ module StaticTools =
     let managerAgentConfig () : obj =
         primaryAgent Role.Manager (Some PromptAssets.managerSystemPrompt)
 
-    let orchestratorAgentConfig () : obj = primaryAgent Role.Orchestrator None
+    let orchestratorAgentConfig () : obj =
+        primaryAgent Role.Orchestrator (Some PromptAssets.orchestratorSystemPrompt)
 
-    let coderAgentConfig () : obj = primaryAgent Role.Coder None
+    let coderAgentConfig () : obj =
+        primaryAgent Role.Coder (Some PromptAssets.coderSystemPrompt)
 
-    let reviewerAgentConfig () : obj = primaryAgent Role.Reviewer None
+    let reviewerAgentConfig () : obj =
+        primaryAgent Role.Reviewer (Some PromptAssets.reviewerSystemPrompt)
 
-    let toollessAgentConfig () : obj = primaryAgent Role.Blogger None
+    /// Companion Session Y: no tools; system prompt for B-record distillation.
+    let toollessAgentConfig () : obj =
+        primaryAgent Role.Blogger (Some PromptAssets.bloggerSystemPrompt)
 
-    let meditatorAgentConfig () : obj = primaryAgent Role.Meditator None
+    let bloggerAgentConfig () : obj = toollessAgentConfig ()
 
-    let browserAgentConfig () : obj = primaryAgent Role.Browser None
+    /// AgentRole.Executor: no tools; system prompt for map/reduce output summarization.
+    /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
+    let executorAgentConfig () : obj =
+        primaryAgent Role.Executor (Some PromptAssets.executorSystemPrompt)
 
-    let inspectorAgentConfig () : obj = primaryAgent Role.Inspector None
+    let meditatorAgentConfig () : obj =
+        primaryAgent Role.Meditator (Some PromptAssets.meditatorSystemPrompt)
 
-    let devopsAgentConfig () : obj = primaryAgent Role.DevOps None
+    let browserAgentConfig () : obj =
+        primaryAgent Role.Browser (Some PromptAssets.browserSystemPrompt)
+
+    let inspectorAgentConfig () : obj =
+        primaryAgent Role.Inspector (Some PromptAssets.inspectorSystemPrompt)
+
+    let devopsAgentConfig () : obj =
+        primaryAgent Role.DevOps (Some PromptAssets.devopsSystemPrompt)
 
     let executorTool () : Tool =
         { Name = "executor"

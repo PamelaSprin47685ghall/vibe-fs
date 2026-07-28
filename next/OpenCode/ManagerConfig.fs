@@ -23,7 +23,7 @@ module ManagerConfig =
             agents?coder <- StaticTools.coderAgentConfig ()
             let toollessConfig = StaticTools.toollessAgentConfig ()
             agents?blogger <- toollessConfig
-            agents?executor <- toollessConfig
+            agents?executor <- StaticTools.executorAgentConfig ()
             agents?inspector <- StaticTools.inspectorAgentConfig ()
             agents?devops <- StaticTools.devopsAgentConfig ()
             agents?browser <- StaticTools.browserAgentConfig ()

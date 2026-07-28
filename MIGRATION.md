@@ -12,7 +12,7 @@
 - **Review witness**：第二次 PERFECT 优先 physical confirmation Host message ID + AuthorityRoot；缺真实 ProviderRunId fail-closed。
 - **Companion projection**：epoch 只能替换 `LastSuccessfulProjection` 已证明覆盖的完整 semantic-turn 前缀，必须保留 Blogger 未覆盖 raw tail。
 - **Inspector**：仅 Executor 工具；继承 caller worktree；父取消必须 await child abort。
-- **Release**：当前版本 `0.4.0-rc.4`。已完成 RC.3 之后的 clean 三轮 canary 与 pack/install，但**不是**最终 `0.4.0`。正式 `0.4.0` 仍需后续观察 + 干净 checkout 晋级。许可证为 `LICENSE` 中的临时商业许可证；包保持 private，任何外部分发须另有签署的商业协议。
+- **Release**：当前版本 `0.4.0-rc.5`。合并 role system prompts 与 session-wide A 语义后的 RC。正式 `0.4.0` 仍需后续观察 + 干净 checkout 晋级。许可证为 `LICENSE` 中的临时商业许可证；包保持 private，任何外部分发须另有签署的商业协议。
 
 ## 架构迁移状态
 

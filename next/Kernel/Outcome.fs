@@ -10,10 +10,12 @@ type AgentRunResult =
       AssistantMessageId: MessageId
       Role: string // AgentRole serialized as string (avoid Kernel→Session dep)
       Directory: string
+      /// Session-wide formal assistant text (A): cumulative across the whole
+      /// Session, not the last turn alone. Excludes reasoning / tool raw streams.
       FinalText: string
       Parts: obj array }
 
-    /// Hard invariant: completed runs must have non-empty final text.
+    /// Hard invariant: completed runs must have non-empty session-wide A text.
     member this.IsValid = not (System.String.IsNullOrWhiteSpace this.FinalText)
 
 type AgentRunFailure =
