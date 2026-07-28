@@ -20,6 +20,9 @@ module InspectorTool =
 
     let private attachAbort = ToolSurfaceEmit.attachAbort
 
+    [<Emit("(args, context) => $0(args, context)")>]
+    let private taskExecute (fn: obj) : obj = jsNative
+
     [<Import("createHash", "node:crypto")>]
     let private createHashImport: string -> obj = jsNative
 
@@ -140,19 +143,28 @@ module InspectorTool =
 
                                 let tcs = TaskCompletionSource<string>()
                                 let mutable sub: IDisposable option = None
+                                let mutable completed = false
 
-                                let finish (text: string) =
-                                    match sub with
-                                    | Some d ->
-                                        try
-                                            d.Dispose()
-                                        with _ ->
-                                            ()
+                                let complete (set: unit -> unit) =
+                                    if not completed then
+                                        completed <- true
 
-                                        sub <- None
-                                    | None -> ()
+                                        match sub with
+                                        | Some d ->
+                                            try
+                                                d.Dispose()
+                                            with _ ->
+                                                ()
 
-                                    tcs.TrySetResult text |> ignore
+                                            sub <- None
+                                        | None -> ()
+
+                                        set ()
+
+                                let finish (text: string) = complete (fun () -> tcs.SetResult text)
+
+                                let fail (error: exn) =
+                                    complete (fun () -> tcs.SetException error)
 
                                 sub <-
                                     Some(
@@ -162,17 +174,15 @@ module InspectorTool =
                                                 match outcome with
                                                 | TerminalOutcome.Completed result -> finish result.FinalText
                                                 | TerminalOutcome.Aborted reason ->
-                                                    tcs.TrySetException(
+                                                    fail (
                                                         InvalidOperationException(
                                                             sprintf "Inspector aborted: %s" reason
                                                         )
                                                     )
-                                                    |> ignore
                                                 | TerminalOutcome.Failed error ->
-                                                    tcs.TrySetException(
+                                                    fail (
                                                         InvalidOperationException(sprintf "Inspector failed: %s" error)
                                                     )
-                                                    |> ignore
                                         )
                                     )
 
@@ -265,4 +275,4 @@ module InspectorTool =
                 [ "description",
                   box "One-shot Inspector investigation (executor only); session is disposed after return"
                   "args", box argsObj
-                  "execute", uncurriedExecute (box execute) ])
+                  "execute", taskExecute (box execute) ])

@@ -207,6 +207,13 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.ok(transformed.messages.some((m) => m.text === 'hello'), 'original user message preserved');
     assert.ok(!allText.some((t) => markerRe.test(t)), 'no synthetic [CAPS]/[REVIEW]/[HINT] marker injected');
 
+    const reviewerInspector = JSON.parse(await hooks.tool.inspector.execute(
+      { agent: 'fast-inspector', prompts: ['git status'] },
+      { sessionID: 'reviewer-contract' },
+    ));
+    assert.equal(reviewerInspector.agent, 'fast-inspector');
+    assert.equal(reviewerInspector.output, 'test output');
+
     const context = { sessionID: 'manager-contract' };
     const unknown = JSON.parse(await hooks.tool.fork.execute({ agent: 'deep-inspecter', prompt: 'work' }, context));
     assert.match(unknown.error, /Unknown managed agent 'deep-inspecter'/);

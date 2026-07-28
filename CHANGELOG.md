@@ -26,6 +26,7 @@ Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infi
 
 ### Runtime fixes
 
+- Fixed the reviewer `inspector` callback returning a curried function instead of a Promise, which OpenCode displayed as a red tool error.
 - Fixed `coder`/`inspector` argument schemas leaking Zod internals into provider JSON, which made DevOps requests fail immediately with `invalid_request_error`; all custom tool arguments are now guarded against raw-schema mixing.
 - Fixed ReviewGuard requiring a third `PERFECT` when `chat.message` accepted the confirmation before the asynchronous guard-send callback; the second distinct `PERFECT` now accepts the durable `ReviewConfirmation` identity.
 
