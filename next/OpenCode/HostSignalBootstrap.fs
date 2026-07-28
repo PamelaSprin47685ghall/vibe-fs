@@ -109,29 +109,19 @@ module HostSignalBootstrap =
                     let assistantId =
                         MessageId.create (sprintf "provider-error-%s-%d" sid (failuresSoFar + 1))
 
-                    // Record failure now; flush ProviderRetryAttempt on a short
-                    // settle. SessionIdle will reschedule the same flush if it
-                    // arrives, so host prompt_async is not rejected as busy.
-                    let pending =
-                        PluginFallbackRetry.handleTurnFailure
-                            sessionPort
-                            eventPort
-                            journal
-                            fallbackFailures
-                            err.SessionId
-                            assistantId
-                            err.Reason
-                            None
-                            (Some(fun messageId -> continuationAccepted err.SessionId messageId))
-
-                    if pending then
-                        PluginFallbackRetry.scheduleFlushOnIdle
-                            sessionPort
-                            eventPort
-                            journal
-                            err.SessionId
-                            (Some(fun messageId -> continuationAccepted err.SessionId messageId))
-                            250
+                    // Record failure now; ProviderRetryAttempt is deferred to
+                    // SessionIdle so host prompt_async is not rejected as busy.
+                    PluginFallbackRetry.handleTurnFailure
+                        sessionPort
+                        eventPort
+                        journal
+                        fallbackFailures
+                        err.SessionId
+                        assistantId
+                        err.Reason
+                        None
+                        (Some(fun messageId -> continuationAccepted err.SessionId messageId))
+                    |> ignore
             | SessionIdle sessionId ->
                 reconciler.HandleSignal signal
 
