@@ -50,7 +50,6 @@ module HostSignalChatMessage =
             outputObj?message?model <- modelObj
 
     let private acceptKeyedPrompt
-        (journal: AgentJournal option)
         (svc: PromptAuthorityService)
         (sessionRoles: Dictionary<string, string>)
         (bindUserMessage: string -> string -> unit)
@@ -73,33 +72,11 @@ module HostSignalChatMessage =
         | _ ->
             match svc.AcceptContinuation key sid mid with
             | Error failure -> raise (InvalidOperationException(sprintf "Continuation acceptance failed: %s" failure))
-            | Ok kind ->
-                if
-                    kind = Some PromptAuthority.ReviewConfirmation
-                    || continuationOrigin = Some "ReviewConfirmation"
-                then
-                    match journal with
-                    | Some j ->
-                        match
-                            AgentJournal.appendAgent
-                                (StreamId.Session sid)
-                                None
-                                (AgentFact.GuardPromptAccepted
-                                    {| TargetSessionId = sid
-                                       GuardKey = sprintf "review-guard:%s:confirm-perfect" sessionId
-                                       HostMessageId = messageId |})
-                                j
-                        with
-                        | Ok _ -> bindContinuationMessage sessionId messageId
-                        | Error failure ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "Reviewer guard acceptance persistence failed: %A" failure.Failure
-                                )
-                            )
-                    | None -> bindContinuationMessage sessionId messageId
-                else
-                    bindContinuationMessage sessionId messageId
+            | Ok _kind ->
+                // GuardPromptAccepted is written by HostReviewGuard on successful
+                // send. chat.message only accepts the claim and binds the physical
+                // confirmation message — re-appending double-counts.
+                bindContinuationMessage sessionId messageId
 
     let createHook
         (journal: AgentJournal option)
@@ -180,7 +157,6 @@ module HostSignalChatMessage =
                     && not (String.IsNullOrWhiteSpace messageId)
                     ->
                     acceptKeyedPrompt
-                        journal
                         svc
                         sessionRoles
                         bindUserMessage
