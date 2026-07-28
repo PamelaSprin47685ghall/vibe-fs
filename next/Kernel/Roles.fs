@@ -9,6 +9,7 @@ type Role =
     | Browser
     | Meditator
     | Reviewer
+    | DevOps
     | Executor
     | Blogger
 
@@ -23,7 +24,9 @@ type ToolPermission =
     | Glob
     | Grep
     | Inspector
+    | Coder
     | Exec
+    | Pty
     | Network
     | Verdict
 
@@ -61,6 +64,17 @@ module Roles =
                   ToolPermission.Grep
                   ToolPermission.Inspector
                   ToolPermission.Verdict ]
+        | Role.DevOps ->
+            set
+                [ ToolPermission.Pty
+                  ToolPermission.Exec
+                  ToolPermission.Join
+                  ToolPermission.List
+                  ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Inspector
+                  ToolPermission.Coder ]
         | Role.Executor
         | Role.Blogger -> Set.empty
 
@@ -77,24 +91,13 @@ type RoleDefinition =
 
 module RoleDefinitions =
 
+    /// Full Manager system prompt lives in prompts/manager-system.md and is
+    /// loaded into OpenCode AgentConfig.prompt (host system prompt). Keep this
+    /// domain stub short so Kernel stays free of filesystem I/O.
     let managerPrompt =
-        "You are the Manager. You coordinate; you do not read or edit files directly.\n\n"
-        + "Available operations:\n"
-        + "- fork(role, prompt): create Coder, Inspector, Browser, Meditator, Reviewer\n"
-        + "- fork(agentId, prompt): nudge or continue an existing child\n"
-        + "- join(): receive the next completed agent/PTY result\n"
-        + "- list(): inspect live resources\n\n"
-        + "Rules:\n"
-        + "1. Use Inspector for command-based investigation.\n"
-        + "2. Use Browser for repository/web evidence.\n"
-        + "3. Use Meditator for architecture and tradeoffs.\n"
-        + "4. Only Coder may modify files.\n"
-        + "5. A completed join result must contain non-empty finalText.\n"
-        + "6. Treat workRecord as supporting context, not proof of completion.\n"
-        + "7. If a child fails or returns a protocol error, nudge or replace it explicitly.\n"
-        + "8. After code changes, fork Reviewer.\n"
-        + "9. REVISE means continue the same Coder with the review report.\n"
-        + "10. Do not finish until the current tree has a confirmed review witness."
+        "Manager system prompt SSOT: prompts/manager-system.md\n"
+        + "Tools: fork / join / list only.\n"
+        + "Manager thinks and delegates. Coder edits. DevOps executes. Reviewer verifies."
 
     let coderPrompt =
         "You are the Coder. You implement changes.\n\n"
@@ -113,6 +116,26 @@ module RoleDefinitions =
         + "Do not modify repository files.\n"
         + "Return a final report with:\n"
         + "- commands run\n- relevant output\n- findings\n- confidence/uncertainty"
+
+    let devopsPrompt =
+        "You are DevOps, the terminal and operations specialist.\n"
+        + "You own PTY and executor. You may gather evidence and delegate code edits.\n\n"
+        + "Available operations:\n"
+        + "- fork-pty(agent=pty, prompt): create a PTY with the given command\n"
+        + "- fork-pty(ptyId, prompt): write to an existing PTY; empty prompt reads buffered output\n"
+        + "- fork-pty(ptyId, signal): send TERM|KILL|INT|HUP|QUIT|USR1|USR2\n"
+        + "- executor(command): run a non-interactive command with the process budget\n"
+        + "- read/glob/grep: inspect repository evidence\n"
+        + "- inspector(prompt): one-shot command investigation\n"
+        + "- coder(prompt): one-shot Coder to modify files (you never write/edit yourself)\n"
+        + "- join(): wait for the next PTY exit completion\n"
+        + "- list(): inspect live PTY resources\n\n"
+        + "Rules:\n"
+        + "1. Execute terminal work and gather evidence as requested.\n"
+        + "2. Never use write/edit yourself; delegate file changes via coder.\n"
+        + "3. Do not plan products, declare tasks complete, or act as Reviewer.\n"
+        + "4. Return concrete evidence: cwd, exit, signals, key output, files changed via coder."
+
 
     let browserPrompt =
         "You are the Browser. Read-only evidence gathering.\n\n"
@@ -141,6 +164,7 @@ module RoleDefinitions =
         let brwTools = Roles.permissions Role.Browser
         let medTools = Roles.permissions Role.Meditator
         let revTools = Roles.permissions Role.Reviewer
+        let devopsTools = Roles.permissions Role.DevOps
         let orchTools = Roles.permissions Role.Orchestrator
         let execTools = Roles.permissions Role.Executor
         let blgTools = Roles.permissions Role.Blogger
@@ -157,6 +181,10 @@ module RoleDefinitions =
             Prompt = inspectorPrompt
             Companion = false
             Tools = inspTools }
+          { Role = Role.DevOps
+            Prompt = devopsPrompt
+            Companion = false
+            Tools = devopsTools }
           { Role = Role.Browser
             Prompt = browserPrompt
             Companion = false

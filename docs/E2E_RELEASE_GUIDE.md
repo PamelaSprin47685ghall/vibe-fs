@@ -105,7 +105,7 @@ new Authority Root（explicit model C）→ BaseModel=C，epoch resets
 
 ## 7. PTY
 
-仅 Manager schema 可见 PTY。逐个验证 `TERM,KILL,INT,HUP,QUIT,USR1,USR2`：
+仅 DevOps schema 可见 `fork-pty`。Manager 只 `fork(devops)` 委派。逐个验证 `TERM,KILL,INT,HUP,QUIT,USR1,USR2`：
 
 - TERM 默认；5 秒后无 exit 才 KILL。
 - Signal/Close 不发布 completion；只有 backend `onExit` 发布。

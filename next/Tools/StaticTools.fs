@@ -42,7 +42,9 @@ module StaticTools =
         | ToolPermission.Glob -> "glob"
         | ToolPermission.Grep -> "grep"
         | ToolPermission.Inspector -> "inspector"
+        | ToolPermission.Coder -> "coder"
         | ToolPermission.Exec -> "executor"
+        | ToolPermission.Pty -> "fork-pty"
         | ToolPermission.Network -> "network"
         | ToolPermission.Verdict -> "verdict"
 
@@ -52,8 +54,8 @@ module StaticTools =
     let permissionObj (role: Role) : obj =
         let allowed = Roles.permissions role |> Set.map toolName
         let known =
-            [ "fork"; "fork-manager"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
-              "inspector"; "executor"; "network"; "verdict" ]
+            [ "fork"; "fork-manager"; "fork-pty"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
+              "inspector"; "coder"; "executor"; "network"; "verdict" ]
         let pairs =
             [ yield "*", box "deny"
               for name in known do
@@ -63,11 +65,25 @@ module StaticTools =
                   | "fork", Role.Orchestrator -> yield name, box "deny"
                   // Orchestrator owns "fork-manager" (maps from ToolPermission.Fork).
                   | "fork-manager", Role.Orchestrator -> yield name, box "allow"
+                  // DevOps owns "fork-pty"; Manager/others never see PTY through fork.
+                  | "fork-pty", Role.DevOps -> yield name, box "allow"
+                  | "fork", Role.DevOps -> yield name, box "deny"
+                  // DevOps may inspect and delegate edits, never write/edit directly.
+                  | "write", Role.DevOps
+                  | "edit", Role.DevOps -> yield name, box "deny"
                   | _ -> yield name, box (if Set.contains name allowed then "allow" else "deny") ]
         createObj pairs
 
-    let private primaryAgent (role: Role) : obj =
-        createObj [ "mode", box "primary"; "permission", permissionObj role ]
+    /// OpenCode AgentConfig: mode + permission + optional system prompt.
+    /// `prompt` is the host agent system prompt, never a user message body.
+    let private primaryAgent (role: Role) (systemPrompt: string option) : obj =
+        match systemPrompt with
+        | Some text when not (String.IsNullOrWhiteSpace text) ->
+            createObj
+                [ "mode", box "primary"
+                  "permission", permissionObj role
+                  "prompt", box text ]
+        | _ -> createObj [ "mode", box "primary"; "permission", permissionObj role ]
 
     /// The only values accepted by the OpenCode reviewer tool.  Keep this
     /// parser deliberately independent of assistant text: a verdict is a tool
@@ -81,21 +97,24 @@ module StaticTools =
     let reviewerVerdictSchemaJson =
         """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
 
-    let managerAgentConfig () : obj = primaryAgent Role.Manager
+    let managerAgentConfig () : obj =
+        primaryAgent Role.Manager (Some PromptAssets.managerSystemPrompt)
 
-    let orchestratorAgentConfig () : obj = primaryAgent Role.Orchestrator
+    let orchestratorAgentConfig () : obj = primaryAgent Role.Orchestrator None
 
-    let coderAgentConfig () : obj = primaryAgent Role.Coder
+    let coderAgentConfig () : obj = primaryAgent Role.Coder None
 
-    let reviewerAgentConfig () : obj = primaryAgent Role.Reviewer
+    let reviewerAgentConfig () : obj = primaryAgent Role.Reviewer None
 
-    let toollessAgentConfig () : obj = primaryAgent Role.Blogger
+    let toollessAgentConfig () : obj = primaryAgent Role.Blogger None
 
-    let meditatorAgentConfig () : obj = primaryAgent Role.Meditator
+    let meditatorAgentConfig () : obj = primaryAgent Role.Meditator None
 
-    let browserAgentConfig () : obj = primaryAgent Role.Browser
+    let browserAgentConfig () : obj = primaryAgent Role.Browser None
 
-    let inspectorAgentConfig () : obj = primaryAgent Role.Inspector
+    let inspectorAgentConfig () : obj = primaryAgent Role.Inspector None
+
+    let devopsAgentConfig () : obj = primaryAgent Role.DevOps None
 
     let executorTool () : Tool =
         { Name = "executor"

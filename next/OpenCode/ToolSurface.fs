@@ -16,6 +16,8 @@ module ToolSurface =
 
     open ToolSurfaceEmit
     open ToolSurfacePty
+    open ToolSurfaceFork
+    open ToolSurfaceJoin
 
     [<Emit("Object.defineProperty($0, $1, { value: $2, enumerable: false })")>]
     let private defineHidden (target: obj) (name: string) (value: obj) : unit = jsNative
@@ -125,9 +127,10 @@ module ToolSurface =
               RuntimeFor = runtimeFor
               OrchestratorHostFor = orchestratorHostFor }
 
-        let forkExecute = ToolSurfacePty.forkExecute ptyDeps
-        let joinExecute = ToolSurfacePty.joinExecute ptyDeps
-        let listExecute = ToolSurfacePty.listExecute ptyDeps
+        let forkExecute = ToolSurfaceFork.forkExecute ptyDeps
+        let forkPtyExecute = ToolSurfacePty.forkPtyExecute ptyDeps
+        let joinExecute = ToolSurfaceJoin.joinExecute ptyDeps
+        let listExecute = ToolSurfaceJoin.listExecute ptyDeps
 
         let verdictExecute =
             VerdictSurface.create
@@ -143,7 +146,7 @@ module ToolSurface =
                 verdictSessions
                 snapshot
 
-        let managerForkArgs, orchestratorManagerJobArgs, verdictArgs, definition =
+        let managerForkArgs, devopsPtyArgs, orchestratorManagerJobArgs, verdictArgs, definition =
             ToolSurfaceOrchestrator.toolDefBuilders factory
 
         let executorRuntimeFor =
@@ -172,7 +175,10 @@ module ToolSurface =
         let inspector =
             InspectorTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir) journal
 
-        // Manager: fork (agent/prompt/signal). Orchestrator: fork-manager (prompt only).
+        let coder =
+            CoderTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir) journal
+
+        // Manager: fork. DevOps: fork-pty. Orchestrator: fork-manager.
         // Names differ because schemas conflict.
         let tools =
             createObj
@@ -180,7 +186,13 @@ module ToolSurface =
                   box (
                       applyTool
                           factory
-                          (definition "Fork, nudge, or control an agent or PTY" managerForkArgs forkExecute)
+                          (definition "Fork or nudge an agent" managerForkArgs forkExecute)
+                  )
+                  "fork-pty",
+                  box (
+                      applyTool
+                          factory
+                          (definition "Create, write, read, or signal a PTY" devopsPtyArgs forkPtyExecute)
                   )
                   "fork-manager",
                   box (applyTool factory (definition "Fork a manager job" orchestratorManagerJobArgs forkExecute))
@@ -189,7 +201,8 @@ module ToolSurface =
                   "list", box (applyTool factory (definition "List active agents and PTYs" (createObj []) listExecute))
                   "verdict", box (applyTool factory (definition "Submit the review verdict" verdictArgs verdictExecute))
                   "executor", executor
-                  "inspector", inspector ]
+                  "inspector", inspector
+                  "coder", coder ]
 
         defineHidden tools "disposeExecutorRuntime" (box disposeExecutorRuntime)
         tools

@@ -27,10 +27,13 @@ Orchestrator (fork/join)
   └── Manager (fork/join/list)
         ├── Coder
         ├── Inspector (executor)
+        ├── DevOps (fork-pty/executor/read/glob/grep/inspector/coder/join/list)
         ├── Browser
         ├── Meditator
         └── Reviewer (PERFECT/REVISE)
 ```
+
+DevOps 是终端操作员：独占 `fork-pty`，可 `executor`，可用 `read/glob/grep/inspector` 取证，文件修改只能通过同步 `coder` 工具委派，禁止直接 write/edit。
 
 Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git 或进程事实。角色和精确权限以 SSOT 为准。
 

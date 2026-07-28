@@ -26,6 +26,7 @@ module MessageTransform =
             | "browser" -> Some Role.Browser
             | "meditator" -> Some Role.Meditator
             | "reviewer" -> Some Role.Reviewer
+            | "devops" -> Some Role.DevOps
             | "executor" -> Some Role.Executor
             | "blogger" -> Some Role.Blogger
             | _ -> None
@@ -38,6 +39,7 @@ module MessageTransform =
         | Role.Blogger
         | Role.Executor
         | Role.Inspector
+        | Role.DevOps
         | Role.Browser
         | Role.Meditator
         | Role.Reviewer -> false

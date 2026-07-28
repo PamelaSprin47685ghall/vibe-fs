@@ -73,6 +73,7 @@
     <Compile Include="Session/CompanionTypes.fs"/>
     <Compile Include="Session/Companion.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
+    <Compile Include="Tools/PromptAssets.fs"/>
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
@@ -137,7 +138,10 @@
     <Compile Include="OpenCode/ToolSurfaceEmit.fs"/>
     <Compile Include="OpenCode/ToolSurfaceOrchestrator.fs"/>
     <Compile Include="OpenCode/ToolSurfacePty.fs"/>
+    <Compile Include="OpenCode/ToolSurfaceFork.fs"/>
+    <Compile Include="OpenCode/ToolSurfaceJoin.fs"/>
     <Compile Include="OpenCode/InspectorTool.fs"/>
+    <Compile Include="OpenCode/CoderTool.fs"/>
     <Compile Include="OpenCode/ToolSurface.fs"/>
     <Compile Include="OpenCode/PluginHost.fs"/>
     <Compile Include="OpenCode/ManagerConfig.fs"/>

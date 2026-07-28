@@ -59,6 +59,11 @@ syncAssets(
   path.join(root, 'testkit'),
   path.join(buildDir, 'testkit')
 );
+// Role system prompts (AgentConfig.prompt) — loaded at runtime next to Tools/*.js
+syncAssets(
+  path.join(root, 'next', 'prompts'),
+  path.join(buildDir, 'next', 'prompts')
+);
 log('✓ Assets synced');
 
 // 5. Clean Fable artifacts

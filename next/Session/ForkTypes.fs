@@ -11,6 +11,7 @@ type AgentRole =
     | Browser
     | Meditator
     | Reviewer
+    | DevOps
     | Executor
     | Blogger
 
