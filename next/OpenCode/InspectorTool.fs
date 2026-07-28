@@ -265,4 +265,4 @@ module InspectorTool =
                 [ "description",
                   box "One-shot Inspector investigation (executor only); session is disposed after return"
                   "args", box argsObj
-                  "execute", box execute ])
+                  "execute", uncurriedExecute (box execute) ])

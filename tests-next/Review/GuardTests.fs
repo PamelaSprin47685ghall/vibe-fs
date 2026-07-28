@@ -62,14 +62,22 @@ module GuardTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
-        // ReviewGuard sends a confirmation nudge after the first PERFECT; its
-        // HostMessageId (GuardPromptAccepted) is the only valid causal proof
-        // that a second PERFECT is a real confirmation round-trip, not two
-        // independent calls (KISS-N07, fail-closed).
-        let confirmPrompt =
-            AgentFact.GuardPromptAccepted
-                {| TargetSessionId = sid
-                   GuardKey = "confirm-perfect:tree200"
+        // chat.message accepts the ReviewConfirmation before the async send
+        // callback persists GuardPromptAccepted. The accepted continuation is
+        // already sufficient causal proof for the second PERFECT.
+        let confirmClaim =
+            AgentFact.PluginPromptClaimed
+                {| PromptKey = "confirm-key"
+                   SessionId = revSid
+                   LogicalRunId = "review-run"
+                   AuthorityRootUserMessageId = "review-root"
+                   ContinuationKind = "ReviewConfirmation"
+                   EffectiveAgent = Some "fast-reviewer" |}
+
+        let confirmAccepted =
+            AgentFact.PluginPromptAccepted
+                {| PromptKey = "confirm-key"
+                   SessionId = revSid
                    HostMessageId = "confirm-200" |}
 
         let fact2 =
@@ -77,7 +85,7 @@ module GuardTests =
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
                    ProviderRunId = "pr-2"
-                   UserPromptText = Some "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                   UserPromptText = None
                    UserMessageId = Some "confirm-200"
                    ToolCallId = "tc2"
                    GitTreeHash = treeHash
@@ -88,7 +96,8 @@ module GuardTests =
         Assert.Equal(1, rg1.ConsecutivePerfects)
         Assert.False(rg1.IsConfirmed)
 
-        let projPrompt = AgentFacts.foldAgentFact proj1 confirmPrompt
+        let projPrompt =
+            AgentFacts.foldAgentFact (AgentFacts.foldAgentFact proj1 confirmClaim) confirmAccepted
 
         let proj2 = AgentFacts.foldAgentFact projPrompt fact2
         let rg2 = proj2.Sessions.[sid].ReviewGuard.Value
@@ -175,7 +184,9 @@ module GuardTests =
                 {| ManagerSessionId = sid
                    ReviewerSessionId = revSid
                    ProviderRunId = "pr-2"
-                   UserPromptText = Some "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                   UserPromptText =
+                    Some
+                        "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
                    UserMessageId = Some "confirm-a"
                    ToolCallId = "tc2"
                    GitTreeHash = "treeA"

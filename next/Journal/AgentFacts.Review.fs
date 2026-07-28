@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Journal
 
 open System
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open AgentFactsFoldHelpers
@@ -94,18 +95,23 @@ module internal AgentFactsReview =
 
                             let hasValidProviderRunId = not (String.IsNullOrWhiteSpace p.ProviderRunId)
 
-                            // Prefer physical confirmation message id. Keep confirmation-marker text as
-                            // fail-soft fallback when Host physical id mapping is unavailable
-                            // in the current tool context, but never accept a second PERFECT
-                            // with neither identity proof.
+                            // chat.message can accept the physical ReviewConfirmation before the
+                            // asynchronous send callback records GuardPromptAccepted. Either durable
+                            // proof must authorize the second PERFECT.
                             let physicalConfirmationMatched =
-                                match p.UserMessageId, existing.ConfirmationPhysicalMessageId with
-                                | Some userMsg, Some confirmMsg when
-                                    not (String.IsNullOrWhiteSpace userMsg)
-                                    && not (String.IsNullOrWhiteSpace confirmMsg)
-                                    && userMsg = confirmMsg
-                                    ->
-                                    true
+                                match p.UserMessageId with
+                                | Some userMsg when not (String.IsNullOrWhiteSpace userMsg) ->
+                                    let acceptedReviewConfirmation =
+                                        Map.tryFind p.ReviewerSessionId proj.Sessions
+                                        |> Option.bind (fun reviewer -> reviewer.PromptAuthority)
+                                        |> Option.bind (fun authority ->
+                                            Map.tryFind (MessageId.create userMsg) authority.AcceptedContinuationIds)
+                                        |> Option.exists ((=) PromptAuthority.ReviewConfirmation)
+
+                                    acceptedReviewConfirmation
+                                    || (existing.ConfirmationPhysicalMessageId
+                                        |> Option.exists (fun confirmMsg ->
+                                            not (String.IsNullOrWhiteSpace confirmMsg) && userMsg = confirmMsg))
                                 | _ -> false
 
                             let confirmationPending =
@@ -129,9 +135,7 @@ module internal AgentFactsReview =
                             // PERFECT provider run is accepted once while physical id remains
                             // the preferred proof when present.
                             let acceptedConfirmSecondPerfect =
-                                confirmationPending
-                                && existing.ConsecutivePerfects = 1
-                                && not providerRunUsed
+                                confirmationPending && existing.ConsecutivePerfects = 1 && not providerRunUsed
 
                             let secondPerfectConfirmed =
                                 hasValidProviderRunId
@@ -259,7 +263,10 @@ module internal AgentFactsReview =
             p.GuardKey.IndexOf("confirm-perfect", StringComparison.OrdinalIgnoreCase) >= 0
 
         let hostMessageId =
-            if String.IsNullOrWhiteSpace p.HostMessageId then None else Some p.HostMessageId
+            if String.IsNullOrWhiteSpace p.HostMessageId then
+                None
+            else
+                Some p.HostMessageId
 
         let applyAcceptance (s: SessionAgentProjection) =
             let rg =
@@ -275,8 +282,7 @@ module internal AgentFactsReview =
                 | None ->
                     { emptyGuard None with
                         AcceptedGuardKey = Some p.GuardKey
-                        ConfirmationPhysicalMessageId =
-                            if isConfirmPerfect then hostMessageId else None }
+                        ConfirmationPhysicalMessageId = if isConfirmPerfect then hostMessageId else None }
 
             { s with ReviewGuard = Some rg }
 
