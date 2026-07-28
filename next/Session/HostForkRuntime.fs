@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Microsoft.FSharp.Control
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Kernel
@@ -25,7 +26,8 @@ type HostForkRuntime
         ?onRunStarted: SessionId -> AgentRole -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> string option,
         ?childWorkRecordFor: SessionId -> string option,
-        ?sessionSnapshot: ISessionSnapshotPort
+        ?sessionSnapshot: ISessionSnapshotPort,
+        ?cancelFallbackRetries: SessionId seq -> unit
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -39,6 +41,7 @@ type HostForkRuntime
     let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
     let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> None)
     let childWorkRecordOf = defaultArg childWorkRecordFor (fun _ -> None)
+    let cancelFallback = defaultArg cancelFallbackRetries (fun _ -> ())
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
@@ -48,8 +51,7 @@ type HostForkRuntime
 
     let sendBusyNudge = HostForkBusyNudge.sender sessions parentId journal directoryOf
 
-    let parentAbortToken =
-        Pty.registerParentAbort parentKey (fun () -> this.Cancel() |> ignore)
+    let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
     do
         ptyPortInstance.AddMailboxSender(fun completion ->
@@ -125,20 +127,23 @@ type HostForkRuntime
 
     member this.MarkReady(run: PendingHostRun) = HostForkRunLifecycle.markReady gate run
 
-    member this.Cancel() : Task<unit> =
-        HostForkChildDispatch.cancelParent
-            (fun () -> this.AwaitRecovery())
-            runtime
-            ptyPortInstance
-            parentKey
-            parentAbortToken
-            gate
-            pendingRuns
-            children
-            sessions
-            journal
-            parentId
-            (fun run outcome -> this.Complete(run, outcome))
+    member this.Cancel() : unit =
+        Async.StartImmediate(
+            HostForkChildDispatch.cancelParent
+                cancelFallback
+                (fun () -> this.AwaitRecovery())
+                runtime
+                ptyPortInstance
+                parentKey
+                parentAbortToken
+                gate
+                pendingRuns
+                children
+                sessions
+                journal
+                parentId
+                (fun run outcome -> this.Complete(run, outcome))
+        )
 
     member this.Join() : Task<Result<RunCompletion, ForkError>> =
         task {
@@ -153,3 +158,4 @@ type HostForkRuntime
 
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
+    member _.IsCancelled = runtime.IsCancelled

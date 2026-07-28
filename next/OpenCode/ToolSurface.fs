@@ -110,7 +110,9 @@ module ToolSurface =
                                             match backgroundBFor with
                                             | Some fn -> fn (SessionId.value sessionId)
                                             | None -> None),
-                                    ?sessionSnapshot = snapshot
+                                    ?sessionSnapshot = snapshot,
+                                    cancelFallbackRetries =
+                                        (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
                                 )
 
                             runtimes.[sid] <- r

@@ -21,16 +21,7 @@ module InspectorTool =
     let private stringify (value: obj) : string =
         if isNull value then "null" else JS.JSON.stringify value
 
-    [<Emit("""
-        (ctx, callback) => {
-          const signal = ctx && (ctx.abort || ctx.abortSignal || ctx.signal);
-          if (!signal || typeof signal.addEventListener !== "function") return () => {};
-          if (signal.aborted) callback();
-          else signal.addEventListener("abort", callback, { once: true });
-          return () => signal.removeEventListener("abort", callback);
-        }
-    """)>]
-    let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) = jsNative
+    let private attachAbort = ToolSurfaceEmit.attachAbort
 
     [<Import("createHash", "node:crypto")>]
     let private createHashImport: string -> obj = jsNative

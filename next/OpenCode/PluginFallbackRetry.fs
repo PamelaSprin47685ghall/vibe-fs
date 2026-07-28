@@ -179,3 +179,17 @@ module PluginFallbackRetry =
         : bool =
         scheduleFlushOnIdle sessionPort eventPort journal sessionId onAccepted 250
         hasPending (SessionId.value sessionId)
+
+    /// Cancel pending ProviderRetryAttempt flush for a session. Used when the
+    /// parent/child is being torn down so no further prompts are sent.
+    let cancelPendingFor (sessionId: SessionId) : unit =
+        let key = SessionId.value sessionId
+
+        lock pendingGate (fun () ->
+            match flushTimers.TryGetValue key with
+            | true, oldTimer ->
+                HostSignalBootstrapTimers.clearTimeout oldTimer
+                flushTimers.Remove key |> ignore
+            | false, _ -> ()
+
+            pending.Remove key |> ignore)

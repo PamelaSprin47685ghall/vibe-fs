@@ -76,6 +76,7 @@
     <Compile Include="OpenCode/ManagerConfigTests.fs"/>
     <Compile Include="OpenCode/ManagedAgentTests.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeTests.fs"/>
+    <Compile Include="OpenCode/ToolSurfaceJoinAbortTests.fs"/>
     <Compile Include="MockOpenCode/MockOpenCode.fs"/>
     <Compile Include="MockOpenCode/ForkRuntimeIntegration.fs"/>
     <Compile Include="MockOpenCode/ReviewGuardIntegration.fs"/>

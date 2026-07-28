@@ -68,6 +68,36 @@ module ToolSurfaceEmit =
     [<Emit("JSON.stringify($0)")>]
     let stringify (value: obj) : string = jsNative
 
+    /// Attach a one-shot callback to an AbortSignal-like object.  The callback
+    /// is invoked immediately if the signal is already aborted.  Returns a
+    /// detacher that removes the listener.  If the context carries no usable
+    /// signal, returns a no-op detacher.
+    let attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) =
+        let signal =
+            if isNull context then
+                null
+            else
+                let a = context?("abort")
+
+                if not (isNull a) then
+                    a
+                else
+                    let b = context?("abortSignal")
+                    if not (isNull b) then b else context?("signal")
+
+        if isNull signal || isNull (signal?("addEventListener")) then
+            fun () -> ()
+        else
+            let aborted = signal?("aborted")
+
+            if not (isNull aborted) && unbox<bool> aborted then
+                callback ()
+                fun () -> ()
+            else
+                let cb = fun (_: obj) -> callback ()
+                signal?addEventListener ("abort", cb, createObj [ "once", box true ])
+                fun () -> signal?removeEventListener ("abort", cb)
+
     let contextString (ctx: obj) (name: string) =
         if isNull ctx || isNull ctx?(name) then
             None

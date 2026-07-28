@@ -137,7 +137,8 @@ module ToolSurfaceOrchestrator =
                         sessionPort,
                         ?journal = None,
                         onChildCreated =
-                            (fun _ role childId -> registerChild sessionParents sessionRoles sid role childId)
+                            (fun _ role childId -> registerChild sessionParents sessionRoles sid role childId),
+                        cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
                     )
 
                 executorRuntimes.[sid] <- r
@@ -155,7 +156,7 @@ module ToolSurfaceOrchestrator =
             match executorRuntimes.TryGetValue sessionKey with
             | true, r ->
                 executorRuntimes.Remove sessionKey |> ignore
-                // Fire-and-forget: Cancel is async (PTY cleanup + child abort) but
-                // disposal must not block the host event path.
-                r.Cancel() |> ignore
+                // Fire-and-forget: Cancel starts async cleanup (PTY + child abort)
+                // but disposal must not block the host event path.
+                r.Cancel()
             | false, _ -> ())

@@ -42,7 +42,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     match worktrees.TryGetValue agentId with
                     | true, path -> Some path
                     | false, _ -> None),
-            onRunStarted = deps.OnRunStarted
+            onRunStarted = deps.OnRunStarted,
+            cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
         )
 
     let awaitAgent (agentId: string) : Task<Result<RunCompletion, string>> =

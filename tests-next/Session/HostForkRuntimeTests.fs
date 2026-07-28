@@ -242,3 +242,39 @@ module HostForkRuntimeTests =
                 Assert.equal (None, captured.[1].Model)
                 trigger ()
             })
+
+    [<Fact>]
+    let ``HostForkRuntime_cancel_invokes_fallback_cancel_for_parent_and_children`` () =
+        task {
+            let parentId = SessionId.create "parent-cancel"
+            let childId = SessionId.create "child-cancel"
+            let captured = ResizeArray<SessionId>()
+
+            let host =
+                { new ISessionHostPort with
+                    member _.SubscribeTerminal(_, _) =
+                        { new IDisposable with
+                            member _.Dispose() = () }
+
+                    member _.SendPrompt(_, _, _) =
+                        Task.FromResult(Ok(MessageId.create "accepted"))
+
+                    member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
+
+                    member _.AbortSession(_) = Task.FromResult(Ok())
+                    member _.AbortChildren(_) = Task.FromResult(()) :> Task
+                    member _.CreateChildSession(_, _) = Task.FromResult(Ok childId)
+                    member _.GetSessionOutput(_) = [] }
+
+            let bridge =
+                HostForkRuntime(parentId, host, cancelFallbackRetries = (fun ids -> captured.AddRange(ids)))
+
+            let! first = bridge.Fork("agent-1", AgentRole.Coder, "work")
+            Assert.Equal(Ok(ForkResult.Created "agent-1"), first)
+
+            bridge.Cancel()
+
+            Assert.True(captured.Contains(parentId), "parent fallback not cancelled")
+            Assert.True(captured.Contains(childId), "child fallback not cancelled")
+            Assert.True(bridge.IsCancelled, "runtime should be cancelled")
+        }

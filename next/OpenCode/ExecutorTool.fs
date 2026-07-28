@@ -27,16 +27,31 @@ module ExecutorTool =
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
-    [<Emit("""
-        (ctx, callback) => {
-          const signal = ctx && (ctx.abort || ctx.abortSignal || ctx.signal);
-          if (!signal || typeof signal.addEventListener !== "function") return () => {};
-          if (signal.aborted) callback();
-          else signal.addEventListener("abort", callback, { once: true });
-          return () => signal.removeEventListener("abort", callback);
-        }
-    """)>]
-    let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) = jsNative
+    let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) =
+        let signal =
+            if isNull context then
+                null
+            else
+                let a = context?("abort")
+
+                if not (isNull a) then
+                    a
+                else
+                    let b = context?("abortSignal")
+                    if not (isNull b) then b else context?("signal")
+
+        if isNull signal || isNull (signal?("addEventListener")) then
+            fun () -> ()
+        else
+            let aborted = signal?("aborted")
+
+            if not (isNull aborted) && unbox<bool> aborted then
+                callback ()
+                fun () -> ()
+            else
+                let cb = fun (_: obj) -> callback ()
+                signal?addEventListener ("abort", cb, createObj [ "once", box true ])
+                fun () -> signal?removeEventListener ("abort", cb)
 
     let private textArg (args: obj) name =
         if isNull args || isNull args?(name) then

@@ -78,7 +78,7 @@ module HostForkRuntimeLinkageTests =
 
                 let host, _, _ = makeCountingFake ()
                 let b = HostForkRuntime(p, host, journal = j)
-                do! b.Cancel()
+                b.Cancel()
 
                 let linkage =
                     AgentJournal.snapshot j
@@ -104,7 +104,7 @@ module HostForkRuntimeLinkageTests =
 
                 let host1, _, _ = makeCountingFake ()
                 let b1 = HostForkRuntime(p, host1, journal = j1)
-                do! b1.Cancel()
+                b1.Cancel()
 
                 (j1 :> IDisposable).Dispose()
 

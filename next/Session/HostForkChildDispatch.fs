@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Microsoft.FSharp.Control
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Kernel.Identity
@@ -119,40 +120,43 @@ module HostForkChildDispatch =
 
             appendRemaining childIds
 
-    /// Tear down linked children only after every unlink fact is durable.
+    /// Abort linked child sessions.  Unlink facts have already been written
+    /// synchronously by the caller before the async cleanup begins.
     let teardownChildren
         (sessions: ISessionHostPort)
-        (journal: AgentJournal option)
         (parentId: SessionId)
         (children: Dictionary<string, SessionId>)
         (gate: obj)
         : Task<Result<unit, string>> =
         task {
             let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
+            let mutable firstError: string option = None
 
-            match unlinkChildren journal parentId childIds with
-            | Error err -> return Error err
-            | Ok() ->
-                let mutable firstError: string option = None
+            for childId in childIds do
+                try
+                    let! abortResult = sessions.AbortSession childId
 
-                for childId in childIds do
-                    try
-                        let! abortResult = sessions.AbortSession childId
+                    match abortResult, firstError with
+                    | Error err, None -> firstError <- Some err
+                    | _ -> ()
+                with ex ->
+                    if firstError.IsNone then
+                        firstError <- Some ex.Message
 
-                        match abortResult, firstError with
-                        | Error err, None -> firstError <- Some err
-                        | _ -> ()
-                    with ex ->
-                        if firstError.IsNone then
-                            firstError <- Some ex.Message
-
-                match firstError with
-                | Some err -> return Error err
-                | None -> return Ok()
+            match firstError with
+            | Some err -> return Error err
+            | None -> return Ok()
         }
 
     /// Cancel parent: fail pending runs, durable-unlink children, clear maps.
+    /// `cancelFallback` is invoked with parentId :: childIds to stop pending
+    /// ProviderRetryAttempt flushes for the torn-down sessions.
+    ///
+    /// Side effects that must be visible before the call returns (ForkRuntime
+    /// cancellation, fallback flush cancellation, durable unlink) run
+    /// synchronously before the async block starts.
     let cancelParent
+        (cancelFallback: SessionId seq -> unit)
         (awaitRecovery: unit -> Task<unit>)
         (runtime: ForkRuntime)
         (ptyPort: PtyPort)
@@ -165,26 +169,38 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (complete: PendingHostRun -> TerminalOutcome -> unit)
-        : Task<unit> =
-        task {
-            runtime.Cancel()
-            do! ptyPort.CloseAll()
-            Pty.unregisterParentAbort parentKey parentAbortToken
+        : Async<unit> =
+        // Synchronous: make sure observers (runtime.Join, tests, parent abort
+        // callbacks) see cancellation and fallback flush immediately.
+        runtime.Cancel()
 
-            let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
+        let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
+        cancelFallback (parentId :: childIds)
 
-            for run in pending do
-                complete run (TerminalOutcome.Failed "cancelled")
+        match unlinkChildren journal parentId childIds with
+        | Error err ->
+            // Journal failure during unlink is a durable-state bug; surface it.
+            async { return raise (InvalidOperationException(sprintf "Parent unlink failed: %s" err)) }
+        | Ok() ->
+            async {
+                do! Async.AwaitTask(ptyPort.CloseAll())
+                Pty.unregisterParentAbort parentKey parentAbortToken
 
-            do! awaitRecovery ()
-            let! teardown = teardownChildren sessions journal parentId children gate
+                let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
 
-            match teardown with
-            | Ok() ->
-                lock gate (fun () ->
-                    children.Clear()
-                    pendingRuns.Clear())
+                for run in pending do
+                    complete run (TerminalOutcome.Failed "cancelled")
 
-                return ()
-            | Error err -> return raise (InvalidOperationException(sprintf "Parent teardown failed: %s" err))
-        }
+                do! Async.AwaitTask(awaitRecovery ())
+
+                let! teardown = Async.AwaitTask(teardownChildren sessions parentId children gate)
+
+                match teardown with
+                | Ok() ->
+                    lock gate (fun () ->
+                        children.Clear()
+                        pendingRuns.Clear())
+
+                    return ()
+                | Error err -> return raise (InvalidOperationException(sprintf "Parent teardown failed: %s" err))
+            }

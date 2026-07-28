@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.OpenCode
 #nowarn "3511"
 
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Session
 open ToolSurfaceEmit
@@ -23,6 +24,12 @@ module ToolSurfaceJoin =
                 match deps.RuntimeFor ctx with
                 | Error err -> return box (stringify (createObj [ "error", box err ]))
                 | Ok runtime ->
+                    let detachAbort = ToolSurfaceEmit.attachAbort ctx (fun () -> runtime.Cancel())
+
+                    use _ =
+                        { new IDisposable with
+                            member _.Dispose() = detachAbort () }
+
                     let! result = runtime.Join()
 
                     match result with

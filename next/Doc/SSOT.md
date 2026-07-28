@@ -153,6 +153,21 @@ Blogger/Executor 名称进入 LLM tool schema
 旧 journal 被猜测性迁移
 ```
 
+## 父/Join 取消语义 [NORMATIVE]
+
+`join` 工具收到 host `abort` 信号时，必须立即同步完成以下动作，然后才返回/继续：
+
+1. 调用 `HostForkRuntime.Cancel()`，后者立即设置 `ForkRuntime.IsCancelled`，使 `runtime.Join()` 返回 `Cancelled` 而不是 `NothingToJoin`。
+2. 计算当前 `HostForkRuntime` 的 parent session 与所有已链接 child session 的 ID 集合。
+3. 调用 `cancelFallbackRetries` callback，移除 `PluginFallbackRetry` 中为这些 session 排队的所有 `ProviderRetryAttempt` flush，防止取消后继续 AABB 重试。
+4. 同步写 `AgentUnlinked` 事实，保证崩溃恢复后这些子 session 不再被当作仍链接。
+
+`HostForkChildDispatch.cancelParent` 把上述同步部分放在 `async { ... }` 块**之前**执行；异步清理（`ptyPort.CloseAll`、子 session `AbortSession`、清空映射表）由 `Async.StartImmediate` 启动，不阻塞 `Cancel()` 的同步返回。
+
+`cancelFallbackRetries` callback 由 `HostForkRuntime` 构造点传入，避免 `Session` 层直接引用 `OpenCode` 的 `PluginFallbackRetry`，从而打破循环文件依赖。
+
+`HostForkRuntime.Cancel()` 为 `unit` 返回；调用者不应 await 它。需要等待清理完成的测试/代码路径应通过观察 `AgentJournal`、`PluginFallbackRetry` 状态或子 session 的副作用间接确认。
+
 ## Event-Stagger 规则
 
 第一个 canary 立即启动；canary N 等待 N−1 输出精确的 `[setupScenario] ready` 随后立即启动（不等待前一个 canary 结束；ready 前退出或 ready 超时 = 该 canary 失败，可以释放启动门继续收集后续诊断，但整轮不能通过）。
