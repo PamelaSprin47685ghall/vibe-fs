@@ -1,0 +1,43 @@
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-FATAL] first script mismatch: reason=no-prefix-matched session=ses_058457650ffefaC8Cb3McjuogE parent=ses_0584578e1ffebPZtzJgqMct86K role=inspector kind=chat model="test-model" tools=["coder","executor","fork-pty","glob","grep","inspector","join","list","read"] msgs=2 lastUser="Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat 2) fork-pty the returned ptyId with prompt: ECHO_TEST 3) fork-pty the ptyId with empty prompt to READ 4) fork-pty the ptyId with signal=\"TERM\" 5) join and confirm exit 6) fork-pty agent=\"pty\" with command: trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null 7) fork-pty that ptyId with signal=\"TERM\" 8) " candidates=["manager-title@pty-stress/manager-title/title/title","session-blogger@pty-stress/session-blogger/blogger/chat","devops-fork-pty@pty-stress/devops/devops/chat","manager-final@pty-stress/manager/manager/chat"]
+── fatal script mismatch: no-prefix-matched ──
+session=ses_058457650ffefaC8Cb3McjuogE lastUser="Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat 2) fork-pty the returned ptyId with prompt: ECHO_TEST 3) fork-pty the ptyId with empty prompt to READ 4) fork-pty the ptyId with signal=\"TERM\" 5) join and confirm exit 6) fork-pty agent=\"pty\" with command: trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null 7) fork-pty that ptyId with signal=\"TERM\" 8) "
+candidates=["manager-title@pty-stress/manager-title/title/title","session-blogger@pty-stress/session-blogger/blogger/chat","devops-fork-pty@pty-stress/devops/devops/chat","manager-final@pty-stress/manager/manager/chat"]
+── event tail ──
+#82 07:57:27.870 message.updated session=ses_05845765
+#83 07:57:27.870 message.part.updated session=ses_05845765
+#84 07:57:27.870 session.updated session=ses_05845765
+#85 07:57:27.870 message.part.updated session=ses_0584578e
+#86 07:57:27.878 session.status session=ses_05845765
+#87 07:57:27.878 message.updated session=ses_05845765
+#88 07:57:27.886 message.part.updated session=ses_0584578e finish=tool-calls
+#89 07:57:27.886 message.updated session=ses_0584578e finish=tool-calls
+#90 07:57:27.901 message.updated session=ses_0584578e finish=tool-calls
+#91 07:57:27.901 session.status session=ses_0584578e
+#92 07:57:27.901 message.updated session=ses_0584578e
+#93 07:57:27.901 session.updated session=ses_0584578e
+#94 07:57:27.901 session.diff session=ses_0584578e
+#95 07:57:27.919 session.status session=ses_0584578e
+#96 07:57:27.931 message.part.updated session=ses_0584578e
+#97 07:57:27.931 message.part.updated session=ses_0584578e
+#98 07:57:27.931 message.part.updated session=ses_0584578e
+#99 07:57:27.948 session.updated session=ses_05845765
+#100 07:57:27.948 session.diff session=ses_05845765
+#101 07:57:27.948 message.updated session=ses_05845765
+  pending blocking devops-fork-pty devops-fork-pty@pty-stress/devops/devops/chat
+  pending blocking devops-pty-write devops-pty-write@pty-stress/devops/devops/chat
+  pending blocking devops-pty-read devops-pty-read@pty-stress/devops/devops/chat
+  pending blocking devops-pty-term devops-pty-term@pty-stress/devops/devops/chat
+  pending blocking devops-join-term devops-join-term@pty-stress/devops/devops/chat
+  pending blocking devops-fork-pty2 devops-fork-pty2@pty-stress/devops/devops/chat
+  pending blocking devops-pty2-term devops-pty2-term@pty-stress/devops/devops/chat
+  pending blocking devops-pty2-kill devops-pty2-kill@pty-stress/devops/devops/chat
+  pending blocking devops-join-kill devops-join-kill@pty-stress/devops/devops/chat
+  pending blocking devops-list devops-list@pty-stress/devops/devops/chat
+  pending blocking devops-final devops-final@pty-stress/devops/devops/chat
+  pending blocking manager-final manager-final@pty-stress/manager/manager/chat
