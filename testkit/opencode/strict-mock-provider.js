@@ -122,6 +122,7 @@ export class StrictMockProvider {
   /** Host restart / new process: old provider-visible seals are not comparable. */
   clearPrefixSeals() {
     this._state.sealedBySession.clear();
+    this._state.lastModelBySession?.clear?.();
   }
   /// Read-only: which session (if any) currently owns an alias. Lets a scenario
   /// route a second session to a distinct alias instead of throwing on rebind.
@@ -271,9 +272,17 @@ export class StrictMockProvider {
           && JSON.stringify(prev0.content) === JSON.stringify(next0.content);
         // Epoch B-head: tools+system stable, body not append-only.
         const epochCold = toolsSame && systemSame;
-        // Fallback A→B: host system prompt embeds the model id/name, so Side B
-        // is an expected KV-cache cold boundary when tools stay identical.
-        const modelSideCold = toolsSame && prev0?.role === 'system' && next0?.role === 'system' && !systemSame;
+        // Fallback A→B: host system prompt embeds model id. Allow reseal only when
+        // the provider model id actually changed vs last sealed chat for session
+        // (not for arbitrary system mutations — those stay fail-closed).
+        const prevModel = s.lastModelBySession?.get(sessionID);
+        const nextModel = parsed?.model?.modelID || parsed?.model?.id || parsed?.model || null;
+        const modelChanged = prevModel != null && nextModel != null && String(prevModel) !== String(nextModel);
+        const modelSideCold = toolsSame
+          && modelChanged
+          && prev0?.role === 'system'
+          && next0?.role === 'system'
+          && !systemSame;
         if (epochCold || modelSideCold) {
           const why = epochCold ? 'epoch/B-head' : 'fallback-model-side';
           console.error(`[MOCK-PREFIX-RESEAL] session=${sessionID} tools stable; resealing after ${why} cold boundary`);
@@ -311,6 +320,9 @@ export class StrictMockProvider {
     // Seal only chat turns (title/synthetic may reshuffle without product cache).
     if (sessionID && requestKindOf(parsed) === 'chat') {
       s.sealedBySession.set(sessionID, sealProviderVisible(parsed));
+      if (!s.lastModelBySession) s.lastModelBySession = new Map();
+      const mid = parsed?.model?.modelID || parsed?.model?.id || parsed?.model || null;
+      if (mid != null) s.lastModelBySession.set(sessionID, mid);
     }
     this.onExpectationConsumed?.({
       id: exp.id,
