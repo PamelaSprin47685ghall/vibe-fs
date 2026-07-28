@@ -1,14 +1,31 @@
+/**
+ * Script forest contract tests (AGENTS.md KISS-N11).
+ * File name kept for gate-testkit discovery; semantics are prefix/content forest.
+ */
 import { assertEq, assertTrue, postJson } from './gate-lib.mjs';
 import { StrictMockProvider } from '../strict-mock-provider.js';
 
-function lane(role, turn, session = role) {
+// neverEnd SSE keeps stream open; read status without waiting for body.
+async function postJsonNoBody(url, body, headers = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  const status = res.status;
+  res.body?.cancel();
+  return { status, ok: status >= 200 && status < 300 };
+}
+
+
+function lane(role, turn = 1, session = role) {
   return { scenario: 'gate', session, role, turn, requestKind: 'chat' };
 }
 
-function chat(content, tools = []) {
+function chat(content, tools = [], extraMessages = []) {
   return {
     model: 'test-model',
-    messages: [{ role: 'user', content }],
+    messages: [...extraMessages, { role: 'user', content }],
     tools: tools.map((name) => ({ type: 'function', function: { name } })),
   };
 }
@@ -21,332 +38,138 @@ function bloggerChat(content) {
   };
 }
 
-async function runStrictMockLanes() {
+async function runForestIndependentPaths() {
   const provider = new StrictMockProvider();
-  provider.strict = true;
-  assertEq(typeof provider.allowOutOfOrder, 'undefined', 'global out-of-order bypass must not exist');
-  assertEq(typeof provider.allowBloggerRequests, 'undefined', 'Blogger bypass must not exist');
-  assertEq(typeof provider.allowTitleGeneration, 'undefined', 'title bypass must not exist');
-  assertEq(typeof provider.allowSyntheticContinuations, 'undefined', 'synthetic continuation bypass must not exist');
-  const consumed = [];
-  provider.onExpectationConsumed = ({ id, lane: consumedLane }) => consumed.push(`${id}:${consumedLane.role}:${consumedLane.turn}`);
   await provider.start();
-
   try {
     provider.expectToolCall({
       id: 'manager-first',
       lane: lane('manager', 1),
       tool: 'fork',
       args: { agent: 'coder', prompt: 'work' },
-      match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager first'] },
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'manager first' },
     });
     provider.expectText({
       id: 'manager-second',
       lane: lane('manager', 2),
       text: 'manager done',
-      match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager second'] },
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'manager second' },
     });
     provider.expectToolCall({
       id: 'coder-write',
       lane: lane('coder', 1),
       tool: 'write',
       args: { filePath: 'x.txt', content: 'ok\n' },
-      match: { requiredTools: ['write'] },
+      match: { requiredTools: ['write'], user: 'write x.txt' },
     });
 
     const coderFirst = await postJson(`${provider.url}/v1/chat/completions`, chat('write x.txt', ['write']));
-    assertTrue(coderFirst.ok, 'independent coder lane may run before manager lane');
+    assertTrue(coderFirst.ok, 'independent coder path may run before manager');
     const managerFirst = await postJson(`${provider.url}/v1/chat/completions`, chat('manager first', ['fork', 'join', 'list']));
-    assertTrue(managerFirst.ok, 'manager lane head should match after coder interleaving');
+    assertTrue(managerFirst.ok, 'manager first user matches');
     const managerSecond = await postJson(`${provider.url}/v1/chat/completions`, chat('manager second', ['fork', 'join', 'list']));
-    assertTrue(managerSecond.ok, 'manager lane second turn should follow its first turn');
-    assertEq(provider.remainingExpectations, 0, 'all lane expectations should be consumed');
-    assertEq(consumed.join(','), 'coder-write:coder:1,manager-first:manager:1,manager-second:manager:2', 'consumption records causal lane order');
-    provider.expectSatisfied();
-
-    const noExpRes = await postJson(`${provider.url}/v1/chat/completions`, chat('unexpected blogger', []));
-    assertEq(noExpRes.status, 500, 'empty queue should return 500');
-    assertEq(provider.unexpectedRequests.length, 1, 'empty queue should record unexpected');
-
-    let satisfiedThrew = false;
-    try { provider.expectSatisfied(); } catch (err) {
-      satisfiedThrew = true;
-      assertTrue(err.message.includes('unexpected'), 'expectSatisfied should fail on unexpected request');
-    }
-    assertTrue(satisfiedThrew, 'expectSatisfied must throw');
-
-    const order = new StrictMockProvider();
-    order.strict = true;
-    await order.start();
-    try {
-      order.expectText({
-        id: 'order-first',
-        lane: lane('manager', 1, 'order'),
-        text: 'first',
-        match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager first'] },
-      });
-      order.expectText({
-        id: 'order-second',
-        lane: lane('manager', 2, 'order'),
-        text: 'second',
-        match: { requiredTools: ['fork', 'join', 'list'], containsText: ['manager second'] },
-      });
-      const mismatchRes = await postJson(`${order.url}/v1/chat/completions`, chat('manager second', ['fork', 'join', 'list']));
-      assertEq(mismatchRes.status, 500, 'later turn must not bypass its lane head');
-      assertEq(order.remainingExpectations, 2, 'lane-order mismatch must not consume expectation');
-    } finally {
-      await order.stop();
-    }
-
-    const missing = new StrictMockProvider();
-    missing.strict = true;
-    await missing.start();
-    try {
-      missing.expectText({
-        id: 'missing-lane',
-        lane: lane('manager', 1, 'missing'),
-        text: 'missing',
-        match: { requiredTools: ['fork', 'join', 'list'] },
-      });
-      let missingThrew = false;
-      try { missing.expectSatisfied(); } catch (err) {
-        missingThrew = true;
-        assertTrue(err.message.includes('remaining expectations'), 'missing expectation should report remaining lane head');
-      }
-      assertTrue(missingThrew, 'missing expectation must fail expectSatisfied');
-    } finally {
-      await missing.stop();
-    }
-  } finally {
-    await provider.stop();
-  }
-}
-
-async function runSessionBoundLanes() {
-  const provider = new StrictMockProvider();
-  await provider.start();
-  try {
-    provider.bindSession('parent', 'parent-1');
-    provider.expectText({
-      id: 'child-first',
-      lane: { ...lane('coder', 1, 'child'), parentSession: 'parent' },
-      text: 'first',
-      match: { requiredTools: ['write'], containsText: ['first child turn'] },
-    });
-    provider.afterExpectation('child-first', () => {
-      provider.expectText({
-        id: 'child-second',
-        lane: { ...lane('coder', 2, 'child'), parentSession: 'parent' },
-        text: 'second',
-        match: { requiredTools: ['write'], containsText: ['second child turn'] },
-      });
-    });
-
-    const headers = {
-      'x-session-affinity': 'child-1',
-      'x-parent-session-id': 'parent-1',
-    };
-    const tools = [{ type: 'function', function: { name: 'write' } }];
-    const firstBody = {
-      model: 'test-model',
-      tools,
-      messages: [{ role: 'user', content: 'first child turn' }],
-    };
-    const first = await postJson(`${provider.url}/v1/chat/completions`, firstBody, headers);
-    assertTrue(first.ok, 'parent-bound child lane must accept its first request');
-    // Same session: full provider-visible history must keep sealed prefix (append-only).
-    const secondBody = {
-      model: 'test-model',
-      tools,
-      messages: [
-        { role: 'user', content: 'first child turn' },
-        { role: 'assistant', content: 'first' },
-        { role: 'user', content: 'second child turn' },
-      ],
-    };
-    const second = await postJson(`${provider.url}/v1/chat/completions`, secondBody, headers);
-    assertTrue(second.ok, 'afterExpectation must register the causal successor atomically');
-    provider.expectSatisfied();
-  } finally {
-    await provider.stop();
-  }
-
-  const wrongParent = new StrictMockProvider();
-  await wrongParent.start();
-  try {
-    wrongParent.bindSession('parent', 'parent-1');
-    wrongParent.expectText({
-      id: 'child',
-      lane: { ...lane('coder', 1, 'child'), parentSession: 'parent' },
-      text: 'never',
-      match: { requiredTools: ['write'] },
-    });
-    const rejected = await postJson(
-      `${wrongParent.url}/v1/chat/completions`,
-      chat('wrong parent', ['write']),
-      { 'x-session-affinity': 'child-1', 'x-parent-session-id': 'other-parent' },
-    );
-    assertEq(rejected.status, 500, 'lane must reject a child with another parent session');
-  } finally {
-    await wrongParent.stop();
-  }
-}
-
-async function runSyntheticSessionLane() {
-  const provider = new StrictMockProvider();
-  await provider.start();
-  try {
-    provider.bindSession('inspector', 'inspector-1');
-    provider.expectText({
-      id: 'inspector-zwsp',
-      lane: { ...lane('synthetic', 1, 'inspector'), requestKind: 'synthetic' },
-      text: 'continued',
-      match: { containsText: ['\u200B'] },
-    });
-
-    const response = await postJson(
-      `${provider.url}/v1/chat/completions`,
-      chat('\u200B', ['executor']),
-      { 'x-session-affinity': 'inspector-1' },
-    );
-    assertTrue(response.ok, 'session-bound zero-width request must consume its explicit synthetic lane');
+    assertTrue(managerSecond.ok, 'manager second user matches without turn queue');
+    const again = await postJson(`${provider.url}/v1/chat/completions`, chat('manager first', ['fork', 'join', 'list']));
+    assertTrue(again.ok, 'same prefix is idempotent (no mute)');
     provider.expectSatisfied();
   } finally {
     await provider.stop();
   }
 }
 
-// neverEnd SSE responses keep the stream open; read status without waiting for body.
-async function postJsonNoBody(url, body, headers = {}) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
-  const status = res.status;
-  res.body?.cancel();
-  return { status, ok: status >= 200 && status < 300 };
-}
-
-async function runNeverEndStaysPending() {
+async function runIdempotentSamePrefix() {
   const provider = new StrictMockProvider();
   await provider.start();
   try {
     provider.expectText({
-      id: 'neverend-alive',
+      id: 'once',
       lane: lane('manager', 1),
-      neverEnd: true,
-      blocking: false,
-      text: 'neverend response',
-      match: { containsText: ['hello from neverend'] },
+      text: 'hello',
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'idempotent ping' },
     });
-    const first = await postJsonNoBody(`${provider.url}/v1/chat/completions`, chat('hello from neverend', ['fork', 'join', 'list']));
-    assertTrue(first.ok, 'neverEnd: first request must match');
-    assertEq(provider.remainingExpectations, 1, 'neverEnd: one expectation remains after first match');
-    const second = await postJsonNoBody(`${provider.url}/v1/chat/completions`, chat('hello from neverend', ['fork', 'join', 'list']));
-    assertTrue(second.ok, 'neverEnd: second request must match again');
-    assertEq(provider.remainingExpectations, 1, 'neverEnd: one expectation remains after second match');
+    const body = chat('idempotent ping', ['fork', 'join', 'list']);
+    const a = await postJson(`${provider.url}/v1/chat/completions`, body);
+    const b = await postJson(`${provider.url}/v1/chat/completions`, body);
+    assertTrue(a.ok && b.ok, 'identical requests both succeed');
+    // blocking edge observed → satisfied even if "pending" uses observed set
     provider.expectSatisfied();
   } finally {
     await provider.stop();
   }
 }
 
-async function runNeverEndBlocksSameLaneTurn() {
+async function runAmbiguousPrefixRejected() {
   const provider = new StrictMockProvider();
   await provider.start();
   try {
     provider.expectText({
-      id: 'neverend-blocker',
-      lane: lane('manager', 1),
-      neverEnd: true,
-      blocking: false,
-      text: 'neverend',
-      match: { containsText: ['neverend content'] },
+      id: 'a',
+      lane: lane('manager', 1, 'm-a'),
+      text: 'A',
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'shared marker' },
     });
     provider.expectText({
-      id: 'blocked-turn-2',
-      lane: lane('manager', 2),
-      text: 'turn2',
-      match: { containsText: ['turn 2 content'] },
+      id: 'b',
+      lane: lane('manager', 1, 'm-b'),
+      text: 'B',
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'shared marker' },
     });
-    // Match the neverEnd head
-    const first = await postJsonNoBody(`${provider.url}/v1/chat/completions`, chat('neverend content', ['fork', 'join', 'list']));
-    assertTrue(first.ok, 'neverEnd blocks: first request matches neverEnd head');
-    // Turn 2 is behind neverEnd head — unreachable
-    const second = await postJson(`${provider.url}/v1/chat/completions`, chat('turn 2 content', ['fork', 'join', 'list']));
-    assertEq(second.status, 500, 'neverEnd blocks: turn 2 behind neverEnd head must 500');
-    assertEq(provider.remainingExpectations, 2, 'neverEnd blocks: both expectations still remain');
+    const res = await postJson(`${provider.url}/v1/chat/completions`, chat('shared marker', ['fork', 'join', 'list']));
+    assertEq(res.status, 500, 'ambiguous equal-specificity templates must 500');
+    assertTrue(
+      provider.unexpectedRequests.some((u) => u.reason === 'ambiguous-prefix' || u.reason === 'ambiguous-lane-heads'),
+      'reason must be ambiguous-prefix',
+    );
   } finally {
     await provider.stop();
   }
 }
 
-async function runBloggerDistinctMarkers() {
+async function runUserForkDisambiguates() {
   const provider = new StrictMockProvider();
   await provider.start();
   try {
-    // Two unbound blogger heads in separate lane queues with different markers
     provider.expectText({
-      id: 'blogger-orch',
-      lane: lane('blogger', 1, 'orch-blogger'),
-      neverEnd: true,
-      blocking: false,
-      text: 'orch bg',
-      match: { containsText: ['orchestrator blog activity'] },
+      id: 'job-a',
+      lane: lane('manager', 1, 'job-a'),
+      text: 'A',
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'Ship job-A' },
     });
     provider.expectText({
-      id: 'blogger-manager',
-      lane: lane('blogger', 1, 'manager-blogger'),
-      neverEnd: true,
-      blocking: false,
-      text: 'manager bg',
-      match: { containsText: ['manager blog activity'] },
+      id: 'job-b',
+      lane: lane('manager', 1, 'job-b'),
+      text: 'B',
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'Ship job-B' },
     });
-    // Request with orch marker — only orch-blogger matches
-    const orchReq = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('orchestrator blog activity'));
-    assertTrue(orchReq.ok, 'blogger distinct: orch request matches orch blogger');
-    // Request with manager marker — only manager-blogger matches
-    const mgrReq = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('manager blog activity'));
-    assertTrue(mgrReq.ok, 'blogger distinct: manager request matches manager blogger');
+    const a = await postJson(`${provider.url}/v1/chat/completions`, chat('Ship job-A please', ['fork', 'join', 'list']));
+    const b = await postJson(`${provider.url}/v1/chat/completions`, chat('Ship job-B please', ['fork', 'join', 'list']));
+    assertTrue(a.ok && b.ok, 'user-text fork disambiguates parallel paths');
     provider.expectSatisfied();
   } finally {
     await provider.stop();
   }
 }
 
-async function runBloggerAmbiguousMarkers() {
+async function runNeverEndStillIdempotent() {
   const provider = new StrictMockProvider();
   await provider.start();
   try {
-    // Two unbound blogger heads with identical containsText
     provider.expectText({
-      id: 'blogger-a',
-      lane: lane('blogger', 1, 'blogger-a'),
+      id: 'blog',
+      lane: { ...lane('blogger', 1), requestKind: 'chat' },
       neverEnd: true,
       blocking: false,
-      text: 'a bg',
-      match: { containsText: ['shared marker'] },
+      text: 'bg',
+      match: { user: 'You are the blogger' },
     });
-    provider.expectText({
-      id: 'blogger-b',
-      lane: lane('blogger', 1, 'blogger-b'),
-      neverEnd: true,
-      blocking: false,
-      text: 'b bg',
-      match: { containsText: ['shared marker'] },
-    });
-    // Both match — ambiguous
-    const res = await postJson(`${provider.url}/v1/chat/completions`, bloggerChat('shared marker'));
-    assertEq(res.status, 500, 'blogger ambiguous: identical markers must 500');
-    const unexp = provider.unexpectedRequests;
-    assertTrue(unexp.length >= 1, 'blogger ambiguous: must record unexpected');
-    assertTrue(unexp.some((u) => u.reason === 'ambiguous-lane-heads'), 'blogger ambiguous: reason must be ambiguous-lane-heads');
+    const r1 = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('delta one'));
+    const r2 = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('delta two'));
+    assertTrue(r1.ok && r2.ok, 'blogger template rematches without mute');
+    provider.expectSatisfied();
   } finally {
     await provider.stop();
   }
 }
-
 
 async function runPrefixCacheInvalidation() {
   const provider = new StrictMockProvider();
@@ -356,38 +179,40 @@ async function runPrefixCacheInvalidation() {
       id: 'turn-1',
       lane: lane('manager', 1),
       text: 'ok1',
-      match: { containsText: ['stable system prefix'] },
+      match: { user: 'stable system prefix' },
     });
     provider.expectText({
       id: 'turn-2',
       lane: lane('manager', 2),
       text: 'ok2',
-      match: { containsText: ['appended user turn'] },
+      match: { user: 'appended user turn' },
     });
+    const tools = [
+      { type: 'function', function: { name: 'fork' } },
+      { type: 'function', function: { name: 'join' } },
+      { type: 'function', function: { name: 'list' } },
+    ];
     const body1 = {
       model: 'test-model',
-      tools: [{ function: { name: 'fork' } }, { function: { name: 'join' } }, { function: { name: 'list' } }],
+      tools,
       messages: [
         { role: 'system', content: 'stable system prefix' },
         { role: 'user', content: 'stable system prefix first user' },
       ],
-      sessionId: 'prefix-session-1',
     };
     const first = await postJson(`${provider.url}/v1/chat/completions`, body1, {
       'x-session-affinity': 'prefix-session-1',
     });
     assertTrue(first.ok, 'prefix: first request matches');
 
-    // Mutate sealed system message — must fail closed as prefix-cache-invalidated.
     const body2 = {
       model: 'test-model',
-      tools: [{ function: { name: 'fork' } }, { function: { name: 'join' } }, { function: { name: 'list' } }],
+      tools,
       messages: [
         { role: 'system', content: 'MUTATED system prefix' },
         { role: 'user', content: 'stable system prefix first user' },
         { role: 'user', content: 'appended user turn' },
       ],
-      sessionId: 'prefix-session-1',
     };
     const second = await postJson(`${provider.url}/v1/chat/completions`, body2, {
       'x-session-affinity': 'prefix-session-1',
@@ -410,13 +235,13 @@ async function runPrefixCacheAppendOk() {
       id: 'turn-1',
       lane: lane('manager', 1),
       text: 'ok1',
-      match: { containsText: ['append-ok first'] },
+      match: { user: 'append-ok first' },
     });
     provider.expectText({
       id: 'turn-2',
       lane: lane('manager', 2),
       text: 'ok2',
-      match: { containsText: ['append-ok second'] },
+      match: { user: 'append-ok second' },
     });
     const tools = [
       { type: 'function', function: { name: 'fork' } },
@@ -455,14 +280,87 @@ async function runPrefixCacheAppendOk() {
   }
 }
 
+async function runMissingEdgeFailsSatisfied() {
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.expectText({
+      id: 'never-hit',
+      lane: lane('manager', 1),
+      text: 'x',
+      match: { requiredTools: ['fork', 'join', 'list'], user: 'never sent' },
+    });
+    let threw = false;
+    try {
+      provider.expectSatisfied();
+    } catch (err) {
+      threw = true;
+      assertTrue(err.message.includes('remaining'), 'must report remaining edges');
+    }
+    assertTrue(threw, 'unobserved blocking edge fails satisfied');
+  } finally {
+    await provider.stop();
+  }
+}
+
+async function runHistorySplitsSameLastUser() {
+  // Same lastUser phrase, different full history → different seals; both use same template edge (idempotent template).
+  const provider = new StrictMockProvider();
+  await provider.start();
+  try {
+    provider.expectToolCall({
+      id: 'review-first',
+      lane: lane('reviewer', 1),
+      tool: 'verdict',
+      args: { verdict: 'PERFECT' },
+      match: { requiredTools: ['verdict'], user: 'Review the current worktree' },
+    });
+    provider.expectToolCall({
+      id: 'review-confirm',
+      lane: lane('reviewer', 2),
+      tool: 'verdict',
+      args: { verdict: 'PERFECT' },
+      match: { requiredTools: ['verdict'], user: 'PERFECT requires confirmation' },
+    });
+    const tools = [{ type: 'function', function: { name: 'verdict' } }];
+    const first = await postJson(`${provider.url}/v1/chat/completions`, {
+      model: 'test-model',
+      tools,
+      messages: [{ role: 'user', content: 'Review the current worktree for correctness.' }],
+    }, { 'x-session-affinity': 'rev-1' });
+    assertTrue(first.ok, 'first review matches');
+    const confirm = await postJson(`${provider.url}/v1/chat/completions`, {
+      model: 'test-model',
+      tools,
+      messages: [
+        { role: 'user', content: 'Review the current worktree for correctness.' },
+        { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'verdict', arguments: '{}' } }] },
+        { role: 'tool', tool_call_id: 'c1', content: 'NEEDS_REVIEW' },
+        { role: 'user', content: 'PERFECT requires confirmation. Call again.' },
+      ],
+    }, { 'x-session-affinity': 'rev-1' });
+    assertTrue(confirm.ok, 'confirm user matches different edge');
+    // Same first-user request shape on another session (post-rebase style) — same template, ok
+    const again = await postJson(`${provider.url}/v1/chat/completions`, {
+      model: 'test-model',
+      tools,
+      messages: [{ role: 'user', content: 'Review the current worktree for correctness.' }],
+    }, { 'x-session-affinity': 'rev-2' });
+    assertTrue(again.ok, 'identical first-user template is reusable across sessions');
+    provider.expectSatisfied();
+  } finally {
+    await provider.stop();
+  }
+}
+
 export const laneCases = [
-  { name: 'strict mock lanes and unexpected requests', fn: runStrictMockLanes },
-  { name: 'session-bound lanes and causal successors', fn: runSessionBoundLanes },
-  { name: 'session-bound synthetic continuation lane', fn: runSyntheticSessionLane },
-  { name: 'neverEnd stays pending and re-matches second request', fn: runNeverEndStaysPending },
-  { name: 'neverEnd head prevents later same-lane turn from matching', fn: runNeverEndBlocksSameLaneTurn },
-  { name: 'two unbound blogger heads with different markers match distinctly', fn: runBloggerDistinctMarkers },
-  { name: 'two unbound blogger heads with identical markers produce ambiguous-lane-heads', fn: runBloggerAmbiguousMarkers },
+  { name: 'forest independent content paths', fn: runForestIndependentPaths },
+  { name: 'identical prefix is idempotent', fn: runIdempotentSamePrefix },
+  { name: 'ambiguous equal templates rejected', fn: runAmbiguousPrefixRejected },
+  { name: 'user-text fork disambiguates parallel jobs', fn: runUserForkDisambiguates },
+  { name: 'blogger template rematches', fn: runNeverEndStillIdempotent },
   { name: 'prefix cache invalidation fails closed', fn: runPrefixCacheInvalidation },
   { name: 'prefix cache append-only succeeds', fn: runPrefixCacheAppendOk },
+  { name: 'unobserved blocking edge fails satisfied', fn: runMissingEdgeFailsSatisfied },
+  { name: 'history splits first vs confirm review', fn: runHistorySplitsSameLastUser },
 ];

@@ -40,11 +40,19 @@ function countFact(workDir, factName) {
 }
 
 async function sendPrompt(scenario, sessionId, prompt) {
+  // Omit model when prompt.model is null/undefined so Host + plugin continue
+  // from durable LastAuthority / Fallback Side (session does not own a model).
+  // Explicit prompt.model always wins.
   const body = {
     agent: prompt.agent,
     parts: [{ type: 'text', text: prompt.text }],
-    model: prompt.model || { providerID: 'test', modelID: 'test-model' },
   };
+  if (prompt.model !== undefined && prompt.model !== null) {
+    body.model = prompt.model;
+  } else if (prompt.model === undefined && prompt.omitModel !== true) {
+    // Back-compat: most scripts still expect a default model on the wire.
+    body.model = { providerID: 'test', modelID: 'test-model' };
+  }
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, { body });
   assert.ok(response.ok, `prompt failed: ${JSON.stringify(response.data)}`);
   return response;

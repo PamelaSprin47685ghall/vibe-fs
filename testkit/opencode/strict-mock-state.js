@@ -1,70 +1,104 @@
 /**
- * strict-mock-state.js — Provider state record helpers.
- * Kept in its own module so the main provider class file
- * stays under the 200-line Kolmogorov line budget.
+ * strict-mock-state.js — Provider state for script forest (KISS-N11).
  */
 
-import { laneKey, normalizeLane } from './strict-mock-lanes.js';
+import { indexPathEdge, normalizeLane, templateFingerprint } from './strict-mock-forest.js';
 
 export function createState() {
   return {
-    lanes: new Map(),
-    lastTurnByLane: new Map(),
-    sessionBindings: new Map(),
+    edges: [],
+    edgeIds: new Set(),
+    templateIndex: new Map(), // fingerprint → edge (dedupe identical templates)
+    aliasToEdge: new Map(),
+    pathEdges: new Map(),
+    pathCursor: new Map(),
+    sealToEdgeId: new Map(),
+    observedEdgeIds: new Set(),
+    sessionBindings: new Map(), // diagnostic / canary routing only
     unexpected: [],
     requests: [],
     responseCounter: 0,
     idCounter: 0,
     strict: true,
-    // First unmatched script stops the mock entirely (no more surprises).
     fatal: null,
-    // sessionId -> last matched provider-visible seal (append-only prefix check).
     sealedBySession: new Map(),
+    stopped: false,
   };
 }
 
 export function pushExpectation(state, respond, opts) {
   const lane = normalizeLane(opts.lane);
-  const key = laneKey(lane);
-  let queue = state.lanes.get(key);
-  const expectedTurn = (state.lastTurnByLane.get(key) || 0) + 1;
-  if (lane.turn !== expectedTurn) {
-    throw new Error(`StrictMock lane ${key} expected turn ${expectedTurn}, got ${lane.turn}`);
-  }
-  if (!queue) {
-    queue = { expectations: [] };
-    state.lanes.set(key, queue);
-  }
-
   const match = { ...(opts.match || {}) };
   if (lane.role !== '*' && match.role === undefined) match.role = lane.role;
   if (lane.requestKind !== '*' && match.requestKind === undefined) match.requestKind = lane.requestKind;
+
+  const id = opts.id || `exp-${++state.idCounter}`;
+  if (state.edgeIds.has(id)) {
+    throw new Error(`StrictMock duplicate edge id: ${id}`);
+  }
+
   const flags = {};
   const flagKeys = [
     'delayFirstToken', 'delayDone', 'disconnectMidSse', 'contextOverflow',
     'emptyAssistant', 'reasoningOnly', 'fragmentArgs', 'malformedArgs',
     'toolCallAsText', 'duplicateToolCallId', 'errorAfterToolCall', 'neverEnd',
-    'missingUsage'
+    'missingUsage',
   ];
   for (const k of flagKeys) {
-    if (opts[k] !== undefined) {
-      flags[k] = opts[k];
-    }
+    if (opts[k] !== undefined) flags[k] = opts[k];
   }
-  queue.expectations.push({
-    id: opts.id || `exp-${++state.idCounter}`,
+
+  // Title requests are pathless reusable templates (same visible shape across sessions).
+  const pathless = opts.pathless === true
+    || lane.requestKind === 'title'
+    || opts.neverEnd === true;
+  // reusable only when explicit or pathless (title/neverEnd). Sequential path
+  // edges advance a cursor; content must disambiguate across paths.
+  const reusable = opts.reusable === true || pathless;
+
+  const edge = {
+    id,
     lane,
     match,
-    blocking: opts.blocking !== false,
+    blocking: opts.blocking !== false && opts.neverEnd !== true && !pathless,
     neverEnd: opts.neverEnd === true,
+    pathless,
+    reusable,
     respond: { ...respond, ...flags },
-  });
-  state.lastTurnByLane.set(key, lane.turn);
+  };
+
+  // Collapse only pathless identical templates (title / neverEnd sidecars).
+  // Sequential path edges stay distinct so path cursors remain well-defined.
+  if (edge.pathless || edge.reusable) {
+    const fp = templateFingerprint(edge);
+    const existing = state.templateIndex.get(fp);
+    if (existing) {
+      if (!existing.aliases) existing.aliases = new Set();
+      existing.aliases.add(id);
+      state.edgeIds.add(id);
+      // Map alias id for waitForExpectation
+      if (!state.aliasToEdge) state.aliasToEdge = new Map();
+      state.aliasToEdge.set(id, existing);
+      return existing;
+    }
+    state.templateIndex.set(fp, edge);
+  }
+
+  state.edges.push(edge);
+  state.edgeIds.add(id);
+  if (!edge.pathless && !edge.reusable) indexPathEdge(state, edge);
+  return edge;
 }
 
 export function resetState(state) {
-  state.lanes.clear();
-  state.lastTurnByLane.clear();
+  state.edges.length = 0;
+  state.edgeIds.clear();
+  state.templateIndex.clear();
+  state.aliasToEdge.clear();
+  state.pathEdges.clear();
+  state.pathCursor.clear();
+  state.sealToEdgeId.clear();
+  state.observedEdgeIds.clear();
   state.sessionBindings.clear();
   state.unexpected.length = 0;
   state.requests.length = 0;

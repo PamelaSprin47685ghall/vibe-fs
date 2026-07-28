@@ -79,11 +79,204 @@ Fallback 不需要状态图。它只需要：
 
 ## Prompt Authority、Logical Run 与 Synthetic Continuation [NORMATIVE]
 
-`PhysicalUserMessage ≠ AuthorityTurn`。Host `role=user` 只表示运输格式。只有 `AuthorityRoot(HumanRoot|AgentOwnerRoot)` 可创建 Logical Run、选择 agent/model/variant、成为 Fallback root、重置 repair 预算、更新 LastAuthorityProfile 或决定 Companion eligibility。
+| Field | Value |
+| --- | --- |
+| Status | NORMATIVE · 冻结语义 |
+| Scope | 所有 OpenCode user-shaped message、模型选择、agent 选择、Fallback、Companion、Guard、repair、nudge |
+| 核心原则 | 物理 user message 不自动拥有语义授权；只有 Authority Root 可以改变执行档案 |
 
-`InteractionRepair`、Manager/Reviewer Guard、ReviewConfirmation、BusyAgentNudge、ProviderRetryAttempt、HostCompactionContinue 都是 Continuation：复用原 `LogicalRunId` 与 `AuthorityRootUserMessageId`；不得创建 completion/run、更新 LastAuthorityProfile、重置 fallback/repair 或改变 Companion eligibility。B retry 只覆盖当前 Attempt 的 EffectiveModel，绝不得成为下一真人 root 的默认 model。
+### 一、顶层不变量
 
-插件 continuation 必须经 PromptDispatcher：durable claim → metadata (`wanxiangshu_prompt_key`, origin, logical run, authority root) → Host acceptance mapping；不能关联 accepted HostMessageId 时 fail-closed。解析优先 accepted mapping、PromptKey、Host provenance、registered AgentOwnerRoot、已证明 external acceptance；默认 `UnknownOrigin`，绝不可默认 Human。零宽/空白/模板文本不能识别来源。Companion eligibility 只能读 ActiveLogicalRun 的 Authority profile；bare continuation 不能单独形成 semantic delta。
+```text
+PhysicalUserMessage ≠ AuthorityTurn
+```
+
+OpenCode 可以用 `role=user` 承载：真人输入、Manager 新任务/nudge、空/XML-only repair、Manager/Reviewer Guard、PERFECT 确认、compaction auto-continue、其他插件/Host continuation。传输层都是 user message，**语义权限不同**。
+
+只有 **Authority Root** 可以：
+
+1. 创建新的 Logical Run；
+2. 选择或改变 agent；
+3. 选择或改变基础 model；
+4. 选择或改变 variant；
+5. 成为新的 Fallback root；
+6. 重置 Interaction Repair 预算；
+7. 改变 Companion 当前角色 eligibility；
+8. 成为后续缺省 agent/model 的延续来源。
+
+所有 **Continuation** 均不得执行以上操作。
+
+零宽字符、空白、固定英文提示、消息创建时间和“看起来像人说的话”都不能证明消息拥有 Authority。
+
+### 二、三个不同的身份
+
+| 身份 | 含义 |
+| --- | --- |
+| `SessionId` | 消息存放的 OpenCode 会话容器（不绑定 agent/model） |
+| `AuthorityRootUserMessageId` | 本次 Logical Run 的授权根 |
+| `PhysicalUserMessageId` | Host 中实际存在的某一条 user-shaped message |
+
+Authority Root 的 PhysicalUserMessageId 等于自己的 root ID。Continuation 有自己的 PhysicalUserMessageId，但必须映射回已有的 AuthorityRootUserMessageId。
+
+### 三、消息来源类型
+
+```fsharp
+type RootAuthorityKind = HumanRoot | AgentOwnerRoot
+
+type ContinuationKind =
+    | InteractionRepair | ManagerGuard | ReviewerGuard
+    | ReviewConfirmation | BusyAgentNudge
+    | ProviderRetryAttempt | HostCompactionContinue
+
+type PromptOrigin =
+    | AuthorityRoot of RootAuthorityKind
+    | Continuation of ContinuationKind
+    | HostInternal
+    | UnknownOrigin
+```
+
+- **HumanRoot**：真实用户新任务。用户显式 agent/model/variant 永远优先；显式 model 建立新基础档案并覆盖旧 Fallback side。
+- **AgentOwnerRoot**：Manager fork(new)/Idle 新任务/Coder one-shot Inspector 等。必须显式 agent/model/variant（或明确 None）；新 Logical Run 与 completion。
+- **Continuation**：只延续已有 Logical Run。不建新 RunId/completion；不改 AuthorityRoot/BaseAgent/BaseModel/variant；不更新 LastAuthorityProfile；不重置 Fallback/repair；不改变 Companion eligibility。
+
+### 四、执行档案
+
+```fsharp
+type AuthorityExecutionProfile =
+    { SessionId; LogicalRunId; AuthorityRootUserMessageId
+      AuthorityKind; Agent; BaseModel; Variant }
+
+type AttemptExecutionProfile =
+    { Authority; PhysicalUserMessageId; ProviderAttempt
+      EffectiveModel; Origin }
+```
+
+Fallback A→B 只改 `AttemptExecutionProfile.EffectiveModel`，不得改 `AuthorityExecutionProfile.BaseModel` 或 `LastAuthorityProfile`。
+
+### 五、Last Authority
+
+每个 Session 的 `LastAuthorityProfile` 是**最后一次有权决定执行档案的 root**，不是最后一条物理 user message。
+
+- 新真人显式字段：用用户值。
+- 新真人省略字段：只从 LastAuthorityProfile 继承；无 profile 时才接受 Host `output.message` 初始缺省。
+- Continuation：显式携带继承档案（agent / attempt EffectiveModel / variant）；Host 内部 Session cache 变化不得写回 LastAuthorityProfile。
+
+### 六、禁止自激励
+
+```text
+零宽 continuation → HumanRoot
+repair continuation → 新 repair 预算
+Review confirmation → 改 Reviewer model
+Manager Guard → 改 Manager agent
+Busy nudge → 新 RunId
+synthetic → 重置 Failures / 成为 currentUserMessageId / 改 Companion eligibility
+B retry → 下一真人 root 默认 model
+按 text="\u200B" / 空白 / 固定提示 / 长度判断来源
+```
+
+`"\u200B"` 只是运输载荷，不是身份标记。
+
+### 七、PromptDispatcher 两阶段协议
+
+所有插件 user-shaped message 必须经 `PromptDispatcher.Send`。禁止模块直接 `prompt_async` 发 Guard/repair/nudge/confirmation。
+
+1. 先持久化 `PluginPromptClaimed`；
+2. 再调 Host，metadata 至少含 `wanxiangshu_prompt_key` / `wanxiangshu_origin` / `wanxiangshu_logical_run` / `wanxiangshu_authority_root`；
+3. Host 返回 PhysicalUserMessageId → `PluginPromptAccepted`；
+4. 失败 → `PluginPromptAbandoned`（不得改变 Active Logical Run）；
+5. Host 丢弃 metadata 且无法 correlation → **禁止发送**，`HostContractUnsupported`。
+
+### 八、来源解析优先级
+
+```text
+accepted HostMessageId
+→ claimed PromptKey
+→ Host compaction/synthetic
+→ registered AgentOwnerRoot
+→ proven external prompt acceptance (HumanRoot)
+→ UnknownOrigin
+```
+
+`UnknownOrigin` fail-closed：不更新 profile、不启动 Fallback epoch、不触发 Companion、不发 continuation、不完成/替换 Logical Run；记录 HostContractViolation。
+
+不得把“不是 synthetic”直接等价为 Human。
+
+### 九、Logical Run
+
+- 新 Authority Root：新 LogicalRunId、更新 LastAuthorityProfile、清空旧 continuation set、新 repair budget、新 Fallback epoch。
+- Continuation：复用 LogicalRunId 与 AuthorityRootUserMessageId，加入 ContinuationMessageIds。
+- Busy nudge：同 Run、同 completion、同 AuthorityRoot。
+- Idle existing agent 新任务：AgentOwnerRoot（新 Run/completion/显式 profile）。
+
+### 十、Fallback
+
+```text
+FallbackAttemptIdentity =
+  logicalRunId + AuthorityRootUserMessageId + providerAttempt
+```
+
+文档与代码中的 `currentUserMessageId` 语义必须是 **AuthorityRootUserMessageId**。Continuation 的 PhysicalUserMessageId 永远不得替代它。
+
+真人显式选模 → 新 Fallback epoch（BaseModel=用户选择, Failures=0, Side=A）。Continuation 沿用同一 epoch。A/A/B/B 只影响当前 Logical Run 的物理请求 attempt。
+
+### 十一、Interaction Repair
+
+```text
+InteractionRepairIdentity =
+  sessionId + AuthorityRootUserMessageId + terminalAssistantMessageId + repairKind
+```
+
+repair continuation 自己的 PhysicalUserMessageId **不进入** identity。同一 identity 最多一次。
+
+### 十二、Review 与 Guard
+
+- Review confirmation：`Origin=ReviewConfirmation`，AuthorityRoot=原 Reviewer task root。Witness 同时记 Physical confirmation id 与 AuthorityRootUserMessageId。
+- Manager/Reviewer Guard：不建新任务、不改 agent/model、不更新 LastAuthority、不重置 Fallback/completion，只延续原 Logical Run。
+
+### 十三、Companion
+
+- eligibility 只读 `ActiveLogicalRun.Profile.Agent`。
+- 不得读 Session 永久 role、最后物理 user 的 agent、synthetic 临时 agent、linkage 推导 role。
+- bare synthetic continuation ≠ semantic delta；其后正式 assistant 输出才可能构成 delta。
+
+### 十四、持久事实（最小）
+
+```text
+AuthorityRootAccepted
+PluginPromptClaimed / PluginPromptAccepted / PluginPromptAbandoned
+LogicalRunClosed
+```
+
+Session 有界投影：`LastAuthorityProfile`、`ActiveLogicalRun`、`PendingClaims`、`AcceptedContinuationIds`。
+
+### 十五、实现修改清单（目标态）
+
+删除：`sessionRoles` 作为 authority/Companion 来源、从 AgentLinked 推导 parent role、从最后物理 user 推导 authority、按零宽文本识别 synthetic、synthetic 更新 currentUserMessageId。
+
+新增/保持：`PromptAuthorityProjection`、`AuthorityExecutionProfile`、`AttemptExecutionProfile`、`LogicalRunBinding`、`PromptDispatcher`、claim/accept/abandon facts。
+
+`chat.message`：解码 origin → AuthorityRoot 建档案 / Continuation 强制继承 profile / Unknown fail-closed。
+
+所有 Prompt 发送点必须走 Dispatcher：TerminalPolicies、HostReviewGuard、ReviewerHost、HostSessionNudge、HostForkRuntime busy nudge、compaction continuation、plugin-owned fallback retry。
+
+### 十六、必须通过的 E2E（摘要）
+
+A 零宽不能变权 · B 零宽不能无限 repair · C 真人可切模型 · D 真人省略 model 继承 LastAuthority 而非 B retry · E Busy nudge 同 Run · F Idle continue 新 OwnerRoot · G Review confirmation 双 id · H Companion 不被 synthetic 切换 · I restart 恢复 profile/run/claims/repair/fallback root。
+
+### 十七、发布阻断
+
+```text
+零宽 repair 可更新 LastAuthority
+synthetic 可重置 repair 预算或成为 Fallback root
+Companion 从 sessionRoles 决定 eligibility
+用户显式 model 被旧 Fallback side 覆盖
+无法识别来源时默认 Human
+模块绕过 PromptDispatcher 直接发 continuation
+```
+
+最终冻结表述：
+
+> Session 没有固定 agent 或 model。Authority Root 拥有 ExecutionProfile。真人 User Root 天然拥有改变 agent/model/variant 的最高权限。Agent Owner 可以为其拥有的子代理创建显式 Root。Guard、repair、确认、Busy nudge 与 Host continuation 虽然以 user message 形式运输，但没有授权能力；它们只能继承既有 Logical Run，永远不能通过自身存在改变后续执行语义。
 
 ## 一、卷表
 
@@ -100,6 +293,8 @@ Fallback 不需要状态图。它只需要：
 |`KISS-N08.md`|Orchestrator / Worktree / Rebase / Review / FF|
 |`KISS-N09.md`|OpenCode Host Adapter、投影管线、工具 Schema|
 |`KISS-N10.md`|保姆式实施、测试、迁移与删除清单|
+|`KISS-N11.md`|Canary Mock 剧本森林（完整前缀、无 mute/编号）|
+|`KISS-N12`|Prompt Authority / Logical Run / Synthetic Continuation|
 
 ## 二、已经冻结的产品语义
 
@@ -3552,4 +3747,398 @@ Watchdog 只终止 test scenario，不终止生产资源。
 
 
 ---
+
+---
+
+# KISS-N11 — Canary Mock 剧本森林（Script Forest）
+
+[NORMATIVE] 本卷是 OpenCode E2E / canary 的 **唯一 mock 语义 SSOT**。
+`testkit/opencode` 的 StrictMock、fixture JSON、gate 测试必须与本卷一致。
+旧 lane 队列（session bind + turn 序号 + 匹配后 mute + 最小编号消歧）**废止**。
+
+---
+
+## 一、问题与目标
+
+### 1.1 要模拟什么
+
+Canary 不测「模型怎么想」，测 **生产插件在给定 provider 历史上是否发出正确的下一请求，以及工具/审查/发布因果是否成立**。
+Mock 的责任是：对每一个到达的 provider request，返回 **确定性的** assistant 回应。
+
+### 1.2 旧模型的失败点
+
+旧 StrictMock 用：
+
+```text
+lane head（session/role/turn）
++ lastUser / tools 匹配
++ 匹配后 consume（mute）
++ 首次匹配 bind 物理 session id
+```
+
+导致：
+
+- 两轮 reverify 若 lastUser 相同 → 撞 head / 无 head
+- 要靠 `loadScripts` 分阶段注册、改生产文案、或 session id 因果
+- 与「确认因果 = 内容、不是 host message id」的产品方向不一致
+
+### 1.3 新模型一句话
+
+```text
+剧本 = 以 provider-visible 完整前缀为键的确定性响应森林。
+同一前缀 → 唯一回应。
+无编号、无 mute。
+分叉只允许在不同的 user prompt 上。
+```
+
+---
+
+## 二、术语 [NORMATIVE]
+
+| 词 | 定义 |
+|---|---|
+| **Provider-visible 前缀** | 真正进入模型的 `tools + messages` 的规范化投影；见 §三 |
+| **剧本边（edge）** | 一条「当前请求前缀 → assistant 回应」规则 |
+| **剧本路径（path）** | 同一逻辑对话上严格延长的边序列：`P0→R0`，`P0+…→R1`，… |
+| **剧本森林（forest）** | 一个 scenario 内全部路径的集合；可共享真前缀 |
+| **请求前缀（request prefix）** | 当前 chat completions 请求的 provider-visible seal |
+| **分叉点** | 两条路径共享某一真前缀 `P`，从 **不同的下一条 user 消息** 起分叉 |
+
+禁止术语（实现与文档不得复活为控制概念）：
+
+```text
+lane turn 序号消歧
+匹配后 mute / 哑
+最小编号抢答
+host message id 作为剧本身份
+ConfirmationPromptMessageId 相等证明
+```
+
+---
+
+## 三、Provider-visible 前缀键 [NORMATIVE]
+
+### 3.1 纳入
+
+与产品 KV-cache / Companion 门禁同一精神：
+
+```text
+tools[]: name + parameters（规范化）
+messages[] 每条:
+  role
+  content 的可见 text / reasoning
+  tool_calls: name + arguments（可见结构）
+  tool result 的可见正文
+```
+
+### 3.2 排除
+
+```text
+message id / call id（若仅作宿主运输 id 且模型不依赖其内容语义——实现必须以「模型可见字节」为准）
+timestamp / cost / usage / runtimeId / directory / status
+UI metadata / finish reason（非模型字段）
+Host accepted-<session> 合成 id
+```
+
+> 若 tool_call id 实际进入模型字节且影响可见性，则它属于可见内容；否则不得进入键。
+> 默认策略：与现有 `sealProviderVisible` 一致，并随 Host 真实请求字段校准；**禁止**把 Host 传输 id 当剧本身份。
+
+### 3.3 规范化
+
+```text
+属性序固定
+空字段策略固定
+字符串换行固定
+同一语义 → 同一 digest / 同一 canonical JSON
+```
+
+`seal = canonicalJSON({ tools, messages })`。
+两请求 `seal` 相等 ⟺ 同一剧本键。
+
+### 3.4 前缀稳定 vs 不稳定
+
+| 情况 | 处理 |
+|---|---|
+| 仅 Host 非可见 metadata 变 | seal 不变 → 同一剧本 |
+| id/时间被误入 seal | 视为实现 bug；修正投影，不写海量剧本 |
+| 语义内容变 | 不同键 → 不同边 |
+
+---
+
+## 四、匹配规则 [NORMATIVE]
+
+对每个到达的 chat request：
+
+```text
+1. 计算 requestPrefix = sealProviderVisible(body)
+2. 在当前 scenario 的剧本森林中查找「该前缀完整等于某条边的触发前缀」的边
+3. 命中恰好 1 条 → 返回该边的 respond；不 mute、不编号
+4. 命中 0 条 → FIRST SCRIPT MISMATCH（fail closed）
+5. 命中 ≥2 条 → FIXTURE AMBIGUITY（加载期或请求期 fail closed；禁止最小编号抢答）
+```
+
+### 4.1 无 mute
+
+同一前缀第 N 次出现，仍返回同一回应。
+Mock 是 **幂等函数**，不是队列。
+
+### 4.2 无编号
+
+不存在 `00-xxx` 抢答。
+消歧唯一手段：作者保证任意可达请求前缀 **至多一条** 边。
+
+### 4.3 同路径更长前缀
+
+多轮同会话：
+
+```text
+P0           → R0（如 first PERFECT tool-call）
+P0 + R0 + …  → R1（如 text after tool）
+P0 + … + U_confirm → R2（second PERFECT）
+```
+
+每条边键是 **完整当前前缀**，不是 lastUser。
+confirmation 与 first 因历史不同而自然分流。
+
+### 4.4 旁路（blogger / title / synthetic）
+
+- 默认同主规则：靠可见前缀区分。
+- 仅当旁路请求 **故意** 与主路径同构且需反复命中时，可声明 `reusable: true`（语义 = 该边幂等，本设计下默认已幂等）。
+- **禁止** 用 mute 或 session bind 区分两个同构 blogger；测试必须用不同 first user / 不同可见内容。
+
+---
+
+## 五、分叉约束 [NORMATIVE]
+
+### 5.1 允许的共享与分叉
+
+```text
+允许：两条路径共享真前缀 P
+允许：从 P 之后下一条 **user** 消息内容不同而分叉
+```
+
+例：
+
+```text
+P = [system, tools, user: "Ship A"]
+  └─ user: "continue review"     → path α
+  └─ user: "resolve conflicts"   → path β
+```
+
+### 5.2 禁止的分叉
+
+```text
+禁止：同一请求前缀上写两个不同 assistant respond
+禁止：以「assistant 不同」或「非 user 的任意宿主字段」作为兄弟边标签来消歧
+禁止：以 host message id / session id / 到达次序 消歧
+```
+
+说明：
+
+- tool-result **不同** 会使后续请求前缀不同，匹配层仍可区分；
+- 作图层应写成两条完整路径，而不是「在 tool 节点上挂两个 sibling respond」。
+- 分叉的 **作者可见标签** 只能是不同 user 文本（及由此产生的更长历史）。
+
+### 5.3 并行同构会话
+
+若两个 session 的 provider-visible 历史从第一条 user 起完全相同，则 **必须** 同一回应。
+Canary 作者 **必须** 人为区分 first user（或其它可见内容），例如：
+
+```text
+Ship publish_proof.txt (job-A)
+Ship publish_proof.txt (job-B)
+```
+
+否则视为 fixture bug，不是 mock bug。
+
+---
+
+## 六、与产品前缀缓存门禁的关系 [NORMATIVE]
+
+Mock 仍强制：
+
+```text
+同一物理 session 的连续 chat 请求：
+  新 seal 必须以旧 seal 为 provider-visible 字节前缀
+  （tools 全等 + messages 为旧 messages 的前缀）
+```
+
+唯一允许的冷边界：产品 epoch 切换导致的 companion-b-head 替换（tools + 既有 system 可见约束仍按现网规则）。
+
+剧本森林 **不替代** 前缀缓存门禁；二者叠加：
+
+```text
+先检查 session append-only seal
+再按完整前缀查剧本边
+```
+
+---
+
+## 七、Fixture 形状 [NORMATIVE]
+
+### 7.1 逻辑形状
+
+作者可以继续用「线性 scripts + match.user」书写 **路径**，加载器展开为边：
+
+```text
+路径内第 k 步的触发前缀 =
+  该路径上第 0..k-1 步的可见历史
+  + 当前请求的 tools / last user 约束所蕴含的最小可见请求
+```
+
+实现可选择：
+
+1. **显式前缀边**（SSOT 理想形）：每步声明完整 `when.prefix`；或  
+2. **路径糖**：同 `path`/`session` 别名的顺序步，由加载器模拟可见历史并生成边。
+
+无论哪种，**运行时匹配只认完整前缀**，不认 turn 号。
+
+### 7.2 废止的匹配依赖
+
+```text
+lane.turn 作为运行时匹配条件
+sessionBindings 作为剧本身份
+lastUser-only 作为唯一键
+loadScripts 仅为了「错开同 lastUser 的两轮」——应改为历史前缀自然分流或不同 user
+```
+
+`loadScripts` 仍可用于 **进程生命周期**（restart 后追加 recovery 路径），不得用于「同前缀第二次换回应」。
+
+### 7.3 双 PERFECT / reverify 范例
+
+```text
+path review-pre:
+  1. tools=[verdict…], lastUser 含 "Review the current worktree"
+       → tool-call verdict(PERFECT)
+  2. （前缀含 first tool 结果后）text after tool
+       → text
+  3. lastUser 含 "PERFECT requires confirmation"
+       → tool-call verdict(PERFECT)
+  4. terminal text
+
+path review-post:   # 历史已含 pre 的 publish/rebase 可见事实，或 first user 不同
+  同形边；若 first user 与 pre 在完整历史上仍可能歧义，则必须区分 first user 或依赖更长历史
+```
+
+同句 reverify、历史不同 → 完整前缀不同 → 可共用书写模板，**键不同**。
+
+---
+
+## 八、错误与诊断 [NORMATIVE]
+
+| 情况 | reason |
+|---|---|
+| 无边命中 | `no-prefix-matched`（可兼容旧日志文案 `no-lane-head-matched` 一轮迁移期） |
+| 多边命中 | `ambiguous-prefix` |
+| session seal 破坏 | `prefix-cache-invalidated` |
+
+首次失败：mock 进入 fatal，后续请求 503；canary 停止。
+
+诊断必须打印：
+
+```text
+session（仅诊断，不入键）
+role / requestKind
+tools
+message count
+lastUser 预览
+matched/candidate edge ids
+prefix digest（短 hash）
+```
+
+---
+
+## 九、表达力边界 [NORMATIVE]
+
+### 9.1 完备
+
+在以下条件下，本模型对 canary 所需的确定性对话是完备的：
+
+```text
+- 前缀投影稳定
+- 需要不同回应的历史，其 provider-visible 前缀不同
+- 并行会话由测试控制的 first user（或其它可见内容）区分
+- 同前缀需要幂等同一回应
+```
+
+### 9.2 故意不支持
+
+```text
+同前缀第 N 次不同回应
+靠到达次序分配不同剧本
+靠 host message id / session id 分流
+靠 mute 制造一次性边
+```
+
+### 9.3 作者责任
+
+```text
+并行 job → 不同 first user
+同构旁路 → 不同可见内容
+歧义边 → 加载失败，修 fixture，不修生产 prompt 去迎合 mock
+```
+
+---
+
+## 十、实现落点 [NORMATIVE]
+
+| 组件 | 职责 |
+|---|---|
+| `sealProviderVisible` / prefix check | 键与 session append-only（已有，保留） |
+| 剧本注册 | 边表：`prefixDigest → { id, respond, blocking, … }`；冲突即抛 |
+| 选择器 | 精确 digest 查找；0/1/多 命中规则见 §四 |
+| fixture 加载 | 路径糖展开为边；禁止 turn 序号匹配 |
+| gate 测试 | 覆盖：同前缀幂等、user 分叉、歧义拒绝、seal 破坏、双 PERFECT 历史分流 |
+
+### 10.0 实现注记（与 loader 糖）
+
+运行时身份仍是 provider-visible seal（同 seal 幂等）。
+
+作者糖允许：
+
+```text
+path 顺序边（lane.session + turn）：仅用于无强内容键的顺序步骤（manager join 等）
+reusable + 内容键（user / userRegex / afterToolResult）：跨 barrier 复用；同 fingerprint 合并，alias id 供 wait
+pathless + afterToolResult 文本：工具后中间轮，不推进 path
+afterToolResult 相对「最后一条 user」之后是否已有 tool result
+确认文案可用 userRegex 覆盖 "PERFECT requires confirmation|Continue the confirmation"
+```
+
+禁止用编号抢答或 mute 制造一次性边。
+
+### 10.1 迁移
+
+1. 写入本卷（本文件）。  
+2. 替换 `strict-mock-lanes` 选择语义为前缀森林。  
+3. 删除对 `sessionBindings` 作为剧本身份的依赖（诊断用 session 可保留）。  
+4. gate-lane-cases 改为前缀森林契约测试。  
+5. orchestrator / reviewer fixtures 去掉「仅为错开同 lastUser」的 loadScripts；靠历史前缀或不同 user。  
+
+### 10.2 与 Release
+
+本卷不改变 Fallback Host 契约：无 `retry` 前 model 解析 API 前，A/A/B/B 仍 **No-Go**。
+剧本森林只解决 mock 因果表达，不伪造 Host 能力。
+
+---
+
+## 十一、验收清单
+
+1. 同一 provider-visible 前缀两次请求 → 同一 respond（幂等）。  
+2. 仅 lastUser 相同、完整历史不同 → 可命中不同边。  
+3. 两路径仅 user 文本不同而分叉 → 合法。  
+4. 同一前缀注册两个 respond → 加载失败。  
+5. 无编号、无 mute、无 message-id 剧本身份。  
+6. session seal 破坏仍 fail closed。  
+7. reviewer 双 PERFECT 与 orchestrator pre/post review 不依赖 host message id。  
+8. 文档与实现唯一 SSOT 为本卷；旧 lane 语义不得在新代码路径复活。
+
+---
+
+## 十二、设计精神对照
+
+| 问题 | 答案 |
+|---|---|
+| 这是物理事实还是程序计数器？ | 事实：模型可见历史；不是 lane turn 计数器 |
+| 能否用更少概念？ | 一个键（可见前缀）+ 确定性表；删除 bind/mute/编号 |
+| 与产品一致吗？ | 与 KV-cache / 内容确认同一「可见字节」本体论 |
 

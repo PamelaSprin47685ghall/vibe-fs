@@ -45,13 +45,7 @@
       "wait": "reviewer-perfect-1"
     },
     {
-      "wait": "reviewer-perfect-1-text"
-    },
-    {
       "wait": "reviewer-perfect-2"
-    },
-    {
-      "wait": "reviewer-terminal"
     },
     {
       "wait": "manager-join-reviewer"
@@ -266,7 +260,9 @@
       "match": {
         "requiredTools": [
           "verdict"
-        ]
+        ],
+        "user": "Review and PERFECT twice",
+        "afterToolResult": false
       },
       "respond": {
         "type": "tool-call",
@@ -274,10 +270,11 @@
         "args": {
           "verdict": "PERFECT"
         }
-      }
+      },
+      "reusable": true
     },
     {
-      "id": "reviewer-perfect-1-text",
+      "id": "reviewer-after-tool-text",
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
@@ -288,12 +285,17 @@
       "match": {
         "requiredTools": [
           "verdict"
-        ]
+        ],
+        "afterToolResult": true
       },
       "respond": {
         "type": "text",
         "text": "First PERFECT submitted; awaiting confirmation prompt."
-      }
+      },
+      "reusable": true,
+      "pathless": true,
+      "blocking": false,
+      "neverEnd": false
     },
     {
       "id": "reviewer-perfect-2",
@@ -308,7 +310,8 @@
         "requiredTools": [
           "verdict"
         ],
-        "user": "PERFECT requires confirmation"
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation",
+        "afterToolResult": false
       },
       "respond": {
         "type": "tool-call",
@@ -316,22 +319,8 @@
         "args": {
           "verdict": "PERFECT"
         }
-      }
-    },
-    {
-      "id": "reviewer-terminal",
-      "lane": {
-        "session": "reviewer",
-        "role": "reviewer",
-        "turn": 4,
-        "requestKind": "chat",
-        "parentSession": "manager"
       },
-      "match": {},
-      "respond": {
-        "type": "text",
-        "text": "Review done."
-      }
+      "reusable": true
     },
     {
       "id": "session-blogger",
@@ -349,7 +338,9 @@
         "text": "Session background."
       },
       "neverEnd": true,
-      "blocking": false
+      "blocking": false,
+      "pathless": true,
+      "reusable": true
     }
   ]
 }

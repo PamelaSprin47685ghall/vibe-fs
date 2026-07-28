@@ -40,6 +40,9 @@ type HostForkRuntime
     let sendChildPrompt =
         HostForkRunLifecycle.childPromptSender sessions parentId modelResolver journal directoryOf
 
+    let sendBusyNudge =
+        HostForkBusyNudge.sender sessions parentId modelResolver journal directoryOf
+
     // Fire-and-forget: the parent-abort callback is synchronous (unit -> unit)
     // but cancellation is best-effort async work, so we discard the Task.
     let parentAbortToken =
@@ -50,7 +53,6 @@ type HostForkRuntime
             lock gate (fun () -> ptyRuns.Add completion.RunId |> ignore)
             runtime.UnregisterPty completion.RunId
             runtime.PublishCompletion completion)
-
     let restoreChildren () =
         match journal with
         | None -> ()
@@ -112,6 +114,7 @@ type HostForkRuntime
                             sessions
                             runtime
                             sendChildPrompt
+                            sendBusyNudge
                             (fun child role -> runStarted child role (directoryOf agentId))
                             agentId
                             childId
@@ -237,6 +240,7 @@ Blockers:"
                                 sessions
                                 runtime
                                 sendChildPrompt
+                                sendBusyNudge
                                 (fun child role -> runStarted child role (directoryOf agentId))
                                 agentId
                                 childId
@@ -255,7 +259,6 @@ Blockers:"
               StartedAt = DateTimeOffset.UtcNow }
 
     member internal _.UntrackPtyRun(id: string) = runtime.UnregisterPty id
-
     member _.IsPtyCompletion(runId: string) =
         lock gate (fun () -> ptyRuns.Contains runId)
 
@@ -264,7 +267,6 @@ Blockers:"
     member _.List() = runtime.List()
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
-
     member this.Cancel() : Task<unit> =
         task {
             // Reject new runs before awaiting owner cleanup; cancellation is the

@@ -5,7 +5,7 @@
  */
 
 import { extractToolNames, extractLastUserMsg } from './strict-mock-matches.js';
-import { laneLabel, pendingExpectations } from './strict-mock-lanes.js';
+import { edgeLabel, pendingExpectations } from './strict-mock-forest.js';
 
 const PREVIEW_LIMIT = 5;
 
@@ -24,7 +24,7 @@ export function checkSatisfied(state) {
   const unexpectedCount = state.unexpected.length;
   if (remaining > 0) {
     const detail = expectations.slice(0, PREVIEW_LIMIT).map((e) =>
-      `  [${e.id}] lane=${laneLabel(e.lane)} respond=${e.respond.type} match=${JSON.stringify(e.match)}`,
+      `  [${e.id}] edge=${edgeLabel(e)} respond=${e.respond.type} match=${JSON.stringify(e.match)}`,
     ).join('\n');
     errors.push(`remaining expectations = ${remaining}:\n${detail}`);
   }

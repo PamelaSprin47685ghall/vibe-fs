@@ -26,10 +26,12 @@ import {
 } from './strict-mock-matches.js';
 import {
   consumeExpectation,
+  edgeLabel,
+  edgeWaitIds,
   laneLabel,
   pendingExpectations,
   selectExpectation,
-} from './strict-mock-lanes.js';
+} from './strict-mock-forest.js';
 import {
   startHttpServer,
   stopHttpServer,
@@ -143,7 +145,7 @@ export class StrictMockProvider {
   get blockedExpectations() {
     return pendingExpectations(this._state).map((expectation) => ({
       id: expectation.id,
-      lane: laneLabel(expectation.lane),
+      lane: edgeLabel(expectation),
       blocking: expectation.blocking,
     }));
   }
@@ -270,9 +272,12 @@ export class StrictMockProvider {
     const s = this._state;
     const sessionID = requestSessionOf(parsed);
     const exp = consumeExpectation(s, match, sessionID);
-    this._signals.consume(exp);
-    this._runAfterExpectation(exp.id);
-    if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${exp.id} ${laneLabel(exp.lane)}`);
+    for (const wid of edgeWaitIds(exp)) {
+      this._signals.consume({ id: wid });
+      // afterExpectation may be registered on any alias wait id.
+      this._runAfterExpectation(wid);
+    }
+    if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${edgeLabel(exp)}`);
     s.requests.push(parsed);
     // Seal only chat turns (title/synthetic may reshuffle without product cache).
     if (sessionID && requestKindOf(parsed) === 'chat') {
@@ -292,7 +297,7 @@ export class StrictMockProvider {
     const parentSessionId = requestParentSessionOf(parsed) || null;
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
-    const candidateLabels = candidates.map(({ expectation }) => `${expectation.id}@${laneLabel(expectation.lane)}`);
+    const candidateLabels = candidates.map(({ expectation }) => edgeLabel(expectation));
     const lastUser = extractLastUserMsg(parsed);
     const fatal = {
       id: `unexpected-${this._state.unexpected.length + 1}`,

@@ -106,19 +106,29 @@ module PromptDispatcher =
 
                     match result with
                     | Ok messageId ->
-                        match
-                            persist (
-                                AgentFact.PluginPromptAccepted
-                                    {| PromptKey = PromptKeyRef.value key
-                                       SessionId = sessionId
-                                       HostMessageId = MessageId.value messageId |}
-                            )
-                        with
-                        | Error error -> return Error error
-                        | Ok() ->
-                            lock gate (fun () -> authority <- PromptAuthority.acceptClaim key messageId authority)
+                        // prompt_async often returns a synthetic admission id
+                        // (accepted-<session>). That is not a durable physical
+                        // user message. Leave the claim pending so chat.message
+                        // can map the real HostMessageId via PluginPromptAccepted.
+                        let hostId = MessageId.value messageId
+
+                        if hostId.StartsWith("accepted-") then
                             onAccepted |> Option.iter (fun callback -> callback messageId)
                             return Ok messageId
+                        else
+                            match
+                                persist (
+                                    AgentFact.PluginPromptAccepted
+                                        {| PromptKey = PromptKeyRef.value key
+                                           SessionId = sessionId
+                                           HostMessageId = hostId |}
+                                )
+                            with
+                            | Error error -> return Error error
+                            | Ok() ->
+                                lock gate (fun () -> authority <- PromptAuthority.acceptClaim key messageId authority)
+                                onAccepted |> Option.iter (fun callback -> callback messageId)
+                                return Ok messageId
                     | Error error ->
                         let abandoned =
                             persist (

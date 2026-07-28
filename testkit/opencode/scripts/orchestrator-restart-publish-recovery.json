@@ -4,9 +4,9 @@
     {
       "id": "manager-recovery-fork-coder",
       "lane": {
-        "session": "manager-recovery",
+        "session": "manager",
         "role": "manager",
-        "turn": 1,
+        "turn": 4,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
@@ -29,9 +29,9 @@
     {
       "id": "manager-recovery-join-coder",
       "lane": {
-        "session": "manager-recovery",
+        "session": "manager",
         "role": "manager",
-        "turn": 2,
+        "turn": 5,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
@@ -51,9 +51,9 @@
     {
       "id": "manager-recovery-terminal",
       "lane": {
-        "session": "manager-recovery",
+        "session": "manager",
         "role": "manager",
-        "turn": 3,
+        "turn": 6,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
@@ -72,11 +72,11 @@
     {
       "id": "coder-recovery-write",
       "lane": {
-        "session": "coder-recovery",
+        "session": "coder",
         "role": "coder",
-        "turn": 1,
+        "turn": 3,
         "requestKind": "chat",
-        "parentSession": "manager-recovery"
+        "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
@@ -95,90 +95,16 @@
     {
       "id": "coder-recovery-terminal",
       "lane": {
-        "session": "coder-recovery",
+        "session": "coder",
         "role": "coder",
-        "turn": 2,
+        "turn": 4,
         "requestKind": "chat",
-        "parentSession": "manager-recovery"
+        "parentSession": "manager"
       },
       "match": {},
       "respond": {
         "type": "text",
         "text": "Coder recovered."
-      }
-    },
-    {
-      "id": "reviewer-perfect-3",
-      "lane": {
-        "session": "reviewer-recovery",
-        "role": "reviewer",
-        "turn": 1,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {
-        "requiredTools": [
-          "verdict"
-        ]
-      },
-      "respond": {
-        "type": "tool-call",
-        "tool": "verdict",
-        "args": {
-          "verdict": "PERFECT"
-        }
-      }
-    },
-    {
-      "id": "reviewer-terminal-3",
-      "lane": {
-        "session": "reviewer-recovery",
-        "role": "reviewer",
-        "turn": 2,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {},
-      "respond": {
-        "type": "text",
-        "text": "Review round three done."
-      }
-    },
-    {
-      "id": "reviewer-perfect-4",
-      "lane": {
-        "session": "reviewer-recovery",
-        "role": "reviewer",
-        "turn": 3,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {
-        "requiredTools": [
-          "verdict"
-        ]
-      },
-      "respond": {
-        "type": "tool-call",
-        "tool": "verdict",
-        "args": {
-          "verdict": "PERFECT"
-        }
-      }
-    },
-    {
-      "id": "reviewer-terminal-4",
-      "lane": {
-        "session": "reviewer-recovery",
-        "role": "reviewer",
-        "turn": 4,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {},
-      "respond": {
-        "type": "text",
-        "text": "Review round four done."
       }
     }
   ]

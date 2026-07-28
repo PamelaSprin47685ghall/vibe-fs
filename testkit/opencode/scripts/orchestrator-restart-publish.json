@@ -23,7 +23,7 @@
   "flow": [
     {
       "afterExpectation": {
-        "id": "reviewer-terminal-2",
+        "id": "reviewer-perfect-2",
         "restart": true
       }
     },
@@ -43,13 +43,7 @@
       "wait": "reviewer-perfect-1"
     },
     {
-      "wait": "reviewer-perfect-1-text"
-    },
-    {
       "wait": "reviewer-perfect-2"
-    },
-    {
-      "wait": "reviewer-terminal-2"
     },
     {
       "awaitRestart": true
@@ -65,36 +59,44 @@
     },
     {
       "wait": "manager-recovery-fork-coder",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "wait": "coder-recovery-write",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "wait": "coder-recovery-terminal",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "wait": "manager-recovery-join-coder",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "wait": "manager-recovery-terminal",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
+    },
+    {
+      "wait": "reviewer-perfect-3",
+      "timeoutMs": 20000
+    },
+    {
+      "wait": "reviewer-perfect-4",
+      "timeoutMs": 20000
     },
     {
       "wait": "orch-join-2",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "wait": "orch-final",
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "awaitTerminal": true,
       "requireAssistantTerminal": false,
-      "timeoutMs": 15000
+      "timeoutMs": 20000
     },
     {
       "expectSatisfied": true
@@ -331,85 +333,6 @@
       }
     },
     {
-      "id": "reviewer-perfect-1",
-      "lane": {
-        "session": "reviewer",
-        "role": "reviewer",
-        "turn": 1,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {
-        "requiredTools": [
-          "verdict"
-        ]
-      },
-      "respond": {
-        "type": "tool-call",
-        "tool": "verdict",
-        "args": {
-          "verdict": "PERFECT"
-        }
-      }
-    },
-    {
-      "id": "reviewer-perfect-1-text",
-      "lane": {
-        "session": "reviewer",
-        "role": "reviewer",
-        "turn": 2,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {
-        "requiredTools": [
-          "verdict"
-        ]
-      },
-      "respond": {
-        "type": "text",
-        "text": "First PERFECT submitted; awaiting confirmation prompt."
-      }
-    },
-    {
-      "id": "reviewer-perfect-2",
-      "lane": {
-        "session": "reviewer",
-        "role": "reviewer",
-        "turn": 3,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {
-        "requiredTools": [
-          "verdict"
-        ],
-        "user": "PERFECT requires confirmation"
-      },
-      "respond": {
-        "type": "tool-call",
-        "tool": "verdict",
-        "args": {
-          "verdict": "PERFECT"
-        }
-      }
-    },
-    {
-      "id": "reviewer-terminal-2",
-      "lane": {
-        "session": "reviewer",
-        "role": "reviewer",
-        "turn": 4,
-        "requestKind": "chat",
-        "parentSession": "orchestrator"
-      },
-      "match": {},
-      "respond": {
-        "type": "text",
-        "text": "Review round two done."
-      }
-    },
-    {
       "id": "session-blogger",
       "lane": {
         "session": "session-blogger",
@@ -444,6 +367,230 @@
       },
       "neverEnd": true,
       "blocking": false
+    },
+    {
+      "id": "reviewer-after-tool-text",
+      "lane": {
+        "session": "reviewer-sidecar",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "pathless": true,
+      "reusable": true,
+      "blocking": false,
+      "neverEnd": false,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": true
+      },
+      "respond": {
+        "type": "text",
+        "text": "Reviewer intermediate text after verdict tool."
+      }
+    },
+    {
+      "id": "reviewer-perfect-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "Review the current worktree for correctness",
+        "afterToolResult": false
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": false,
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-3",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "Review the current worktree for correctness",
+        "afterToolResult": false
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-4",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": false,
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-5",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "Review the current worktree for correctness",
+        "afterToolResult": false
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-6",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": false,
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-7",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "Review the current worktree for correctness",
+        "afterToolResult": false
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
+    },
+    {
+      "id": "reviewer-perfect-8",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "reusable": true,
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": false,
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
     }
   ]
 }

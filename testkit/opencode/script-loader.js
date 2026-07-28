@@ -1,9 +1,9 @@
 /**
- * Data-driven mock scripts (linear only).
+ * Data-driven mock scripts — Script Forest (AGENTS.md KISS-N11).
  *
- * JSON under scripts/*.json is independent of canary code.
- * Stages = distinct first-message match (user / userRegex).
- * Same conversation continues by lane turn. No phases.
+ * Runtime match key = provider-visible full request seal (idempotent).
+ * Authoring sugar = content match (user / tools / role) on path steps.
+ * No mute, no numbering, no session-bind identity.
  *
  * Schema:
  * {
@@ -11,10 +11,13 @@
  *   "setup?": { "project?", "env?", "strict?", "watchdogLabel?" },
  *   "session?": { "agent", "bind?": ["alias", ...] },
  *   "prompt?": { "agent", "text" } | "prompts?": [...],
- *   "flow?": [ { "wait": "id" } | { "restart": true } | { "prompt": {...} } | { "awaitTerminal": true } | { "expectSatisfied": true } | { "abort": true } | { "bindChild": { "from": "parentId", "agent": "coder", "aliases": ["coder"] } } | ... ],
+ *   "flow?": [ { "wait": "id" } | { "restart": true } | { "prompt": {...} } | { "loadScripts": "file" } | ... ],
  *   "pass?": "message",
  *   "scripts": [ { id, lane, match, respond, neverEnd?, blocking? } ]
  * }
+ *
+ * lane.turn is authoring metadata only (not a runtime match key).
+ * Parallel jobs must differ by user (or other visible) content.
  */
 
 import fs from 'node:fs';
@@ -73,7 +76,7 @@ function registerStep(provider, scenario, abs, step) {
         : true,
     neverEnd: Boolean(step.neverEnd),
   };
-  for (const flag of ['neverEnd', 'delayFirstToken', 'delayDone', 'disconnectMidSse']) {
+  for (const flag of ['neverEnd', 'reusable', 'pathless', 'delayFirstToken', 'delayDone', 'disconnectMidSse']) {
     if (step[flag] !== undefined) opts[flag] = step[flag];
     if (step.respond?.[flag] !== undefined) opts[flag] = step.respond[flag];
   }

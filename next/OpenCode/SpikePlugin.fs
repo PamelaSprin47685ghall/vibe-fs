@@ -207,6 +207,7 @@ module SpikePlugin =
                                 modelConfig
                                 onRunStarted
                                 backgroundBFor
+                                snapshotOpt
 
                         toolSurfaceRef <- Some toolSurface
                         hooks?tool <- toolSurface

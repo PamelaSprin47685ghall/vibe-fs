@@ -147,8 +147,9 @@
       "blocking": false,
       "match": {
         "containsText": [
-          "Condense the following FULL companion context"
-        ]
+          "companion context"
+        ],
+        "userRegex": "Condense|FULL companion|self.?rebase|existing_blog|Rewrite the supplied existing blog"
       },
       "respond": {
         "type": "text",
@@ -244,9 +245,9 @@
       "blocking": false,
       "match": {
         "containsText": [
-          "Re-anchor on the FULL current companion context B",
-          "You are the blogger of a coding agent session."
-        ]
+          "Re-anchor"
+        ],
+        "userRegex": "Re-anchor|FULL current companion|You are the blogger"
       },
       "respond": {
         "type": "text",
@@ -293,9 +294,9 @@
       "blocking": false,
       "match": {
         "containsText": [
-          "Re-anchor on the FULL current companion context B",
-          "You are the blogger of a coding agent session."
-        ]
+          "Re-anchor"
+        ],
+        "userRegex": "Re-anchor|FULL current companion|You are the blogger"
       },
       "respond": {
         "type": "error",

@@ -81,6 +81,7 @@ module SpikePluginHelpers =
         (modelConfig: ModelResolver.ModelConfig option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
+        (snapshot: ISessionSnapshotPort option)
         : obj =
         ToolSurface.create
             toolModule
@@ -96,3 +97,4 @@ module SpikePluginHelpers =
             modelConfig
             onRunStarted
             backgroundBFor
+            snapshot

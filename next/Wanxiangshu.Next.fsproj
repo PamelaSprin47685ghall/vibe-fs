@@ -90,6 +90,7 @@
     <Compile Include="OpenCode/PromptDispatcher.fs"/>
     <Compile Include="Session/AgentRoleHelpers.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
+    <Compile Include="Session/HostForkBusyNudge.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
@@ -107,6 +108,7 @@
     <Compile Include="OpenCode/RetrySignalHandler.fs"/>
     <Compile Include="OpenCode/ReviewerGuardState.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
+    <Compile Include="OpenCode/HostSignalChatMessage.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
     <Compile Include="OpenCode/ExecutorSummarize.fs"/>
@@ -119,6 +121,7 @@
     <Compile Include="OpenCode/OrchestratorSessionDirectories.fs"/>
     <Compile Include="OpenCode/OrchestratorReviewRead.fs"/>
     <Compile Include="OpenCode/OrchestratorManagerJob.fs"/>
+    <Compile Include="OpenCode/OrchestratorHostReview.fs"/>
     <Compile Include="OpenCode/OrchestratorHost.fs"/>
     <Compile Include="OpenCode/ToolSurfaceFields.fs"/>
     <Compile Include="OpenCode/ToolSurfaceEmit.fs"/>

@@ -95,7 +95,7 @@ module GuardDurableTests =
                 let promptFact =
                     AgentFact.GuardPromptAccepted
                         {| TargetSessionId = sid
-                           GuardKey = "guard-key-2"
+                           GuardKey = "confirm-perfect:tree-durable-100"
                            HostMessageId = "confirm-user-2" |}
 
                 let _ = AgentJournal.appendAgent (StreamId.Session sid) None promptFact journal
@@ -110,7 +110,7 @@ module GuardDurableTests =
                         "tc-2"
                         treeHash
                         ReviewGuardVerdict.Perfect
-                        (Some "confirm-user-2")
+                        (Some "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.")
 
                 Assert.True(Result.isOk res2)
                 let proj2 = Result.defaultWith (fun _ -> failwith "unexpected") res2

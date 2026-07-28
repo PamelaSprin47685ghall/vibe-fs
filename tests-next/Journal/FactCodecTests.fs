@@ -41,7 +41,7 @@ module FactCodecTests =
                     {| ManagerSessionId = sid
                        ReviewerSessionId = revSid
                        ProviderRunId = "pr-1"
-                       RootUserMessageId = None
+                       UserPromptText = None
                        ToolCallId = "call123"
                        GitTreeHash = "tree123"
                        Verdict = ReviewGuardVerdict.Perfect |}
@@ -55,7 +55,7 @@ module FactCodecTests =
             Assert.Equal(sid, r.ManagerSessionId)
             Assert.Equal(revSid, r.ReviewerSessionId)
             Assert.Equal("pr-1", r.ProviderRunId)
-            Assert.Equal(None, r.RootUserMessageId)
+            Assert.Equal(None, r.UserPromptText)
             Assert.Equal("call123", r.ToolCallId)
             Assert.Equal("tree123", r.GitTreeHash)
             Assert.Equal(ReviewGuardVerdict.Perfect, r.Verdict)

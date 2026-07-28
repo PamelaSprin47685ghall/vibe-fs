@@ -108,32 +108,27 @@ module HostReviewGuard =
                     nudgeKeys.Add guardKey |> ignore
 
                     // prompt_async may only return a synthetic admission id
-                    // (accepted-<session>). That must not become the durable
-                    // ConfirmationPromptMessageId: the second PERFECT proves
-                    // causality against the real chat.message user id. Persist
-                    // only real host message ids here; the chat.message hook
-                    // rewrites/records the authoritative id when metadata lands.
+                    // (accepted-<session>). Content confirmation no longer
+                    // needs the real chat.message id — GuardKey containing
+                    // confirm-perfect installs ConfirmationPromptMarker, and
+                    // the second PERFECT proves itself by containing that
+                    // marker text. Always persist acceptance on successful send.
                     let hostId = MessageId.value hostMessageId
 
-                    if not (hostId.StartsWith("accepted-")) then
-                        let fact =
-                            AgentFact.GuardPromptAccepted
-                                {| TargetSessionId = targetSessionId
-                                   GuardKey = guardKey
-                                   HostMessageId = hostId |}
+                    let fact =
+                        AgentFact.GuardPromptAccepted
+                            {| TargetSessionId = targetSessionId
+                               GuardKey = guardKey
+                               HostMessageId = hostId |}
 
-                        match AgentJournal.appendAgent (StreamId.Session targetSessionId) None fact journal with
-                        | Ok _ -> onContinuationAccepted targetSessionId hostMessageId
-                        | Error failure ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "Failed to persist review guard prompt acceptance: %A" failure.Failure
-                                )
+                    match AgentJournal.appendAgent (StreamId.Session targetSessionId) None fact journal with
+                    | Ok _ -> onContinuationAccepted targetSessionId hostMessageId
+                    | Error failure ->
+                        raise (
+                            InvalidOperationException(
+                                sprintf "Failed to persist review guard prompt acceptance: %A" failure.Failure
                             )
-                    else
-                        // Keep the claim key marked so we do not re-send, but
-                        // leave ConfirmationPromptMessageId unset until chat.message.
-                        ()))
+                        )))
 
     let nudgeManager
         (sessionPort: ISessionHostPort)
@@ -180,8 +175,8 @@ module HostReviewGuard =
 
     /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07:
     /// "PERFECT requires confirmation"). This is the ONLY code path that produces
-    /// a ConfirmationPromptMessageId; the resulting HostMessageId becomes the
-    /// causal proof the second PERFECT's root user message must match. Without
+    /// a ConfirmationPromptMarker; the confirmation prompt body becomes the
+    /// content proof the second PERFECT's user prompt must contain. Without
     /// this nudge, two independent PERFECT calls could never be distinguished
     /// from a genuine confirmed round-trip -- fail-closed confirmation requires
     /// this to actually fire.

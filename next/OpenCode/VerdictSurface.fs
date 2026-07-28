@@ -26,6 +26,44 @@ module VerdictSurface =
 
     let private mkSid (s: string) = SessionId.create s
 
+    let private textFromParts (parts: obj array) =
+        CompletedTurnClassifier.partsText parts
+
+    let private latestUserPromptText (snapshot: ISessionSnapshotPort option) (sessionId: string) (preferredMessageId: string option) =
+        task {
+            match snapshot with
+            | None -> return None
+            | Some port ->
+                let! messagesResult = port.GetMessages(SessionId.create sessionId)
+
+                match messagesResult with
+                | Error _ -> return None
+                | Ok messages ->
+                    let users =
+                        messages
+                        |> List.filter (fun message -> message.Role = "user")
+
+                    let preferred =
+                        match preferredMessageId with
+                        | Some mid when not (String.IsNullOrWhiteSpace mid) ->
+                            users
+                            |> List.tryFind (fun message -> MessageId.value message.Id = mid)
+                            |> Option.bind (fun message ->
+                                let text = textFromParts message.Parts
+                                if String.IsNullOrWhiteSpace text then None else Some text)
+                        | _ -> None
+
+                    match preferred with
+                    | Some text -> return Some text
+                    | None ->
+                        return
+                            users
+                            |> List.rev
+                            |> List.tryPick (fun message ->
+                                let text = textFromParts message.Parts
+                                if String.IsNullOrWhiteSpace text then None else Some text)
+        }
+
     let create
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
@@ -34,6 +72,7 @@ module VerdictSurface =
         (gitTreePortFor: string -> GitTreePort option)
         (reviewerHosts: Dictionary<string, ReviewerHost>)
         (verdictSessions: HashSet<string>)
+        (snapshot: ISessionSnapshotPort option)
         : (obj -> obj -> Task<obj>) =
         let gate = obj ()
 
@@ -115,32 +154,32 @@ module VerdictSurface =
                         // Content-based confirmation: pass the current user prompt
                         // text (not message ids). Second PERFECT is proven when this
                         // text contains the confirmation marker set by ReviewGuard.
-                        let userPromptText =
-                            let fromParts =
-                                if isNull ctx || isNull ctx?message || isNull ctx?message?parts then
-                                    None
-                                else
-                                    try
-                                        unbox<obj array> ctx?message?parts
-                                        |> Array.choose (fun part ->
-                                            if isNull part then
-                                                None
-                                            else
-                                                match part?``type`` with
-                                                | :? string as t when t = "text" ->
-                                                    match part?text with
-                                                    | :? string as s when not (String.IsNullOrWhiteSpace s) -> Some s
-                                                    | _ -> None
-                                                | _ -> None)
-                                        |> function
-                                            | [||] -> None
-                                            | texts -> Some(String.concat "\n" texts)
-                                    with _ ->
+                        let! userPromptText =
+                            task {
+                                let fromParts =
+                                    if isNull ctx || isNull ctx?message || isNull ctx?message?parts then
                                         None
+                                    else
+                                        try
+                                            let text = textFromParts (unbox<obj array> ctx?message?parts)
+                                            if String.IsNullOrWhiteSpace text then None else Some text
+                                        with _ ->
+                                            None
 
-                            fromParts
-                            |> Option.orElse (contextString ctx "prompt")
-                            |> Option.orElse (contextString ctx "input")
+                                match
+                                    fromParts
+                                    |> Option.orElse (contextString ctx "prompt")
+                                    |> Option.orElse (contextString ctx "input")
+                                with
+                                | Some text -> return Some text
+                                | None ->
+                                    let preferred =
+                                        currentPhysicalUserMessage reviewerId
+                                        |> Option.orElse (contextString ctx "userMessageID")
+                                        |> Option.orElse (contextString ctx "userMessageId")
+
+                                    return! latestUserPromptText snapshot reviewerId preferred
+                            }
 
                         match providerRunId with
                         | None -> return box (stringify (createObj [ "error", box "Missing ProviderRunId" ]))

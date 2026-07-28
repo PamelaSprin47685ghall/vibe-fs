@@ -36,6 +36,7 @@ module ToolSurface =
         (modelConfig: ModelResolver.ModelConfig option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
+        (snapshot: ISessionSnapshotPort option)
         : obj =
         let factory = toolModule?tool
         let runtimes = Dictionary<string, HostForkRuntime>()
@@ -129,6 +130,7 @@ module ToolSurface =
                     | false, _ -> gitTreePort)
                 reviewerHosts
                 verdictSessions
+                snapshot
 
         let managerForkArgs, orchestratorManagerJobArgs, verdictArgs, definition =
             ToolSurfaceOrchestrator.toolDefBuilders factory

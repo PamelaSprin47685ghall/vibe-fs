@@ -143,6 +143,7 @@ module HostForkRunLifecycle =
         (sessions: ISessionHostPort)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> AgentRole -> string -> Task<Result<unit, string>>)
+        (sendBusyNudge: string -> SessionId -> AgentRole -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> AgentRole -> unit)
         (agentId: string)
         (childId: SessionId)
@@ -159,12 +160,14 @@ module HostForkRunLifecycle =
             match activeRun with
             | Some _ when runtime.IsCancelled -> return Error "Fork runtime is cancelled"
             | Some _ ->
-                let! sent = sendChildPrompt agentId childId role prompt
+                // Active run: BusyAgentNudge continuation (same LogicalRun).
+                let! sent = sendBusyNudge agentId childId role prompt
 
                 match sent with
                 | Ok() -> return Ok(ForkResult.Nudged agentId)
                 | Error err -> return Error err
             | None ->
+                // Idle existing child: new AgentOwnerRoot work via ordinary send.
                 let run = installRun gate pendingRuns sessions agentId childId
                 onRunStarted childId role
                 let result = runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task))

@@ -54,23 +54,30 @@ CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 6. 旧/外来 `companion-b-head-*` fixture 不得被视为当前 epoch 的幂等命中；必须 fail closed 或走明确清理路径。
 7. 重启后恢复同一个 Blogger；若 Blogger 不存在，发送 full reset，不得将 delta 发给空白 Blogger。
 
-## 4. Fallback：发布前必须先完成 Host 合同 Spike
+## 4. Fallback A/A/B/B（user-prompt 延续语义，非 session 永久 model）
 
-当前 Host 源码证据表明内部 retry 由 processor 内部 `Effect.retry` 执行，不新建 user message，也不调用 session model setter。因此，现有插件 Hook **不能证明** provider-attempt 级 A/A/B/B。
+Session **不**绑定永久 agent/model。Host 的语义是：延续**最后一次 user prompt** 上的 agent/model（见 host-docs：createUserMessage 会用本条 message 的 model 更新 session 缓存）。用户只要在下一条 prompt 显式指定其他 model，即可切走。
 
-在没有新增 Host 合同前，本节不能通过，版本不得晋升 RC。
+产品 A/A/B/B 因此不依赖 `setAgentModel` 或 retry 钩子改 session 永久字段，而依赖：
 
-若 Host 提供 request-before-model-resolve 和 request-reject 边界，Spike 必须记录每个真实 request：request ID、root user message ID、model、retry signal 时刻、下一 request 建立时刻。唯一可接受轨迹：
+1. `session.status=retry` 写 durable `FallbackFailureRecorded`（唯一写入口）；
+2. Failures 映射：0/1→A，2 永久切 B，3→B，≥4 Dead；
+3. 下一条 **省略 model** 的 Authority Root user prompt，由 `chat.message` 按 durable Side 注入 A 或 B，写入该条 user message；
+4. Host 内部 Effect.retry 仍可能对**同一条 user message** 复用同一 model（A 或 B 的第二次 attempt）——这是同 prompt 内的 provider retry，不是 session 永久绑定。
+
+可接受 canary 轨迹（`fallback-canary`）：
 
 ```text
-request 1: A → failure #1
-request 2: A → failure #2
-request 3: B → failure #3
-request 4: B → failure #4
-no request 5
+user root (model A) → fail → same-prompt A retry → idle
+user root (model A) → fail → same-prompt A retry → idle  (Side 永久 B)
+restart
+user root (omit model) → plugin injects B → fail → same-prompt B retry
+user root (omit model) → B → fail → same-prompt B retry → Dead
 ```
 
-重试 identity 必须由插件为每个 root user message 单调分配；不得使用 Host `attempt` 字段或 `"unknown"` 回退。缺少可控制的 Host 边界时记录 `HOST_CONTRACT_UNAVAILABLE`，停止发布，而不是将跨 user turn 的模型切换当成通过。
+显式 user model 永远优先，并开启新 Fallback epoch（Failures=0, Side=A）。
+
+**不是** Host 合同阻塞：禁止用「Host 不在 Effect.retry 里 setAgentModel」作为 No-Go 理由。
 
 ## 5. Review witness
 

@@ -41,9 +41,9 @@ module ReviewerHostTests =
                     ReviewFinishResult.NeedsReview
                     (host.RecordVerdict("call-1", "tree-a", ReviewGuardVerdict.Perfect, "run-1"))
 
-                // ReviewGuard's confirm-perfect nudge after the first PERFECT is the
-                // only source of a valid confirmation message id; without it the
-                // second PERFECT must not confirm (fail-closed, KISS-N07).
+                // ReviewGuard's confirm-perfect nudge after the first PERFECT installs the
+                // content marker; without the marker text the second PERFECT must
+                // not confirm (fail-closed, KISS-N07).
                 let confirmFact =
                     AgentFact.GuardPromptAccepted
                         {| TargetSessionId = manager
@@ -54,7 +54,13 @@ module ReviewerHostTests =
 
                 expect
                     ReviewFinishResult.Confirmed
-                    (host.RecordVerdict("call-2", "tree-a", ReviewGuardVerdict.Perfect, "run-2", "confirm-a"))
+                    (host.RecordVerdict(
+                        "call-2",
+                        "tree-a",
+                        ReviewGuardVerdict.Perfect,
+                        "run-2",
+                        "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                    ))
 
                 expect
                     ReviewFinishResult.NeedsReview
@@ -141,7 +147,7 @@ module ReviewerHostTests =
                         "call-2",
                         ReviewGuardVerdict.Perfect,
                         providerRunId = "run-2",
-                        rootUserMessageId = "confirm-a"
+                        userPromptText = "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
                     )
                 )
 

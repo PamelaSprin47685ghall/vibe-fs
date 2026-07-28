@@ -8,7 +8,7 @@ module OrchestratorReviewRead =
     /// Manager review-guard state for the current worktree.
     /// PendingConfirmation means a first PERFECT already landed and HostReviewGuard
     /// owns the confirmation nudge — Orchestrator must not re-fork a full review.
-    type ReviewState =
+    type ReviewStatus =
         | Confirmed
         | PendingConfirmation
         | NeedsReview
@@ -18,7 +18,7 @@ module OrchestratorReviewRead =
         (journal: AgentJournal option)
         (reviewOwnerSessionId: SessionId)
         (worktree: string)
-        : Task<Result<ReviewState, string>> =
+        : Task<Result<ReviewStatus, string>> =
         task {
             match journal with
             | None -> return Error "Orchestrator review requires a journal"

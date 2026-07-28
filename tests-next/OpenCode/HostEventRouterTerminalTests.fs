@@ -35,7 +35,8 @@ module HostEventRouterTerminalTests =
 
                 if activeSessions.Contains id then
                     prompts.Add(id, text)
-                    Task.FromResult(Ok(MessageId.create "accepted"))
+                    // Host prompt_async admission id (not a durable physical user message).
+                    Task.FromResult(Ok(MessageId.create ("accepted-" + id)))
                 else
                     Task.FromResult(Error "AG-LISTENER-BEFORE-SEND")
 
@@ -260,7 +261,7 @@ module HostEventRouterTerminalTests =
 
                 do! drainMicrotasks 16
                 Assert.Single(prompts) |> ignore
-                Assert.Equal("\u200B", snd prompts.[0])
+                Assert.equal("\u200B", snd prompts.[0])
 
                 let authority =
                     (AgentJournal.snapshot journal).AgentProjections.Sessions
@@ -269,12 +270,24 @@ module HostEventRouterTerminalTests =
 
                 match authority with
                 | Some projection ->
-                    Assert.Equal(
+                    // Zero-width is Continuation: LastAuthority stays the human root.
+                    Assert.equal(
                         Some "u1",
                         projection.LastAuthorityProfile
                         |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
                     )
 
-                    Assert.True(projection.AcceptedContinuationIds.ContainsKey "accepted")
+                    Assert.equal(
+                        Some "u1",
+                        projection.ActiveLogicalRun
+                        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+                    )
+
+                    // prompt_async returns synthetic accepted-* ids; durable
+                    // PluginPromptAccepted is deferred to chat.message with the
+                    // real HostMessageId. Claim must remain pending, not mapped
+                    // under the synthetic admission id.
+                    Assert.False(projection.AcceptedContinuationIds.ContainsKey("accepted-" + sessionId))
+                    Assert.True(not (Map.isEmpty projection.PendingClaims))
                 | None -> Assert.True(false, "zero-width continuation lost authority projection")
             })

@@ -7,6 +7,10 @@ open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module PromptAuthorityTests =
 
@@ -126,3 +130,108 @@ module PromptAuthorityTests =
 
         Assert.Equal(Some newProfile, projection.LastAuthorityProfile)
         Assert.True(oldProfile.LogicalRunId <> newProfile.LogicalRunId)
+
+    [<Fact>]
+    let ``Chat_message_maps_keyed_continuation_without_becoming_human_root`` () =
+        withTempDir (fun directory ->
+            task {
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "rt-authority") 1 DateTimeOffset.UtcNow
+
+                let session = SessionId.create "s-auth"
+                let humanRoot = MessageId.create "human-root-1"
+
+                let profile =
+                    PromptAuthority.createAuthorityRoot
+                        session
+                        PromptAuthority.HumanRoot
+                        humanRoot
+                        "manager"
+                        None
+                        None
+
+                match
+                    AgentJournal.appendAgent
+                        (StreamId.Session session)
+                        (Some(TurnId.ofMessageId humanRoot))
+                        (AgentFact.AuthorityRootAccepted
+                            {| SessionId = session
+                               LogicalRunId = profile.LogicalRunId
+                               HostMessageId = MessageId.value humanRoot
+                               AuthorityKind = "HumanRoot"
+                               Agent = "manager"
+                               BaseProviderID = None
+                               BaseModelID = None
+                               Variant = None |})
+                        journal
+                with
+                | Error e -> Assert.True(false, sprintf "authority root failed: %A" e)
+                | Ok _ -> ()
+
+                match
+                    AgentJournal.appendAgent
+                        (StreamId.Session session)
+                        None
+                        (AgentFact.PluginPromptClaimed
+                            {| PromptKey = "pk-repair-1"
+                               SessionId = session
+                               LogicalRunId = profile.LogicalRunId
+                               AuthorityRootUserMessageId = MessageId.value humanRoot
+                               ContinuationKind = "InteractionRepair"
+                               Agent = Some "manager"
+                               EffectiveProviderID = None
+                               EffectiveModelID = None
+                               Variant = None |})
+                        journal
+                with
+                | Error e -> Assert.True(false, sprintf "claim failed: %A" e)
+                | Ok _ -> ()
+
+                let roles = System.Collections.Generic.Dictionary<string, string>()
+                let bound = ResizeArray<string * string>()
+
+                let hookObj =
+                    HostSignalChatMessage.createHook
+                        (Some journal)
+                        roles
+                        (fun sid mid -> bound.Add(("root", sid + ":" + mid)))
+                        (fun sid mid -> bound.Add(("cont", sid + ":" + mid)))
+                        (fun _ -> ())
+                        None
+
+                let hook = unbox<obj -> obj -> unit> hookObj
+
+                let input =
+                    createObj
+                        [ "sessionID", box "s-auth"
+                          "messageID", box "physical-repair-1"
+                          "agent", box "manager"
+                          "metadata",
+                          box (
+                              createObj
+                                  [ "wanxiangshu_prompt_key", box "pk-repair-1"
+                                    "wanxiangshu_origin", box "InteractionRepair" ]
+                          ) ]
+
+                hook input (createObj [ "message", createObj [ "id", box "physical-repair-1" ] ])
+
+                let projection =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Map.find session
+                    |> fun s -> s.PromptAuthority
+
+                match projection with
+                | None -> Assert.True(false, "missing authority projection")
+                | Some proj ->
+                    Assert.Equal(
+                        Some(MessageId.value humanRoot),
+                        proj.LastAuthorityProfile
+                        |> Option.map (fun p -> p.AuthorityRootUserMessageId)
+                    )
+
+                    Assert.True(proj.AcceptedContinuationIds.ContainsKey "physical-repair-1")
+                    Assert.False(proj.AcceptedContinuationIds.ContainsKey "accepted-s-auth")
+                    Assert.True(bound.Exists(fun (kind, _) -> kind = "cont"))
+                    Assert.False(bound.Exists(fun (kind, pair) -> kind = "root" && pair.Contains "physical-repair-1"))
+            })
+

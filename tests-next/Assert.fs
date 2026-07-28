@@ -13,11 +13,15 @@ module private AssertHelper =
     let resetHeartbeat () : unit = ()
 
 type Assert =
-    static member Equal<'T>(expected: 'T, actual: 'T) =
+    // Fable/tests use lowercase `equal` historically; keep both spellings.
+    static member equal<'T>(expected: 'T, actual: 'T) =
         AssertHelper.resetHeartbeat ()
 
         if not (Unchecked.equals expected actual) then
-            failwithf "Assert.Equal failed.\nExpected: %A\nActual:   %A" expected actual
+            failwithf "Assert.equal failed.\nExpected: %A\nActual:   %A" expected actual
+
+    static member Equal<'T>(expected: 'T, actual: 'T) =
+        Assert.equal (expected, actual)
 
     static member Same(expected: obj, actual: obj) =
         AssertHelper.resetHeartbeat ()
