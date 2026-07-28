@@ -18,6 +18,11 @@ Production authority + host-signal fixes on top of sealed rc.5.
 - PromptAuthority chat.message correlation regressions
 - resolveForSession same-run A/A/B/B before Dead
 
+### Sealed
+
+- Clean-checkout three-round gate evidence: `docs/evidence/0.4.0-rc.6/`
+- tests-next 281, gate-testkit 29, CANARY_REPEAT=3 17 canaries, pack + empty-dir import
+
 ### Still blocking final 0.4.0
 
 - RC observation period with event-driven exit (no open P0/P1)

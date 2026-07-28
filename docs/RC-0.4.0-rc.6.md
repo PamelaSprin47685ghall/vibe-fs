@@ -49,5 +49,13 @@ That is a production authority bug; production code changed → **rc.6**.
 
 ## Gate
 
-Requires clean `npm ci` + `test:release` (`CANARY_REPEAT=3`) + pack + empty-dir
-install. Evidence target: `docs/evidence/0.4.0-rc.6/`.
+Sealed on clean `git clean -xfd` + `npm ci` + `test:release` (`CANARY_REPEAT=3`) + pack + empty-dir install.
+Evidence: `docs/evidence/0.4.0-rc.6/`.
+
+| Gate | Result |
+|---|---|
+| clean `npm ci` | pass |
+| `tests-next` | 281 passed |
+| manager-tools + gate-testkit | pass (29) |
+| `CANARY_REPEAT=3` 17 canaries | pass |
+| pack + empty-dir install/import | pass |
