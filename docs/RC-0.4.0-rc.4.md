@@ -1,3 +1,5 @@
+# Superseded as ship marker by `0.4.0-rc.5` (this document remains historical).
+
 # 0.4.0-rc.4 — release candidate
 
 | Field | Value |

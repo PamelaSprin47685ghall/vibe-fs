@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0-rc.5 — release candidate
+
+Merge `worktree-0-branch` role system prompts and session-wide A semantics on top of the rc.4 clean gate lineage.
+
+### Changes
+
+- Role `AgentConfig.prompt` assets under `next/prompts/*.md` for all roles
+- Session-wide formal assistant A accumulation (`TerminalSessionA`) used as join `finalText`
+- A/B defined as full-session formal text / work log (not last-turn only)
+- Manager tool-contract coverage for DevOps / role surfaces
+
+### Still blocking final 0.4.0
+
+- Clean-checkout three-round gate on this merge commit
+- Observation period
+- Optional real-provider same-run A/A/B/B request traces
+
 ## 0.4.0-rc.4 — release candidate
 
 Amended from a premature `0.4.0` final cut. Current ship marker is **`0.4.0-rc.4`**, not final `0.4.0`.
