@@ -61,25 +61,42 @@ type SessionReconciler
         messages |> List.rev |> List.tryFind (fun message -> message.Role = "user")
 
     let findLatestBoundTurn (messages: SessionMessage list) (binding: ActiveRunBinding) =
-        let userMessageId =
+        let rootUserMessageId =
             match binding.RootUserMessageId with
             | Some id -> Some id
             | None -> findLatestUser messages |> Option.map (fun message -> message.Id)
 
-        match userMessageId with
-        | None -> None
-        | Some userMessageId ->
-            match findAssistantAfter messages userMessageId with
+        let physicalUserMessageId =
+            binding.PhysicalUserMessageId |> Option.orElse rootUserMessageId
+
+        match rootUserMessageId, physicalUserMessageId with
+        | Some rootUserMessageId, Some physicalUserMessageId ->
+            let assistant =
+                findAssistantAfter messages physicalUserMessageId
+                // Some Host prompt_async variants acknowledge queue admission
+                // with a synthetic ID. Keep that ID as the continuation's
+                // causal identity for tools, but reconcile terminal output from
+                // the authority-root transcript when the synthetic ID is not a
+                // persisted user message.
+                |> Option.orElseWith (fun () ->
+                    if physicalUserMessageId = rootUserMessageId then
+                        None
+                    else
+                        findAssistantAfter messages rootUserMessageId)
+
+            match assistant with
             | None -> None
             | Some assistant ->
                 Some(
                     CompletedTurnClassifier.buildTurn
                         binding.SessionId
-                        userMessageId
+                        physicalUserMessageId
+                        rootUserMessageId
                         assistant
                         binding.AgentRole
                         binding.Directory
                 )
+        | _ -> None
 
     let consumeKey (turn: ReconciledTurn) =
         sprintf
@@ -117,15 +134,35 @@ type SessionReconciler
             | true, binding ->
                 bindings.[key] <-
                     { binding with
-                        RootUserMessageId = Some userMessageId }
+                        RootUserMessageId = Some userMessageId
+                        PhysicalUserMessageId = Some userMessageId }
             | false, _ ->
                 bindings.[key] <-
                     { SessionId = sessionId
                       RunId = None
                       RootUserMessageId = Some userMessageId
+                      PhysicalUserMessageId = Some userMessageId
                       ContinuationMessageIds = Set.empty
                       AgentRole = None
                       Directory = "" })
+
+    member _.BindContinuationUserMessage(sessionId: SessionId, userMessageId: MessageId) =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+
+            match bindings.TryGetValue key with
+            | true, binding ->
+                bindings.[key] <-
+                    { binding with
+                        PhysicalUserMessageId = Some userMessageId
+                        ContinuationMessageIds = binding.ContinuationMessageIds.Add(MessageId.value userMessageId) }
+            | false, _ -> ())
+
+    member _.TryPhysicalUserMessage(sessionId: SessionId) =
+        lock gate (fun () ->
+            match bindings.TryGetValue(SessionId.value sessionId) with
+            | true, binding -> binding.PhysicalUserMessageId
+            | false, _ -> None)
 
     member _.ClearSession(sessionId: SessionId) =
         lock gate (fun () ->
@@ -177,6 +214,7 @@ type SessionReconciler
                             { SessionId = sessionId
                               RunId = None
                               RootUserMessageId = None
+                              PhysicalUserMessageId = None
                               ContinuationMessageIds = Set.empty
                               AgentRole = None
                               Directory = "" }

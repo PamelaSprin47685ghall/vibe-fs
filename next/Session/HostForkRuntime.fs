@@ -193,7 +193,8 @@ Blockers:"
                                     enrichedPrompt,
                                     { Model = HostPendingRun.resolveModel modelResolver journal childId
                                       Agent = Some(role.ToString().ToLowerInvariant())
-                                      Directory = directoryOf agentId }
+                                      Directory = directoryOf agentId
+                                      Metadata = None }
                                 )
 
                             match sent with

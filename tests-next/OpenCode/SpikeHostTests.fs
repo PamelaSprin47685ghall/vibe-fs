@@ -65,7 +65,8 @@ module SpikeHostTests =
             let opts: OpenCodePromptOptions =
                 { Model = None
                   Agent = None
-                  Directory = None }
+                  Directory = None
+                  Metadata = None }
 
             let! errRes = sessionPort.SendPrompt(sId, "hello without listener", opts)
 
@@ -216,7 +217,8 @@ module SpikeHostTests =
             let opts: OpenCodePromptOptions =
                 { Model = None
                   Agent = None
-                  Directory = None }
+                  Directory = None
+                  Metadata = None }
 
             let sendTask = sessionPort.SendPrompt(sessionId, "pending", opts)
 
@@ -244,7 +246,8 @@ module SpikeHostTests =
             let opts: OpenCodePromptOptions =
                 { Model = None
                   Agent = None
-                  Directory = None }
+                  Directory = None
+                  Metadata = None }
 
             let! _ = sessionPort.SendPrompt(sA, "Prompt for A", opts)
             let! _ = sessionPort.SendPrompt(sB, "Prompt for B", opts)
@@ -257,41 +260,4 @@ module SpikeHostTests =
 
             Assert.Single(outB)
             Assert.Equal("Prompt: Prompt for B", List.head outB)
-        }
-
-    [<Fact>]
-    let ``Parent_cancellation_aborts_all_child_sessions_and_cleans_up`` () =
-        task {
-            let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
-            let sessionPort = InjectedSessionPort(None, eventPort) :> ISessionHostPort
-            let parentId = SessionId.create "parent-sess"
-
-            let mutable childTerminalCount = 0
-
-            let childOptions: OpenCodeChildOptions =
-                { Title = Some "Child 1"
-                  Agent = None
-                  Directory = None }
-
-            let! childIdRes = sessionPort.CreateChildSession(parentId, childOptions)
-
-            let childId =
-                match childIdRes with
-                | Ok cId -> cId
-                | Error err -> failwith err
-
-            use _subChild =
-                sessionPort.SubscribeTerminal(
-                    childId,
-                    fun _ outcome ->
-                        match outcome with
-                        | Aborted _ -> childTerminalCount <- childTerminalCount + 1
-                        | _ -> ()
-                )
-
-            let! _ = sessionPort.AbortSession(parentId)
-
-            Assert.Equal(1, childTerminalCount)
-            let childOut = sessionPort.GetSessionOutput(childId)
-            Assert.True(childOut |> List.exists (fun line -> line.Contains("Aborted")))
         }

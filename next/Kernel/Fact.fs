@@ -44,7 +44,7 @@ module Fact =
             {| ManagerSessionId: SessionId
                ReviewerSessionId: SessionId
                ProviderRunId: string
-               RootUserMessageId: string option
+               UserPromptText: string option
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |}
@@ -57,6 +57,33 @@ module Fact =
                Reason: string
                AssistantMessageId: string
                ProviderAttempt: string |}
+        | AuthorityRootAccepted of
+            {| SessionId: SessionId
+               LogicalRunId: string
+               HostMessageId: string
+               AuthorityKind: string
+               Agent: string
+               BaseProviderID: string option
+               BaseModelID: string option
+               Variant: string option |}
+        | PluginPromptClaimed of
+            {| PromptKey: string
+               SessionId: SessionId
+               LogicalRunId: string
+               AuthorityRootUserMessageId: string
+               ContinuationKind: string
+               Agent: string option
+               EffectiveProviderID: string option
+               EffectiveModelID: string option
+               Variant: string option |}
+        | PluginPromptAccepted of
+            {| PromptKey: string
+               SessionId: SessionId
+               HostMessageId: string |}
+        | PluginPromptAbandoned of
+            {| PromptKey: string
+               SessionId: SessionId
+               Reason: string |}
         | OrchestratorManagerJobCreated of
             {| ManagerId: string
                WorktreePath: string

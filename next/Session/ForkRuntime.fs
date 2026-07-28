@@ -13,6 +13,7 @@ type AgentRole =
     | Meditator
     | Reviewer
     | Executor
+    | Blogger
 
 [<RequireQualifiedAccess>]
 type AgentStatus =

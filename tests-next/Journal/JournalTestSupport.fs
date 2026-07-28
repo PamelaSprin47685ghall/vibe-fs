@@ -4,6 +4,9 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Journal
 
 module private NodeFsTestSupport =
     [<Import("existsSync", "node:fs")>]
@@ -22,6 +25,22 @@ module private NodeFsTestSupport =
     let pathJoin (a: string, b: string) : string = jsNative
 
 module JournalTestSupport =
+
+    let registerAuthorityRoot (journal: AgentJournal) sessionId agent =
+        AgentJournal.appendAgent
+            (StreamId.Session(SessionId.create sessionId))
+            (Some(TurnId.ofMessageId (MessageId.create "u1")))
+            (AgentFact.AuthorityRootAccepted
+                {| SessionId = SessionId.create sessionId
+                   LogicalRunId = "run-" + sessionId
+                   HostMessageId = "u1"
+                   AuthorityKind = "HumanRoot"
+                   Agent = agent
+                   BaseProviderID = None
+                   BaseModelID = None
+                   Variant = None |})
+            journal
+        |> ignore
 
     let withTempDir (action: string -> Task<unit>) : Task<unit> =
         task {

@@ -28,6 +28,7 @@
     <Compile Include="Journal/FactCodecTests.fs"/>
     <Compile Include="Journal/JournalIsolationTests.fs"/>
     <Compile Include="Journal/AgentFactsTests.fs"/>
+    <Compile Include="Journal/PromptAuthorityFactTests.fs"/>
     <Compile Include="Journal/AgentFactsOrchestratorTests.fs"/>
     <Compile Include="Journal/AgentFactsOrchestratorBarrierTests.fs"/>
     <Compile Include="Journal/AgentJournalTests.fs"/>
@@ -56,11 +57,14 @@
     <Compile Include="OpenCode/EventsTests.fs"/>
     <Compile Include="OpenCode/ProjectionCanonicalTests.fs"/>
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
+    <Compile Include="OpenCode/SessionPortLifecycleTests.fs"/>
     <Compile Include="OpenCode/HostReviewGuardTests.fs"/>
     <Compile Include="OpenCode/HostReviewGuardMissingTreeTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTests.fs"/>
     <Compile Include="OpenCode/SessionReconcilerTests.fs"/>
     <Compile Include="OpenCode/HostSignalAdapterTests.fs"/>
+    <Compile Include="OpenCode/PromptAuthorityTests.fs"/>
+    <Compile Include="OpenCode/MessageOriginDecoderTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterSessionDeadTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>

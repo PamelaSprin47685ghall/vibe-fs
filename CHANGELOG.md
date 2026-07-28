@@ -8,4 +8,4 @@ Current blockers include provider-attempt-level A/A/B/B fallback control, real O
 
 ## Distribution policy
 
-The package remains private (`private: true`, `license: UNLICENSED`). It must not be published to the public npm registry. A public release requires an explicit license decision, a matching `LICENSE` file, a non-private build manifest, and the release gate documented in `docs/E2E_RELEASE_GUIDE.md`.
+The package remains private (`private: true`) under the provisional commercial license in `LICENSE` (`license: SEE LICENSE IN LICENSE`). It must not be published to the public npm registry. Any external distribution requires a signed commercial agreement and the release gate documented in `docs/E2E_RELEASE_GUIDE.md`.

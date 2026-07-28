@@ -69,7 +69,8 @@ module internal CompanionHostBlogger =
                         prompt,
                         { Model = Some model
                           Agent = Some "blogger"
-                          Directory = None }
+                          Directory = None
+                          Metadata = None }
                     )
 
                 match sent with
@@ -78,8 +79,23 @@ module internal CompanionHostBlogger =
                     let! outcome = completion.Task
 
                     match outcome with
-                    | Completed _ ->
-                        let text = deps.AssistantOutput childId watermark
+                    | Completed result ->
+                        // Prefer watermarked session output first (the durable
+                        // A-text stream used by fork/join consumers). Fall back
+                        // to TerminalOutcome.FinalText when the output port is
+                        // empty — production records FinalText before notify.
+                        // If the host marks Completed with empty FinalText and
+                        // no streamed bytes, treat it as failure so pending
+                        // reset / empty-output contracts stay fail-closed.
+                        let streamed = deps.AssistantOutput childId watermark
+
+                        let text =
+                            if not (String.IsNullOrWhiteSpace streamed) then
+                                streamed
+                            elif not (String.IsNullOrWhiteSpace result.FinalText) then
+                                result.FinalText
+                            else
+                                ""
 
                         if String.IsNullOrWhiteSpace text then
                             return failBlog "Blogger returned no assistant text"
@@ -125,7 +141,8 @@ module internal CompanionHostBlogger =
                         prompt,
                         { Model = Some model
                           Agent = Some "blogger"
-                          Directory = None }
+                          Directory = None
+                          Metadata = None }
                     )
 
                 match sent with
@@ -134,8 +151,14 @@ module internal CompanionHostBlogger =
                     let! outcome = completion.Task
 
                     match outcome with
-                    | Completed _ ->
-                        let text = deps.AssistantOutput childId watermark
+                    | Completed result ->
+                        let streamed = deps.AssistantOutput childId watermark
+
+                        let text =
+                            if not (String.IsNullOrWhiteSpace streamed) then
+                                streamed
+                            else
+                                result.FinalText
 
                         if String.IsNullOrWhiteSpace text then
                             return failBlog "Blogger returned no assistant text"

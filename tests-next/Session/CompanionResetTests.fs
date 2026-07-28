@@ -175,7 +175,7 @@ module CompanionResetTests =
                           AssistantMessageId = MessageId.create "empty"
                           Role = "test"
                           Directory = ""
-                          FinalText = "done"
+                          FinalText = ""
                           Parts = [||] }
                     )
                 )
@@ -197,3 +197,15 @@ module CompanionResetTests =
         Assert.True(CompanionTransform.bloggerSelfRebaseDue 32000 (String.replicate 102400 "x"))
         Assert.False(CompanionTransform.bloggerSelfRebaseDue 32000 (String.replicate 100000 "x"))
         Assert.False(CompanionTransform.bloggerSelfRebaseDue 0 (String.replicate 200000 "x"))
+
+    [<Fact>]
+    let ``self rebase threshold uses smaller of sticky and override budgets`` () =
+        // Pure contract of the min() selection used by bloggerBudgetForPrimary:
+        // a sticky 32k model limit must not prevent a 1k fixture override from
+        // triggering self-rebase once B crosses 0.8 * 1000 * 4 bytes.
+        let sticky = 32000
+        let overrideBudget = 1000
+        let effective = min sticky overrideBudget
+        Assert.Equal(1000, effective)
+        Assert.True(CompanionTransform.bloggerSelfRebaseDue effective (String.replicate 4364 "x"))
+        Assert.False(CompanionTransform.bloggerSelfRebaseDue sticky (String.replicate 4364 "x"))

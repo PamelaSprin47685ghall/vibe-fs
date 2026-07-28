@@ -19,21 +19,22 @@ type ReviewerHost
 
     /// providerRunId must be per-call. Prefer Host assistant message id (one run);
     /// fall back to toolCallId only when the host does not expose a run id.
-    /// rootUserMessageId is the Host root user message for this provider run (confirmation identity).
+    /// userPromptText is the current user prompt content used for content-based
+    /// second-PERFECT confirmation (no host message ids).
     member _.RecordVerdict
         (
             toolCallId: string,
             treeHash: string,
             verdict: ReviewGuardVerdict,
             providerRunId: string,
-            ?rootUserMessageId: string
+            ?userPromptText: string
         ) : Result<ReviewFinishResult, string> =
         if System.String.IsNullOrWhiteSpace providerRunId then
             Error "ReviewerHost.RecordVerdict requires a real ProviderRunId"
         else
-            let rootId =
-                match rootUserMessageId with
-                | Some id when not (System.String.IsNullOrWhiteSpace id) -> Some id
+            let promptText =
+                match userPromptText with
+                | Some text when not (System.String.IsNullOrWhiteSpace text) -> Some text
                 | _ -> None
 
             lock gate (fun () ->
@@ -54,7 +55,7 @@ type ReviewerHost
                             {| ManagerSessionId = managerSessionId
                                ReviewerSessionId = reviewerSessionId
                                ProviderRunId = providerRunId
-                               RootUserMessageId = rootId
+                               UserPromptText = promptText
                                ToolCallId = toolCallId
                                GitTreeHash = treeHash
                                Verdict = verdict |}
@@ -64,7 +65,7 @@ type ReviewerHost
                     | Error failure -> Error(sprintf "%A" failure.Failure))
 
     member this.SubmitVerdict
-        (toolCallId: string, verdict: ReviewGuardVerdict, ?providerRunId: string, ?rootUserMessageId: string)
+        (toolCallId: string, verdict: ReviewGuardVerdict, ?providerRunId: string, ?userPromptText: string)
         : Result<ReviewFinishResult, string> =
         match providerRunId with
         | None
@@ -72,13 +73,7 @@ type ReviewerHost
         | Some runId ->
             match gitTreePort with
             | Some port ->
-                this.RecordVerdict(
-                    toolCallId,
-                    port.GetTreeHash(),
-                    verdict,
-                    runId,
-                    ?rootUserMessageId = rootUserMessageId
-                )
+                this.RecordVerdict(toolCallId, port.GetTreeHash(), verdict, runId, ?userPromptText = userPromptText)
             | None -> Error "ReviewerHost.SubmitVerdict requires a GitTreePort"
 
     member _.TryFinish(currentTreeHash: string) =

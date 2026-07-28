@@ -34,9 +34,14 @@ module CompanionTransformHelpers =
             bloggerBudgetByPrimary.[primarySessionId] <- budget
 
     let bloggerBudgetForPrimary (primarySessionId: string) =
+        // Always re-read the operator override. A sticky remembered model limit
+        // must not permanently pin Y to 32k after a smaller fixture/override is
+        // active (or vice versa: remember the min of both when both exist).
+        let overrideBudget = bloggerBudgetOverride ()
+
         match bloggerBudgetByPrimary.TryGetValue primarySessionId with
-        | true, budget -> budget
-        | _ -> bloggerBudgetOverride ()
+        | true, budget when budget > 0 -> min budget overrideBudget
+        | _ -> overrideBudget
 
     type BudgetFacts =
         { ContextLimit: int

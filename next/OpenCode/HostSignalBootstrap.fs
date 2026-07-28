@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
@@ -19,6 +20,7 @@ module HostSignalBootstrap =
           RegisterSource: string -> SessionSignalSource -> unit
           BindUserMessage: string -> string -> unit
           BindActiveRun: SessionId -> AgentRole -> string option -> unit
+          CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
           ObserveEvent: obj -> unit }
 
@@ -49,9 +51,14 @@ module HostSignalBootstrap =
                         Task.FromResult(Ok([]: SessionMessage list)) }
 
         let abortedSessions = HashSet<string>()
+        let mutable reconcilerRef: SessionReconciler option = None
+
+        let continuationAccepted (sessionId: SessionId) (messageId: MessageId) =
+            reconcilerRef
+            |> Option.iter (fun reconciler -> reconciler.BindContinuationUserMessage(sessionId, messageId))
 
         let onTurn (turn: ReconciledTurn) =
-            TerminalPolicies.apply
+            TerminalPolicies.applyWithContinuation
                 sessionPort
                 eventPort
                 journal
@@ -62,9 +69,11 @@ module HostSignalBootstrap =
                 sessionParents
                 disposeExecutorRuntime
                 abortedSessions
+                continuationAccepted
                 turn
 
         let reconciler = SessionReconciler(snapshot, onTurn)
+        reconcilerRef <- Some reconciler
 
         let onSignal (signal: HostSignal) =
             match signal with
@@ -101,6 +110,13 @@ module HostSignalBootstrap =
                 registerOwned sessionId
                 registerSource sessionId LocalPluginEvent
 
+        let bindContinuationMessage (sessionId: string) (messageId: string) =
+            if
+                not (String.IsNullOrWhiteSpace sessionId)
+                && not (String.IsNullOrWhiteSpace messageId)
+            then
+                reconciler.BindContinuationUserMessage(SessionId.create sessionId, MessageId.create messageId)
+
         let workspaceDir =
             if isNull input || isNull input?directory then
                 None
@@ -123,6 +139,10 @@ module HostSignalBootstrap =
                 { SessionId = sessionId
                   RunId = None
                   RootUserMessageId =
+                    match userMessageBindings.TryGetValue(SessionId.value sessionId) with
+                    | true, mid -> Some mid
+                    | false, _ -> None
+                  PhysicalUserMessageId =
                     match userMessageBindings.TryGetValue(SessionId.value sessionId) with
                     | true, mid -> Some mid
                     | false, _ -> None
@@ -169,39 +189,101 @@ module HostSignalBootstrap =
 
                     registerOwned sessionId
 
-                    agent
-                    |> Option.bind HostSessionContext.canonicalRole
-                    |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
+                    let canonicalAgent = agent |> Option.bind HostSessionContext.canonicalRole
 
-                    bindUserMessage sessionId messageId
+                    canonicalAgent |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
 
-                    // A/A/B/B: rewrite outbound model from durable Fallback projection.
-                    // HostPendingRun already does this for forked children; root sessions
-                    // need the same path so Side B is not stuck on client-supplied model.
-                    match modelConfig, journal, agent with
-                    | Some cfg, Some j, Some _ when not (String.IsNullOrWhiteSpace sessionId) ->
+                    // `chat.message` is the only external prompt-acceptance
+                    // boundary. A plugin continuation has a pre-recorded key;
+                    // it must not replace the active Authority Root here.
+                    let promptKey =
+                        if isNull inputObj?metadata || isNull inputObj?metadata?wanxiangshu_prompt_key then
+                            None
+                        else
+                            Some(unbox<string> inputObj?metadata?wanxiangshu_prompt_key)
+
+                    let continuationOrigin =
+                        if isNull inputObj?metadata || isNull inputObj?metadata?wanxiangshu_origin then
+                            None
+                        else
+                            Some(unbox<string> inputObj?metadata?wanxiangshu_origin)
+
+                    let selectedModel =
+                        if isNull inputObj?model then
+                            None
+                        elif not (isNull inputObj?model?providerID) && not (isNull inputObj?model?modelID) then
+                            Some(unbox<string> inputObj?model?providerID, unbox<string> inputObj?model?modelID)
+                        else
+                            None
+
+                    match journal, canonicalAgent, promptKey with
+                    | Some j, Some role, None when
+                        not (String.IsNullOrWhiteSpace sessionId)
+                        && not (String.IsNullOrWhiteSpace messageId)
+                        ->
                         match
-                            ModelResolver.resolveForSession cfg (SessionId.create sessionId) (AgentJournal.snapshot j)
+                            AgentJournal.appendAgent
+                                (StreamId.Session(SessionId.create sessionId))
+                                (Some(TurnId.ofMessageId (MessageId.create messageId)))
+                                (AgentFact.AuthorityRootAccepted
+                                    {| SessionId = SessionId.create sessionId
+                                       LogicalRunId = Guid.NewGuid().ToString("N")
+                                       HostMessageId = messageId
+                                       AuthorityKind = "HumanRoot"
+                                       Agent = role
+                                       BaseProviderID = selectedModel |> Option.map fst
+                                       BaseModelID = selectedModel |> Option.map snd
+                                       Variant = None |})
+                                j
                         with
-                        | Some selected ->
-                            let modelObj =
-                                createObj
-                                    [ "providerID", box selected.providerID
-                                      "modelID", box selected.modelID
-                                      "id", box selected.modelID ]
+                        | Ok _ -> bindUserMessage sessionId messageId
+                        | Error failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf "Authority root persistence failed: %A" failure.Failure
+                                )
+                            )
+                    | None, _, None when
+                        not (String.IsNullOrWhiteSpace sessionId)
+                        && not (String.IsNullOrWhiteSpace messageId)
+                        ->
+                        bindUserMessage sessionId messageId
+                    | Some j, _, Some _key when
+                        (continuationOrigin = Some "ReviewerGuard"
+                         || continuationOrigin = Some "ReviewConfirmation")
+                        && not (String.IsNullOrWhiteSpace sessionId)
+                        && not (String.IsNullOrWhiteSpace messageId)
+                        ->
+                        // chat.message is the authoritative physical user-message
+                        // id for confirmation causality. Always bind it, and
+                        // record GuardPromptAccepted with this real id so the
+                        // second PERFECT can match ConfirmationPromptMessageId.
+                        match
+                            AgentJournal.appendAgent
+                                (StreamId.Session(SessionId.create sessionId))
+                                None
+                                (AgentFact.GuardPromptAccepted
+                                    {| TargetSessionId = SessionId.create sessionId
+                                       GuardKey =
+                                        // Stable per-session confirmation slot;
+                                        // fold overwrites ConfirmationPromptMessageId.
+                                        sprintf "review-guard:%s:confirm-perfect" sessionId
+                                       HostMessageId = messageId |})
+                                j
+                        with
+                        | Ok _ -> bindContinuationMessage sessionId messageId
+                        | Error failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf "Reviewer guard acceptance persistence failed: %A" failure.Failure
+                                )
+                            )
+                    | _, _, Some _ -> bindContinuationMessage sessionId messageId
+                    | _ -> ()
 
-                            if not (isNull outputObj) then
-                                if not (isNull outputObj?message) then
-                                    outputObj?message?model <- modelObj
-
-                                if not (isNull outputObj?info) then
-                                    outputObj?info?model <- modelObj
-
-                                outputObj?model <- modelObj
-
-                            inputObj?model <- modelObj
-                        | None -> ()
-                    | _ -> ())
+                    // Fallback is attempt-local. A newly accepted authority root
+                    // must not be rewritten to a prior run's Side B selection.
+                    ())
 
         { Reconciler = reconciler
           SignalRouter = signalRouter
@@ -209,6 +291,10 @@ module HostSignalBootstrap =
           RegisterOwned = registerOwned
           BindUserMessage = bindUserMessage
           BindActiveRun = bindActiveRun
+          CurrentPhysicalUserMessage =
+            (fun sessionId ->
+                reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
+                |> Option.map MessageId.value)
           ChatMessageHook = chatMessageHook
           RegisterSource = registerSource
           ObserveEvent = signalRouter.ObserveLocal }

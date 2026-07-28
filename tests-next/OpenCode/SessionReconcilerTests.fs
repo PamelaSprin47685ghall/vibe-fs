@@ -60,6 +60,7 @@ module SessionReconcilerTests =
             { SessionId = SessionId.create sessionId
               RunId = None
               RootUserMessageId = Some(MessageId.create userId)
+              PhysicalUserMessageId = Some(MessageId.create userId)
               ContinuationMessageIds = Set.empty
               AgentRole = Some role
               Directory = "/tmp/ws" }
@@ -235,6 +236,32 @@ module SessionReconcilerTests =
             match turns.[0].Outcome with
             | TurnOutcome.TurnAborted _ -> ()
             | other -> Assert.True(false, sprintf "expected TurnAborted, got %A" other)
+        }
+
+    [<Fact>]
+    let ``Continuation preserves authority root and reports physical user message`` () =
+        task {
+            let turns = ResizeArray<ReconciledTurn>()
+            let sid = SessionId.create "s-continuation"
+
+            let snapshot =
+                FakeSnapshot(
+                    [ msg "u-root" "user" None None [||] None
+                      msg "u-confirm" "user" None None [||] None
+                      msg "a-confirm" "assistant" (Some "reviewer") (Some "stop") [| textPart "confirmed" |] None ]
+                )
+
+            let reconciler =
+                SessionReconciler(snapshot :> ISessionSnapshotPort, (fun turn -> turns.Add turn))
+
+            bind reconciler "s-continuation" "u-root" AgentRole.Reviewer
+            reconciler.BindContinuationUserMessage(sid, MessageId.create "u-confirm")
+            reconciler.MarkDirty(sid)
+            do! drainMicrotasks 8
+
+            Assert.Single(turns) |> ignore
+            Assert.Equal("u-root", MessageId.value turns.[0].RootUserMessageId)
+            Assert.Equal("u-confirm", MessageId.value turns.[0].UserMessageId)
         }
 
     [<Fact>]

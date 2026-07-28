@@ -16,18 +16,23 @@ module OrchestratorManagerJob =
     /// phase requires two FRESH PERFECT verdicts on the current tree.
     let emitReviewBarrier
         (journal: AgentJournal option)
-        (orchestratorId: SessionId)
+        (reviewOwnerSessionId: SessionId)
         (barrierKey: string)
         : Task<Result<unit, string>> =
         task {
             match journal with
             | Some j ->
+                // reviewOwnerSessionId must be the durable session that receives
+                // ReviewVerdictRecorded for this barrier (the reviewer's parent
+                // in sessionParents / linkage). For OrchestratorHost reverify
+                // that is the Orchestrator session; for Manager-owned reviewers
+                // it is the Manager session.
                 let fact =
                     AgentFact.ReviewBarrierStarted
-                        {| ManagerSessionId = orchestratorId
+                        {| ManagerSessionId = reviewOwnerSessionId
                            BarrierKey = barrierKey |}
 
-                match AgentJournal.appendAgent (StreamId.Session orchestratorId) None fact j with
+                match AgentJournal.appendAgent (StreamId.Session reviewOwnerSessionId) None fact j with
                 | Ok _ -> return Ok()
                 | Error failure -> return Error(sprintf "%A" failure.Failure)
             | None -> return Ok()

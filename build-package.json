@@ -28,7 +28,7 @@
     "smol-toml": "1.7.0",
     "yaml": "^2.9.0"
   },
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "publishConfig": {
     "access": "restricted"

@@ -1,0 +1,98 @@
+namespace Wanxiangshu.Next.Journal
+
+open Wanxiangshu.Next.Kernel.Identity
+open AgentFactsFoldHelpers
+
+module AgentFactsAuthority =
+
+    let private empty =
+        { LastAuthorityProfile = None
+          ActiveLogicalRun = None
+          PendingClaims = Map.empty
+          AcceptedContinuationIds = Map.empty }
+
+    let foldAuthorityRootAccepted
+        (proj: AgentProjectionSet)
+        (sessionId: SessionId)
+        logicalRunId
+        hostMessageId
+        authorityKind
+        agent
+        baseProviderId
+        baseModelId
+        variant
+        =
+        let profile: AuthorityProfileProjection =
+            { LogicalRunId = logicalRunId
+              AuthorityRootUserMessageId = hostMessageId
+              AuthorityKind = authorityKind
+              Agent = agent
+              BaseProviderID = baseProviderId
+              BaseModelID = baseModelId
+              Variant = variant }
+
+        let sessions =
+            updateSession
+                sessionId
+                (fun s ->
+                    { s with
+                        PromptAuthority =
+                            Some
+                                { LastAuthorityProfile = Some profile
+                                  ActiveLogicalRun = Some profile
+                                  PendingClaims = Map.empty
+                                  AcceptedContinuationIds = Map.empty } })
+                proj.Sessions
+
+        { proj with Sessions = sessions }
+
+    let foldPluginPromptClaimed (proj: AgentProjectionSet) sessionId promptKey continuationKind =
+        let sessions =
+            updateSession
+                sessionId
+                (fun s ->
+                    let authority = defaultArg s.PromptAuthority empty
+
+                    { s with
+                        PromptAuthority =
+                            Some
+                                { authority with
+                                    PendingClaims = Map.add promptKey continuationKind authority.PendingClaims } })
+                proj.Sessions
+
+        { proj with Sessions = sessions }
+
+    let foldPluginPromptAccepted (proj: AgentProjectionSet) sessionId promptKey hostMessageId =
+        let sessions =
+            updateSession
+                sessionId
+                (fun s ->
+                    let authority = defaultArg s.PromptAuthority empty
+                    let kind = defaultArg (Map.tryFind promptKey authority.PendingClaims) "unknown"
+
+                    { s with
+                        PromptAuthority =
+                            Some
+                                { authority with
+                                    PendingClaims = Map.remove promptKey authority.PendingClaims
+                                    AcceptedContinuationIds =
+                                        Map.add hostMessageId kind authority.AcceptedContinuationIds } })
+                proj.Sessions
+
+        { proj with Sessions = sessions }
+
+    let foldPluginPromptAbandoned (proj: AgentProjectionSet) sessionId promptKey =
+        let sessions =
+            updateSession
+                sessionId
+                (fun s ->
+                    let authority = defaultArg s.PromptAuthority empty
+
+                    { s with
+                        PromptAuthority =
+                            Some
+                                { authority with
+                                    PendingClaims = Map.remove promptKey authority.PendingClaims } })
+                proj.Sessions
+
+        { proj with Sessions = sessions }

@@ -24,6 +24,8 @@
     <Compile Include="Journal/AgentFacts.FoldHelpers.fs"/>
     <Compile Include="Journal/AgentFacts.Review.fs"/>
     <Compile Include="Journal/AgentFacts.Fallback.fs"/>
+    <Compile Include="Journal/AgentFacts.Authority.fs"/>
+    <Compile Include="Journal/AgentFacts.Linkage.fs"/>
     <Compile Include="Journal/AgentFacts.fs"/>
     <Compile Include="Journal/Boot.fs"/>
     <Compile Include="Journal/Writer.fs"/>
@@ -72,6 +74,7 @@
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="OpenCode/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/PromptAuthority.fs"/>
     <Compile Include="OpenCode/ModelResolver.fs"/>
     <Compile Include="OpenCode/MessageOriginDecoder.fs"/>
     <Compile Include="OpenCode/CanonicalJson.fs"/>
@@ -84,6 +87,7 @@
     <Compile Include="OpenCode/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
+    <Compile Include="OpenCode/PromptDispatcher.fs"/>
     <Compile Include="Session/AgentRoleHelpers.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
@@ -101,6 +105,7 @@
     <Compile Include="OpenCode/CompletedTurnClassifier.fs"/>
     <Compile Include="OpenCode/SessionReconciler.fs"/>
     <Compile Include="OpenCode/RetrySignalHandler.fs"/>
+    <Compile Include="OpenCode/ReviewerGuardState.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>

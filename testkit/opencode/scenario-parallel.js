@@ -99,7 +99,17 @@ export async function setupScenarioParallel(opts, tmpDir) {
       pluginPaths,
       contextLimit: opts.contextLimit,
       extraEnv: {
-        WANXIANGSHU_BLOGGER_CONTEXT_LIMIT: process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || '32000',
+        // Prefer the scenario's explicit contextLimit so canaries that shrink
+        // the model budget also shrink Y's self-rebase threshold. A global
+        // process env must not keep the production 32k default and prevent
+        // threshold-driven self-rebase in small fixtures.
+        WANXIANGSHU_BLOGGER_CONTEXT_LIMIT:
+          opts.contextLimit != null
+            ? String(opts.contextLimit)
+            : (process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || '32000'),
+        // Every companion-enabled canary needs a concrete cheap-model identity;
+        // production still fails closed when operators omit this setting.
+        WANXIANGSHU_BLOGGER_MODEL: process.env.WANXIANGSHU_BLOGGER_MODEL || 'test/test-model',
         ...(opts.extraEnv || {}),
       },
     });

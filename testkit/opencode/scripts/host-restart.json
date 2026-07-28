@@ -45,6 +45,9 @@
       "wait": "reviewer-perfect-1"
     },
     {
+      "wait": "reviewer-perfect-1-text"
+    },
+    {
       "wait": "reviewer-perfect-2"
     },
     {
@@ -274,7 +277,7 @@
       }
     },
     {
-      "id": "reviewer-perfect-2",
+      "id": "reviewer-perfect-1-text",
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
@@ -286,6 +289,26 @@
         "requiredTools": [
           "verdict"
         ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "First PERFECT submitted; awaiting confirmation prompt."
+      }
+    },
+    {
+      "id": "reviewer-perfect-2",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "PERFECT requires confirmation"
       },
       "respond": {
         "type": "tool-call",
@@ -300,7 +323,7 @@
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
-        "turn": 3,
+        "turn": 4,
         "requestKind": "chat",
         "parentSession": "manager"
       },

@@ -30,6 +30,7 @@ module ToolSurface =
         (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
+        (currentPhysicalUserMessage: string -> string option)
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
@@ -120,6 +121,7 @@ module ToolSurface =
             VerdictSurface.create
                 sessionParents
                 sessionRoles
+                currentPhysicalUserMessage
                 journal
                 (fun reviewerId ->
                     match worktreeTreePorts.TryGetValue reviewerId with

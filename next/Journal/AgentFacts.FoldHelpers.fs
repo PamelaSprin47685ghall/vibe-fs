@@ -18,6 +18,7 @@ module internal AgentFactsFoldHelpers =
                   Linkage = None
                   ReviewGuard = None
                   Fallback = None
+                  PromptAuthority = None
                   Effects = None }
 
         Map.add sessionId (updateFn existing) map

@@ -122,6 +122,7 @@ module CompletedTurnClassifier =
     let buildTurn
         (sessionId: SessionId)
         (userMessageId: MessageId)
+        (rootUserMessageId: MessageId)
         (assistant: SessionMessage)
         (roleFallback: AgentRole option)
         (directory: string)
@@ -131,6 +132,7 @@ module CompletedTurnClassifier =
 
         { SessionId = sessionId
           UserMessageId = userMessageId
+          RootUserMessageId = rootUserMessageId
           AssistantMessageId = assistant.Id
           AgentRole = role
           Directory = directory

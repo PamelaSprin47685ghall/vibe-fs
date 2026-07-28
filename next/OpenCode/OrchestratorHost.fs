@@ -105,31 +105,65 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let reverify (managerId: string) (worktree: string) (barrierKey: string) : Task<Result<unit, string>> =
         task {
-            let! barrierResult = OrchestratorManagerJob.emitReviewBarrier deps.Journal orchestratorId barrierKey
+            // OrchestratorHost forks the reviewer under the Orchestrator runtime,
+            // so sessionParents[reviewer] = orchestrator and ReviewVerdictRecorded
+            // lands on the Orchestrator session. Barriers and reads must use that
+            // same durable session — managerId is only a job alias, not a Host
+            // session id.
+            let reviewOwnerSessionId = orchestratorId
+            let! barrierResult = OrchestratorManagerJob.emitReviewBarrier deps.Journal reviewOwnerSessionId barrierKey
 
             match barrierResult with
             | Error err -> return Error err
             | Ok() ->
-                let! priorState = OrchestratorReviewRead.read deps.Journal orchestratorId worktree
+                let! priorState = OrchestratorReviewRead.read deps.Journal reviewOwnerSessionId worktree
 
                 match priorState with
                 | Error err -> return Error err
-                | Ok true -> return Ok()
-                | Ok false ->
+                | Ok OrchestratorReviewRead.Confirmed -> return Ok()
+                | Ok OrchestratorReviewRead.RevisionRequired -> return Error "Reviewer requested revision"
+                | Ok OrchestratorReviewRead.PendingConfirmation
+                | Ok OrchestratorReviewRead.NeedsReview ->
+                    // One reviewer assignment covers first PERFECT + HostReviewGuard
+                    // confirmation + second PERFECT. TerminalPolicies withholds the
+                    // first PERFECT completion until confirmation finishes, so this
+                    // await spans the full double-PERFECT barrier.
                     let prompt =
-                        "Review the current worktree for correctness. Submit your verdict with the verdict tool."
+                        match priorState with
+                        | Ok OrchestratorReviewRead.PendingConfirmation ->
+                            "Continue the confirmation: call verdict(PERFECT) again for the current tree."
+                        | _ -> "Review the current worktree for correctness. Submit your verdict with the verdict tool."
 
                     let! ran = runReviewerOnce managerId worktree prompt
 
                     match ran with
                     | Error err -> return Error err
                     | Ok() ->
-                        let! state = OrchestratorReviewRead.read deps.Journal orchestratorId worktree
+                        let! state = OrchestratorReviewRead.read deps.Journal reviewOwnerSessionId worktree
 
                         match state with
                         | Error err -> return Error err
-                        | Ok true -> return Ok()
-                        | Ok false ->
+                        | Ok OrchestratorReviewRead.Confirmed -> return Ok()
+                        | Ok OrchestratorReviewRead.RevisionRequired -> return Error "Reviewer requested revision"
+                        | Ok OrchestratorReviewRead.PendingConfirmation ->
+                            let! nudged =
+                                runReviewerOnce
+                                    managerId
+                                    worktree
+                                    "Continue the confirmation: call verdict(PERFECT) again for the current tree."
+
+                            match nudged with
+                            | Error err -> return Error err
+                            | Ok() ->
+                                let! retry = OrchestratorReviewRead.read deps.Journal reviewOwnerSessionId worktree
+
+                                match retry with
+                                | Error err -> return Error err
+                                | Ok OrchestratorReviewRead.Confirmed -> return Ok()
+                                | Ok OrchestratorReviewRead.RevisionRequired ->
+                                    return Error "Reviewer requested revision"
+                                | Ok _ -> return Error "Reviewer produced no confirmed verdict"
+                        | Ok OrchestratorReviewRead.NeedsReview ->
                             let! nudged =
                                 runReviewerOnce
                                     managerId
@@ -139,12 +173,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                             match nudged with
                             | Error err -> return Error err
                             | Ok() ->
-                                let! retry = OrchestratorReviewRead.read deps.Journal orchestratorId worktree
+                                let! retry = OrchestratorReviewRead.read deps.Journal reviewOwnerSessionId worktree
 
                                 match retry with
                                 | Error err -> return Error err
-                                | Ok true -> return Ok()
-                                | Ok false -> return Error "Reviewer produced no verdict"
+                                | Ok OrchestratorReviewRead.Confirmed -> return Ok()
+                                | Ok OrchestratorReviewRead.RevisionRequired ->
+                                    return Error "Reviewer requested revision"
+                                | Ok _ -> return Error "Reviewer produced no confirmed verdict"
         }
 
     let managerPort: ManagerPort =

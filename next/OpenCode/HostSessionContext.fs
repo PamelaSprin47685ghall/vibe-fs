@@ -19,6 +19,7 @@ module HostSessionContext =
         | "meditator" -> Some AgentRole.Meditator
         | "reviewer" -> Some AgentRole.Reviewer
         | "executor" -> Some AgentRole.Executor
+        | "blogger" -> Some AgentRole.Blogger
         | _ -> None
 
     let canonicalRole (agent: string) =

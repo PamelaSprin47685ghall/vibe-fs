@@ -57,7 +57,9 @@ module MessageOriginDecoder =
             if allSynthetic then
                 HostInternal
             else
-                Human(TurnId.create userMsg.id)
+                // External authority must be proven at the prompt-acceptance
+                // boundary. Transcript shape alone cannot grant it.
+                UnknownOrigin
 
     let isCompactionAssistant (msg: OpencodeAssistantMessage) : bool =
         match msg.summary with

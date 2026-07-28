@@ -161,7 +161,8 @@ module InspectorTool =
                                     fullPrompt,
                                     { Model = None
                                       Agent = Some "inspector"
-                                      Directory = parentDir }
+                                      Directory = parentDir
+                                      Metadata = None }
                                 )
 
                             match sent with

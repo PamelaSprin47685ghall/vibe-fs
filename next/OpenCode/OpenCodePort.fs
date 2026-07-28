@@ -10,7 +10,8 @@ open Wanxiangshu.Next.Kernel.Outcome
 type OpenCodePromptOptions =
     { Model: OpencodeModel option
       Agent: string option
-      Directory: string option }
+      Directory: string option
+      Metadata: obj option }
 
 type IPromptPort =
     abstract SendPrompt:
@@ -51,6 +52,9 @@ module OpenCodePort =
                            |> Option.defaultValue [])
                         @ (opts.Agent
                            |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
+                        @ (opts.Metadata
+                           |> Option.map (fun metadata -> [ "metadata", metadata ])
                            |> Option.defaultValue [])
 
                     let payload =
@@ -186,6 +190,9 @@ module OpenCodePort =
                            |> Option.defaultValue [])
                         @ (opts.Agent
                            |> Option.map (fun agent -> [ "agent", box agent ])
+                           |> Option.defaultValue [])
+                        @ (opts.Metadata
+                           |> Option.map (fun metadata -> [ "metadata", metadata ])
                            |> Option.defaultValue [])
 
                     let! res = postJson $"/session/{sId}/prompt_async" (createObj bodyFields)

@@ -222,7 +222,7 @@
       }
     },
     {
-      "id": "reviewer-terminal-1",
+      "id": "reviewer-perfect-1-text",
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
@@ -237,7 +237,7 @@
       },
       "respond": {
         "type": "text",
-        "text": "Review round one done."
+        "text": "First PERFECT submitted; awaiting confirmation prompt."
       }
     },
     {
@@ -252,7 +252,8 @@
       "match": {
         "requiredTools": [
           "verdict"
-        ]
+        ],
+        "user": "PERFECT requires confirmation"
       },
       "respond": {
         "type": "tool-call",
@@ -304,7 +305,7 @@
       }
     },
     {
-      "id": "reviewer-terminal-3",
+      "id": "reviewer-perfect-3-text",
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
@@ -319,7 +320,7 @@
       },
       "respond": {
         "type": "text",
-        "text": "Review round three done."
+        "text": "First PERFECT submitted; awaiting confirmation prompt."
       }
     },
     {
@@ -334,7 +335,8 @@
       "match": {
         "requiredTools": [
           "verdict"
-        ]
+        ],
+        "user": "PERFECT requires confirmation"
       },
       "respond": {
         "type": "tool-call",
@@ -421,7 +423,7 @@
       "wait": "reviewer-perfect-1"
     },
     {
-      "wait": "reviewer-terminal-1"
+      "wait": "reviewer-perfect-1-text"
     },
     {
       "wait": "reviewer-perfect-2"
@@ -433,7 +435,7 @@
       "wait": "reviewer-perfect-3"
     },
     {
-      "wait": "reviewer-terminal-3"
+      "wait": "reviewer-perfect-3-text"
     },
     {
       "wait": "reviewer-perfect-4"

@@ -65,7 +65,13 @@ try {
     project: { files: { 'AGENTS.md': 'companion replacement canary\n' } },
     strict: true,
     contextLimit,
-
+    // Force Y self-rebase threshold to the same 1000-token fixture budget.
+    // Without this, a host-remembered blogger model limit can keep the default
+    // 32k budget and leave round-3 expecting a condense request that never fires.
+    extraEnv: {
+      WANXIANGSHU_BLOGGER_CONTEXT_LIMIT: String(contextLimit),
+      WANXIANGSHU_BLOGGER_MODEL: 'test/test-model',
+    },
   });
   scenario.provider.expectTitle({
     id: 'primary-title',

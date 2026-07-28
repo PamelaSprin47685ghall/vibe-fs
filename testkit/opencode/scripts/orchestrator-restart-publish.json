@@ -43,7 +43,7 @@
       "wait": "reviewer-perfect-1"
     },
     {
-      "wait": "reviewer-terminal-1"
+      "wait": "reviewer-perfect-1-text"
     },
     {
       "wait": "reviewer-perfect-2"
@@ -81,22 +81,6 @@
     },
     {
       "wait": "manager-recovery-terminal",
-      "timeoutMs": 15000
-    },
-    {
-      "wait": "reviewer-perfect-3",
-      "timeoutMs": 15000
-    },
-    {
-      "wait": "reviewer-terminal-3",
-      "timeoutMs": 15000
-    },
-    {
-      "wait": "reviewer-perfect-4",
-      "timeoutMs": 15000
-    },
-    {
-      "wait": "reviewer-terminal-4",
       "timeoutMs": 15000
     },
     {
@@ -369,7 +353,7 @@
       }
     },
     {
-      "id": "reviewer-terminal-1",
+      "id": "reviewer-perfect-1-text",
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
@@ -377,10 +361,14 @@
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
-      "match": {},
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ]
+      },
       "respond": {
         "type": "text",
-        "text": "Review round one done."
+        "text": "First PERFECT submitted; awaiting confirmation prompt."
       }
     },
     {
@@ -395,7 +383,8 @@
       "match": {
         "requiredTools": [
           "verdict"
-        ]
+        ],
+        "user": "PERFECT requires confirmation"
       },
       "respond": {
         "type": "tool-call",

@@ -113,6 +113,7 @@ module HostReviewGuardTests =
     let private reviewerTurn sessionId messageId =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create messageId
           AgentRole = Some AgentRole.Reviewer
           Directory = "/tmp/ws"
@@ -125,6 +126,7 @@ module HostReviewGuardTests =
     let private managerTurn sessionId messageId =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create messageId
           AgentRole = Some AgentRole.Manager
           Directory = "/tmp/ws"
@@ -144,6 +146,8 @@ module HostReviewGuardTests =
 
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "reviewer-guard-runtime") 1 DateTimeOffset.UtcNow
+
+                registerAuthorityRoot journal sessionId "reviewer"
 
                 applyDecide
                     (recordingPort prompts)
@@ -172,6 +176,7 @@ module HostReviewGuardTests =
                         DateTimeOffset.UtcNow
                         boot
 
+                // Authority profile survives boot together with the guard fact.
                 // Restart must not append a second acceptance: the guard fact is
                 // durable and the in-memory dedupe is re-seeded from the projection.
                 applyDecide
@@ -204,6 +209,8 @@ module HostReviewGuardTests =
                         (RuntimeId.create "reviewer-guard-failure-runtime")
                         1
                         DateTimeOffset.UtcNow
+
+                registerAuthorityRoot journal sessionId "reviewer"
 
                 applyDecide
                     (gatedRecordingPort prompts sendObserved acceptance)

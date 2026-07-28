@@ -71,6 +71,7 @@ module HostReviewGuard =
         (prompt: string)
         (agent: string)
         (model: OpencodeModel option)
+        (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         let journal =
             match journal with
@@ -87,31 +88,52 @@ module HostReviewGuard =
             not (hasAcceptedGuardKey journal targetSessionId guardKey)
             && not (nudgeKeys.Contains guardKey)
         then
-            HostSessionNudge.send
+            let continuationKind =
+                match agent, reason with
+                | "reviewer", r when r.Contains("confirm-perfect") -> PromptAuthority.ReviewConfirmation
+                | "reviewer", _ -> PromptAuthority.ReviewerGuard
+                | _ -> PromptAuthority.ManagerGuard
+
+            HostSessionNudge.sendContinuation
                 sessionPort
                 targetSessionId
                 prompt
+                continuationKind
                 { Model = model
                   Agent = Some agent
-                  Directory = None }
-                (fun hostMessageId ->
+                  Directory = None
+                  Metadata = None }
+                (Some journal)
+                (Some(fun hostMessageId ->
                     nudgeKeys.Add guardKey |> ignore
 
-                    let fact =
-                        AgentFact.GuardPromptAccepted
-                            {| TargetSessionId = targetSessionId
-                               GuardKey = guardKey
-                               HostMessageId = MessageId.value hostMessageId |}
+                    // prompt_async may only return a synthetic admission id
+                    // (accepted-<session>). That must not become the durable
+                    // ConfirmationPromptMessageId: the second PERFECT proves
+                    // causality against the real chat.message user id. Persist
+                    // only real host message ids here; the chat.message hook
+                    // rewrites/records the authoritative id when metadata lands.
+                    let hostId = MessageId.value hostMessageId
 
-                    match AgentJournal.appendAgent (StreamId.Session targetSessionId) None fact journal with
-                    | Ok _ -> ()
-                    | Error failure ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf "Failed to persist review guard prompt acceptance: %A" failure.Failure
+                    if not (hostId.StartsWith("accepted-")) then
+                        let fact =
+                            AgentFact.GuardPromptAccepted
+                                {| TargetSessionId = targetSessionId
+                                   GuardKey = guardKey
+                                   HostMessageId = hostId |}
+
+                        match AgentJournal.appendAgent (StreamId.Session targetSessionId) None fact journal with
+                        | Ok _ -> onContinuationAccepted targetSessionId hostMessageId
+                        | Error failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf "Failed to persist review guard prompt acceptance: %A" failure.Failure
+                                )
                             )
-                        ))
-                (Some journal)
+                    else
+                        // Keep the claim key marked so we do not re-send, but
+                        // leave ConfirmationPromptMessageId unset until chat.message.
+                        ()))
 
     let nudgeManager
         (sessionPort: ISessionHostPort)
@@ -121,6 +143,7 @@ module HostReviewGuard =
         messageId
         treeHash
         (model: OpencodeModel option)
+        (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         sendGuardNudge
             sessionPort
@@ -132,6 +155,7 @@ module HostReviewGuard =
             "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
             "manager"
             model
+            onContinuationAccepted
 
     let nudgeReviewer
         (sessionPort: ISessionHostPort)
@@ -140,6 +164,7 @@ module HostReviewGuard =
         sessionId
         messageId
         (model: OpencodeModel option)
+        (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         sendGuardNudge
             sessionPort
@@ -151,6 +176,7 @@ module HostReviewGuard =
             "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
             "reviewer"
             model
+            onContinuationAccepted
 
     /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07:
     /// "PERFECT requires confirmation"). This is the ONLY code path that produces
@@ -166,6 +192,7 @@ module HostReviewGuard =
         sessionId
         messageId
         (model: OpencodeModel option)
+        (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
         sendGuardNudge
             sessionPort
@@ -177,3 +204,4 @@ module HostReviewGuard =
             "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
             "reviewer"
             model
+            onContinuationAccepted

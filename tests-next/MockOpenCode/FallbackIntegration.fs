@@ -22,7 +22,8 @@ module FallbackIntegration =
             failwithf "Expected %A, got %A" expected actual
 
     let private trueThat condition message =
-        if not condition then failwith message
+        if not condition then
+            failwith message
 
     /// Helper: count fallback failures in a journal snapshot for a session.
     let private fallbackFailures (journal: AgentJournal) sessionId : int =
@@ -58,14 +59,12 @@ module FallbackIntegration =
                 userBindings.[sessionId] <- MessageId.create "user-1"
 
                 use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "fallback-a1-runtime")
-                        1
-                        DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "fallback-a1-runtime") 1 DateTimeOffset.UtcNow
 
                 RetrySignalHandler.handle
-                    (Some journal) recorded userBindings
+                    (Some journal)
+                    recorded
+                    userBindings
                     (retrySignal sessionId "1" "first provider failure")
 
                 equal 1 (fallbackFailures journal (SessionId.create sessionId))
@@ -82,22 +81,14 @@ module FallbackIntegration =
                 userBindings.[sessionId] <- MessageId.create "user-1"
 
                 use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "fallback-b1-runtime")
-                        1
-                        DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "fallback-b1-runtime") 1 DateTimeOffset.UtcNow
 
                 // First retry
-                RetrySignalHandler.handle
-                    (Some journal) recorded userBindings
-                    (retrySignal sessionId "1" "failure 1")
+                RetrySignalHandler.handle (Some journal) recorded userBindings (retrySignal sessionId "1" "failure 1")
                 equal (Some "A") (fallbackSide journal (SessionId.create sessionId))
 
                 // Second retry -> switch to B
-                RetrySignalHandler.handle
-                    (Some journal) recorded userBindings
-                    (retrySignal sessionId "2" "failure 2")
+                RetrySignalHandler.handle (Some journal) recorded userBindings (retrySignal sessionId "2" "failure 2")
                 equal 2 (fallbackFailures journal (SessionId.create sessionId))
                 equal (Some "B") (fallbackSide journal (SessionId.create sessionId))
             })
@@ -112,15 +103,13 @@ module FallbackIntegration =
                 userBindings.[sessionId] <- MessageId.create "user-1"
 
                 use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "fallback-b2-runtime")
-                        1
-                        DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "fallback-b2-runtime") 1 DateTimeOffset.UtcNow
 
-                for i in 1 .. 3 do
+                for i in 1..3 do
                     RetrySignalHandler.handle
-                        (Some journal) recorded userBindings
+                        (Some journal)
+                        recorded
+                        userBindings
                         (retrySignal sessionId (string i) (sprintf "failure %d" i))
 
                 equal 3 (fallbackFailures journal (SessionId.create sessionId))
@@ -137,22 +126,22 @@ module FallbackIntegration =
                 userBindings.[sessionId] <- MessageId.create "user-1"
 
                 use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "fallback-dead-runtime")
-                        1
-                        DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "fallback-dead-runtime") 1 DateTimeOffset.UtcNow
 
-                for i in 1 .. 4 do
+                for i in 1..4 do
                     RetrySignalHandler.handle
-                        (Some journal) recorded userBindings
+                        (Some journal)
+                        recorded
+                        userBindings
                         (retrySignal sessionId (string i) (sprintf "failure %d" i))
 
                 equal 4 (fallbackFailures journal (SessionId.create sessionId))
 
                 // Wanxiangshu.Next.Session.DurableFallback.isDead must return true
                 let snapshot = AgentJournal.snapshot journal
-                trueThat (Wanxiangshu.Next.Session.DurableFallback.isDead (SessionId.create sessionId) snapshot)
+
+                trueThat
+                    (Wanxiangshu.Next.Session.DurableFallback.isDead (SessionId.create sessionId) snapshot)
                     "Session must be dead after 4 failures"
             })
 
@@ -167,16 +156,14 @@ module FallbackIntegration =
                 userBindings.[sessionId] <- MessageId.create "user-1"
 
                 use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "fallback-dedup-runtime")
-                        1
-                        DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "fallback-dedup-runtime") 1 DateTimeOffset.UtcNow
 
                 // Same retry three times
-                for _ in 1 .. 3 do
+                for _ in 1..3 do
                     RetrySignalHandler.handle
-                        (Some journal) recorded userBindings
+                        (Some journal)
+                        recorded
+                        userBindings
                         (retrySignal sessionId "1" "same failure")
 
                 // Only one failure recorded
@@ -193,25 +180,30 @@ module FallbackIntegration =
                 userBindings.[sessionId] <- MessageId.create "user-1"
 
                 // Phase 1: record 2 failures before "crash"
-                do! task {
-                    use journal =
-                        AgentJournal.create
-                            directory
-                            (RuntimeId.create "fallback-restart-old-runtime")
-                            1
-                            DateTimeOffset.UtcNow
+                do!
+                    task {
+                        use journal =
+                            AgentJournal.create
+                                directory
+                                (RuntimeId.create "fallback-restart-old-runtime")
+                                1
+                                DateTimeOffset.UtcNow
 
-                    RetrySignalHandler.handle
-                        (Some journal) recorded userBindings
-                        (retrySignal sessionId "1" "failure 1")
+                        RetrySignalHandler.handle
+                            (Some journal)
+                            recorded
+                            userBindings
+                            (retrySignal sessionId "1" "failure 1")
 
-                    RetrySignalHandler.handle
-                        (Some journal) recorded userBindings
-                        (retrySignal sessionId "2" "failure 2")
+                        RetrySignalHandler.handle
+                            (Some journal)
+                            recorded
+                            userBindings
+                            (retrySignal sessionId "2" "failure 2")
 
-                    equal (Some "B") (fallbackSide journal (SessionId.create sessionId))
-                    ()
-                }
+                        equal (Some "B") (fallbackSide journal (SessionId.create sessionId))
+                        ()
+                    }
 
                 // Phase 2: "restart" - create journal from boot
                 let boot = Boot.boot directory
@@ -238,14 +230,12 @@ module FallbackIntegration =
                 let emptyBindings = Dictionary<string, MessageId>()
 
                 use journal =
-                    AgentJournal.create
-                        directory
-                        (RuntimeId.create "fallback-orphan-runtime")
-                        1
-                        DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "fallback-orphan-runtime") 1 DateTimeOffset.UtcNow
 
                 RetrySignalHandler.handle
-                    (Some journal) recorded emptyBindings
+                    (Some journal)
+                    recorded
+                    emptyBindings
                     (retrySignal sessionId "1" "no identity")
 
                 equal 0 (fallbackFailures journal (SessionId.create sessionId))
@@ -257,7 +247,9 @@ module FallbackIntegration =
             task {
                 let sessionIdStr = "fallback-cancel"
                 let state, eventPort, sessionPort = MockOpenCode.createHost ()
-                use _sub = sessionPort.SubscribeTerminal(SessionId.create sessionIdStr, (fun _ _ -> ()))
+
+                use _sub =
+                    sessionPort.SubscribeTerminal(SessionId.create sessionIdStr, (fun _ _ -> ()))
 
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "fb-cancel-runtime") 1 DateTimeOffset.UtcNow
@@ -265,6 +257,7 @@ module FallbackIntegration =
                 let turn: ReconciledTurn =
                     { SessionId = SessionId.create sessionIdStr
                       UserMessageId = MessageId.create "u-cancel"
+                      RootUserMessageId = MessageId.create "u-cancel"
                       AssistantMessageId = MessageId.create "a-cancel"
                       AgentRole = Some AgentRole.Coder
                       Directory = "/tmp/ws"
@@ -275,15 +268,28 @@ module FallbackIntegration =
                       Outcome = TurnOutcome.TurnAborted "user pressed escape" }
 
                 TerminalPolicies.apply
-                    sessionPort eventPort (Some journal) None
-                    (HashSet<string>()) (HashSet<string>()) (HashSet<string>()) (Dictionary<string, string>())
-                    (fun _ -> ()) (HashSet<string>())
+                    sessionPort
+                    eventPort
+                    (Some journal)
+                    None
+                    (HashSet<string>())
+                    (HashSet<string>())
+                    (HashSet<string>())
+                    (Dictionary<string, string>())
+                    (fun _ -> ())
+                    (HashSet<string>())
                     turn
 
                 do! drainMicrotasks 8
+
                 let failures =
-                    match (AgentJournal.snapshot journal).AgentProjections.Sessions.TryFind (SessionId.create sessionIdStr) with
+                    match
+                        (AgentJournal.snapshot journal)
+                            .AgentProjections.Sessions.TryFind(SessionId.create sessionIdStr)
+                    with
                     | Some s -> s.Fallback |> Option.map (fun fb -> fb.TotalFailures) |> Option.defaultValue 0
                     | None -> 0
-                if failures <> 0 then failwithf "Expected 0 fallback failures for cancellation, got %d" failures
+
+                if failures <> 0 then
+                    failwithf "Expected 0 fallback failures for cancellation, got %d" failures
             })

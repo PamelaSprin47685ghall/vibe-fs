@@ -47,6 +47,8 @@ module ReconcilerIntegration =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "recon-test") 1 DateTimeOffset.UtcNow
 
+                registerAuthorityRoot journal (SessionId.value sid) "reviewer"
+
                 let onTurn turn =
                     TerminalPolicies.apply
                         sessionPort
@@ -82,6 +84,7 @@ module ReconcilerIntegration =
                     { SessionId = sid
                       RunId = None
                       RootUserMessageId = Some(MessageId.create "u1")
+                      PhysicalUserMessageId = Some(MessageId.create "u1")
                       ContinuationMessageIds = Set.empty
                       AgentRole = Some AgentRole.Reviewer
                       Directory = "/tmp/ws" }
@@ -117,6 +120,7 @@ module ReconcilerIntegration =
                 { SessionId = sid
                   RunId = None
                   RootUserMessageId = Some(MessageId.create "u1")
+                  PhysicalUserMessageId = Some(MessageId.create "u1")
                   ContinuationMessageIds = Set.empty
                   AgentRole = Some AgentRole.Coder
                   Directory = "/tmp/ws" }

@@ -12,21 +12,30 @@ type TurnOutcome =
     | TurnUnknown
 
 type ReconciledTurn =
-    { SessionId: SessionId
-      UserMessageId: MessageId
-      AssistantMessageId: MessageId
-      AgentRole: AgentRole option
-      Directory: string
-      Parts: obj array
-      Finish: string option
-      ErrorName: string option
-      Model: OpencodeModel option
-      Outcome: TurnOutcome }
+    {
+        SessionId: SessionId
+        /// Physical user message that caused this provider run.
+        UserMessageId: MessageId
+        /// Semantic authority root; continuations never replace this identity.
+        RootUserMessageId: MessageId
+        AssistantMessageId: MessageId
+        AgentRole: AgentRole option
+        Directory: string
+        Parts: obj array
+        Finish: string option
+        ErrorName: string option
+        Model: OpencodeModel option
+        Outcome: TurnOutcome
+    }
 
 type ActiveRunBinding =
-    { SessionId: SessionId
-      RunId: string option
-      RootUserMessageId: MessageId option
-      ContinuationMessageIds: Set<string>
-      AgentRole: AgentRole option
-      Directory: string }
+    {
+        SessionId: SessionId
+        RunId: string option
+        RootUserMessageId: MessageId option
+        /// Latest physical user message for the active logical run.
+        PhysicalUserMessageId: MessageId option
+        ContinuationMessageIds: Set<string>
+        AgentRole: AgentRole option
+        Directory: string
+    }

@@ -214,6 +214,7 @@ module CompanionCacheTests =
                 sessionOutputLimits
                 sessionRoles
                 (Ok bloggerModel)
+                None
                 inObj
                 out1
 
@@ -233,6 +234,7 @@ module CompanionCacheTests =
                 sessionOutputLimits
                 sessionRoles
                 (Ok bloggerModel)
+                None
                 inObj
                 out2
 
@@ -250,6 +252,7 @@ module CompanionCacheTests =
                 sessionOutputLimits
                 sessionRoles
                 (Ok bloggerModel)
+                None
                 inObj
                 out2
 

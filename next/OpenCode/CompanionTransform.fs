@@ -27,6 +27,7 @@ module CompanionTransform =
         (sessionOutputLimits: Dictionary<string, int>)
         (sessionRoles: Dictionary<string, string>)
         (bloggerModel: Result<OpencodeModel, string>)
+        (onBloggerCreated: (SessionId -> unit) option)
         (inObj: obj)
         (rawOutObj: obj)
         =
@@ -112,7 +113,13 @@ module CompanionTransform =
                                     ?bloggerModel = Some bloggerModel,
                                     ?outputBoundary = outputBoundary,
                                     onBloggerCreated =
-                                        (fun bloggerId -> sessionRoles.[SessionId.value bloggerId] <- "blogger"),
+                                        (fun bloggerId ->
+                                            let key = SessionId.value bloggerId
+                                            sessionRoles.[key] <- "blogger"
+                                            // Own + bind the blogger run so idle
+                                            // reconcile can NotifyTerminal and
+                                            // complete the pending blog Submit.
+                                            onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
                                     ?restoredBloggerId = restoredBloggerId
                                 )
 
@@ -219,12 +226,23 @@ module CompanionTransform =
 
                 applyEpoch ()
 
+                // Y self-rebase must be evaluated against the already-accumulated
+                // LatestB *before* submitting the next delta. TransformRaw.Submit
+                // sets the companion busy for that delta; if we check afterwards,
+                // every non-empty turn permanently skips self-rebase and Y never
+                // condenses even after crossing its own budget.
+                let bloggerBudget = bloggerBudgetForPrimary sessionId
+
+                // If the host never recorded a blogger-model budget for this
+                // primary (e.g. system.transform omitted parentID), still honour
+                // the operator/test override so threshold canaries stay deterministic.
+                rememberBloggerBudget sessionId bloggerBudget
+
                 match companion.Memory.LatestB with
-                | Some blog ->
-                    let bloggerBudget = bloggerBudgetForPrimary sessionId
+                | Some blog when bloggerSelfRebaseDue bloggerBudget blog -> companion.SelfRebase() |> ignore
+                | _ -> ()
 
-                    if bloggerSelfRebaseDue bloggerBudget blog then
-                        companion.SelfRebase() |> ignore
-                | None -> ()
-
+                // When a self-rebase is in flight, Submit is busy-skipped and the
+                // delta is naturally deferred to the next free transform. That is
+                // correct: condense first, then absorb the pending delta onto B'.
                 companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj

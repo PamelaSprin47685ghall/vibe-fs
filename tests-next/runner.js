@@ -53,9 +53,12 @@ export async function runTest(file, exportName, timeoutMs = 1000) {
 
   try {
     await Promise.race([fn(), failPromise]);
+  } finally {
+    // A fast assertion failure also leaves Promise.race. Mark it finished and
+    // clear the heartbeat before rethrowing, otherwise the abandoned timeout
+    // rejects one second later and falsely masks the original failure.
     finished = true;
     clearTimeout(heartbeatTimer);
-  } finally {
     delete globalThis.__resetAssertionTimeout;
   }
 }

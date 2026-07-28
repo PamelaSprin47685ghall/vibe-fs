@@ -29,6 +29,7 @@ module VerdictSurface =
     let create
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
+        (currentPhysicalUserMessage: string -> string option)
         (journal: AgentJournal option)
         (gitTreePortFor: string -> GitTreePort option)
         (reviewerHosts: Dictionary<string, ReviewerHost>)
@@ -111,38 +112,41 @@ module VerdictSurface =
                         let providerRunId =
                             contextString ctx "messageID" |> Option.orElse (contextString ctx "messageId")
 
-                        // Root user message for this run (confirmation identity for 2nd PERFECT).
-                        // Host may expose it under several keys; also walk ctx.message if nested.
-                        let rootUserMessageId =
-                            contextString ctx "userMessageId"
-                            |> Option.orElse (contextString ctx "userMessageID")
-                            |> Option.orElse (contextString ctx "parentMessageID")
-                            |> Option.orElse (contextString ctx "message.parentID")
-                            |> Option.orElse (
-                                if isNull ctx || isNull ctx?message then
+                        // Content-based confirmation: pass the current user prompt
+                        // text (not message ids). Second PERFECT is proven when this
+                        // text contains the confirmation marker set by ReviewGuard.
+                        let userPromptText =
+                            let fromParts =
+                                if isNull ctx || isNull ctx?message || isNull ctx?message?parts then
                                     None
-                                elif not (isNull ctx?message?parentID) then
-                                    Some(unbox<string> ctx?message?parentID)
-                                elif
-                                    not (isNull ctx?message?id)
-                                    && not (isNull ctx?message?role)
-                                    && unbox<string> ctx?message?role = "user"
-                                then
-                                    Some(unbox<string> ctx?message?id)
                                 else
-                                    None
-                            )
+                                    try
+                                        unbox<obj array> ctx?message?parts
+                                        |> Array.choose (fun part ->
+                                            if isNull part then
+                                                None
+                                            else
+                                                match part?``type`` with
+                                                | :? string as t when t = "text" ->
+                                                    match part?text with
+                                                    | :? string as s when not (String.IsNullOrWhiteSpace s) -> Some s
+                                                    | _ -> None
+                                                | _ -> None)
+                                        |> function
+                                            | [||] -> None
+                                            | texts -> Some(String.concat "\n" texts)
+                                    with _ ->
+                                        None
+
+                            fromParts
+                            |> Option.orElse (contextString ctx "prompt")
+                            |> Option.orElse (contextString ctx "input")
 
                         match providerRunId with
                         | None -> return box (stringify (createObj [ "error", box "Missing ProviderRunId" ]))
                         | Some providerRunId ->
                             match
-                                host.SubmitVerdict(
-                                    toolCallId,
-                                    verdict,
-                                    providerRunId,
-                                    ?rootUserMessageId = rootUserMessageId
-                                )
+                                host.SubmitVerdict(toolCallId, verdict, providerRunId, ?userPromptText = userPromptText)
                             with
                             | Error err -> return box (stringify (createObj [ "error", box err ]))
                             | Ok result ->

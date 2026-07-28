@@ -16,7 +16,8 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 module ReviewGuardIntegration =
 
     let private trueThat condition message =
-        if not condition then failwith message
+        if not condition then
+            failwith message
 
     /// Reviewer terminal without verdict: TerminalPolicies.apply must
     /// send a guard nudge through the mock port when a journal is present.
@@ -26,13 +27,16 @@ module ReviewGuardIntegration =
                 let state, eventPort, sessionPort = MockOpenCode.createHost ()
                 let sessionId = SessionId.create "r-no-verdict"
                 use _sub = sessionPort.SubscribeTerminal(sessionId, (fun _ _ -> ()))
+
                 use journal =
-                    AgentJournal.create
-                        directory (RuntimeId.create "rg-test-runtime") 1 DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "rg-test-runtime") 1 DateTimeOffset.UtcNow
+
+                registerAuthorityRoot journal (SessionId.value sessionId) "reviewer"
 
                 let turn: ReconciledTurn =
                     { SessionId = sessionId
                       UserMessageId = MessageId.create "u1"
+                      RootUserMessageId = MessageId.create "u1"
                       AssistantMessageId = MessageId.create "a1"
                       AgentRole = Some AgentRole.Reviewer
                       Directory = "/tmp/ws"
@@ -43,9 +47,16 @@ module ReviewGuardIntegration =
                       Outcome = TurnOutcome.TurnCompleted }
 
                 TerminalPolicies.apply
-                    sessionPort eventPort (Some journal) None
-                    (HashSet<string>()) (HashSet<string>()) (HashSet<string>()) (Dictionary<string, string>())
-                    (fun _ -> ()) (HashSet<string>())
+                    sessionPort
+                    eventPort
+                    (Some journal)
+                    None
+                    (HashSet<string>())
+                    (HashSet<string>())
+                    (HashSet<string>())
+                    (Dictionary<string, string>())
+                    (fun _ -> ())
+                    (HashSet<string>())
                     turn
 
                 do! drainMicrotasks 16
@@ -59,13 +70,14 @@ module ReviewGuardIntegration =
                 let state, eventPort, sessionPort = MockOpenCode.createHost ()
                 let sessionId = SessionId.create "a-no-nudge"
                 use _sub = sessionPort.SubscribeTerminal(sessionId, (fun _ _ -> ()))
+
                 use journal =
-                    AgentJournal.create
-                        directory (RuntimeId.create "rg-abort-runtime") 1 DateTimeOffset.UtcNow
+                    AgentJournal.create directory (RuntimeId.create "rg-abort-runtime") 1 DateTimeOffset.UtcNow
 
                 let turn: ReconciledTurn =
                     { SessionId = sessionId
                       UserMessageId = MessageId.create "u1"
+                      RootUserMessageId = MessageId.create "u1"
                       AssistantMessageId = MessageId.create "a1"
                       AgentRole = Some AgentRole.Coder
                       Directory = "/tmp/ws"
@@ -76,9 +88,16 @@ module ReviewGuardIntegration =
                       Outcome = TurnOutcome.TurnAborted "user cancelled" }
 
                 TerminalPolicies.apply
-                    sessionPort eventPort (Some journal) None
-                    (HashSet<string>()) (HashSet<string>()) (HashSet<string>()) (Dictionary<string, string>())
-                    (fun _ -> ()) (HashSet<string>())
+                    sessionPort
+                    eventPort
+                    (Some journal)
+                    None
+                    (HashSet<string>())
+                    (HashSet<string>())
+                    (HashSet<string>())
+                    (Dictionary<string, string>())
+                    (fun _ -> ())
+                    (HashSet<string>())
                     turn
 
                 do! drainMicrotasks 8

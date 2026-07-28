@@ -37,7 +37,17 @@ module SpikePluginHelpers =
               const lim = input.model.limit;
               if (lim.context > 0) {
                 $0.set(input.sessionID, lim.context);
-                if (input.agent === 'blogger' && input.parentID) $2(input.parentID, lim.context);
+                // Y self-rebase budget is the smaller of the observed model
+                // context and WANXIANGSHU_BLOGGER_CONTEXT_LIMIT. Also seed from
+                // the primary's own system transform so we do not depend on the
+                // host populating blogger parentID on every child request.
+                const override = Number(process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || 0);
+                const budget = override > 0 ? Math.min(lim.context, override) : lim.context;
+                if (input.agent === 'blogger' && input.parentID) {
+                  $2(input.parentID, budget);
+                } else if (input.agent && input.agent !== 'blogger' && input.agent !== 'title') {
+                  $2(input.sessionID, budget);
+                }
               }
               if (lim.output > 0) $1.set(input.sessionID, lim.output);
             }
@@ -65,6 +75,7 @@ module SpikePluginHelpers =
         (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (sessionRoles: Dictionary<string, string>)
+        (currentPhysicalUserMessage: string -> string option)
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (modelConfig: ModelResolver.ModelConfig option)
@@ -79,6 +90,7 @@ module SpikePluginHelpers =
             workspaceDirectory
             sessionParents
             sessionRoles
+            currentPhysicalUserMessage
             verdictSessions
             sessionDirectories
             modelConfig

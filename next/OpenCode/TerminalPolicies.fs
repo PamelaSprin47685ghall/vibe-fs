@@ -51,43 +51,7 @@ module TerminalPolicies =
         not (sessionParents.ContainsKey sessionKey)
         && not (isLinkedChild journal sessionKey)
 
-    /// Reviewer already left a durable verdict on its parent manager's guard.
-    let private reviewerSubmittedVerdict (journal: AgentJournal option) (reviewerKey: string) =
-        match journal with
-        | None -> false
-        | Some j ->
-            let snapshot = AgentJournal.snapshot j
-            let child = ChildId.create reviewerKey
-
-            snapshot.AgentProjections.Sessions
-            |> Map.exists (fun _ session ->
-                match session.Linkage, session.ReviewGuard with
-                | Some linkage, Some guard when Map.containsKey child linkage.LinkedChildren ->
-                    guard.IsConfirmed
-                    || guard.ConsecutivePerfects > 0
-                    || not (List.isEmpty guard.RecentToolCallIds)
-                | _ -> false)
-
-    /// Reviewer gave a first PERFECT on the current tree but the confirmed
-    /// double-PERFECT barrier has not landed yet. Distinct from
-    /// `reviewerSubmittedVerdict` (which is only "has said anything at all") --
-    /// this specifically detects the "awaiting confirmation" state so the guard
-    /// can send the confirm-perfect nudge instead of silently going idle.
-    let private reviewerPendingConfirmation (journal: AgentJournal option) (reviewerKey: string) =
-        match journal with
-        | None -> false
-        | Some j ->
-            let snapshot = AgentJournal.snapshot j
-            let child = ChildId.create reviewerKey
-
-            snapshot.AgentProjections.Sessions
-            |> Map.exists (fun _ session ->
-                match session.Linkage, session.ReviewGuard with
-                | Some linkage, Some guard when Map.containsKey child linkage.LinkedChildren ->
-                    guard.ConsecutivePerfects = 1 && not guard.IsConfirmed
-                | _ -> false)
-
-    let apply
+    let applyWithContinuation
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -98,10 +62,16 @@ module TerminalPolicies =
         (sessionParents: Dictionary<string, string>)
         (disposeExecutorRuntime: string -> unit)
         (abortedSessions: HashSet<string>)
+        (continuationAccepted: SessionId -> MessageId -> unit)
         (turn: ReconciledTurn)
         =
         let sessionKey = SessionId.value turn.SessionId
         disposeExecutorRuntime sessionKey
+
+        match turn.AgentRole with
+        | Some agent when isLinkedChild journal sessionKey || sessionParents.ContainsKey sessionKey ->
+            HostSessionNudge.ensureAgentOwnerAuthority journal turn.SessionId turn.RootUserMessageId agent turn.Model
+        | _ -> ()
 
         match turn.Outcome with
         | TurnUnknown -> ()
@@ -109,19 +79,21 @@ module TerminalPolicies =
             // Tool-calls in progress: never complete the run. Send zero-width
             // continuation so the model continues its work.
             if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                HostSessionNudge.send
+                HostSessionNudge.sendContinuation
                     sessionPort
                     turn.SessionId
                     "\u200B"
+                    PromptAuthority.InteractionRepair
                     { Model = turn.Model
                       Agent = roleName turn.AgentRole
                       Directory =
                         if String.IsNullOrWhiteSpace turn.Directory then
                             None
                         else
-                            Some turn.Directory }
-                    ignore
+                            Some turn.Directory
+                      Metadata = None }
                     journal
+                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
         | TurnNeedsContinuation reason ->
             // No final text or length limit. Do NOT complete the run. Send a
             // repair prompt to get the final report.
@@ -134,19 +106,21 @@ module TerminalPolicies =
                 + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
                 + "Do not call another tool unless necessary."
 
-            HostSessionNudge.send
+            HostSessionNudge.sendContinuation
                 sessionPort
                 turn.SessionId
                 repairPrompt
+                PromptAuthority.InteractionRepair
                 { Model = turn.Model
                   Agent = roleName
                   Directory =
                     if String.IsNullOrWhiteSpace turn.Directory then
                         None
                     else
-                        Some turn.Directory }
-                ignore
+                        Some turn.Directory
+                  Metadata = None }
                 journal
+                (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
@@ -166,26 +140,58 @@ module TerminalPolicies =
 
             let runResult: AgentRunResult =
                 { SessionId = turn.SessionId
-                  RootUserMessageId = turn.UserMessageId
+                  RootUserMessageId = turn.RootUserMessageId
                   AssistantMessageId = turn.AssistantMessageId
                   Role = roleStr
                   Directory = turn.Directory
                   FinalText = textOutput turn
                   Parts = turn.Parts }
 
-            if String.IsNullOrWhiteSpace runResult.FinalText then
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
-            else
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
-            |> ignore
+            // A first PERFECT is not a child completion. Keep the reviewer's
+            // physical handle live until the confirmation prompt causes a
+            // distinct run that records the second PERFECT; otherwise Manager
+            // `join()` can return before the ReviewWitness is confirmed.
+            let awaitingReviewerConfirmation =
+                turn.AgentRole = Some AgentRole.Reviewer
+                && ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey
+
+            if not awaitingReviewerConfirmation then
+                if String.IsNullOrWhiteSpace runResult.FinalText then
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
+                    |> ignore
+                else
+                    // Companion / fork consumers read session output from the
+                    // event port watermark, not from TerminalOutcome alone.
+                    // Record the formal A-text before NotifyTerminal so a
+                    // SubscribeTerminal listener that joins immediately still
+                    // observes non-empty assistant output.
+                    recordOutput eventPort turn.SessionId runResult.FinalText
+
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                    |> ignore
 
             if wasAborted then
                 ()
             elif not (sessionDead journal turn.SessionId) then
                 match turn.AgentRole with
+                // A first PERFECT must always enter its causal confirmation
+                // round-trip before the generic "missing verdict" branch.
+                // `verdictSessions` is only a terminal bookkeeping hint; it
+                // must never suppress the pending confirmation transition.
+                | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey ->
+                    verdictSessions.Remove sessionKey |> ignore
+
+                    HostReviewGuard.confirmPerfect
+                        sessionPort
+                        journal
+                        nudgeSent
+                        sessionKey
+                        (MessageId.value turn.AssistantMessageId)
+                        turn.Model
+                        continuationAccepted
                 | Some AgentRole.Reviewer when
                     not (verdictSessions.Remove sessionKey)
-                    && not (reviewerSubmittedVerdict journal sessionKey)
+                    && not (ReviewerGuardState.submitted sessionParents journal sessionKey)
                     ->
                     HostReviewGuard.nudgeReviewer
                         sessionPort
@@ -194,14 +200,7 @@ module TerminalPolicies =
                         sessionKey
                         (MessageId.value turn.AssistantMessageId)
                         turn.Model
-                | Some AgentRole.Reviewer when reviewerPendingConfirmation journal sessionKey ->
-                    HostReviewGuard.confirmPerfect
-                        sessionPort
-                        journal
-                        nudgeSent
-                        sessionKey
-                        (MessageId.value turn.AssistantMessageId)
-                        turn.Model
+                        continuationAccepted
                 | Some AgentRole.Manager when isTopLevelManager sessionParents journal sessionKey ->
                     match HostReviewGuard.missingTree journal gitTreePort sessionKey with
                     | HostReviewGuard.ReviewGuardMissing treeHash ->
@@ -213,22 +212,52 @@ module TerminalPolicies =
                             (MessageId.value turn.AssistantMessageId)
                             treeHash
                             turn.Model
+                            continuationAccepted
                     | HostReviewGuard.ReviewGuardConfirmed -> ()
                     | HostReviewGuard.ReviewGuardUnavailable reason ->
                         raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
                 | _ -> ()
 
                 if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                    HostSessionNudge.send
+                    HostSessionNudge.sendContinuation
                         sessionPort
                         turn.SessionId
                         "\u200B"
+                        PromptAuthority.InteractionRepair
                         { Model = None
                           Agent = roleName turn.AgentRole
                           Directory =
                             if String.IsNullOrWhiteSpace turn.Directory then
                                 None
                             else
-                                Some turn.Directory }
-                        ignore
+                                Some turn.Directory
+                          Metadata = None }
                         journal
+                        (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+    let apply
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (gitTreePort: GitTreePort option)
+        (verdictSessions: HashSet<string>)
+        (nudgeSent: HashSet<string>)
+        (managerGuardNudges: HashSet<string>)
+        (sessionParents: Dictionary<string, string>)
+        (disposeExecutorRuntime: string -> unit)
+        (abortedSessions: HashSet<string>)
+        (turn: ReconciledTurn)
+        =
+        applyWithContinuation
+            sessionPort
+            eventPort
+            journal
+            gitTreePort
+            verdictSessions
+            nudgeSent
+            managerGuardNudges
+            sessionParents
+            disposeExecutorRuntime
+            abortedSessions
+            (fun _ _ -> ())
+            turn

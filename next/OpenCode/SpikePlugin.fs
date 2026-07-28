@@ -143,6 +143,11 @@ module SpikePlugin =
                         sessionOutputLimits
                         sessionRoles
                         bloggerModel
+                        (Some(fun bloggerId ->
+                            // Register ownership + ActiveRun so idle→reconcile
+                            // emits TerminalOutcome.Completed for this child.
+                            wired.RegisterOwned(SessionId.value bloggerId)
+                            wired.BindActiveRun bloggerId AgentRole.Blogger None))
                         inObj
                         outObj
 
@@ -196,6 +201,7 @@ module SpikePlugin =
                                 (PluginHost.workspaceDirectory input)
                                 sessionParents
                                 sessionRoles
+                                wired.CurrentPhysicalUserMessage
                                 verdictSessions
                                 sessionDirectories
                                 modelConfig

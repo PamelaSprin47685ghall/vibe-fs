@@ -1,10 +1,17 @@
 namespace Wanxiangshu.Next.Journal
 
+open System
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open AgentFactsFoldHelpers
 
 module internal AgentFactsReview =
+
+    /// Content marker embedded in the confirmation prompt. Second PERFECT is
+    /// proven when the current user prompt contains this marker — not by host
+    /// message ids.
+    [<Literal>]
+    let ConfirmationMarker = "PERFECT requires confirmation"
 
     let private recentToolCallWindowSize = 2
 
@@ -19,6 +26,16 @@ module internal AgentFactsReview =
             else
                 updated
 
+    let private emptyGuard barrierKey : ReviewGuardProjection =
+        { LastGitTreeHash = None
+          ConsecutivePerfects = 0
+          IsConfirmed = false
+          AcceptedGuardKey = None
+          RecentToolCallIds = []
+          RecentProviderRunIds = []
+          ConfirmationPromptMarker = None
+          CurrentBarrierKey = barrierKey }
+
     let foldReviewBarrierStarted
         (proj: AgentProjectionSet)
         (p:
@@ -26,15 +43,12 @@ module internal AgentFactsReview =
                BarrierKey: string |})
         : AgentProjectionSet =
         // A new review barrier resets the guard so the phase requires two FRESH
-        // PERFECT verdicts (distinct ToolCallIds) on the current tree. The reset
-        // prevents a stale confirmation from carrying across phases (e.g.
-        // pre-rebase confirmation borrowing into post-rebase when the tree hash
-        // is unchanged by rebase).
+        // PERFECT verdicts on the current tree. The reset prevents a stale
+        // confirmation from carrying across phases (e.g. pre-rebase into
+        // post-rebase when the tree hash is unchanged by rebase).
         //
         // Idempotent per key: re-emitting the barrier that is already current is
-        // a replay (restart resume re-runs the same phase), NOT a new phase. It
-        // must not discard durable verdicts already recorded for this barrier,
-        // which would burn two extra reviewer rounds after every restart.
+        // a replay (restart resume), NOT a new phase.
         let sessions =
             updateSession
                 p.ManagerSessionId
@@ -42,29 +56,8 @@ module internal AgentFactsReview =
                     let rg =
                         match s.ReviewGuard with
                         | Some existing when existing.CurrentBarrierKey = Some p.BarrierKey -> existing
-                        | Some existing ->
-                            { existing with
-                                // Clearing the tree hash is load-bearing: the
-                                // review-state reader treats "same tree + zero
-                                // perfects" as REVISE. A fresh barrier must read
-                                // as "no verdicts yet" even when the tree is
-                                // unchanged (rebase alters ancestry, not tree).
-                                LastGitTreeHash = None
-                                ConsecutivePerfects = 0
-                                IsConfirmed = false
-                                RecentToolCallIds = []
-                                RecentProviderRunIds = []
-                                ConfirmationPromptMessageId = None
-                                CurrentBarrierKey = Some p.BarrierKey }
-                        | None ->
-                            { LastGitTreeHash = None
-                              ConsecutivePerfects = 0
-                              IsConfirmed = false
-                              AcceptedGuardKey = None
-                              RecentToolCallIds = []
-                              RecentProviderRunIds = []
-                              ConfirmationPromptMessageId = None
-                              CurrentBarrierKey = Some p.BarrierKey }
+                        | Some _ -> emptyGuard (Some p.BarrierKey)
+                        | None -> emptyGuard (Some p.BarrierKey)
 
                     { s with ReviewGuard = Some rg })
                 proj.Sessions
@@ -77,7 +70,7 @@ module internal AgentFactsReview =
             {| ManagerSessionId: SessionId
                ReviewerSessionId: SessionId
                ProviderRunId: string
-               RootUserMessageId: string option
+               UserPromptText: string option
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |})
@@ -103,22 +96,24 @@ module internal AgentFactsReview =
                                 else
                                     existing.RecentProviderRunIds
 
-                            let hasValidProviderRunId = not (System.String.IsNullOrWhiteSpace p.ProviderRunId)
+                            let hasValidProviderRunId = not (String.IsNullOrWhiteSpace p.ProviderRunId)
 
-                            // Fail-closed causal proof: the second PERFECT's root user
-                            // message must equal the confirmation prompt ReviewGuard sent
-                            // after the first PERFECT (KISS-N07 normative). A missing
-                            // ConfirmationPromptMessageId means no confirmation nudge has
-                            // landed yet (e.g. host send still in flight, or the nudge was
-                            // never wired for this session) -- that must NOT auto-pass, or
-                            // any two independent PERFECT calls on an unchanged tree would
-                            // confirm without proof of a real confirmation round-trip.
+                            // Content-based confirmation: the second PERFECT's user
+                            // prompt must contain the confirmation marker that was
+                            // set when ReviewGuard sent the confirmation request.
+                            // No host message ids are compared.
+                            let promptContainsConfirmation =
+                                match p.UserPromptText, existing.ConfirmationPromptMarker with
+                                | Some text, Some marker when
+                                    not (String.IsNullOrWhiteSpace text)
+                                    && not (String.IsNullOrWhiteSpace marker)
+                                    && text.IndexOf(marker, StringComparison.Ordinal) >= 0
+                                    ->
+                                    true
+                                | _ -> false
+
                             let secondPerfectConfirmed =
-                                hasValidProviderRunId
-                                && not providerRunUsed
-                                && match p.RootUserMessageId, existing.ConfirmationPromptMessageId with
-                                   | Some rootId, Some confirmId -> rootId = confirmId
-                                   | _ -> false
+                                hasValidProviderRunId && not providerRunUsed && promptContainsConfirmation
 
                             match existing.LastGitTreeHash with
                             | Some lastHash when lastHash = hash ->
@@ -154,7 +149,7 @@ module internal AgentFactsReview =
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
-                                        ConfirmationPromptMessageId = None
+                                        ConfirmationPromptMarker = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                             | _ ->
@@ -164,10 +159,8 @@ module internal AgentFactsReview =
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 1
                                         IsConfirmed = false
-                                        // Tree changed: any confirmation prompt issued for the
-                                        // previous tree is stale and must not be reused to
-                                        // confirm a PERFECT on this new tree.
-                                        ConfirmationPromptMessageId = None
+                                        // Tree changed: prior confirmation is stale.
+                                        ConfirmationPromptMarker = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Perfect ->
@@ -180,29 +173,22 @@ module internal AgentFactsReview =
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
-                                        ConfirmationPromptMessageId = None
+                                        ConfirmationPromptMarker = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                         | None ->
                             match p.Verdict with
                             | ReviewGuardVerdict.Perfect ->
-                                { LastGitTreeHash = Some hash
-                                  ConsecutivePerfects = 1
-                                  IsConfirmed = false
-                                  AcceptedGuardKey = None
-                                  RecentToolCallIds = [ p.ToolCallId ]
-                                  RecentProviderRunIds = [ p.ProviderRunId ]
-                                  ConfirmationPromptMessageId = None
-                                  CurrentBarrierKey = None }
+                                { emptyGuard None with
+                                    LastGitTreeHash = Some hash
+                                    ConsecutivePerfects = 1
+                                    RecentToolCallIds = [ p.ToolCallId ]
+                                    RecentProviderRunIds = [ p.ProviderRunId ] }
                             | ReviewGuardVerdict.Revise ->
-                                { LastGitTreeHash = Some hash
-                                  ConsecutivePerfects = 0
-                                  IsConfirmed = false
-                                  AcceptedGuardKey = None
-                                  RecentToolCallIds = [ p.ToolCallId ]
-                                  RecentProviderRunIds = [ p.ProviderRunId ]
-                                  ConfirmationPromptMessageId = None
-                                  CurrentBarrierKey = None }
+                                { emptyGuard None with
+                                    LastGitTreeHash = Some hash
+                                    RecentToolCallIds = [ p.ToolCallId ]
+                                    RecentProviderRunIds = [ p.ProviderRunId ] }
 
                     { s with ReviewGuard = Some rg })
                 proj.Sessions
@@ -216,25 +202,48 @@ module internal AgentFactsReview =
                GuardKey: string
                HostMessageId: string |})
         : AgentProjectionSet =
+        // Manager/Orchestrator review state is owned by the review owner session.
+        // A reviewer continuation is sent to the child session, so resolve its
+        // linked parent before recording acceptance.
+        let reviewOwner =
+            match Map.tryFind p.TargetSessionId proj.Sessions with
+            | Some session when session.ReviewGuard.IsSome -> p.TargetSessionId
+            | _ ->
+                let child = ChildId.create (SessionId.value p.TargetSessionId)
+
+                proj.Sessions
+                |> Map.tryPick (fun parentId session ->
+                    session.Linkage
+                    |> Option.bind (fun linkage ->
+                        if Map.containsKey child linkage.LinkedChildren then
+                            Some parentId
+                        else
+                            None))
+                |> Option.defaultValue p.TargetSessionId
+
+        // Content marker only for the confirm-perfect path. Missing-verdict /
+        // missing-review prompts do not authorize a second PERFECT.
+        let isConfirmPerfect =
+            p.GuardKey.IndexOf("confirm-perfect", StringComparison.OrdinalIgnoreCase) >= 0
+
         let sessions =
             updateSession
-                p.TargetSessionId
+                reviewOwner
                 (fun s ->
                     let rg =
                         match s.ReviewGuard with
                         | Some existing ->
                             { existing with
                                 AcceptedGuardKey = Some p.GuardKey
-                                ConfirmationPromptMessageId = Some p.HostMessageId }
+                                ConfirmationPromptMarker =
+                                    if isConfirmPerfect then
+                                        Some ConfirmationMarker
+                                    else
+                                        existing.ConfirmationPromptMarker }
                         | None ->
-                            { LastGitTreeHash = None
-                              ConsecutivePerfects = 0
-                              IsConfirmed = false
-                              AcceptedGuardKey = Some p.GuardKey
-                              RecentToolCallIds = []
-                              RecentProviderRunIds = []
-                              ConfirmationPromptMessageId = Some p.HostMessageId
-                              CurrentBarrierKey = None }
+                            { emptyGuard None with
+                                AcceptedGuardKey = Some p.GuardKey
+                                ConfirmationPromptMarker = if isConfirmPerfect then Some ConfirmationMarker else None }
 
                     { s with ReviewGuard = Some rg })
                 proj.Sessions

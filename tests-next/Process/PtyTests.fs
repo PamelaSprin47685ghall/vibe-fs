@@ -137,6 +137,7 @@ module PtyTests =
             let abortedTurn =
                 { SessionId = parent
                   UserMessageId = MessageId.create "u-aborted"
+                  RootUserMessageId = MessageId.create "u-aborted"
                   AssistantMessageId = MessageId.create "a-aborted"
                   AgentRole = None
                   Directory = ""

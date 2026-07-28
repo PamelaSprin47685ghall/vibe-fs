@@ -11,7 +11,7 @@
 - **Review witness**：第二次 PERFECT 的 root user message 必须是第一次后 guard 接受的 confirmation prompt；缺真实 ProviderRunId fail-closed。
 - **Companion**：epoch 只能替换 `LastSuccessfulProjection` 已证明覆盖的完整 semantic-turn 前缀，必须保留 Blogger 未覆盖 raw tail。
 - **Inspector**：仅 Executor 工具；继承 caller worktree；父取消必须 await child abort。
-- **Release**：最终包独立安装、三轮 event-stagger gate、真实 Host E2E 与 crash matrix 全部通过后才可升级版本。
+- **Release**：最终包独立安装、三轮 event-stagger gate、真实 Host E2E 与 crash matrix 全部通过后才可升级版本。当前许可证为 `LICENSE` 中的临时商业许可证；包保持 private，任何外部分发须另有签署的商业协议。
 
 ## 架构迁移状态
 

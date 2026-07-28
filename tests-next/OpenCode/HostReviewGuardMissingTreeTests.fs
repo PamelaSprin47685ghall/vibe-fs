@@ -65,6 +65,7 @@ module HostReviewGuardMissingTreeTests =
     let private managerTurn sessionId messageId =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create messageId
           AgentRole = Some AgentRole.Manager
           Directory = "/tmp/ws"
@@ -145,6 +146,7 @@ module HostReviewGuardMissingTreeTests =
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "empty-tree-nudge-runtime") 1 DateTimeOffset.UtcNow
 
+                registerAuthorityRoot journal sessionId "manager"
                 let port = { GetTreeHash = fun () -> "" }
 
                 applyDecide

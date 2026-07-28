@@ -49,14 +49,18 @@ type AgentLinkageProjection =
       LinkedRoles: Map<ChildId, string> }
 
 type ReviewGuardProjection =
-    { LastGitTreeHash: GitTreeHash option
-      ConsecutivePerfects: int
-      IsConfirmed: bool
-      AcceptedGuardKey: string option
-      RecentToolCallIds: string list
-      RecentProviderRunIds: string list
-      ConfirmationPromptMessageId: string option
-      CurrentBarrierKey: string option }
+    {
+        LastGitTreeHash: GitTreeHash option
+        ConsecutivePerfects: int
+        IsConfirmed: bool
+        AcceptedGuardKey: string option
+        RecentToolCallIds: string list
+        RecentProviderRunIds: string list
+        /// Content marker from the confirmation prompt text (not a host message id).
+        /// Second PERFECT is proven when the current user prompt contains this marker.
+        ConfirmationPromptMarker: string option
+        CurrentBarrierKey: string option
+    }
 
 type ModelSide =
     | SideA
@@ -106,11 +110,27 @@ type EffectStatus =
 type DurableEffectProjection =
     { Current: (EffectId * EffectStatus) option }
 
+type AuthorityProfileProjection =
+    { LogicalRunId: string
+      AuthorityRootUserMessageId: string
+      AuthorityKind: string
+      Agent: string
+      BaseProviderID: string option
+      BaseModelID: string option
+      Variant: string option }
+
+type PromptAuthorityProjection =
+    { LastAuthorityProfile: AuthorityProfileProjection option
+      ActiveLogicalRun: AuthorityProfileProjection option
+      PendingClaims: Map<string, string>
+      AcceptedContinuationIds: Map<string, string> }
+
 type SessionAgentProjection =
     { Companion: CompanionProjection option
       Linkage: AgentLinkageProjection option
       ReviewGuard: ReviewGuardProjection option
       Fallback: FallbackProjection option
+      PromptAuthority: PromptAuthorityProjection option
       Effects: DurableEffectProjection option }
 
 type AgentProjectionSet =

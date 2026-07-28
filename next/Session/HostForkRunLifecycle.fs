@@ -35,7 +35,8 @@ module HostForkRunLifecycle =
             prompt,
             { Model = model
               Agent = Some(role.ToString().ToLowerInvariant())
-              Directory = directory }
+              Directory = directory
+              Metadata = None }
         )
 
     let childPromptSender sessions parentId modelResolver journal directoryOf =

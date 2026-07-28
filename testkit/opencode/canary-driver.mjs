@@ -340,6 +340,16 @@ export async function runCanary(scriptPath, { customs } = {}) {
     if (scenario?.provider?.unexpectedRequests?.length) {
       console.error(JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 3)));
     }
+    if (process.env.CANARY_DEBUG_FACTS === '1' && scenario?.host?.workDir) {
+      const common = execFileSync('git', ['-C', scenario.host.workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
+      const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(scenario.host.workDir, common), 'wanxiangshu-next', 'runtimes');
+      if (fs.existsSync(runtimeDir)) {
+        for (const file of fs.readdirSync(runtimeDir).filter(name => name.endsWith('.ndjson'))) {
+          console.error(`[canary-facts] ${file}`);
+          console.error(fs.readFileSync(path.join(runtimeDir, file), 'utf8'));
+        }
+      }
+    }
     if (scenario) {
       try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}
     }

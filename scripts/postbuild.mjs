@@ -24,7 +24,16 @@ if (fs.existsSync(pkgSrc)) {
   warn('Warning: build-package.json not found');
 }
 
-// 3. Recursively copy non-F# assets into build/
+// 3. Copy the package license so `SEE LICENSE IN LICENSE` resolves inside a tarball.
+const licenseSrc = path.join(root, 'LICENSE');
+if (fs.existsSync(licenseSrc)) {
+  fs.copyFileSync(licenseSrc, path.join(buildDir, 'LICENSE'));
+  log('✓ Copied LICENSE');
+} else {
+  warn('Warning: LICENSE not found');
+}
+
+// 4. Recursively copy non-F# assets into build/
 function syncAssets(sourceDir, targetDir) {
   if (!fs.existsSync(sourceDir)) return;
   fs.mkdirSync(targetDir, { recursive: true });
@@ -52,7 +61,7 @@ syncAssets(
 );
 log('✓ Assets synced');
 
-// 4. Clean Fable artifacts
+// 5. Clean Fable artifacts
 const fableModules = path.join(buildDir, 'next', 'fable_modules');
 const gitignore = path.join(fableModules, '.gitignore');
 if (fs.existsSync(gitignore)) {

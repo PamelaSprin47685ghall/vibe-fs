@@ -77,6 +77,14 @@ Fallback 不需要状态图。它只需要：
 
 如果答案指向"用一段程序就能写清楚但你把它拆成了三个文件加五个 DU"，回退重来。
 
+## Prompt Authority、Logical Run 与 Synthetic Continuation [NORMATIVE]
+
+`PhysicalUserMessage ≠ AuthorityTurn`。Host `role=user` 只表示运输格式。只有 `AuthorityRoot(HumanRoot|AgentOwnerRoot)` 可创建 Logical Run、选择 agent/model/variant、成为 Fallback root、重置 repair 预算、更新 LastAuthorityProfile 或决定 Companion eligibility。
+
+`InteractionRepair`、Manager/Reviewer Guard、ReviewConfirmation、BusyAgentNudge、ProviderRetryAttempt、HostCompactionContinue 都是 Continuation：复用原 `LogicalRunId` 与 `AuthorityRootUserMessageId`；不得创建 completion/run、更新 LastAuthorityProfile、重置 fallback/repair 或改变 Companion eligibility。B retry 只覆盖当前 Attempt 的 EffectiveModel，绝不得成为下一真人 root 的默认 model。
+
+插件 continuation 必须经 PromptDispatcher：durable claim → metadata (`wanxiangshu_prompt_key`, origin, logical run, authority root) → Host acceptance mapping；不能关联 accepted HostMessageId 时 fail-closed。解析优先 accepted mapping、PromptKey、Host provenance、registered AgentOwnerRoot、已证明 external acceptance；默认 `UnknownOrigin`，绝不可默认 Human。零宽/空白/模板文本不能识别来源。Companion eligibility 只能读 ActiveLogicalRun 的 Authority profile；bare continuation 不能单独形成 semantic delta。
+
 ## 一、卷表
 
 |卷|主题|

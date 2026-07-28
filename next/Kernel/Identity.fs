@@ -23,6 +23,9 @@ module Identity =
         | Human of TurnId
         | PluginGenerated of promptKey: PromptKeyRef
         | HostInternal
+        /// A physical user-shaped message is never human authority merely because
+        /// it lacks known synthetic markers.
+        | UnknownOrigin
 
     module RuntimeId =
         let create (value: string) = RuntimeId value

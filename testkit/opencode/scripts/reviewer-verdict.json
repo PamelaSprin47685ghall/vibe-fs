@@ -27,7 +27,10 @@
       "wait": "review-perfect-1"
     },
     {
-      "wait": "review-perfect-2"
+      "wait": "reviewer-after-first-perfect"
+    },
+    {
+      "wait": "review-perfect-confirmed"
     },
     {
       "wait": "manager-join-reviewer"
@@ -79,7 +82,7 @@
     {
       "assertFacts": {
         "name": "GuardPromptAccepted",
-        "eq": 1
+        "eq": 2
       }
     },
     {
@@ -264,7 +267,7 @@
       }
     },
     {
-      "id": "review-perfect-2",
+      "id": "reviewer-after-first-perfect",
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
@@ -276,6 +279,26 @@
         "requiredTools": [
           "verdict"
         ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "The first PERFECT was submitted; I await an explicit confirmation request."
+      }
+    },
+    {
+      "id": "review-perfect-confirmed",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "user": "PERFECT requires confirmation"
       },
       "respond": {
         "type": "tool-call",
@@ -290,7 +313,7 @@
       "lane": {
         "session": "reviewer",
         "role": "reviewer",
-        "turn": 3,
+        "turn": 4,
         "requestKind": "chat",
         "parentSession": "manager"
       },

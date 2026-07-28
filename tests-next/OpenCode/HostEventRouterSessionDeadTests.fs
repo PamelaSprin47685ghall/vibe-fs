@@ -70,6 +70,7 @@ module HostEventRouterSessionDeadTests =
     let private completedTurn sessionId role parts =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create "a1"
           AgentRole = Some role
           Directory = "/tmp/ws"
@@ -82,6 +83,7 @@ module HostEventRouterSessionDeadTests =
     let private abortedTurn sessionId role =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create "a1"
           AgentRole = Some role
           Directory = "/tmp/ws"
@@ -160,6 +162,7 @@ module HostEventRouterSessionDeadTests =
                 let prompts = ResizeArray<string * string>()
                 let sessionPort = recordingPort prompts
                 use j = AgentJournal.create d (RuntimeId.create "r-ndm") 1 DateTimeOffset.UtcNow
+                registerAuthorityRoot j sid "manager"
                 recordFailures j sid 3
 
                 applyDecide

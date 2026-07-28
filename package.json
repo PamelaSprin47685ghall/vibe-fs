@@ -2,6 +2,7 @@
   "name": "wanxiangshu",
   "version": "0.4.0-rc.1",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
   "main": "build/next/OpenCode/Plugin.js",

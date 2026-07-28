@@ -70,6 +70,7 @@ module HostEventRouterTerminalTests =
     let private completedTurn sessionId role parts =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create "a1"
           AgentRole = Some role
           Directory = "/tmp/ws"
@@ -82,6 +83,7 @@ module HostEventRouterTerminalTests =
     let private abortedTurn sessionId role =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create "a1"
           AgentRole = Some role
           Directory = "/tmp/ws"
@@ -90,6 +92,22 @@ module HostEventRouterTerminalTests =
           ErrorName = Some "MessageAbortedError"
           Model = None
           Outcome = TurnOutcome.TurnAborted "aborted" }
+
+    let private registerAuthority (journal: AgentJournal) sessionId agent =
+        AgentJournal.appendAgent
+            (StreamId.Session(SessionId.create sessionId))
+            (Some(TurnId.ofMessageId (MessageId.create "u1")))
+            (AgentFact.AuthorityRootAccepted
+                {| SessionId = SessionId.create sessionId
+                   LogicalRunId = "run-" + sessionId
+                   HostMessageId = "u1"
+                   AuthorityKind = "HumanRoot"
+                   Agent = agent
+                   BaseProviderID = None
+                   BaseModelID = None
+                   Variant = None |})
+            journal
+        |> ignore
 
     let private fallbackFailures (journal: AgentJournal) sessionId =
         match
@@ -109,8 +127,11 @@ module HostEventRouterTerminalTests =
                 let sessionId = "shutdown-idle-session"
                 let prompts = ResizeArray<string * string>()
                 let sessionPort = recordingPort prompts
+
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "shutdown-idle-runtime") 1 DateTimeOffset.UtcNow
+
+                registerAuthority journal sessionId "reviewer"
 
                 // Completed reviewer terminal -> exactly one reviewer missing-verdict nudge.
                 applyDecide
@@ -150,6 +171,7 @@ module HostEventRouterTerminalTests =
                 let sessionId = "abort-order-session"
                 let prompts = ResizeArray<string * string>()
                 let sessionPort = recordingPort prompts
+
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "abort-order-runtime") 1 DateTimeOffset.UtcNow
 
@@ -191,9 +213,11 @@ module HostEventRouterTerminalTests =
                 let sessionId = "manager-guard-session"
                 let prompts = ResizeArray<string * string>()
                 let sessionPort = recordingPort prompts
+
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "manager-guard-runtime") 1 DateTimeOffset.UtcNow
 
+                registerAuthority journal sessionId "manager"
                 let gitTreePort = { GetTreeHash = fun () -> "tree-without-review" }
 
                 applyDecide
@@ -213,22 +237,44 @@ module HostEventRouterTerminalTests =
 
     [<Fact>]
     let ``Terminal_empty_text_part_receives_one_zero_width_continuation`` () =
-        task {
-            let sessionId = "coder-session"
-            let prompts = ResizeArray<string * string>()
-            let sessionPort = recordingPort prompts
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "coder-session"
+                let prompts = ResizeArray<string * string>()
+                let sessionPort = recordingPort prompts
 
-            applyDecide
-                sessionPort
-                None
-                None
-                (HashSet())
-                (HashSet())
-                (HashSet())
-                (Dictionary())
-                (completedTurn sessionId AgentRole.Coder [| textPart "" |])
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "coder-runtime") 1 DateTimeOffset.UtcNow
 
-            do! drainMicrotasks 16
-            Assert.Single(prompts) |> ignore
-            Assert.Equal("\u200B", snd prompts.[0])
-        }
+                registerAuthority journal sessionId "coder"
+
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    (completedTurn sessionId AgentRole.Coder [| textPart "" |])
+
+                do! drainMicrotasks 16
+                Assert.Single(prompts) |> ignore
+                Assert.Equal("\u200B", snd prompts.[0])
+
+                let authority =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Map.find (SessionId.create sessionId)
+                    |> fun session -> session.PromptAuthority
+
+                match authority with
+                | Some projection ->
+                    Assert.Equal(
+                        Some "u1",
+                        projection.LastAuthorityProfile
+                        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+                    )
+
+                    Assert.True(projection.AcceptedContinuationIds.ContainsKey "accepted")
+                | None -> Assert.True(false, "zero-width continuation lost authority projection")
+            })

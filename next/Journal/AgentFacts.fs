@@ -23,8 +23,14 @@ module AgentFacts =
           AcceptedGuardKey = None
           RecentToolCallIds = []
           RecentProviderRunIds = []
-          ConfirmationPromptMessageId = None
+          ConfirmationPromptMarker = None
           CurrentBarrierKey = None }
+
+    let emptyPromptAuthority: PromptAuthorityProjection =
+        { LastAuthorityProfile = None
+          ActiveLogicalRun = None
+          PendingClaims = Map.empty
+          AcceptedContinuationIds = Map.empty }
 
     let emptyFallback: FallbackProjection =
         { Side = SideA
@@ -45,6 +51,7 @@ module AgentFacts =
           Linkage = None
           ReviewGuard = None
           Fallback = None
+          PromptAuthority = None
           Effects = None }
 
     let empty: AgentProjectionSet =
@@ -179,6 +186,24 @@ module AgentFacts =
 
         | AgentFact.FallbackFailureRecorded p -> AgentFactsFallback.foldFallbackFailureRecorded proj p
 
+        | AgentFact.AuthorityRootAccepted p ->
+            AgentFactsAuthority.foldAuthorityRootAccepted
+                proj
+                p.SessionId
+                p.LogicalRunId
+                p.HostMessageId
+                p.AuthorityKind
+                p.Agent
+                p.BaseProviderID
+                p.BaseModelID
+                p.Variant
+        | AgentFact.PluginPromptClaimed p ->
+            AgentFactsAuthority.foldPluginPromptClaimed proj p.SessionId p.PromptKey p.ContinuationKind
+        | AgentFact.PluginPromptAccepted p ->
+            AgentFactsAuthority.foldPluginPromptAccepted proj p.SessionId p.PromptKey p.HostMessageId
+        | AgentFact.PluginPromptAbandoned p ->
+            AgentFactsAuthority.foldPluginPromptAbandoned proj p.SessionId p.PromptKey
+
         | AgentFact.OrchestratorManagerJobCreated p ->
             AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch p.Prompt
 
@@ -228,52 +253,8 @@ module AgentFacts =
 
     and foldAgentFactEnvelope (proj: AgentProjectionSet) (envelope: Envelope) (fact: AgentFact) : AgentProjectionSet =
         match fact with
-        | AgentFact.AgentLinked p ->
-            let role =
-                p.Role
-                |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
-
-            let sessions =
-                updateSession
-                    p.ParentId
-                    (fun s ->
-                        let link =
-                            match s.Linkage with
-                            | Some existing ->
-                                { LinkedChildren = Map.add p.ChildId p.TargetAgent existing.LinkedChildren
-                                  LinkedRoles =
-                                    match role with
-                                    | Some role -> Map.add p.ChildId role existing.LinkedRoles
-                                    | None -> existing.LinkedRoles }
-                            | None ->
-                                { LinkedChildren = Map.ofList [ (p.ChildId, p.TargetAgent) ]
-                                  LinkedRoles =
-                                    role
-                                    |> Option.map (fun role -> Map.ofList [ (p.ChildId, role) ])
-                                    |> Option.defaultValue Map.empty }
-
-                        { s with Linkage = Some link })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
-
-        | AgentFact.AgentUnlinked p ->
-            let sessions =
-                updateSession
-                    p.ParentId
-                    (fun s ->
-                        let link =
-                            match s.Linkage with
-                            | Some existing ->
-                                { LinkedChildren = Map.remove p.ChildId existing.LinkedChildren
-                                  LinkedRoles = Map.remove p.ChildId existing.LinkedRoles }
-                            | None -> emptyLinkage
-
-                        { s with Linkage = Some link })
-                    proj.Sessions
-
-            { proj with Sessions = sessions }
-
+        | AgentFact.AgentLinked p -> AgentFactsLinkage.foldLinked proj p.ParentId p.ChildId p.TargetAgent p.Role
+        | AgentFact.AgentUnlinked p -> AgentFactsLinkage.foldUnlinked proj p.ParentId p.ChildId
         | fact -> foldAgentFact proj fact
 
     let foldEnvelope (proj: AgentProjectionSet) (env: Envelope) : AgentProjectionSet =

@@ -122,7 +122,7 @@ module AgentFactsTests =
         Assert.Equal(Some(GitTreeHash.create treeHash2), rg.LastGitTreeHash)
 
     [<Fact>]
-    let Fallback_cumulative_side_selection_and_death () =
+    let ``Fallback_cumulative_side_selection_and_death`` () =
         let rt = RuntimeId.create "rt-fallback-1"
         let sid = SessionId.create "session-fallback"
         let t0 = DateTimeOffset.UtcNow

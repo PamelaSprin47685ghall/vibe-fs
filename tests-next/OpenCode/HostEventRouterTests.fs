@@ -69,6 +69,7 @@ module HostEventRouterTests =
     let private completedTurn sessionId role parts =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
           AssistantMessageId = MessageId.create "a1"
           AgentRole = Some role
           Directory = "/tmp/ws"
@@ -123,6 +124,7 @@ module HostEventRouterTests =
             let unknown =
                 { SessionId = SessionId.create sessionId
                   UserMessageId = MessageId.create "u1"
+                  RootUserMessageId = MessageId.create "u1"
                   AssistantMessageId = MessageId.create "a1"
                   AgentRole = Some AgentRole.Coder
                   Directory = "/tmp/ws"
@@ -142,6 +144,7 @@ module HostEventRouterTests =
         withTempDir (fun directory ->
             task {
                 let sessionId = "retry-identity-session"
+
                 use journal =
                     AgentJournal.create directory (RuntimeId.create "retry-identity-runtime") 1 DateTimeOffset.UtcNow
 
@@ -176,6 +179,7 @@ module HostEventRouterTests =
 
                 // A retry with no current user/assistant identity writes nothing.
                 let orphan = Dictionary<string, MessageId>()
+
                 RetrySignalHandler.handle
                     (Some journal)
                     recorded
@@ -189,6 +193,7 @@ module HostEventRouterTests =
 
                 // A genuinely new user turn records a distinct fallback.
                 userBindings.[sessionId] <- MessageId.create "user-2"
+
                 RetrySignalHandler.handle
                     (Some journal)
                     recorded
