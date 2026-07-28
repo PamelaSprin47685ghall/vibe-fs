@@ -49,7 +49,19 @@
       "wait": "reviewer-perfect-1"
     },
     {
+      "wait": "reviewer-after-tool-text"
+    },
+    {
       "wait": "reviewer-perfect-2"
+    },
+    {
+      "wait": "reviewer-after-tool-text"
+    },
+    {
+      "waitFact": {
+        "name": "OrchestratorPreRebaseReviewConfirmed",
+        "eq": 1
+      }
     },
     {
       "wait": "manager-conflict-resume"
@@ -75,8 +87,26 @@
       "timeoutMs": 20000
     },
     {
+      "wait": "reviewer-after-tool-text"
+    },
+    {
       "wait": "reviewer-perfect-4",
       "timeoutMs": 20000
+    },
+    {
+      "wait": "reviewer-after-tool-text"
+    },
+    {
+      "waitFact": {
+        "name": "OrchestratorPostRebaseReviewConfirmed",
+        "eq": 1
+      }
+    },
+    {
+      "waitFact": {
+        "name": "OrchestratorPublished",
+        "eq": 1
+      }
     },
     {
       "wait": "orch-join-2",

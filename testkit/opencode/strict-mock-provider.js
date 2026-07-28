@@ -128,13 +128,30 @@ export class StrictMockProvider {
   sessionFor(alias) {
     return this._state.sessionBindings.get(alias) || null;
   }
-  waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForExpectation(id, timeoutMs); }
+  /** Map authoring wait ids (including reusable aliases) onto the primary edge id. */
+  _primaryWaitId(id) {
+    const aliased = this._state.aliasToEdge?.get(id);
+    if (aliased?.id) return aliased.id;
+    return id;
+  }
+
+  waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) {
+    // Alias-merged reusable templates (perfect-3 → perfect-1) wait on the primary
+    // edge. Each successive wait blocks until the next primary match — so the
+    // canary flow inserts post-rebase PERFECT as a real intermediate event under
+    // the default 2s causal budget, without wall-clock timeout inflation.
+    return this._signals.waitForExpectation(this._primaryWaitId(id), timeoutMs);
+  }
   waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
   afterExpectation(id, callback) {
-    if (this._signals.hasConsumed(id)) return callback();
-    const callbacks = this._afterExpectation.get(id) || [];
+    const primary = this._primaryWaitId(id);
+    // Permanent one-shot only: already satisfied ⇒ run immediately.
+    // Reusable primary never permanently consumes, so later registration waits
+    // for the next match (intermediate post-rebase event).
+    if (this._signals.hasConsumed(primary)) return callback();
+    const callbacks = this._afterExpectation.get(primary) || [];
     callbacks.push(callback);
-    this._afterExpectation.set(id, callbacks);
+    this._afterExpectation.set(primary, callbacks);
   }
 
   get requests() { return this._state.requests; }
@@ -272,9 +289,15 @@ export class StrictMockProvider {
     const s = this._state;
     const sessionID = requestSessionOf(parsed);
     const exp = consumeExpectation(s, match, sessionID);
-    for (const wid of edgeWaitIds(exp)) {
-      this._signals.consume({ id: wid });
-      // afterExpectation may be registered on any alias wait id.
+    // Reusable templates (dual PERFECT) must wake only the primary wait id once
+    // per match. Resolving every alias (perfect-1..perfect-8) would pre-satisfy
+    // post-rebase waits and leave no intermediate causal events for the 2s budget.
+    // One-shot path edges still resolve every alias id permanently.
+    const waitIds = exp.reusable ? [exp.id] : edgeWaitIds(exp);
+    const permanent = !exp.reusable && !exp.neverEnd && !exp.pathless;
+    for (const wid of waitIds) {
+      this._signals.consume({ id: wid, permanent });
+      // afterExpectation may be registered on primary or (one-shot) alias ids.
       this._runAfterExpectation(wid);
     }
     if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${edgeLabel(exp)}`);

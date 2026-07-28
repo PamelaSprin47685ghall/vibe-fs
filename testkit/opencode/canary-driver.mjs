@@ -72,6 +72,46 @@ async function runFlow(scenario, doc, ctx) {
       }
       continue;
     }
+    if (step.waitFact) {
+      // Intermediate causal barrier on durable journal facts (e.g. OrchestratorPublished)
+      // between LLM turns. Do NOT raise the single wait timeout: re-arm the 2s
+      // scenario-local watchdog on every host event / poll slice so a multi-second
+      // publish/ff chain is covered by intermediate progress, not a larger timeoutMs.
+      const name = step.waitFact.name;
+      const need = step.waitFact.eq !== undefined ? step.waitFact.eq : step.waitFact.gte !== undefined ? step.waitFact.gte : 1;
+      const cmp = step.waitFact.eq !== undefined
+        ? (n) => n === need
+        : (n) => n >= need;
+      // Overall span may exceed WATCHDOG_TIMEOUT_MS; silence budget stays 2s via advance.
+      const overallMs = step.timeoutMs || 30000;
+      const deadline = Date.now() + overallMs;
+      let ok = cmp(countFact(scenario.host.workDir, name));
+      while (!ok && Date.now() < deadline) {
+        scenario.watchdog?.advance({
+          reason: `wait-fact:${name}`,
+          lane: step.lane || `fact:${name}`,
+          blocking: true,
+        });
+        const remaining = Math.max(1, deadline - Date.now());
+        // Slice well under the 2s silence budget so advance never races the watchdog.
+        const slice = Math.min(remaining, 500);
+        try {
+          // Any host event re-enters the loop; fact may appear without a matching
+          // provider request (ff / join completion is host-side).
+          await scenario.events.awaitEvent(() => true, slice);
+        } catch {
+          // slice elapsed without events — re-check fact below
+        }
+        ok = cmp(countFact(scenario.host.workDir, name));
+      }
+      assert.ok(ok, `waitFact ${name} not satisfied (need ${step.waitFact.eq !== undefined ? 'eq' : 'gte'} ${need}, got ${countFact(scenario.host.workDir, name)})`);
+      scenario.watchdog?.advance({
+        reason: `fact-ready:${name}`,
+        lane: step.lane || `fact:${name}`,
+        blocking: true,
+      });
+      continue;
+    }
     if (step.prompt) {
       const sid = step.session === 'child' ? ctx.childId
         : step.session === 'guard' ? (ctx.guardId || ctx.sessions?.guard)

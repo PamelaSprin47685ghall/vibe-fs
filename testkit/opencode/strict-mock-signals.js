@@ -1,7 +1,10 @@
 export class StrictMockSignals {
   constructor() {
     this._activeResponses = new Set();
+    /** @type {Set<string>} permanently satisfied one-shot expectation ids */
     this._consumed = new Set();
+    /** @type {Map<string, number>} match counts (reusable edges keep rising) */
+    this._matchCount = new Map();
     this._expectationWaiters = new Map();
     this._idleWaiters = new Set();
     this._fatalError = null;
@@ -15,16 +18,36 @@ export class StrictMockSignals {
     });
   }
 
+  /**
+   * Record one match of `id` and wake current waiters.
+   * - permanent: one-shot path edges. Future wait(id) returns immediately.
+   * - non-permanent (reusable): only this generation of waiters wakes; a later
+   *   wait(id) blocks until the *next* match. Used so dual-PERFECT barriers
+   *   insert intermediate causal events without raising wall-clock timeouts.
+   */
   consume(expectation) {
-    this._consumed.add(expectation.id);
-    this._resolveWaiters(this._expectationWaiters.get(expectation.id));
-    this._expectationWaiters.delete(expectation.id);
+    const id = expectation.id;
+    const permanent = expectation.permanent === true;
+    this._matchCount.set(id, (this._matchCount.get(id) || 0) + 1);
+    if (permanent) this._consumed.add(id);
+    this._resolveWaiters(this._expectationWaiters.get(id));
+    this._expectationWaiters.delete(id);
   }
 
   hasConsumed(id) {
     return this._consumed.has(id);
   }
 
+  matchCount(id) {
+    return this._matchCount.get(id) || 0;
+  }
+
+  /**
+   * Wait for the next match of `id`.
+   * One-shot (already permanently consumed): resolve immediately.
+   * Reusable: always wait for a new match after this call is registered
+   * (prior matches do not satisfy a later wait).
+   */
   waitForExpectation(id, timeoutMs) {
     if (this._fatalError) return Promise.reject(this._fatalError);
     if (this._consumed.has(id)) return Promise.resolve();
