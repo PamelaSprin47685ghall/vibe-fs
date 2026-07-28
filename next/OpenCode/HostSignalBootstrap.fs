@@ -80,6 +80,49 @@ module HostSignalBootstrap =
         let onSignal (signal: HostSignal) =
             match signal with
             | ProviderRetry retry -> RetrySignalHandler.handle journal fallbackFailures userMessageBindings retry
+            | ProviderError err ->
+                // Non-retryable provider failure never produces an assistant
+                // message, so TurnFailed policies never run. Drive AABB here.
+                // Local+global dual delivery of the same session.error is common.
+                // Dedupe on the physical error identity (session+reason+status),
+                // NOT failure count — count advances after the first delivery and
+                // would let the second copy record another failure.
+                let sid = SessionId.value err.SessionId
+
+                let dedupeKey =
+                    sprintf
+                        "provider-error|%s|%s|%s"
+                        sid
+                        err.Reason
+                        (err.StatusCode |> Option.map string |> Option.defaultValue "-")
+
+                if fallbackFailures.Add dedupeKey then
+                    let failuresSoFar =
+                        match journal with
+                        | None -> 0
+                        | Some j ->
+                            match Map.tryFind err.SessionId (AgentJournal.snapshot j).AgentProjections.Sessions with
+                            | Some session ->
+                                session.Fallback
+                                |> Option.map (fun fb -> fb.TotalFailures)
+                                |> Option.defaultValue 0
+                            | None -> 0
+
+                    let assistantId =
+                        MessageId.create (sprintf "provider-error-%s-%d" sid (failuresSoFar + 1))
+
+                    PluginFallbackRetry.handleTurnFailure
+                        sessionPort
+                        eventPort
+                        journal
+                        fallbackFailures
+                        modelConfig
+                        err.SessionId
+                        assistantId
+                        err.Reason
+                        None
+                        (Some(fun messageId -> continuationAccepted err.SessionId messageId))
+                    |> ignore
             | SessionIdle _
             | SessionDeleted _ -> reconciler.HandleSignal signal
 

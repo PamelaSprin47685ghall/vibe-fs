@@ -105,5 +105,11 @@ module ArchitectureGateSupport =
           "next/OpenCode/RetrySignalHandler.fs"
           "next/OpenCode/HostSignalSubscribe.fs" ]
 
+    // Non-retryable provider failures without assistant messages.
+    let sessionErrorAllowlist =
+        [ "next/OpenCode/HostSignalAdapter.fs"
+          "next/OpenCode/HostSignal.fs"
+          "next/OpenCode/HostSignalBootstrap.fs" ]
+
     let isNextDocPath (file: string) : bool =
         file.Replace("\\", "/").Contains("/next/Doc/")

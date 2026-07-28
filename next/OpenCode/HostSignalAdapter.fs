@@ -51,14 +51,24 @@ module HostSignalAdapter =
         let properties = if isNull raw then null else raw?properties
         let status = if isNull properties then null else properties?status
 
-        if isNull status || isNull status?``type`` || unbox<string> status?``type`` <> "retry" then
+        if
+            isNull status
+            || isNull status?``type``
+            || unbox<string> status?``type`` <> "retry"
+        then
             None
         else
             let attempt =
-                if isNull status?attempt then "unknown" else string status?attempt
+                if isNull status?attempt then
+                    "unknown"
+                else
+                    string status?attempt
 
             let reason =
-                if isNull status?message then "provider retry" else unbox<string> status?message
+                if isNull status?message then
+                    "provider retry"
+                else
+                    unbox<string> status?message
 
             let messageId =
                 if not (isNull properties) && not (isNull properties?messageID) then
@@ -74,7 +84,65 @@ module HostSignalAdapter =
                   Reason = reason
                   MessageId = messageId }
 
-    /// SSOT signals only: session.status idle|retry and session.deleted.
+    /// Non-retryable provider failure with no assistant message.
+    /// Host emits session.error then idle; idle alone cannot classify TurnFailed.
+    let private providerErrorSignal (sessionId: SessionId) (raw: obj) : ProviderErrorSignal option =
+        let properties = if isNull raw then null else raw?properties
+        let error = if isNull properties then null else properties?error
+
+        if isNull error then
+            None
+        else
+            let data = if isNull error?data then null else error?data
+
+            let statusCode =
+                if isNull data || isNull data?statusCode then
+                    None
+                else
+                    Some(unbox<int> data?statusCode)
+
+            let isRetryable =
+                if isNull data || isNull data?isRetryable then
+                    None
+                else
+                    Some(unbox<bool> data?isRetryable)
+
+            // Only non-retryable client/provider failures without host retry.
+            // Abort / 5xx / missing status stay out of this path.
+            let accepted =
+                match isRetryable, statusCode with
+                | Some false, Some code when code > 0 && code < 500 -> true
+                | None, Some code when code > 0 && code < 500 -> true
+                | _ -> false
+
+            if not accepted then
+                None
+            else
+                let reason =
+                    if not (isNull data) && not (isNull data?message) then
+                        unbox<string> data?message
+                    elif not (isNull error?message) then
+                        unbox<string> error?message
+                    else
+                        "provider error"
+
+                let messageId =
+                    if not (isNull properties) && not (isNull properties?messageID) then
+                        Some(MessageId.create (unbox<string> properties?messageID))
+                    elif not (isNull properties) && not (isNull properties?messageId) then
+                        Some(MessageId.create (unbox<string> properties?messageId))
+                    else
+                        None
+
+                Some
+                    { SessionId = sessionId
+                      Reason = reason
+                      StatusCode = statusCode
+                      IsRetryable = isRetryable
+                      MessageId = messageId }
+
+    /// SSOT signals: session.status idle|retry, non-retryable session.error,
+    /// and session.deleted.
     let tryAdapt (isOwned: SessionId -> bool) (rawInput: obj) : HostSignal option =
         let raw = unwrap rawInput
 
@@ -97,6 +165,11 @@ module HostSignalAdapter =
                         | "idle" -> Some(SessionIdle sessionId)
                         | "retry" -> retrySignal sessionId raw |> Option.map ProviderRetry
                         | _ -> None
+            | "session.error" ->
+                match sessionIdOf raw with
+                | None -> None
+                | Some sessionId when not (isOwned sessionId) -> None
+                | Some sessionId -> providerErrorSignal sessionId raw |> Option.map ProviderError
             | "session.deleted" ->
                 match sessionIdOf raw with
                 | Some sessionId when isOwned sessionId -> Some(SessionDeleted sessionId)
@@ -124,30 +197,37 @@ type HostSignalRouter(ownedSessions: HashSet<string>, onSignal: HostSignal -> un
         sources.Remove key |> ignore
 
     /// Plugin-local event hook path. Drops sessions registered as global-only.
+    /// ProviderError is an exception: host often emits it only on global SSE even
+    /// for local sessions, so both paths accept it for owned sessions.
     member _.ObserveLocal(raw: obj) =
         match HostSignalAdapter.tryAdapt isOwned raw with
         | None -> ()
+        | Some(ProviderError _ as signal) -> onSignal signal
         | Some signal ->
             let sid =
                 match signal with
                 | SessionIdle id
                 | SessionDeleted id -> id
                 | ProviderRetry retry -> retry.SessionId
+                | ProviderError err -> err.SessionId
 
             match sources.TryGetValue(SessionId.value sid) with
             | true, GlobalForeignDirectoryEvent -> ()
             | _ -> onSignal signal
 
-    /// Global SSE path. Drops sessions registered as local-only.
+    /// Global SSE path. Drops sessions registered as local-only, except
+    /// ProviderError (see ObserveLocal).
     member _.ObserveGlobal(raw: obj) =
         match HostSignalAdapter.tryAdapt isOwned raw with
         | None -> ()
+        | Some(ProviderError _ as signal) -> onSignal signal
         | Some signal ->
             let sid =
                 match signal with
                 | SessionIdle id
                 | SessionDeleted id -> id
                 | ProviderRetry retry -> retry.SessionId
+                | ProviderError err -> err.SessionId
 
             match sources.TryGetValue(SessionId.value sid) with
             | true, LocalPluginEvent -> ()

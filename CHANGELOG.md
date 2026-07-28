@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0-rc.6 — release candidate
+
+Production authority + host-signal fixes on top of sealed rc.5.
+
+### Changes
+
+- Host-stable prompt correlation: part metadata + unique pending-claim recovery
+- ReviewConfirmation / Guard continuations no longer become HumanRoot
+- AgentOwnerRoot accept when host strips top-level metadata
+- Non-retryable `session.error` drives PluginFallbackRetry (AABB decision path)
+- Dual-source signal subscription for session.error; ProviderError dedupe
+- Optional `WANXIANGSHU_CHAT_MAX_RETRIES`; `chat.params` EffectiveModel hook
+
+### Tests
+
+- PromptAuthority chat.message correlation regressions
+- resolveForSession same-run A/A/B/B before Dead
+
+### Still blocking final 0.4.0
+
+- RC observation period with event-driven exit (no open P0/P1)
+- **Blocking**: provider-visible same-run A/A/B/B **request** trajectory under host re-prompt
+- Private distribution only unless a separate license decision replaces `LICENSE`
+- Final `0.4.0` cut requires a second clean-checkout gate on the real version number
+
+Scope freeze: `docs/SCOPE-0.4.0-FREEZE.md`.
+
 ## 0.4.0-rc.5 — release candidate
 
 Merge `worktree-0-branch` role system prompts and session-wide A semantics on top of the rc.4 clean gate lineage.

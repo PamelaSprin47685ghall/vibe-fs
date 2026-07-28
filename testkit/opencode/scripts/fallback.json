@@ -234,41 +234,6 @@
       }
     }
   ],
-  "rounds": [
-    {
-      "id": "round1",
-      "prompt": "Round 1 fallback attempt.",
-      "model": "test-model",
-      "failureId": "round1-failure",
-      "retryId": "round1-retry",
-      "facts": 1
-    },
-    {
-      "id": "round2",
-      "prompt": "Round 2 fallback attempt.",
-      "model": "test-model",
-      "failureId": "round2-failure",
-      "retryId": "round2-retry",
-      "facts": 2
-    },
-    {
-      "id": "round3",
-      "prompt": "Round 3 fallback attempt.",
-      "model": "test-model",
-      "failureId": "round3-failure",
-      "retryId": "round3-retry",
-      "facts": 3,
-      "afterRestart": true
-    },
-    {
-      "id": "round4",
-      "prompt": "Round 4 fallback attempt.",
-      "model": "test-model",
-      "failureId": "round4-failure",
-      "retryId": "round4-retry",
-      "facts": 4
-    }
-  ],
   "setup": {
     "project": {
       "files": {}
@@ -452,5 +417,5 @@
       "expectSatisfied": true
     }
   ],
-  "pass": "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root."
+  "pass": "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root. Same-run provider-visible A→A→B→B remains final No-Go evidence (see docs/evidence)."
 }

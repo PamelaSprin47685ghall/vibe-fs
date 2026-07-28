@@ -292,4 +292,5 @@ type SessionReconciler
         match signal with
         | SessionIdle sessionId -> this.MarkDirty sessionId
         | SessionDeleted sessionId -> this.ClearSession sessionId
-        | ProviderRetry _ -> ()
+        | ProviderRetry _
+        | ProviderError _ -> ()

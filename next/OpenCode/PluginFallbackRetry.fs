@@ -23,8 +23,7 @@ module PluginFallbackRetry =
             | Some session ->
                 session.PromptAuthority
                 |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                |> Option.map (fun run ->
-                    run.LogicalRunId, run.AuthorityRootUserMessageId, session.Fallback)
+                |> Option.map (fun run -> run.LogicalRunId, run.AuthorityRootUserMessageId, session.Fallback)
             | None -> None
 
     let private nextProviderAttempt (fallback: FallbackProjection option) =
@@ -38,7 +37,9 @@ module PluginFallbackRetry =
         (journal: AgentJournal)
         =
         match modelConfig with
-        | None -> ModelResolver.fromEnv () |> Option.bind (fun cfg -> ModelResolver.resolveForSession cfg sessionId (AgentJournal.snapshot journal))
+        | None ->
+            ModelResolver.fromEnv ()
+            |> Option.bind (fun cfg -> ModelResolver.resolveForSession cfg sessionId (AgentJournal.snapshot journal))
         | Some cfg -> ModelResolver.resolveForSession cfg sessionId (AgentJournal.snapshot journal)
 
     /// After a provider/turn failure: record durable failure for the active
@@ -62,7 +63,7 @@ module PluginFallbackRetry =
             match journal, activeIdentity journal sessionId with
             | None, _
             | _, None -> false
-            | Some j, Some (logicalRunId, authorityRoot, fallbackBefore) ->
+            | Some j, Some(logicalRunId, authorityRoot, fallbackBefore) ->
                 let attempt = nextProviderAttempt fallbackBefore
 
                 let decision =
@@ -78,26 +79,25 @@ module PluginFallbackRetry =
 
                 match decision with
                 | FallbackDecision.Dead ->
-                    eventPort.NotifyTerminal
-                        sessionId
-                        (TerminalOutcome.Failed "LOGICAL_RUN_DEAD")
+                    eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed "LOGICAL_RUN_DEAD")
                     |> ignore
 
                     true
                 | FallbackDecision.NextAttempt _ ->
                     match effectiveModel modelConfig sessionId j with
                     | None ->
-                        eventPort.NotifyTerminal
-                            sessionId
-                            (TerminalOutcome.Failed "LOGICAL_RUN_DEAD")
+                        eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed "LOGICAL_RUN_DEAD")
                         |> ignore
 
                         true
                     | Some model ->
+                        // Host may skip provider calls for zero-width-only user
+                        // messages after a terminal APIError. Use a short visible
+                        // continuation so the next EffectiveModel request is real.
                         HostSessionNudge.sendContinuation
                             sessionPort
                             sessionId
-                            "\u200B"
+                            "Continue after provider failure."
                             PromptAuthority.ProviderRetryAttempt
                             { Model = Some model
                               Agent = None

@@ -12,7 +12,8 @@ Sealed suite green is necessary but not sufficient for final 0.4.0.
 | Inspector/Executor/PTY bounds | Canaries green | Final dispose/leak logs optional extras |
 | Orchestrator crash recovery | restart-publish canary green | Keep as final evidence re-export |
 | Dispose leaks | ProcessHost leak gate + canary dispose | Final cleanup checklist file still recommended |
-| **Suspected**: ReviewConfirmation accepted as HumanRoot in journals | Seen during canary fact dumps (`AuthorityRootAccepted` with HumanRoot on confirmation turns) | Investigate whether fact encoding is mislabeled vs real authority write-back; treat as potential No-Go until cleared |
+| ReviewConfirmation accepted as HumanRoot | **Fixed in rc.6**: part-metadata + pending-claim correlation; live orch dump shows reviewer roots as AgentOwnerRoot only, confirmations as PluginPromptClaimed ReviewConfirmation | Keep regression tests green |
+| Provider-visible same-run A/A/B/B **requests** | Durable `resolveForSession` A→A→B→B proven; PluginFallbackRetry claims EffectiveModel; host may not re-call provider after non-retryable APIError | Still final No-Go until wire-level request models A→A→B→B are observed |
 
 ## Default policy already locked
 

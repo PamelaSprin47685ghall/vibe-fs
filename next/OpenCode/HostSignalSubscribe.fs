@@ -31,6 +31,7 @@ module HostSignalSubscribe =
     let private isSignalEvent (raw: obj) =
         match eventTypeOf raw with
         | "session.status"
+        | "session.error"
         | "session.deleted" -> true
         | _ -> false
 
@@ -131,10 +132,7 @@ module HostSignalSubscribe =
                 with ex ->
                     Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    let trySubscribe
-        (input: obj)
-        (onSignalEvent: obj -> unit)
-        : Result<IDisposable option * string, string> =
+    let trySubscribe (input: obj) (onSignalEvent: obj -> unit) : Result<IDisposable option * string, string> =
         let listenTarget =
             if isNull input then
                 None
@@ -150,13 +148,33 @@ module HostSignalSubscribe =
 
         let client = if isNull input then null else input?client
 
+        // Host often emits non-retryable provider failures only on global SSE.
+        // Keep idle/retry/deleted single-sourced; allow session.error from global
+        // as a second, filtered subscription when local listen is primary.
+        let onlySessionError (raw: obj) =
+            if eventTypeOf (unwrap raw) = "session.error" then
+                onSignalEvent raw
+
         match listenTarget with
         | Some events ->
             match subscribeListen events onSignalEvent with
-            | Ok sub ->
-                logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
-                Ok(Some sub, "events.listen")
             | Error err -> Error err
+            | Ok localSub ->
+                match subscribeGlobalEvent client onlySessionError with
+                | Ok globalSub ->
+                    logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen+global.session.error"
+
+                    let composite =
+                        { new IDisposable with
+                            member _.Dispose() =
+                                localSub.Dispose()
+                                globalSub.Dispose() }
+
+                    Ok(Some composite, "events.listen+global.session.error")
+                | Error _ ->
+                    // Global optional: local alone still satisfies idle/retry/deleted.
+                    logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                    Ok(Some localSub, "events.listen")
         | None ->
             match subscribeGlobalEvent client onSignalEvent with
             | Ok sub ->

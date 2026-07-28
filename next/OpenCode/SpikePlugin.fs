@@ -129,6 +129,8 @@ module SpikePlugin =
                         inObj
                         outObj
 
+                let chatParams = ChatParamsHook.create journal modelConfig
+
                 let hooks =
                     createObj
                         [ "projection", box Projection.projectMessages
@@ -138,6 +140,9 @@ module SpikePlugin =
                           "hostEventsSubscription", box wired.Subscription
                           "bindRunStarted", bindRunStarted
                           "chat.message", box (uncurriedExecute wired.ChatMessageHook)
+                          // Host built-in retry reuses the same user message; inject
+                          // DurableFallback EffectiveModel on every provider attempt.
+                          "chat.params", box (uncurriedExecute chatParams)
                           "chat.transform", box (uncurriedExecute (box transform))
                           // Both hooks are registered for compatibility: some
                           // OpenCode host versions call chat.transform while
@@ -177,8 +182,7 @@ module SpikePlugin =
 
                                 match fromB with
                                 | Some text -> Some text
-                                | None ->
-                                    TerminalSessionA.fullText eventPort (SessionId.create sessionId))
+                                | None -> TerminalSessionA.fullText eventPort (SessionId.create sessionId))
 
                         let toolSurface =
                             toolHooks

@@ -27,7 +27,7 @@ module HostSignalAdapterTests =
         Assert.True(HostSignalAdapter.tryAdapt owned updated |> Option.isNone)
 
     [<Fact>]
-    let ``Drops_legacy_session_idle_and_session_error`` () =
+    let ``Drops_legacy_session_idle_and_abort_session_error`` () =
         let idle =
             createObj
                 [ "type", box "session.idle"
@@ -35,7 +35,7 @@ module HostSignalAdapterTests =
 
         Assert.True(HostSignalAdapter.tryAdapt owned idle |> Option.isNone)
 
-        let err =
+        let abortErr =
             createObj
                 [ "type", box "session.error"
                   "properties",
@@ -45,7 +45,38 @@ module HostSignalAdapterTests =
                             "error", box (createObj [ "name", box "MessageAbortedError" ]) ]
                   ) ]
 
-        Assert.True(HostSignalAdapter.tryAdapt owned err |> Option.isNone)
+        Assert.True(HostSignalAdapter.tryAdapt owned abortErr |> Option.isNone)
+
+    [<Fact>]
+    let ``Non_retryable_session_error_is_provider_error_signal`` () =
+        let err =
+            createObj
+                [ "type", box "session.error"
+                  "properties",
+                  box (
+                      createObj
+                          [ "sessionID", box "s1"
+                            "error",
+                            box (
+                                createObj
+                                    [ "name", box "APIError"
+                                      "data",
+                                      box (
+                                          createObj
+                                              [ "message", box "bad request"
+                                                "statusCode", box 400
+                                                "isRetryable", box false ]
+                                      ) ]
+                            ) ]
+                  ) ]
+
+        match HostSignalAdapter.tryAdapt owned err with
+        | Some(ProviderError signal) ->
+            Assert.equal ("s1", SessionId.value signal.SessionId)
+            Assert.equal ("bad request", signal.Reason)
+            Assert.equal (Some 400, signal.StatusCode)
+            Assert.equal (Some false, signal.IsRetryable)
+        | other -> Assert.True(false, sprintf "unexpected %A" other)
 
     [<Fact>]
     let ``Idle_and_retry_and_deleted_are_signals`` () =
@@ -53,11 +84,7 @@ module HostSignalAdapterTests =
             createObj
                 [ "type", box "session.status"
                   "properties",
-                  box (
-                      createObj
-                          [ "sessionID", box "s1"
-                            "status", box (createObj [ "type", box "idle" ]) ]
-                  ) ]
+                  box (createObj [ "sessionID", box "s1"; "status", box (createObj [ "type", box "idle" ]) ]) ]
 
         match HostSignalAdapter.tryAdapt owned idle with
         | Some(SessionIdle sid) -> Assert.Equal("s1", SessionId.value sid)
@@ -72,12 +99,7 @@ module HostSignalAdapterTests =
                           [ "sessionID", box "s1"
                             "messageID", box "m1"
                             "status",
-                            box (
-                                createObj
-                                    [ "type", box "retry"
-                                      "attempt", box 2
-                                      "message", box "provider blew up" ]
-                            ) ]
+                            box (createObj [ "type", box "retry"; "attempt", box 2; "message", box "provider blew up" ]) ]
                   ) ]
 
         match HostSignalAdapter.tryAdapt owned retry with
@@ -102,11 +124,7 @@ module HostSignalAdapterTests =
             createObj
                 [ "type", box "session.status"
                   "properties",
-                  box (
-                      createObj
-                          [ "sessionID", box "other"
-                            "status", box (createObj [ "type", box "idle" ]) ]
-                  ) ]
+                  box (createObj [ "sessionID", box "other"; "status", box (createObj [ "type", box "idle" ]) ]) ]
 
         Assert.True(HostSignalAdapter.tryAdapt owned idle |> Option.isNone)
 
@@ -114,17 +132,13 @@ module HostSignalAdapterTests =
     let ``Empty_owned_registry_is_fail_closed`` () =
         let signals = ResizeArray<HostSignal>()
         let owned = HashSet<string>()
-        let router = HostSignalRouter(owned, fun s -> signals.Add s)
+        let router = HostSignalRouter(owned, (fun s -> signals.Add s))
 
         let idle =
             createObj
                 [ "type", box "session.status"
                   "properties",
-                  box (
-                      createObj
-                          [ "sessionID", box "s1"
-                            "status", box (createObj [ "type", box "idle" ]) ]
-                  ) ]
+                  box (createObj [ "sessionID", box "s1"; "status", box (createObj [ "type", box "idle" ]) ]) ]
 
         router.Observe idle
         Assert.Equal(0, signals.Count)

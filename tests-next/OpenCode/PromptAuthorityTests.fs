@@ -14,8 +14,9 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module PromptAuthorityTests =
 
-    type private CapturingPort() =
+    type private CapturingPort(?returnId: string) =
         let mutable options: OpenCodePromptOptions option = None
+        let responseId = defaultArg returnId "continuation-1"
 
         member _.Options = options
 
@@ -26,7 +27,7 @@ module PromptAuthorityTests =
 
             member _.SendPrompt(_, _, opts) =
                 options <- Some opts
-                Task.FromResult(Ok(MessageId.create "continuation-1"))
+                Task.FromResult(Ok(MessageId.create responseId))
 
             member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
             member _.AbortSession(_) = Task.FromResult(Ok())
@@ -228,8 +229,7 @@ module PromptAuthorityTests =
                 | Some proj ->
                     Assert.Equal(
                         Some(MessageId.value humanRoot),
-                        proj.LastAuthorityProfile
-                        |> Option.map (fun p -> p.AuthorityRootUserMessageId)
+                        proj.LastAuthorityProfile |> Option.map (fun p -> p.AuthorityRootUserMessageId)
                     )
 
                     Assert.True(proj.AcceptedContinuationIds.ContainsKey "physical-repair-1")
@@ -242,10 +242,13 @@ module PromptAuthorityTests =
     let ``Stable logical run id is deterministic for same host message`` () =
         let session = SessionId.create "s1"
         let root = MessageId.create "human-root"
+
         let a =
             PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
+
         let b =
             PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
+
         Assert.Equal(a.LogicalRunId, b.LogicalRunId)
         Assert.True(a.LogicalRunId.Length = 64)
 
@@ -253,16 +256,18 @@ module PromptAuthorityTests =
     let ``Interaction repair identity is claimed only once`` () =
         let session = SessionId.create "s1"
         let root = MessageId.create "human-root"
+
         let profile =
             PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
+
         let identity =
             PromptAuthority.repairIdentity
                 profile.LogicalRunId
                 profile.AuthorityRootUserMessageId
                 (MessageId.create "asst-1")
                 "zero-width"
+
         let first = PromptAuthority.tryClaimRepair identity PromptAuthority.empty
         Assert.True(first.IsSome)
         let second = PromptAuthority.tryClaimRepair identity first.Value
         Assert.True(second.IsNone)
-

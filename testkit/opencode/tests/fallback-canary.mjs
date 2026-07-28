@@ -2,8 +2,14 @@
  *
  * Product semantics: Fallback belongs to a Logical Run. New Authority Root
  * resets Failures=0/Side=A. Omit-model inherits LastAuthority.BaseModel only,
- * never old Side B. Same-run A/A/B/B requires host retry control; this canary
- * proves durable failure facts + omit-model BaseModel inheritance.
+ * never old Side B.
+ *
+ * This canary proves durable FallbackFailureRecorded facts under host retry
+ * signals + omit-model BaseModel inheritance.
+ *
+ * Final 0.4.0 still requires provider-visible same-run A→A→B→B request
+ * trajectory evidence (resolveForSession unit path is covered; host re-prompt
+ * after non-retryable provider error remains a HostContract gap).
  */
 import { runCanary } from '../canary-driver.mjs';
 import { fileURLToPath } from 'node:url';

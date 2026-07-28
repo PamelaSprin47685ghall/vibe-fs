@@ -121,6 +121,7 @@
     <Compile Include="OpenCode/TerminalSessionA.fs"/>
     <Compile Include="OpenCode/TerminalPolicyHelpers.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
+    <Compile Include="OpenCode/ChatMessageOrigin.fs"/>
     <Compile Include="OpenCode/HostSignalChatMessage.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
@@ -147,6 +148,7 @@
     <Compile Include="OpenCode/ToolSurface.fs"/>
     <Compile Include="OpenCode/PluginHost.fs"/>
     <Compile Include="OpenCode/ManagerConfig.fs"/>
+    <Compile Include="OpenCode/ChatParamsHook.fs"/>
     <Compile Include="OpenCode/SpikePluginHelpers.fs"/>
     <Compile Include="OpenCode/SpikePlugin.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>

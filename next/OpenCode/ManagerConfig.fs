@@ -34,5 +34,26 @@ module ManagerConfig =
             // host only honors it via cfg.compaction.auto === false (host-docs 05.md:331),
             // so emit it explicitly on the mutated config object.
             config?compaction <- createObj [ "auto" ==> false ]
-            // Do not write unknown host config keys here: an invalid field can
-            // prevent the whole agent registration map from loading.
+
+            // Optional: WANXIANGSHU_CHAT_MAX_RETRIES=0 disables host built-in
+            // provider retries so PluginFallbackRetry owns A/A/B/B with EffectiveModel.
+            // Host chat.params cannot change model mid-retry; only a new prompt can.
+            match System.Environment.GetEnvironmentVariable("WANXIANGSHU_CHAT_MAX_RETRIES") with
+            | null
+            | "" -> ()
+            | raw ->
+                match System.Int32.TryParse raw with
+                | true, n when n >= 0 ->
+                    let experimental =
+                        if isNull config?experimental then
+                            let created: obj = createEmpty
+                            config?experimental <- created
+                            created
+                        else
+                            config?experimental
+
+                    experimental?chatMaxRetries <- n
+                | _ -> ()
+
+// Do not write unknown host config keys here: an invalid field can
+// prevent the whole agent registration map from loading.

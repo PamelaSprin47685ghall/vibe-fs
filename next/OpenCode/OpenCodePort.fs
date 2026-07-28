@@ -43,7 +43,15 @@ module OpenCodePort =
             member _.SendPrompt (sessionId: SessionId) text opts =
                 task {
                     let sId = SessionId.value sessionId
-                    let parts = [| {| ``type`` = "text"; text = text |} |]
+                    // Host PromptInput has no top-level correlation field. Put
+                    // wanxiangshu keys on TextPart.metadata so chat.message
+                    // can recover them from output.parts even when body.metadata
+                    // is stripped.
+                    let parts =
+                        match opts.Metadata with
+                        | Some metadata ->
+                            [| createObj [ "type", box "text"; "text", box text; "metadata", metadata ] |]
+                        | None -> [| createObj [ "type", box "text"; "text", box text ] |]
 
                     let bodyFields =
                         [ "parts", box parts ]
@@ -183,8 +191,15 @@ module OpenCodePort =
                 task {
                     let sId = SessionId.value sessionId
                     // Omit optional fields when absent: host rejects model:null.
+                    // Correlation metadata lives on the text part (host-stable).
+                    let parts =
+                        match opts.Metadata with
+                        | Some metadata ->
+                            [| createObj [ "type", box "text"; "text", box text; "metadata", metadata ] |]
+                        | None -> [| createObj [ "type", box "text"; "text", box text ] |]
+
                     let bodyFields =
-                        [ "parts", box [| {| ``type`` = "text"; text = text |} |] ]
+                        [ "parts", box parts ]
                         @ (opts.Model
                            |> Option.map (fun model -> [ "model", box model ])
                            |> Option.defaultValue [])
