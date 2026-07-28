@@ -80,8 +80,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | Error err -> return Error err
                 | Ok run ->
                     match run.Outcome with
-                    | Error err -> return Error err
-                    | Ok _ -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
+                    | AgentCompleted _ -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
+                    | AgentFailed payload -> return Error payload.Message
+                    | AgentAborted payload -> return Error payload.Message
         }
 
     let runReviewerOnce (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
@@ -99,8 +100,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | Error err -> return Error err
                 | Ok run ->
                     match run.Outcome with
-                    | Error err -> return Error err
-                    | Ok _ -> return Ok()
+                    | AgentCompleted _ -> return Ok()
+                    | AgentFailed payload -> return Error payload.Message
+                    | AgentAborted payload -> return Error payload.Message
         }
 
     let reverify (managerId: string) (worktree: string) (barrierKey: string) : Task<Result<unit, string>> =

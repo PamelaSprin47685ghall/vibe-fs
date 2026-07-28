@@ -70,6 +70,8 @@ module HostSignalBootstrap =
                 disposeExecutorRuntime
                 abortedSessions
                 continuationAccepted
+                fallbackFailures
+                modelConfig
                 turn
 
         let reconciler = SessionReconciler(snapshot, onTurn)

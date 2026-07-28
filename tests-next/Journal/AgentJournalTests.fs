@@ -31,6 +31,8 @@ module AgentJournalTests =
                 let fact =
                     AgentFact.FallbackFailureRecorded
                         {| SessionId = sid
+                           LogicalRunId = "run-test"
+                           AuthorityRootUserMessageId = "root-test"
                            Reason = "Timeout"
                            AssistantMessageId = "test-msg-1"
                            ProviderAttempt = "1" |}
@@ -73,6 +75,8 @@ module AgentJournalTests =
                 let fact =
                     AgentFact.FallbackFailureRecorded
                         {| SessionId = sid
+                           LogicalRunId = "run-test"
+                           AuthorityRootUserMessageId = "root-test"
                            Reason = "Err"
                            AssistantMessageId = "test-msg-2"
                            ProviderAttempt = "2" |}
@@ -111,6 +115,7 @@ module AgentJournalTests =
                            ReviewerSessionId = sid
                            ProviderRunId = "pr-1"
                            UserPromptText = None
+                           UserMessageId = None
                            ToolCallId = "call-123"
                            GitTreeHash = "hash123"
                            Verdict = ReviewGuardVerdict.Perfect |}
@@ -158,6 +163,8 @@ module AgentJournalTests =
                 let fact =
                     AgentFact.FallbackFailureRecorded
                         {| SessionId = sessionId
+                           LogicalRunId = "run-test"
+                           AuthorityRootUserMessageId = "root-test"
                            Reason = "external startup fact"
                            AssistantMessageId = "test-msg-3"
                            ProviderAttempt = "3" |}

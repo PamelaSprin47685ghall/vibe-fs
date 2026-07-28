@@ -72,11 +72,19 @@ type PtyPort
                 // below is the authoritative exit outcome delivered to Join.
                 this.FailRead(id, "PTY closed before read completed")
 
+                let agentId = defaultArg handle.AgentId id.Value
+                let role = defaultArg handle.Role AgentRole.Executor
+
+                let typedOutcome =
+                    match outcome with
+                    | Ok text -> AgentCompletion.ofSimpleText agentId id.Value role text
+                    | Error err -> AgentCompletion.ofSimpleError agentId id.Value role err
+
                 let completion =
                     { RunId = id.Value
-                      AgentId = defaultArg handle.AgentId id.Value
-                      Role = defaultArg handle.Role AgentRole.Executor
-                      Outcome = outcome
+                      AgentId = agentId
+                      Role = role
+                      Outcome = typedOutcome
                       CompletedAt = DateTimeOffset.UtcNow }
 
                 let senders = lock gate (fun () -> mailboxSenders |> Seq.toList)

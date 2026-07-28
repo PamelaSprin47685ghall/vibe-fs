@@ -45,6 +45,7 @@ module Fact =
                ReviewerSessionId: SessionId
                ProviderRunId: string
                UserPromptText: string option
+               UserMessageId: string option
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |}
@@ -54,6 +55,8 @@ module Fact =
                HostMessageId: string |}
         | FallbackFailureRecorded of
             {| SessionId: SessionId
+               LogicalRunId: string
+               AuthorityRootUserMessageId: string
                Reason: string
                AssistantMessageId: string
                ProviderAttempt: string |}
@@ -84,6 +87,12 @@ module Fact =
             {| PromptKey: string
                SessionId: SessionId
                Reason: string |}
+        | InteractionRepairClaimed of
+            {| SessionId: SessionId
+               LogicalRunId: string
+               AuthorityRootUserMessageId: string
+               TerminalAssistantMessageId: string
+               RepairKind: string |}
         | OrchestratorManagerJobCreated of
             {| ManagerId: string
                WorktreePath: string

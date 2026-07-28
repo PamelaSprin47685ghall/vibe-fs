@@ -100,7 +100,17 @@ module ToolSurface =
                                             match sessionDirectories.TryGetValue sid with
                                             | true, path -> Some path
                                             | false, _ -> None),
-                                    ?onRunStarted = onRunStarted
+                                    ?onRunStarted = onRunStarted,
+                                    parentWorkRecordFor =
+                                        (fun sessionId ->
+                                            match backgroundBFor with
+                                            | Some fn -> fn (SessionId.value sessionId)
+                                            | None -> None),
+                                    childWorkRecordFor =
+                                        (fun sessionId ->
+                                            match backgroundBFor with
+                                            | Some fn -> fn (SessionId.value sessionId)
+                                            | None -> None)
                                 )
 
                             runtimes.[sid] <- r
@@ -159,7 +169,7 @@ module ToolSurface =
             ExecutorTool.create toolModule runtimeFor executorRuntimeFor workspaceDirectory (Some sessionDirFor)
 
         let inspector =
-            InspectorTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir)
+            InspectorTool.create toolModule sessionPort backgroundBFor (Some sessionDirFor) (Some registerChildDir) journal
 
         // Manager: fork (agent/prompt/signal). Orchestrator: fork-manager (prompt only).
         // Names differ because schemas conflict.

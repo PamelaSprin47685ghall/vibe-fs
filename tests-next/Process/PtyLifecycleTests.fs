@@ -170,7 +170,7 @@ module PtyLifecycleTests =
             let! read = readTask
             equal (Error "PTY spawn failed: boom") read
             equal 1 completions.Count
-            equal (Error "PTY spawn failed: boom") completions.[0].Outcome
+            equal "PTY spawn failed: boom" (AgentCompletion.text completions.[0].Outcome)
         }
 
     [<Fact>]
@@ -213,7 +213,7 @@ module PtyLifecycleTests =
             b.AppendOutput(id, "hello world")
             b.ForceExit(id)
             equal 1 completions.Count
-            equal (Ok "hello world") completions.[0].Outcome
+            equal "hello world" (AgentCompletion.text completions.[0].Outcome)
             let! read = p.Read(id)
             equal (Ok("", true)) read
         }

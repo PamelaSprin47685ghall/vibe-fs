@@ -145,7 +145,7 @@
       },
       "match": {
         "user": "Round 3 fallback attempt.",
-        "model": "test-model-b",
+        "model": "test-model",
         "requiredTools": [
           "write"
         ]
@@ -174,7 +174,7 @@
       },
       "match": {
         "user": "Round 3 fallback attempt.",
-        "model": "test-model-b",
+        "model": "test-model",
         "requiredTools": [
           "write"
         ]
@@ -194,7 +194,7 @@
       },
       "match": {
         "user": "Round 4 fallback attempt.",
-        "model": "test-model-b",
+        "model": "test-model",
         "requiredTools": [
           "write"
         ]
@@ -223,7 +223,7 @@
       },
       "match": {
         "user": "Round 4 fallback attempt.",
-        "model": "test-model-b",
+        "model": "test-model",
         "requiredTools": [
           "write"
         ]
@@ -254,7 +254,7 @@
     {
       "id": "round3",
       "prompt": "Round 3 fallback attempt.",
-      "model": "test-model-b",
+      "model": "test-model",
       "failureId": "round3-failure",
       "retryId": "round3-retry",
       "facts": 3,
@@ -263,7 +263,7 @@
     {
       "id": "round4",
       "prompt": "Round 4 fallback attempt.",
-      "model": "test-model-b",
+      "model": "test-model",
       "failureId": "round4-failure",
       "retryId": "round4-retry",
       "facts": 4
@@ -452,5 +452,5 @@
       "expectSatisfied": true
     }
   ],
-  "pass": "Fallback canary passed: data-driven scripts; durable A/A/B/B recorded."
+  "pass": "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root."
 }

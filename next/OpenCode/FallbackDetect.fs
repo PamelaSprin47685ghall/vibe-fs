@@ -155,13 +155,16 @@ module FallbackDetect =
         (journal: AgentJournal option)
         (recorded: HashSet<string>)
         (sessionId: string)
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
         (assistantMessageId: string)
         (providerAttempt: string)
         (reason: string)
         : FallbackDecision =
         let sid = SessionId.create sessionId
         // Must match AgentJournal.fallbackIdentity / fold RecentFailureIds.
-        let identity = AgentJournal.fallbackIdentity assistantMessageId providerAttempt
+        let identity =
+            AgentJournal.fallbackIdentity logicalRunId authorityRootUserMessageId providerAttempt
 
         let currentDecision (j: AgentJournal) =
             DurableFallback.nextDecision sid (AgentJournal.snapshot j)
@@ -173,6 +176,8 @@ module FallbackDetect =
                 let fact =
                     AgentFact.FallbackFailureRecorded
                         {| SessionId = sid
+                           LogicalRunId = logicalRunId
+                           AuthorityRootUserMessageId = authorityRootUserMessageId
                            Reason = reason
                            AssistantMessageId = assistantMessageId
                            ProviderAttempt = providerAttempt |}

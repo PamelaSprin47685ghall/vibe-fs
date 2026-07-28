@@ -159,7 +159,7 @@ module CompanionResetTests =
 
                 let durable2 = AgentJournalCompanionPort(reopened) :> ICompanionDurablePort
                 let host2, _, _, prompts, _, setTerminal, setGrowOutput = makeFake ()
-                setTerminal (Aborted "cancelled")
+                setTerminal (TerminalOutcome.Aborted "cancelled")
 
                 let restored =
                     new CompanionHost(primaryId, host2, durable2, ?bloggerModel = Some(Ok bloggerModel))

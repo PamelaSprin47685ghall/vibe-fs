@@ -1,9 +1,9 @@
 /** fallback-canary — data-driven. Script: scripts/fallback.json
  *
- * Product semantics: Session does not own a permanent model. Host continues the
- * last user prompt's agent/model. After two durable failures, Side=B permanently;
- * subsequent user prompts that omit model receive Side B via chat.message.
- * Explicit user model always wins and starts a new Authority/Fallback epoch.
+ * Product semantics: Fallback belongs to a Logical Run. New Authority Root
+ * resets Failures=0/Side=A. Omit-model inherits LastAuthority.BaseModel only,
+ * never old Side B. Same-run A/A/B/B requires host retry control; this canary
+ * proves durable failure facts + omit-model BaseModel inheritance.
  */
 import { runCanary } from '../canary-driver.mjs';
 import { fileURLToPath } from 'node:url';

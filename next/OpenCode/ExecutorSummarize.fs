@@ -49,8 +49,10 @@ module ExecutorSummarize =
 
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
-        | Ok text -> text
-        | Error error -> raise (InvalidOperationException error)
+        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.FinalText) -> payload.FinalText
+        | AgentCompleted _ -> raise (InvalidOperationException "completed with empty final text")
+        | AgentFailed payload -> raise (InvalidOperationException payload.Message)
+        | AgentAborted payload -> raise (InvalidOperationException payload.Message)
 
     /// Join until the target Executor completes; stash foreign (other Executor)
     /// completions so a concurrent reduce cannot be mistaken for a map result.

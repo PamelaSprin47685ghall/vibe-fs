@@ -22,7 +22,8 @@ type HostForkRuntime
         ?ptyPort: PtyPort,
         ?directoryFor: string -> string option,
         ?onRunStarted: SessionId -> AgentRole -> string option -> unit,
-        ?parentWorkRecordFor: SessionId -> string option
+        ?parentWorkRecordFor: SessionId -> string option,
+        ?childWorkRecordFor: SessionId -> string option
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -36,18 +37,16 @@ type HostForkRuntime
     let directoryOf = defaultArg directoryFor (fun _ -> None)
     let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
     let parentWorkRecordOf = defaultArg parentWorkRecordFor (fun _ -> None)
+    let childWorkRecordOf = defaultArg childWorkRecordFor (fun _ -> None)
 
     let sendChildPrompt =
         HostForkRunLifecycle.childPromptSender sessions parentId modelResolver journal directoryOf
-
     let sendBusyNudge =
         HostForkBusyNudge.sender sessions parentId modelResolver journal directoryOf
-
     // Fire-and-forget: the parent-abort callback is synchronous (unit -> unit)
     // but cancellation is best-effort async work, so we discard the Task.
     let parentAbortToken =
         Pty.registerParentAbort parentKey (fun () -> this.Cancel() |> ignore)
-
     do
         ptyPort.AddMailboxSender(fun completion ->
             lock gate (fun () -> ptyRuns.Add completion.RunId |> ignore)
@@ -58,14 +57,11 @@ type HostForkRuntime
         | None -> ()
         | Some journal ->
             let snapshot = AgentJournal.snapshot journal
-
             match Map.tryFind parentId snapshot.AgentProjections.Sessions with
             | Some session when session.Linkage.IsSome ->
                 let linkage = session.Linkage.Value
-
                 for KeyValue(childId, agentId) in linkage.LinkedChildren do
                     let role = linkage.LinkedRoles |> Map.tryFind childId |> Option.bind roleOfString
-
                     match role with
                     | Some role ->
                         let childSessionId = SessionId.create (ChildId.value childId)
@@ -74,14 +70,16 @@ type HostForkRuntime
                         childCreatedDir agentId childSessionId (directoryOf agentId)
                     | None -> ()
             | _ -> ()
-
     do restoreChildren ()
-
     let complete run outcome =
-        HostForkRunLifecycle.complete gate pendingRuns sessions run outcome
-
+        let workRecord =
+            match outcome with
+            | TerminalOutcome.Completed _ -> AgentCompletion.snapshotOption (childWorkRecordOf run.ChildId)
+            | _ -> None
+        HostForkRunLifecycle.complete gate pendingRuns sessions run outcome workRecord
     let installRun agentId childId role =
-        let run = HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId
+        let run = HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId role
+        runtime.BindChildSession(agentId, SessionId.value childId)
         runStarted childId role (directoryOf agentId)
         run
 
@@ -108,7 +106,7 @@ type HostForkRuntime
                 | Some refusal -> return Error refusal
                 | None ->
                     return!
-                        HostForkRunLifecycle.sendToExistingChild
+                        HostForkChildDispatch.sendToExistingChild
                             gate
                             pendingRuns
                             sessions
@@ -191,14 +189,14 @@ Blockers:"
                                 | _ -> prompt
 
                             let! sent =
-                                sessions.SendPrompt(
-                                    childId,
-                                    enrichedPrompt,
-                                    { Model = HostPendingRun.resolveModel modelResolver journal childId
-                                      Agent = Some(role.ToString().ToLowerInvariant())
-                                      Directory = directoryOf agentId
-                                      Metadata = None }
-                                )
+                                HostForkAgentOwner.sendFirstPrompt
+                                    sessions
+                                    journal
+                                    modelResolver
+                                    childId
+                                    role
+                                    (directoryOf agentId)
+                                    enrichedPrompt
 
                             match sent with
                             | Ok _ -> return Ok result
@@ -234,7 +232,7 @@ Blockers:"
                         // OpenCode resolves an agent-less child prompt to the
                         // default build agent, not the session's original role.
                         return!
-                            HostForkRunLifecycle.sendToExistingChild
+                            HostForkChildDispatch.sendToExistingChild
                                 gate
                                 pendingRuns
                                 sessions
@@ -281,9 +279,9 @@ Blockers:"
             let pending = lock gate (fun () -> pendingRuns.Values |> Seq.toList)
 
             for run in pending do
-                HostForkRunLifecycle.complete gate pendingRuns sessions run (TerminalOutcome.Failed "cancelled")
+                complete run (TerminalOutcome.Failed "cancelled")
 
-            let! teardown = HostForkRunLifecycle.teardownChildren sessions journal parentId children gate
+            let! teardown = HostForkChildDispatch.teardownChildren sessions journal parentId children gate
 
             match teardown with
             | Ok() ->

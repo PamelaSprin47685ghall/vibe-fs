@@ -150,15 +150,83 @@ module ToolSurfacePty =
 
                     match result with
                     | Ok c ->
-                        let fields =
-                            [ "agentId", box c.AgentId; "runId", box c.RunId; "outcome", box c.Outcome ]
-                            @ (if runtime.IsPtyCompletion c.RunId then
-                                   [ "ptyId", box c.RunId ]
-                               else
-                                   [])
+                        let isPty = runtime.IsPtyCompletion c.RunId
 
-                        return box (stringify (createObj fields))
-                    | Error e -> return box (stringify (createObj [ "error", box (e.ToString()) ]))
+                        let payload =
+                            match c.Outcome with
+                            | AgentCompleted p ->
+                                let work =
+                                    p.WorkRecord
+                                    |> Option.map (fun w ->
+                                        createObj
+                                            [ "text", box w.Text
+                                              "digest", box w.Digest
+                                              "freshness", box w.Freshness
+                                              "coveredThrough", box (defaultArg w.CoveredThrough null) ]
+                                        |> box)
+                                    |> Option.defaultValue null
+
+                                createObj
+                                    [ "kind", box (if isPty then "pty" else "agent")
+                                      "status", box "completed"
+                                      "agentId", box p.AgentId
+                                      "childSessionId", box p.ChildSessionId
+                                      "runId", box p.RunId
+                                      "role", box (p.Role.ToString().ToLowerInvariant())
+                                      "rootUserMessageId", box p.RootUserMessageId
+                                      "assistantMessageId", box p.AssistantMessageId
+                                      "finalText", box p.FinalText
+                                      "workRecord", work
+                                      "directory", box p.Directory
+                                      "ptyId", box (if isPty then c.RunId else null) ]
+                            | AgentFailed p
+                            | AgentAborted p ->
+                                createObj
+                                    [ "kind", box (if isPty then "pty" else "agent")
+                                      "status",
+                                      box (
+                                          match c.Outcome with
+                                          | AgentAborted _ -> "aborted"
+                                          | _ -> "failed"
+                                      )
+                                      "agentId", box p.AgentId
+                                      "childSessionId", box (defaultArg p.ChildSessionId null)
+                                      "runId", box p.RunId
+                                      "role",
+                                      box (
+                                          p.Role
+                                          |> Option.map (fun r -> r.ToString().ToLowerInvariant())
+                                          |> Option.defaultValue null
+                                      )
+                                      "error",
+                                      box (
+                                          createObj
+                                              [ "code", box p.Code
+                                                "message", box p.Message ]
+                                      )
+                                      "ptyId", box (if isPty then c.RunId else null) ]
+
+                        return box (stringify payload)
+                    | Error e ->
+                        let code =
+                            match e with
+                            | ForkError.NothingToJoin -> "NOTHING_TO_JOIN"
+                            | ForkError.Cancelled -> "CANCELLED"
+                            | ForkError.Empty -> "EMPTY"
+                            | ForkError.NotFound id -> "NOT_FOUND:" + id
+
+                        return
+                            box (
+                                stringify (
+                                    createObj
+                                        [ "error",
+                                          box (
+                                              createObj
+                                                  [ "code", box code
+                                                    "message", box (e.ToString()) ]
+                                          ) ]
+                                )
+                            )
         }
 
     let listExecute (deps: PtyToolDeps) (_args: obj) (ctx: obj) =
@@ -175,8 +243,12 @@ module ToolSurfacePty =
                         createObj
                             [ "kind", box ToolSurfaceFields.ListKind.Agent
                               "agentId", box a.AgentId
-                              "role", box (a.Role.ToString())
-                              "status", box (a.Status.ToString()) ])
+                              "childSessionId", box (defaultArg a.ChildSessionId null)
+                              "role", box (a.Role.ToString().ToLowerInvariant())
+                              "status", box (a.Status.ToString().ToLowerInvariant())
+                              "currentRunId", box (defaultArg a.CurrentRunId null)
+                              "hasPendingCompletion", box a.HasPendingCompletion
+                              "lastCompletionStatus", box (defaultArg a.LastCompletionStatus null) ])
 
                 let ptyEntries =
                     ptys

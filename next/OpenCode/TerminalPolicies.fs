@@ -63,6 +63,8 @@ module TerminalPolicies =
         (disposeExecutorRuntime: string -> unit)
         (abortedSessions: HashSet<string>)
         (continuationAccepted: SessionId -> MessageId -> unit)
+        (fallbackFailures: HashSet<string>)
+        (modelConfig: ModelResolver.ModelConfig option)
         (turn: ReconciledTurn)
         =
         let sessionKey = SessionId.value turn.SessionId
@@ -79,21 +81,29 @@ module TerminalPolicies =
             // Tool-calls in progress: never complete the run. Send zero-width
             // continuation so the model continues its work.
             if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                HostSessionNudge.sendContinuation
-                    sessionPort
-                    turn.SessionId
-                    "\u200B"
-                    PromptAuthority.InteractionRepair
-                    { Model = turn.Model
-                      Agent = roleName turn.AgentRole
-                      Directory =
-                        if String.IsNullOrWhiteSpace turn.Directory then
-                            None
-                        else
-                            Some turn.Directory
-                      Metadata = None }
-                    journal
-                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+                let sent =
+                    HostSessionNudge.trySendInteractionRepair
+                        sessionPort
+                        turn.SessionId
+                        "\u200B"
+                        { Model = turn.Model
+                          Agent = roleName turn.AgentRole
+                          Directory =
+                            if String.IsNullOrWhiteSpace turn.Directory then
+                                None
+                            else
+                                Some turn.Directory
+                          Metadata = None }
+                        journal
+                        turn.AssistantMessageId
+                        "zero-width"
+                        (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+                if not sent then
+                    eventPort.NotifyTerminal
+                        turn.SessionId
+                        (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                    |> ignore
         | TurnNeedsContinuation reason ->
             // No final text or length limit. Do NOT complete the run. Send a
             // repair prompt to get the final report.
@@ -106,21 +116,29 @@ module TerminalPolicies =
                 + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
                 + "Do not call another tool unless necessary."
 
-            HostSessionNudge.sendContinuation
-                sessionPort
-                turn.SessionId
-                repairPrompt
-                PromptAuthority.InteractionRepair
-                { Model = turn.Model
-                  Agent = roleName
-                  Directory =
-                    if String.IsNullOrWhiteSpace turn.Directory then
-                        None
-                    else
-                        Some turn.Directory
-                  Metadata = None }
-                journal
-                (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+            let sent =
+                HostSessionNudge.trySendInteractionRepair
+                    sessionPort
+                    turn.SessionId
+                    repairPrompt
+                    { Model = turn.Model
+                      Agent = roleName
+                      Directory =
+                        if String.IsNullOrWhiteSpace turn.Directory then
+                            None
+                        else
+                            Some turn.Directory
+                      Metadata = None }
+                    journal
+                    turn.AssistantMessageId
+                    "missing-final-report"
+                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+            if not sent then
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                |> ignore
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
@@ -128,7 +146,18 @@ module TerminalPolicies =
 
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
             |> ignore
-        | TurnFailed error -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+        | TurnFailed error ->
+            let directory =
+                if String.IsNullOrWhiteSpace turn.Directory then None else Some turn.Directory
+
+            let handled =
+                PluginFallbackRetry.handleTurnFailure
+                    sessionPort eventPort journal fallbackFailures modelConfig
+                    turn.SessionId turn.AssistantMessageId error directory
+                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+            if not handled then
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
         | TurnCompleted ->
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
@@ -160,13 +189,7 @@ module TerminalPolicies =
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
                     |> ignore
                 else
-                    // Companion / fork consumers read session output from the
-                    // event port watermark, not from TerminalOutcome alone.
-                    // Record the formal A-text before NotifyTerminal so a
-                    // SubscribeTerminal listener that joins immediately still
-                    // observes non-empty assistant output.
-                    recordOutput eventPort turn.SessionId runResult.FinalText
-
+                    // Completion fact path only: ReconciledTurn → AgentRunResult → TerminalOutcome.
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
 
@@ -219,21 +242,29 @@ module TerminalPolicies =
                 | _ -> ()
 
                 if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                    HostSessionNudge.sendContinuation
-                        sessionPort
-                        turn.SessionId
-                        "\u200B"
-                        PromptAuthority.InteractionRepair
-                        { Model = None
-                          Agent = roleName turn.AgentRole
-                          Directory =
-                            if String.IsNullOrWhiteSpace turn.Directory then
-                                None
-                            else
-                                Some turn.Directory
-                          Metadata = None }
-                        journal
-                        (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+                    let sent =
+                        HostSessionNudge.trySendInteractionRepair
+                            sessionPort
+                            turn.SessionId
+                            "​"
+                            { Model = None
+                              Agent = roleName turn.AgentRole
+                              Directory =
+                                if String.IsNullOrWhiteSpace turn.Directory then
+                                    None
+                                else
+                                    Some turn.Directory
+                              Metadata = None }
+                            journal
+                            turn.AssistantMessageId
+                            "zero-width"
+                            (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+                    if not sent then
+                        eventPort.NotifyTerminal
+                            turn.SessionId
+                            (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                        |> ignore
 
     let apply
         (sessionPort: ISessionHostPort)
@@ -260,4 +291,6 @@ module TerminalPolicies =
             disposeExecutorRuntime
             abortedSessions
             (fun _ _ -> ())
+            (HashSet<string>())
+            None
             turn

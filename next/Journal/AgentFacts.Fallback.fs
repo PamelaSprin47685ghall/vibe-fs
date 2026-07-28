@@ -1,73 +1,105 @@
 namespace Wanxiangshu.Next.Journal
 
+open System
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open AgentFactsFoldHelpers
 
 module internal AgentFactsFallback =
 
-    let private failureIdentity (assistantMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s" assistantMessageId providerAttempt
+    let private failureIdentity
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
+        (providerAttempt: string)
+        =
+        sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     let private rememberFailureId (ids: string list) (identity: string) =
         let next = identity :: (ids |> List.filter ((<>) identity))
         next |> List.truncate 4
 
+    let private emptyEpoch logicalRunId authorityRoot =
+        { LogicalRunId = logicalRunId
+          AuthorityRootUserMessageId = authorityRoot
+          Side = SideA
+          FailuresOnCurrentSide = 0
+          TotalFailures = 0
+          IsDead = false
+          RecentFailureIds = [] }
+
     let foldFallbackFailureRecorded
         (proj: AgentProjectionSet)
         (p:
             {| SessionId: SessionId
+               LogicalRunId: string
+               AuthorityRootUserMessageId: string
                Reason: string
                AssistantMessageId: string
                ProviderAttempt: string |})
         : AgentProjectionSet =
-        let identity = failureIdentity p.AssistantMessageId p.ProviderAttempt
+        let logicalRunId =
+            if String.IsNullOrWhiteSpace p.LogicalRunId then
+                "unknown-run"
+            else
+                p.LogicalRunId
+
+        let authorityRoot =
+            if String.IsNullOrWhiteSpace p.AuthorityRootUserMessageId then
+                "unknown-root"
+            else
+                p.AuthorityRootUserMessageId
+
+        let identity = failureIdentity logicalRunId authorityRoot p.ProviderAttempt
 
         let sessions =
             updateSession
                 p.SessionId
                 (fun s ->
-                    let fb =
+                    let baseline =
                         match s.Fallback with
-                        | Some existing when List.contains identity existing.RecentFailureIds -> existing
-                        | Some existing when existing.IsDead -> existing
-                        | Some existing ->
-                            let newTotal = existing.TotalFailures + 1
-                            let ids = rememberFailureId existing.RecentFailureIds identity
+                        | Some existing when existing.LogicalRunId = logicalRunId -> existing
+                        | _ -> emptyEpoch logicalRunId authorityRoot
 
-                            match existing.Side with
+                    let fb =
+                        if List.contains identity baseline.RecentFailureIds then
+                            baseline
+                        elif baseline.IsDead then
+                            baseline
+                        else
+                            let newTotal = baseline.TotalFailures + 1
+                            let ids = rememberFailureId baseline.RecentFailureIds identity
+
+                            match baseline.Side with
                             | SideA ->
-                                if existing.FailuresOnCurrentSide < 1 then
-                                    { Side = SideA
-                                      FailuresOnCurrentSide = existing.FailuresOnCurrentSide + 1
-                                      TotalFailures = newTotal
-                                      IsDead = false
-                                      RecentFailureIds = ids }
+                                if baseline.FailuresOnCurrentSide < 1 then
+                                    { baseline with
+                                        Side = SideA
+                                        FailuresOnCurrentSide = baseline.FailuresOnCurrentSide + 1
+                                        TotalFailures = newTotal
+                                        IsDead = false
+                                        RecentFailureIds = ids }
                                 else
-                                    { Side = SideB
-                                      FailuresOnCurrentSide = 0
-                                      TotalFailures = newTotal
-                                      IsDead = false
-                                      RecentFailureIds = ids }
+                                    { baseline with
+                                        Side = SideB
+                                        FailuresOnCurrentSide = 0
+                                        TotalFailures = newTotal
+                                        IsDead = false
+                                        RecentFailureIds = ids }
                             | SideB ->
-                                if existing.FailuresOnCurrentSide < 1 then
-                                    { Side = SideB
-                                      FailuresOnCurrentSide = existing.FailuresOnCurrentSide + 1
-                                      TotalFailures = newTotal
-                                      IsDead = false
-                                      RecentFailureIds = ids }
+                                if baseline.FailuresOnCurrentSide < 1 then
+                                    { baseline with
+                                        Side = SideB
+                                        FailuresOnCurrentSide = baseline.FailuresOnCurrentSide + 1
+                                        TotalFailures = newTotal
+                                        IsDead = false
+                                        RecentFailureIds = ids }
                                 else
-                                    { Side = SideB
-                                      FailuresOnCurrentSide = 2
-                                      TotalFailures = newTotal
-                                      IsDead = true
-                                      RecentFailureIds = ids }
-                        | None ->
-                            { Side = SideA
-                              FailuresOnCurrentSide = 1
-                              TotalFailures = 1
-                              IsDead = false
-                              RecentFailureIds = [ identity ] }
+                                    { baseline with
+                                        Side = SideB
+                                        FailuresOnCurrentSide = 2
+                                        TotalFailures = newTotal
+                                        IsDead = true
+                                        RecentFailureIds = ids }
 
                     { s with Fallback = Some fb })
                 proj.Sessions

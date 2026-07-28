@@ -42,6 +42,7 @@ module FactCodecTests =
                        ReviewerSessionId = revSid
                        ProviderRunId = "pr-1"
                        UserPromptText = None
+                       UserMessageId = None
                        ToolCallId = "call123"
                        GitTreeHash = "tree123"
                        Verdict = ReviewGuardVerdict.Perfect |}
@@ -56,6 +57,7 @@ module FactCodecTests =
             Assert.Equal(revSid, r.ReviewerSessionId)
             Assert.Equal("pr-1", r.ProviderRunId)
             Assert.Equal(None, r.UserPromptText)
+            Assert.Equal(None, r.UserMessageId)
             Assert.Equal("call123", r.ToolCallId)
             Assert.Equal("tree123", r.GitTreeHash)
             Assert.Equal(ReviewGuardVerdict.Perfect, r.Verdict)

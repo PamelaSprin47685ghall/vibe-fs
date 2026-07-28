@@ -85,6 +85,8 @@ module HostForkRuntimeSessionDeadTests =
                 None
                 (AgentFact.FallbackFailureRecorded
                     {| SessionId = childId
+                       LogicalRunId = "run-test"
+                       AuthorityRootUserMessageId = "root-test"
                        Reason = sprintf "f%d" i
                        AssistantMessageId = sprintf "m%d" i
                        ProviderAttempt = sprintf "pa%d" i |})
@@ -120,7 +122,7 @@ module HostForkRuntimeSessionDeadTests =
             })
 
     [<Fact>]
-    let ``Fork_proceeds_with_SideB_after_three_failures`` () =
+    let ``Fork_new_AgentOwnerRoot_uses_BaseModel_not_previous_SideB`` () =
         withTempDir (fun d ->
             task {
                 let p = SessionId.create "p-3"
@@ -139,6 +141,8 @@ module HostForkRuntimeSessionDeadTests =
 
                 use j = AgentJournal.create d (RuntimeId.create "r-3") 1 DateTimeOffset.UtcNow
                 link j p c a
+                // Three failures leave durable Side B on the previous Logical Run.
+                // A new AgentOwnerRoot must still start from BaseModel/SideA.
                 fail j c 3
 
                 let host, captured = capturingFake ()
@@ -146,7 +150,7 @@ module HostForkRuntimeSessionDeadTests =
                 let! r = b.Fork(a, AgentRole.Coder, "w")
 
                 Assert.True(Result.isOk r, sprintf "expected Ok, got %A" r)
-                Assert.Equal(Some cfg.SideB, captured.[0].Model)
+                Assert.Equal(Some cfg.SideA, captured.[0].Model)
             })
 
     [<Fact>]

@@ -5,8 +5,13 @@ open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-/// Busy-agent nudge via PromptDispatcher (KISS-N12 Continuation).
+/// Busy-agent nudge via PromptAuthorityService (KISS-N12 Continuation).
 module HostForkBusyNudge =
+
+    let private service (journal: AgentJournal option) =
+        match journal with
+        | Some j -> PromptDispatcher.forJournal j
+        | None -> PromptDispatcher.ephemeral ()
 
     /// Continuation of the child's active Logical Run. Never creates a new
     /// Authority Root / RunId / completion.
@@ -35,45 +40,47 @@ module HostForkBusyNudge =
                           Metadata = None }
                     )
             | Some j ->
+                let svc = service (Some j)
+
                 let profileOpt =
-                    match Map.tryFind childId (AgentJournal.snapshot j).AgentProjections.Sessions with
-                    | None -> None
-                    | Some session ->
-                        session.PromptAuthority
-                        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                        |> Option.map (fun durable ->
-                            let baseModel =
-                                match durable.BaseProviderID, durable.BaseModelID with
-                                | Some providerID, Some modelID ->
-                                    Some
-                                        { providerID = providerID
-                                          modelID = modelID
-                                          variant = durable.Variant }
-                                | _ -> model
+                    match svc.ActiveProfile childId with
+                    | Some profile -> Some profile
+                    | None ->
+                        match Map.tryFind childId (AgentJournal.snapshot j).AgentProjections.Sessions with
+                        | None -> None
+                        | Some session ->
+                            session.PromptAuthority
+                            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+                            |> Option.map (fun durable ->
+                                let baseModel =
+                                    match durable.BaseProviderID, durable.BaseModelID with
+                                    | Some providerID, Some modelID ->
+                                        Some
+                                            { providerID = providerID
+                                              modelID = modelID
+                                              variant = durable.Variant }
+                                    | _ -> model
 
-                            let authorityKind =
-                                match durable.AuthorityKind with
-                                | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
-                                | _ -> PromptAuthority.HumanRoot
+                                let authorityKind =
+                                    match durable.AuthorityKind with
+                                    | "AgentOwnerRoot" -> PromptAuthority.AgentOwnerRoot
+                                    | _ -> PromptAuthority.HumanRoot
 
-                            ({ SessionId = childId
-                               LogicalRunId = durable.LogicalRunId
-                               AuthorityRootUserMessageId =
-                                   MessageId.create durable.AuthorityRootUserMessageId
-                               AuthorityKind = authorityKind
-                               Agent = durable.Agent
-                               BaseModel = baseModel
-                               Variant = durable.Variant }
-                             : PromptAuthority.AuthorityExecutionProfile))
+                                ({ SessionId = childId
+                                   LogicalRunId = durable.LogicalRunId
+                                   AuthorityRootUserMessageId =
+                                       MessageId.create durable.AuthorityRootUserMessageId
+                                   AuthorityKind = authorityKind
+                                   Agent = durable.Agent
+                                   BaseModel = baseModel
+                                   Variant = durable.Variant }
+                                 : PromptAuthority.AuthorityExecutionProfile))
 
                 match profileOpt with
-                | None ->
-                    return Error "Busy nudge requires ActiveLogicalRun on child session"
+                | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
-                    let dispatcher = PromptDispatcher.Dispatcher(?journal = journal)
-
                     let! sent =
-                        dispatcher.SendContinuation
+                        svc.SendContinuation
                             sessions
                             childId
                             prompt

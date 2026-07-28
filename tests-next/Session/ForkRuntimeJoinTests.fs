@@ -22,7 +22,7 @@ module ForkRuntimeJoinTests =
         task {
             let runtime = ForkRuntime()
             // Park a busy agent with a never-completing work item so Join waits.
-            let never = TaskCompletionSource<Result<string, string>>()
+            let never = TaskCompletionSource<AgentCompletionOutcome>()
             let _ =
                 runtime.Fork(
                     "a1",

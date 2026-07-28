@@ -105,32 +105,10 @@ module SpikePlugin =
                     | Some projectionSessionId ->
                         wired.RegisterOwned projectionSessionId
 
-                        if not (sessionRoles.ContainsKey projectionSessionId) then
-                            let inferredRole =
-                                if not (isNull inObj) && not (isNull inObj?agent) then
-                                    HostSessionContext.canonicalRole (unbox<string> inObj?agent)
-                                elif not (isNull outObj) && not (isNull outObj?messages) then
-                                    unbox<obj array> outObj?messages
-                                    |> Array.tryPick (fun message ->
-                                        if isNull message || isNull message?info || isNull message?info?agent then
-                                            None
-                                        else
-                                            HostSessionContext.canonicalRole (unbox<string> message?info?agent))
-                                else
-                                    None
-
-                            inferredRole
-                            |> Option.iter (fun role -> sessionRoles.[projectionSessionId] <- role)
-
+                        // sessionRoles is display/tool-surface cache only.
+                        // Companion eligibility must not be inferred here.
                         if not (isNull inObj) && isNull inObj?sessionID then
                             inObj?sessionID <- projectionSessionId
-
-                        if
-                            not (isNull inObj)
-                            && isNull inObj?agent
-                            && sessionRoles.ContainsKey projectionSessionId
-                        then
-                            inObj?agent <- sessionRoles.[projectionSessionId]
                     | None -> ()
 
                     CompanionTransform.handleCompanionTransform

@@ -10,21 +10,31 @@ type PendingHostRun =
     { Token: obj
       AgentId: string
       ChildId: SessionId
-      Source: TaskCompletionSource<Result<string, string>>
-      OutputWatermark: int option
-      FallbackOutputCount: int
+      Role: AgentRole
+      Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Ready: bool
       mutable Finished: bool }
 
 module HostPendingRun =
     let completionSource () =
-        TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+        TaskCompletionSource<AgentCompletionOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
 
     let resolveModel resolver journal childId =
         match resolver, journal with
         | Some resolver, Some journal ->
             ModelResolver.resolveForSession resolver childId (AgentJournal.snapshot journal)
+        | _ -> None
+
+    /// New AgentOwnerRoot / omit-model default. Never inherits previous Side B.
+    let resolveAuthorityDefault resolver journal childId =
+        match resolver, journal with
+        | Some resolver, Some journal ->
+            ModelResolver.resolveAuthorityDefault
+                (Some resolver)
+                childId
+                (AgentJournal.snapshot journal)
+        | Some resolver, None -> Some resolver.SideA
         | _ -> None
 
     /// Fail-closed gate: a session is dead after 4 consecutive fallback failures

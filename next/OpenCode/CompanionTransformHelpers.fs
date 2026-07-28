@@ -48,10 +48,13 @@ module CompanionTransformHelpers =
           InputLimit: int option
           OutputLimit: int option }
 
-    type EpochCandidate =
+    /// Private validated epoch candidate only. Callers must not invent cutoffs.
+    type ValidatedEpochCandidate =
         { CutoffMessageIndex: int
           CoveredPrefixDigest: string
-          FrozenB: string }
+          FrozenB: string
+          UncoveredRawTailCount: int
+          CandidateTokenCount: int }
 
     let utf8ByteLength (text: string) : int =
         if isNull text || text = "" then
@@ -88,7 +91,7 @@ module CompanionTransformHelpers =
         (latestB: string option)
         (cutoffMessageIndex: int)
         (coveredPrefixDigest: string)
-        : EpochCandidate option =
+        : ValidatedEpochCandidate option =
         match latestB with
         | None -> None
         | Some frozenB when cutoffMessageIndex <= 0 || cutoffMessageIndex > List.length messages -> None
@@ -116,7 +119,9 @@ module CompanionTransformHelpers =
                         Some
                             { CutoffMessageIndex = cutoffMessageIndex
                               CoveredPrefixDigest = coveredPrefixDigest
-                              FrozenB = frozenB }
+                              FrozenB = frozenB
+                              UncoveredRawTailCount = List.length tail
+                              CandidateTokenCount = candidateTokens }
 
     let bloggerSelfRebaseDue (bloggerBudgetTokens: int) (b: string) : bool =
         bloggerBudgetTokens > 0

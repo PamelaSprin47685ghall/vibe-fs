@@ -32,6 +32,7 @@ module Guard =
         (gitTreeHash: string)
         (verdict: ReviewGuardVerdict)
         (userPromptText: string option)
+        (userMessageId: string option)
         : Result<ProjectionSet, string> =
         let fact =
             AgentFact.ReviewVerdictRecorded
@@ -39,6 +40,7 @@ module Guard =
                    ReviewerSessionId = reviewerSessionId
                    ProviderRunId = providerRunId
                    UserPromptText = userPromptText
+                   UserMessageId = userMessageId
                    ToolCallId = toolCallId
                    GitTreeHash = gitTreeHash
                    Verdict = verdict |}

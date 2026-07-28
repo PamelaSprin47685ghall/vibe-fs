@@ -100,6 +100,8 @@ module HostEventRouterSessionDeadTests =
                 None
                 (AgentFact.FallbackFailureRecorded
                     {| SessionId = SessionId.create sessionId
+                       LogicalRunId = "run-test"
+                       AuthorityRootUserMessageId = "root-test"
                        Reason = sprintf "f%d" i
                        AssistantMessageId = sprintf "m%d" i
                        ProviderAttempt = sprintf "pa%d" i |})

@@ -6,8 +6,11 @@ open System.Threading.Tasks
 open Xunit
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 /// Provider-prefix cache gates for Companion epoch freeze.
 module CompanionCacheTests =
@@ -183,89 +186,94 @@ module CompanionCacheTests =
     /// Dual-hook safety: second transform with b-head present is a no-op.
     [<Fact>]
     let ``Transform_idempotent_when_b_head_already_present`` () =
-        task {
-            let nextText = ref "blog paragraph"
-            let host = makeHost nextText "x"
-            let companions = Dictionary<string, CompanionHost>()
-            let gate = obj ()
-            let sessionRoles = Dictionary<string, string>()
-            sessionRoles.["primary"] <- "manager"
-            let sessionBudgets = Dictionary<string, int>()
-            sessionBudgets.["primary"] <- 100
-            let sessionOutputLimits = Dictionary<string, int>()
-            let sid = "primary"
+        withTempDir (fun directory ->
+            task {
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "rt-companion-cache") 1 DateTimeOffset.UtcNow
 
-            let companion =
-                new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
+                let sid = "primary"
+                registerAuthorityRoot journal sid "manager"
 
-            companions.[sid] <- companion
+                let nextText = ref "blog paragraph"
+                let host = makeHost nextText "x"
+                let companions = Dictionary<string, CompanionHost>()
+                let gate = obj ()
+                let sessionRoles = Dictionary<string, string>()
+                let sessionBudgets = Dictionary<string, int>()
+                sessionBudgets.["primary"] <- 100
+                let sessionOutputLimits = Dictionary<string, int>()
 
-            let baseMsgs = [| msg sid "u1" "old"; msg sid "u2" "mid" |]
-            let out1 = createObj [ "messages", box baseMsgs ]
-            let inObj = createObj [ "sessionID", box sid; "agent", box "manager" ]
+                let companion =
+                    new CompanionHost(SessionId.create sid, host, ?bloggerModel = Some(Ok bloggerModel))
 
-            CompanionTransform.handleCompanionTransform
-                companions
-                gate
-                host
-                None
-                None
-                sessionBudgets
-                sessionOutputLimits
-                sessionRoles
-                (Ok bloggerModel)
-                None
-                inObj
-                out1
+                companions.[sid] <- companion
 
-            do! companion.WaitInFlightAsync()
-            Assert.True(companion.EnablePrefixReplacement())
+                let baseMsgs = [| msg sid "u1" "old"; msg sid "u2" "mid" |]
+                let out1 = createObj [ "messages", box baseMsgs ]
+                let inObj = createObj [ "sessionID", box sid; "agent", box "manager" ]
 
-            let extended = Array.append baseMsgs [| msg sid "u3" "tail" |]
-            let out2 = createObj [ "messages", box extended ]
+                CompanionTransform.handleCompanionTransform
+                    companions
+                    gate
+                    host
+                    None
+                    (Some journal)
+                    sessionBudgets
+                    sessionOutputLimits
+                    sessionRoles
+                    (Ok bloggerModel)
+                    None
+                    inObj
+                    out1
 
-            CompanionTransform.handleCompanionTransform
-                companions
-                gate
-                host
-                None
-                None
-                sessionBudgets
-                sessionOutputLimits
-                sessionRoles
-                (Ok bloggerModel)
-                None
-                inObj
-                out2
+                do! companion.WaitInFlightAsync()
+                Assert.True(companion.EnablePrefixReplacement())
 
-            do! companion.WaitInFlightAsync()
-            let after1 = unbox<obj array> out2?messages
-            Assert.True((unbox<string> after1.[0]?info?id).StartsWith("companion-b-head"))
+                let extended = Array.append baseMsgs [| msg sid "u3" "tail" |]
+                let out2 = createObj [ "messages", box extended ]
 
-            CompanionTransform.handleCompanionTransform
-                companions
-                gate
-                host
-                None
-                None
-                sessionBudgets
-                sessionOutputLimits
-                sessionRoles
-                (Ok bloggerModel)
-                None
-                inObj
-                out2
+                CompanionTransform.handleCompanionTransform
+                    companions
+                    gate
+                    host
+                    None
+                    (Some journal)
+                    sessionBudgets
+                    sessionOutputLimits
+                    sessionRoles
+                    (Ok bloggerModel)
+                    None
+                    inObj
+                    out2
 
-            let after2 = unbox<obj array> out2?messages
-            Assert.Equal(after1.Length, after2.Length)
+                do! companion.WaitInFlightAsync()
+                let after1 = unbox<obj array> out2?messages
+                Assert.True((unbox<string> after1.[0]?info?id).StartsWith("companion-b-head"))
 
-            let heads =
-                after2
-                |> Array.filter (fun m ->
-                    not (isNull m)
-                    && not (isNull m?info)
-                    && not (isNull m?info?id)
-                    && (unbox<string> m?info?id).StartsWith("companion-b-head"))
+                CompanionTransform.handleCompanionTransform
+                    companions
+                    gate
+                    host
+                    None
+                    (Some journal)
+                    sessionBudgets
+                    sessionOutputLimits
+                    sessionRoles
+                    (Ok bloggerModel)
+                    None
+                    inObj
+                    out2
 
-            Assert.Equal(1, heads.Length)
-        }
+                let after2 = unbox<obj array> out2?messages
+                Assert.equal(after1.Length, after2.Length)
+
+                let heads =
+                    after2
+                    |> Array.filter (fun m ->
+                        not (isNull m)
+                        && not (isNull m?info)
+                        && not (isNull m?info?id)
+                        && (unbox<string> m?info?id).StartsWith("companion-b-head"))
+
+                Assert.equal(1, heads.Length)
+            })

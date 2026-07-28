@@ -82,7 +82,7 @@ module GuardDurableTests =
 
                 // Record 1st verdict -> appends to journal and returns projection immediately
                 let res1 =
-                    Guard.recordVerdict journalPort sid revSid "pr-1" "tc-1" treeHash ReviewGuardVerdict.Perfect None
+                    Guard.recordVerdict journalPort sid revSid "pr-1" "tc-1" treeHash ReviewGuardVerdict.Perfect None None
 
                 Assert.True(Result.isOk res1)
                 let proj1 = Result.defaultWith (fun _ -> failwith "unexpected") res1
@@ -111,6 +111,7 @@ module GuardDurableTests =
                         treeHash
                         ReviewGuardVerdict.Perfect
                         (Some "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.")
+                        (Some "confirm-user-2")
 
                 Assert.True(Result.isOk res2)
                 let proj2 = Result.defaultWith (fun _ -> failwith "unexpected") res2

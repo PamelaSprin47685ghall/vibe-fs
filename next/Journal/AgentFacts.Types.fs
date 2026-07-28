@@ -56,9 +56,11 @@ type ReviewGuardProjection =
         AcceptedGuardKey: string option
         RecentToolCallIds: string list
         RecentProviderRunIds: string list
-        /// Content marker from the confirmation prompt text (not a host message id).
-        /// Second PERFECT is proven when the current user prompt contains this marker.
-        ConfirmationPromptMarker: string option
+        /// Physical Host message id of the confirmation prompt. Second PERFECT is
+        /// proven only when its root user message id equals this id.
+        ConfirmationPhysicalMessageId: string option
+        /// Authority root of the original reviewer task (informational / restart).
+        AuthorityRootUserMessageId: string option
         CurrentBarrierKey: string option
     }
 
@@ -68,6 +70,9 @@ type ModelSide =
 
 type FallbackProjection =
     {
+        /// Logical Run that owns this Fallback epoch. New Authority Root resets.
+        LogicalRunId: string
+        AuthorityRootUserMessageId: string
         Side: ModelSide
         FailuresOnCurrentSide: int
         TotalFailures: int
@@ -123,7 +128,8 @@ type PromptAuthorityProjection =
     { LastAuthorityProfile: AuthorityProfileProjection option
       ActiveLogicalRun: AuthorityProfileProjection option
       PendingClaims: Map<string, string>
-      AcceptedContinuationIds: Map<string, string> }
+      AcceptedContinuationIds: Map<string, string>
+      RepairClaims: string list }
 
 type SessionAgentProjection =
     { Companion: CompanionProjection option

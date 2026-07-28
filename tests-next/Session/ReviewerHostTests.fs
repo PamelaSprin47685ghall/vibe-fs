@@ -59,7 +59,9 @@ module ReviewerHostTests =
                         "tree-a",
                         ReviewGuardVerdict.Perfect,
                         "run-2",
-                        "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                        userPromptText =
+                            "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.",
+                        userMessageId = "confirm-a"
                     ))
 
                 expect
@@ -141,13 +143,15 @@ module ReviewerHostTests =
 
                 let _ = AgentJournal.appendAgent (StreamId.Session manager) None confirmFact journal
 
-                Assert.Equal(
+                Assert.equal(
                     Ok ReviewFinishResult.Confirmed,
                     host.SubmitVerdict(
                         "call-2",
                         ReviewGuardVerdict.Perfect,
                         providerRunId = "run-2",
-                        userPromptText = "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                        userPromptText =
+                            "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.",
+                        userMessageId = "confirm-a"
                     )
                 )
 

@@ -9,7 +9,8 @@ module AgentFactsAuthority =
         { LastAuthorityProfile = None
           ActiveLogicalRun = None
           PendingClaims = Map.empty
-          AcceptedContinuationIds = Map.empty }
+          AcceptedContinuationIds = Map.empty
+          RepairClaims = [] }
 
     let foldAuthorityRootAccepted
         (proj: AgentProjectionSet)
@@ -36,12 +37,23 @@ module AgentFactsAuthority =
                 sessionId
                 (fun s ->
                     { s with
+                        // New Authority Root creates a new Fallback epoch.
+                        Fallback =
+                            Some
+                                { LogicalRunId = logicalRunId
+                                  AuthorityRootUserMessageId = hostMessageId
+                                  Side = SideA
+                                  FailuresOnCurrentSide = 0
+                                  TotalFailures = 0
+                                  IsDead = false
+                                  RecentFailureIds = [] }
                         PromptAuthority =
                             Some
                                 { LastAuthorityProfile = Some profile
                                   ActiveLogicalRun = Some profile
                                   PendingClaims = Map.empty
-                                  AcceptedContinuationIds = Map.empty } })
+                                  AcceptedContinuationIds = Map.empty
+                                  RepairClaims = [] } })
                 proj.Sessions
 
         { proj with Sessions = sessions }
@@ -93,6 +105,41 @@ module AgentFactsAuthority =
                             Some
                                 { authority with
                                     PendingClaims = Map.remove promptKey authority.PendingClaims } })
+                proj.Sessions
+
+        { proj with Sessions = sessions }
+
+
+    let foldInteractionRepairClaimed
+        (proj: AgentProjectionSet)
+        (sessionId: SessionId)
+        logicalRunId
+        authorityRootUserMessageId
+        terminalAssistantMessageId
+        repairKind
+        =
+        let identity =
+            sprintf
+                "%s|%s|%s|%s"
+                logicalRunId
+                authorityRootUserMessageId
+                terminalAssistantMessageId
+                repairKind
+
+        let sessions =
+            updateSession
+                sessionId
+                (fun s ->
+                    let authority = defaultArg s.PromptAuthority empty
+
+                    if List.contains identity authority.RepairClaims then
+                        s
+                    else
+                        { s with
+                            PromptAuthority =
+                                Some
+                                    { authority with
+                                        RepairClaims = identity :: authority.RepairClaims } })
                 proj.Sessions
 
         { proj with Sessions = sessions }

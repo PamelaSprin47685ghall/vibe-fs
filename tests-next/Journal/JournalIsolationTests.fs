@@ -44,6 +44,8 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "errA"
                                AssistantMessageId = "test-msg-1"
                                ProviderAttempt = "1" |}
@@ -53,6 +55,8 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "errB"
                                AssistantMessageId = "test-msg-2"
                                ProviderAttempt = "2" |}
@@ -104,6 +108,8 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "errB1"
                                AssistantMessageId = "test-msg-3"
                                ProviderAttempt = "3" |}
@@ -118,6 +124,8 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "errB2"
                                AssistantMessageId = "test-msg-4"
                                ProviderAttempt = "4" |}
@@ -145,6 +153,8 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "err1"
                                AssistantMessageId = "test-msg-5"
                                ProviderAttempt = "5" |}
@@ -186,6 +196,8 @@ module JournalIsolationTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = session1
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "err1"
                                AssistantMessageId = "test-msg-6"
                                ProviderAttempt = "6" |}

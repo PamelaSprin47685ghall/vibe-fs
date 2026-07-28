@@ -209,7 +209,13 @@ module ProcessBoundedTests =
     let ``ExecutorSummarize_private_mailbox_does_not_steal_manager_completions`` () =
         task {
             let runner (agentId: string) (role: AgentRole) (prompt: string option) =
-                Task.FromResult(Ok(sprintf "out:%s" (defaultArg prompt "")))
+                Task.FromResult(
+                    AgentCompletion.ofSimpleText
+                        agentId
+                        ("run-" + agentId)
+                        role
+                        (sprintf "out:%s" (defaultArg prompt ""))
+                )
 
             // Manager's mailbox (must NOT be starved by the summarizer).
             let managerRuntime = ForkRuntime(runner = runner)

@@ -23,17 +23,21 @@ module AgentFacts =
           AcceptedGuardKey = None
           RecentToolCallIds = []
           RecentProviderRunIds = []
-          ConfirmationPromptMarker = None
+          ConfirmationPhysicalMessageId = None
+          AuthorityRootUserMessageId = None
           CurrentBarrierKey = None }
 
     let emptyPromptAuthority: PromptAuthorityProjection =
         { LastAuthorityProfile = None
           ActiveLogicalRun = None
           PendingClaims = Map.empty
-          AcceptedContinuationIds = Map.empty }
+          AcceptedContinuationIds = Map.empty
+          RepairClaims = [] }
 
     let emptyFallback: FallbackProjection =
-        { Side = SideA
+        { LogicalRunId = ""
+          AuthorityRootUserMessageId = ""
+          Side = SideA
           FailuresOnCurrentSide = 0
           TotalFailures = 0
           IsDead = false
@@ -203,6 +207,14 @@ module AgentFacts =
             AgentFactsAuthority.foldPluginPromptAccepted proj p.SessionId p.PromptKey p.HostMessageId
         | AgentFact.PluginPromptAbandoned p ->
             AgentFactsAuthority.foldPluginPromptAbandoned proj p.SessionId p.PromptKey
+        | AgentFact.InteractionRepairClaimed p ->
+            AgentFactsAuthority.foldInteractionRepairClaimed
+                proj
+                p.SessionId
+                p.LogicalRunId
+                p.AuthorityRootUserMessageId
+                p.TerminalAssistantMessageId
+                p.RepairKind
 
         | AgentFact.OrchestratorManagerJobCreated p ->
             AgentFactsFoldHelpers.foldOrchestratorManagerJobCreated proj p.ManagerId p.WorktreePath p.Branch p.Prompt

@@ -101,7 +101,7 @@ module PtyTests =
             let! signalCompletion = bridge.Join()
             let signalCompletion = ok signalCompletion
             equal signalledId.Value signalCompletion.RunId
-            equal (Ok PtyOutcome.Closed) signalCompletion.Outcome
+            equal PtyOutcome.Closed (AgentCompletion.text signalCompletion.Outcome)
             equal 4 log.Count
         }
 
@@ -127,7 +127,7 @@ module PtyTests =
             let id = ok created
             port.Complete(id, outcome = Ok "output")
             let! completion = bridge.Join()
-            equal (Ok "output") (ok completion).Outcome
+            equal "output" (AgentCompletion.text (ok completion).Outcome)
             let! _ = bridge.ForkPty("stay", cwd = "/workspace")
             let! _ = bridge.Fork("agent-list", AgentRole.Coder, "work")
             let agents, ptys = bridge.List()
@@ -226,7 +226,7 @@ module PtyTests =
         port.Complete(ptyId, outcome = Ok PtyOutcome.Closed)
         equal 1 completions.Count
         equal ptyId.Value completions.[0].RunId
-        equal (Ok "closed") completions.[0].Outcome
+        equal "closed" (AgentCompletion.text completions.[0].Outcome)
 
     [<Fact>]
     let ``Pty_mixed_list_returns_agent_and_pty_snapshots`` () =

@@ -18,8 +18,12 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
     /// Durable dedupe identity for a fallback failure. Matches the identity the
     /// fold stores in the per-session bounded `RecentFailureIds` (max 4 — the
     /// Dead threshold), so dedupe is O(sessions), not O(history).
-    let fallbackIdentity (assistantMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s" assistantMessageId providerAttempt
+    let fallbackIdentity
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
+        (providerAttempt: string)
+        =
+        sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
@@ -41,7 +45,9 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
                     match Map.tryFind p.SessionId proj.AgentProjections.Sessions with
                     | Some { Fallback = Some fb } ->
                         fb.IsDead
-                        || List.contains (fallbackIdentity p.AssistantMessageId p.ProviderAttempt) fb.RecentFailureIds
+                        || List.contains
+                            (fallbackIdentity p.LogicalRunId p.AuthorityRootUserMessageId p.ProviderAttempt)
+                            fb.RecentFailureIds
                     | _ -> false
                 | _ -> false
 
@@ -68,8 +74,12 @@ module AgentJournal =
 
     /// Single durable failure identity format shared by append boundary, fold,
     /// and FallbackDetect in-memory dedupe.
-    let fallbackIdentity (assistantMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s" assistantMessageId providerAttempt
+    let fallbackIdentity
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
+        (providerAttempt: string)
+        =
+        sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
 
     let createFromProjection
         (directory: string)

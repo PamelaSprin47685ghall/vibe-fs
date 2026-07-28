@@ -151,9 +151,13 @@ module VerdictSurface =
                         let providerRunId =
                             contextString ctx "messageID" |> Option.orElse (contextString ctx "messageId")
 
-                        // Content-based confirmation: pass the current user prompt
-                        // text (not message ids). Second PERFECT is proven when this
-                        // text contains the confirmation marker set by ReviewGuard.
+                        // Physical confirmation: pass both prompt text (diagnostics)
+                        // and the current physical user message id (authorization).
+                        let physicalUserMessageId =
+                            currentPhysicalUserMessage reviewerId
+                            |> Option.orElse (contextString ctx "userMessageID")
+                            |> Option.orElse (contextString ctx "userMessageId")
+
                         let! userPromptText =
                             task {
                                 let fromParts =
@@ -173,19 +177,20 @@ module VerdictSurface =
                                 with
                                 | Some text -> return Some text
                                 | None ->
-                                    let preferred =
-                                        currentPhysicalUserMessage reviewerId
-                                        |> Option.orElse (contextString ctx "userMessageID")
-                                        |> Option.orElse (contextString ctx "userMessageId")
-
-                                    return! latestUserPromptText snapshot reviewerId preferred
+                                    return! latestUserPromptText snapshot reviewerId physicalUserMessageId
                             }
 
                         match providerRunId with
                         | None -> return box (stringify (createObj [ "error", box "Missing ProviderRunId" ]))
                         | Some providerRunId ->
                             match
-                                host.SubmitVerdict(toolCallId, verdict, providerRunId, ?userPromptText = userPromptText)
+                                host.SubmitVerdict(
+                                    toolCallId,
+                                    verdict,
+                                    providerRunId,
+                                    ?userPromptText = userPromptText,
+                                    ?userMessageId = physicalUserMessageId
+                                )
                             with
                             | Error err -> return box (stringify (createObj [ "error", box err ]))
                             | Ok result ->

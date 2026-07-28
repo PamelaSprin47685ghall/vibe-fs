@@ -54,10 +54,17 @@ test('manager permission denies global executor tool and executes mailbox path',
     const list = JSON.parse(await hooks.tool.list.execute({}, context));
 
     assert.match(fork.agentId, /^[a-z0-9]{6}$/);
+    assert.equal(join.kind, 'agent');
+    assert.equal(join.status, 'completed');
     assert.equal(join.agentId, fork.agentId);
-    assert.equal(join.outcome[0], 'Ok');
+    assert.ok(typeof join.finalText === 'string' && join.finalText.length > 0, 'join finalText must be non-empty');
+    assert.ok(!Array.isArray(join.outcome), 'join must not emit F# Result arrays');
+    assert.equal(list[0].kind, 'agent');
     assert.equal(list[0].agentId, fork.agentId);
-    assert.equal(list[0].role, 'Coder');
+    assert.equal(list[0].role, 'coder');
+    assert.equal(typeof list[0].hasPendingCompletion, 'boolean');
+    assert.ok('currentRunId' in list[0], 'list must expose currentRunId');
+    assert.ok('lastCompletionStatus' in list[0], 'list must expose lastCompletionStatus');
     const commonDirectory = execFileSync('git', ['-C', journalDirectory, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
     const gitDirectory = path.isAbsolute(commonDirectory) ? commonDirectory : path.resolve(journalDirectory, commonDirectory);
     const runtimeDirectory = path.join(gitDirectory, 'wanxiangshu-next', 'runtimes');

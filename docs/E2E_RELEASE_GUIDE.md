@@ -42,7 +42,7 @@ CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 
 ## 3. Companion
 
-**Host-contract gate.** The installed plugin type declares `experimental.chat.messages.transform(input: {})`: no session or typed role is provided. Do not infer an unknown root role. Before these scenarios can pass, obtain a transform session ID + role, a stable SDK metadata read, or a typed prompt-acceptance role binding. Otherwise record `COMPANION_HOST_CONTRACT_UNAVAILABLE` and keep release blocked.
+**Authority gate.** Companion eligibility reads only `ActiveLogicalRun.Profile.Agent`. Missing ActiveLogicalRun means no Blogger and a `MissingAuthorityProfile` diagnostic. Do not infer role from `sessionRoles`, last physical user agent, transform input agent, or child linkage.
 
 每项必须比较实际送到 provider 的 provider-visible bytes，而非 Host timestamp/runtime metadata：
 
@@ -54,30 +54,29 @@ CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 6. 旧/外来 `companion-b-head-*` fixture 不得被视为当前 epoch 的幂等命中；必须 fail closed 或走明确清理路径。
 7. 重启后恢复同一个 Blogger；若 Blogger 不存在，发送 full reset，不得将 delta 发给空白 Blogger。
 
-## 4. Fallback A/A/B/B（user-prompt 延续语义，非 session 永久 model）
+## 4. Fallback A/A/B/B（Logical Run attempt，非 Session 永久 Side）
 
-Session **不**绑定永久 agent/model。Host 的语义是：延续**最后一次 user prompt** 上的 agent/model（见 host-docs：createUserMessage 会用本条 message 的 model 更新 session 缓存）。用户只要在下一条 prompt 显式指定其他 model，即可切走。
+Fallback 属于 **Logical Run**，不属于 Session 永久状态。
 
-产品 A/A/B/B 因此不依赖 `setAgentModel` 或 retry 钩子改 session 永久字段，而依赖：
+冻结规则：
 
 1. `session.status=retry` 写 durable `FallbackFailureRecorded`（唯一写入口）；
-2. Failures 映射：0/1→A，2 永久切 B，3→B，≥4 Dead；
-3. 下一条 **省略 model** 的 Authority Root user prompt，由 `chat.message` 按 durable Side 注入 A 或 B，写入该条 user message；
-4. Host 内部 Effect.retry 仍可能对**同一条 user message** 复用同一 model（A 或 B 的第二次 attempt）——这是同 prompt 内的 provider retry，不是 session 永久绑定。
+2. 同一 Logical Run attempt 映射：1→A，2→A，3→B，4→B，5→禁止；
+3. identity = `logicalRunId + AuthorityRootUserMessageId + providerAttempt`；
+4. 新 Authority Root 始终新 epoch：`Failures=0, Side=A`；
+5. 真人显式 model 永远优先；
+6. 真人省略 model 只继承 `LastAuthorityProfile.BaseModel`，**绝不**继承旧 Run 的 Side B EffectiveModel；
+7. Continuation / B retry 不写回 LastAuthorityProfile。
 
 可接受 canary 轨迹（`fallback-canary`）：
 
 ```text
-user root (model A) → fail → same-prompt A retry → idle
-user root (model A) → fail → same-prompt A retry → idle  (Side 永久 B)
-restart
-user root (omit model) → plugin injects B → fail → same-prompt B retry
-user root (omit model) → B → fail → same-prompt B retry → Dead
+Authority Root A → fail → same-run A retry → fail → same-run B → fail → same-run B → Dead
+new Authority Root（omit model）→ inherits BaseModel，epoch resets to Side=A
+new Authority Root（explicit model C）→ BaseModel=C，epoch resets
 ```
 
-显式 user model 永远优先，并开启新 Fallback epoch（Failures=0, Side=A）。
-
-**不是** Host 合同阻塞：禁止用「Host 不在 Effect.retry 里 setAgentModel」作为 No-Go 理由。
+**仍是发行阻断**：必须证明同一 Logical Run 内真实 provider request 为严格 `A A B B`，且没有第五个 request。不能用「下一真人 prompt 才切 B」冒充同 Run A/A/B/B。
 
 ## 5. Review witness
 

@@ -34,6 +34,7 @@ const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 30000,
 const CANARY_COUNT = 16;
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
+  "testkit/opencode/tests/manager-full-loop-canary.mjs",
   "testkit/opencode/tests/companion-canary.mjs",
   "testkit/opencode/tests/reviewer-verdict-canary.mjs",
   "testkit/opencode/tests/executor-canary.mjs",

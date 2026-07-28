@@ -70,6 +70,7 @@ module JournalFoldTests =
                            ReviewerSessionId = revSid
                            ProviderRunId = "pr-1"
                            UserPromptText = None
+                           UserMessageId = None
                            ToolCallId = "call-1"
                            GitTreeHash = treeHash
                            Verdict = ReviewGuardVerdict.Perfect |})

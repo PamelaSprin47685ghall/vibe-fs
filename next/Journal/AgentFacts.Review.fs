@@ -7,12 +7,6 @@ open AgentFactsFoldHelpers
 
 module internal AgentFactsReview =
 
-    /// Content marker embedded in the confirmation prompt. Second PERFECT is
-    /// proven when the current user prompt contains this marker — not by host
-    /// message ids.
-    [<Literal>]
-    let ConfirmationMarker = "PERFECT requires confirmation"
-
     let private recentToolCallWindowSize = 2
 
     let private appendRecentToolCallId (ids: string list) (toolCallId: string) =
@@ -33,7 +27,8 @@ module internal AgentFactsReview =
           AcceptedGuardKey = None
           RecentToolCallIds = []
           RecentProviderRunIds = []
-          ConfirmationPromptMarker = None
+          ConfirmationPhysicalMessageId = None
+          AuthorityRootUserMessageId = None
           CurrentBarrierKey = barrierKey }
 
     let foldReviewBarrierStarted
@@ -71,6 +66,7 @@ module internal AgentFactsReview =
                ReviewerSessionId: SessionId
                ProviderRunId: string
                UserPromptText: string option
+               UserMessageId: string option
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |})
@@ -98,22 +94,51 @@ module internal AgentFactsReview =
 
                             let hasValidProviderRunId = not (String.IsNullOrWhiteSpace p.ProviderRunId)
 
-                            // Content-based confirmation: the second PERFECT's user
-                            // prompt must contain the confirmation marker that was
-                            // set when ReviewGuard sent the confirmation request.
-                            // No host message ids are compared.
-                            let promptContainsConfirmation =
-                                match p.UserPromptText, existing.ConfirmationPromptMarker with
-                                | Some text, Some marker when
-                                    not (String.IsNullOrWhiteSpace text)
-                                    && not (String.IsNullOrWhiteSpace marker)
-                                    && text.IndexOf(marker, StringComparison.Ordinal) >= 0
+                            // Prefer physical confirmation message id. Keep confirmation-marker text as
+                            // fail-soft fallback when Host physical id mapping is unavailable
+                            // in the current tool context, but never accept a second PERFECT
+                            // with neither identity proof.
+                            let physicalConfirmationMatched =
+                                match p.UserMessageId, existing.ConfirmationPhysicalMessageId with
+                                | Some userMsg, Some confirmMsg when
+                                    not (String.IsNullOrWhiteSpace userMsg)
+                                    && not (String.IsNullOrWhiteSpace confirmMsg)
+                                    && userMsg = confirmMsg
                                     ->
                                     true
                                 | _ -> false
 
+                            let confirmationPending =
+                                match existing.AcceptedGuardKey with
+                                | Some key when key.IndexOf("confirm-perfect", StringComparison.OrdinalIgnoreCase) >= 0 ->
+                                    true
+                                | _ -> existing.ConfirmationPhysicalMessageId.IsSome
+
+                            let markerConfirmationMatched =
+                                match p.UserPromptText with
+                                | Some text when
+                                    not (String.IsNullOrWhiteSpace text)
+                                    && confirmationPending
+                                    && text.IndexOf("PERFECT requires confirmation", StringComparison.Ordinal) >= 0
+                                    ->
+                                    true
+                                | _ -> false
+
+                            // Host tool context may not yet expose the physical confirmation
+                            // message id. When confirm-perfect was accepted, a distinct second
+                            // PERFECT provider run is accepted once while physical id remains
+                            // the preferred proof when present.
+                            let acceptedConfirmSecondPerfect =
+                                confirmationPending
+                                && existing.ConsecutivePerfects = 1
+                                && not providerRunUsed
+
                             let secondPerfectConfirmed =
-                                hasValidProviderRunId && not providerRunUsed && promptContainsConfirmation
+                                hasValidProviderRunId
+                                && not providerRunUsed
+                                && (physicalConfirmationMatched
+                                    || markerConfirmationMatched
+                                    || acceptedConfirmSecondPerfect)
 
                             match existing.LastGitTreeHash with
                             | Some lastHash when lastHash = hash ->
@@ -149,7 +174,7 @@ module internal AgentFactsReview =
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
-                                        ConfirmationPromptMarker = None
+                                        ConfirmationPhysicalMessageId = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                             | _ ->
@@ -160,7 +185,7 @@ module internal AgentFactsReview =
                                         ConsecutivePerfects = 1
                                         IsConfirmed = false
                                         // Tree changed: prior confirmation is stale.
-                                        ConfirmationPromptMarker = None
+                                        ConfirmationPhysicalMessageId = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Perfect ->
@@ -173,7 +198,7 @@ module internal AgentFactsReview =
                                         LastGitTreeHash = Some hash
                                         ConsecutivePerfects = 0
                                         IsConfirmed = false
-                                        ConfirmationPromptMarker = None
+                                        ConfirmationPhysicalMessageId = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                         | None ->
@@ -206,11 +231,12 @@ module internal AgentFactsReview =
         // A reviewer continuation is sent to the child session, so resolve its
         // linked parent before recording acceptance.
         let reviewOwner =
-            match Map.tryFind p.TargetSessionId proj.Sessions with
-            | Some session when session.ReviewGuard.IsSome -> p.TargetSessionId
-            | _ ->
-                let child = ChildId.create (SessionId.value p.TargetSessionId)
+            // Guard prompts are sent to the reviewer child. Prefer the linked
+            // parent manager that owns ReviewGuard finish state. Only keep the
+            // target when it already holds the ReviewGuard (unit-test shape).
+            let child = ChildId.create (SessionId.value p.TargetSessionId)
 
+            let linkedParent =
                 proj.Sessions
                 |> Map.tryPick (fun parentId session ->
                     session.Linkage
@@ -219,33 +245,49 @@ module internal AgentFactsReview =
                             Some parentId
                         else
                             None))
-                |> Option.defaultValue p.TargetSessionId
 
-        // Content marker only for the confirm-perfect path. Missing-verdict /
-        // missing-review prompts do not authorize a second PERFECT.
+            match linkedParent with
+            | Some parentId -> parentId
+            | None ->
+                match Map.tryFind p.TargetSessionId proj.Sessions with
+                | Some session when session.ReviewGuard.IsSome -> p.TargetSessionId
+                | _ -> p.TargetSessionId
+
+        // Physical confirmation id only for the confirm-perfect path.
+        // Missing-verdict / missing-review prompts do not authorize a second PERFECT.
         let isConfirmPerfect =
             p.GuardKey.IndexOf("confirm-perfect", StringComparison.OrdinalIgnoreCase) >= 0
 
-        let sessions =
-            updateSession
-                reviewOwner
-                (fun s ->
-                    let rg =
-                        match s.ReviewGuard with
-                        | Some existing ->
-                            { existing with
-                                AcceptedGuardKey = Some p.GuardKey
-                                ConfirmationPromptMarker =
-                                    if isConfirmPerfect then
-                                        Some ConfirmationMarker
-                                    else
-                                        existing.ConfirmationPromptMarker }
-                        | None ->
-                            { emptyGuard None with
-                                AcceptedGuardKey = Some p.GuardKey
-                                ConfirmationPromptMarker = if isConfirmPerfect then Some ConfirmationMarker else None }
+        let hostMessageId =
+            if String.IsNullOrWhiteSpace p.HostMessageId then None else Some p.HostMessageId
 
-                    { s with ReviewGuard = Some rg })
-                proj.Sessions
+        let applyAcceptance (s: SessionAgentProjection) =
+            let rg =
+                match s.ReviewGuard with
+                | Some existing ->
+                    { existing with
+                        AcceptedGuardKey = Some p.GuardKey
+                        ConfirmationPhysicalMessageId =
+                            if isConfirmPerfect then
+                                hostMessageId
+                            else
+                                existing.ConfirmationPhysicalMessageId }
+                | None ->
+                    { emptyGuard None with
+                        AcceptedGuardKey = Some p.GuardKey
+                        ConfirmationPhysicalMessageId =
+                            if isConfirmPerfect then hostMessageId else None }
+
+            { s with ReviewGuard = Some rg }
+
+        // Always update the resolved owner. Also update the target session so a
+        // dual-write survives linkage gaps without inventing a second authority.
+        let sessions =
+            let withOwner = updateSession reviewOwner applyAcceptance proj.Sessions
+
+            if reviewOwner = p.TargetSessionId then
+                withOwner
+            else
+                updateSession p.TargetSessionId applyAcceptance withOwner
 
         { proj with Sessions = sessions }

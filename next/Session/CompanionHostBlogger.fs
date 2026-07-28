@@ -20,10 +20,48 @@ module internal CompanionHostBlogger =
           BloggerNeedsReset: bool ref
           Companion: Companion
           OutputWatermark: SessionId -> int
-          AssistantOutput: SessionId -> int -> string }
+          AssistantOutput: SessionId -> int -> string
+          Journal: AgentJournal option }
 
     let failBlog (message: string) : string =
         raise (InvalidOperationException message)
+
+    let private sendBloggerPrompt
+        (deps: BloggerDeps)
+        (childId: SessionId)
+        (prompt: string)
+        (model: OpencodeModel)
+        : Task<Result<MessageId, string>> =
+        task {
+            match deps.Journal with
+            | Some journal ->
+                let svc = PromptDispatcher.forJournal journal
+
+                let! outcome =
+                    svc.SendAgentOwnerRoot
+                        deps.Sessions
+                        childId
+                        prompt
+                        "blogger"
+                        (Some model)
+                        None
+                        None
+                        None
+
+                match outcome with
+                | Ok (messageId, _) -> return Ok messageId
+                | Error err -> return Error err
+            | None ->
+                return!
+                    deps.Sessions.SendPrompt(
+                        childId,
+                        prompt,
+                        { Model = Some model
+                          Agent = Some "blogger"
+                          Directory = None
+                          Metadata = None }
+                    )
+        }
 
     let blog (deps: BloggerDeps) (currentProjection: ProjectionSnapshot) (delta: ProjectionSnapshot) : Task<BlogText> =
         task {
@@ -63,15 +101,7 @@ module internal CompanionHostBlogger =
                             "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
                             delta
 
-                let! sent =
-                    deps.Sessions.SendPrompt(
-                        childId,
-                        prompt,
-                        { Model = Some model
-                          Agent = Some "blogger"
-                          Directory = None
-                          Metadata = None }
-                    )
+                let! sent = sendBloggerPrompt deps childId prompt model
 
                 match sent with
                 | Error error -> return failBlog error
@@ -135,15 +165,7 @@ module internal CompanionHostBlogger =
                         "You are the blogger of a coding agent session. Condense the following FULL companion context into a single dense paragraph that preserves every durable fact, decision, and instruction. Output ONLY the condensed paragraph.\n%s"
                         currentB
 
-                let! sent =
-                    deps.Sessions.SendPrompt(
-                        childId,
-                        prompt,
-                        { Model = Some model
-                          Agent = Some "blogger"
-                          Directory = None
-                          Metadata = None }
-                    )
+                let! sent = sendBloggerPrompt deps childId prompt model
 
                 match sent with
                 | Error error -> return failBlog error

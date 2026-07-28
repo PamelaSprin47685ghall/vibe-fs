@@ -24,6 +24,8 @@ module private DurableFallbackTestSupport =
         let fact =
             AgentFact.FallbackFailureRecorded
                 {| SessionId = sessionId
+                   LogicalRunId = "run-test"
+                   AuthorityRootUserMessageId = "root-test"
                    Reason = reason
                    AssistantMessageId = sprintf "test-msg-%s-%d" (SessionId.value sessionId) n
                    ProviderAttempt = sprintf "test-attempt-%d" n |}
@@ -200,6 +202,8 @@ module DurableFallbackTests =
                         None
                         (AgentFact.FallbackFailureRecorded
                             {| SessionId = sid
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = sprintf "err-%d" i
                                AssistantMessageId = sprintf "msg-%d" i
                                ProviderAttempt = sprintf "attempt-%d" i |})
@@ -218,6 +222,8 @@ module DurableFallbackTests =
                         None
                         (AgentFact.FallbackFailureRecorded
                             {| SessionId = sid
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "post-dead"
                                AssistantMessageId = "msg-5"
                                ProviderAttempt = "attempt-5" |})

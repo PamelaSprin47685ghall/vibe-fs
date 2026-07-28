@@ -32,6 +32,8 @@
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/AgentJournal.fs"/>
     <Compile Include="Journal/RuntimePath.fs"/>
+    <Compile Include="Session/ForkTypes.fs"/>
+    <Compile Include="Session/AgentCompletion.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/Fallback.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
@@ -87,11 +89,17 @@
     <Compile Include="OpenCode/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
+    <Compile Include="OpenCode/PromptAuthorityRestore.fs"/>
+    <Compile Include="OpenCode/PromptAuthorityAccept.fs"/>
+    <Compile Include="OpenCode/PromptAuthoritySend.fs"/>
+    <Compile Include="OpenCode/PromptAuthorityService.fs"/>
     <Compile Include="OpenCode/PromptDispatcher.fs"/>
     <Compile Include="Session/AgentRoleHelpers.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
+    <Compile Include="Session/HostForkChildDispatch.fs"/>
+    <Compile Include="Session/HostForkAgentOwner.fs"/>
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
@@ -106,6 +114,7 @@
     <Compile Include="OpenCode/CompletedTurnClassifier.fs"/>
     <Compile Include="OpenCode/SessionReconciler.fs"/>
     <Compile Include="OpenCode/RetrySignalHandler.fs"/>
+    <Compile Include="OpenCode/PluginFallbackRetry.fs"/>
     <Compile Include="OpenCode/ReviewerGuardState.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
     <Compile Include="OpenCode/HostSignalChatMessage.fs"/>

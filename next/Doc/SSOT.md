@@ -26,17 +26,32 @@ Host `role=user` 只是运输格式。零宽、空白、固定模板、时间与
 - Busy nudge：同 RunId、同 completion、同 AuthorityRoot
 - Idle existing agent 的新任务：`AgentOwnerRoot`（新 Run）
 
-### PromptDispatcher 两阶段协议
+### PromptAuthorityService / PromptDispatcher 两阶段协议
 
-所有插件 user-shaped message 必须经 `PromptDispatcher`：
+每个 Plugin runtime 只有一个 `PromptAuthorityService`（由 Journal snapshot 初始化）。禁止多处 `new Dispatcher()` 各自维护内存 projection。
+
+所有插件 user-shaped message 必须经该服务：
 
 1. `PluginPromptClaimed(PromptKey, Origin, LogicalRunId, AuthorityRoot, Agent, EffectiveModel, Variant)`
 2. 带 metadata 发送：`wanxiangshu_prompt_key` / `wanxiangshu_origin` / `wanxiangshu_logical_run` / `wanxiangshu_authority_root`
-3. Host 接受 → `PluginPromptAccepted(PromptKey, HostMessageId)`
+3. Host 接受 → `PluginPromptAccepted(PromptKey, HostMessageId)`；Authority Root 还写 `AuthorityRootAccepted`
 4. 失败 → `PluginPromptAbandoned`
 5. Host 无法关联 acceptance → fail-closed `HostContractUnsupported`（禁止当 HumanRoot）
 
-禁止任何模块直接 `prompt_async` 发送 Guard / repair / nudge / confirmation。
+`logicalRunId = hash(runtimeId + sessionId + authorityRootUserMessageId)`；同一 Host message 重放只产生一个 root。
+
+AgentOwnerRoot 必须两阶段：
+
+```text
+create child
+→ claim AgentOwnerRoot
+→ SendPrompt（显式 agent/model/variant + PromptKey metadata）
+→ Host 接受
+→ AuthorityRootAccepted
+→ 才允许 run 进入 active
+```
+
+禁止任何模块直接 `prompt_async` 发送 Guard / repair / nudge / confirmation / 新 child 首 prompt。
 
 ### 来源解析优先级
 
@@ -56,24 +71,44 @@ accepted HostMessageId
 ### LastAuthorityProfile
 
 - 真人显式 agent/model/variant 永远优先并开启新 Authority + 新 Fallback epoch（Failures=0, Side=A）
-- 真人省略字段只从 `LastAuthorityProfile` 继承，绝不从最后物理 user 或 B retry 继承
+- 真人省略字段只从 `LastAuthorityProfile` 继承：agent / BaseModel / variant
+- 省略 model 绝不从旧 Run 的 Side B EffectiveModel 继承
 - Continuation 不得写回 LastAuthorityProfile
 
-### Fallback identity
+### Fallback
 
 ```text
-logicalRunId + AuthorityRootUserMessageId + providerAttempt
+Fallback 属于 Logical Run。
+新 Authority Root 创建新 Fallback epoch：Failures=0, Side=A。
+Continuation 不创建新 epoch。
+B attempt 不成为未来真人 prompt 的默认模型。
+
+FallbackAttemptIdentity =
+  logicalRunId + AuthorityRootUserMessageId + providerAttempt
 ```
 
-禁止用「最后物理 user message」替代 AuthorityRootUserMessageId。
+当前 Run attempt 映射：1→A, 2→A, 3→B, 4→B, 5→禁止。唯一 durable writer：`session.status=retry`。
+
+禁止：
+
+```text
+每 Session 永久 Side B
+下一 Authority Root 省略 model 时继承旧 Run 的 Side B
+Session 自身拥有 A/B model 作为 authority 来源
+```
 
 ### Interaction Repair
 
 ```text
-sessionId + AuthorityRootUserMessageId + terminalAssistantMessageId + repairKind
+InteractionRepairClaimed {
+  LogicalRunId
+  AuthorityRootUserMessageId
+  TerminalAssistantMessageId
+  RepairKind
+}
 ```
 
-同一 identity 最多一次。repair continuation 的 PhysicalUserMessageId **不**进入 identity、**不**产生新预算。
+同一 identity 最多一次。第二次仍空输出→ `MISSING_FINAL_REPORT`，禁止继续零宽自激励。
 
 ### Review witness
 
@@ -82,11 +117,13 @@ sessionId + AuthorityRootUserMessageId + terminalAssistantMessageId + repairKind
 - `PhysicalUserMessageId` = confirmation Host message
 - `AuthorityRootUserMessageId` = 原 Reviewer task root
 
-不得混为一个字段。
+不得混为一个字段；不得仅以确认文本 marker 作为授权证明。
 
 ### Companion
 
-- eligibility 只读 `ActiveLogicalRun.Profile.Agent`
+- eligibility **唯一** 读 `ActiveLogicalRun.Profile.Agent`
+- 缺 ActiveLogicalRun：不创建 Blogger，记录 MissingAuthorityProfile
+- 禁止生产备用：`sessionRoles`、最后物理 user agent、transform input agent、child linkage、历史最早带 agent 消息
 - bare synthetic continuation ≠ semantic delta；其后正式 assistant 输出才可能构成 delta
 
 ### 删除清单（语义层）
@@ -96,7 +133,9 @@ Session 永久 agent/model 作为 authority 来源
 从最后物理 user 推导 authority
 按零宽文本识别 synthetic
 synthetic 更新 currentUserMessageId / Fallback root
-sessionRoles 推导 Companion eligibility（目标态）
+sessionRoles 推导 Companion eligibility
+新真人省略 model 时注入旧 Side B
+多个 PromptDispatcher 实例各自缓存 authority
 ```
 
 ### 发布阻断
@@ -105,7 +144,9 @@ sessionRoles 推导 Companion eligibility（目标态）
 零宽 repair 可更新 LastAuthority
 synthetic 可重置 repair 预算或成为 Fallback root
 无法识别来源时默认 Human
-模块绕过 PromptDispatcher 发 continuation
+模块绕过 PromptAuthorityService 发 continuation
+sessionRoles 决定 Companion eligibility
+用户显式 model 被旧 Fallback side 覆盖
 ```
 
 ## Event-Stagger 规则

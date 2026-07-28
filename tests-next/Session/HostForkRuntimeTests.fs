@@ -76,7 +76,7 @@ module HostForkRuntimeTests =
             let! joined = bridge.Join()
 
             match joined with
-            | Ok completion -> Assert.Equal(Ok "A version output", completion.Outcome)
+            | Ok completion -> Assert.equal("A version output", AgentCompletion.text completion.Outcome)
             | Error error -> Assert.True(false, sprintf "Expected completion, got %A" error)
 
             let! second = bridge.Reuse("agent-1", "continue")
@@ -173,7 +173,7 @@ module HostForkRuntimeTests =
             let! joined = bridge.Join()
 
             match joined with
-            | Ok completion -> Assert.Equal(Ok "A version output", completion.Outcome)
+            | Ok completion -> Assert.equal("A version output", AgentCompletion.text completion.Outcome)
             | Error error -> Assert.True(false, sprintf "Expected completion, got %A" error)
 
             Assert.Equal(0, bridge.PendingRunCount)
@@ -252,6 +252,8 @@ module HostForkRuntimeTests =
                         None
                         (AgentFact.FallbackFailureRecorded
                             {| SessionId = childId
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = reason
                                AssistantMessageId = sprintf "test-msg-%s" attempt
                                ProviderAttempt = attempt |})

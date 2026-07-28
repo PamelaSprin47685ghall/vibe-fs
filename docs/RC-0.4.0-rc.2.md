@@ -1,48 +1,62 @@
-# 0.4.0-rc.2 — Remediation RC (release gate green)
+# 0.4.0-rc.2 — historical development record (not a release)
 
 | Field | Value |
 |---|---|
-| **Version** | `0.4.0-rc.2` |
+| **Version marker** | `0.4.0-rc.2` (superseded by `0.4.0-rc.3-dev`) |
 | **Date** | 2026-07-28 |
-| **Gate** | `npm run test:release` → **exit 0** |
-| **P0** | 16 canaries × 3 staggered rounds — all pass |
+| **Status** | Historical development snapshot. **Not** a release candidate. |
 
-## Semantic correction: Fallback is not a Host-contract blocker
+## Why this is not RC
 
-Session **does not own** a permanent agent/model. Host only continues the **last user prompt**'s agent/model. Explicit user model always wins and may start a new Authority / Fallback epoch.
+This document previously claimed a green release gate. That claim is withdrawn: there was no matching clean-checkout evidence package, and later audits found conflicting product semantics still open.
 
-A/A/B/B is implemented as:
+Current development marker: `0.4.0-rc.3-dev`.
 
-1. Durable `FallbackFailureRecorded` only on `session.status=retry`
-2. Failures → Side map (A, A, permanent B, B, Dead)
-3. Next Authority Root prompt that **omits model** → `chat.message` injects Side A/B into **that user message**
-4. Host Effect.retry may re-run the **same** user message with the same model (attempt-local); that is not session lock-in
+The first real release candidate for this track should be:
 
-No `setAgentModel` required. No `HOST_CONTRACT_UNAVAILABLE` for this product shape.
-
-## What landed (code, not docs-only)
-
-- Prompt Authority full pipeline (claim/accept, UnknownOrigin fail-closed, Busy nudge, Companion eligibility, Fallback identity)
-- Script forest mock (KISS-N11); error edges not seal-cached
-- Review content confirmation; orchestrator / restart publish canaries
-- Fallback user-prompt model injection in `HostSignalChatMessage`
-- `docs/E2E_RELEASE_GUIDE.md` §4 rewritten to match
-
-## Verify
-
-```bash
-npm run test:release
-# = build + test:compile + test:next + manager-tools + gate-testkit + 3× staggered P0
+```text
+0.4.0-rc.3
 ```
 
-## Next
+Do not reuse the `rc.2` label after it already published a premature green claim.
 
-- Optional: promote to `0.4.0` final after clean-checkout re-run and pack install smoke
-- Keep product rule: explicit user model resets Fallback epoch; omit-model inherits durable Side
+## What did land in that development window
 
-## Ship
+Useful progress, not ship criteria:
 
-```bash
-git push origin master
-# optional: git tag v0.4.0-rc.2 && git push origin v0.4.0-rc.2
+- Prompt Authority types, journal facts, UnknownOrigin fail-closed baseline
+- tool-calls → TurnInProgress / length → TurnNeedsContinuation
+- Reconciler chooses last assistant after current root
+- Role prompts and parent LatestB injection for new children
+- Busy nudge beginning to use continuation metadata
+- Event-stagger canary runner shape
+
+## Open blockers retained after that window
+
+1. Prompt Authority does not fully replace `sessionRoles` / session-level model inference.
+2. Agent completion is still collapsed to `Result<string,string>` / F# Result arrays at `join()`.
+3. Manager → Inspector/Coder/Reviewer real Host loop is incomplete.
+4. Companion eligibility still has production fallbacks outside `ActiveLogicalRun`.
+5. Review second PERFECT still leans on confirmation text markers.
+6. Fallback docs/code mixed Logical-Run attempts with cross-root Side B inheritance.
+
+## Correct Fallback / Authority rules going forward
+
+```text
+Fallback belongs to a Logical Run.
+New Authority Root creates a new Fallback epoch (Failures=0, Side=A).
+Explicit human model always wins.
+Continuation never creates a new epoch.
+B attempt EffectiveModel never becomes the next human root default model.
+Omit-model human root inherits LastAuthorityProfile.BaseModel only.
+Companion eligibility reads only ActiveLogicalRun.Profile.Agent.
 ```
+
+## Do not claim
+
+- release gate green
+- 16 × 3 all pass as ship evidence
+- Fallback fully solved
+- ready to promote to `0.4.0`
+
+Those claims require a later `0.4.0-rc.3` evidence package: commit SHA, dependency lock hash, three-round logs, provider traces, journal, clean tarball install.

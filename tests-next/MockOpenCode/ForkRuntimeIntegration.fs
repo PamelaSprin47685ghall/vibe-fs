@@ -21,14 +21,14 @@ module ForkRuntimeIntegration =
         task {
             let mutable completed = None
             let runner (_: string) (_: AgentRole) (_: string option) =
-                Task.FromResult(Ok "task done")
+                Task.FromResult(AgentCompletion.ofSimpleText "agent-1" "run-1" AgentRole.Coder "task done")
             let runtime = ForkRuntime(runner = runner, listener = (fun c -> completed <- Some c))
             let result = runtime.Fork("agent-1", AgentRole.Coder, prompt = "implement feature")
             trueThat (match result with ForkResult.Created _ -> true | _ -> false) "Fork must return Created"
             let! joinResult = runtime.Join()
             match joinResult with
             | Ok c ->
-                equal "agent-1" c.AgentId; equal AgentRole.Coder c.Role; equal (Ok "task done") c.Outcome
+                equal "agent-1" c.AgentId; equal AgentRole.Coder c.Role; equal "task done" (AgentCompletion.text c.Outcome)
             | Error err -> failwithf "Expected Ok completion, got %A" err
             match completed with Some c -> equal "agent-1" c.AgentId | None -> failwith "Listener not called"
         }
@@ -37,7 +37,7 @@ module ForkRuntimeIntegration =
     let ``Fork busy agent returns Nudged`` () =
         task {
             let mutable count = 0
-            let neverComplete = TaskCompletionSource<Result<string, string>>()
+            let neverComplete = TaskCompletionSource<AgentCompletionOutcome>()
             let runner (_: string) (_: AgentRole) (_: string option) = neverComplete.Task
             let runtime = ForkRuntime(runner = runner, listener = (fun _ -> count <- count + 1))
             let r1 = runtime.Fork("a", AgentRole.Coder, prompt = "first")
@@ -48,10 +48,10 @@ module ForkRuntimeIntegration =
             trueThat (match r2 with ForkResult.Nudged _ -> true | _ -> false) "Busy fork must be Nudged"
 
             // Complete the first run
-            neverComplete.SetResult(Ok "done")
+            neverComplete.SetResult(AgentCompletion.ofSimpleText "a" "run-a" AgentRole.Coder "done")
             let! j = runtime.Join()
             match j with
-            | Ok c -> equal "a" c.AgentId; equal AgentRole.Coder c.Role; equal (Ok "done") c.Outcome
+            | Ok c -> equal "a" c.AgentId; equal AgentRole.Coder c.Role; equal "done" (AgentCompletion.text c.Outcome)
             | Error e -> failwithf "Expected Ok, got %A" e
             equal 1 count
         }
@@ -68,27 +68,27 @@ module ForkRuntimeIntegration =
     let ``Fork with work function delivers outcome`` () =
         task {
             let runtime = ForkRuntime()
-            let work () : Task<Result<string, string>> = Task.FromResult(Ok "computed")
+            let work () : Task<AgentCompletionOutcome> = Task.FromResult(AgentCompletion.ofSimpleText "w" "run-w" AgentRole.Coder "computed")
             runtime.Fork("w", AgentRole.Coder, runWork = work) |> ignore
             let! j = runtime.Join()
-            match j with Ok c -> equal (Ok "computed") c.Outcome | Error e -> failwithf "Expected Ok, got %A" e
+            match j with Ok c -> equal "computed" (AgentCompletion.text c.Outcome) | Error e -> failwithf "Expected Ok, got %A" e
         }
 
     /// Fork with a failing work function returns error outcome.
     let ``Fork with failing work function delivers error outcome`` () =
         task {
             let runtime = ForkRuntime()
-            let work () : Task<Result<string, string>> = Task.FromResult(Error "failed")
+            let work () : Task<AgentCompletionOutcome> = Task.FromResult(AgentCompletion.ofSimpleError "f" "run-f" AgentRole.Coder "failed")
             runtime.Fork("f", AgentRole.Coder, runWork = work) |> ignore
             let! j = runtime.Join()
-            match j with Ok c -> equal (Error "failed") c.Outcome | Error e -> failwithf "Expected Ok, got %A" e
+            match j with Ok c -> equal "failed" (AgentCompletion.text c.Outcome) | Error e -> failwithf "Expected Ok, got %A" e
         }
 
     /// Cancel a runtime that has a busy agent and pending join waiter.
     let ``Cancel runtime delivers Cancelled to pending joiners`` () =
         task {
             let runtime = ForkRuntime()
-            let never = TaskCompletionSource<Result<string, string>>()
+            let never = TaskCompletionSource<AgentCompletionOutcome>()
             runtime.Fork("a1", AgentRole.Coder, runWork = (fun () -> never.Task)) |> ignore
             let jt = runtime.Join()
             runtime.Cancel()

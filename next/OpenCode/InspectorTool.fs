@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
 
 /// One-shot Inspector tool for Coder/Reviewer/Meditator.
@@ -59,6 +60,7 @@ module InspectorTool =
         (backgroundBFor: (string -> string option) option)
         (directoryFor: (string -> string option) option)
         (registerChildDirectory: (string -> string -> unit) option)
+        (journal: AgentJournal option)
         : obj =
         let factory = toolModule?tool
         let backgroundOf = defaultArg backgroundBFor (fun _ -> None)
@@ -133,15 +135,8 @@ module InspectorTool =
                                         childId,
                                         fun _ outcome ->
                                             match outcome with
-                                            | TerminalOutcome.Completed _ ->
-                                                let output =
-                                                    sessionPort.GetSessionOutput childId
-                                                    |> List.filter (fun line ->
-                                                        not (line.StartsWith "Prompt: ")
-                                                        && not (line.StartsWith "ChildPrompt: "))
-                                                    |> String.concat "\n"
-
-                                                finish output
+                                            | TerminalOutcome.Completed result ->
+                                                finish result.FinalText
                                             | TerminalOutcome.Aborted reason ->
                                                 tcs.TrySetException(
                                                     InvalidOperationException(sprintf "Inspector aborted: %s" reason)
@@ -156,14 +151,35 @@ module InspectorTool =
                                 )
 
                             let! sent =
-                                sessionPort.SendPrompt(
-                                    childId,
-                                    fullPrompt,
-                                    { Model = None
-                                      Agent = Some "inspector"
-                                      Directory = parentDir
-                                      Metadata = None }
-                                )
+                                match journal with
+                                | Some j ->
+                                    task {
+                                        let svc = PromptDispatcher.forJournal j
+
+                                        let! outcome =
+                                            svc.SendAgentOwnerRoot
+                                                sessionPort
+                                                childId
+                                                fullPrompt
+                                                "inspector"
+                                                None
+                                                None
+                                                parentDir
+                                                None
+
+                                        match outcome with
+                                        | Ok (messageId, _) -> return Ok messageId
+                                        | Error err -> return Error err
+                                    }
+                                | None ->
+                                    sessionPort.SendPrompt(
+                                        childId,
+                                        fullPrompt,
+                                        { Model = None
+                                          Agent = Some "inspector"
+                                          Directory = parentDir
+                                          Metadata = None }
+                                    )
 
                             match sent with
                             | Error err -> finish (sprintf "send failed: %s" err)

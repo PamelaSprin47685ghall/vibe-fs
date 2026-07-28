@@ -1,0 +1,1199 @@
+{
+  "scenario": "manager-full-loop",
+  "setup": {
+    "project": {
+      "files": {
+        "AGENTS.md": "manager full loop canary\n",
+        "src/main.txt": "target\n"
+      }
+    },
+    "strict": true
+  },
+  "session": {
+    "agent": "manager",
+    "bind": [
+      "manager-title",
+      "manager"
+    ]
+  },
+  "prompt": {
+    "agent": "manager",
+    "text": "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork coder with one-shot inspector, join coder, fork reviewer, handle REVISE, get dual PERFECT, join reviewer report, finish."
+  },
+  "flow": [
+    {
+      "wait": "manager-fork-inspector"
+    },
+    {
+      "bindChild": {
+        "agent": "inspector",
+        "aliases": [
+          "inspector"
+        ]
+      }
+    },
+    {
+      "wait": "inspector-report"
+    },
+    {
+      "wait": "inspector-finished"
+    },
+    {
+      "wait": "manager-join-1"
+    },
+    {
+      "wait": "manager-fork-browser"
+    },
+    {
+      "bindChild": {
+        "agent": "browser",
+        "aliases": [
+          "browser"
+        ]
+      }
+    },
+    {
+      "wait": "browser-report"
+    },
+    {
+      "wait": "browser-finished"
+    },
+    {
+      "wait": "manager-join-2"
+    },
+    {
+      "wait": "manager-fork-meditator"
+    },
+    {
+      "bindChild": {
+        "agent": "meditator",
+        "aliases": [
+          "meditator"
+        ]
+      }
+    },
+    {
+      "wait": "meditator-report"
+    },
+    {
+      "wait": "meditator-finished"
+    },
+    {
+      "wait": "manager-join-3"
+    },
+    {
+      "wait": "manager-fork-coder"
+    },
+    {
+      "bindChild": {
+        "agent": "coder",
+        "aliases": [
+          "coder"
+        ]
+      }
+    },
+    {
+      "wait": "coder-inspector"
+    },
+    {
+      "wait": "coder-edit"
+    },
+    {
+      "wait": "coder-finished"
+    },
+    {
+      "wait": "manager-join-coder"
+    },
+    {
+      "wait": "manager-fork-reviewer"
+    },
+    {
+      "bindChild": {
+        "agent": "reviewer",
+        "aliases": [
+          "reviewer"
+        ]
+      }
+    },
+    {
+      "wait": "review-revise"
+    },
+    {
+      "wait": "reviewer-revise-report"
+    },
+    {
+      "wait": "manager-join-reviewer-revise"
+    },
+    {
+      "wait": "manager-nudge-coder"
+    },
+    {
+      "bindChild": {
+        "agent": "coder",
+        "aliases": [
+          "coder"
+        ]
+      }
+    },
+    {
+      "wait": "coder-fix"
+    },
+    {
+      "wait": "coder-fix-finished"
+    },
+    {
+      "wait": "manager-join-coder-fix"
+    },
+    {
+      "wait": "manager-fork-reviewer-2"
+    },
+    {
+      "bindChild": {
+        "agent": "reviewer",
+        "aliases": [
+          "reviewer"
+        ]
+      }
+    },
+    {
+      "wait": "review-perfect-1"
+    },
+    {
+      "wait": "reviewer-after-first-perfect"
+    },
+    {
+      "wait": "review-perfect-confirmed"
+    },
+    {
+      "wait": "reviewer-final-report"
+    },
+    {
+      "wait": "manager-join-reviewer-final"
+    },
+    {
+      "wait": "manager-complete"
+    },
+    {
+      "awaitTerminal": true,
+      "requireAssistantTerminal": true
+    },
+    {
+      "assertFacts": {
+        "name": "ReviewVerdictRecorded",
+        "gte": 3
+      }
+    },
+    {
+      "expectSatisfied": true
+    }
+  ],
+  "pass": "Manager full loop canary passed.",
+  "scripts": [
+    {
+      "id": "manager-title",
+      "lane": {
+        "session": "manager-title",
+        "role": "title",
+        "turn": 1,
+        "requestKind": "title"
+      },
+      "match": {},
+      "respond": {
+        "type": "title",
+        "text": "E2E Test Session"
+      }
+    },
+    {
+      "id": "manager-fork-inspector",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "inspector",
+          "prompt": "Run executor investigation and return a formal report."
+        }
+      }
+    },
+    {
+      "id": "manager-fork-browser",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 2,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "browser",
+          "prompt": "Read AGENTS.md and report architecture constraints."
+        }
+      }
+    },
+    {
+      "id": "manager-fork-meditator",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 3,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "meditator",
+          "prompt": "Propose a plan without changing the worktree."
+        }
+      }
+    },
+    {
+      "id": "inspector-report",
+      "lane": {
+        "session": "inspector",
+        "role": "inspector",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "executor"
+        ],
+        "forbiddenTools": [
+          "fork",
+          "join",
+          "list",
+          "write",
+          "edit",
+          "verdict"
+        ],
+        "userRegex": "Run executor investigation"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "executor",
+        "args": {
+          "command": "pwd && printf 'inspector-evidence\\n'",
+          "estimated_output_bytes": 256,
+          "estimated_running_secs": 5,
+          "estimated_mem_usage": "medium"
+        }
+      }
+    },
+    {
+      "id": "inspector-finished",
+      "lane": {
+        "session": "inspector",
+        "role": "inspector",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "executor"
+        ],
+        "userRegex": "Run executor investigation|executor"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Inspector formal report: evidence collected via executor."
+      }
+    },
+    {
+      "id": "browser-report",
+      "lane": {
+        "session": "browser",
+        "role": "browser",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "read"
+        ],
+        "forbiddenTools": [
+          "write",
+          "edit",
+          "executor",
+          "fork",
+          "join",
+          "verdict"
+        ],
+        "userRegex": "Read AGENTS\\.md and report architecture constraints"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "read",
+        "args": {
+          "filePath": "AGENTS.md"
+        }
+      }
+    },
+    {
+      "id": "browser-finished",
+      "lane": {
+        "session": "browser",
+        "role": "browser",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "read"
+        ],
+        "userRegex": "Read AGENTS\\.md and report architecture constraints"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Browser formal report: architecture constraints reviewed."
+      }
+    },
+    {
+      "id": "meditator-report",
+      "lane": {
+        "session": "meditator",
+        "role": "meditator",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "read"
+        ],
+        "forbiddenTools": [
+          "write",
+          "edit",
+          "executor",
+          "fork",
+          "join",
+          "verdict"
+        ],
+        "userRegex": "Propose a plan without changing the worktree"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "read",
+        "args": {
+          "filePath": "src/main.txt"
+        }
+      }
+    },
+    {
+      "id": "meditator-finished",
+      "lane": {
+        "session": "meditator",
+        "role": "meditator",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "read"
+        ],
+        "userRegex": "Propose a plan without changing the worktree"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Meditator formal plan: keep worktree clean, implement via coder, verify with reviewer."
+      }
+    },
+    {
+      "id": "manager-join-1",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 4,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-join-2",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 5,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-join-3",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 6,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-fork-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 7,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Use inspector once, edit src/main.txt to 'patched', report final A."
+        }
+      }
+    },
+    {
+      "id": "coder-inspector",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "inspector"
+        ],
+        "userRegex": "Use inspector once|edit src/main.txt"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "inspector",
+        "args": {
+          "prompt": "Collect command evidence via executor."
+        }
+      }
+    },
+    {
+      "id": "oneshot-inspector-executor",
+      "lane": {
+        "session": "oneshot-inspector",
+        "role": "inspector",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "coder"
+      },
+      "match": {
+        "requiredTools": [
+          "executor"
+        ],
+        "forbiddenTools": [
+          "fork",
+          "join",
+          "list",
+          "write",
+          "edit",
+          "verdict"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "executor",
+        "args": {
+          "command": "pwd && printf 'oneshot-evidence\\n'",
+          "estimated_output_bytes": 256,
+          "estimated_running_secs": 5,
+          "estimated_mem_usage": "medium"
+        }
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "reusable": true
+    },
+    {
+      "id": "oneshot-inspector-final",
+      "lane": {
+        "session": "oneshot-inspector",
+        "role": "inspector",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "coder"
+      },
+      "match": {
+        "requiredTools": [
+          "executor"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "One-shot inspector formal report: evidence collected."
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "reusable": true
+    },
+    {
+      "id": "coder-edit",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write",
+          "inspector"
+        ],
+        "userRegex": "Use inspector once|edit src/main.txt|Collect command evidence"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "write",
+        "args": {
+          "filePath": "src/main.txt",
+          "content": "patched\n"
+        }
+      }
+    },
+    {
+      "id": "coder-finished",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write",
+          "inspector"
+        ],
+        "userRegex": "Use inspector once|edit src/main.txt|Collect command evidence"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Coder final report: inspector used, src/main.txt patched, tests not required."
+      }
+    },
+    {
+      "id": "manager-join-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 8,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-fork-reviewer",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 9,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "reviewer",
+          "prompt": "Review current worktree and submit structured verdicts."
+        }
+      }
+    },
+    {
+      "id": "review-revise",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 1,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "forbiddenTools": [
+          "write",
+          "edit"
+        ],
+        "userRegex": "Review current worktree and submit structured verdicts"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "REVISE"
+        }
+      }
+    },
+    {
+      "id": "reviewer-revise-report",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 2,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "userRegex": "Review current worktree and submit structured verdicts"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Reviewer REVISE report: add CHANGELOG note before acceptance."
+      }
+    },
+    {
+      "id": "manager-join-reviewer-revise",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 10,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-nudge-coder",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 11,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "coder",
+          "prompt": "Apply reviewer REVISE: write CHANGELOG.md with fixed."
+        }
+      }
+    },
+    {
+      "id": "coder-fix",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write",
+          "inspector"
+        ],
+        "userRegex": "Apply reviewer REVISE|CHANGELOG"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "write",
+        "args": {
+          "filePath": "CHANGELOG.md",
+          "content": "fixed\n"
+        }
+      }
+    },
+    {
+      "id": "coder-fix-finished",
+      "lane": {
+        "session": "coder",
+        "role": "coder",
+        "turn": 5,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "write",
+          "inspector"
+        ],
+        "userRegex": "Apply reviewer REVISE|CHANGELOG"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Coder fix report: CHANGELOG.md written for REVISE."
+      }
+    },
+    {
+      "id": "manager-join-coder-fix",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 12,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-fork-reviewer-2",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 13,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "reviewer",
+          "prompt": "Re-review the fixed tree and submit dual PERFECT."
+        }
+      }
+    },
+    {
+      "id": "review-perfect-1",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "forbiddenTools": [
+          "write",
+          "edit"
+        ],
+        "userRegex": "Re-review the fixed tree and submit dual PERFECT"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      },
+      "reusable": true
+    },
+    {
+      "id": "reviewer-after-first-perfect",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": true,
+        "userRegex": "Re-review the fixed tree and submit dual PERFECT|PERFECT"
+      },
+      "respond": {
+        "type": "text",
+        "text": "First PERFECT submitted; await confirmation request."
+      },
+      "blocking": false,
+      "pathless": true,
+      "reusable": true
+    },
+    {
+      "id": "review-perfect-confirmed",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 5,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      },
+      "reusable": true
+    },
+    {
+      "id": "reviewer-final-report",
+      "lane": {
+        "session": "reviewer",
+        "role": "reviewer",
+        "turn": 6,
+        "requestKind": "chat",
+        "parentSession": "manager"
+      },
+      "match": {
+        "requiredTools": [
+          "verdict"
+        ],
+        "afterToolResult": true,
+        "userRegex": "PERFECT requires confirmation|Continue the confirmation|Re-review the fixed tree"
+      },
+      "respond": {
+        "type": "text",
+        "text": "Reviewer formal report: dual PERFECT confirmed for current tree."
+      },
+      "blocking": true
+    },
+    {
+      "id": "manager-join-reviewer-final",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 14,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-complete",
+      "lane": {
+        "session": "manager",
+        "role": "manager",
+        "turn": 15,
+        "requestKind": "chat"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "forbiddenTools": [
+          "read",
+          "write",
+          "edit",
+          "bash",
+          "glob",
+          "grep",
+          "verdict",
+          "executor",
+          "inspector"
+        ]
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager finished: joined inspector/browser/meditator/coder/reviewer reports with dual PERFECT."
+      }
+    },
+    {
+      "id": "session-blogger",
+      "lane": {
+        "session": "session-blogger",
+        "role": "blogger",
+        "turn": 1,
+        "requestKind": "chat"
+      },
+      "blocking": false,
+      "neverEnd": true,
+      "match": {
+        "userRegex": "You are the blogger of a coding agent session\\."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Session background."
+      }
+    }
+  ]
+}

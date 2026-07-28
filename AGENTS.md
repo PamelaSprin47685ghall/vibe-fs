@@ -313,7 +313,7 @@ Companion 从 sessionRoles 决定 eligibility
 13. `3 × estimated_running_secs` 是进程唯一时限；无其他 timeout 层。模型允许用巨大 estimate 主动申请巨大预算。
 14. `actual_output_bytes > 3 × estimated_output_bytes` 时触发 spool；摘要按 200KB 块做在线 ripple-carry reduce（fan-in=8，按 chunk index 排序，Executor ID 由 processId+level+range hash 生成），不积存全部 map summary。
 15. `estimated_mem_usage=large` 全 OpenCode 进程同时最多一个；medium 不限并发。
-16. Fallback：retry event #1 → A 重试；#2 → 永久切 B；#3 → B 重试；#4 → Session 真死。成功不把 Session 切回 A。唯一写 durable fallback 事实的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 Host run root user message，不包括插件 synthetic 消息。
+16. Fallback 属于 Logical Run：retry event #1 → A 重试；#2 → 切 B；#3 → B 重试；#4 → 当前 Logical Run 真死。成功不把 Side 切回 A。新 Authority Root 始终新 epoch（Failures=0, Side=A）；真人省略 model 只继承 LastAuthorityProfile.BaseModel，不继承旧 Side B。唯一写 durable fallback 事实的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 AuthorityRootUserMessageId，不包括插件 synthetic 消息。
 17. Review：REVISE 一次立即生效；PERFECT 必须来自不同 ProviderRunIdentity 且第二次的 user 输入包含第一次后的确认请求。每个审查屏障要求两个不同的 ProviderRunIdentity。
 18. ReviewGuard 同时守 Manager 结束和 Reviewer 未给出有效 verdict。
 19. PTY 仍复用 `fork` 表面，但 signal 使用结构化 enum，不使用魔法字符串。PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
@@ -326,7 +326,7 @@ Companion 从 sessionRoles 决定 eligibility
 26. **不修改 OpenCode 本体**：生产功能只在现有插件 Hook（`chat.message`/`experimental.chat.messages.transform`/`tool.execute.before`/`after`/`event`）和 SDK API 边界内工作。
 27. **稳定性门禁**：scenario-local 因果 Watchdog 超时 2 秒；只认因果进展。Watchdog deadline > 被测动作 deadline + cleanup allowance。Event-stagger 规则：第一个 canary 立即启动，canary N 等待 N−1 输出精确的 `[setupScenario] ready` 随后立即启动（不等待前一个 canary 结束；ready 前退出或 ready 超时 = 该 canary 失败，可以释放启动门继续收集后续诊断，但整轮不能通过）。Release gate 恰好运行 3 轮。最多重复 3 次。
 28. **Provider-visible projection**：缓存比较只使用真正进入模型的字段（role/text/reasoning/tool call/result），排除 timestamp/cost/usage/runtimeId 等非模型 metadata。
-29. **Fallback identity**：`sessionId + currentUserMessageId + providerAttempt`。`currentUserMessageId` 是 Host run root user message。Single-flight `retry` 事件到达后 append `FallbackFailureRecorded`。空/XML-only terminal 触发 InteractionRepairIdentity 去重（最多一次）。
+29. **Fallback identity**：`logicalRunId + AuthorityRootUserMessageId + providerAttempt`。Single-flight `retry` 事件到达后 append `FallbackFailureRecorded`。空/XML-only terminal 触发 InteractionRepairIdentity 去重（最多一次）。
 
 ## 三、总形状
 
@@ -479,7 +479,7 @@ KISS 不等于禁止变量。禁止的是把控制位置伪装成领域。
 |`BlogText`|真实 B 版缓存|
 |`BlogBaseJson`|JSON delta 的真实基线|
 |`PrefixReplacementEnabled`|投影策略已启用的配置事实|
-|`ModelSide = A | B`|当前 Session 已永久选择的模型角色|
+|`ModelSide = A|B`|当前 Logical Run 的 Fallback 侧；新 Authority Root 重置为 A|
 |`FailureCount`|每 Session 真实失败预算消耗|
 |`perfectConfirmations` 局部变量|本次 reviewer 确认函数的递归参数|
 
@@ -2209,15 +2209,11 @@ Fallback 是每个 Session 调用模型时的一段递归函数，不是独立�
 
 ## 一、冻结语义 [NORMATIVE]
 
-每个 Session 有两个模型角色：
+Fallback 属于 **Logical Run**，不属于 Session 永久状态。每个 Logical Run 有：
 
 ```fsharp
 type ModelSide = A | B
-```
 
-和一个单调失败计数：
-
-```fsharp
 type FallbackMemory =
     { mutable Side: ModelSide
       mutable Failures: int }
@@ -2228,11 +2224,14 @@ type FallbackMemory =
 |失败序号|动作|
 |---:|---|
 |1|仍用 A，立即重试|
-|2|永久切换 B，并立即尝试 B|
+|2|切换 B，并立即尝试 B|
 |3|仍用 B，立即重试|
-|4|Session 真死|
+|4|当前 Logical Run 真死|
 
-成功不会把 Side 切回 A，也不会减少 Failures。`Failures` 是该 Session 生命周期累计失败数。
+成功不会把 Side 切回 A，也不会减少 Failures。
+新 Authority Root 始终新 epoch（Failures=0, Side=A）。
+真人省略 model 只继承 `LastAuthorityProfile.BaseModel`，不继承旧 Run 的 Side B。
+B attempt 不得成为下一真人 root 的默认 model。
 
 ---
 
@@ -2290,7 +2289,7 @@ let rec invokeWithFallback (s: ModelSession) request =
 - Coordinator；
 - Lease。
 
-`Side` 是永久模型选择事实，`Failures` 是预算计数。程序下一步由普通模式匹配决定：
+`Side` 是当前 Logical Run 的模型侧事实，`Failures` 是该 Run 的预算计数。程序下一步由普通模式匹配决定：
 
 ```fsharp
 match failures with
@@ -2419,13 +2418,14 @@ providerAttempt 是插件自增编号（不是宿主原始编号）。
 1. A 首次成功。
 2. A 失败一次，A 重试成功。
 3. A 两次失败，永久切 B，B 成功。
-4. 后续新 turn 仍使用 B。
+4. 同一 Logical Run 内后续 attempt 仍使用 B；新 Authority Root 重置为 A。
 5. B 第三次累计失败后重试 B。
-6. 第四次累计失败 SessionDead。
+6. 第四次累计失败 LogicalRunDead；新真人 root 仍可开始新 Run。
 7. 成功不清零 Failures。
 8. 用户取消不计数。
-9. 每个 child 计数独立。
+9. 每个 child Logical Run 计数独立。
 10. Blogger 死亡不杀 X；仅停止 B 更新。
+11. 真人省略 model 继承 LastAuthority.BaseModel，不继承旧 Side B。
 
 
 ---

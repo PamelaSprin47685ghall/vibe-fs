@@ -15,7 +15,7 @@ module ExecutorSummarizeTests =
 
     // --- helpers ---------------------------------------------------------------
 
-    let private mkCompletion (agentId: string) (outcome: Result<string, string>) =
+    let private mkCompletion (agentId: string) (outcome: AgentCompletionOutcome) =
         { RunId = "run-" + agentId
           AgentId = agentId
           Role = AgentRole.Executor
@@ -83,11 +83,11 @@ module ExecutorSummarizeTests =
                         // Keep each summary single-line so the resident batch size
                         // (number of summaries) equals the newline count; the
                         // combined content (all CHUNK markers) is preserved via '|'.
-                        mkCompletion aid (Ok(combined.Replace("\n", "|")))
+                        mkCompletion aid (AgentCompletion.ofSimpleText aid ("run-" + aid) AgentRole.Executor (combined.Replace("\n", "|")))
                     else
                         mapCount <- mapCount + 1
                         let idx = parseChunkIndex prompt
-                        mkCompletion aid (Ok(sprintf "CHUNK%d" idx))
+                        mkCompletion aid (AgentCompletion.ofSimpleText aid ("run-" + aid) AgentRole.Executor (sprintf "CHUNK%d" idx))
 
                 Task.FromResult(Ok completion)
 
@@ -171,7 +171,7 @@ module ExecutorSummarizeTests =
                         Task.FromResult(Ok(ForkResult.Created "x"))
 
                     member _.Join() =
-                        Task.FromResult(Ok(mkCompletion "x" (Error "summarizer boom"))) }
+                        Task.FromResult(Ok(mkCompletion "x" (AgentCompletion.ofSimpleError "x" "run-x" AgentRole.Executor "summarizer boom"))) }
 
             let! propagated =
                 task {
@@ -243,7 +243,7 @@ module ExecutorSummarizeTests =
             let runtimeB = ForkRuntime()
             let created = runtimeA.Fork("agent-A", AgentRole.Executor, prompt = "work")
             Assert.Equal(ForkResult.Created "agent-A", created)
-            runtimeA.PublishCompletion(mkCompletion "agent-A" (Ok "A"))
+            runtimeA.PublishCompletion(mkCompletion "agent-A" (AgentCompletion.ofSimpleText "agent-A" "run-A" AgentRole.Executor "A"))
             Assert.Equal(1, runtimeA.PendingCompletionCount)
             Assert.Equal(0, runtimeB.PendingCompletionCount)
             let! joinedA = runtimeA.Join()
@@ -262,8 +262,8 @@ module ExecutorSummarizeTests =
             let exec = ExecutorSummarize.ofForkRuntime fr
             let stash = Dictionary<string, RunCompletion>()
 
-            let foreign = mkCompletion "foreign-1" (Ok "FOREIGN-OUT")
-            let target = mkCompletion "target-1" (Ok "TARGET-OUT")
+            let foreign = mkCompletion "foreign-1" (AgentCompletion.ofSimpleText "foreign-1" "run-f" AgentRole.Executor "FOREIGN-OUT")
+            let target = mkCompletion "target-1" (AgentCompletion.ofSimpleText "target-1" "run-t" AgentRole.Executor "TARGET-OUT")
 
             // Publish a FOREIGN completion (different agentId) before the target.
             fr.PublishCompletion(foreign)
@@ -275,9 +275,7 @@ module ExecutorSummarizeTests =
             fr.PublishCompletion(target)
             let! result = pending
 
-            match result.Outcome with
-            | Ok text -> Assert.Equal("TARGET-OUT", text)
-            | Error e -> Assert.True(false, sprintf "expected target completion, got %s" e)
+            Assert.Equal("TARGET-OUT", AgentCompletion.text result.Outcome)
 
             // The foreign completion was stashed, not consumed or destroyed.
             Assert.True(stash.ContainsKey("foreign-1"), "foreign completion must not be consumed by awaitAgent")
@@ -285,7 +283,5 @@ module ExecutorSummarizeTests =
             // It remains joinable afterwards (stash semantics, not destruction).
             let! foreignAgain = ExecutorSummarize.awaitAgent exec "foreign-1" stash
 
-            match foreignAgain.Outcome with
-            | Ok text -> Assert.Equal("FOREIGN-OUT", text)
-            | Error e -> Assert.True(false, sprintf "foreign completion should still be joinable, got %s" e)
+            Assert.Equal("FOREIGN-OUT", AgentCompletion.text foreignAgain.Outcome)
         }

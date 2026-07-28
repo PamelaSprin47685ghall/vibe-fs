@@ -17,7 +17,8 @@ type CompanionHost
         ?onBloggerCreated: SessionId -> unit,
         ?bloggerModel: Result<OpencodeModel, string>,
         ?outputBoundary: IEventOutputBoundaryPort,
-        ?restoredBloggerId: string
+        ?restoredBloggerId: string,
+        ?journal: AgentJournal
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
@@ -138,7 +139,8 @@ type CompanionHost
           BloggerNeedsReset = bloggerNeedsReset
           Companion = companion
           OutputWatermark = outputWatermark
-          AssistantOutput = assistantOutput }
+          AssistantOutput = assistantOutput
+          Journal = journal }
 
     member this.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome =
         let deps = this.BloggerDeps

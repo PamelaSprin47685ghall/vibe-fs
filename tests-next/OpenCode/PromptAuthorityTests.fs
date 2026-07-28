@@ -40,7 +40,7 @@ module PromptAuthorityTests =
         let root = MessageId.create "human-root"
 
         let profile =
-            PromptAuthority.createAuthorityRoot session PromptAuthority.HumanRoot root "manager" None None
+            PromptAuthority.createAuthorityRoot "rt-test" session PromptAuthority.HumanRoot root "manager" None None
 
         let before = PromptAuthority.registerAuthority profile PromptAuthority.empty
         let key = PromptAuthority.newPromptKey ()
@@ -68,7 +68,7 @@ module PromptAuthorityTests =
             let root = MessageId.create "human-root"
 
             let profile =
-                PromptAuthority.createAuthorityRoot session PromptAuthority.HumanRoot root "manager" None None
+                PromptAuthority.createAuthorityRoot "rt-test" session PromptAuthority.HumanRoot root "manager" None None
 
             let port = CapturingPort()
             let dispatcher = PromptDispatcher.Dispatcher()
@@ -109,6 +109,7 @@ module PromptAuthorityTests =
 
         let oldProfile =
             PromptAuthority.createAuthorityRoot
+                "rt-test"
                 session
                 PromptAuthority.HumanRoot
                 (MessageId.create "root-a")
@@ -118,6 +119,7 @@ module PromptAuthorityTests =
 
         let newProfile =
             PromptAuthority.createAuthorityRoot
+                "rt-test"
                 session
                 PromptAuthority.HumanRoot
                 (MessageId.create "root-b")
@@ -143,6 +145,7 @@ module PromptAuthorityTests =
 
                 let profile =
                     PromptAuthority.createAuthorityRoot
+                        "rt-authority"
                         session
                         PromptAuthority.HumanRoot
                         humanRoot
@@ -234,4 +237,32 @@ module PromptAuthorityTests =
                     Assert.True(bound.Exists(fun (kind, _) -> kind = "cont"))
                     Assert.False(bound.Exists(fun (kind, pair) -> kind = "root" && pair.Contains "physical-repair-1"))
             })
+
+    [<Fact>]
+    let ``Stable logical run id is deterministic for same host message`` () =
+        let session = SessionId.create "s1"
+        let root = MessageId.create "human-root"
+        let a =
+            PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
+        let b =
+            PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
+        Assert.Equal(a.LogicalRunId, b.LogicalRunId)
+        Assert.True(a.LogicalRunId.Length = 64)
+
+    [<Fact>]
+    let ``Interaction repair identity is claimed only once`` () =
+        let session = SessionId.create "s1"
+        let root = MessageId.create "human-root"
+        let profile =
+            PromptAuthority.createAuthorityRoot "rt" session PromptAuthority.HumanRoot root "manager" None None
+        let identity =
+            PromptAuthority.repairIdentity
+                profile.LogicalRunId
+                profile.AuthorityRootUserMessageId
+                (MessageId.create "asst-1")
+                "zero-width"
+        let first = PromptAuthority.tryClaimRepair identity PromptAuthority.empty
+        Assert.True(first.IsSome)
+        let second = PromptAuthority.tryClaimRepair identity first.Value
+        Assert.True(second.IsNone)
 

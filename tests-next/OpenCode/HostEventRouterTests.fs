@@ -191,7 +191,8 @@ module HostEventRouterTests =
 
                 Assert.Equal(1, fallbackFailures journal sessionId)
 
-                // A genuinely new user turn records a distinct fallback.
+                // A genuinely new user turn is a new Logical Run / Fallback epoch.
+                // Projection TotalFailures resets to 1 (not session-cumulative).
                 userBindings.[sessionId] <- MessageId.create "user-2"
 
                 RetrySignalHandler.handle
@@ -203,5 +204,5 @@ module HostEventRouterTests =
                       Reason = "new user turn"
                       MessageId = None }
 
-                Assert.Equal(2, fallbackFailures journal sessionId)
+                Assert.Equal(1, fallbackFailures journal sessionId)
             })

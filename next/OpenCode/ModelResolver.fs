@@ -61,7 +61,9 @@ module ModelResolver =
                   SideB = parseModel b }
         | _ -> None
 
-    let resolve (config: ModelConfig) (fallback: FallbackProjection option) : OpencodeModel option =
+    /// Current-run attempt selection only. Never used to invent a new
+    /// Authority Root default model.
+    let resolveAttempt (config: ModelConfig) (fallback: FallbackProjection option) : OpencodeModel option =
         let autoFallbackDisabled = envVar "WANXIANGSHU_DISABLE_AUTO_FALLBACK" = Some "1"
 
         if autoFallbackDisabled then
@@ -75,13 +77,46 @@ module ModelResolver =
                 | SideA -> Some config.SideA
                 | SideB -> Some config.SideB
 
+    /// New Authority Root / omit-model inheritance.
+    /// Prefer LastAuthority.BaseModel; never inject previous Side B.
+    let resolveAuthorityDefault
+        (config: ModelConfig option)
+        (sessionId: SessionId)
+        (projection: ProjectionSet)
+        : OpencodeModel option =
+        let session = Map.tryFind sessionId projection.AgentProjections.Sessions
+
+        let lastBase =
+            session
+            |> Option.bind (fun s -> s.PromptAuthority)
+            |> Option.bind (fun auth -> auth.LastAuthorityProfile)
+            |> Option.bind (fun profile ->
+                match profile.BaseProviderID, profile.BaseModelID with
+                | Some providerID, Some modelID ->
+                    Some
+                        { providerID = providerID
+                          modelID = modelID
+                          variant = profile.Variant }
+                | _ -> None)
+
+        match lastBase with
+        | Some model -> Some model
+        | None -> config |> Option.map (fun c -> c.SideA)
+
+    /// Legacy name kept for current-run attempt callers (retry / pending child
+    /// attempt). Does not invent cross-root Side B inheritance.
+    let resolve (config: ModelConfig) (fallback: FallbackProjection option) : OpencodeModel option =
+        resolveAttempt config fallback
+
     let resolveForSession
         (config: ModelConfig)
         (sessionId: SessionId)
         (projection: ProjectionSet)
         : OpencodeModel option =
+        // Keep attempt resolution available for same-run callers. New human /
+        // AgentOwner roots must call resolveAuthorityDefault instead.
         let fallback =
             Map.tryFind sessionId projection.AgentProjections.Sessions
             |> Option.bind (fun session -> session.Fallback)
 
-        resolve config fallback
+        resolveAttempt config fallback

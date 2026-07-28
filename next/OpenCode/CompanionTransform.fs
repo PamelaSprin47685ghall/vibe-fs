@@ -65,9 +65,8 @@ module CompanionTransform =
                 unbox<string> inObj?sessionID
 
         if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
-            // Eligibility source of truth: ActiveLogicalRun.Agent (KISS-N12).
-            // sessionRoles / message agent are display fallback only — never
-            // override a durable authority agent with synthetic continuation agent.
+            // Eligibility source of truth: ActiveLogicalRun.Agent only.
+            // No production fallback to sessionRoles / message agent / transform input.
             let authorityAgent =
                 match journal with
                 | None -> None
@@ -78,27 +77,20 @@ module CompanionTransform =
                     |> Option.bind (fun auth -> auth.ActiveLogicalRun)
                     |> Option.map (fun run -> run.Agent)
 
-            let rawAgentRole =
-                match authorityAgent with
-                | Some role -> Some role
-                | None ->
-                    match sessionRoles.TryGetValue sessionId with
-                    | true, role -> Some role
-                    | _ ->
-                        match messageContext |> Option.bind snd with
-                        | Some role -> Some role
-                        | None when not (isNull inObj) && not (isNull inObj?agent) ->
-                            Some(unbox<string> inObj?agent)
-                        | None -> None
+            let agentRole = authorityAgent |> Option.bind HostSessionContext.canonicalRole
 
-            let agentRole = rawAgentRole |> Option.bind HostSessionContext.canonicalRole
+            match agentRole with
+            | Some role -> sessionRoles.[sessionId] <- role
+            | None ->
+                // No ActiveLogicalRun.Profile.Agent: fail closed for companion.
+                // sessionRoles/message agent/transform input are not production sources.
+                ()
 
-            // Cache only authority-proven or already-canonical roles; never let a
-            // bare continuation invent a new session role for eligibility.
-            match authorityAgent, agentRole with
-            | Some role, _ -> sessionRoles.[sessionId] <- role
-            | None, Some role when not (sessionRoles.ContainsKey sessionId) -> sessionRoles.[sessionId] <- role
-            | _ -> ()
+            if agentRole.IsNone then
+                // Diagnostic only — do not create Blogger without Authority.
+                System.Console.Error.WriteLine(
+                    sprintf "[MissingAuthorityProfile] session=%s companion eligibility denied" sessionId
+                )
 
             if Companion.shouldCreateForAgent agentRole then
                 let companion =
@@ -141,7 +133,8 @@ module CompanionTransform =
                                             // reconcile can NotifyTerminal and
                                             // complete the pending blog Submit.
                                             onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
-                                    ?restoredBloggerId = restoredBloggerId
+                                    ?restoredBloggerId = restoredBloggerId,
+                                    ?journal = journal
                                 )
 
                             companions.[sessionId] <- value

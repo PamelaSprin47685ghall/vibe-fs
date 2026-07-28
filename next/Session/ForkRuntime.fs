@@ -3,75 +3,18 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Threading.Tasks
 
-[<RequireQualifiedAccess>]
-type AgentRole =
-    | Manager
-    | Orchestrator
-    | Coder
-    | Inspector
-    | Browser
-    | Meditator
-    | Reviewer
-    | Executor
-    | Blogger
-
-[<RequireQualifiedAccess>]
-type AgentStatus =
-    | Idle
-    | Busy
-    | Closed
-
-[<RequireQualifiedAccess>]
-type ForkResult =
-    | Created of agentId: string
-    | Nudged of agentId: string
-    | NotFound of agentId: string
-
-type ForkResult with
-    member this.AgentId =
-        match this with
-        | ForkResult.Created id
-        | ForkResult.Nudged id
-        | ForkResult.NotFound id -> id
-
-[<RequireQualifiedAccess>]
-type ForkError =
-    | Empty
-    | NothingToJoin
-    | Cancelled
-    | NotFound of agentId: string
-
-type RunCompletion =
-    { RunId: string
-      AgentId: string
-      Role: AgentRole
-      Outcome: Result<string, string>
-      CompletedAt: DateTimeOffset }
-
-type PtyRecord =
-    { PtyId: string
-      AgentId: string
-      Command: string
-      StartedAt: DateTimeOffset }
-
-type AgentRecord =
-    { AgentId: string
-      Role: AgentRole
-      Status: AgentStatus
-      CurrentRunId: string option
-      LastCompletionStatus: string option
-      HasPendingCompletion: bool
-      ChildSessionId: string option }
-
 type ForkRuntime
     (
-        ?runner: string -> AgentRole -> string option -> Task<Result<string, string>>,
+        ?runner: string -> AgentRole -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
         ?cleanup: string -> unit
     ) =
 
     let childRunner =
-        defaultArg runner (fun _ _ prompt -> Task.FromResult(Ok(defaultArg prompt "ok")))
+        defaultArg
+            runner
+            (fun agentId role prompt ->
+                Task.FromResult(AgentCompletion.ofSimpleText agentId "run-local" role (defaultArg prompt "ok")))
 
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
@@ -90,7 +33,7 @@ type ForkRuntime
         (agentId: string)
         (role: AgentRole)
         (promptOpt: string option)
-        (workOpt: (unit -> Task<Result<string, string>>) option)
+        (workOpt: (unit -> Task<AgentCompletionOutcome>) option)
         =
         let runId = "run-" + Guid.NewGuid().ToString("N").Substring(0, 8)
 
@@ -109,8 +52,10 @@ type ForkRuntime
                             | Some w -> return! w ()
                             | None -> return! childRunner agentId role promptOpt
                         with ex ->
-                            return Error ex.Message
+                            return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
+
+                let outcome = AgentCompletion.withRunIdentity agentId runId role outcome
 
                 let completion =
                     { RunId = runId
@@ -119,17 +64,13 @@ type ForkRuntime
                       Outcome = outcome
                       CompletedAt = DateTimeOffset.UtcNow }
 
-                // Deliver to an existing join and update live status.
                 lock lockObj (fun () ->
                     if waiters.Count > 0 then
                         waiters.Dequeue().SetResult(Ok completion)
                     else
                         mailbox.Enqueue(completion)
 
-                    let statusStr =
-                        match completion.Outcome with
-                        | Ok _ -> Some "completed"
-                        | Error _ -> Some "failed"
+                    let statusStr = Some(AgentCompletion.status completion.Outcome)
 
                     match agents.TryGetValue(agentId) with
                     | true, rec' when rec'.Status <> AgentStatus.Closed ->
@@ -141,7 +82,6 @@ type ForkRuntime
                                 HasPendingCompletion = true }
                     | _ -> ())
 
-                // Notify observers after the completion is available to Join and status is updated.
                 onTerminal completion
             }
 
@@ -149,19 +89,14 @@ type ForkRuntime
         runId, launch
 
     member this.Fork
-        (agentId: string, role: AgentRole, ?prompt: string, ?runWork: unit -> Task<Result<string, string>>)
+        (agentId: string, role: AgentRole, ?prompt: string, ?runWork: unit -> Task<AgentCompletionOutcome>)
         : ForkResult =
         lock lockObj (fun () ->
-            // A cancelled runtime must reject new forks. The parent-abort path
-            // cancels but leaves the dict entry until disposal, so a reused
-            // runtime would otherwise fork on a torn-down mailbox.
             if isCancelled then
                 ForkResult.NotFound agentId
             else
                 match agents.TryGetValue agentId with
                 | true, rec' when rec'.Status = AgentStatus.Busy ->
-                    // A busy agent owns its current completion. A nudge never
-                    // creates another run waiting on the same physical terminal.
                     ForkResult.Nudged agentId
                 | true, rec' ->
                     let runId, launch = startRun agentId role prompt runWork
@@ -208,7 +143,6 @@ type ForkRuntime
                     waiters.Enqueue(waiter)
                     waiter.Task)
 
-    /// Enqueue an external completion (for example, a PTY) in this runtime's Join mailbox.
     member _.PublishCompletion(completion: RunCompletion) : unit =
         lock lockObj (fun () ->
             if waiters.Count > 0 then
@@ -230,6 +164,15 @@ type ForkRuntime
                       LastCompletionStatus = None
                       HasPendingCompletion = false
                       ChildSessionId = None })
+
+    member _.BindChildSession(agentId: string, childSessionId: string) : unit =
+        lock lockObj (fun () ->
+            match agents.TryGetValue agentId with
+            | true, rec' ->
+                agents.[agentId] <-
+                    { rec' with
+                        ChildSessionId = Some childSessionId }
+            | false, _ -> ())
 
     member _.UnregisterPty(ptyId: string) : unit =
         lock lockObj (fun () -> ptys.Remove(ptyId) |> ignore)

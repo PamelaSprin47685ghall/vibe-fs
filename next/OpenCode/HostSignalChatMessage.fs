@@ -9,6 +9,47 @@ open Wanxiangshu.Next.Journal
 
 module HostSignalChatMessage =
 
+    let private service (journal: AgentJournal option) =
+        match journal with
+        | Some j -> PromptDispatcher.forJournal j
+        | None -> PromptDispatcher.ephemeral ()
+
+    let private parseModel (inputObj: obj) : OpencodeModel option =
+        if isNull inputObj?model then
+            None
+        elif not (isNull inputObj?model?providerID) && not (isNull inputObj?model?modelID) then
+            Some
+                { providerID = unbox<string> inputObj?model?providerID
+                  modelID = unbox<string> inputObj?model?modelID
+                  variant =
+                    if isNull inputObj?model?variant then
+                        None
+                    else
+                        Some(unbox<string> inputObj?model?variant) }
+        else
+            None
+
+    let private injectModel (inputObj: obj) (outputObj: obj) (model: OpencodeModel) =
+        // Host schema rejects null variant; omit the field when None.
+        let modelObj =
+            match model.variant with
+            | Some variant ->
+                createObj
+                    [ "providerID", box model.providerID
+                      "modelID", box model.modelID
+                      "id", box model.modelID
+                      "variant", box variant ]
+            | None ->
+                createObj
+                    [ "providerID", box model.providerID
+                      "modelID", box model.modelID
+                      "id", box model.modelID ]
+
+        inputObj?model <- modelObj
+
+        if not (isNull outputObj) && not (isNull outputObj?message) then
+            outputObj?message?model <- modelObj
+
     let createHook
         (journal: AgentJournal option)
         (sessionRoles: Dictionary<string, string>)
@@ -47,7 +88,7 @@ module HostSignalChatMessage =
                     else
                         ""
 
-                let agent =
+                let explicitAgent =
                     if not (isNull inputObj?agent) then
                         Some(unbox<string> inputObj?agent)
                     else
@@ -55,13 +96,11 @@ module HostSignalChatMessage =
 
                 registerOwned sessionId
 
-                let canonicalAgent = agent |> Option.bind HostSessionContext.canonicalRole
+                let canonicalAgent = explicitAgent |> Option.bind HostSessionContext.canonicalRole
 
+                // sessionRoles is display/tool-surface cache only; never authority source.
                 canonicalAgent |> Option.iter (fun role -> sessionRoles.[sessionId] <- role)
 
-                // `chat.message` is the only external prompt-acceptance
-                // boundary. A plugin continuation has a pre-recorded key;
-                // it must not replace the active Authority Root here.
                 let promptKey =
                     if isNull inputObj?metadata || isNull inputObj?metadata?wanxiangshu_prompt_key then
                         None
@@ -74,132 +113,126 @@ module HostSignalChatMessage =
                     else
                         Some(unbox<string> inputObj?metadata?wanxiangshu_origin)
 
-                let selectedModel =
-                    if isNull inputObj?model then
+                let explicitModel = parseModel inputObj
+                let hostModel = parseModel outputObj
+                let hostVariant =
+                    if isNull outputObj || isNull outputObj?message || isNull outputObj?message?variant then
                         None
-                    elif not (isNull inputObj?model?providerID) && not (isNull inputObj?model?modelID) then
-                        Some(unbox<string> inputObj?model?providerID, unbox<string> inputObj?model?modelID)
+                    else
+                        Some(unbox<string> outputObj?message?variant)
+
+                let hostAgent =
+                    if not (isNull outputObj) && not (isNull outputObj?message) && not (isNull outputObj?message?agent) then
+                        HostSessionContext.canonicalRole (unbox<string> outputObj?message?agent)
                     else
                         None
 
-                // Session does not own a permanent model. Host continues the last
-                // user prompt's model. When the user omits model and durable
-                // Fallback Side is B (or LastAuthority BaseModel is set), inject
-                // that model into this user message so the Host continues it.
-                // Explicit user model always wins and starts a fresh Authority Root.
-                let selectedModel =
-                    match selectedModel, modelConfig, journal, promptKey with
-                    | Some _, _, _, _ -> selectedModel
-                    | None, Some cfg, Some j, None when not (String.IsNullOrWhiteSpace sessionId) ->
-                        let sid = SessionId.create sessionId
-                        let proj = AgentJournal.snapshot j
+                let svc = service journal
 
-                        match ModelResolver.resolveForSession cfg sid proj with
-                        | Some m ->
-                            let modelObj =
-                                createObj
-                                    [ "providerID", box m.providerID
-                                      "modelID", box m.modelID
-                                      "id", box m.modelID ]
-
-                            inputObj?model <- modelObj
-
-                            if not (isNull outputObj) && not (isNull outputObj?message) then
-                                outputObj?message?model <- modelObj
-
-                            Some(m.providerID, m.modelID)
-                        | None -> None
-                    | _ -> selectedModel
-
-                // Authority Root only when there is no plugin PromptKey. A keyed message is
-                // always a claimed continuation (or abandoned claim), never HumanRoot.
-                match journal, canonicalAgent, promptKey with
-                | Some j, Some role, None when
+                match journal, promptKey with
+                | Some _, Some key when
                     not (String.IsNullOrWhiteSpace sessionId)
                     && not (String.IsNullOrWhiteSpace messageId)
                     ->
-                    match
-                        AgentJournal.appendAgent
-                            (StreamId.Session(SessionId.create sessionId))
-                            (Some(TurnId.ofMessageId (MessageId.create messageId)))
-                            (AgentFact.AuthorityRootAccepted
-                                {| SessionId = SessionId.create sessionId
-                                   LogicalRunId = Guid.NewGuid().ToString("N")
-                                   HostMessageId = messageId
-                                   AuthorityKind = "HumanRoot"
-                                   Agent = role
-                                   BaseProviderID = selectedModel |> Option.map fst
-                                   BaseModelID = selectedModel |> Option.map snd
-                                   Variant = None |})
-                            j
-                    with
-                    | Ok _ -> bindUserMessage sessionId messageId
-                    | Error failure ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf "Authority root persistence failed: %A" failure.Failure
-                            )
-                        )
-                | None, _, None when
-                    not (String.IsNullOrWhiteSpace sessionId)
-                    && not (String.IsNullOrWhiteSpace messageId)
-                    ->
-                    // No journal: still bind physical user for fallback identity only.
-                    bindUserMessage sessionId messageId
-                | Some j, _, Some key when
-                    not (String.IsNullOrWhiteSpace sessionId)
-                    && not (String.IsNullOrWhiteSpace messageId)
-                    ->
-                    // Map Host physical id → claimed continuation. This is the
-                    // only durable proof after Host strips transport metadata.
-                    match
-                        AgentJournal.appendAgent
-                            (StreamId.Session(SessionId.create sessionId))
-                            None
-                            (AgentFact.PluginPromptAccepted
-                                {| PromptKey = key
-                                   SessionId = SessionId.create sessionId
-                                   HostMessageId = messageId |})
-                            j
-                    with
-                    | Error failure ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf "Continuation acceptance persistence failed: %A" failure.Failure
-                            )
-                        )
-                    | Ok _ ->
-                        // Content marker only for review confirmation (not every Guard).
-                        if continuationOrigin = Some "ReviewConfirmation" then
-                            match
-                                AgentJournal.appendAgent
-                                    (StreamId.Session(SessionId.create sessionId))
-                                    None
-                                    (AgentFact.GuardPromptAccepted
-                                        {| TargetSessionId = SessionId.create sessionId
-                                           GuardKey = sprintf "review-guard:%s:confirm-perfect" sessionId
-                                           HostMessageId = messageId |})
-                                    j
-                            with
-                            | Ok _ -> bindContinuationMessage sessionId messageId
-                            | Error failure ->
-                                raise (
-                                    InvalidOperationException(
-                                        sprintf
-                                            "Reviewer guard acceptance persistence failed: %A"
-                                            failure.Failure
-                                    )
+                    let sid = SessionId.create sessionId
+                    let mid = MessageId.create messageId
+
+                    match continuationOrigin with
+                    | Some "AgentOwnerRoot" ->
+                        match svc.AcceptAgentOwnerRoot key sid mid with
+                        | Ok profile ->
+                            sessionRoles.[sessionId] <- profile.Agent
+                            bindUserMessage sessionId messageId
+                        | Error failure ->
+                            raise (InvalidOperationException(sprintf "AgentOwnerRoot acceptance failed: %s" failure))
+                    | _ ->
+                        match svc.AcceptContinuation key sid mid with
+                        | Error failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf "Continuation acceptance failed: %s" failure
                                 )
-                        else
-                            bindContinuationMessage sessionId messageId
-                | _, _, Some _ ->
+                            )
+                        | Ok kind ->
+                            if kind = Some PromptAuthority.ReviewConfirmation
+                               || continuationOrigin = Some "ReviewConfirmation" then
+                                match journal with
+                                | Some j ->
+                                    match
+                                        AgentJournal.appendAgent
+                                            (StreamId.Session sid)
+                                            None
+                                            (AgentFact.GuardPromptAccepted
+                                                {| TargetSessionId = sid
+                                                   GuardKey = sprintf "review-guard:%s:confirm-perfect" sessionId
+                                                   HostMessageId = messageId |})
+                                            j
+                                    with
+                                    | Ok _ -> bindContinuationMessage sessionId messageId
+                                    | Error failure ->
+                                        raise (
+                                            InvalidOperationException(
+                                                sprintf
+                                                    "Reviewer guard acceptance persistence failed: %A"
+                                                    failure.Failure
+                                            )
+                                        )
+                                | None -> bindContinuationMessage sessionId messageId
+                            else
+                                bindContinuationMessage sessionId messageId
+                | None, Some _ ->
                     // Keyed continuation without journal: still not an Authority Root.
                     bindContinuationMessage sessionId messageId
+                | _, None when
+                    not (String.IsNullOrWhiteSpace sessionId)
+                    && not (String.IsNullOrWhiteSpace messageId)
+                    ->
+                    let sid = SessionId.create sessionId
+                    let mid = MessageId.create messageId
+
+                    // Omit-model inherits LastAuthority.BaseModel only, never Side B.
+                    let selectedModel =
+                        match explicitModel with
+                        | Some model -> Some model
+                        | None ->
+                            match journal with
+                            | Some j ->
+                                ModelResolver.resolveAuthorityDefault
+                                    modelConfig
+                                    sid
+                                    (AgentJournal.snapshot j)
+                            | None -> modelConfig |> Option.map (fun c -> c.SideA)
+
+                    match selectedModel, explicitModel with
+                    | Some model, None -> injectModel inputObj outputObj model
+                    | _ -> ()
+
+                    match
+                        svc.AcceptHumanRoot
+                            sid
+                            mid
+                            (canonicalAgent)
+                            explicitModel
+                            None
+                            hostAgent
+                            (selectedModel |> Option.orElse hostModel)
+                            hostVariant
+                    with
+                    | Ok profile ->
+                        sessionRoles.[sessionId] <- profile.Agent
+                        bindUserMessage sessionId messageId
+                    | Error _ when journal.IsNone ->
+                        // No journal: still bind physical user for fallback identity only.
+                        bindUserMessage sessionId messageId
+                    | Error failure ->
+                        // Missing agent on first root without host default is fail-closed.
+                        raise (
+                            InvalidOperationException(
+                                sprintf "Authority root acceptance failed: %s" failure
+                            )
+                        )
                 | _ ->
                     // UnknownOrigin / incomplete context: fail-closed — do not
                     // invent HumanRoot, do not bind authority-changing user root.
                     ()
-
-                // Fallback is attempt-local. A newly accepted authority root
-                // must not be rewritten to a prior run's Side B selection.
-                ())
+        )

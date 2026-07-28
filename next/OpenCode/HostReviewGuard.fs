@@ -107,12 +107,10 @@ module HostReviewGuard =
                 (Some(fun hostMessageId ->
                     nudgeKeys.Add guardKey |> ignore
 
-                    // prompt_async may only return a synthetic admission id
-                    // (accepted-<session>). Content confirmation no longer
-                    // needs the real chat.message id — GuardKey containing
-                    // confirm-perfect installs ConfirmationPromptMarker, and
-                    // the second PERFECT proves itself by containing that
-                    // marker text. Always persist acceptance on successful send.
+                    // Always persist GuardPromptAccepted after a successful send. Host may first
+                    // return an admission id (accepted-*); chat.message later upgrades the
+                    // physical confirmation id when PromptKey metadata is present. Without
+                    // this fact, dual PERFECT can never confirm (fail-closed forever).
                     let hostId = MessageId.value hostMessageId
 
                     let fact =
@@ -173,13 +171,9 @@ module HostReviewGuard =
             model
             onContinuationAccepted
 
-    /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07:
-    /// "PERFECT requires confirmation"). This is the ONLY code path that produces
-    /// a ConfirmationPromptMarker; the confirmation prompt body becomes the
-    /// content proof the second PERFECT's user prompt must contain. Without
-    /// this nudge, two independent PERFECT calls could never be distinguished
-    /// from a genuine confirmed round-trip -- fail-closed confirmation requires
-    /// this to actually fire.
+    /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07).
+    /// This is the ONLY code path that installs confirm-perfect GuardKey; the
+    /// accepted confirmation Host message id becomes ConfirmationPhysicalMessageId.
     let confirmPerfect
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)

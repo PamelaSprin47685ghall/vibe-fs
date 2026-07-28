@@ -35,6 +35,8 @@ module JournalWriterTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = sid
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "Timeout"
                                AssistantMessageId = "test-msg-1"
                                ProviderAttempt = "1" |}
@@ -87,6 +89,8 @@ module JournalWriterTests =
                     Fact.Agent(
                         AgentFact.FallbackFailureRecorded
                             {| SessionId = SessionId.create "s1"
+                               LogicalRunId = "run-test"
+                               AuthorityRootUserMessageId = "root-test"
                                Reason = "err"
                                AssistantMessageId = "test-msg-2"
                                ProviderAttempt = "2" |}
@@ -117,6 +121,8 @@ module JournalWriterTests =
                             Fact.Agent(
                                 AgentFact.FallbackFailureRecorded
                                     {| SessionId = SessionId.create (sprintf "s%d" i)
+                                       LogicalRunId = "run-test"
+                                       AuthorityRootUserMessageId = "root-test"
                                        Reason = "err"
                                        AssistantMessageId = "test-msg-3"
                                        ProviderAttempt = "3" |}
