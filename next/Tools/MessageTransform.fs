@@ -1,9 +1,5 @@
 namespace Wanxiangshu.Next.Tools
 
-open System
-open Wanxiangshu.Next.Kernel
-open Wanxiangshu.Next.OpenCode
-
 type HostMessage =
     { Role: string
       Text: string
@@ -13,21 +9,6 @@ type HostMessage =
 type MessageWatermark = Index of int
 
 module MessageTransform =
-
-    /// Companion eligibility uses Canonical Role. Accept exact Managed Agent
-    /// names (fast-* / deep-*). Bare canonical roles and build/plan aliases are
-    /// rejected.
-    let roleOfAgent (agent: string option) : Role option =
-        match agent with
-        | None -> None
-        | Some value when String.IsNullOrWhiteSpace value -> None
-        | Some value -> ManagedAgent.tryParse value |> Option.map (fun managed -> managed.Role)
-
-    let companionAllowedRole (role: Role) : bool =
-        RoleDefinitions.forRole role |> Option.exists (fun definition -> definition.Companion)
-
-    let shouldCreateCompanion (agent: string option) : bool =
-        agent |> roleOfAgent |> Option.exists companionAllowedRole
 
     let sanitize (messages: HostMessage list) : HostMessage list =
         messages

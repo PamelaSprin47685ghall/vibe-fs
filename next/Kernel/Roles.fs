@@ -93,10 +93,14 @@ module Roles =
 
 
 /// RoleDefinition: combines tool permissions with system prompts for each agent role.
+/// No `Companion` flag. COMPANION-001's eligible set is answered by
+/// `PromptAuthority.hasCompanion` from the Logical Run's CanonicalRole, and a
+/// flag here was a second source that disagreed with it: Reviewer, DevOps and
+/// Meditator were marked as having no Companion, so three of the six eligible
+/// roles silently never got one.
 type RoleDefinition =
     { Role: Role
       Prompt: string
-      Companion: bool
       Tools: ToolPermission Set }
 
 module RoleDefinitions =
@@ -166,50 +170,40 @@ module RoleDefinitions =
 
         [ { Role = Role.Manager
             Prompt = managerPrompt
-            Companion = true
             Tools = mgrTools }
           { Role = Role.Coder
             Prompt = coderPrompt
-            Companion = true
             Tools = cdrTools }
           { Role = Role.Inspector
             Prompt = inspectorPrompt
-            Companion = false
             Tools = inspTools }
           { Role = Role.DevOps
             Prompt = devopsPrompt
-            Companion = false
             Tools = devopsTools }
           { Role = Role.Browser
             Prompt = browserPrompt
-            Companion = false
             Tools = brwTools }
           { Role = Role.Meditator
             Prompt = meditatorPrompt
-            Companion = false
             Tools = medTools }
           { Role = Role.Reviewer
             Prompt = reviewerPrompt
-            Companion = false
             Tools = revTools }
           { Role = Role.Orchestrator
             Prompt =
               "Orchestrator system prompt SSOT: prompts/orchestrator-system.md\n"
               + "Tools: fork-manager / join.\n"
               + "Parallel ManagerJobs, serial integration, host-owned dual PERFECT."
-            Companion = true
             Tools = orchTools }
           { Role = Role.Executor
             Prompt =
               "Executor agent system prompt SSOT: prompts/executor-system.md\n"
               + "Tools: none. Distill command output; preserve paths/errors/exit codes."
-            Companion = false
             Tools = execTools }
           { Role = Role.Blogger
             Prompt =
               "Blogger system prompt SSOT: prompts/blogger-system.md\n"
               + "Tools: none. Dense work log for Session X prefix memory."
-            Companion = false
             Tools = blgTools } ]
 
     let forRole (role: Role) : RoleDefinition option =

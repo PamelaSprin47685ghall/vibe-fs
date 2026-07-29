@@ -80,17 +80,26 @@ module CompanionTransform =
             // Neither the message's `agent` field nor the transform input is a
             // production source — both describe what the Host is about to send,
             // not what an Authority Root fixed.
-            let authorityAgent =
+            //
+            // The profile is passed whole to `hasCompanion`. The previous version
+            // extracted `SelectedAgent` and re-parsed a Role out of that string,
+            // which reintroduced exactly the agent-string inference the clause
+            // forbids — one field away from the durable CanonicalRole it needed.
+            //
+            // Fully qualified: the OpenCode `PromptAuthority` facade shadows the
+            // Domain module here, and adding a re-export there would be a second
+            // definition of this decision.
+            let eligible =
                 match journal with
-                | None -> None
+                | None -> false
                 | Some j ->
                     (AgentJournal.snapshot j).AgentProjections.Sessions
                     |> Map.tryFind (SessionId.create sessionId)
                     |> Option.bind (fun s -> s.PromptAuthority)
                     |> Option.bind (fun auth -> auth.ActiveLogicalRun)
-                    |> Option.map (fun run -> run.SelectedAgent)
+                    |> Option.exists Wanxiangshu.Next.Domain.PromptAuthority.hasCompanion
 
-            if Companion.shouldCreateForAgent authorityAgent then
+            if eligible then
                 let companion =
                     lock gate (fun () ->
                         match companions.TryGetValue sessionId with

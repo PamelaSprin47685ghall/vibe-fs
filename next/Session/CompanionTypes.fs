@@ -36,12 +36,6 @@ type ICompanionDurablePort =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Companion =
 
-    let canCreateForRole (role: Role) : bool =
-        MessageTransform.companionAllowedRole role
-
-    let shouldCreateForAgent (agent: string option) : bool =
-        MessageTransform.shouldCreateCompanion agent
-
     let jsonDelta = CompanionDelta.jsonDelta
 
     /// Pure compressPrefix: delegates to MessageTransform.replacePrefix using currentB and explicit watermark index.
