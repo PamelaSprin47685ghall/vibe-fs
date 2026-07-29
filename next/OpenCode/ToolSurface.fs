@@ -64,6 +64,40 @@ module ToolSurface =
                 orchestratorHosts
                 sid
 
+        let createRuntime (sid: string) =
+            HostForkRuntime(
+                mkSid sid,
+                sessionPort,
+                ?journal = journal,
+                onChildCreated =
+                    (fun _ role childId ->
+                        ToolSurfaceOrchestrator.registerChild sessionParents sessionRoles sid role childId),
+                onChildCreatedDir =
+                    (fun _ childId dirOpt ->
+                        dirOpt
+                        |> Option.iter (fun d -> sessionDirectories.[SessionId.value childId] <- d)),
+                directoryFor =
+                    (fun _ ->
+                        match sessionDirectories.TryGetValue sid with
+                        | true, path -> Some path
+                        | false, _ -> None),
+                ?onRunStarted = onRunStarted,
+                parentWorkRecordFor =
+                    (fun sessionId ->
+                        match backgroundBFor with
+                        | Some fn -> fn (SessionId.value sessionId)
+                        | None -> None),
+                childWorkRecordFor =
+                    (fun sessionId ->
+                        match backgroundBFor with
+                        | Some fn -> fn (SessionId.value sessionId)
+                        | None -> None),
+                ?sessionSnapshot = snapshot,
+                cancelFallbackRetries =
+                    (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor),
+                cancelSignals = onCancelSignals
+            )
+
         let runtimeFor (ctx: obj) =
             let sid =
                 if isNull ctx || isNull ctx?sessionID then
@@ -77,50 +111,13 @@ module ToolSurface =
                 Ok(
                     lock gate (fun () ->
                         match runtimes.TryGetValue sid with
-                        | true, r -> r
-                        | false, _ ->
-                            let r =
-                                HostForkRuntime(
-                                    mkSid sid,
-                                    sessionPort,
-                                    ?journal = journal,
-                                    onChildCreated =
-                                        (fun _ role childId ->
-                                            ToolSurfaceOrchestrator.registerChild
-                                                sessionParents
-                                                sessionRoles
-                                                sid
-                                                role
-                                                childId),
-                                    onChildCreatedDir =
-                                        (fun _ childId dirOpt ->
-                                            dirOpt
-                                            |> Option.iter (fun d ->
-                                                sessionDirectories.[SessionId.value childId] <- d)),
-                                    directoryFor =
-                                        (fun _ ->
-                                            match sessionDirectories.TryGetValue sid with
-                                            | true, path -> Some path
-                                            | false, _ -> None),
-                                    ?onRunStarted = onRunStarted,
-                                    parentWorkRecordFor =
-                                        (fun sessionId ->
-                                            match backgroundBFor with
-                                            | Some fn -> fn (SessionId.value sessionId)
-                                            | None -> None),
-                                    childWorkRecordFor =
-                                        (fun sessionId ->
-                                            match backgroundBFor with
-                                            | Some fn -> fn (SessionId.value sessionId)
-                                            | None -> None),
-                                    ?sessionSnapshot = snapshot,
-                                    cancelFallbackRetries =
-                                        (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor),
-                                    cancelSignals = onCancelSignals
-                                )
-
-                            runtimes.[sid] <- r
-                            r)
+                        | true, runtime when not runtime.IsCancelled -> runtime
+                        | _ ->
+                            // Esc tears down the current physical runtime. A later user turn
+                            // needs a fresh resource, never a resurrected child or a dead cache entry.
+                            let runtime = createRuntime sid
+                            runtimes.[sid] <- runtime
+                            runtime)
                 )
 
         let ptyDeps =
