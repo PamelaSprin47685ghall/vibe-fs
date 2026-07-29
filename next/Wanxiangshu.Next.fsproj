@@ -49,6 +49,7 @@
     <Compile Include="Process/ProcessRequest.fs"/>
     <Compile Include="Process/LargeGate.fs"/>
     <Compile Include="Process/NodeProcessHost.fs"/>
+    <Compile Include="Process/NodeProcessWait.fs"/>
     <Compile Include="Process/Spool.fs"/>
     <Compile Include="Process/ProcessOutput.fs"/>
     <Compile Include="Process/ProcessRunner.fs"/>

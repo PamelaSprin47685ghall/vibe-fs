@@ -38,7 +38,7 @@ let private waitFlow (child: NodeProcessHost.ChildProcess) (estimate: ProcessEst
     fromTask (fun _ ct ->
         let clock = fun () -> DateTimeOffset.UtcNow
         let deadline = Deadline.ofBudget (clock ()) (budgetSpan estimate)
-        NodeProcessHost.waitForExit child deadline ct)
+        NodeProcessWait.waitForExit child deadline ct)
     |> (fun flow ->
         Flow.create (fun ctx ct ->
             task {
