@@ -6,8 +6,18 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 
+/// One message as the Host transcript has it.
+///
+/// `Id` is a raw wire address, deliberately untyped. SSOT has no generic message
+/// identity: PROMPT-001 gives `role=user` a `PhysicalUserMessageId`, HOST-010
+/// gives `role=assistant` a `ProviderRunIdentity`, and the two are not
+/// interchangeable. A single typed id here would have to be one of them, so it
+/// would be wrong for half the transcript.
+///
+/// The reconcile layer constructs the typed identity at the point where the role
+/// is known. This is the Host-raw boundary the migration allows an adapter at.
 type SessionMessage =
-    { Id: MessageId
+    { Id: string
       Role: string
       Agent: string option
       Finish: string option
@@ -59,10 +69,22 @@ module SessionSnapshotPort =
 
     let private errorNameOf (info: obj) (raw: obj) =
         let candidates =
-            [ if not (isNull info) && not (isNull info?error) then info?error?name else null
-              if not (isNull info) && not (isNull info?error) then info?error?``type`` else null
-              if not (isNull raw) && not (isNull raw?error) then raw?error?name else null
-              if not (isNull raw) && not (isNull raw?error) then raw?error?``type`` else null
+            [ if not (isNull info) && not (isNull info?error) then
+                  info?error?name
+              else
+                  null
+              if not (isNull info) && not (isNull info?error) then
+                  info?error?``type``
+              else
+                  null
+              if not (isNull raw) && not (isNull raw?error) then
+                  raw?error?name
+              else
+                  null
+              if not (isNull raw) && not (isNull raw?error) then
+                  raw?error?``type``
+              else
+                  null
               // Some host payloads put abort on the message root.
               if not (isNull info) then info?errorName else null
               if not (isNull raw) then raw?errorName else null ]
@@ -97,7 +119,7 @@ module SessionSnapshotPort =
                     |> Option.orElse (readString raw?finishReason)
 
                 Some
-                    { Id = MessageId.create id
+                    { Id = id
                       Role = role
                       Agent = agent
                       Finish = finish
@@ -176,8 +198,7 @@ module SessionSnapshotPort =
             member _.GetMessages(sessionId) =
                 task {
                     try
-                        let url =
-                            sprintf "%s/session/%s/message" cleanBase (SessionId.value sessionId)
+                        let url = sprintf "%s/session/%s/message" cleanBase (SessionId.value sessionId)
 
                         let init = createObj [ "method", box "GET" ]
                         let! response = jsFetch url init

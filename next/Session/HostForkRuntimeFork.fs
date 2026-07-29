@@ -21,7 +21,11 @@ module HostForkRuntimeFork =
         |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
 
     let private missingReviewRequirement (input: ReviewRequirementInput) : Result<string list, string> =
-        Error(sprintf "Cannot load original user requirement message %s for reviewer" (MessageId.value input.MessageId))
+        Error(
+            sprintf
+                "Cannot load original user requirement message %s for reviewer"
+                (AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId)
+        )
 
     let rec private resolveReviewRequirementInputs
         (port: ISessionSnapshotPort)
@@ -34,8 +38,13 @@ module HostForkRuntimeFork =
             | [] -> return Ok(List.rev resolved)
             | input :: remaining ->
                 let consume (messages: SessionMessage list) =
+                    // The Authority Root was promoted from a physical message, so its
+                    // value is that message's wire address. Compared as an address
+                    // because the transcript has no notion of authority.
+                    let address = AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId
+
                     messages
-                    |> List.tryFind (fun message -> message.Id = input.MessageId)
+                    |> List.tryFind (fun message -> message.Id = address)
                     |> Option.bind userPromptText
 
                 match Map.tryFind input.SourceSessionId cached with

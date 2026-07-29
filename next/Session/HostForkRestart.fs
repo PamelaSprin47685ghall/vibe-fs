@@ -57,7 +57,7 @@ module HostForkRestart =
 
                         let root =
                             lastByRole messages "user"
-                            |> Option.map (fun user -> MessageId.value user.Id)
+                            |> Option.map (fun user -> user.Id)
                             |> Option.defaultValue ""
 
                         let payload =
@@ -67,7 +67,7 @@ module HostForkRestart =
                                 ("run-restored-" + agentId)
                                 role
                                 root
-                                (MessageId.value assistant.Id)
+                                assistant.Id
                                 text
                                 None
                                 ""

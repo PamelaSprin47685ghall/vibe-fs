@@ -7,8 +7,8 @@ open System
 /// signature becomes a promise nobody checks.
 ///
 /// PROMPT-001 is the reason this module exists at all: `PhysicalUserMessage ≠
-/// AuthorityTurn`. As long as both are `string` (or both are one `MessageId`),
-/// that clause is a comment. Here it is a type error.
+/// AuthorityTurn`. As long as both are `string`, or share one generic message-id
+/// type, that clause is a comment. Here it is a type error.
 module Identity =
 
     // ── runtime and transport ───────────────────────────────────────────────

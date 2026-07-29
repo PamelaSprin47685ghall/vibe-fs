@@ -33,7 +33,7 @@ module VerdictTool =
                         preferredMessageId
                         |> Option.bind (fun messageId ->
                             users
-                            |> List.tryFind (fun message -> MessageId.value message.Id = messageId)
+                            |> List.tryFind (fun message -> message.Id = messageId)
                             |> Option.bind (fun message ->
                                 let text = textFromParts message.Parts
                                 if String.IsNullOrWhiteSpace text then None else Some text))
@@ -140,12 +140,12 @@ module VerdictTool =
 
                                 let runResult: AgentRunResult =
                                     { SessionId = sessionId
-                                      RootUserMessageId = MessageId.create rootUser
-                                      AssistantMessageId = MessageId.create assistant
-                                      Role = "reviewer"
+                                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create rootUser
+                                      ProviderRun = ProviderRunIdentity.create assistant
+                                      Role = Role.Reviewer
                                       Directory = directory
-                                      FinalText = finalText
-                                      FormalText = finalText }
+                                      SessionWideText = finalText
+                                      TurnFormalText = finalText }
 
                                 eventPort.NotifyTerminal sessionId (TerminalOutcome.Completed runResult)
                                 |> ignore

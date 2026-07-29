@@ -15,10 +15,14 @@ type ReconciledTurn =
     {
         SessionId: SessionId
         /// Physical user message that caused this provider run.
-        UserMessageId: MessageId
+        PhysicalUserMessageId: PhysicalUserMessageId
         /// Semantic authority root; continuations never replace this identity.
-        RootUserMessageId: MessageId
-        AssistantMessageId: MessageId
+        AuthorityRootUserMessageId: AuthorityRootUserMessageId
+        /// HOST-010/HOST-011: one assistant message is one provider request is
+        /// one turn, so the run identity IS the assistant message id. Naming the
+        /// field `AssistantMessageId` invited a second identity for the same
+        /// thing — and FALLBACK-003 deduplicates failed attempts by this value.
+        ProviderRun: ProviderRunIdentity
         AgentRole: AgentRole option
         Directory: string
         Parts: MessagePart array
@@ -32,9 +36,9 @@ type ActiveRunBinding =
     {
         SessionId: SessionId
         RunId: string option
-        RootUserMessageId: MessageId option
+        AuthorityRootUserMessageId: AuthorityRootUserMessageId option
         /// Latest physical user message for the active logical run.
-        PhysicalUserMessageId: MessageId option
+        PhysicalUserMessageId: PhysicalUserMessageId option
         ContinuationMessageIds: Set<string>
         AgentRole: AgentRole option
         Directory: string

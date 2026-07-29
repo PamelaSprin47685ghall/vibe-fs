@@ -14,7 +14,7 @@ type ISessionHostPort =
 
     /// PROMPT-005/PROMPT-011: the outcome, not a `Result`.
     ///
-    /// `Result<MessageId, string>` had to invent a message id on every success and
+    /// `Result<messageId, string>` had to invent a message id on every success and
     /// had one failure shape for every failure. Both erasures matter: a transport
     /// receipt is not a physical message, and `AcceptanceUnknown` is not
     /// `Retryable` — resending the former can produce two logical effects.

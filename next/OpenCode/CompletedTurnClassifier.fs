@@ -66,8 +66,7 @@ module CompletedTurnClassifier =
             parts
             |> Array.exists (function
                 | MessagePart.ToolCall _ -> true
-                | MessagePart.Activity kind ->
-                    kind = "patch" || kind = "step-start" || kind = "step-finish"
+                | MessagePart.Activity kind -> kind = "patch" || kind = "step-start" || kind = "step-finish"
                 | _ -> false)
 
     let isAbortErrorName (name: string option) =
@@ -132,8 +131,8 @@ module CompletedTurnClassifier =
 
     let buildTurn
         (sessionId: SessionId)
-        (userMessageId: MessageId)
-        (rootUserMessageId: MessageId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (authorityRoot: AuthorityRootUserMessageId)
         (assistant: SessionMessage)
         (roleFallback: AgentRole option)
         (directory: string)
@@ -142,9 +141,10 @@ module CompletedTurnClassifier =
         let outcome = classifyOutcome assistant.Finish assistant.ErrorName assistant.Parts
 
         { SessionId = sessionId
-          UserMessageId = userMessageId
-          RootUserMessageId = rootUserMessageId
-          AssistantMessageId = assistant.Id
+          PhysicalUserMessageId = physicalUserMessageId
+          AuthorityRootUserMessageId = authorityRoot
+          // HOST-010: the assistant message IS the provider run.
+          ProviderRun = ProviderRunIdentity.create assistant.Id
           AgentRole = role
           Directory = directory
           Parts = assistant.Parts

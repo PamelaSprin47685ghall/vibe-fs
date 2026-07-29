@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Next.OpenCode
 
-open System
 open System.Collections.Generic
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
@@ -9,98 +8,115 @@ open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 
 /// Root / physical / continuation bindings for a logical run.
-/// No Host payload reading.  Bindings are explicit in-memory facts or
-/// recovered from the durable PromptAuthority projection.
+///
+/// No Host payload reading. Bindings are explicit in-memory facts or recovered
+/// from the durable PromptAuthority projection.
+///
+/// `ContinuationMessageIds` stays a set of raw wire addresses: it is matched
+/// against transcript addresses during reconcile, where role is not yet known.
 module TurnBinding =
 
     let private canonicalRoleOf (role: Role) : AgentRole option =
         Wanxiangshu.Next.Session.AgentRoleIdentity.roleOfString (PromptAuthority.roleLabel role)
 
     /// Build an ActiveRunBinding from the journal PromptAuthority projection.
+    ///
     /// Directory is not a journal fact; it must be supplied by the host when the
     /// run is registered.
+    ///
+    /// `ActiveLogicalRun` exists only after an Authority Root was accepted, so
+    /// `Some run` already carries a real root. The old blank-string guard was a
+    /// sentinel check that PROMPT-001's typed identity removes.
+    ///
+    /// Physical stays `None` when nothing is bound. It is not backfilled from the
+    /// root, because PROMPT-002 makes promotion one-way and there is deliberately
+    /// no `AuthorityRootUserMessageId -> PhysicalUserMessageId` inverse. Reconcile
+    /// resolves the missing physical against the root's own wire address instead.
     let fromProjection
         (sessionId: SessionId)
         (projection: PromptAuthority.PromptAuthorityProjection)
-        (userBindings: Dictionary<string, MessageId>)
+        (userBindings: Dictionary<string, PhysicalUserMessageId>)
         (continuationIds: Set<string>)
         : ActiveRunBinding option =
         match projection.ActiveLogicalRun with
         | None -> None
-        | Some run when String.IsNullOrWhiteSpace(MessageId.value run.AuthorityRootUserMessageId) -> None
         | Some run ->
-            let root = run.AuthorityRootUserMessageId
-
             let physical =
                 match userBindings.TryGetValue(SessionId.value sessionId) with
-                | true, mid -> mid
-                | false, _ -> root
+                | true, bound -> Some bound
+                | false, _ -> None
 
             Some
                 { SessionId = sessionId
                   RunId = None
-                  RootUserMessageId = Some root
-                  PhysicalUserMessageId = Some physical
+                  AuthorityRootUserMessageId = Some run.AuthorityRootUserMessageId
+                  PhysicalUserMessageId = physical
                   ContinuationMessageIds = continuationIds
                   AgentRole = canonicalRoleOf run.CanonicalRole
                   Directory = "" }
 
-    /// Mutable store for in-memory bindings.  Durable recovery uses the journal.
+    /// Mutable store for in-memory bindings. Durable recovery uses the journal.
     type Store() =
         let gate = obj ()
-        let userMessageBindings = Dictionary<string, MessageId>()
+        let userMessageBindings = Dictionary<string, PhysicalUserMessageId>()
         let activeBindings = Dictionary<string, ActiveRunBinding>()
         let continuationMessageIds = Dictionary<string, Set<string>>()
 
         member _.UserMessageBindings = userMessageBindings
 
         /// Bind a new authority root (human or agent owner).
-        member _.BindUserMessage(sessionId: SessionId, userMessageId: MessageId, ?agentRole: AgentRole) =
+        ///
+        /// The caller hands over the physical message that opened the run; the root
+        /// is derived from it by PROMPT-002 promotion, never parsed separately.
+        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: AgentRole) =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
-                userMessageBindings.[key] <- userMessageId
+                let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
+                userMessageBindings.[key] <- physical
 
                 match activeBindings.TryGetValue(key) with
                 | true, binding ->
                     activeBindings.[key] <-
                         { binding with
-                            RootUserMessageId = Some userMessageId
-                            PhysicalUserMessageId = Some userMessageId
+                            AuthorityRootUserMessageId = Some root
+                            PhysicalUserMessageId = Some physical
                             AgentRole = agentRole |> Option.orElse binding.AgentRole }
                 | false, _ ->
                     activeBindings.[key] <-
                         { SessionId = sessionId
                           RunId = None
-                          RootUserMessageId = Some userMessageId
-                          PhysicalUserMessageId = Some userMessageId
+                          AuthorityRootUserMessageId = Some root
+                          PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = Set.empty
                           AgentRole = agentRole
                           Directory = "" })
 
         /// Bind a continuation physical message to the active logical run.
-        member _.BindContinuationUserMessage(sessionId: SessionId, messageId: MessageId) =
+        member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
+                let address = PhysicalUserMessageId.value physical
 
                 let continuations =
                     match continuationMessageIds.TryGetValue(key) with
-                    | true, set -> set.Add(MessageId.value messageId)
-                    | false, _ -> Set.singleton (MessageId.value messageId)
+                    | true, set -> set.Add address
+                    | false, _ -> Set.singleton address
 
                 continuationMessageIds.[key] <- continuations
+                userMessageBindings.[key] <- physical
 
                 match activeBindings.TryGetValue(key) with
                 | true, binding ->
                     activeBindings.[key] <-
                         { binding with
-                            PhysicalUserMessageId = Some messageId
+                            PhysicalUserMessageId = Some physical
                             ContinuationMessageIds = continuations }
                 | false, _ ->
                     activeBindings.[key] <-
                         { SessionId = sessionId
                           RunId = None
-                          RootUserMessageId = None
-                          PhysicalUserMessageId = Some messageId
+                          AuthorityRootUserMessageId = None
+                          PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = continuations
                           AgentRole = None
                           Directory = "" })
@@ -127,7 +143,7 @@ module TurnBinding =
 
                 let fromExplicit () =
                     match activeBindings.TryGetValue(key) with
-                    | true, binding when binding.RootUserMessageId.IsSome -> Some binding
+                    | true, binding when binding.AuthorityRootUserMessageId.IsSome -> Some binding
                     | true, binding when Option.isSome binding.PhysicalUserMessageId -> Some binding
                     | _ -> None
 
@@ -148,10 +164,10 @@ module TurnBinding =
                             | Some authority -> fromProjection sessionId authority userMessageBindings continuations
 
                     match fromExplicit (), projected with
-                    | Some binding, Some p when binding.RootUserMessageId.IsNone ->
+                    | Some binding, Some p when binding.AuthorityRootUserMessageId.IsNone ->
                         Some
                             { binding with
-                                RootUserMessageId = p.RootUserMessageId
+                                AuthorityRootUserMessageId = p.AuthorityRootUserMessageId
                                 PhysicalUserMessageId =
                                     (binding.PhysicalUserMessageId |> Option.orElse p.PhysicalUserMessageId)
                                 ContinuationMessageIds = binding.ContinuationMessageIds + continuations }
@@ -166,13 +182,13 @@ module TurnBinding =
                     | None, None -> None)
 
         /// Latest physical user message for the active logical run.
-        member _.TryPhysicalUserMessage(sessionId: SessionId) : MessageId option =
+        member _.TryPhysicalUserMessage(sessionId: SessionId) : PhysicalUserMessageId option =
             lock gate (fun () ->
                 match activeBindings.TryGetValue(SessionId.value sessionId) with
                 | true, binding -> binding.PhysicalUserMessageId
                 | false, _ ->
                     match userMessageBindings.TryGetValue(SessionId.value sessionId) with
-                    | true, mid -> Some mid
+                    | true, bound -> Some bound
                     | false, _ -> None)
 
         /// Remove all state for a session (session.deleted or explicit cleanup).
