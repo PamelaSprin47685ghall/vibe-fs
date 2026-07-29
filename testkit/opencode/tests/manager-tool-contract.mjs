@@ -100,6 +100,8 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(typeof config.agent['fast-manager'].prompt, 'string');
     assert.match(config.agent['fast-manager'].prompt, /Manager thinks and delegates/);
     assert.match(config.agent['fast-manager'].prompt, /fork\(agent, prompt\)/);
+    assert.match(config.agent['fast-manager'].prompt, /Treat every `join\(\)` as a deliberate blocking point/);
+    assert.match(config.agent['fast-manager'].prompt, /work already known and work newly exposed by the latest facts/);
     assert.match(config.agent['fast-manager'].prompt, /fast-coder/);
     assert.match(config.agent['fast-manager'].prompt, /Never assign verification to a Coder/);
     assert.match(config.agent['fast-manager'].prompt, /Do not ask a Coder to run, check, diagnose, or interpret compilation, builds, typechecks, linters, tests, or program execution/);
