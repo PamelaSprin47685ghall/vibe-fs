@@ -46,13 +46,43 @@ module HostForkRuntimeLinkageTests =
         AgentJournal.appendAgent
             (StreamId.Session parentId)
             None
-            (AgentFact.AgentLinked
+            (AgentFact.AgentForked
                 {| ParentId = parentId
                    ChildId = ChildId.create (SessionId.value childId)
                    TargetAgent = agentId
                    Role = Some "fast-coder" |})
             journal
         |> ignore
+
+    [<Fact>]
+    let ``Restart_does_not_restore_companion_link_into_join_runtime`` () =
+        withTempDir (fun d ->
+            task {
+                let parent = SessionId.create "parent-companion-link"
+                let blogger = ChildId.create "companion-blogger"
+
+                use journal =
+                    AgentJournal.create d (RuntimeId.create "runtime-companion-link") 1 DateTimeOffset.UtcNow
+
+                let companionPort = AgentJournalCompanionPort(journal) :> ICompanionDurablePort
+
+                match companionPort.AppendLink(parent, blogger, "blogger", Some "fast-blogger") with
+                | Ok() -> ()
+                | Error error -> failwithf "failed to persist companion link: %s" error
+
+                let host, _, _ = makeCountingFake ()
+                let runtime = HostForkRuntime(parent, host, journal = journal)
+                do! runtime.AwaitRecovery()
+
+                let agents, _ = runtime.List()
+                Assert.Empty agents
+
+                let! joined = runtime.Join()
+
+                match joined with
+                | Error ForkError.NothingToJoin -> ()
+                | other -> Assert.True(false, sprintf "companion leaked into join runtime: %A" other)
+            })
 
     // --- AgentUnlinked (SSOT §5 bounded projections) ---------------------------
     // A Cancel must persist AgentUnlinked per linked child BEFORE aborting, so a

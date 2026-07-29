@@ -14,7 +14,8 @@ module AgentFacts =
 
     let emptyLinkage: AgentLinkageProjection =
         { LinkedChildren = Map.empty
-          LinkedRoles = Map.empty }
+          LinkedRoles = Map.empty
+          ForkedChildren = Map.empty }
 
     let emptyReviewGuard: ReviewGuardProjection =
         { LastGitTreeHash = None
@@ -61,6 +62,7 @@ module AgentFacts =
     let foldAgentFact (proj: AgentProjectionSet) (fact: AgentFact) : AgentProjectionSet =
         match fact with
         | AgentFact.AgentLinked _ -> proj
+        | AgentFact.AgentForked _ -> proj
         | AgentFact.AgentUnlinked _ -> proj
         | AgentFact.CompanionBaselineSet p ->
             let sessions =
@@ -244,6 +246,7 @@ module AgentFacts =
     and foldAgentFactEnvelope (proj: AgentProjectionSet) (envelope: Envelope) (fact: AgentFact) : AgentProjectionSet =
         match fact with
         | AgentFact.AgentLinked p -> AgentFactsLinkage.foldLinked proj p.ParentId p.ChildId p.TargetAgent p.Role
+        | AgentFact.AgentForked p -> AgentFactsLinkage.foldForked proj p.ParentId p.ChildId p.TargetAgent p.Role
         | AgentFact.AgentUnlinked p -> AgentFactsLinkage.foldUnlinked proj p.ParentId p.ChildId
         | fact -> foldAgentFact proj fact
 

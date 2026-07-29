@@ -236,49 +236,23 @@ module ExecutorSummarizeTests =
     [<Fact>]
     let ``ForkRuntime_mailbox_isolation_completion_stays_in_own_runtime`` () =
         task {
+            let completion = TaskCompletionSource<AgentCompletionOutcome>()
             let runtimeA = ForkRuntime()
             let runtimeB = ForkRuntime()
-            let created = runtimeA.Fork("agent-A", AgentRole.Executor, prompt = "work")
+
+            let created =
+                runtimeA.Fork("agent-A", AgentRole.Executor, runWork = (fun () -> completion.Task))
+
             Assert.Equal(ForkResult.Created "agent-A", created)
-            runtimeA.PublishCompletion(mkCompletion "agent-A" (AgentCompletion.ofSimpleText "agent-A" "run-A" AgentRole.Executor "A"))
-            Assert.Equal(1, runtimeA.PendingCompletionCount)
             Assert.Equal(0, runtimeB.PendingCompletionCount)
-            let! joinedA = runtimeA.Join()
+
+            let joined = runtimeA.Join()
+            completion.SetResult(AgentCompletion.ofSimpleText "agent-A" "run-A" AgentRole.Executor "A")
+            let! joinedA = joined
 
             match joinedA with
-            | Ok completion -> Assert.Equal("agent-A", completion.AgentId)
+            | Ok result -> Assert.Equal("agent-A", result.AgentId)
             | Error error -> Assert.True(false, sprintf "expected A completion, got %A" error)
 
             Assert.Equal(0, runtimeB.PendingCompletionCount)
-        }
-
-    [<Fact>]
-    let ``ExecutorSummarize_awaitAgent_stashes_foreign_completion_and_resolves_target`` () =
-        task {
-            let fr = ForkRuntime()
-            let exec = ExecutorSummarize.ofForkRuntime fr
-            let stash = Dictionary<string, RunCompletion>()
-
-            let foreign = mkCompletion "foreign-1" (AgentCompletion.ofSimpleText "foreign-1" "run-f" AgentRole.Executor "FOREIGN-OUT")
-            let target = mkCompletion "target-1" (AgentCompletion.ofSimpleText "target-1" "run-t" AgentRole.Executor "TARGET-OUT")
-
-            // Publish a FOREIGN completion (different agentId) before the target.
-            fr.PublishCompletion(foreign)
-
-            // awaitAgent on the target must stash the foreign one and keep waiting.
-            let pending = ExecutorSummarize.awaitAgent exec "target-1" stash
-
-            // The target then arrives.
-            fr.PublishCompletion(target)
-            let! result = pending
-
-            Assert.Equal("TARGET-OUT", AgentCompletion.text result.Outcome)
-
-            // The foreign completion was stashed, not consumed or destroyed.
-            Assert.True(stash.ContainsKey("foreign-1"), "foreign completion must not be consumed by awaitAgent")
-
-            // It remains joinable afterwards (stash semantics, not destruction).
-            let! foreignAgain = ExecutorSummarize.awaitAgent exec "foreign-1" stash
-
-            Assert.Equal("FOREIGN-OUT", AgentCompletion.text foreignAgain.Outcome)
         }

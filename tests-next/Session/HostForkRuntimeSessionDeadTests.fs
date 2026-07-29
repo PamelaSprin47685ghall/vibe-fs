@@ -69,7 +69,7 @@ module HostForkRuntimeSessionDeadTests =
         AgentJournal.appendAgent
             (StreamId.Session parentId)
             None
-            (AgentFact.AgentLinked
+            (AgentFact.AgentForked
                 {| ParentId = parentId
                    ChildId = ChildId.create (SessionId.value childId)
                    TargetAgent = agentId

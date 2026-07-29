@@ -121,7 +121,9 @@ module HostForkRestart =
             let linkage = session.Linkage.Value
             let recovered = Dictionary<string, SessionId * AgentRole * string>()
 
-            for KeyValue(childId, agentId) in linkage.LinkedChildren do
+            // Companion and other system associations share the session graph,
+            // but they never belong to this ForkRuntime's join mailbox.
+            for KeyValue(childId, agentId) in linkage.ForkedChildren do
                 let managedName =
                     linkage.LinkedRoles |> Map.tryFind childId |> Option.defaultValue ""
 

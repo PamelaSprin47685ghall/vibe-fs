@@ -46,8 +46,12 @@ type CompanionProjection =
     member this.PrefixReplacementEnabled = this.ReplacementActive
 
 type AgentLinkageProjection =
-    { LinkedChildren: Map<ChildId, string>
-      LinkedRoles: Map<ChildId, string> }
+    { /// All durable session associations, including internal companions.
+      LinkedChildren: Map<ChildId, string>
+      LinkedRoles: Map<ChildId, string>
+      /// Direct children created by this session's fork runtime. This is the
+      /// only set eligible for restart recovery into a join mailbox.
+      ForkedChildren: Map<ChildId, string> }
 
 type ReviewGuardProjection =
     {

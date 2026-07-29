@@ -29,7 +29,15 @@ module Fact =
                Projection: string
                Content: string |}
         | CompanionReplacementActiveSet of {| SessionId: SessionId; Active: bool |}
+        /// A non-joinable session association (for example, a Companion Blogger).
         | AgentLinked of
+            {| ParentId: SessionId
+               ChildId: ChildId
+               TargetAgent: string
+               Role: string option |}
+        /// A direct child created through this session's fork runtime. Only these
+        /// links may be restored into that runtime's join mailbox.
+        | AgentForked of
             {| ParentId: SessionId
                ChildId: ChildId
                TargetAgent: string

@@ -68,6 +68,28 @@ module ForkRuntimeTests =
         }
 
     [<Fact>]
+    let ``ForkRuntime_join_ignores_completion_not_owned_by_runtime`` () =
+        task {
+            let runtime = ForkRuntime()
+
+            let bloggerCompletion : RunCompletion =
+                { RunId = "run-system-blogger"
+                  AgentId = "system-blogger"
+                  Role = AgentRole.Blogger
+                  Outcome = AgentCompletion.ofSimpleText "system-blogger" "run-system-blogger" AgentRole.Blogger "blog"
+                  CompletedAt = DateTimeOffset.UtcNow }
+
+            runtime.PublishCompletion bloggerCompletion
+            Assert.Equal(0, runtime.PendingCompletionCount)
+
+            let! joined = runtime.Join()
+
+            match joined with
+            | Error ForkError.NothingToJoin -> ()
+            | other -> Assert.True(false, sprintf "foreign completion resolved join: %A" other)
+        }
+
+    [<Fact>]
     let ``ForkRuntime_join_waits_for_pending_completion`` () =
         task {
             let pendingWork = TaskCompletionSource<AgentCompletionOutcome>()

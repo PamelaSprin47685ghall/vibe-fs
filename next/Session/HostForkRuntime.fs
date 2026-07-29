@@ -57,9 +57,13 @@ type HostForkRuntime
 
     do
         ptyPortInstance.AddMailboxSender(fun completion ->
-            lock gate (fun () -> ptyRuns.Add completion.RunId |> ignore)
-            runtime.UnregisterPty completion.RunId
-            runtime.PublishCompletion completion)
+            let owned = lock gate (fun () -> ptyRuns.Contains completion.RunId)
+
+            if owned then
+                // A PtyPort can be shared by multiple runtimes. Its sender fan-out
+                // must not turn another runtime's exit into this runtime's join.
+                runtime.PublishCompletion completion
+                runtime.UnregisterPty completion.RunId)
 
     let completedTask () : Task = task { return () } :> Task
     let mutable recoveryTask: Task = completedTask ()

@@ -81,6 +81,24 @@ module FactCodecTests =
         | _ -> Assert.True(false, "Expected AgentLinked fact")
 
     [<Fact>]
+    let Serialize_and_deserialize_AgentForked_role () =
+        let fact =
+            Fact.Agent(
+                AgentFact.AgentForked
+                    {| ParentId = SessionId.create "parent"
+                       ChildId = ChildId.create "forked-child"
+                       TargetAgent = "agent-forked"
+                       Role = Some "fast-coder" |}
+            )
+
+        match FactCodec.deserializeFact (FactCodec.serializeFact fact) with
+        | Ok(Fact.Agent(AgentFact.AgentForked forked)) ->
+            Assert.Equal("forked-child", ChildId.value forked.ChildId)
+            Assert.Equal("agent-forked", forked.TargetAgent)
+            Assert.Equal(Some "fast-coder", forked.Role)
+        | _ -> Assert.True(false, "Expected AgentForked fact")
+
+    [<Fact>]
     let Deserialize_legacy_AgentLinked_without_role () =
         let fact =
             Fact.Agent(

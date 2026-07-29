@@ -22,18 +22,41 @@ module AgentFactsLinkage =
                               LinkedRoles =
                                 match role with
                                 | Some value -> Map.add childId value existing.LinkedRoles
-                                | None -> existing.LinkedRoles }
+                                | None -> existing.LinkedRoles
+                              ForkedChildren = existing.ForkedChildren }
                         | None ->
                             { LinkedChildren = Map.ofList [ (childId, targetAgent) ]
                               LinkedRoles =
                                 role
                                 |> Option.map (fun value -> Map.ofList [ (childId, value) ])
-                                |> Option.defaultValue Map.empty }
+                                |> Option.defaultValue Map.empty
+                              ForkedChildren = Map.empty }
 
                     { s with Linkage = Some link })
                 proj.Sessions
 
         { proj with Sessions = sessions }
+
+    /// Record a direct fork in addition to the generic session association.
+    /// Only this projection is eligible to repopulate a ForkRuntime after restart.
+    let foldForked proj parentId childId targetAgent role =
+        let linked = foldLinked proj parentId childId targetAgent role
+
+        let sessions =
+            updateSession
+                parentId
+                (fun s ->
+                    match s.Linkage with
+                    | Some existing ->
+                        { s with
+                            Linkage =
+                                Some
+                                    { existing with
+                                        ForkedChildren = Map.add childId targetAgent existing.ForkedChildren } }
+                    | None -> s)
+                linked.Sessions
+
+        { linked with Sessions = sessions }
 
     let foldUnlinked proj parentId childId =
         let sessions =
@@ -44,10 +67,12 @@ module AgentFactsLinkage =
                         match s.Linkage with
                         | Some existing ->
                             { LinkedChildren = Map.remove childId existing.LinkedChildren
-                              LinkedRoles = Map.remove childId existing.LinkedRoles }
+                              LinkedRoles = Map.remove childId existing.LinkedRoles
+                              ForkedChildren = Map.remove childId existing.ForkedChildren }
                         | None ->
                             { LinkedChildren = Map.empty
-                              LinkedRoles = Map.empty }
+                              LinkedRoles = Map.empty
+                              ForkedChildren = Map.empty }
 
                     { s with Linkage = Some link })
                 proj.Sessions
