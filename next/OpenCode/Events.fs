@@ -13,13 +13,7 @@ type TerminalOutcome =
 
 type TerminalCompletionListener = SessionId -> TerminalOutcome -> unit
 
-/// Optional output boundary used to isolate one prompt/run from prior session history.
-type IEventOutputBoundaryPort =
-    abstract GetSessionOutputWatermark: sessionId: SessionId -> int
-    abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
-
 type IEventObservationPort =
-    inherit IEventOutputBoundaryPort
     abstract SubscribeTerminalListener: listener: TerminalCompletionListener -> IDisposable
     abstract NotifyTerminal: sessionId: SessionId -> outcome: TerminalOutcome -> bool
     abstract IsCompleted: sessionId: SessionId -> bool
@@ -53,10 +47,6 @@ module Events =
             member _.IsCompleted sessionId = false
 
             member _.GetSessionOutput _ = []
-
-        interface IEventOutputBoundaryPort with
-            member _.GetSessionOutputWatermark _ = 0
-            member _.GetSessionOutputSince(_, _) = []
 
     type HostEventPort() =
         let listeners = ResizeArray<TerminalCompletionListener>()
@@ -110,19 +100,4 @@ module Events =
                 lock lockObj (fun () ->
                     match sessionOutputs.TryGetValue(sessionId) with
                     | true, output -> output |> Seq.toList
-                    | false, _ -> [])
-
-        interface IEventOutputBoundaryPort with
-            member _.GetSessionOutputWatermark sessionId =
-                lock lockObj (fun () ->
-                    match sessionOutputs.TryGetValue(sessionId) with
-                    | true, output -> output.Count
-                    | false, _ -> 0)
-
-            member _.GetSessionOutputSince(sessionId, watermark) =
-                lock lockObj (fun () ->
-                    match sessionOutputs.TryGetValue(sessionId) with
-                    | true, output ->
-                        let start = max 0 (min watermark output.Count)
-                        output |> Seq.skip start |> Seq.toList
                     | false, _ -> [])

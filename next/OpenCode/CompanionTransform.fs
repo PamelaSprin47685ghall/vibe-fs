@@ -21,7 +21,6 @@ module CompanionTransform =
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
         (sessionPort: ISessionHostPort)
-        (outputBoundary: IEventOutputBoundaryPort option)
         (journal: AgentJournal option)
         (sessionBudgets: Dictionary<string, int>)
         (sessionOutputLimits: Dictionary<string, int>)
@@ -132,7 +131,6 @@ module CompanionTransform =
                                     SessionId.create sessionId,
                                     sessionPort,
                                     ?durable = durable,
-                                    ?outputBoundary = outputBoundary,
                                     onBloggerCreated =
                                         (fun bloggerId ->
                                             let key = SessionId.value bloggerId

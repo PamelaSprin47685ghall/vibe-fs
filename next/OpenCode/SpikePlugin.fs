@@ -116,7 +116,6 @@ module SpikePlugin =
                         companions
                         companionGate
                         sessionPort
-                        (Some(eventPort :> IEventOutputBoundaryPort))
                         journal
                         sessionBudgets
                         sessionOutputLimits

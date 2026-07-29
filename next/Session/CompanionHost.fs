@@ -15,7 +15,6 @@ type CompanionHost
         sessions: ISessionHostPort,
         ?durable: ICompanionDurablePort,
         ?onBloggerCreated: SessionId -> unit,
-        ?outputBoundary: IEventOutputBoundaryPort,
         ?restoredBloggerId: string,
         ?journal: AgentJournal
     ) =
@@ -24,23 +23,6 @@ type CompanionHost
     let bloggerCreated = defaultArg onBloggerCreated (fun _ -> ())
 
     let bloggerEffectiveAgent = ManagedAgent.nameOf AgentTier.Fast Role.Blogger
-
-    let outputWatermark (sessionId: SessionId) =
-        match outputBoundary with
-        | Some boundary -> boundary.GetSessionOutputWatermark sessionId
-        | None -> sessions.GetSessionOutput sessionId |> List.length
-
-    let assistantOutput (childId: SessionId) (watermark: int) =
-        let output =
-            match outputBoundary with
-            | Some boundary -> boundary.GetSessionOutputSince(childId, watermark)
-            | None ->
-                sessions.GetSessionOutput childId
-                |> List.skip (min watermark (sessions.GetSessionOutput childId).Length)
-
-        output
-        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
-        |> String.concat "\n"
 
     let mutable bloggerTask: Task<SessionId> option = None
     let mutable bloggerId: SessionId option = None
@@ -135,8 +117,6 @@ type CompanionHost
           Gate = gate
           BloggerNeedsReset = bloggerNeedsReset
           Companion = companion
-          OutputWatermark = outputWatermark
-          AssistantOutput = assistantOutput
           Journal = journal
           EffectiveAgent = bloggerEffectiveAgent }
 

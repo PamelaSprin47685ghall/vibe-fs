@@ -33,7 +33,8 @@ module CompanionCacheTests =
                     else
                         nextText.Value
 
-                output <- output @ [ text ]
+                let fullOutput = "blogger private thought\n\n" + text
+                output <- output @ [ fullOutput ]
 
                 terminal
                 |> Option.iter (fun l ->
@@ -45,8 +46,12 @@ module CompanionCacheTests =
                               AssistantMessageId = MessageId.create "blog"
                               Role = "test"
                               Directory = ""
-                              FinalText = "done"
-                              Parts = [||] }
+                              FinalText = fullOutput
+                              Parts =
+                                [| createObj
+                                       [ "type", box "reasoning"
+                                         "text", box "blogger private thought" ]
+                                   createObj [ "type", box "text"; "text", box text ] |] }
                         )))
 
                 Task.FromResult(Ok(MessageId.create "accepted"))
@@ -208,7 +213,6 @@ module CompanionCacheTests =
                     companions
                     gate
                     host
-                    None
                     (Some journal)
                     sessionBudgets
                     sessionOutputLimits
@@ -227,7 +231,6 @@ module CompanionCacheTests =
                     companions
                     gate
                     host
-                    None
                     (Some journal)
                     sessionBudgets
                     sessionOutputLimits
@@ -244,7 +247,6 @@ module CompanionCacheTests =
                     companions
                     gate
                     host
-                    None
                     (Some journal)
                     sessionBudgets
                     sessionOutputLimits

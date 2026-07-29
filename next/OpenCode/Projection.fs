@@ -130,6 +130,18 @@ module Projection =
             | "" -> None
             | _ -> None
 
+    /// Formal visible assistant text only. Reasoning/thinking and tool parts are excluded.
+    let formalTextFromParts (parts: obj array) : string =
+        if isNull parts then
+            ""
+        else
+            parts
+            |> Array.choose (fun part ->
+                match projectPart part with
+                | Some(Text text) -> Some text
+                | _ -> None)
+            |> String.concat ""
+
     let projectMessage (rawObj: obj) : ProviderVisibleMessage option =
         if isNull rawObj then
             None

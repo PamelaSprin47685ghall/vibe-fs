@@ -34,8 +34,10 @@ module CompanionHostTests =
                   AssistantMessageId = MessageId.create "blog"
                   Role = "test"
                   Directory = ""
-                  FinalText = "done"
-                  Parts = [||] }
+                  FinalText = "blogger private thought\n\nblog paragraph"
+                  Parts =
+                    [| createObj [ "type", box "reasoning"; "text", box "blogger private thought" ]
+                       createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
             )
 
         let mutable growOutput = true
@@ -58,7 +60,7 @@ module CompanionHostTests =
                         Task.FromResult(Error "send failed")
                     else
                         if growOutput then
-                            output <- output @ [ "blog paragraph" ]
+                            output <- output @ [ "blogger private thought\n\nblog paragraph" ]
 
                         terminal |> Option.iter (fun listener -> listener childId terminalOutcome)
                         Task.FromResult(Ok(MessageId.create "accepted"))
@@ -91,6 +93,7 @@ module CompanionHostTests =
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":1}"))
             do! companion.WaitInFlightAsync()
             Assert.Equal(Some "blog paragraph", companion.Memory.LatestB)
+            Assert.False(companion.Memory.LatestB.Value.Contains("blogger private thought"))
             Assert.Equal(Submitted, companion.SubmitProjection("{\"step\":2}"))
             do! companion.WaitInFlightAsync()
             Assert.Equal(1, childCount ())
@@ -232,8 +235,12 @@ module CompanionHostTests =
                                       AssistantMessageId = MessageId.create "blog"
                                       Role = "test"
                                       Directory = ""
-                                      FinalText = "done"
-                                      Parts = [||] }
+                                      FinalText = "blogger private thought\n\n" + text
+                                      Parts =
+                                        [| createObj
+                                               [ "type", box "reasoning"
+                                                 "text", box "blogger private thought" ]
+                                           createObj [ "type", box "text"; "text", box text ] |] }
                                 )))
 
                         Task.FromResult(Ok(MessageId.create "accepted"))

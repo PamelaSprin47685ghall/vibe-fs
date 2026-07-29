@@ -23,18 +23,7 @@ module CompletedTurnClassifier =
     /// Formal visible assistant text only (no reasoning/thinking).
     /// Used for empty/XML-only repair classification and finish=stop emptiness.
     let partsText (parts: obj array) : string =
-        if isNull parts then
-            ""
-        else
-            parts
-            |> Array.choose (fun part ->
-                if isNull part then
-                    None
-                else
-                    match asString part?``type`` with
-                    | Some "text" -> asString part?text
-                    | _ -> None)
-            |> String.concat ""
+        Projection.formalTextFromParts parts
 
     /// Session A material: formal text + host-visible reasoning/thinking.
     /// Still excludes tool raw streams / tool results.

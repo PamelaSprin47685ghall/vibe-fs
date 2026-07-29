@@ -18,8 +18,6 @@ module internal CompanionHostBlogger =
           Gate: obj
           BloggerNeedsReset: bool ref
           Companion: Companion
-          OutputWatermark: SessionId -> int
-          AssistantOutput: SessionId -> int -> string
           Journal: AgentJournal option
           EffectiveAgent: string }
 
@@ -62,8 +60,6 @@ module internal CompanionHostBlogger =
             let completion =
                 TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            let watermark = deps.OutputWatermark childId
-
             let mutable terminalDelivered = false
 
             let onTerminal _ outcome =
@@ -99,18 +95,10 @@ module internal CompanionHostBlogger =
 
                 match outcome with
                 | Completed result ->
-                    let streamed = deps.AssistantOutput childId watermark
-
-                    let text =
-                        if not (String.IsNullOrWhiteSpace streamed) then
-                            streamed
-                        elif not (String.IsNullOrWhiteSpace result.FinalText) then
-                            result.FinalText
-                        else
-                            ""
+                    let text = Projection.formalTextFromParts result.Parts
 
                     if String.IsNullOrWhiteSpace text then
-                        return failBlog "Blogger returned no assistant text"
+                        return failBlog "Blogger returned no formal assistant text"
                     else
                         lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
                         return text
@@ -124,8 +112,6 @@ module internal CompanionHostBlogger =
 
             let completion =
                 TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let watermark = deps.OutputWatermark childId
 
             let mutable terminalDelivered = false
 
@@ -150,16 +136,10 @@ module internal CompanionHostBlogger =
 
                 match outcome with
                 | Completed result ->
-                    let streamed = deps.AssistantOutput childId watermark
-
-                    let text =
-                        if not (String.IsNullOrWhiteSpace streamed) then
-                            streamed
-                        else
-                            result.FinalText
+                    let text = Projection.formalTextFromParts result.Parts
 
                     if String.IsNullOrWhiteSpace text then
-                        return failBlog "Blogger returned no assistant text"
+                        return failBlog "Blogger returned no formal assistant text"
                     else
                         return text
                 | Aborted reason -> return failBlog reason

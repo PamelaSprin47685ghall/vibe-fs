@@ -67,7 +67,6 @@ module CompanionEligibilityTests =
                         gate
                         host
                         None
-                        None
                         sessionBudgets
                         sessionOutputLimits
                         sessionRoles

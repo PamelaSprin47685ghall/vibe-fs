@@ -33,8 +33,10 @@ module CompanionResetTests =
                   AssistantMessageId = MessageId.create "blog"
                   Role = "test"
                   Directory = ""
-                  FinalText = "done"
-                  Parts = [||] }
+                  FinalText = "blogger private thought\n\nblog paragraph"
+                  Parts =
+                    [| createObj [ "type", box "reasoning"; "text", box "blogger private thought" ]
+                       createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
             )
 
         let mutable growOutput = true
@@ -56,7 +58,7 @@ module CompanionResetTests =
                         Task.FromResult(Error "send failed")
                     else
                         if growOutput then
-                            output <- output @ [ "blog paragraph" ]
+                            output <- output @ [ "blogger private thought\n\nblog paragraph" ]
 
                         terminal |> Option.iter (fun listener -> listener childId terminalOutcome)
                         Task.FromResult(Ok(MessageId.create "accepted"))
@@ -182,6 +184,22 @@ module CompanionResetTests =
                 Assert.Equal(Some "{\"seed\":1}", restored.Memory.LastSuccessfulProjection)
 
                 setGrowOutput true
+                setTerminal (
+                    TerminalOutcome.Completed(
+                        { SessionId = SessionId.create "x"
+                          RootUserMessageId = MessageId.create "success"
+                          AssistantMessageId = MessageId.create "success"
+                          Role = "test"
+                          Directory = ""
+                          FinalText = "blogger private thought\n\nblog paragraph"
+                          Parts =
+                            [| createObj
+                                   [ "type", box "reasoning"
+                                     "text", box "blogger private thought" ]
+                               createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
+                    )
+                )
+
                 Assert.Equal(Submitted, restored.SubmitProjection("{\"success\":4}"))
                 do! restored.WaitInFlightAsync()
                 Assert.Equal(Some "{\"success\":4}", restored.Memory.LastSuccessfulProjection)

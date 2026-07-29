@@ -24,12 +24,6 @@ type ISessionHostPort =
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract GetSessionOutput: sessionId: SessionId -> string list
 
-/// Optional per-session output boundary. Implementations expose only output appended
-/// after a caller's watermark; older ISessionHostPort implementations can omit it.
-type ISessionOutputBoundaryPort =
-    abstract GetSessionOutputWatermark: sessionId: SessionId -> int
-    abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
-
 type InjectedSessionPort
     (
         underlyingPort: IOpenCodePort option,
@@ -233,11 +227,3 @@ type InjectedSessionPort
 
                 localOutput
                 @ (capturedOutput |> List.filter (fun line -> not (existing.Contains line))))
-
-
-    interface ISessionOutputBoundaryPort with
-        member _.GetSessionOutputWatermark(sessionId) =
-            eventPort.GetSessionOutputWatermark sessionId
-
-        member _.GetSessionOutputSince(sessionId, watermark) =
-            eventPort.GetSessionOutputSince(sessionId, watermark)
