@@ -9,7 +9,8 @@ open Wanxiangshu.Next.Session
 /// join is routed to its ManagerJob publication mailbox by authority role.
 module JoinTool =
 
-    let private optionalString value = value |> Option.map Encode.string |> Option.defaultValue Encode.nil
+    let private optionalString value =
+        value |> Option.map Encode.string |> Option.defaultValue Encode.nil
 
     let private workRecord value =
         value
@@ -21,7 +22,8 @@ module JoinTool =
                   "coveredThrough", optionalString record.CoveredThrough ])
         |> Option.defaultValue Encode.nil
 
-    let private errorCode = function
+    let private errorCode =
+        function
         | ForkError.NothingToJoin -> "NOTHING_TO_JOIN"
         | ForkError.Cancelled -> "CANCELLED"
         | ForkError.Empty -> "EMPTY"
@@ -53,7 +55,7 @@ module JoinTool =
                       "assistantMessageId", Encode.string payload.AssistantMessageId
                       "finalText", Encode.string payload.FinalText
                       "workRecord", workRecord payload.WorkRecord
-                      "directory", Encode.string payload.Directory ]
+                      "directory", optionalString payload.Directory ]
 
                 let managed =
                     runtime.TryFindAgent payload.AgentId
@@ -110,8 +112,7 @@ module JoinTool =
                 return ToolHostCodec.jsonObject [ "outcome", Encode.string verdict ]
             else
                 match scope.RuntimeFor context with
-                | Error runtimeError ->
-                    return ToolHostCodec.jsonObject [ "error", Encode.string runtimeError ]
+                | Error runtimeError -> return ToolHostCodec.jsonObject [ "error", Encode.string runtimeError ]
                 | Ok runtime ->
                     let detachAbort = context.AttachAbort(fun () -> runtime.Cancel())
 

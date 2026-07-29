@@ -24,49 +24,13 @@ type ManagedAgentParseError =
 
 module ManagedAgent =
 
-    let private publicRoles =
-        Map.ofList
-            [ "orchestrator", Role.Orchestrator
-              "manager", Role.Manager
-              "coder", Role.Coder
-              "inspector", Role.Inspector
-              "devops", Role.DevOps
-              "browser", Role.Browser
-              "meditator", Role.Meditator
-              "reviewer", Role.Reviewer ]
-
-    let private internalRoles =
-        Map.ofList [ "blogger", Role.Blogger; "executor", Role.Executor ]
-
-    let private legacyNames =
-        set
-            [ "orchestrator"
-              "manager"
-              "build"
-              "plan"
-              "coder"
-              "inspector"
-              "devops"
-              "browser"
-              "meditator"
-              "reviewer"
-              "blogger"
-              "executor"
-              "fast"
-              "deep" ]
-
+    /// The wire spelling of a Role.
+    ///
+    /// Delegates to the one labeller. It used to be a second ten-case match with the
+    /// same strings, so the two could disagree while both compiled — and a durable
+    /// `CanonicalRole` written through one would then fail to parse through the other.
     let roleName (role: Role) : string =
-        match role with
-        | Role.Orchestrator -> "orchestrator"
-        | Role.Manager -> "manager"
-        | Role.Coder -> "coder"
-        | Role.Inspector -> "inspector"
-        | Role.DevOps -> "devops"
-        | Role.Browser -> "browser"
-        | Role.Meditator -> "meditator"
-        | Role.Reviewer -> "reviewer"
-        | Role.Blogger -> "blogger"
-        | Role.Executor -> "executor"
+        Wanxiangshu.Next.Domain.PromptAuthority.roleLabel role
 
     let tierName (tier: AgentTier) : string =
         match tier with
@@ -125,61 +89,30 @@ module ManagedAgent =
     let coderToolNames: string list =
         [ nameOf AgentTier.Fast Role.Coder; nameOf AgentTier.Deep Role.Coder ]
 
-    let tryParse (value: string) : ManagedAgent option =
-        if String.IsNullOrWhiteSpace value then
-            None
-        else
-            let trimmed = value.Trim()
-            let parts = trimmed.Split([| '-' |], 2)
-
-            if parts.Length <> 2 then
-                None
-            else
-                let tier =
-                    match parts.[0] with
-                    | "fast" -> Some AgentTier.Fast
-                    | "deep" -> Some AgentTier.Deep
-                    | _ -> None
-
-                let roleNamePart = parts.[1]
-
-                match tier, publicRoles.TryFind roleNamePart, internalRoles.TryFind roleNamePart with
-                | Some tierValue, Some role, _ ->
-                    Some
-                        { Name = trimmed
-                          Role = role
-                          Tier = tierValue
-                          Visibility = AgentVisibility.Public }
-                | Some tierValue, _, Some role ->
-                    Some
-                        { Name = trimmed
-                          Role = role
-                          Tier = tierValue
-                          Visibility = AgentVisibility.Internal }
-                | _ -> None
-
+    /// AGENT-002/003: the ONE parser lives in `Domain.PromptAuthority`. This adds
+    /// only the visibility that `ManagedAgent` carries.
+    ///
+    /// It used to be a second implementation: its own legacy-rejection list, its own
+    /// role tables, its own tier table, its own peer derivation. Nothing kept the two
+    /// in step, so a role added to one would be rejected by the other.
     let parse (value: string) : Result<ManagedAgent, ManagedAgentParseError> =
-        if String.IsNullOrWhiteSpace value then
-            Error(ManagedAgentParseError.Malformed value)
-        else
-            let trimmed = value.Trim()
+        match Wanxiangshu.Next.Domain.PromptAuthority.parseAgentNameTyped value with
+        | Ok parsed ->
+            Ok
+                { Name = parsed.Name
+                  Role = parsed.Role
+                  Tier = parsed.Tier
+                  Visibility = visibilityOf parsed.Role }
+        | Error rejection ->
+            match rejection with
+            | Wanxiangshu.Next.Domain.PromptAuthority.AgentNameRejection.LegacyAgentName name ->
+                Error(ManagedAgentParseError.LegacyAgentName name)
+            | Wanxiangshu.Next.Domain.PromptAuthority.AgentNameRejection.UnknownManagedAgent name ->
+                Error(ManagedAgentParseError.UnknownManagedAgent name)
+            | Wanxiangshu.Next.Domain.PromptAuthority.AgentNameRejection.Malformed name ->
+                Error(ManagedAgentParseError.Malformed name)
 
-            match tryParse trimmed with
-            | Some agent -> Ok agent
-            | None ->
-                let lower = trimmed.ToLowerInvariant()
-
-                if
-                    legacyNames.Contains lower
-                    || lower.Contains '_'
-                    || lower.EndsWith("-fast")
-                    || lower.EndsWith("-deep")
-                    || lower.StartsWith("fast_")
-                    || lower.StartsWith("deep_")
-                then
-                    Error(ManagedAgentParseError.LegacyAgentName trimmed)
-                else
-                    Error(ManagedAgentParseError.UnknownManagedAgent trimmed)
+    let tryParse (value: string) : ManagedAgent option = parse value |> Result.toOption
 
     let peer (agent: ManagedAgent) : ManagedAgent =
         let tier =

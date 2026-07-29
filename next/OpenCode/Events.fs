@@ -28,7 +28,6 @@ type SessionARecord =
 type IEventObservationPort =
     abstract SubscribeTerminalListener: listener: TerminalCompletionListener -> IDisposable
     abstract NotifyTerminal: sessionId: SessionId -> outcome: TerminalOutcome -> bool
-    abstract IsCompleted: sessionId: SessionId -> bool
 
     /// HOST-005: A material for one provider run.
     ///
@@ -111,8 +110,6 @@ module Events =
                 let hasListeners = lock lockObj (fun () -> listeners.Count > 0)
                 notify sessionId outcome
                 hasListeners
-
-            member _.IsCompleted sessionId = false
 
             member _.RecordSessionA sessionId providerRun text =
                 accumulator.Record sessionId providerRun text

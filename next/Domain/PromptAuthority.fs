@@ -237,14 +237,35 @@ module PromptAuthority =
               "fast"
               "deep" ]
 
+    /// Why a managed agent name was refused.
+    ///
+    /// Typed rather than a message, because the three cases mean different things to
+    /// a caller: a legacy name is a migration error the operator must fix, an unknown
+    /// name may be a typo worth a suggestion, and malformed means the shape itself is
+    /// wrong. A single string forced every consumer that wanted to distinguish them
+    /// to match on prose.
+    [<RequireQualifiedAccess>]
+    type AgentNameRejection =
+        | LegacyAgentName of string
+        | UnknownManagedAgent of string
+        | Malformed of string
+
+    /// A parsed `fast-ROLE` / `deep-ROLE` name with its A/B peer (AGENT-002/003).
+    type ParsedAgentName =
+        { Name: string
+          Role: Role
+          Tier: AgentTier
+          PeerName: string }
+
     /// AGENT-002 and AGENT-003: parse `fast-ROLE` / `deep-ROLE` and derive the peer.
     ///
-    /// This is one of the four places AGENT-001 permits an agent string to be
-    /// interpreted (config parsing, Authority Root creation, profile
-    /// construction, Host send boundary). Package B removes every other site.
-    let parseAgentName (value: string) : Result<string * Role * AgentTier * string, string> =
+    /// The ONE parser for this format. `ManagedAgent.parse` delegates here rather
+    /// than repeating it: the previous pair had two copies of the legacy-rejection
+    /// list, two role tables, two tier tables and two peer derivations, and nothing
+    /// kept them in step — a role added to one would be rejected by the other.
+    let parseAgentNameTyped (value: string) : Result<ParsedAgentName, AgentNameRejection> =
         if String.IsNullOrWhiteSpace value then
-            Error "Expected fast-ROLE or deep-ROLE."
+            Error(AgentNameRejection.Malformed value)
         else
             let trimmed = value.Trim()
             let lower = trimmed.ToLowerInvariant()
@@ -257,26 +278,41 @@ module PromptAuthority =
                 || lower.StartsWith("fast_")
                 || lower.StartsWith("deep_")
             then
-                Error(sprintf "Legacy agent name '%s' is not supported." trimmed)
+                Error(AgentNameRejection.LegacyAgentName trimmed)
             else
                 let parts = trimmed.Split([| '-' |], 2)
 
                 if parts.Length <> 2 then
-                    Error "Expected fast-ROLE or deep-ROLE."
+                    Error(AgentNameRejection.Malformed trimmed)
                 else
                     match tryParseTier parts.[0], tryParseRole parts.[1] with
-                    | None, _ -> Error "Unknown tier. Use fast-* or deep-*."
-                    | _, None -> Error "Unknown role. Use fast-* or deep-*."
+                    | None, _
+                    | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
                     | Some tier, Some role ->
                         let peerTier =
                             match tier with
                             | AgentTier.Fast -> AgentTier.Deep
                             | AgentTier.Deep -> AgentTier.Fast
 
-                        let peerName =
-                            sprintf "%s-%s" ((tierLabel peerTier).ToLowerInvariant()) (roleLabel role)
+                        Ok
+                            { Name = trimmed
+                              Role = role
+                              Tier = tier
+                              // The wire spelling is lowercase; `tierLabel` is the
+                              // journal's capitalised form and is deliberately NOT
+                              // reused here — a Host agent name and a durable fact
+                              // label are different strings for different readers.
+                              PeerName = sprintf "%s-%s" ((tierLabel peerTier).ToLowerInvariant()) (roleLabel role) }
 
-                        Ok(trimmed, role, tier, peerName)
+    /// String-error form, for the fact-fold and claim paths that only report.
+    let parseAgentName (value: string) : Result<string * Role * AgentTier * string, string> =
+        parseAgentNameTyped value
+        |> Result.map (fun parsed -> parsed.Name, parsed.Role, parsed.Tier, parsed.PeerName)
+        |> Result.mapError (fun rejection ->
+            match rejection with
+            | AgentNameRejection.LegacyAgentName name -> sprintf "Legacy agent name '%s' is not supported." name
+            | AgentNameRejection.UnknownManagedAgent _ -> "Unknown tier or role. Use fast-* or deep-*."
+            | AgentNameRejection.Malformed _ -> "Expected fast-ROLE or deep-ROLE.")
 
     /// Deterministic Logical Run id. PROMPT-011 requires stability across
     /// restarts, so it is derived from durable identities and never generated.

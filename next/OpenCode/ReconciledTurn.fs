@@ -24,7 +24,9 @@ type ReconciledTurn =
         /// thing — and FALLBACK-003 deduplicates failed attempts by this value.
         ProviderRun: ProviderRunIdentity
         AgentRole: AgentRole option
-        Directory: string
+        /// The worktree this run executed in, when it has one. A Manager child runs
+        /// in its own worktree; a top-level session has none.
+        Directory: string option
         Parts: MessagePart array
         Finish: string option
         ErrorName: string option
@@ -41,5 +43,5 @@ type ActiveRunBinding =
         PhysicalUserMessageId: PhysicalUserMessageId option
         ContinuationMessageIds: Set<string>
         AgentRole: AgentRole option
-        Directory: string
+        Directory: string option
     }

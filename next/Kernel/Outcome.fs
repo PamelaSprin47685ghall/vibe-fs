@@ -15,7 +15,13 @@ type AgentRunResult =
         /// message id, which is also what tool calls in that run observed.
         ProviderRun: ProviderRunIdentity
         Role: Role
-        Directory: string
+        /// The worktree this run executed in, when it has one.
+        ///
+        /// `option`, not `""`. An empty path is not a directory, and every consumer
+        /// had to re-test for blankness to find that out — `TurnCompletionProgram`
+        /// did exactly that before passing it on, which means the sentinel was
+        /// converted back into an option one layer later anyway.
+        Directory: string option
         /// Session-wide A (HOST-005): cumulative formal text plus host-visible
         /// reasoning across the whole Session, not the last turn alone. Excludes
         /// tool raw streams.

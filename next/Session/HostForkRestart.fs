@@ -54,32 +54,33 @@ module HostForkRestart =
                     match lastByRole messages "assistant" with
                     | None -> ()
                     | Some assistant when isTerminalCompleted assistant ->
-                        let text = textOfParts assistant.Parts
+                        // The completion needs the Authority Root the child ran under,
+                        // and that is the last physical user message in its transcript.
+                        // A terminal assistant with no user message before it is not a
+                        // state the Host produces; reporting it with a blank root would
+                        // hand `join` a completion whose PROMPT-002 identity is empty.
+                        match lastByRole messages "user" with
+                        | None -> runtime.MarkInterrupted(agentId, "host restart: terminal child has no user message")
+                        | Some user ->
+                            let payload =
+                                AgentCompletion.completed
+                                    agentId
+                                    (SessionId.value childSessionId)
+                                    ("run-restored-" + agentId)
+                                    role
+                                    user.Id
+                                    assistant.Id
+                                    (textOfParts assistant.Parts)
+                                    None
+                                    None
 
-                        let root =
-                            lastByRole messages "user"
-                            |> Option.map (fun user -> user.Id)
-                            |> Option.defaultValue ""
-
-                        let payload =
-                            AgentCompletion.completed
-                                agentId
-                                (SessionId.value childSessionId)
-                                ("run-restored-" + agentId)
-                                role
-                                root
-                                assistant.Id
-                                text
-                                None
-                                ""
-
-                        runtime.PublishCompletion
-                            { RunId = "run-restored-" + agentId
-                              AgentId = agentId
-                              AgentName = agent
-                              Role = role
-                              Outcome = payload
-                              CompletedAt = DateTimeOffset.UtcNow }
+                            runtime.PublishCompletion
+                                { RunId = "run-restored-" + agentId
+                                  AgentId = agentId
+                                  AgentName = agent
+                                  Role = role
+                                  Outcome = payload
+                                  CompletedAt = DateTimeOffset.UtcNow }
                     | Some assistant ->
                         runtime.MarkInterrupted(
                             agentId,

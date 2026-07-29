@@ -19,17 +19,20 @@ type AgentFailurePayload =
       Message: string }
 
 type AgentCompletionPayload =
-    { AgentId: string
-      ChildSessionId: string
-      RunId: string
-      Role: AgentRole
-      RootUserMessageId: string
-      AssistantMessageId: string
-      /// Session-wide A for the child Session: formal text + reasoning/thinking.
-      FinalText: string
-      /// Session-wide companion work log (B / LatestB) when available.
-      WorkRecord: WorkRecordSnapshot option
-      Directory: string }
+    {
+        AgentId: string
+        ChildSessionId: string
+        RunId: string
+        Role: AgentRole
+        RootUserMessageId: string
+        AssistantMessageId: string
+        /// Session-wide A for the child Session: formal text + reasoning/thinking.
+        FinalText: string
+        /// Session-wide companion work log (B / LatestB) when available.
+        WorkRecord: WorkRecordSnapshot option
+        /// The worktree this child ran in, when it has one.
+        Directory: string option
+    }
 
 type AgentCompletionOutcome =
     | AgentCompleted of AgentCompletionPayload
@@ -63,7 +66,7 @@ module AgentCompletion =
         (assistantMessageId: string)
         (finalText: string)
         (workRecord: WorkRecordSnapshot option)
-        (directory: string)
+        (directory: string option)
         =
         AgentCompleted
             { AgentId = agentId
@@ -85,7 +88,14 @@ module AgentCompletion =
               Code = code
               Message = message }
 
-    let aborted (agentId: string) (runId: string) (role: AgentRole option) (childSessionId: string option) code message =
+    let aborted
+        (agentId: string)
+        (runId: string)
+        (role: AgentRole option)
+        (childSessionId: string option)
+        code
+        message
+        =
         AgentAborted
             { AgentId = agentId
               ChildSessionId = childSessionId
@@ -102,9 +112,24 @@ module AgentCompletion =
 
     let withRunIdentity (agentId: string) (runId: string) (role: AgentRole) (outcome: AgentCompletionOutcome) =
         match outcome with
-        | AgentCompleted payload -> AgentCompleted { payload with RunId = runId; AgentId = agentId; Role = role }
-        | AgentFailed payload -> AgentFailed { payload with RunId = runId; AgentId = agentId; Role = Some role }
-        | AgentAborted payload -> AgentAborted { payload with RunId = runId; AgentId = agentId; Role = Some role }
+        | AgentCompleted payload ->
+            AgentCompleted
+                { payload with
+                    RunId = runId
+                    AgentId = agentId
+                    Role = role }
+        | AgentFailed payload ->
+            AgentFailed
+                { payload with
+                    RunId = runId
+                    AgentId = agentId
+                    Role = Some role }
+        | AgentAborted payload ->
+            AgentAborted
+                { payload with
+                    RunId = runId
+                    AgentId = agentId
+                    Role = Some role }
 
     let snapshotFromText (text: string) : WorkRecordSnapshot =
         let bytes = System.Text.Encoding.UTF8.GetBytes text
@@ -129,22 +154,23 @@ module AgentCompletion =
 /// key in ForkRuntime's Map<string, ChildRun>. AgentName is the preferred
 /// field for consumer code that needs the managed agent name.
 type RunCompletion =
-    { /// Unique identity for this run attempt.
-      RunId: string
+    {
+        /// Unique identity for this run attempt.
+        RunId: string
 
-      /// DEPRECATED: The agentId that owns this completion. Kept for HostFork*
-      /// backward compatibility. New code should use the Map key or AgentName.
-      AgentId: string
+        /// DEPRECATED: The agentId that owns this completion. Kept for HostFork*
+        /// backward compatibility. New code should use the Map key or AgentName.
+        AgentId: string
 
-      /// The managed agent name (e.g. "fast-coder", "deep-reviewer").
-      AgentName: string
+        /// The managed agent name (e.g. "fast-coder", "deep-reviewer").
+        AgentName: string
 
-      /// Canonical role of the agent.
-      Role: AgentRole
+        /// Canonical role of the agent.
+        Role: AgentRole
 
-      /// The completion outcome (completed/failed/aborted payload).
-      Outcome: AgentCompletionOutcome
+        /// The completion outcome (completed/failed/aborted payload).
+        Outcome: AgentCompletionOutcome
 
-      /// When the run reached terminal state.
-      CompletedAt: DateTimeOffset }
-
+        /// When the run reached terminal state.
+        CompletedAt: DateTimeOffset
+    }

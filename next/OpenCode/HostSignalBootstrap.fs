@@ -178,7 +178,7 @@ module HostSignalBootstrap =
                   PhysicalUserMessageId = physical
                   ContinuationMessageIds = Set.empty
                   AgentRole = Some role
-                  Directory = defaultArg directory "" }
+                  Directory = directory }
 
         let chatMessageHook =
             PromptIngress.createHook journal bindUserMessage bindContinuationMessage registerOwned

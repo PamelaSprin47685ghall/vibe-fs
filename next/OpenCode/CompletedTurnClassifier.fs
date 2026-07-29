@@ -135,7 +135,7 @@ module CompletedTurnClassifier =
         (authorityRoot: AuthorityRootUserMessageId)
         (assistant: SessionMessage)
         (roleFallback: AgentRole option)
-        (directory: string)
+        (directory: string option)
         : ReconciledTurn =
         let role = roleOfAgent assistant.Agent roleFallback
         let outcome = classifyOutcome assistant.Finish assistant.ErrorName assistant.Parts

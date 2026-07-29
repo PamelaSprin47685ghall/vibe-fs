@@ -53,7 +53,7 @@ module TurnBinding =
                   PhysicalUserMessageId = physical
                   ContinuationMessageIds = continuationIds
                   AgentRole = canonicalRoleOf run.CanonicalRole
-                  Directory = "" }
+                  Directory = None }
 
     /// Mutable store for in-memory bindings. Durable recovery uses the journal.
     type Store() =
@@ -89,7 +89,7 @@ module TurnBinding =
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = Set.empty
                           AgentRole = agentRole
-                          Directory = "" })
+                          Directory = None })
 
         /// Bind a continuation physical message to the active logical run.
         member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =
@@ -119,7 +119,7 @@ module TurnBinding =
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = continuations
                           AgentRole = None
-                          Directory = "" })
+                          Directory = None })
 
         /// Register a host-provided active run (e.g. child session start).
         member _.BindActiveRun(binding: ActiveRunBinding) =

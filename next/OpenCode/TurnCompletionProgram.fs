@@ -13,12 +13,6 @@ open Wanxiangshu.Next.Session
 /// (NotifyTerminal, dispose runtime, nudges, fallback advance).
 module TurnCompletionProgram =
 
-    let private repairDirectory (turn: ReconciledTurn) =
-        if String.IsNullOrWhiteSpace turn.Directory then
-            None
-        else
-            Some turn.Directory
-
     /// FALLBACK-008: one repair per unusable terminal.
     ///
     /// The task is awaited rather than discarded. `|> ignore` on the task also
@@ -38,7 +32,7 @@ module TurnCompletionProgram =
                     sessionPort
                     turn.SessionId
                     prompt
-                    (repairDirectory turn)
+                    turn.Directory
                     journal
                     turn.ProviderRun
                     repairKind
@@ -96,7 +90,7 @@ module TurnCompletionProgram =
                             turn.SessionId
                             "Continue after provider failure."
                             PromptAuthority.ProviderRetryAttempt
-                            (repairDirectory turn)
+                            turn.Directory
                             journal
                             None
 
