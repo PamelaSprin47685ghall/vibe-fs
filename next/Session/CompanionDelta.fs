@@ -227,11 +227,3 @@ module CompanionDelta =
             index
         with _ ->
             0
-
-    let assistantOutput (getSessionOutput: SessionId -> string list) (childId: SessionId) (watermark: int) : string =
-        let output = getSessionOutput childId
-
-        output
-        |> List.skip (min watermark output.Length)
-        |> List.filter (fun line -> not (line.StartsWith("Prompt: ")) && not (line.StartsWith("ChildPrompt: ")))
-        |> String.concat "\n"

@@ -13,16 +13,72 @@ type TerminalOutcome =
 
 type TerminalCompletionListener = SessionId -> TerminalOutcome -> unit
 
+/// One provider run's contribution to session-wide A (HOST-005, COMPANION-005).
+///
+/// Segmented by `ProviderRun` rather than kept as a flat `string list`. COMPANION-005
+/// makes "this round's assistant body" the unit that is appended to B, and a flat
+/// list cannot answer which round a chunk belongs to. It also made re-recording
+/// unsafe: a reconcile pass that observed the same run twice appended its text
+/// twice, and de-duplicating by text collapsed two runs that genuinely said the
+/// same thing.
+type SessionARecord =
+    { ProviderRun: ProviderRunIdentity
+      Text: string }
+
 type IEventObservationPort =
     abstract SubscribeTerminalListener: listener: TerminalCompletionListener -> IDisposable
     abstract NotifyTerminal: sessionId: SessionId -> outcome: TerminalOutcome -> bool
     abstract IsCompleted: sessionId: SessionId -> bool
-    abstract GetSessionOutput: sessionId: SessionId -> string list
+
+    /// HOST-005: A material for one provider run.
+    ///
+    /// On the interface, not on one concrete port. The writer used to live only on
+    /// `HostEventPort`, so `TerminalSessionA` reached it through a type test and
+    /// silently discarded A for every other port — which is why the reader needed a
+    /// current-turn fallback that masked the loss.
+    abstract RecordSessionA: sessionId: SessionId -> providerRun: ProviderRunIdentity -> text: string -> unit
+
+    abstract SessionARecords: sessionId: SessionId -> SessionARecord list
 
 module Events =
 
+    /// Per-session A segments, keyed by provider run.
+    ///
+    /// Recording the same run again REPLACES its segment. A run's parts become
+    /// visible progressively, so the last observation is the complete one;
+    /// appending would duplicate the prefix on every reconcile pass.
+    type private SessionAccumulator() =
+        let bySession = Dictionary<SessionId, ResizeArray<SessionARecord>>()
+        let gate = obj ()
+
+        member _.Record (sessionId: SessionId) (providerRun: ProviderRunIdentity) (text: string) =
+            if not (String.IsNullOrWhiteSpace text) then
+                lock gate (fun () ->
+                    let segments =
+                        match bySession.TryGetValue sessionId with
+                        | true, existing -> existing
+                        | false, _ ->
+                            let created = ResizeArray<SessionARecord>()
+                            bySession.[sessionId] <- created
+                            created
+
+                    let record =
+                        { ProviderRun = providerRun
+                          Text = text }
+
+                    match segments.FindIndex(fun segment -> segment.ProviderRun = providerRun) with
+                    | -1 -> segments.Add record
+                    | index -> segments.[index] <- record)
+
+        member _.Records(sessionId: SessionId) =
+            lock gate (fun () ->
+                match bySession.TryGetValue sessionId with
+                | true, segments -> segments |> Seq.toList
+                | false, _ -> [])
+
     type DeterministicEventPort() =
         let listeners = ResizeArray<TerminalCompletionListener>()
+        let accumulator = SessionAccumulator()
         let lockObj = obj ()
 
         interface IEventObservationPort with
@@ -46,34 +102,21 @@ module Events =
 
             member _.IsCompleted sessionId = false
 
-            member _.GetSessionOutput _ = []
+            member _.RecordSessionA sessionId providerRun text =
+                accumulator.Record sessionId providerRun text
+
+            member _.SessionARecords sessionId = accumulator.Records sessionId
 
     type HostEventPort() =
         let listeners = ResizeArray<TerminalCompletionListener>()
-
-        let sessionOutputs =
-            System.Collections.Generic.Dictionary<SessionId, ResizeArray<string>>()
-
+        let accumulator = SessionAccumulator()
         let lockObj = obj ()
-
-        let recordOutput sessionId text =
-            lock lockObj (fun () ->
-                match sessionOutputs.TryGetValue(sessionId) with
-                | true, output -> output.Add(text)
-                | false, _ ->
-                    let output = ResizeArray<string>()
-                    output.Add(text)
-                    sessionOutputs.[sessionId] <- output)
 
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
 
             for handler in handlers do
                 handler sessionId outcome
-
-        member _.RecordSessionOutput (sessionId: SessionId) (text: string) =
-            if not (String.IsNullOrWhiteSpace text) then
-                recordOutput sessionId text
 
         /// Terminal completions arrive through NotifyTerminal from the reconcile
         /// path. Raw host event observation is handled upstream by the signal stack
@@ -95,8 +138,7 @@ module Events =
 
             member _.IsCompleted sessionId = false
 
-            member _.GetSessionOutput sessionId =
-                lock lockObj (fun () ->
-                    match sessionOutputs.TryGetValue(sessionId) with
-                    | true, output -> output |> Seq.toList
-                    | false, _ -> [])
+            member _.RecordSessionA sessionId providerRun text =
+                accumulator.Record sessionId providerRun text
+
+            member _.SessionARecords sessionId = accumulator.Records sessionId

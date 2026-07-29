@@ -29,7 +29,6 @@ type ISessionHostPort =
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
-    abstract GetSessionOutput: sessionId: SessionId -> string list
 
 type InjectedSessionPort
     (
@@ -40,16 +39,8 @@ type InjectedSessionPort
     let activeListeners = HashSet<SessionId>()
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     let childParents = Dictionary<SessionId, SessionId>()
-    let sessionOutputs = Dictionary<SessionId, List<string>>()
     let lockObj = obj ()
     let restoredParent = defaultArg familyParent (fun _ -> None)
-
-    let recordOutput (sId: SessionId) (text: string) =
-        lock lockObj (fun () ->
-            if not (sessionOutputs.ContainsKey(sId)) then
-                sessionOutputs.[sId] <- List<string>()
-
-            sessionOutputs.[sId].Add(text))
 
     let familyRoot (sessionId: SessionId) =
         match lock lockObj (fun () -> childParents.TryGetValue sessionId) with
@@ -111,8 +102,6 @@ type InjectedSessionPort
             let children = getAndRemoveChildren parentId
 
             for childId in children do
-                recordOutput childId "Aborted"
-
                 match underlyingPort with
                 | Some port ->
                     let! _ = port.AbortSession childId
@@ -149,8 +138,6 @@ type InjectedSessionPort
                     // same wrong order cannot fix it.
                     return Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
                 else
-                    recordOutput sessionId (sprintf "Prompt: %s" text)
-
                     match underlyingPort with
                     | Some port ->
                         // Pass the outcome through unchanged. This layer knows less
@@ -168,14 +155,12 @@ type InjectedSessionPort
         member me.SendChildPromptFireAndForget(parentId, childId, text, opts) =
             task {
                 registerChild parentId childId
-                recordOutput childId (sprintf "ChildPrompt: %s" text)
                 return! (me :> ISessionHostPort).SendPrompt(childId, text, opts)
             }
 
         member me.AbortSession(sessionId) =
             task {
                 detachChild sessionId
-                recordOutput sessionId "Aborted"
                 do! abortChildren sessionId
 
                 match underlyingPort with
@@ -208,17 +193,3 @@ type InjectedSessionPort
                     // that every later operation silently no-ops against.
                     return Error "No Host transport: cannot create a child session"
             }
-
-        member me.GetSessionOutput(sessionId) =
-            lock lockObj (fun () ->
-                let localOutput =
-                    if sessionOutputs.ContainsKey(sessionId) then
-                        sessionOutputs.[sessionId] |> Seq.toList
-                    else
-                        []
-
-                let capturedOutput = eventPort.GetSessionOutput sessionId
-                let existing = localOutput |> Set.ofList
-
-                localOutput
-                @ (capturedOutput |> List.filter (fun line -> not (existing.Contains line))))
