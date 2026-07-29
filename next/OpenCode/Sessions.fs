@@ -198,16 +198,7 @@ type InjectedSessionPort
         member me.CreateChildSession(parentId, options) =
             task {
                 let rootId = familyRoot parentId
-
-                // Companion Bloggers remain owned by the flattened family for
-                // cancellation, but use their primary Session as the Host
-                // parent so the Blogger is visible as that Agent's subagent.
-                let hostParentId =
-                    options.Agent
-                    |> Option.bind ManagedAgent.tryParse
-                    |> Option.filter (fun agent -> agent.Role = Role.Blogger)
-                    |> Option.map (fun _ -> parentId)
-                    |> Option.defaultValue rootId
+                let hostParentId = rootId
 
                 match underlyingPort with
                 | Some port ->
