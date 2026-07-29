@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
@@ -72,31 +73,21 @@ type PtyPort
                 // below is the authoritative exit outcome delivered to Join.
                 this.FailRead(id, "PTY closed before read completed")
 
-                let agentId = defaultArg handle.AgentId id.Value
-                let role = defaultArg handle.Role AgentRole.Executor
+                // AGENT-013 makes PTY DevOps-exclusive, and the handle now carries the
+                // managed agent its fork selected, so neither the name nor the role is
+                // rebuilt here. The PTY id is the agent id: a PTY is its own resource,
+                // not a child agent session.
+                let role = AgentRoleIdentity.ofManaged handle.Agent
 
                 let typedOutcome =
                     match outcome with
-                    | Ok text -> AgentCompletion.ofSimpleText agentId id.Value role text
-                    | Error err -> AgentCompletion.ofSimpleError agentId id.Value role err
-
-                // AGENT-013 makes PTY DevOps-exclusive, but a PtyHandle records only
-                // an AgentRole, so the managed agent name has to be rebuilt here —
-                // and rebuilding it invents tier Fast. Two consequences: a
-                // `deep-devops` PTY reports `fast-devops`, and a handle forked
-                // without a role at all reports `fast-executor`.
-                //
-                // Package F owns the fix: PtyHandle must carry the managed name its
-                // forking profile selected (EXEC-009 typed handles). Left in place
-                // rather than marked unmigrated because the name reaches only the
-                // completion record's diagnostics, and failing here would break PTY
-                // completion, which EXEC-015 requires to come from `onExit` alone.
-                let agentName = sprintf "fast-%s" (role.ToString().ToLowerInvariant())
+                    | Ok text -> AgentCompletion.ofSimpleText id.Value id.Value role text
+                    | Error err -> AgentCompletion.ofSimpleError id.Value id.Value role err
 
                 let completion =
                     { RunId = id.Value
-                      AgentId = agentId
-                      AgentName = agentName
+                      AgentId = id.Value
+                      AgentName = handle.Agent.Name
                       Role = role
                       Outcome = typedOutcome
                       CompletedAt = DateTimeOffset.UtcNow }
@@ -116,7 +107,13 @@ type PtyPort
     member _.Handler = handler
     member _.AgentProvider = agentProvider
 
-    member this.Fork(command: string, ?agentId: string, ?role: AgentRole, ?ptyId: PtyId, ?cwd: string) : PtyId =
+    /// Open a PTY for a managed agent.
+    ///
+    /// `agent` is required. It used to be an optional `AgentRole` that no caller
+    /// supplied, so every completion reported `fast-executor` — PROMPT-008 forbids
+    /// inventing a managed name, and the only way to keep that true here is to make
+    /// the real one non-optional.
+    member this.Fork(command: string, agent: ManagedAgent, ?ptyId: PtyId, ?cwd: string) : PtyId =
         let id =
             defaultArg ptyId (PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8)))
 
@@ -124,8 +121,7 @@ type PtyPort
             { Id = id
               Command = command
               StartedAt = DateTimeOffset.UtcNow
-              AgentId = agentId
-              Role = role }
+              Agent = agent }
 
         lock gate (fun () ->
             closedIds.Remove id |> ignore

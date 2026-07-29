@@ -84,6 +84,21 @@ type ToolRuntimeScope
             |> Option.map (fun profile -> profile.CanonicalRole)
         | _ -> None
 
+    /// The managed agent the Authority Root selected for this session.
+    ///
+    /// `SelectedAgent`, not `EffectiveAgent`: a PTY belongs to the Logical Run, and
+    /// PROMPT-002 fixes SelectedAgent for its whole duration, whereas FALLBACK-002
+    /// moves EffectiveAgent per attempt. A PTY labelled with whichever side the
+    /// cursor happened to be on would change identity mid-run.
+    let private managedAgentFor (ctx: HostToolContext) =
+        match journal with
+        | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
+            PromptAuthorityLedger.activeProfile
+                (SessionId.create ctx.SessionId)
+                (AgentJournal.snapshot durable).AgentProjections
+            |> Option.bind (fun profile -> ManagedAgent.tryParse profile.SelectedAgent)
+        | _ -> None
+
     member _.Sessions = sessions
     member _.Journal = journal
     member _.Snapshot = snapshot
@@ -113,6 +128,9 @@ type ToolRuntimeScope
     member _.RegisterDirectory(sessionId, path) = sessionDirectories.[sessionId] <- path
 
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
+
+    /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
+    member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx
 
     member this.IsRole(ctx: HostToolContext, expected: Role) = this.RoleFor ctx = Some expected
 

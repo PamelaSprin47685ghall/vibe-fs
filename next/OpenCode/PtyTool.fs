@@ -20,7 +20,8 @@ module PtyTool =
           Prompt = args.Text "prompt"
           Signal = args.OptionalText "signal" }
 
-    let private error (message: string) = ToolHostCodec.jsonObject [ "error", Encode.string message ]
+    let private error (message: string) =
+        ToolHostCodec.jsonObject [ "error", Encode.string message ]
 
     let private success (id: string) (output: string) (closed: bool) =
         ToolHostCodec.jsonObject
@@ -50,18 +51,21 @@ module PtyTool =
                             | Ok read -> return success read.Id.Value read.Output read.Closed
                             | Error sendError -> return error sendError
                         | None when request.Agent = Pty.AgentName ->
-                            match signalValue with
-                            | Some _ -> return error "PTY creation does not accept signal"
-                            | None ->
+                            match signalValue, scope.ManagedAgentFor context with
+                            | Some _, _ -> return error "PTY creation does not accept signal"
+                            // PROMPT-008 fail closed: without a durable Authority Root
+                            // there is no managed agent to attribute the PTY to, and
+                            // inventing one is what made every PTY report
+                            // `fast-executor`.
+                            | None, None -> return error "fork-pty requires an accepted Authority Root for this session"
+                            | None, Some agent ->
                                 let directory =
-                                    scope.DirectoryFor context.SessionId
-                                    |> Option.orElse scope.WorkspaceDirectory
+                                    scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
 
-                                match! runtime.ForkPty(request.Prompt, ?cwd = directory) with
+                                match! runtime.ForkPty(request.Prompt, agent, ?cwd = directory) with
                                 | Ok id -> return success id.Value "" false
                                 | Error forkError -> return error forkError
-                        | None ->
-                            return error "fork-pty only accepts agent=pty or an existing PTY id"
+                        | None -> return error "fork-pty only accepts agent=pty or an existing PTY id"
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

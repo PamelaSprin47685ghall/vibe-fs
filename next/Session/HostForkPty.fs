@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Kernel.Identity
 
@@ -22,12 +23,13 @@ module HostForkRuntimePty =
             lock this.Gate (fun () -> this.PtyRuns.Remove id |> ignore)
             this.Runtime.UnregisterPty id
 
-        member this.OwnsPty(id: PtyId) = lock this.Gate (fun () -> this.PtyRuns.Contains id.Value)
+        member this.OwnsPty(id: PtyId) =
+            lock this.Gate (fun () -> this.PtyRuns.Contains id.Value)
 
         member this.IsPtyCompletion(runId: string) =
             lock this.Gate (fun () -> this.PtyRuns.Contains runId)
 
-        member this.ForkPty(command: string, ?cwd: string) : Task<Result<PtyId, string>> =
+        member this.ForkPty(command: string, agent: ManagedAgent, ?cwd: string) : Task<Result<PtyId, string>> =
             task {
                 if String.IsNullOrWhiteSpace command then
                     return Error "PTY command is required"
@@ -37,7 +39,7 @@ module HostForkRuntimePty =
                     this.RegisterPtySnapshot id command
 
                     try
-                        this.PtyPort.Fork(command, ptyId = id, ?cwd = cwd) |> ignore
+                        this.PtyPort.Fork(command, agent, ptyId = id, ?cwd = cwd) |> ignore
                         return Ok id
                     with ex ->
                         this.UntrackPtyRun id.Value

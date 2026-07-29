@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Process
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 
 [<RequireQualifiedAccess>]
@@ -64,12 +65,19 @@ type PtyId =
 
     static member Create(id: string) = PtyId id
 
+/// One live PTY.
+///
+/// `Agent` is the managed agent the forking profile selected, held as the parsed
+/// `ManagedAgent` rather than a name plus a role. The previous shape had
+/// `AgentId: string option` and `Role: AgentRole option`, and `PtyPort.Fork` was
+/// never called with either — so every PTY completion reported role `Executor` and
+/// a rebuilt name `fast-executor`, regardless of which DevOps agent opened it.
+/// Keeping name and role as one parsed value makes that disagreement unrepresentable.
 type PtyHandle =
     { Id: PtyId
       Command: string
       StartedAt: DateTimeOffset
-      AgentId: string option
-      Role: AgentRole option }
+      Agent: ManagedAgent }
 
 type PtyRead =
     { Id: PtyId
