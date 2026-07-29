@@ -632,6 +632,24 @@ HandleRetired
 
 最后迁移，依赖前面几乎全部协议。
 
+#### 包 G-1 清点结果
+
+包 0b 已删除全部九个旧 `Orchestrator*` 事实，包 0c 已把投影换成 `JobProgress` 判别联合并写好 `recoveryAction`。因此新协议的**读侧已完备，写侧全部悬空**——`Orchestrator/OrchestratorProgram.fs` 与 `Orchestrator.fs` 仍在构造九个已不存在的事实。
+
+五处结构性偏离，按迁移顺序：
+
+1. **Integration Gate 跨 review 持有**（ORCH-005 熔断项）。`OrchestratorProgram.program:246` 在进入 `publishLoop` 前 `use! _gate = IntegrationGate.acquire`，而 `publishLoop` 内含 `rebase` 与 `postReview`——即 LLM review 与冲突修复全程持锁。条款要求 lock 只保护 ref mutation，多个 Job 可并行 rebase 与 review。锁必须下移到 `publish` 内部、`FfMerge` 前后。
+
+2. **`OrchestratorRecovery.currentJob` 是 stage-like 重建**。它在投影缺失时用 `Option.defaultValue` 造一个五字段全 `None` 的记录，`preReview` / `postReview` / `rebase` / `publish` 再按「哪个字段被设过」推断该做什么。这正是 ORCH-006 禁止的形状，且 0c 之后该记录类型已不存在。整个 `Orchestrator.Recovery.fs`（29 行，两个函数）应删除——`recoveryAction` 已经用一次匹配代替了对五个字段排优先级。
+
+3. **`CandidateId` 已灭绝但九处仍在构造它**。旧事实用 `candidate-<managerId>` 合成 id 作为 barrier 身份；ORCH-006 改为 barrier 事实携带 `ReviewBarrierId` 并指向已持久化的 `ConfirmedReviewWitness`。`OrchestratorRecovery.candidateId` 一并删除。
+
+4. **`ManagerId: string` vs `ManagerJobId`**。运行期全链路（`ManagerJob.ManagerId`、`OrchestratorHandle`、`ManagerPort` 三个函数、`VerdictMailbox`、`OrchestratorVerdict` 五个 case）用裸 string，而新事实要求 `ManagerJobId` + `ManagerSessionId` + `WorktreeIdentity` 三个 typed 身份。`OrchestratorHost.runReviewerOnce` 已经在用 `sprintf "%s-reviewer" managerId` 从 manager id 派生 reviewer 的 agent id，这是把 id 当字符串拼装的既有入口。
+
+5. **`ManagerJobCreated` 六字段无处可取**。`Orchestrator.forkManagerCore` 目前只有 `managerId` / `worktreePath` / `branch` / `prompt`；新事实需要 `ManagerSessionId`（Host 签发，需从 fork 结果取）、`ManagerAgent`（PROMPT-008，不可从 role 重建）、`WorktreeIdentity`（稳定身份，非可变路径）、`TargetBranchFrozen`（ORCH-008 的 `symbolic-ref` 冻结值）。`GitPort` 无 symbolic-ref 冻结动作，需新增。
+
+同时确认的 REVIEW-008 次序矛盾（包 D 遗留的两处 `SHOCK-UNMIGRATED`）：`emitReviewBarrier` 在 `runReviewerOnce` fork reviewer 之前调用，此时 reviewer session 尚不存在。本包按「barrier 从 reviewer fork 路径发出」解决——一个 barrier 对应一次 reviewer fork，新 reviewer session 的 guard 起始为空，REVIEW-008 的「全新双 PERFECT」因此自动成立。
+
 ### 包 H：Plugin Composition Root
 
 | 项 | 值 |
