@@ -73,10 +73,11 @@ module Identity =
     /// identity the SDK exposes — `modelID` and `providerID` are configuration
     /// labels, identical across every run of a session.
     ///
-    /// SSOT names this concept twice (`ProviderRunIdentity` in HOST-010 and
-    /// REVIEW-004, `ProviderAttemptIdentity` in PROMPT-008 and FALLBACK-007).
     /// One Host assistant message is one provider request is one attempt, so
-    /// there is one type here. Two types would be a double model.
+    /// there is exactly one type for it. SSOT used to name the concept twice
+    /// (`ProviderAttemptIdentity` in PROMPT-008 and FALLBACK-007); the wording is
+    /// now unified, because two types would make "are these two identities of the
+    /// same attempt equal" an askable but meaningless question.
     type ProviderRunIdentity = private ProviderRunIdentity of string
 
     /// One tool invocation inside a provider run. `ToolContext.callID`.
