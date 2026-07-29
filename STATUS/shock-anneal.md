@@ -235,6 +235,43 @@ PromptAuthoritySendTests
 
 文件本身在封炉期删除；内容由 Git 历史保存（`c3c35756^`）。
 
+### 包 W：因果推进门禁重建
+
+| 项 | 值 |
+|----|----|
+| 条款 | VERIFY-004 VERIFY-002 |
+| 目标模块 | `testkit/opencode/watchdog.js`、`watchdog-constants.js`、`stability-checker.js`、`scripts/run-canary-staggered.mjs`、`tests-next/runner.js` |
+| 原理状态 | 保留。没有进展就杀死、watchdog 按语义事件投喂、因果 bark 交错启动，三者是既有设计中最有价值的部分，必须继承发扬 |
+| 实现状态 | 不合格。见下方实测缺陷 |
+| 重建方式 | 第一性原理瀑布流，与包 K 同期。禁止在现有实现上逐点修补 |
+| 生产 | 不涉及 |
+
+原理与实现必须分开评价。VERIFY-004 的文字是判据，现有代码不因先存在而获得权威。
+
+#### 实测缺陷
+
+| 缺陷 | 位置 | 后果 |
+|------|------|------|
+| 声明了断言心跳但未接线 | `tests-next/Assert.fs:13` `resetHeartbeat () : unit = ()` 空实现；`runner.js` 的 `globalThis.__resetAssertionTimeout` 无人调用 | 单测的「断言投喂心跳」根本不存在。1000ms 是纯 wall-clock 超时，读者却以为有因果保护 |
+| 数量常量与清单各自维护 | `run-canary-staggered.mjs`：`CANARY_COUNT = 17`，`CANARY_TESTS` 实际 19 条 | 已经漂移。日志里的 `expected ~17` 是错的 |
+| 静态门禁指向不存在的目录 | `stability-checker.js:32` 判 `e2e/opencode/specs/`，该目录不存在 | `containsTool` 检查恒为通过，伪门禁 |
+| 超时值散落为字面量 | `run-canary-staggered.mjs:120` 就绪窗口 `10000`；`:35` canary 兜底 `90000`；`watchdog.js:84` 诊断竞速 `3000` | 只有 `WATCHDOG_TIMEOUT_MS` 是集中的。其余三个无法统一调整，也无法被门禁检查 |
+| 启动阶段只有 wall-clock 覆盖 | canary 进程拉起到 `[setupScenario] ready` 之间只有 10s 硬窗口 | 存在一段无因果判据的时间窗，违反 VERIFY-004「覆盖必须无缝」 |
+
+#### 重建顺序
+
+```text
+W1  集中所有时间常量，建立单一来源；门禁禁止字面量超时
+W2  canary 清单单一事实来源，数量从清单派生
+W3  删除伪门禁，静态检查路径判据与实际目录对齐
+W4  重建单测运行器的因果心跳：断言真实投喂，并有测试证明未接线会红
+W5  启动阶段因果判据，消除只有 wall-clock 的时间窗
+W6  watchdog 重写：语义投喂、背景不续期、诊断完整、不持有事件循环
+W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试
+```
+
+W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没有测试证明能力真实存在。`Assert.fs` 的空 `resetHeartbeat` 能存在这么久，正是因为没有任何测试断言心跳被投喂。
+
 ### 包 K：剧本森林重建
 
 | 项 | 值 |
