@@ -1,278 +1,491 @@
 namespace Wanxiangshu.Next.Journal
 
-open System
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Pure envelope dispatch. Each bounded projection owns its own fold algorithm.
+/// Why a journal line was refused during a fold.
+///
+/// PERSIST-004 requires a corrupt journal to stop startup rather than be
+/// absorbed. A benign duplicate is not corruption, so the two are separated
+/// here: `FoldRejection` means the line is impossible, and the caller must fail
+/// closed.
+type FoldRejection = { Fact: string; Reason: string }
+
+/// Pure envelope dispatch. Each bounded projection owns its own fold algorithm;
+/// this module only routes facts and decides which refusals are fatal.
 module Fold =
 
     let empty: ProjectionSet =
         { AgentProjections = AgentProjection.empty
           RuntimeId = None }
 
-    let private reviewOwner target projection =
-        let child = ChildId.create (SessionId.value target)
+    let private reject factName reason =
+        Error { Fact = factName; Reason = reason }
 
-        projection.Sessions
-        |> Map.tryPick (fun parentId session ->
-            session.Linkage
-            |> Option.bind (fun linkage ->
-                if Map.containsKey child linkage.LinkedChildren then Some parentId else None))
-        |> Option.defaultValue target
+    /// A dedupe refusal is the fold working as intended: the same failed attempt
+    /// or the same tool call arrived twice. The projection stays as it was and
+    /// the fold continues.
+    ///
+    /// A validation refusal is different. FALLBACK-007's modulo-4 check and
+    /// REVIEW-003's causal proof can only fail on a line that could not have been
+    /// written by a correct writer, so absorbing it would mean replaying a
+    /// journal into a state the domain forbids.
+    let private fallbackOutcome factName projection result =
+        match result with
+        | Ok updated -> Ok updated
+        | Error AlreadyObserved
+        | Error AlreadyExhausted
+        | Error DifferentRun -> Ok projection
+        | Error InvalidTransition ->
+            reject factName "cursor advance violates FALLBACK-007 (offset or count is not the successor)"
 
-    let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) =
-        match fact with
-        | AgentFact.AgentLinked p ->
-            AgentProjection.update
-                p.ParentId
-                (fun session ->
-                    { session with
-                        Linkage = Some(LinkageProjection.link p.ChildId p.TargetAgent p.Role session.Linkage) })
-                projection
-        | AgentFact.AgentForked p ->
-            AgentProjection.update
-                p.ParentId
-                (fun session ->
-                    { session with
-                        Linkage = Some(LinkageProjection.fork p.ChildId p.TargetAgent p.Role session.Linkage) })
-                projection
-        | AgentFact.AgentUnlinked p ->
-            AgentProjection.update
-                p.ParentId
-                (fun session ->
-                    { session with Linkage = Some(LinkageProjection.unlink p.ChildId session.Linkage) })
-                projection
-        | AgentFact.CompanionBaselineSet p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with Companion = Some(CompanionProjection.baseline p.Projection session.Companion) })
-                projection
-        | AgentFact.CompanionCheckpointReplaced p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with Companion = Some(CompanionProjection.checkpoint p.Content session.Companion) })
-                projection
-        | AgentFact.CompanionAdvanced p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        Companion = Some(CompanionProjection.recordBlogAdvance p.Projection p.Content session.Companion) })
-                projection
-        | AgentFact.CompanionEpochSwitched p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        Companion =
-                            Some(
-                                CompanionProjection.switchEpoch
-                                    p.EpochId
-                                    p.FrozenB
-                                    p.CutoffMessageIndex
-                                    p.CoveredPrefixDigest
-                                    session.Companion
-                            ) })
-                projection
-        | AgentFact.CompanionReplacementActiveSet p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        Companion = Some(CompanionProjection.setReplacement p.Active session.Companion) })
-                projection
-        | AgentFact.ReviewBarrierStarted p ->
-            AgentProjection.update
-                p.ManagerSessionId
-                (fun session ->
-                    { session with
-                        ReviewGuard = Some(ReviewProjection.startBarrier p.BarrierKey session.ReviewGuard) })
-                projection
-        | AgentFact.ReviewVerdictRecorded p ->
-            let existing =
-                Map.tryFind p.ManagerSessionId projection.Sessions
-                |> Option.bind (fun session -> session.ReviewGuard)
+    let private verdictOutcome factName projection result =
+        match result with
+        | Ok updated -> Ok updated
+        | Error DuplicateAttempt
+        | Error SameProviderRun -> Ok projection
+        | Error ChallengeNotProven ->
+            reject factName "second PERFECT has no provider input seal proving it consumed the challenge (REVIEW-003)"
 
-            let secondPerfect =
-                existing
-                |> Option.exists (fun guard ->
-                    ReviewConfirmation.isSecondPerfectConfirmed
-                        projection
-                        guard
-                        p.ReviewerSessionId
-                        p.ProviderRunId
-                        p.UserMessageId)
+    let private handleOutcome factName projection result =
+        match result with
+        | Ok updated -> Ok updated
+        // Replaying a completion or a retirement is expected; the tombstone
+        // makes both idempotent.
+        | Error AlreadyCompleted
+        | Error HandleIsRetired -> Ok projection
+        | Error UnknownHandle -> reject factName "handle completion or retirement for a handle that was never linked"
+        | Error NotCompleted -> reject factName "join retired a handle that had no completion (EXEC-004)"
 
-            AgentProjection.update
-                p.ManagerSessionId
-                (fun session ->
-                    { session with
-                        ReviewGuard = Some(ReviewProjection.recordVerdict secondPerfect p session.ReviewGuard) })
-                projection
-        | AgentFact.GuardPromptAccepted p ->
-            let owner = reviewOwner p.TargetSessionId projection
-            let hostMessageId =
-                if String.IsNullOrWhiteSpace p.HostMessageId then None else Some p.HostMessageId
+    // ── session-scoped helpers ──────────────────────────────────────────────
 
-            let isConfirmation =
-                Map.tryFind owner projection.Sessions
-                |> Option.bind (fun session -> session.ReviewGuard)
-                |> Option.exists (fun guard -> ReviewWitness.isPerfectPending guard.Witness)
+    let private updateSession sessionId apply projection =
+        AgentProjection.update sessionId apply projection
 
-            let apply session =
+    let private updateCompanion sessionId apply projection =
+        updateSession
+            sessionId
+            (fun session ->
                 { session with
-                    ReviewGuard =
-                        Some(
-                            ReviewProjection.acceptGuard
-                                p.GuardKey
-                                hostMessageId
-                                isConfirmation
-                                session.ReviewGuard
-                        ) }
+                    Companion = Some(apply (Option.defaultValue CompanionProjection.empty session.Companion)) })
+            projection
 
-            let withOwner = AgentProjection.update owner apply projection
-            if owner = p.TargetSessionId then withOwner else AgentProjection.update p.TargetSessionId apply withOwner
-        | AgentFact.HumanPromptAccepted p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        ReviewRequirements =
-                            Some(
-                                ReviewProjection.addRequirement
-                                    p.SourceSessionId
-                                    p.MessageId
-                                    session.ReviewRequirements
-                            ) })
-                projection
-        | AgentFact.ReviewConfirmedIdle p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        ReviewRequirements =
-                            Some(
-                                ReviewProjection.confirmIdle
-                                    p.AssistantMessageId
-                                    session.ReviewRequirements
-                            ) })
-                projection
-        | AgentFact.FallbackCursorAdvanced p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        Fallback =
-                            Some(
-                                FallbackProjection.recordRetry
-                                    p.LogicalRunId
-                                    p.AuthorityRootUserMessageId
-                                    p.ProviderAttempt
-                                    session.Fallback
-                            ) })
-                projection
-        | AgentFact.AuthorityRootAccepted p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with
-                        PromptAuthority = Some(AuthorityProjection.acceptRoot session.PromptAuthority p)
-                        Fallback = Some(FallbackProjection.forAuthority p.LogicalRunId p.HostMessageId) })
-                projection
-        | AgentFact.PluginPromptClaimed p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with PromptAuthority = Some(AuthorityProjection.claim session.PromptAuthority p) })
-                projection
-        | AgentFact.PluginPromptAccepted p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with PromptAuthority = Some(AuthorityProjection.accept session.PromptAuthority p) })
-                projection
-        | AgentFact.PluginPromptAbandoned p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with PromptAuthority = Some(AuthorityProjection.abandon session.PromptAuthority p) })
-                projection
-        | AgentFact.InteractionRepairClaimed p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with PromptAuthority = Some(AuthorityProjection.claimRepair session.PromptAuthority p) })
-                projection
-        | AgentFact.OrchestratorManagerJobCreated p ->
-            { projection with
-                Orchestrator =
-                    OrchestratorProjection.createManager
-                        p.ManagerId
-                        p.WorktreePath
-                        p.Branch
-                        p.Prompt
-                        projection.Orchestrator }
-        | AgentFact.OrchestratorCandidateRegistered p ->
-            { projection with
-                Orchestrator =
-                    OrchestratorProjection.registerCandidate
-                        p.ManagerId
-                        p.CandidateId
-                        p.Branch
-                        p.CommitHash
-                        projection.Orchestrator }
-        | AgentFact.OrchestratorPublished p ->
-            { projection with
-                Orchestrator = OrchestratorProjection.published p.ManagerId p.CommitHash projection.Orchestrator }
-        | AgentFact.OrchestratorRejected p ->
-            { projection with Orchestrator = OrchestratorProjection.rejected p.ManagerId projection.Orchestrator }
-        | AgentFact.OrchestratorPreRebaseReviewConfirmed p ->
-            { projection with
-                Orchestrator =
-                    OrchestratorProjection.preRebaseReviewed p.ManagerId p.CommitHash projection.Orchestrator }
-        | AgentFact.OrchestratorRebased p ->
-            { projection with
-                Orchestrator = OrchestratorProjection.rebased p.ManagerId p.RebasedCommit projection.Orchestrator }
-        | AgentFact.OrchestratorConflictDetected p ->
-            { projection with
-                Orchestrator = OrchestratorProjection.conflict p.ManagerId p.Files projection.Orchestrator }
-        | AgentFact.OrchestratorPostRebaseReviewConfirmed p ->
-            { projection with
-                Orchestrator =
-                    OrchestratorProjection.postRebaseReviewed p.ManagerId p.RebasedCommit projection.Orchestrator }
-        | AgentFact.OrchestratorPublishClaimed p ->
-            { projection with
-                Orchestrator =
-                    OrchestratorProjection.claimed p.ManagerId p.ExpectedTargetHead projection.Orchestrator }
-        | AgentFact.DurableEffectRequested p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with Effects = Some(EffectProjection.request p.EffectId p.Target p.Payload session.Effects) })
-                projection
-        | AgentFact.DurableEffectAccepted p ->
-            AgentProjection.update
-                p.SessionId
-                (fun session ->
-                    { session with Effects = Some(EffectProjection.accept p.EffectId p.Result session.Effects) })
-                projection
+    let private updateReviewGuard sessionId apply projection =
+        updateSession
+            sessionId
+            (fun session ->
+                { session with
+                    ReviewGuard = Some(apply (Option.defaultValue ReviewProjection.empty session.ReviewGuard)) })
+            projection
 
-    let foldAgentEnvelope projection envelope =
+    let private updateRequirements sessionId apply projection =
+        updateSession
+            sessionId
+            (fun session ->
+                { session with
+                    ReviewRequirements =
+                        Some(apply (Option.defaultValue ReviewRequirementProjection.empty session.ReviewRequirements)) })
+            projection
+
+    let private updateOrchestrator apply (projection: AgentProjectionSet) =
+        { projection with
+            Orchestrator = apply projection.Orchestrator }
+
+    /// PROMPT-005: dispatch facts all key on the same session and projection.
+    let private updateAuthority sessionId apply projection =
+        updateSession
+            sessionId
+            (fun session ->
+                { session with
+                    PromptAuthority =
+                        Some(apply (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)) })
+            projection
+
+    let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
+        match fact with
+
+        // ── prompt dispatch ─────────────────────────────────────────────────
+
+        | AgentFact.PluginPromptClaimed payload ->
+            Ok(
+                updateAuthority
+                    payload.SessionId
+                    (fun authority -> PromptAuthorityLedger.foldPromptClaimed authority payload)
+                    projection
+            )
+
+        | AgentFact.PluginPromptSubmitted payload ->
+            Ok(
+                updateAuthority
+                    payload.SessionId
+                    (fun authority -> PromptAuthorityLedger.foldPromptSubmitted authority payload)
+                    projection
+            )
+
+        | AgentFact.PluginPromptPhysicalAccepted payload ->
+            Ok(
+                updateAuthority
+                    payload.SessionId
+                    (fun authority -> PromptAuthorityLedger.foldPromptPhysicalAccepted authority payload)
+                    projection
+            )
+
+        | AgentFact.PluginPromptAbandoned payload ->
+            Ok(
+                updateAuthority
+                    payload.SessionId
+                    (fun authority -> PromptAuthorityLedger.foldPromptAbandoned authority payload)
+                    projection
+            )
+
+        // ── authority ───────────────────────────────────────────────────────
+
+        | AgentFact.AuthorityRootAccepted payload ->
+            // FALLBACK-001: a new Authority Root starts a fresh cursor. Done here
+            // rather than by a separate reset fact, because the reset is not an
+            // independent event — it IS this fact.
+            //
+            // REVIEW-007: a HumanRoot also creates a review requirement. An
+            // AgentOwnerRoot does not: the agent that forked the work is
+            // accountable for it, and requiring review of every internal prompt
+            // would make the Guard fire on its own continuations.
+            let withAuthority =
+                updateSession
+                    payload.SessionId
+                    (fun session ->
+                        { session with
+                            PromptAuthority =
+                                Some(
+                                    PromptAuthorityLedger.foldAuthorityRootAccepted
+                                        (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)
+                                        payload
+                                )
+                            Fallback =
+                                Some(
+                                    FallbackProjection.forAuthority
+                                        payload.LogicalRunId
+                                        payload.AuthorityRootUserMessageId
+                                ) })
+                    projection
+
+            if payload.AuthorityKind = "HumanRoot" then
+                Ok(
+                    updateRequirements
+                        payload.SessionId
+                        (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
+                        withAuthority
+                )
+            else
+                Ok withAuthority
+
+        // ── fallback ────────────────────────────────────────────────────────
+
+        | AgentFact.FallbackCursorAdvanced payload ->
+            let identity =
+                { SessionId = payload.SessionId
+                  LogicalRunId = payload.LogicalRunId
+                  AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                  ProviderRun = payload.ProviderRun }
+
+            AgentProjection.tryUpdate
+                payload.SessionId
+                (fun session ->
+                    // An advance for a run with no cursor cannot be validated:
+                    // FALLBACK-001 says the cursor is created by the Authority
+                    // Root, so its absence means the root fact is missing.
+                    match session.Fallback with
+                    | None -> Error InvalidTransition
+                    | Some current ->
+                        FallbackProjection.applyAdvance
+                            identity
+                            payload.PreviousOffset
+                            payload.NextOffset
+                            payload.ConsecutiveFailureCount
+                            current
+                        |> Result.map (fun updated -> { session with Fallback = Some updated }))
+                projection
+            |> fallbackOutcome "FallbackCursorAdvanced" projection
+
+        | AgentFact.FallbackExhausted payload ->
+            Ok(
+                updateSession
+                    payload.SessionId
+                    (fun session ->
+                        { session with
+                            Fallback = session.Fallback |> Option.map FallbackProjection.applyExhausted })
+                    projection
+            )
+
+        // ── review ──────────────────────────────────────────────────────────
+
+        | AgentFact.ReviewBarrierStarted payload ->
+            Ok(
+                updateReviewGuard
+                    payload.ReviewerSessionId
+                    (ReviewProjection.startBarrier payload.BarrierId payload.GitTreeHash)
+                    projection
+            )
+
+        | AgentFact.PerfectChallengeIssued payload ->
+            let challenge =
+                { BarrierId = payload.BarrierId
+                  GitTreeHash = payload.GitTreeHash
+                  ReviewerSessionId = payload.ReviewerSessionId
+                  FirstProviderRun = payload.FirstProviderRun
+                  FirstToolCallId = payload.FirstToolCallId
+                  ChallengeTextVersion = payload.ChallengeTextVersion
+                  ChallengeContentDigest = payload.ChallengeContentDigest }
+
+            Ok(updateReviewGuard payload.ReviewerSessionId (ReviewProjection.applyChallengeIssued challenge) projection)
+
+        | AgentFact.ProviderInputSealed payload ->
+            let seal =
+                { SessionId = payload.SessionId
+                  ProviderRun = payload.ProviderRun
+                  PhysicalUserMessageId = payload.PhysicalUserMessageId
+                  SealDigest = payload.SealDigest
+                  CanonicalVersion = payload.CanonicalVersion
+                  IncludedToolResultDigests =
+                    payload.IncludedToolResultDigests |> List.map SealDigest.value |> Set.ofList }
+
+            Ok(updateReviewGuard payload.SessionId (ReviewProjection.applySeal seal) projection)
+
+        | AgentFact.ReviewVerdictRecorded payload ->
+            let attempt =
+                { ReviewBarrierId = payload.BarrierId
+                  GitTreeHash = payload.GitTreeHash
+                  ReviewerSessionId = payload.ReviewerSessionId
+                  ProviderRun = payload.ProviderRun
+                  ToolCallId = payload.ToolCallId }
+
+            AgentProjection.tryUpdate
+                payload.ReviewerSessionId
+                (fun session ->
+                    ReviewProjection.applyVerdict
+                        attempt
+                        payload.Verdict
+                        (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
+                    |> Result.map (fun updated ->
+                        { session with
+                            ReviewGuard = Some updated }))
+                projection
+            |> verdictOutcome "ReviewVerdictRecorded" projection
+
+        | AgentFact.ConfirmedReviewWitness payload ->
+            // REVIEW-007: a confirmed witness clears the requirements it covered.
+            // Recorded against the Manager session, which is where the Guard asks.
+            Ok(
+                updateRequirements
+                    payload.ManagerSessionId
+                    (ReviewRequirementProjection.clearOnConfirmation payload.SecondProviderRun)
+                    projection
+            )
+
+        // ── execution handles ───────────────────────────────────────────────
+
+        | AgentFact.HandleLinked payload ->
+            AgentProjection.tryUpdate
+                payload.ParentSessionId
+                (fun session ->
+                    HandleProjection.link
+                        payload.Handle
+                        payload.TargetAgent
+                        payload.CanonicalRole
+                        (Option.defaultValue HandleProjection.empty session.Handles)
+                    |> Result.map (fun updated -> { session with Handles = Some updated }))
+                projection
+            |> handleOutcome "HandleLinked" projection
+
+        | AgentFact.HandleCompleted payload ->
+            AgentProjection.tryUpdate
+                payload.ParentSessionId
+                (fun session ->
+                    HandleProjection.complete
+                        payload.Handle
+                        payload.Kind
+                        (Option.defaultValue HandleProjection.empty session.Handles)
+                    |> Result.map (fun updated -> { session with Handles = Some updated }))
+                projection
+            |> handleOutcome "HandleCompleted" projection
+
+        | AgentFact.HandleRetired payload ->
+            AgentProjection.tryUpdate
+                payload.ParentSessionId
+                (fun session ->
+                    HandleProjection.retire payload.Handle (Option.defaultValue HandleProjection.empty session.Handles)
+                    |> Result.map (fun updated -> { session with Handles = Some updated }))
+                projection
+            |> handleOutcome "HandleRetired" projection
+
+        // ── orchestrator ────────────────────────────────────────────────────
+
+        | AgentFact.ManagerJobCreated payload ->
+            Ok(updateOrchestrator (OrchestratorProjection.createJob payload) projection)
+
+        | AgentFact.CandidateReady payload ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress
+                        payload.ManagerJobId
+                        (JobProgress.CandidateReady
+                            {| CandidateCommit = payload.CandidateCommit
+                               PreRebaseReviewBarrierId = payload.PreRebaseReviewBarrierId |}))
+                    projection
+            )
+
+        | AgentFact.ConflictDetected payload ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress
+                        payload.ManagerJobId
+                        (JobProgress.ConflictPending
+                            {| CandidateCommit = payload.CandidateCommit
+                               TargetHeadSnapshot = payload.TargetHeadSnapshot
+                               ConflictFiles = payload.ConflictFiles
+                               DiagnosticsDigest = payload.DiagnosticsDigest |}))
+                    projection
+            )
+
+        | AgentFact.RebasedCandidateReady payload ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress
+                        payload.ManagerJobId
+                        (JobProgress.RebasedCandidateReady
+                            {| RebasedCommit = payload.RebasedCommit
+                               TargetHeadSnapshot = payload.TargetHeadSnapshot
+                               PostRebaseReviewBarrierId = payload.PostRebaseReviewBarrierId |}))
+                    projection
+            )
+
+        | AgentFact.PublishClaimed payload ->
+            // ORCH-007 needs the rebased commit to recognise "already published".
+            // It comes from the job's current progress rather than the claim
+            // fact, because the claim is written inside the CAS window where the
+            // rebased candidate is already established.
+            let rebasedCommit =
+                OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
+                |> Option.bind (fun job ->
+                    match job.Progress with
+                    | JobProgress.RebasedCandidateReady rebased -> Some rebased.RebasedCommit
+                    | _ -> None)
+
+            match rebasedCommit with
+            | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
+            | Some commit ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordProgress
+                            payload.ManagerJobId
+                            (JobProgress.PublishClaimed
+                                {| RebasedCommit = commit
+                                   ExpectedHead = payload.ExpectedHead |}))
+                        projection
+                )
+
+        | AgentFact.Published payload ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress
+                        payload.ManagerJobId
+                        (JobProgress.Published
+                            {| CandidateCommit = payload.CandidateCommit
+                               ResultingTargetHead = payload.ResultingTargetHead |}))
+                    projection
+            )
+
+        | AgentFact.JobFailed payload ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress payload.ManagerJobId (JobProgress.Failed payload.Reason))
+                    projection
+            )
+
+        | AgentFact.JobAbandoned payload ->
+            Ok(
+                updateOrchestrator
+                    (OrchestratorProjection.recordProgress payload.ManagerJobId JobProgress.Abandoned)
+                    projection
+            )
+
+        // ── companion ───────────────────────────────────────────────────────
+
+        | AgentFact.CompanionBaselineSet payload ->
+            Ok(updateCompanion payload.SessionId (CompanionProjection.baseline payload.Projection) projection)
+
+        | AgentFact.CompanionCheckpointReplaced payload ->
+            Ok(updateCompanion payload.SessionId (CompanionProjection.checkpoint payload.Content) projection)
+
+        | AgentFact.CompanionAdvanced payload ->
+            Ok(
+                updateCompanion
+                    payload.SessionId
+                    (CompanionProjection.recordBlogAdvance payload.Projection payload.Content)
+                    projection
+            )
+
+        | AgentFact.CompanionEpochSwitched payload ->
+            Ok(
+                updateCompanion
+                    payload.SessionId
+                    (CompanionProjection.switchEpoch
+                        payload.EpochId
+                        payload.FrozenB
+                        payload.CutoffMessageIndex
+                        payload.CoveredPrefixDigest)
+                    projection
+            )
+
+        | AgentFact.CompanionReplacementActiveSet payload ->
+            Ok(updateCompanion payload.SessionId (CompanionProjection.setReplacement payload.Active) projection)
+
+        // ── durable effects ─────────────────────────────────────────────────
+
+        | AgentFact.DurableEffectRequested payload ->
+            Ok(
+                updateSession
+                    payload.SessionId
+                    (fun session ->
+                        { session with
+                            Effects =
+                                Some(
+                                    EffectProjection.request
+                                        payload.EffectId
+                                        payload.Target
+                                        payload.Payload
+                                        session.Effects
+                                ) })
+                    projection
+            )
+
+        | AgentFact.DurableEffectAccepted payload ->
+            Ok(
+                updateSession
+                    payload.SessionId
+                    (fun session ->
+                        { session with
+                            Effects = Some(EffectProjection.accept payload.EffectId payload.Result session.Effects) })
+                    projection
+            )
+
+    let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
-        | Fact.Agent fact -> foldAgentFact projection fact
-        | _ -> projection
-
-    let applyAgentFacts projection envelopes = List.fold foldAgentEnvelope projection envelopes
-
-    let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) =
-        match envelope.Fact with
-        | Runtime(RuntimeStarted runtime) -> { projection with RuntimeId = Some runtime.RuntimeId }
+        | Runtime(RuntimeStarted runtime) ->
+            Ok
+                { projection with
+                    RuntimeId = Some runtime.RuntimeId }
         | Agent fact ->
-            { projection with
-                AgentProjections = foldAgentFact projection.AgentProjections fact }
+            foldAgentFact projection.AgentProjections fact
+            |> Result.map (fun agents ->
+                { projection with
+                    AgentProjections = agents })
 
-    let apply projection envelopes = List.fold foldEnvelope projection envelopes
+    /// Fold a journal. PERSIST-004: the first impossible line stops the fold and
+    /// reports which fact and why, rather than producing a partially replayed
+    /// state that no writer could have produced.
+    let apply (projection: ProjectionSet) (envelopes: Envelope list) : Result<ProjectionSet, FoldRejection> =
+        envelopes
+        |> List.fold
+            (fun state envelope -> state |> Result.bind (fun current -> foldEnvelope current envelope))
+            (Ok projection)

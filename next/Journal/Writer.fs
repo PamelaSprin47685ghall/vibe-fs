@@ -75,13 +75,17 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
               ObservedAt = startedAt
               EventId = initEventId
               Stream = StreamId.Workspace
-              TurnId = None
+              ProviderRun = None
               Fact = initFact }
 
         let jsonLine = Envelope.serialize initEnvelope + "\n"
         let bytes = System.Text.Encoding.UTF8.GetBytes(jsonLine)
         NodeFsWriter.writeSync (fd, bytes) |> ignore
-        try NodeFsWriter.fdatasyncSync fd with _ -> NodeFsWriter.fsyncSync fd
+
+        try
+            NodeFsWriter.fdatasyncSync fd
+        with _ ->
+            NodeFsWriter.fsyncSync fd
 
         (new JournalWriter(runtimeId, filePath, fd), initEnvelope)
 
@@ -91,14 +95,29 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
 
         try
             NodeFsWriter.writeSync (fd, bytes) |> ignore
-            try NodeFsWriter.fdatasyncSync fd with _ -> NodeFsWriter.fsyncSync fd
+
+            try
+                NodeFsWriter.fdatasyncSync fd
+            with _ ->
+                NodeFsWriter.fsyncSync fd
+
             currentSeq <- currentSeq + 1L
             Committed env
         with ex ->
             poisoned <- true
             CommitUnknown(eventId, WriteFailed ex.Message)
 
-    member this.Append (streamKind: StreamId) (turnId: TurnId option) (fact: Fact) : CommitResult<Envelope> =
+    /// PERSIST-002: append yields Committed or CommitUnknown. There is no
+    /// partial write, so there is no third result to return.
+    ///
+    /// `providerRun` is the run this fact was observed during, when there was
+    /// one. Facts belonging to no run — runtime start, worktree creation, a
+    /// Manager job's lifecycle — pass None.
+    member this.Append
+        (streamKind: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: Fact)
+        : CommitResult<Envelope> =
         lock gate (fun () ->
             let eventId = EventId.create (Guid.NewGuid().ToString("N"))
 
@@ -111,7 +130,7 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
                       ObservedAt = DateTimeOffset.UtcNow
                       EventId = eventId
                       Stream = streamKind
-                      TurnId = turnId
+                      ProviderRun = providerRun
                       Fact = fact }
 
                 this.WriteAndFlush env eventId)
@@ -120,7 +139,11 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
         lock gate (fun () ->
             if not disposed then
                 disposed <- true
-                try NodeFsWriter.closeSync fd with _ -> ())
+
+                try
+                    NodeFsWriter.closeSync fd
+                with _ ->
+                    ())
 
     interface IDisposable with
         member this.Dispose() = this.DisposeInternal()
@@ -128,4 +151,4 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
     interface IAsyncDisposable with
         member this.DisposeAsync() =
             this.DisposeInternal()
-            Fable.Core.JS.Constructors.Promise.resolve() |> unbox<ValueTask>
+            Fable.Core.JS.Constructors.Promise.resolve () |> unbox<ValueTask>

@@ -1,125 +1,216 @@
 namespace Wanxiangshu.Next.Journal
 
-type ManagerId = private ManagerId of string
+open Wanxiangshu.Next.Kernel.Identity
 
-module ManagerId =
-    let create value = ManagerId value
-    let value (ManagerId value) = value
+/// What actually happened to a ManagerJob, most recent fact only.
+///
+/// ORCH-006 forbids a shape where the recovery action is ambiguous. The old
+/// projection held five independent optional fields (PreRebaseReviewCommit,
+/// RebasedCommit, ConflictFiles, PostRebaseReviewCommit, PublishClaimHead), so
+/// recovery had to guess an ordering from which combination happened to be set —
+/// and "candidate registered" could mean either "waiting for review" or "ready
+/// to publish".
+///
+/// This is NOT a program counter (ARCH-001). Every case carries physical
+/// evidence that exists in the world: a commit, a target head snapshot, a review
+/// barrier, a set of conflicted files. None of them says where the program
+/// should go next; ORCH-007 derives that, and it derives it by matching one
+/// value instead of ranking five.
+type JobProgress =
+    /// ManagerJobCreated. Worktree exists, Manager has produced nothing yet.
+    | ManagerStarted
+    /// CandidateReady. A candidate commit exists with a pre-rebase witness.
+    | CandidateReady of
+        {| CandidateCommit: CommitHash
+           PreRebaseReviewBarrierId: ReviewBarrierId |}
+    /// ConflictDetected. ORCH-003: the SAME Manager resolves it, in the same
+    /// worktree. Without this case, recovery cannot tell an in-progress conflict
+    /// resolution from a job that never produced a candidate.
+    | ConflictPending of
+        {| CandidateCommit: CommitHash
+           TargetHeadSnapshot: CommitHash
+           ConflictFiles: string list
+           DiagnosticsDigest: string |}
+    /// RebasedCandidateReady. Rebased onto a known head and re-reviewed.
+    | RebasedCandidateReady of
+        {| RebasedCommit: CommitHash
+           TargetHeadSnapshot: CommitHash
+           PostRebaseReviewBarrierId: ReviewBarrierId |}
+    /// PublishClaimed. Written inside the short CAS window (ORCH-005), so the
+    /// ref mutation may or may not have happened.
+    | PublishClaimed of
+        {| RebasedCommit: CommitHash
+           ExpectedHead: CommitHash |}
+    /// Published. Terminal success.
+    | Published of
+        {| CandidateCommit: CommitHash
+           ResultingTargetHead: CommitHash |}
+    /// Terminal failure.
+    | Failed of reason: string
+    /// Terminal, deliberate.
+    | Abandoned
 
-type CandidateId = private CandidateId of string
-
-module CandidateId =
-    let create value = CandidateId value
-    let value (CandidateId value) = value
-
-type CandidateStatus =
-    | Registered of candidateId: CandidateId * branch: string * commitHash: string
-    | Published of candidateId: CandidateId * commitHash: string
-    | Rejected of candidateId: CandidateId * reason: string
-
-type ManagerState = { Status: CandidateStatus option }
-
+/// One ManagerJob: one worktree, one Manager, for its whole life (ORCH-003).
 type ManagerJobProjection =
-    { WorktreePath: string
-      Branch: string
-      CandidateId: CandidateId option
-      CandidateCommit: string option
-      PublishedCommit: string option
-      Prompt: string
-      PreRebaseReviewCommit: string option
-      RebasedCommit: string option
-      ConflictFiles: string list option
-      PostRebaseReviewCommit: string option
-      PublishClaimHead: string option }
+    {
+        ManagerJobId: ManagerJobId
+        ManagerSessionId: SessionId
+        /// ORCH-003: persisted so recovery restores `fast-manager` or
+        /// `deep-manager` rather than degrading to a bare role.
+        ManagerAgent: string
+        /// ORCH-006: recovery locates the worktree by identity. The path is
+        /// diagnostic — it is mutable state, and a moved worktree must not orphan
+        /// a job.
+        WorktreeIdentity: WorktreeIdentity
+        WorktreePath: WorktreePath
+        TargetRef: TargetRef
+        /// ORCH-008: frozen by `git symbolic-ref` at fork time. GetTargetHead
+        /// failure must fail closed, never fall back to HEAD.
+        TargetBranchFrozen: string
+        Progress: JobProgress
+    }
 
+/// PERSIST-008: keyed lookup, no history scan. Terminal jobs stay in the map so
+/// re-folding a Published fact is recognised as a duplicate rather than
+/// resurrecting a fresh entry; `activeJobs` filters them out.
 type OrchestratorProjection =
-    { ManagerJobs: Map<ManagerId, ManagerJobProjection>
-      Managers: Map<ManagerId, ManagerState>
-      PublishedCommit: string option }
+    { Jobs: Map<ManagerJobId, ManagerJobProjection> }
 
-/// Durable Git/publish facts only; no workflow stage is stored.
+/// ORCH-007: exactly one action per job, derived from its last fact.
+type JobRecoveryAction =
+    /// Resume the Manager from the existing worktree.
+    | ResumeManager
+    /// Enter rebaseReviewPublishLoop with this candidate.
+    | RebaseReviewPublish of CommitHash
+    /// Hand the conflict back to the same Manager in the same worktree.
+    | ResumeConflictResolution of
+        {| CandidateCommit: CommitHash
+           ConflictFiles: string list |}
+    /// Acquire the short gate and re-read the head before ff-only.
+    | AttemptPublish of
+        {| RebasedCommit: CommitHash
+           ExpectedHead: CommitHash |}
+    /// ORCH-007 branch 1: the ff already happened, only the fact is missing.
+    | BackfillPublished of
+        {| RebasedCommit: CommitHash
+           ResultingTargetHead: CommitHash |}
+    /// ORCH-007 branch 3: the claim expired. Discard it AND the post-rebase
+    /// witness (REVIEW-008), then rebase and review again.
+    | RebaseAndReviewAgain
+    /// Clean up the worktree; nothing is owed.
+    | CleanUp
+    /// GetTargetHead failed. ORCH-008: fail closed rather than guess.
+    | FailClosed of reason: string
+
 module OrchestratorProjection =
 
-    let empty =
-        { ManagerJobs = Map.empty
-          Managers = Map.empty
-          PublishedCommit = None }
+    let empty = { Jobs = Map.empty }
 
-    let createManager managerId worktree branch prompt projection =
-        let id = ManagerId.create managerId
+    let tryFind (jobId: ManagerJobId) (projection: OrchestratorProjection) = Map.tryFind jobId projection.Jobs
 
-        let job =
-            { WorktreePath = worktree
-              Branch = branch
-              CandidateId = None
-              CandidateCommit = None
-              PublishedCommit = None
-              Prompt = prompt
-              PreRebaseReviewCommit = None
-              RebasedCommit = None
-              ConflictFiles = None
-              PostRebaseReviewCommit = None
-              PublishClaimHead = None }
+    let private isTerminal (progress: JobProgress) =
+        match progress with
+        | Published _
+        | Failed _
+        | Abandoned -> true
+        | ManagerStarted
+        | CandidateReady _
+        | ConflictPending _
+        | RebasedCandidateReady _
+        | PublishClaimed _ -> false
 
-        { projection with ManagerJobs = Map.add id job projection.ManagerJobs }
+    /// ORCH-004: jobs still owed work. Multiple jobs may rebase and review in
+    /// parallel; only the ref mutation serialises.
+    let activeJobs (projection: OrchestratorProjection) =
+        projection.Jobs
+        |> Map.toList
+        |> List.map snd
+        |> List.filter (fun job -> not (isTerminal job.Progress))
 
-    let private updateJob managerId update projection =
-        let id = ManagerId.create managerId
+    let createJob
+        (job:
+            {| ManagerJobId: ManagerJobId
+               ManagerSessionId: SessionId
+               ManagerAgent: string
+               WorktreeIdentity: WorktreeIdentity
+               WorktreePath: WorktreePath
+               TargetRef: TargetRef
+               TargetBranchFrozen: string |})
+        (projection: OrchestratorProjection)
+        =
+        { projection with
+            Jobs =
+                Map.add
+                    job.ManagerJobId
+                    { ManagerJobId = job.ManagerJobId
+                      ManagerSessionId = job.ManagerSessionId
+                      ManagerAgent = job.ManagerAgent
+                      WorktreeIdentity = job.WorktreeIdentity
+                      WorktreePath = job.WorktreePath
+                      TargetRef = job.TargetRef
+                      TargetBranchFrozen = job.TargetBranchFrozen
+                      Progress = ManagerStarted }
+                    projection.Jobs }
 
-        match Map.tryFind id projection.ManagerJobs with
+    /// Record a job's latest progress.
+    ///
+    /// Named `recordProgress` rather than `advance`: `advance` belongs to the
+    /// fallback cursor's modulo-4 step, and one algorithm name owned by two
+    /// modules is how a reader starts assuming they are the same operation.
+    ///
+    /// ORCH-003 fixes the worktree and the Manager for the job's whole life, so
+    /// only `Progress` is ever replaced. A terminal job accepts nothing further,
+    /// which makes a replayed Published idempotent instead of reopening the job.
+    let recordProgress (jobId: ManagerJobId) (progress: JobProgress) (projection: OrchestratorProjection) =
+        match Map.tryFind jobId projection.Jobs with
         | None -> projection
+        | Some job when isTerminal job.Progress -> projection
         | Some job ->
             { projection with
-                ManagerJobs = Map.add id (update job) projection.ManagerJobs }
+                Jobs = Map.add jobId { job with Progress = progress } projection.Jobs }
 
-    let registerCandidate managerId candidateId branch commit projection =
-        let manager = ManagerId.create managerId
-        let candidate = CandidateId.create candidateId
-        let status = Registered(candidate, branch, commit)
+    /// ORCH-007. `currentHead` is None when GetTargetHead failed.
+    ///
+    /// The three PublishClaimed branches are evaluated in the clause's fixed
+    /// order: already-published first, then unchanged target, then everything
+    /// else. Order matters — checking "unchanged" first would re-attempt an ff
+    /// that already succeeded.
+    let recoveryAction (currentHead: CommitHash option) (job: ManagerJobProjection) : JobRecoveryAction =
+        match job.Progress with
+        | ManagerStarted -> ResumeManager
 
-        let withJob =
-            updateJob
-                managerId
-                (fun job ->
-                    { job with
-                        CandidateId = Some candidate
-                        CandidateCommit = Some commit })
-                projection
+        | CandidateReady candidate -> RebaseReviewPublish candidate.CandidateCommit
 
-        { withJob with Managers = Map.add manager { Status = Some status } withJob.Managers }
+        | ConflictPending conflict ->
+            ResumeConflictResolution
+                {| CandidateCommit = conflict.CandidateCommit
+                   ConflictFiles = conflict.ConflictFiles |}
 
-    let published managerId commit projection =
-        let id = ManagerId.create managerId
+        | RebasedCandidateReady rebased ->
+            match currentHead with
+            | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+            | Some head when head = rebased.TargetHeadSnapshot ->
+                AttemptPublish
+                    {| RebasedCommit = rebased.RebasedCommit
+                       ExpectedHead = rebased.TargetHeadSnapshot |}
+            // The target moved while this job held no lock, which ORCH-005
+            // explicitly allows. The post-rebase witness is now for the wrong
+            // base (REVIEW-008), so it must not be reused.
+            | Some _ -> RebaseAndReviewAgain
 
-        { projection with
-            ManagerJobs = Map.remove id projection.ManagerJobs
-            Managers = Map.remove id projection.Managers
-            PublishedCommit = Some commit }
+        | PublishClaimed claim ->
+            match currentHead with
+            | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+            | Some head when head = claim.RebasedCommit ->
+                BackfillPublished
+                    {| RebasedCommit = claim.RebasedCommit
+                       ResultingTargetHead = head |}
+            | Some head when head = claim.ExpectedHead ->
+                AttemptPublish
+                    {| RebasedCommit = claim.RebasedCommit
+                       ExpectedHead = claim.ExpectedHead |}
+            | Some _ -> RebaseAndReviewAgain
 
-    let rejected managerId projection =
-        let id = ManagerId.create managerId
-
-        { projection with
-            ManagerJobs = Map.remove id projection.ManagerJobs
-            Managers = Map.remove id projection.Managers }
-
-    let preRebaseReviewed managerId commit projection =
-        updateJob managerId (fun job -> { job with PreRebaseReviewCommit = Some commit }) projection
-
-    let rebased managerId commit projection =
-        updateJob
-            managerId
-            (fun job ->
-                { job with
-                    RebasedCommit = Some commit
-                    ConflictFiles = None })
-            projection
-
-    let conflict managerId files projection =
-        updateJob managerId (fun job -> { job with ConflictFiles = Some files }) projection
-
-    let postRebaseReviewed managerId commit projection =
-        updateJob managerId (fun job -> { job with PostRebaseReviewCommit = Some commit }) projection
-
-    let claimed managerId expectedHead projection =
-        updateJob managerId (fun job -> { job with PublishClaimHead = Some expectedHead }) projection
+        | Published _
+        | Failed _
+        | Abandoned -> CleanUp

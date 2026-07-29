@@ -5,15 +5,17 @@ open Wanxiangshu.Next.Kernel.Identity
 /// One witnessed PERFECT verdict.
 ///
 /// REVIEW-006 requires a witness to be self-contained: it must answer on its
-/// own who reviewed, which tree, which provider run and which tool call. Any
-/// field that has to be looked up elsewhere is a field that can be missing at
-/// Guard time.
+/// own who reviewed, which tree, which provider run and which tool call.
+///
+/// Deliberately NO AuthorityRootUserMessageId. REVIEW-003 forbids confirming on
+/// a shared authority root, and REVIEW-006's field list does not include one.
+/// Carrying it "for context" is how same-root guessing gets reintroduced: once
+/// the field exists, comparing it is one line away.
 type VerdictWitness =
     { ProviderRun: ProviderRunIdentity
       ToolCallId: ToolCallId
       GitTreeHash: GitTreeHash
-      ReviewerSessionId: SessionId
-      AuthorityRootUserMessageId: AuthorityRootUserMessageId }
+      ReviewerSessionId: SessionId }
 
 /// Review state, derived only from witnessed verdicts.
 ///
@@ -30,7 +32,9 @@ type ReviewWitness =
         {| BarrierId: ReviewBarrierId
            First: VerdictWitness
            Second: VerdictWitness
-           GitTreeHash: GitTreeHash |}
+           GitTreeHash: GitTreeHash
+           ChallengeResultDigest: SealDigest
+           SecondProviderInputDigest: SealDigest |}
 
 module ReviewWitness =
 
@@ -93,18 +97,20 @@ module ReviewWitness =
 
     /// Build a confirmed witness from a proven pair.
     ///
-    /// Deliberately takes the seal proof as a parameter it cannot fabricate:
-    /// the caller must have already established condition 6. Making the proof
-    /// an argument means "confirm without causal evidence" is not expressible.
+    /// The causal proof is a parameter this function cannot fabricate: the caller
+    /// must already hold the challenge digest and the second run's input digest,
+    /// and must have checked that the former appears in the latter's seal
+    /// (REVIEW-010). Passing the digests rather than a boolean means the witness
+    /// carries its own evidence, so REVIEW-006's self-containment does not
+    /// depend on a caller remembering to copy them.
     let confirm
         (barrierId: ReviewBarrierId)
-        (challengeConsumed: bool)
+        (challengeResultDigest: SealDigest)
+        (secondProviderInputDigest: SealDigest)
         (first: VerdictWitness)
         (second: VerdictWitness)
         : ReviewWitness option =
-        if not challengeConsumed then
-            None
-        elif not (isDistinctAttempt barrierId first second) then
+        if not (isDistinctAttempt barrierId first second) then
             None
         else
             Some(
@@ -112,5 +118,7 @@ module ReviewWitness =
                     {| BarrierId = barrierId
                        First = first
                        Second = second
-                       GitTreeHash = second.GitTreeHash |}
+                       GitTreeHash = second.GitTreeHash
+                       ChallengeResultDigest = challengeResultDigest
+                       SecondProviderInputDigest = secondProviderInputDigest |}
             )

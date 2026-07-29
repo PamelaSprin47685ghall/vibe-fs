@@ -182,6 +182,79 @@ PluginPromptClaimed           ok (1)
 其余六个                       declared, no writer yet（包 A/C/D/F/G 接线）
 ```
 
+### 包 0c：Journal 投影与 Fold
+
+| 项 | 值 |
+|----|----|
+| 条款 | PERSIST-001 PERSIST-002 PERSIST-004 PERSIST-008 FALLBACK-001 FALLBACK-003 FALLBACK-007 REVIEW-003 REVIEW-004 REVIEW-007 REVIEW-008 REVIEW-010 EXEC-004 EXEC-005 EXEC-009 ORCH-003 ORCH-006 ORCH-007 ORCH-008 HOST-010 |
+| 目标模块 | `Journal/` 全部 17 文件 |
+| 生产 | DOMAIN_MIGRATED（投影与 fold 完成；OpenCode/Session/Review/Orchestrator 侧调用方属包 A–H） |
+| 测试 | UNTOUCHED |
+
+#### 拒绝必须是值，不是「原样返回」
+
+旧 fold 在每条拒绝路径上都返回未修改的投影。后果是四种情形无法区分：
+
+```text
+重复事实（幂等，正常）
+不同 Logical Run（无关，正常）
+模四后继关系错误（FALLBACK-007 违规，必须 fail closed）
+第二次 PERFECT 无 seal 证明（REVIEW-003 违规，必须 fail closed）
+```
+
+后两种是「没有正确 writer 能写出这条线」，把它们当成 no-op 吸收，等于把 journal 重放进一个领域禁止的状态。
+
+现在三个投影各自返回 `Result<_, Rejection>`：
+
+```text
+FallbackAdvanceRejection  = AlreadyObserved | AlreadyExhausted | DifferentRun | InvalidTransition
+VerdictRejection          = DuplicateAttempt | SameProviderRun | ChallengeNotProven
+HandleTransitionRejection = UnknownHandle | HandleIsRetired | AlreadyCompleted | NotCompleted
+```
+
+`Fold` 把每种拒绝分类为「继续」或 `FoldRejection`。`FoldRejection` 携带事实名与原因，`Fold.apply` 遇到即停止并上报（PERSIST-004）。
+
+#### 删除两个文件
+
+`Journal/AuthorityProjection.fs`：五个函数全是 `PromptAuthorityLedger.foldXxx` 的纯转发，每个还各自重新声明一遍匿名记录形状。它是一层只增加拼写错误机会的间接。
+
+`Journal/ReviewConfirmation.fs`：REVIEW-003 禁止的三种弱代理的实现体本身——`AcceptedContinuationIds`、`AcceptedContinuationRoots`、`ConfirmationPhysicalMessageId`，加上 `samePhysicalRootReevaluationMatched`。因果证明改由 seal 承担后，它没有任何合法用途。
+
+灭绝表随之下降：`samePhysicalRootReevaluation` 2→0，`RecentProviderRunIds` 5→0，`AcceptedContinuationIds`（scoped）1→0。
+
+#### PERSIST-008：三处全量扫描
+
+| 位置 | 旧行为 | 修正 |
+|------|--------|------|
+| `Fold.reviewOwner` | `Map.tryPick` 遍历所有 session 找 reviewer 的父级 | 删除。review 事实携带 `ReviewerSessionId`，ReviewGuard 按它键控——review 对话发生在 reviewer 的 session 里，状态就该在那里 |
+| `PromptAuthorityLedger.acceptedContinuation` | `Map.tryPick` 遍历所有 session 找 message id | 要求 `SessionId` 参数。一个 message id 只属于一个 session，跨 session 命中本身就是 bug，扫描只是把它静默容忍了 |
+| `AgentJournal.reviewRequirementScope` | 递归走父链，每步 `Map.tryPick` 全扫 | 删除。requirement 由 fold 在收到 HumanRoot 的 session 上创建，由 `ConfirmedReviewWitness` 在 Manager session 上清除，无需搜索发现归属 |
+
+#### AgentJournal 不再自己去重
+
+旧 append 边界重新实现了一遍去重键：
+
+```fsharp
+let fallbackIdentity logicalRunId authorityRootUserMessageId providerAttempt =
+    sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
+```
+
+journal 与 fold 因此各持一份「什么算同一次 attempt」的定义。FALLBACK-003 把这个判断给了 FallbackController，REVIEW-004 把 review 去重给了投影；append 边界的第二份去重是同一知识的第二处实现。
+
+删除后重放重复事实依然安全：fold 返回未变的投影。
+
+#### 其他修正
+
+`Envelope.TurnId` → `ProviderRun`。HOST-010 已证明一条 assistant message = 一次 provider request = 一个 turn，所以独立的 turn 身份只能是 run id 的副本，或者与它不一致。
+
+`FactCodec` 的 pre-0.5.0 标记从 7 个字段名扩到 24 项，纳入本次替换掉的全部旧 case 名。否则解码器只会报一个不透明的 union 错误，运维看到的是「第 3 行解析失败」而不是「这个 journal 早于 0.5.0」——精确诊断决定了是归档文件还是去调试 codec。
+
+`AgentJournal.createFromBoot` 与 `SharedAgentJournal.acquire` 返回 `Result`。PERSIST-004 要求无法折叠的 journal 停止启动；「尽可能折叠一部分」会把 runtime 建立在没有任何 writer 产生过的前缀上。
+
+`OrchestratorProjection` 的五个独立可选字段（`PreRebaseReviewCommit` / `RebasedCommit` / `ConflictFiles` / `PostRebaseReviewCommit` / `PublishClaimHead`）合为一个 `JobProgress` 判别联合。这不是状态机（ARCH-001）：每个 case 携带物理证据（commit、head 快照、review barrier、冲突文件），没有一个说「程序接下来去哪」。ORCH-007 的恢复动作由 case 匹配得出，而不是给五个字段排优先级。
+
+`SessionAgentProjection.Linkage` 改名 `Handles`，类型从两张 map（linked / unlinked）变为一张 `Map<HandleId, HandleRecord>` 加三态生命周期。旧模型无法表达 completed-awaiting-join，而 EXEC-005 要求 `list` 显示该状态。
+
 ### 包 A：PromptDispatcher
 
 | 项 | 值 |

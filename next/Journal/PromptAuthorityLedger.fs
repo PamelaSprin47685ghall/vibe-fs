@@ -1,52 +1,65 @@
 namespace Wanxiangshu.Next.Journal
 
-open System
 open Wanxiangshu.Next.Domain
-open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
-open Wanxiangshu.Next.Kernel.Fact
 
+/// Prompt Authority folds (SSOT/03).
+///
+/// Each fold takes the fact payload directly. The previous version accepted
+/// anonymous records of strings that mirrored the fact shape and re-parsed every
+/// identity, which let the fold disagree with the fact about what a field meant —
+/// and it did: an unparseable AuthorityKind defaulted to HumanRoot, silently
+/// granting human authority to an agent-owned root.
 module PromptAuthorityLedger =
 
     let empty = PromptAuthority.empty
 
-    let private toOptionMessageId (value: string) =
-        if String.IsNullOrWhiteSpace value then
-            None
-        else
-            Some(MessageId.create value)
-
-    let private parseAuthorityKind (value: string) =
+    /// PROMPT-004 has exactly two root kinds. An unrecognised label is NOT a
+    /// HumanRoot by default: HOST-001 requires fail-closed, and HumanRoot is the
+    /// most privileged value in this domain.
+    let private tryParseAuthorityKind (value: string) =
         match value with
-        | "AgentOwnerRoot" -> PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-        | _ -> PromptAuthority.RootAuthorityKind.HumanRoot
+        | "HumanRoot" -> Some PromptAuthority.RootAuthorityKind.HumanRoot
+        | "AgentOwnerRoot" -> Some PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        | _ -> None
 
+    /// PROMPT-002: an Authority Root took effect and fixed the profile.
+    ///
+    /// An uninterpretable fact leaves the projection alone. A fact naming an
+    /// illegal agent (AGENT-004) or an unknown authority kind is not evidence of
+    /// authority, and building a profile from it would hand the run to whatever
+    /// the defaults happened to be.
     let foldAuthorityRootAccepted
         (projection: PromptAuthority.PromptAuthorityProjection)
-        (p:
+        (fact:
             {| SessionId: SessionId
-               LogicalRunId: string
-               HostMessageId: string
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
                AuthorityKind: string
                SelectedAgent: string
                PeerAgent: string
                CanonicalRole: string
                SelectedTier: string |})
         =
-        match PromptAuthority.parseAgentName p.SelectedAgent with
-        | Error _ -> projection
-        | Ok(name, role, tier, peer) ->
+        match tryParseAuthorityKind fact.AuthorityKind, PromptAuthority.parseAgentName fact.SelectedAgent with
+        | None, _ -> projection
+        | _, Error _ -> projection
+        | Some authorityKind, Ok(name, role, tier, derivedPeer) ->
+            // The recorded peer wins when present. AGENT-003 requires the pair to
+            // be proven during config validation, and the fact preserves what was
+            // proven then; deriving it here would silently repair a journal
+            // written under a different config.
             let peerAgent =
-                if String.IsNullOrWhiteSpace p.PeerAgent then
-                    peer
+                if System.String.IsNullOrWhiteSpace fact.PeerAgent then
+                    derivedPeer
                 else
-                    p.PeerAgent
+                    fact.PeerAgent
 
             let profile: PromptAuthority.AuthorityExecutionProfile =
-                { SessionId = p.SessionId
-                  LogicalRunId = p.LogicalRunId
-                  AuthorityRootUserMessageId = MessageId.create p.HostMessageId
-                  AuthorityKind = parseAuthorityKind p.AuthorityKind
+                { SessionId = fact.SessionId
+                  LogicalRunId = fact.LogicalRunId
+                  AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
+                  AuthorityKind = authorityKind
                   SelectedAgent = name
                   PeerAgent = peerAgent
                   CanonicalRole = role
@@ -54,92 +67,101 @@ module PromptAuthorityLedger =
 
             PromptAuthorityRun.registerAuthority profile projection
 
-    let foldPluginPromptClaimed
+    /// PROMPT-005 `Claimed`.
+    let foldPromptClaimed
         (projection: PromptAuthority.PromptAuthorityProjection)
-        (p:
-            {| PromptKey: string
+        (fact:
+            {| PromptKey: PromptKey
                SessionId: SessionId
-               LogicalRunId: string
-               AuthorityRootUserMessageId: string
                ContinuationKind: string
-               EffectiveAgent: string option |})
+               LogicalRunId: LogicalRunId option
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId option
+               EffectiveAgent: string option
+               PayloadDigest: string |})
         =
         let origin =
-            if p.ContinuationKind = "AgentOwnerRoot" then
-                PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            if fact.ContinuationKind = "AgentOwnerRoot" then
+                Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
             else
-                match PromptAuthority.tryParseContinuationKind p.ContinuationKind with
-                | Some kind -> PromptAuthority.PromptOrigin.Continuation kind
-                | None -> PromptAuthority.PromptOrigin.UnknownOrigin
+                PromptAuthority.tryParseContinuationKind fact.ContinuationKind
+                |> Option.map PromptAuthority.PromptOrigin.Continuation
 
-        if origin = PromptAuthority.PromptOrigin.UnknownOrigin then
-            projection
-        else
+        match origin with
+        // PROMPT-004: UnknownOrigin fails closed. A registered claim with an
+        // unrecognised origin would later resolve into whatever the resolution
+        // order defaults to.
+        | None -> projection
+        | Some resolvedOrigin ->
             let claim: PromptAuthority.PromptClaim =
-                { PromptAuthority.PromptClaim.PromptKey = PromptKeyRef.create p.PromptKey
-                  SessionId = p.SessionId
-                  Origin = origin
-                  LogicalRunId = p.LogicalRunId
-                  AuthorityRootUserMessageId = toOptionMessageId p.AuthorityRootUserMessageId
-                  EffectiveAgent = p.EffectiveAgent }
+                { PromptKey = fact.PromptKey
+                  SessionId = fact.SessionId
+                  Origin = resolvedOrigin
+                  LogicalRunId = fact.LogicalRunId
+                  AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
+                  EffectiveAgent = fact.EffectiveAgent
+                  PayloadDigest = fact.PayloadDigest }
 
             PromptAuthorityRun.registerClaim claim projection
 
-    let foldPluginPromptAccepted
+    /// PROMPT-005 `Submitted`.
+    ///
+    /// The claim stays pending: a transport receipt is not physical acceptance,
+    /// and PROMPT-011 needs the claim resolvable after a restart. The receipt is
+    /// durable in the journal; the projection only needs to know the claim is
+    /// still open, which it already does. Present as a named no-op so the fold's
+    /// four-fact coverage is visible rather than inferred from an absence.
+    let foldPromptSubmitted (projection: PromptAuthority.PromptAuthorityProjection) _fact = projection
+
+    /// PROMPT-005 `PhysicalAccepted`: a real physical message resolved the claim.
+    let foldPromptPhysicalAccepted
         (projection: PromptAuthority.PromptAuthorityProjection)
-        (p:
-            {| PromptKey: string
+        (fact:
+            {| PromptKey: PromptKey
                SessionId: SessionId
-               HostMessageId: string |})
+               PhysicalUserMessageId: PhysicalUserMessageId |})
         =
-        PromptAuthorityRun.acceptClaim (PromptKeyRef.create p.PromptKey) (MessageId.create p.HostMessageId) projection
+        PromptAuthorityRun.acceptClaim fact.PromptKey fact.PhysicalUserMessageId projection
 
-    let foldPluginPromptAbandoned
+    /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
+    let foldPromptAbandoned
         (projection: PromptAuthority.PromptAuthorityProjection)
-        (p:
-            {| PromptKey: string
-               SessionId: SessionId
-               Reason: string |})
+        (fact:
+            {| PromptKey: PromptKey
+               SessionId: SessionId |})
         =
-        PromptAuthorityRun.abandonClaim (PromptKeyRef.create p.PromptKey) projection
+        PromptAuthorityRun.abandonClaim fact.PromptKey projection
 
-    let foldInteractionRepairClaimed
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        (p:
-            {| SessionId: SessionId
-               LogicalRunId: string
-               AuthorityRootUserMessageId: string
-               TerminalAssistantMessageId: string
-               RepairKind: string |})
-        =
-        let identity =
-            PromptAuthority.repairIdentity
-                p.LogicalRunId
-                (MessageId.create p.AuthorityRootUserMessageId)
-                (MessageId.create p.TerminalAssistantMessageId)
-                p.RepairKind
-
-        PromptAuthorityRun.tryClaimRepair identity projection
-        |> Option.defaultValue projection
+    // ── queries ─────────────────────────────────────────────────────────────
+    // PERSIST-008: every lookup is keyed by SessionId. Nothing scans all
+    // sessions.
 
     let projectionFor (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
         Map.tryFind sessionId agentProjections.Sessions
-        |> Option.bind (fun s -> s.PromptAuthority)
+        |> Option.bind (fun session -> session.PromptAuthority)
 
     let activeProfile (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
         projectionFor sessionId agentProjections
-        |> Option.bind (fun a -> a.ActiveLogicalRun)
+        |> Option.bind (fun authority -> authority.ActiveLogicalRun)
 
     let lastAuthorityProfile (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
         projectionFor sessionId agentProjections
-        |> Option.bind (fun a -> a.LastAuthorityProfile)
+        |> Option.bind (fun authority -> authority.LastAuthorityProfile)
 
-    let pendingClaim (sessionId: SessionId) (promptKey: PromptKeyRef) (agentProjections: AgentProjectionSet) =
+    let pendingClaim (sessionId: SessionId) (promptKey: PromptKey) (agentProjections: AgentProjectionSet) =
         projectionFor sessionId agentProjections
-        |> Option.bind (fun a -> Map.tryFind promptKey a.PendingClaims)
+        |> Option.bind (fun authority -> Map.tryFind promptKey authority.PendingClaims)
 
-    let acceptedContinuation (messageId: MessageId) (agentProjections: AgentProjectionSet) =
-        agentProjections.Sessions
-        |> Map.tryPick (fun _ s ->
-            s.PromptAuthority
-            |> Option.bind (fun a -> Map.tryFind messageId a.AcceptedContinuationIds))
+    /// PROMPT-003: was this physical message accepted as a continuation, and of
+    /// what kind.
+    ///
+    /// Requires the SessionId. The previous version searched every session with
+    /// `Map.tryPick`, which violates PERSIST-008 and is also wrong in principle:
+    /// a message id belongs to exactly one session, so a hit under a different
+    /// one would be a bug the scan silently tolerated.
+    let acceptedContinuation
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        (agentProjections: AgentProjectionSet)
+        =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority -> Map.tryFind physicalMessageId authority.AcceptedContinuationIds)

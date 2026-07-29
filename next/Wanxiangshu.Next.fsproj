@@ -37,8 +37,6 @@
     <Compile Include="Journal/ReviewProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
-    <Compile Include="Journal/AuthorityProjection.fs"/>
-    <Compile Include="Journal/ReviewConfirmation.fs"/>
     <Compile Include="Journal/Boot.fs"/>
     <Compile Include="Journal/ProjectionState.fs"/>
     <Compile Include="Journal/Writer.fs"/>

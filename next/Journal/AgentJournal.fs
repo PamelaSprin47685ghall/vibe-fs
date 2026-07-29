@@ -1,60 +1,70 @@
 namespace Wanxiangshu.Next.Journal
 
 open System
-open System.Collections.Generic
-open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Outcome
 
 type JournalAppendFailure =
-    { EventId: EventId
-      Failure: JournalFailure }
+    /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
+    /// landed is unknown, so the runtime must fail closed and reconcile.
+    | WriteUnknown of EventId * JournalFailure
+    /// The line was written but the fold refuses it.
+    ///
+    /// This is not a data problem — it means a writer produced a fact the domain
+    /// forbids (FALLBACK-007's modulo-4 check, REVIEW-003's causal proof). The
+    /// journal is now unfoldable, so it is poisoned deliberately rather than
+    /// left to fail on the next boot.
+    | FactRejected of EventId * FoldRejection
 
+/// The single durable journal for one runtime.
+///
+/// PERSIST-008: `Snapshot` is integrated state, never a replay. Appending folds
+/// exactly one envelope into the projection it already holds.
 type AgentJournal internal (writer: JournalWriter, initialProjection: ProjectionSet) =
     let gate = obj ()
-    let mutable proj = initialProjection
-
-    /// Durable dedupe identity for a fallback failure. Matches the identity the
-    /// fold stores in the per-session bounded `RecentFailureIds`, so dedupe is
-    /// O(sessions), not O(history).
-    let fallbackIdentity (logicalRunId: string) (authorityRootUserMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
+    let mutable projection = initialProjection
+    let mutable rejected: (EventId * FoldRejection) option = None
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
-    member _.IsPoisoned = writer.IsPoisoned
 
-    member _.Snapshot: ProjectionSet = lock gate (fun () -> proj)
+    /// PERSIST-003: a poisoned writer or a rejected fact both mean this journal
+    /// may no longer be appended to.
+    member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned || Option.isSome rejected)
 
+    member _.Snapshot: ProjectionSet = lock gate (fun () -> projection)
+
+    /// Append one fact and fold it.
+    ///
+    /// Deduplication is deliberately absent here. FALLBACK-003 names the
+    /// FallbackController as the single place that decides whether a failed
+    /// attempt advances the cursor, and REVIEW-004 gives review dedupe to the
+    /// projection. A second dedupe at the append boundary would be the same
+    /// knowledge in a second place — and the previous version proved the cost: it
+    /// re-implemented the dedupe key as `sprintf "%s|%s|%s"`, so the journal and
+    /// the fold each had their own idea of what identified an attempt.
+    ///
+    /// Replaying a duplicate is safe: the fold returns the projection unchanged.
     member _.AppendAgent
         (stream: StreamId)
-        (turnId: TurnId option)
+        (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
         : Result<ProjectionSet, JournalAppendFailure> =
         lock gate (fun () ->
-            // Fallback append boundary: dedupe only. 0.5.0 never refuses for Dead.
-            let refuseFallback =
-                match fact with
-                | AgentFact.FallbackCursorAdvanced p ->
-                    match Map.tryFind p.SessionId proj.AgentProjections.Sessions with
-                    | Some { Fallback = Some fb } ->
-                        List.contains
-                            (fallbackIdentity p.LogicalRunId p.AuthorityRootUserMessageId p.ProviderAttempt)
-                            fb.RecentFailureIds
-                    | _ -> false
-                | _ -> false
-
-            if refuseFallback then
-                // Duplicate identity: idempotent no-op, no new envelope.
-                Ok proj
-            else
-                match writer.Append stream turnId (Fact.Agent fact) with
-                | Committed env ->
-                    let updated = Fold.foldEnvelope proj env
-                    proj <- updated
-                    Ok updated
-                | CommitUnknown(eventId, failure) -> Error { EventId = eventId; Failure = failure })
+            match rejected with
+            | Some(eventId, rejection) -> Error(FactRejected(eventId, rejection))
+            | None ->
+                match writer.Append stream providerRun (Fact.Agent fact) with
+                | CommitUnknown(eventId, failure) -> Error(WriteUnknown(eventId, failure))
+                | Committed envelope ->
+                    match Fold.foldEnvelope projection envelope with
+                    | Ok updated ->
+                        projection <- updated
+                        Ok updated
+                    | Error rejection ->
+                        rejected <- Some(envelope.EventId, rejection)
+                        Error(FactRejected(envelope.EventId, rejection)))
 
     interface IDisposable with
         member _.Dispose() = (writer :> IDisposable).Dispose()
@@ -65,44 +75,43 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
 
 module AgentJournal =
 
-    /// Single durable failure identity format shared by append boundary, fold,
-    /// and FallbackDetect in-memory dedupe.
-    let fallbackIdentity (logicalRunId: string) (authorityRootUserMessageId: string) (providerAttempt: string) =
-        sprintf "%s|%s|%s" logicalRunId authorityRootUserMessageId providerAttempt
-
-    let createFromProjection
-        (directory: string)
-        (runtimeId: RuntimeId)
-        (processId: int)
-        (startedAt: DateTimeOffset)
-        (projection: ProjectionSet)
-        : AgentJournal =
-        let writer, initEnv = JournalWriter.create directory runtimeId processId startedAt
-        let initialProj = Fold.foldEnvelope projection initEnv
-        new AgentJournal(writer, initialProj)
-
+    /// PERSIST-004: a journal that cannot be folded stops startup. Recovering
+    /// "as much as folded cleanly" would build the runtime on a prefix no writer
+    /// ever produced.
     let createFromBoot
         (directory: string)
         (runtimeId: RuntimeId)
         (processId: int)
         (startedAt: DateTimeOffset)
         (boot: BootSnapshot)
-        : AgentJournal =
-        let projection = Fold.apply Fold.empty boot.Envelopes
-        let writer, initEnv = JournalWriter.create directory runtimeId processId startedAt
-        let initialProj = Fold.foldEnvelope projection initEnv
-        new AgentJournal(writer, initialProj)
+        : Result<AgentJournal, FoldRejection> =
+        Fold.apply Fold.empty boot.Envelopes
+        |> Result.bind (fun replayed ->
+            let writer, initEnvelope =
+                JournalWriter.create directory runtimeId processId startedAt
 
-    let create (directory: string) (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) : AgentJournal =
-        createFromProjection directory runtimeId processId startedAt Fold.empty
+            Fold.foldEnvelope replayed initEnvelope
+            |> Result.map (fun withRuntime -> new AgentJournal(writer, withRuntime)))
+
+    let create
+        (directory: string)
+        (runtimeId: RuntimeId)
+        (processId: int)
+        (startedAt: DateTimeOffset)
+        : Result<AgentJournal, FoldRejection> =
+        let writer, initEnvelope =
+            JournalWriter.create directory runtimeId processId startedAt
+
+        Fold.foldEnvelope Fold.empty initEnvelope
+        |> Result.map (fun projection -> new AgentJournal(writer, projection))
 
     let appendAgent
         (stream: StreamId)
-        (turnId: TurnId option)
+        (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
         (journal: AgentJournal)
         : Result<ProjectionSet, JournalAppendFailure> =
-        journal.AppendAgent stream turnId fact
+        journal.AppendAgent stream providerRun fact
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
 
@@ -110,98 +119,20 @@ module AgentJournal =
 
     let isPoisoned (journal: AgentJournal) : bool = journal.IsPoisoned
 
-    /// User requirements belong to the logical session family root, not the
-    /// reviewer child that happens to consume them.
-    let reviewRequirementScope (journal: AgentJournal option) (sessionId: SessionId) : SessionId =
-        let parentOf (sessions: Map<SessionId, SessionAgentProjection>) childId =
-            let child = ChildId.create (SessionId.value childId)
-
-            sessions
-            |> Map.tryPick (fun parentId session ->
-                session.Linkage
-                |> Option.bind (fun linkage ->
-                    if Map.containsKey child linkage.LinkedChildren then Some parentId else None))
-
-        let rec root sessions seen current =
-            if Set.contains current seen then
-                current
-            else
-                match parentOf sessions current with
-                | Some parent -> root sessions (Set.add current seen) parent
-                | None -> current
-
-        match journal with
-        | None -> sessionId
-        | Some value ->
-            let sessions = (snapshot value).AgentProjections.Sessions
-            root sessions Set.empty sessionId
-
-    let pendingReviewRequirements
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        : ReviewRequirementInput list =
+    /// REVIEW-007: which human prompts in this session still await a confirmed
+    /// review.
+    ///
+    /// Keyed directly by session (PERSIST-008). The previous version walked a
+    /// parent chain with `Map.tryPick` to find a "review requirement scope",
+    /// scanning every session at each step. That is gone because the reason for
+    /// it is gone: requirements are created by the fold on the session that
+    /// received the HumanRoot, and cleared by `ConfirmedReviewWitness` on the
+    /// Manager session, so no ownership has to be rediscovered by search.
+    let pendingReviewRequirements (journal: AgentJournal option) (sessionId: SessionId) : ReviewRequirementInput list =
         match journal with
         | None -> []
         | Some value ->
-            let scope = reviewRequirementScope journal sessionId
-
-            (snapshot value).AgentProjections.Sessions
-            |> Map.tryFind scope
+            AgentProjection.tryFind sessionId (snapshot value).AgentProjections
             |> Option.bind (fun session -> session.ReviewRequirements)
             |> Option.map (fun requirements -> requirements.HumanPromptInputs)
             |> Option.defaultValue []
-
-
-    let recordHumanPromptAccepted
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        (messageId: MessageId)
-        : Result<unit, string> =
-        let scope = reviewRequirementScope (Some journal) sessionId
-
-        let input =
-            { SourceSessionId = sessionId
-              MessageId = messageId }
-
-        if List.contains input (pendingReviewRequirements (Some journal) scope) then
-            Ok()
-        else
-            appendAgent
-                (StreamId.Session scope)
-                (Some(TurnId.ofMessageId messageId))
-                (AgentFact.HumanPromptAccepted
-                    {| SessionId = scope
-                       SourceSessionId = sessionId
-                       MessageId = MessageId.value messageId |})
-                journal
-            |> Result.map (fun _ -> ())
-            |> Result.mapError (fun failure -> sprintf "%A" failure.Failure)
-
-    let recordReviewConfirmedIdle
-        (journal: AgentJournal)
-        (reviewOwnerSessionId: SessionId)
-        (reviewerSessionId: SessionId)
-        (assistantMessageId: MessageId)
-        : Result<unit, string> =
-        let scope = reviewRequirementScope (Some journal) reviewOwnerSessionId
-
-        let alreadyRecorded =
-            (snapshot journal).AgentProjections.Sessions
-            |> Map.tryFind scope
-            |> Option.bind (fun session -> session.ReviewRequirements)
-            |> Option.bind (fun requirements -> requirements.LastConfirmedIdleAssistantMessageId)
-            |> Option.exists ((=) assistantMessageId)
-
-        if alreadyRecorded then
-            Ok()
-        else
-            appendAgent
-                (StreamId.Session scope)
-                None
-                (AgentFact.ReviewConfirmedIdle
-                    {| SessionId = scope
-                       ReviewerSessionId = reviewerSessionId
-                       AssistantMessageId = MessageId.value assistantMessageId |})
-                journal
-            |> Result.map (fun _ -> ())
-            |> Result.mapError (fun failure -> sprintf "%A" failure.Failure)

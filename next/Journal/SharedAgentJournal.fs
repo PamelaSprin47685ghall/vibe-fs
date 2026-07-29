@@ -6,9 +6,11 @@ open Wanxiangshu.Next.Kernel.Identity
 
 /// Process-local shared AgentJournal owners.
 ///
-/// OpenCode can load the plugin once for the root workspace and again for each
-/// manager worktree. ReviewGuard / Fallback / Authority facts must remain one
-/// projection for that git common-dir runtime path.
+/// OpenCode loads the plugin once for the root workspace and again for each
+/// manager worktree. ReviewGuard, Fallback and Authority facts must remain ONE
+/// projection per git common-dir runtime path — two projections over the same
+/// facts is the split-brain that FALLBACK-003 and REVIEW-003 both depend on not
+/// happening.
 module SharedAgentJournal =
 
     type private SharedJournal =
@@ -18,21 +20,25 @@ module SharedAgentJournal =
     let private gate = obj ()
     let private shared = Dictionary<string, SharedJournal>()
 
-    let acquire (directory: string) (processId: int) (startedAt: DateTimeOffset) : AgentJournal =
+    /// PERSIST-004: an unfoldable journal stops startup.
+    ///
+    /// Returns the rejection instead of throwing, so the composition root decides
+    /// how to fail closed — it is the only layer that knows how to report a
+    /// startup refusal to the Host.
+    let acquire (directory: string) (processId: int) (startedAt: DateTimeOffset) : Result<AgentJournal, FoldRejection> =
         lock gate (fun () ->
             match shared.TryGetValue directory with
             | true, entry ->
                 entry.RefCount <- entry.RefCount + 1
-                entry.Journal
+                Ok entry.Journal
             | false, _ ->
                 let boot = Boot.boot directory
                 let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
 
-                let journal =
-                    AgentJournal.createFromBoot directory runtimeId processId startedAt boot
-
-                shared.[directory] <- { Journal = journal; RefCount = 1 }
-                journal)
+                AgentJournal.createFromBoot directory runtimeId processId startedAt boot
+                |> Result.map (fun journal ->
+                    shared.[directory] <- { Journal = journal; RefCount = 1 }
+                    journal))
 
     let release (journal: AgentJournal option) =
         match journal with

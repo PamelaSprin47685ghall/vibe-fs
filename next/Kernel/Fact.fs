@@ -132,18 +132,30 @@ module Fact =
                FinalOffset: byte |}
 
         // ── Review (REVIEW-003, REVIEW-006, REVIEW-010) ─────────────────────
+        //
+        // Every review fact carries ReviewerSessionId, and the ReviewGuard
+        // projection is keyed by it. The review conversation happens in the
+        // reviewer's session, so that is where its state belongs; the Manager
+        // Guard resolves the reviewer through its own handle projection, which
+        // is a keyed lookup it already owns.
+        //
+        // The previous shape keyed review state by manager session and then
+        // searched every session to discover the parent of a reviewer, which is
+        // a full scan (PERSIST-008) and silently tolerated a hit under the wrong
+        // parent.
 
         /// A new review barrier opened for a tree.
         | ReviewBarrierStarted of
-            {| ManagerSessionId: SessionId
+            {| ReviewerSessionId: SessionId
+               ManagerSessionId: SessionId
                BarrierId: ReviewBarrierId
                GitTreeHash: GitTreeHash |}
 
         /// A verdict was executed. REVIEW-002: any REVISE clears a pending
-        /// PERFECT, so both verdicts are recorded through one fact.
+        /// PERFECT, so both verdicts flow through one fact.
         | ReviewVerdictRecorded of
-            {| ManagerSessionId: SessionId
-               ReviewerSessionId: SessionId
+            {| ReviewerSessionId: SessionId
+               ManagerSessionId: SessionId
                BarrierId: ReviewBarrierId
                GitTreeHash: GitTreeHash
                ProviderRun: ProviderRunIdentity

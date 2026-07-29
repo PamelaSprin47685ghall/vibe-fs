@@ -3,9 +3,15 @@ namespace Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
+/// The seven bounded projections one session owns (PERSIST-008).
+///
+/// Each is `option` because a session acquires state only when a fact concerning
+/// it arrives. "No fact yet" and "an empty projection" are different claims and
+/// must stay distinguishable — collapsing them is how a missing fact starts
+/// looking like a satisfied precondition.
 type SessionAgentProjection =
     { Companion: CompanionProjection option
-      Linkage: AgentLinkageProjection option
+      Handles: AgentLinkageProjection option
       ReviewGuard: ReviewGuardProjection option
       ReviewRequirements: ReviewRequirementProjection option
       Fallback: FallbackProjection option
@@ -21,7 +27,7 @@ module AgentProjection =
 
     let emptySession =
         { Companion = None
-          Linkage = None
+          Handles = None
           ReviewGuard = None
           ReviewRequirements = None
           Fallback = None
@@ -32,9 +38,29 @@ module AgentProjection =
         { Sessions = Map.empty
           Orchestrator = OrchestratorProjection.empty }
 
-    let updateSession sessionId update sessions =
-        let current = Map.tryFind sessionId sessions |> Option.defaultValue emptySession
-        Map.add sessionId (update current) sessions
+    let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
+        Map.tryFind sessionId projection.Sessions
 
-    let update sessionId update projection =
-        { projection with Sessions = updateSession sessionId update projection.Sessions }
+    let private sessionOrEmpty sessionId projection =
+        Map.tryFind sessionId projection.Sessions |> Option.defaultValue emptySession
+
+    let update sessionId apply projection =
+        { projection with
+            Sessions = Map.add sessionId (apply (sessionOrEmpty sessionId projection)) projection.Sessions }
+
+    /// Update one session when the change itself may be refused.
+    ///
+    /// Threads the rejection out rather than swallowing it. A projection that
+    /// silently ignores an invalid fact cannot fail closed, and FALLBACK-007's
+    /// modulo-4 validation and REVIEW-003's causal proof both require exactly
+    /// that.
+    let tryUpdate
+        (sessionId: SessionId)
+        (apply: SessionAgentProjection -> Result<SessionAgentProjection, 'rejection>)
+        (projection: AgentProjectionSet)
+        : Result<AgentProjectionSet, 'rejection> =
+        sessionOrEmpty sessionId projection
+        |> apply
+        |> Result.map (fun session ->
+            { projection with
+                Sessions = Map.add sessionId session projection.Sessions })
