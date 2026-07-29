@@ -46,7 +46,7 @@ CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs
 
 ## 3. Companion
 
-**Authority gate.** Companion eligibility reads only `ActiveLogicalRun.Profile` Canonical Role / SelectedAgent. Missing ActiveLogicalRun means no Blogger and a `MissingAuthorityProfile` diagnostic. Do not infer role from `sessionRoles`, last physical user agent, transform input agent, or child linkage.
+**Authority gate.** Companion eligibility reads only `ActiveLogicalRun.Profile` Canonical Role / SelectedAgent. Missing ActiveLogicalRun means no Blogger; this expected fail-closed result stays silent in the user terminal. Do not infer role from `sessionRoles`, last physical user agent, transform input agent, or child linkage.
 
 Blogger 为内部 `fast-blogger`/`deep-blogger`；每个新 Blog step Logical Run 固定 fast 起步、deep 为 B，无限 AABBAABB。不向任何 LLM 工具 schema 暴露。
 

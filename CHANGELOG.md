@@ -26,6 +26,7 @@ Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infi
 
 ### Runtime fixes
 
+- Removed the repeated `companion eligibility denied` stderr message from pre-authority and host-internal transforms. Missing `ActiveLogicalRun` still fails closed without creating a Blogger, while eligible sessions continue to use the durable authority projection.
 - Fixed the reviewer `inspector` callback returning a curried function instead of a Promise, which OpenCode displayed as a red tool error.
 - Fixed `coder`/`inspector` argument schemas leaking Zod internals into provider JSON, which made DevOps requests fail immediately with `invalid_request_error`; all custom tool arguments are now guarded against raw-schema mixing.
 - Fixed reviewer confirmation liveness: after the first skeptical tool result, a second `PERFECT` from a distinct ProviderRunIdentity under the same Authority Root now confirms immediately; duplicate tool calls in one provider run remain invalid, and terminal-then-`ReviewConfirmation` remains the fallback path.
