@@ -8,9 +8,9 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
 
-/// One-shot Inspector tool for Coder/Reviewer/Meditator.
+/// One-shot Inspector tool for authorized diagnostic roles.
 /// Creates a disposable Inspector session, optionally injects caller B,
-/// runs one prompt (executor-only tools), returns A text, then aborts.
+/// runs one prompt, returns A text, then aborts.
 module InspectorTool =
 
     open ToolSurfaceEmit
@@ -273,6 +273,6 @@ module InspectorTool =
             factory
             (createObj
                 [ "description",
-                  box "One-shot Inspector investigation (executor only); session is disposed after return"
+                  box "One-shot read-only investigation; session is disposed after return"
                   "args", box argsObj
                   "execute", taskExecute (box execute) ])

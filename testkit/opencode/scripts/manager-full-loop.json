@@ -18,7 +18,7 @@
   },
   "prompt": {
     "agent": "fast-manager",
-    "text": "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork coder with one-shot inspector, join coder, fork reviewer, handle REVISE, get dual PERFECT, join reviewer report, finish."
+    "text": "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork coder to edit, delegate verification, join coder, fork reviewer, handle REVISE, get dual PERFECT, join reviewer report, finish."
   },
   "flow": [
     {
@@ -91,9 +91,6 @@
           "fast-coder"
         ]
       }
-    },
-    {
-      "wait": "coder-inspector"
     },
     {
       "wait": "coder-edit"
@@ -598,106 +595,24 @@
         "tool": "fork",
         "args": {
           "agent": "fast-coder",
-          "prompt": "Use inspector once, edit src/main.txt to 'patched', report final A."
+          "prompt": "Edit src/main.txt to 'patched', report final A and the verification handoff."
         }
       }
-    },
-    {
-      "id": "coder-inspector",
-      "lane": {
-        "session": "fast-coder",
-        "role": "coder",
-        "turn": 1,
-        "requestKind": "chat",
-        "parentSession": "manager"
-      },
-      "match": {
-        "requiredTools": [
-          "inspector"
-        ],
-        "userRegex": "Use inspector once|edit src/main.txt"
-      },
-      "respond": {
-        "type": "tool-call",
-        "tool": "inspector",
-        "args": {
-          "prompt": "Collect command evidence via executor."
-        }
-      }
-    },
-    {
-      "id": "oneshot-inspector-executor",
-      "lane": {
-        "session": "oneshot-inspector",
-        "role": "inspector",
-        "turn": 1,
-        "requestKind": "chat",
-        "parentSession": "coder"
-      },
-      "match": {
-        "requiredTools": [
-          "executor"
-        ],
-        "forbiddenTools": [
-          "fork",
-          "join",
-          "list",
-          "write",
-          "edit",
-          "verdict"
-        ]
-      },
-      "respond": {
-        "type": "tool-call",
-        "tool": "executor",
-        "args": {
-          "command": "pwd && printf 'oneshot-evidence\\n'",
-          "estimated_output_bytes": 256,
-          "estimated_running_secs": 5,
-          "estimated_mem_usage": "medium"
-        }
-      },
-      "blocking": false,
-      "neverEnd": true,
-      "reusable": true
-    },
-    {
-      "id": "oneshot-inspector-final",
-      "lane": {
-        "session": "oneshot-inspector",
-        "role": "inspector",
-        "turn": 2,
-        "requestKind": "chat",
-        "parentSession": "coder"
-      },
-      "match": {
-        "requiredTools": [
-          "executor"
-        ]
-      },
-      "respond": {
-        "type": "text",
-        "text": "One-shot inspector formal report: evidence collected."
-      },
-      "blocking": false,
-      "neverEnd": true,
-      "reusable": true
     },
     {
       "id": "coder-edit",
       "lane": {
         "session": "fast-coder",
         "role": "coder",
-        "turn": 2,
+        "turn": 1,
         "requestKind": "chat",
         "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
-          "write",
-          "inspector"
+          "write"
         ],
-        "userRegex": "Use inspector once|edit src/main.txt|Collect command evidence"
+        "userRegex": "edit src/main.txt"
       },
       "respond": {
         "type": "tool-call",
@@ -713,20 +628,19 @@
       "lane": {
         "session": "fast-coder",
         "role": "coder",
-        "turn": 3,
+        "turn": 2,
         "requestKind": "chat",
         "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
-          "write",
-          "inspector"
+          "write"
         ],
-        "userRegex": "Use inspector once|edit src/main.txt|Collect command evidence"
+        "userRegex": "edit src/main.txt"
       },
       "respond": {
         "type": "text",
-        "text": "Coder final report: inspector used, src/main.txt patched, tests not required."
+        "text": "Coder final report: src/main.txt patched; verification handed off."
       }
     },
     {
@@ -919,14 +833,13 @@
       "lane": {
         "session": "fast-coder",
         "role": "coder",
-        "turn": 4,
+        "turn": 3,
         "requestKind": "chat",
         "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
-          "write",
-          "inspector"
+          "write"
         ],
         "userRegex": "Apply reviewer REVISE|CHANGELOG"
       },
@@ -944,14 +857,13 @@
       "lane": {
         "session": "fast-coder",
         "role": "coder",
-        "turn": 5,
+        "turn": 4,
         "requestKind": "chat",
         "parentSession": "manager"
       },
       "match": {
         "requiredTools": [
-          "write",
-          "inspector"
+          "write"
         ],
         "userRegex": "Apply reviewer REVISE|CHANGELOG"
       },
@@ -1094,7 +1006,7 @@
         "requiredTools": [
           "verdict"
         ],
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",
@@ -1119,11 +1031,11 @@
           "verdict"
         ],
         "afterToolResult": true,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation|Re-review the fixed tree"
+        "userRegex": "Nope, let's re-evaluate:|Re-review the fixed tree"
       },
       "respond": {
         "type": "text",
-        "text": "Reviewer formal report: dual PERFECT confirmed for current tree."
+        "text": "Reviewer formal report: current tree accepted after a fresh skeptical review."
       },
       "blocking": true
     },

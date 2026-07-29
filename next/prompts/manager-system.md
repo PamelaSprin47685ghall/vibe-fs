@@ -64,7 +64,7 @@ You do **not** implement double-PERFECT yourself. After a first `PERFECT`, the H
 ## III. Your Specialized Force
 
 * `fast-inspector` / `deep-inspector`: Read-only command execution & environment investigation. Spawns no sub-agents. Cannot edit files.
-* `fast-coder` / `deep-coder`: The **only** roles that edit code. Feature a built-in synchronous `inspector` for localized checks.
+* `fast-coder` / `deep-coder`: The **only** roles that edit code. They may request narrow Inspector facts when file tools cannot answer a concrete question, but routine verification belongs to DevOps or Reviewer.
 * `fast-devops` / `deep-devops`: Terminal Operator. Owns PTY sessions (`fork-pty`), builds, test suites, and interactive CLI. Delegates code edits to `coder`.
 * `fast-browser` / `deep-browser`: Reads workspace files and external web documentation.
 * `fast-meditator` / `deep-meditator`: High-level architectural reasoning and trade-off analysis.

@@ -59,14 +59,13 @@ module ManagerCanaryTests =
         falseThat (Roles.isAllowed Role.Manager ToolPermission.Inspector) "Manager must not inspect"
         falseThat (Roles.isAllowed Role.Manager ToolPermission.Verdict) "Manager must not verdict"
 
-    let ``Coder_one_shot_inspector_role_surface`` () =
-        // Coder has Inspector tool permission to request inspection, but not Exec
-        trueThat (Roles.isAllowed Role.Coder ToolPermission.Inspector) "Coder must allow inspector"
+    let ``Coder role surface allows Inspector but not direct execution`` () =
+        trueThat (Roles.isAllowed Role.Coder ToolPermission.Inspector) "Coder must allow Inspector"
         falseThat (Roles.isAllowed Role.Coder ToolPermission.Exec) "Coder must not exec"
         falseThat (Roles.isAllowed Role.Coder ToolPermission.Fork) "Coder must not fork"
         falseThat (Roles.isAllowed Role.Coder ToolPermission.Join) "Coder must not join"
 
-        // Inspector role has Exec permission
+        // Inspector remains an independently authorized diagnostic role.
         trueThat (Roles.isAllowed Role.Inspector ToolPermission.Exec) "Inspector must allow exec"
         falseThat (Roles.isAllowed Role.Inspector ToolPermission.Read) "Inspector must not read"
         falseThat (Roles.isAllowed Role.Inspector ToolPermission.Write) "Inspector must not write"

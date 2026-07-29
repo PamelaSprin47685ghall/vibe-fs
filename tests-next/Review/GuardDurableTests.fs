@@ -110,7 +110,7 @@ module GuardDurableTests =
                         "tc-2"
                         treeHash
                         ReviewGuardVerdict.Perfect
-                        (Some "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.")
+                        (Some "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?")
                         (Some "confirm-user-2")
 
                 Assert.True(Result.isOk res2)

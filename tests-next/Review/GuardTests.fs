@@ -186,7 +186,7 @@ module GuardTests =
                    ProviderRunId = "pr-2"
                    UserPromptText =
                     Some
-                        "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                        "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
                    UserMessageId = Some "confirm-a"
                    ToolCallId = "tc2"
                    GitTreeHash = "treeA"

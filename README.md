@@ -27,13 +27,15 @@ TestKit 以 scenario/session/role/turn/request-kind lane 匹配真实 OpenCode s
 ```text
 Orchestrator (fork/join)
   └── Manager (fork/join/list)
-        ├── Coder
+        ├── Coder (file tools + opaque inspector)
         ├── Inspector (executor)
         ├── DevOps (fork-pty/executor/read/glob/grep/inspector/coder/join/list)
         ├── Browser
         ├── Meditator
         └── Reviewer (PERFECT/REVISE)
 ```
+
+Coder 可读写代码并调用不透明的 `inspector` 调查具体必要的事实；其 schema 不含 `executor` 或终端能力，Coder prompt 也不暴露 Inspector 的内部执行权限。Coder 不应把 Inspector 当作常规验证代理，所需测试仍交接给 DevOps 或 Reviewer。
 
 DevOps 是终端操作员：独占 `fork-pty`，可 `executor`，可用 `read/glob/grep/inspector` 取证，文件修改只能通过同步 `coder` 工具委派，禁止直接 write/edit。
 

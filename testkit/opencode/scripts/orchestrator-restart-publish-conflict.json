@@ -457,7 +457,7 @@
           "verdict"
         ],
         "afterToolResult": false,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",
@@ -507,7 +507,7 @@
           "verdict"
         ],
         "afterToolResult": false,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",
@@ -557,7 +557,7 @@
           "verdict"
         ],
         "afterToolResult": false,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",
@@ -607,7 +607,7 @@
           "verdict"
         ],
         "afterToolResult": false,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",
@@ -657,7 +657,7 @@
           "verdict"
         ],
         "afterToolResult": false,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",
@@ -707,7 +707,7 @@
           "verdict"
         ],
         "afterToolResult": false,
-        "userRegex": "PERFECT requires confirmation|Continue the confirmation"
+        "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
         "type": "tool-call",

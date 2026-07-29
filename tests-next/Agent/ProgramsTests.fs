@@ -32,7 +32,7 @@ module ProgramsTests =
         fun req -> Task.FromResult(Ok(RunnerOutcome.Completed(exitCode, stdout, stderr, false)))
 
     [<Fact>]
-    let ``Coder capability has file operations and one-shot Inspector factory`` () =
+    let ``Coder capability has file operations and a one-shot Inspector factory`` () =
         task {
             let filePort = dummyFilePort ()
             let runnerPort = dummyRunnerPort 0 "ok" ""
@@ -50,7 +50,7 @@ module ProgramsTests =
                 Assert.Equal(Ok(), editRes)
 
                 match coderCap.CreateInspector runnerPort with
-                | Error err -> failwithf "Expected inspector creation success, got %A" err
+                | Error err -> failwithf "Expected Inspector creation success, got %A" err
                 | Ok inspector ->
                     let cmd =
                         { FileName = "echo"
@@ -134,7 +134,6 @@ module ProgramsTests =
                 Assert.True(
                     perm = ToolPermission.Write
                     || perm = ToolPermission.Edit
-                    || perm = ToolPermission.Inspector
                 )
             | res -> failwithf "Expected permission denied for browser write, got %A" res
         }
