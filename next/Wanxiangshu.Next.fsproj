@@ -14,12 +14,12 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs"/>
     <Compile Include="Kernel/Identity.fs"/>
+    <Compile Include="Kernel/Roles.fs"/>
     <Compile Include="Kernel/Flow.fs"/>
     <Compile Include="Kernel/DomainFlow.fs"/>
     <Compile Include="Kernel/AsyncSupport.fs"/>
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
-    <Compile Include="Kernel/Roles.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>

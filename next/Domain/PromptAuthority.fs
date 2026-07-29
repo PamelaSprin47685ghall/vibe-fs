@@ -11,6 +11,8 @@ module PromptAuthority =
         | HumanRoot
         | AgentOwnerRoot
 
+    /// PROMPT-003. Every one of these extends an existing Logical Run and may
+    /// not change the execution profile.
     type ContinuationKind =
         | InteractionRepair
         | ManagerGuard
@@ -26,52 +28,78 @@ module PromptAuthority =
         | HostInternal
         | UnknownOrigin
 
+    /// What an Authority Root fixes for the whole Logical Run (PROMPT-002).
+    ///
+    /// FALLBACK-004: SelectedAgent, PeerAgent, CanonicalRole and SelectedTier
+    /// never change here. Fallback moves EffectiveAgent, which lives on the
+    /// per-attempt profile instead — that separation is the clause.
+    ///
+    /// PROMPT-002 also forbids a model id: there is deliberately no field for
+    /// one, so "Authority Root overrides the model" is not expressible.
     type AuthorityExecutionProfile =
         { SessionId: SessionId
-          LogicalRunId: string
-          AuthorityRootUserMessageId: MessageId
+          LogicalRunId: LogicalRunId
+          AuthorityRootUserMessageId: AuthorityRootUserMessageId
           AuthorityKind: RootAuthorityKind
           SelectedAgent: string
           PeerAgent: string
           CanonicalRole: Role
           SelectedTier: AgentTier }
 
+    /// One provider request (PROMPT-008).
+    ///
+    /// Shock package B gives this its remaining fields (SystemPromptId,
+    /// ToolCapabilitySet) and the single `buildAttemptExecutionProfile`
+    /// constructor. Package 0 only retypes the identities.
     type AttemptExecutionProfile =
         { Authority: AuthorityExecutionProfile
-          PhysicalUserMessageId: MessageId
-          ProviderAttempt: int64
+          PhysicalUserMessageId: PhysicalUserMessageId
+          ProviderRun: ProviderRunIdentity
           EffectiveAgent: string
           Origin: PromptOrigin }
 
+    /// A dispatched prompt before the Host has confirmed anything (PROMPT-005
+    /// `Claimed`).
+    ///
+    /// `LogicalRunId` is optional because the two origins differ in kind:
+    /// a Continuation extends a run that already exists, while an Authority Root
+    /// *creates* the run — and its id derives from the physical message that
+    /// does not exist yet at claim time. An empty-string sentinel would make
+    /// "no run yet" and "run with a blank id" the same value.
     type PromptClaim =
-        { PromptKey: PromptKeyRef
-          SessionId: SessionId
-          Origin: PromptOrigin
-          LogicalRunId: string
-          AuthorityRootUserMessageId: MessageId option
-          EffectiveAgent: string option }
+        {
+            PromptKey: PromptKey
+            SessionId: SessionId
+            Origin: PromptOrigin
+            LogicalRunId: LogicalRunId option
+            AuthorityRootUserMessageId: AuthorityRootUserMessageId option
+            EffectiveAgent: string option
+            /// PROMPT-005 requires the payload digest at claim time so recovery can
+            /// tell two dispatches of the same shape apart.
+            PayloadDigest: string
+        }
 
     type PromptAuthorityProjection =
-        { LastAuthorityProfile: AuthorityExecutionProfile option
-          ActiveLogicalRun: AuthorityExecutionProfile option
-          PendingClaims: Map<PromptKeyRef, PromptClaim>
-          AcceptedContinuationIds: Map<MessageId, ContinuationKind>
-          /// Physical user message id -> authority root user message id for every
-          /// accepted continuation. Used by the review witness to prove that a
-          /// second PERFECT physical message is a Host-accepted ReviewConfirmation.
-          AcceptedContinuationRoots: Map<MessageId, MessageId>
-          RepairClaims: Set<string> }
+        {
+            LastAuthorityProfile: AuthorityExecutionProfile option
+            ActiveLogicalRun: AuthorityExecutionProfile option
+            PendingClaims: Map<PromptKey, PromptClaim>
+            /// Physical message id -> the continuation kind it was accepted as.
+            ///
+            /// PROMPT-003 and PROMPT-009 only: this answers "was this message a
+            /// continuation, and of what kind". REVIEW-003 forbids it as review
+            /// confirmation evidence — a continuation being accepted says nothing
+            /// about whether a model consumed the challenge.
+            AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
+            RepairClaims: Set<string>
+        }
 
     let empty: PromptAuthorityProjection =
         { LastAuthorityProfile = None
           ActiveLogicalRun = None
           PendingClaims = Map.empty
           AcceptedContinuationIds = Map.empty
-          AcceptedContinuationRoots = Map.empty
           RepairClaims = Set.empty }
-
-    let newPromptKey () =
-        PromptKeyRef.create (Guid.NewGuid().ToString("N"))
 
     let originLabel (origin: PromptOrigin) =
         match origin with
@@ -136,21 +164,8 @@ module PromptAuthority =
         | "deep" -> Some AgentTier.Deep
         | _ -> None
 
-    let private roleOfName (name: string) =
-        match name.ToLowerInvariant() with
-        | "manager" -> Some Role.Manager
-        | "orchestrator" -> Some Role.Orchestrator
-        | "coder" -> Some Role.Coder
-        | "inspector" -> Some Role.Inspector
-        | "devops" -> Some Role.DevOps
-        | "browser" -> Some Role.Browser
-        | "meditator" -> Some Role.Meditator
-        | "reviewer" -> Some Role.Reviewer
-        | "blogger" -> Some Role.Blogger
-        | "executor" -> Some Role.Executor
-        | _ -> None
-
-    let private legacySet =
+    /// AGENT-004: these are illegal, with no alias and no autocompletion.
+    let private legacyAgentNames =
         set
             [ "orchestrator"
               "manager"
@@ -167,6 +182,11 @@ module PromptAuthority =
               "fast"
               "deep" ]
 
+    /// AGENT-002 and AGENT-003: parse `fast-ROLE` / `deep-ROLE` and derive the peer.
+    ///
+    /// This is one of the four places AGENT-001 permits an agent string to be
+    /// interpreted (config parsing, Authority Root creation, profile
+    /// construction, Host send boundary). Package B removes every other site.
     let parseAgentName (value: string) : Result<string * Role * AgentTier * string, string> =
         if String.IsNullOrWhiteSpace value then
             Error "Expected fast-ROLE or deep-ROLE."
@@ -175,7 +195,7 @@ module PromptAuthority =
             let lower = trimmed.ToLowerInvariant()
 
             if
-                legacySet.Contains lower
+                legacyAgentNames.Contains lower
                 || lower.Contains("_")
                 || lower.EndsWith("-fast")
                 || lower.EndsWith("-deep")
@@ -189,41 +209,36 @@ module PromptAuthority =
                 if parts.Length <> 2 then
                     Error "Expected fast-ROLE or deep-ROLE."
                 else
-                    let tier =
-                        match parts.[0] with
-                        | "fast" -> Some AgentTier.Fast
-                        | "deep" -> Some AgentTier.Deep
-                        | _ -> None
+                    match tryParseTier parts.[0], tryParseRole parts.[1] with
+                    | None, _ -> Error "Unknown tier. Use fast-* or deep-*."
+                    | _, None -> Error "Unknown role. Use fast-* or deep-*."
+                    | Some tier, Some role ->
+                        let peerTier =
+                            match tier with
+                            | AgentTier.Fast -> AgentTier.Deep
+                            | AgentTier.Deep -> AgentTier.Fast
 
-                    match tier with
-                    | None -> Error "Unknown tier. Use fast-* or deep-*."
-                    | Some tierValue ->
-                        match roleOfName parts.[1] with
-                        | None -> Error "Unknown role. Use fast-* or deep-*."
-                        | Some role ->
-                            let peerTier =
-                                match tierValue with
-                                | AgentTier.Fast -> AgentTier.Deep
-                                | AgentTier.Deep -> AgentTier.Fast
+                        let peerName =
+                            sprintf "%s-%s" ((tierLabel peerTier).ToLowerInvariant()) (roleLabel role)
 
-                            let peerName =
-                                sprintf "%s-%s" ((tierLabel peerTier).ToLowerInvariant()) (roleLabel role)
+                        Ok(trimmed, role, tier, peerName)
 
-                            Ok(trimmed, role, tierValue, peerName)
-
+    /// Deterministic Logical Run id. PROMPT-011 requires stability across
+    /// restarts, so it is derived from durable identities and never generated.
     let stableLogicalRunId
         (sha256: string -> string)
-        (runtimeId: string)
+        (runtimeId: RuntimeId)
         (sessionId: SessionId)
-        (rootUserMessageId: MessageId)
-        =
-        sha256 (
-            String.Concat(
-                [| runtimeId
-                   "\n"
-                   SessionId.value sessionId
-                   "\n"
-                   MessageId.value rootUserMessageId |]
+        (authorityRoot: AuthorityRootUserMessageId)
+        : LogicalRunId =
+        LogicalRunId.create (
+            sha256 (
+                String.Join(
+                    "\n",
+                    [| RuntimeId.value runtimeId
+                       SessionId.value sessionId
+                       AuthorityRootUserMessageId.value authorityRoot |]
+                )
             )
         )
 
@@ -234,26 +249,21 @@ module PromptAuthority =
     let effectiveAgentAt (profile: AuthorityExecutionProfile) (offset: byte) : string =
         AgentPairCursor.effectiveAgent (agentPair profile) (AgentPairCursor.atOffset offset)
 
-    let selectedEffectiveAgent (profile: AuthorityExecutionProfile) = profile.SelectedAgent
+    let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
+        AgentPairCursor.effectiveAgent (agentPair profile) cursor
 
-    let effectiveAgentFromManaged (selected: string) (peer: string) (cursor: AgentPairCursor.FallbackCursor) : string =
-        AgentPairCursor.effectiveAgent
-            { AgentPairCursor.AuthorityAgentPair.SelectedAgent = selected
-              AgentPairCursor.AuthorityAgentPair.PeerAgent = peer }
-            cursor
-
+    /// FALLBACK-008: an interaction repair fires at most once per terminal
+    /// assistant message, so the dedupe key names exactly that occasion.
     let repairIdentity
-        (logicalRunId: string)
-        (authorityRootUserMessageId: MessageId)
-        (terminalAssistantMessageId: MessageId)
+        (logicalRunId: LogicalRunId)
+        (authorityRoot: AuthorityRootUserMessageId)
+        (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
         =
-        String.Concat(
-            [| logicalRunId
-               "|"
-               MessageId.value authorityRootUserMessageId
-               "|"
-               MessageId.value terminalAssistantMessageId
-               "|"
+        String.Join(
+            "\u001f",
+            [| LogicalRunId.value logicalRunId
+               AuthorityRootUserMessageId.value authorityRoot
+               ProviderRunIdentity.value terminalProviderRun
                repairKind |]
         )

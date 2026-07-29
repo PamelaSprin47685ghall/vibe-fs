@@ -67,15 +67,49 @@
 
 | 项 | 值 |
 |----|----|
-| 条款 | PROMPT-008 ARCH-006 EXEC-009 ORCH-006 |
-| 目标模块 | `next/Kernel/Identity.fs` `next/Kernel/Fact.fs` `next/Domain/` |
-| 旧入口 | 裸 `string` 承载 LogicalRunId / AuthorityRoot / ProviderRunId / ToolCallId / HandleId / ManagerId |
-| 新入口 | typed identity：`LogicalRunId` `AuthorityRootUserMessageId` `PhysicalUserMessageId` `PromptKey` `ProviderAttemptIdentity` `ProviderRunIdentity` `ReviewBarrierId` `GitTreeHash` `HandleId` `ManagerJobId` `WorktreeIdentity` `TargetRef` |
-| 必须删除 | `LogicalRunId: string` 等所有 record 中的裸 string 身份字段 |
-| 生产 | UNTOUCHED |
+| 条款 | PROMPT-001 PROMPT-002 PROMPT-005 PROMPT-008 FALLBACK-002 FALLBACK-004 FALLBACK-005 REVIEW-003 REVIEW-004 REVIEW-006 REVIEW-008 EXEC-009 ORCH-006 ORCH-008 HOST-010 HOST-011 ARCH-006 |
+| 目标模块 | `Kernel/Identity.fs` `Kernel/Outcome.fs` `Domain/AgentPairCursor.fs` `Domain/PromptAuthority.fs` `Domain/PromptAuthorityRun.fs` `Domain/ReviewWitness.fs` |
+| 旧入口 | 裸 `string` 承载 LogicalRunId / ProviderRunId / ToolCallId / GitTreeHash / ManagerId；单一 `MessageId` 同时表示物理消息与 Authority Root |
+| 新入口 | 26 个 typed identity + 2 个复合身份（`FallbackAttemptIdentity` `ReviewAttemptIdentity`） |
+| 生产 | DOMAIN_MIGRATED（Kernel + Domain 完成；Journal 与调用方属包 1b/1c 与 A–H） |
 | 测试 | UNTOUCHED |
 
 先做，破坏面最大。
+
+#### 用类型表达的条款
+
+不是「加一层包装」，而是把之前只能靠注释维持的条款变成编译期事实：
+
+| 条款 | 之前 | 之后 |
+|------|------|------|
+| PROMPT-001 `PhysicalUserMessage ≠ AuthorityTurn` | 两者都是 `MessageId` | 两个类型；`promoteToAuthorityRoot` 是唯一单向通道，且无逆函数 |
+| PROMPT-005 `accepted-*` 不是 Authority | 都是 `MessageId`，靠前缀字符串判别 | `TransportReceipt` 独立类型，不存在到任何消息身份的函数 |
+| PROMPT-002 Authority Root 禁止覆盖 model | 靠纪律 | `AuthorityExecutionProfile` 无 model 字段，不可表达 |
+| FALLBACK-004 成功不重置 Offset | `LastProviderAttempt: int64 option` 混合语义 | `Offset` 与 `ConsecutiveFailureCount` 两个字段；`recordSuccess` 只动后者 |
+| FALLBACK-005 循环无界预算有界 | 无 count 概念 | `RecoveryVerdict = MayContinue \| Exhausted`；判定在推进之后 |
+| REVIEW-003 需因果证明 | `canConfirm` 接受 same-root 猜测 | `confirm` 必须传入 `challengeConsumed`，无法自行伪造 |
+| REVIEW-004 两次 PERFECT 必须 run 与 call 皆不同 | `ProviderRunId`/`ToolCallId` 同为 string | 两个类型，`isDistinctAttempt` 的检查有意义 |
+| REVIEW-008 witness 永久，有效性是派生谓词 | `invalidateByTreeChange` 返回 `NoReview`（销毁历史） | `isValidForTree` 只回答问题，不改状态 |
+| ORCH-006 恢复按 identity 不按 path | 只有 `WorktreePath` | `WorktreeIdentity` 与 `WorktreePath` 分离 |
+| ORCH-007 head 比较不是同义反复 | `TargetRef` 与 commit 同类型 | `TargetRef` 与 `CommitHash` 分离 |
+| EXEC-009 retired 不回退成 Agent 名 | handle 是 string | `HandleId` 三 case 联合；只有 `describe`，无 parse |
+| PERSIST-002 append 只有两种结果 | — | `CommitResult` 恰好两 case（保持） |
+
+#### 命名统一：ProviderAttemptIdentity = ProviderRunIdentity
+
+SSOT 对同一概念用了两个名字：PROMPT-008 与 FALLBACK-007 写 `ProviderAttemptIdentity`，HOST-010 与 REVIEW-004 写 `ProviderRunIdentity`。
+
+依据 `evidence/host-transform-run-binding.md`：一条 Host assistant message = 一次 provider request = 一次 attempt。Host 每个 provider step 新建一条 assistant message（`prompt.ts:1186`），并把同一 id 交给该 run 内所有 tool call（`ToolContext.messageID`）。因此实现只有 `ProviderRunIdentity` 一个类型。
+
+这不是降低条款，是拒绝双模型：两个类型会让「同一 attempt 的两个身份是否相等」成为一个可提问但无意义的问题。
+
+登记为待办的规范文字统一，不属 SSOT 例外协议（无语义矛盾，仅命名冗余）。退火三前把两处 SSOT 文字统一为 `ProviderRunIdentity`。
+
+#### 顺带修正
+
+`Kernel/Roles.fs` 前移到 `Kernel/Flow.fs` 之前。`Domain/PromptAuthority.fs` 需要 `Role` 与 `AgentTier`，F# 按声明顺序编译，原顺序把 Roles 排在 Outcome 之后属于偶然可用。
+
+`Outcome.SessionError.FallbackExhausted` 改名 `AutoRecoveryExhausted`：同名的 journal 事实（FALLBACK-005）是另一回事，一个名字两个概念正是双模型的起点。
 
 ### 包 A：PromptDispatcher
 
@@ -294,7 +328,19 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 
 残留数由 `node scripts/shock-audit.mjs` 测量。休克结束时全部为 0（除标注「允许 1」的唯一入口）。
 
-基线测量：commit `274a30aa`，2026-07-29。
+基线测量：commit `274a30aa`，2026-07-29。包 0 完成后的复测标注在行内。
+
+### 作用域计数
+
+少数符号在 SSOT 授权的位置合法、在别处非法。这类行只统计非法路径，`shock-audit` 标 `(scoped)`。
+
+全仓计数对它们是错的：目标永远到不了 0，最终会逼出一次错误的删除。违规是出现的位置，不是符号本身。
+
+| 符号 | 合法用途 | 非法路径（计数范围） |
+|------|---------|-------------------|
+| `AcceptedContinuationIds` | PROMPT-003 / PROMPT-009：判定某消息是否为 continuation 及其种类 | `Journal/ReviewConfirmation` `Journal/ReviewProjection` `Review/` `Session/ReviewerHost` |
+
+`AcceptedContinuationRoots` 不在此列：它存在的唯一目的是让 witness 从共享 authority root 推断确认，无任何授权用途，整仓清零。
 
 ### 生产与测试侧
 
@@ -309,8 +355,8 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 | `FallbackCursorAdvanced` 旧形状 | 含 Previous/Next Offset + count | FALLBACK-007 | 5 | 17 | 7 | next 允许 1 append site |
 | `ConfirmationPhysicalMessageId` | `ProviderInputSeal` | REVIEW-010 | 11 | 0 | 0 | 0 |
 | `samePhysicalRootReevaluation` | seal 含 challenge digest | REVIEW-003 | 2 | 0 | 0 | 0 |
-| `AcceptedContinuationIds` 作确认依据 | seal 因果证明 | REVIEW-003 | 9 | 6 | 0 | 0 |
-| `AcceptedContinuationRoots` 作确认依据 | seal 因果证明 | REVIEW-003 | 8 | 0 | 0 | 0 |
+| `AcceptedContinuationIds` 出现在 review 路径 | seal 因果证明 | REVIEW-003 | 1 | 0 | 0 | 0 |
+| `AcceptedContinuationRoots` | seal 因果证明 | REVIEW-003 | 3 | 0 | 0 | 0 |
 | `RecentProviderRunIds` 作唯一去重 | `ReviewAttemptIdentity` | REVIEW-004 | 5 | 0 | 0 | 0 |
 | `ReviewConfirmedIdle` | `ConfirmedReviewWitness` | REVIEW-006 | 6 | 1 | 1 | 0 |
 | `GuardPromptAccepted` | Dispatcher 四事实 | PROMPT-005 | 6 | 12 | 1 | 0 |

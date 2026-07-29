@@ -1,93 +1,116 @@
 namespace Wanxiangshu.Next.Domain
 
-/// Uniquely identifies a review barrier (one complete review cycle)
-type ReviewBarrierId = ReviewBarrierId of string
+open Wanxiangshu.Next.Kernel.Identity
 
-module ReviewBarrierId =
-    let create (value: string) = ReviewBarrierId value
-    let value (ReviewBarrierId value) = value
+/// One witnessed PERFECT verdict.
+///
+/// REVIEW-006 requires a witness to be self-contained: it must answer on its
+/// own who reviewed, which tree, which provider run and which tool call. Any
+/// field that has to be looked up elsewhere is a field that can be missing at
+/// Guard time.
+type VerdictWitness =
+    { ProviderRun: ProviderRunIdentity
+      ToolCallId: ToolCallId
+      GitTreeHash: GitTreeHash
+      ReviewerSessionId: SessionId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId }
 
-/// A single witnessed verdict with proof of execution.
-/// The authority root and physical user message are retained so the
-/// projection can prove causal confirmation without persisted booleans.
-type VerdictWitness = {
-    ProviderRunId: string
-    ToolCallId: string
-    GitTreeHash: string
-    AuthorityRootUserMessageId: string option
-    UserMessageId: string option
-}
-
-/// Structured review witness — the ONLY authority for review state
+/// Review state, derived only from witnessed verdicts.
+///
+/// REVIEW-005 forbids a persisted boolean for "confirmed": confirmation is a
+/// property of the evidence, so it is a union case carrying that evidence
+/// rather than a flag next to it.
 type ReviewWitness =
     | NoReview
-    | RevisionWitness of {| Report: string; GitTreeHash: string |}
+    | RevisionWitness of
+        {| Report: string
+           GitTreeHash: GitTreeHash |}
     | PerfectPending of first: VerdictWitness
     | Confirmed of
         {| BarrierId: ReviewBarrierId
            First: VerdictWitness
            Second: VerdictWitness
-           TreeHash: string |}
+           GitTreeHash: GitTreeHash |}
 
 module ReviewWitness =
-    let isConfirmed (w: ReviewWitness) : bool =
-        match w with
+
+    let isConfirmed (witness: ReviewWitness) : bool =
+        match witness with
         | Confirmed _ -> true
-        | _ -> false
+        | NoReview
+        | RevisionWitness _
+        | PerfectPending _ -> false
 
-    let isPerfectPending (w: ReviewWitness) : bool =
-        match w with
+    let isPerfectPending (witness: ReviewWitness) : bool =
+        match witness with
         | PerfectPending _ -> true
-        | _ -> false
+        | NoReview
+        | RevisionWitness _
+        | Confirmed _ -> false
 
-    let isRevision (w: ReviewWitness) : bool =
-        match w with
+    let isRevision (witness: ReviewWitness) : bool =
+        match witness with
         | RevisionWitness _ -> true
-        | _ -> false
+        | NoReview
+        | PerfectPending _
+        | Confirmed _ -> false
 
-    let getGitTreeHash (w: ReviewWitness) : string option =
-        match w with
-        | Confirmed c -> Some c.TreeHash
-        | PerfectPending p -> Some p.GitTreeHash
-        | RevisionWitness r -> Some r.GitTreeHash
+    let gitTreeHash (witness: ReviewWitness) : GitTreeHash option =
+        match witness with
+        | Confirmed confirmed -> Some confirmed.GitTreeHash
+        | PerfectPending pending -> Some pending.GitTreeHash
+        | RevisionWitness revision -> Some revision.GitTreeHash
         | NoReview -> None
 
-    let invalidateByTreeChange (w: ReviewWitness) (currentTree: string) : ReviewWitness =
-        match w with
-        | Confirmed c when c.TreeHash <> currentTree -> NoReview
-        | PerfectPending p when p.GitTreeHash <> currentTree -> NoReview
-        | RevisionWitness r when r.GitTreeHash <> currentTree -> NoReview
-        | _ -> w
+    /// REVIEW-008: any Git tree change makes a pending challenge stale and a
+    /// confirmed witness no longer sufficient for the Guard.
+    ///
+    /// This returns the derived predicate, not a mutation. Witness history is
+    /// permanent (REVIEW-008 forbids deleting it); validity is a question asked
+    /// against the current tree.
+    let isValidForTree (currentTree: GitTreeHash) (witness: ReviewWitness) : bool =
+        match gitTreeHash witness with
+        | Some tree -> tree = currentTree
+        | None -> false
 
-    let isDistinctWitness (a: VerdictWitness) (b: VerdictWitness) : bool =
-        a.ProviderRunId <> b.ProviderRunId
-        && a.ToolCallId <> b.ToolCallId
+    /// The attempt identity of a witnessed verdict (REVIEW-004).
+    let attemptIdentity (barrierId: ReviewBarrierId) (witness: VerdictWitness) : ReviewAttemptIdentity =
+        { ReviewBarrierId = barrierId
+          GitTreeHash = witness.GitTreeHash
+          ReviewerSessionId = witness.ReviewerSessionId
+          ProviderRun = witness.ProviderRun
+          ToolCallId = witness.ToolCallId }
 
-    /// True when `second` is a valid confirming witness for `first`.
-    /// It must be a distinct provider run and tool call, on the same tree,
-    /// and share the same authority root (or be a Host-accepted ReviewConfirmation
-    /// continuation bound to the first's root).
-    let canConfirm (firstRootAuthority: string option) (second: VerdictWitness) (first: VerdictWitness) : bool =
-        if not (isDistinctWitness second first) then
-            false
-        elif second.GitTreeHash <> first.GitTreeHash then
-            false
+    /// REVIEW-003 conditions 1-5: same reviewer session, same barrier, same
+    /// tree, different provider run, different tool call.
+    ///
+    /// This is necessary but NOT sufficient. Condition 6 — the second provider
+    /// input seal demonstrably contains the first challenge result — is the
+    /// causal proof, and it lives with the seal (REVIEW-010), not here. A
+    /// witness pair passing this check is a candidate, not a confirmation.
+    let isDistinctAttempt (barrierId: ReviewBarrierId) (first: VerdictWitness) (second: VerdictWitness) : bool =
+        ReviewAttemptIdentity.isDistinctAttempt (attemptIdentity barrierId first) (attemptIdentity barrierId second)
+
+    /// Build a confirmed witness from a proven pair.
+    ///
+    /// Deliberately takes the seal proof as a parameter it cannot fabricate:
+    /// the caller must have already established condition 6. Making the proof
+    /// an argument means "confirm without causal evidence" is not expressible.
+    let confirm
+        (barrierId: ReviewBarrierId)
+        (challengeConsumed: bool)
+        (first: VerdictWitness)
+        (second: VerdictWitness)
+        : ReviewWitness option =
+        if not challengeConsumed then
+            None
+        elif not (isDistinctAttempt barrierId first second) then
+            None
         else
-            let sameRoot =
-                match first.AuthorityRootUserMessageId, second.AuthorityRootUserMessageId with
-                | Some r1, Some r2 when r1 = r2 -> true
-                | _ -> false
-
-            // If the first root is unknown, fail-closed: a confirmed second cannot
-            // be proven to belong to the same logical run.
-            if sameRoot then
-                true
-            else
-                match first.AuthorityRootUserMessageId, firstRootAuthority with
-                | Some r1, Some r2 when r1 = r2 ->
-                    // The first's root matches the authority under which the second
-                    // physical message was accepted as a ReviewConfirmation.
-                    match second.UserMessageId with
-                    | Some userMsg -> userMsg = r2
-                    | None -> false
-                | _ -> false
+            Some(
+                Confirmed
+                    {| BarrierId = barrierId
+                       First = first
+                       Second = second
+                       GitTreeHash = second.GitTreeHash |}
+            )

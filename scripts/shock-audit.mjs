@@ -15,6 +15,11 @@ const SCOPES = {
 }
 
 // target: allowed residue per scope. Absent scope means 0.
+//
+// scopedTo: count only inside these path fragments. Some symbols are legitimate
+// where SSOT sanctions them and forbidden elsewhere — a whole-repo count would
+// then be a gate that can never reach zero, which eventually forces a wrong
+// deletion. The scope IS the violation.
 const EXTINCTION = [
   { symbol: 'PostPromptFireAndForget', clause: 'PROMPT-007' },
   { symbol: 'prompt_async', clause: 'PROMPT-005', target: { next: 1, testkit: Infinity } },
@@ -24,8 +29,20 @@ const EXTINCTION = [
   { symbol: 'ProviderFailureWakeup', clause: 'FALLBACK-003' },
   { symbol: 'ConfirmationPhysicalMessageId', clause: 'REVIEW-010' },
   { symbol: 'samePhysicalRootReevaluation', clause: 'REVIEW-003' },
-  { symbol: 'AcceptedContinuationIds', clause: 'REVIEW-003' },
+
+  // AcceptedContinuationIds is legitimate for PROMPT-003/PROMPT-009 (was this
+  // message a continuation, and of what kind). REVIEW-003 forbids it only as
+  // review-confirmation evidence, so the violation is its presence in the
+  // review path — not the symbol.
+  {
+    symbol: 'AcceptedContinuationIds',
+    clause: 'REVIEW-003',
+    scopedTo: ['Journal/ReviewConfirmation', 'Journal/ReviewProjection', 'Review/', 'Session/ReviewerHost'],
+  },
+  // AcceptedContinuationRoots existed only to let a witness infer confirmation
+  // from a shared authority root. No sanctioned use remains.
   { symbol: 'AcceptedContinuationRoots', clause: 'REVIEW-003' },
+
   { symbol: 'RecentProviderRunIds', clause: 'REVIEW-004' },
   { symbol: 'ReviewConfirmedIdle', clause: 'REVIEW-006' },
   { symbol: 'GuardPromptAccepted', clause: 'PROMPT-005' },
@@ -116,23 +133,34 @@ const failures = []
 const targetFor = (entry, scope) => entry.target?.[scope] ?? 0
 const pad = (value, width) => String(value).padEnd(width)
 
+/** Restrict a scope's file list to the paths where the symbol is a violation. */
+const filesFor = (entry, scope) => {
+  const all = files[scope]
+  if (!entry.scopedTo) return all
+  return all.filter((file) => entry.scopedTo.some((fragment) => file.replace(/\\/g, '/').includes(fragment)))
+}
+
 console.log('shock-audit: legacy symbol residue\n')
 console.log(`${pad('SYMBOL', 40)}${pad('CLAUSE', 14)}${scopeNames.map((s) => pad(s, 9)).join('')}`)
 
 for (const entry of EXTINCTION) {
-  const counts = scopeNames.map((scope) => countLiteral(files[scope], entry.symbol).length)
+  const counts = scopeNames.map((scope) => countLiteral(filesFor(entry, scope), entry.symbol).length)
   const cells = counts.map((count, index) => {
     const target = targetFor(entry, scopeNames[index])
     const flag = count > target ? '!' : ' '
     return pad(`${count}${flag}`, 9)
   })
-  console.log(`${pad(entry.symbol, 40)}${pad(entry.clause, 14)}${cells.join('')}`)
+  const label = entry.scopedTo ? `${entry.symbol} (scoped)` : entry.symbol
+  console.log(`${pad(label, 40)}${pad(entry.clause, 14)}${cells.join('')}`)
 
   counts.forEach((count, index) => {
     const scope = scopeNames[index]
     const target = targetFor(entry, scope)
     if (count > target) {
-      failures.push(`${entry.clause} ${entry.symbol}: ${scope} residue ${count} > target ${target}`)
+      const where = entry.scopedTo ? ` within ${entry.scopedTo.join(', ')}` : ''
+      failures.push(
+        `${entry.clause} ${entry.symbol}: ${scope} residue ${count} > target ${target}${where}`,
+      )
     }
   })
 }

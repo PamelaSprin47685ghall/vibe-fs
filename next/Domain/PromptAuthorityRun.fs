@@ -1,64 +1,85 @@
 namespace Wanxiangshu.Next.Domain
 
-open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Pure authority-run lifecycle operations. Types and identity rules live in
-/// PromptAuthority; this module owns claim/run/projection transitions only.
+/// Pure authority-run lifecycle transitions. Types and identity rules live in
+/// PromptAuthority; this module owns claim / run / projection transitions only.
 [<RequireQualifiedAccess>]
 module PromptAuthorityRun =
 
+    /// Create the Authority Root profile for a proven physical message.
+    ///
+    /// Takes a PhysicalUserMessageId and promotes it, because PROMPT-005 allows
+    /// promotion only once `PhysicalAccepted` is established. The type signature
+    /// therefore marks this as the one place that transition happens; a
+    /// TransportReceipt cannot reach it at all.
     let createAuthorityRoot
         (sha256: string -> string)
-        (runtimeId: string)
+        (runtimeId: RuntimeId)
         (sessionId: SessionId)
         (rootKind: PromptAuthority.RootAuthorityKind)
-        (messageId: MessageId)
+        (physicalMessageId: PhysicalUserMessageId)
         (selectedAgentName: string)
         : Result<PromptAuthority.AuthorityExecutionProfile, string> =
         match PromptAuthority.parseAgentName selectedAgentName with
-        | Error e -> Error e
+        | Error error -> Error error
         | Ok(name, role, tier, peer) ->
+            let authorityRoot = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
+
             Ok
                 { SessionId = sessionId
-                  LogicalRunId = PromptAuthority.stableLogicalRunId sha256 runtimeId sessionId messageId
-                  AuthorityRootUserMessageId = messageId
+                  LogicalRunId = PromptAuthority.stableLogicalRunId sha256 runtimeId sessionId authorityRoot
+                  AuthorityRootUserMessageId = authorityRoot
                   AuthorityKind = rootKind
                   SelectedAgent = name
                   PeerAgent = peer
                   CanonicalRole = role
                   SelectedTier = tier }
 
+    /// Claim a prompt that will become a new Authority Root (PROMPT-004
+    /// AgentOwnerRoot).
+    ///
+    /// No LogicalRunId yet: the run's id derives from the physical message,
+    /// which does not exist until the Host accepts. `None` says exactly that.
     let claimAgentOwnerRoot
-        (key: PromptKeyRef)
+        (key: PromptKey)
         (sessionId: SessionId)
+        (payloadDigest: string)
         (selectedAgentName: string)
         : Result<PromptAuthority.PromptClaim, string> =
         match PromptAuthority.parseAgentName selectedAgentName with
-        | Error e -> Error e
+        | Error error -> Error error
         | Ok(name, _role, _tier, _peer) ->
             Ok
                 { PromptKey = key
                   SessionId = sessionId
                   Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                  LogicalRunId = ""
+                  LogicalRunId = None
                   AuthorityRootUserMessageId = None
-                  EffectiveAgent = Some name }
+                  EffectiveAgent = Some name
+                  PayloadDigest = payloadDigest }
 
+    /// Claim a continuation (PROMPT-003). It inherits the run and the root, and
+    /// carries the EffectiveAgent the current fallback cursor selected.
     let claimContinuation
-        (key: PromptKeyRef)
+        (key: PromptKey)
         (sessionId: SessionId)
         (continuation: PromptAuthority.ContinuationKind)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (effectiveAgent: string)
+        (payloadDigest: string)
         : PromptAuthority.PromptClaim =
         { PromptKey = key
           SessionId = sessionId
           Origin = PromptAuthority.PromptOrigin.Continuation continuation
-          LogicalRunId = profile.LogicalRunId
+          LogicalRunId = Some profile.LogicalRunId
           AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
-          EffectiveAgent = Some effectiveAgent }
+          EffectiveAgent = Some effectiveAgent
+          PayloadDigest = payloadDigest }
 
+    /// A new Authority Root resets everything scoped to a Logical Run
+    /// (PROMPT-002): continuation set, repair budget, and — via the caller's
+    /// fallback projection — the cursor (FALLBACK-001).
     let registerAuthority
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (projection: PromptAuthority.PromptAuthorityProjection)
@@ -68,44 +89,48 @@ module PromptAuthorityRun =
             ActiveLogicalRun = Some profile
             PendingClaims = Map.empty
             AcceptedContinuationIds = Map.empty
-            AcceptedContinuationRoots = Map.empty
             RepairClaims = Set.empty }
 
     let registerClaim (claim: PromptAuthority.PromptClaim) (projection: PromptAuthority.PromptAuthorityProjection) =
         { projection with
             PendingClaims = Map.add claim.PromptKey claim projection.PendingClaims }
 
+    /// PROMPT-005 `PhysicalAccepted`: a real Host message id resolved a claim.
+    ///
+    /// Only continuations are recorded. An Authority Root claim resolving does
+    /// not belong in a continuation map, and recording the root a continuation
+    /// belonged to is deliberately gone — that map existed solely to let
+    /// ReviewWitness guess confirmation from a shared root, which REVIEW-003
+    /// forbids. Review confirmation now requires the provider input seal
+    /// (REVIEW-010), so no substitute lookup is provided here.
     let acceptClaim
-        (key: PromptKeyRef)
-        (hostMessageId: MessageId)
+        (key: PromptKey)
+        (physicalMessageId: PhysicalUserMessageId)
         (projection: PromptAuthority.PromptAuthorityProjection)
         =
         match Map.tryFind key projection.PendingClaims with
-        | Some { Origin = PromptAuthority.PromptOrigin.Continuation continuation; AuthorityRootUserMessageId = authorityRoot } ->
-            let root =
-                match authorityRoot with
-                | Some rootId -> rootId
-                | None -> hostMessageId
-
-            { projection with
-                PendingClaims = Map.remove key projection.PendingClaims
-                AcceptedContinuationIds = Map.add hostMessageId continuation projection.AcceptedContinuationIds
-                AcceptedContinuationRoots = Map.add hostMessageId root projection.AcceptedContinuationRoots }
-        | Some { AuthorityRootUserMessageId = authorityRoot } ->
-            let root =
-                match authorityRoot with
-                | Some rootId -> rootId
-                | None -> hostMessageId
-
-            { projection with
-                PendingClaims = Map.remove key projection.PendingClaims
-                AcceptedContinuationRoots = Map.add hostMessageId root projection.AcceptedContinuationRoots }
         | None -> projection
+        | Some claim ->
+            let withoutClaim = Map.remove key projection.PendingClaims
 
-    let abandonClaim (key: PromptKeyRef) (projection: PromptAuthority.PromptAuthorityProjection) =
+            match claim.Origin with
+            | PromptAuthority.PromptOrigin.Continuation continuation ->
+                { projection with
+                    PendingClaims = withoutClaim
+                    AcceptedContinuationIds = Map.add physicalMessageId continuation projection.AcceptedContinuationIds }
+            | PromptAuthority.PromptOrigin.AuthorityRoot _
+            | PromptAuthority.PromptOrigin.HostInternal
+            | PromptAuthority.PromptOrigin.UnknownOrigin ->
+                { projection with
+                    PendingClaims = withoutClaim }
+
+    /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
+    let abandonClaim (key: PromptKey) (projection: PromptAuthority.PromptAuthorityProjection) =
         { projection with
             PendingClaims = Map.remove key projection.PendingClaims }
 
+    /// FALLBACK-008: at most one interaction repair per occasion. Returns None
+    /// when this identity was already claimed, so the caller cannot double-send.
     let tryClaimRepair (identity: string) (projection: PromptAuthority.PromptAuthorityProjection) =
         if Set.contains identity projection.RepairClaims then
             None
@@ -114,13 +139,24 @@ module PromptAuthorityRun =
                 { projection with
                     RepairClaims = Set.add identity projection.RepairClaims }
 
+    /// PROMPT-009 resolution order, evaluated top to bottom:
+    ///
+    ///   accepted physical message id
+    ///   → claimed PromptKey
+    ///   → Host compaction / synthetic
+    ///   → registered AgentOwnerRoot
+    ///   → UnknownOrigin
+    ///
+    /// HumanRoot is absent on purpose: PROMPT-004 requires proven external
+    /// acceptance carrying an explicit agent, which this pure function cannot
+    /// observe. Anything unproven lands on UnknownOrigin and fails closed.
     let resolveKnownOrigin
-        (messageId: MessageId)
-        (promptKey: PromptKeyRef option)
+        (physicalMessageId: PhysicalUserMessageId)
+        (promptKey: PromptKey option)
         (hostCompaction: bool)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : PromptAuthority.PromptOrigin =
-        match Map.tryFind messageId projection.AcceptedContinuationIds with
+        match Map.tryFind physicalMessageId projection.AcceptedContinuationIds with
         | Some continuation -> PromptAuthority.PromptOrigin.Continuation continuation
         | None ->
             match promptKey |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims) with

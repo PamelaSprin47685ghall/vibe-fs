@@ -1,36 +1,57 @@
 namespace Wanxiangshu.Next.Kernel
 
+open System
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Typed completion payload for a successful agent run.
-/// Carries the completion payload for a successful agent run.
-/// No transport parts are kept; business programs inspect the typed turn directly.
+/// Completion payload for a successful agent run.
+///
+/// No transport parts are kept: business programs read the typed turn
+/// (HOST-004), never a raw payload.
 type AgentRunResult =
-    { SessionId: SessionId
-      RootUserMessageId: MessageId
-      AssistantMessageId: MessageId
-      Role: string // AgentRole serialized as string (avoid Kernel→Session dep)
-      Directory: string
-      /// Session-wide A: cumulative formal text + reasoning/thinking across the
-      /// whole Session, not the last turn alone. Excludes tool raw streams.
-      FinalText: string
-      /// Current turn's formal assistant text only (no reasoning/thinking).
-      /// B record for blogger companions is built from this field.
-      FormalText: string }
+    {
+        SessionId: SessionId
+        AuthorityRootUserMessageId: AuthorityRootUserMessageId
+        /// The provider run that reached terminal. HOST-011: this is the assistant
+        /// message id, which is also what tool calls in that run observed.
+        ProviderRun: ProviderRunIdentity
+        Role: Role
+        Directory: string
+        /// Session-wide A (HOST-005): cumulative formal text plus host-visible
+        /// reasoning across the whole Session, not the last turn alone. Excludes
+        /// tool raw streams.
+        SessionWideText: string
+        /// This turn's formal assistant text only, without reasoning. The
+        /// Companion B record is built from this (COMPANION-005).
+        TurnFormalText: string
+    }
 
-    /// Hard invariant: completed runs must have non-empty session-wide A text.
-    member this.IsValid = not (System.String.IsNullOrWhiteSpace this.FinalText)
+    /// EXEC-006: a completed run must carry session-wide A. An empty A means the
+    /// turn was not actually reconciled, so consumers must not treat it as done.
+    member this.IsValid = not (String.IsNullOrWhiteSpace this.SessionWideText)
 
 type AgentRunFailure =
     { SessionId: SessionId; Reason: string }
 
-
 module Outcome =
 
+    /// The result of asking the Host to accept a prompt (PROMPT-005 `Submitted`).
+    ///
+    /// The two admitted cases are separate because the Host may return either an
+    /// `accepted-*` admission receipt or a real message id, and PROMPT-005 gives
+    /// them different authority: only a real physical message id may become an
+    /// Authority Root. One case carrying an untyped id would erase that
+    /// distinction at exactly the point it matters.
     type SendOutcome =
-        | Delivered of MessageId
+        /// Host accepted and returned only a transport receipt. Write
+        /// `Submitted`; `PhysicalAccepted` still requires a real message.
+        | AdmittedWithReceipt of TransportReceipt
+        /// Host accepted and returned a real physical message identity.
+        | AdmittedWithPhysicalMessage of PhysicalUserMessageId
+        /// Transport failed in a way that proves the prompt was not accepted.
         | Retryable of reason: string
-        | AcceptanceUnknown of reason: string * messageId: MessageId option
+        /// PROMPT-011: acceptance cannot be proven either way. Stay Pending and
+        /// never auto-resend — the contract is at-most-one logical effect.
+        | AcceptanceUnknown of reason: string
         | Fatal of reason: string
 
     type SessionOutcome =
@@ -41,8 +62,13 @@ module Outcome =
     type SessionError =
         | NoProgress of reason: string
         | SessionCancelled
-        | FallbackExhausted
+        /// FALLBACK-005: the automatic recovery budget is spent. Named for the
+        /// budget rather than the cycle, because the A/A/B/B cursor itself never
+        /// ends — and because `FallbackExhausted` is the journal fact, and one
+        /// name for two concepts is how a double model starts.
+        | AutoRecoveryExhausted
         | ReviewExhausted
+        /// A dispatched prompt whose physical acceptance could not be proven.
         | PromptUncertain
         | ProjectionBroken of reason: string
         | InboxFull
@@ -52,6 +78,8 @@ module Outcome =
         | WriteFailed of reason: string
         | FlushFailed of reason: string
 
+    /// PERSIST-002: append has exactly two results. There is no partial write,
+    /// so there is no third case to represent one.
     type CommitResult<'e> =
         | Committed of 'e
         | CommitUnknown of EventId * JournalFailure
