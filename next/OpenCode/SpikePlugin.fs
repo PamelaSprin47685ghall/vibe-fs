@@ -44,6 +44,13 @@ module SpikePlugin =
                 let wired =
                     HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
+                // PROMPT-011: reconcile pending claims BEFORE any hook can dispatch a
+                // new prompt. Awaited rather than fired off: a new claim racing the
+                // recovery pass would be indistinguishable from a pending one, and the
+                // pass is bounded — every claim it sees is resolved or abandoned within
+                // RecoveryAttemptBudget starts.
+                let! _reconciled = PromptRecovery.reconcile journal snapshotOpt
+
                 let transform inObj outObj : Task<unit> =
                     let projectionSessionIdOpt =
                         if

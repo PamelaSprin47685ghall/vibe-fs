@@ -63,13 +63,11 @@ module PromptDispatcherSend =
                        Receipt = receipt |}
                 |> this.Persist sessionId None
 
+            // `Abandoned` is written by `Runtime.Abandon` (PROMPT-005 single writer).
+            // Constructing the fact here as well would make PROMPT-011's recovery a
+            // second writer of the same fact with its own copy of the payload shape.
             let abandon (reason: PromptAbandonReason) (error: string) =
-                AgentFact.PluginPromptAbandoned
-                    {| PromptKey = key
-                       SessionId = sessionId
-                       Reason = reason |}
-                |> this.Persist sessionId None
-                |> Result.bind (fun () -> Error error)
+                this.Abandon key sessionId reason |> Result.bind (fun () -> Error error)
 
             match outcome with
             | AdmittedWithReceipt receipt ->

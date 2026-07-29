@@ -131,6 +131,32 @@ module SessionSnapshotPort =
         || isTrue (if isNull info then null else info?summary)
         || isTrue (if isNull raw then null else raw?summary)
 
+    /// PROMPT-011 anchor, wherever the Host kept it.
+    ///
+    /// `OpenCodePort` writes it onto the text part because that survives the Host
+    /// round-trip more reliably than `body.metadata`; both spellings are read here so
+    /// the recovery does not depend on which one a given Host version preserved.
+    let private promptKeyOf (info: obj) (raw: obj) =
+        let fromMetadata (source: obj) =
+            if isNull source || isNull source?metadata then
+                None
+            else
+                readString source?metadata?(PromptMetadataCodec.PromptKeyField)
+
+        let fromParts () =
+            if isNull raw || isNull raw?parts then
+                None
+            else
+                try
+                    unbox<obj array> raw?parts
+                    |> Array.tryPick (fun part -> if isNull part then None else fromMetadata part)
+                with _ ->
+                    None
+
+        [ fromMetadata info; fromMetadata raw ]
+        |> List.tryPick id
+        |> Option.orElseWith fromParts
+
     let projectMessage (raw: obj) : SessionMessage option =
         if isNull raw then
             None
@@ -170,6 +196,7 @@ module SessionSnapshotPort =
                         |> Option.orElse (readString raw?parentID)
                       Completed = completedOf info raw
                       IsCompaction = isCompactionOf info raw
+                      PromptKey = promptKeyOf info raw
                       Parts = partsOf raw }
 
     let projectMessages (rawMessages: obj array) =

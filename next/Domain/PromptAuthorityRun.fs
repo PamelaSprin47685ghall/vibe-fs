@@ -57,7 +57,9 @@ module PromptAuthorityRun =
                   LogicalRunId = None
                   AuthorityRootUserMessageId = None
                   EffectiveAgent = Some name
-                  PayloadDigest = payloadDigest }
+                  PayloadDigest = payloadDigest
+                  Receipt = None
+                  RecoveryAttempts = 0 }
 
     /// Claim a continuation (PROMPT-003). It inherits the run and the root, and
     /// carries the EffectiveAgent the current fallback cursor selected.
@@ -75,7 +77,25 @@ module PromptAuthorityRun =
           LogicalRunId = Some profile.LogicalRunId
           AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
           EffectiveAgent = Some effectiveAgent
-          PayloadDigest = payloadDigest }
+          PayloadDigest = payloadDigest
+          Receipt = None
+          RecoveryAttempts = 0 }
+
+    /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
+    ///
+    /// Recorded on the claim rather than discarded. PROMPT-011 has to tell "the Host
+    /// accepted something we cannot locate" from "we never got that far", and those
+    /// are different operator diagnoses even though both stay pending.
+    let submitClaim
+        (key: PromptKey)
+        (receipt: TransportReceipt)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        =
+        match Map.tryFind key projection.PendingClaims with
+        | None -> projection
+        | Some claim ->
+            { projection with
+                PendingClaims = Map.add key { claim with Receipt = Some receipt } projection.PendingClaims }
 
     /// A new Authority Root resets everything scoped to a Logical Run
     /// (PROMPT-002): continuation set, repair budget, and — via the caller's

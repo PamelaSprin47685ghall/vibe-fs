@@ -106,6 +106,22 @@ module PromptAuthority =
             /// PROMPT-005 requires the payload digest at claim time so recovery can
             /// tell two dispatches of the same shape apart.
             PayloadDigest: string
+            /// PROMPT-005 `Submitted`: the transport receipt, once the Host call has
+            /// returned. `None` while the claim is still only `Claimed`.
+            ///
+            /// PROMPT-011's recovery needs the two states distinguishable: step 4 (a
+            /// receipt exists but no physical message was found) and step 5 (not even
+            /// a receipt) both stay pending, but they are different diagnoses for an
+            /// operator — one means the Host accepted something we cannot locate.
+            Receipt: TransportReceipt option
+            /// PROMPT-011 `RecoveryAttemptBudget`: how many plugin starts have seen
+            /// this claim still unresolved.
+            ///
+            /// Counted by folding `RuntimeStarted`, not stored by a writer. A fact
+            /// saying "I tried to recover this" would itself have to be written
+            /// during recovery, so a crash before writing it would lose the attempt
+            /// and the budget could never expire.
+            RecoveryAttempts: int
         }
 
     type PromptAuthorityProjection =
@@ -300,6 +316,38 @@ module PromptAuthority =
         match value with
         | Some text -> text
         | None -> "\u0000absent"
+
+    /// PROMPT-011 recovery bounds.
+    ///
+    /// The tail window exists because a Host session's history is unbounded while
+    /// a pending claim is minutes old at most. Scanning further would not find a
+    /// message that is genuinely absent, and PROMPT-011 forbids resending either
+    /// way — so a wider window buys nothing and costs an unbounded read.
+    [<Literal>]
+    let RecoveryTailWindow = 50
+
+    /// After this many plugin starts an unresolved claim is abandoned rather than
+    /// carried forever.
+    [<Literal>]
+    let RecoveryAttemptBudget = 3
+
+    /// PROMPT-011: a plugin start was observed, so every still-pending claim has
+    /// now survived one more recovery attempt.
+    ///
+    /// Bounded by the number of pending claims, which PROMPT-005 resolves or
+    /// abandons — it does not grow with session lifetime (PERSIST-008).
+    let countRecoveryAttempt (projection: PromptAuthorityProjection) =
+        { projection with
+            PendingClaims =
+                projection.PendingClaims
+                |> Map.map (fun _ claim ->
+                    { claim with
+                        RecoveryAttempts = claim.RecoveryAttempts + 1 }) }
+
+    /// PROMPT-011: this claim has spent its recovery budget and must be abandoned
+    /// with `UnresolvedAfterRecovery`.
+    let recoveryBudgetSpent (claim: PromptClaim) =
+        claim.RecoveryAttempts >= RecoveryAttemptBudget
 
     /// The scope a ClaimSequence counts within.
     ///

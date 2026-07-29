@@ -170,7 +170,6 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'PluginPromptAbandoned',
     allowed: [
-      'OpenCode/PromptDispatcherSend.fs',
       'OpenCode/PromptDispatcher.fs',
       'Journal/PromptAuthorityLedger.fs',
       'Journal/Fold.fs',

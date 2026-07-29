@@ -89,6 +89,23 @@ module PromptDispatcher =
                     agent
                 |> Result.bind (fun profile -> this.RegisterAuthority profile |> Result.map (fun () -> profile))
 
+        /// PROMPT-005 `Abandoned`.
+        ///
+        /// Public because PROMPT-011's recovery is the second legitimate caller: a
+        /// claim whose budget expired must be abandoned with
+        /// `UnresolvedAfterRecovery`, and that happens at startup rather than inside
+        /// a send. The send path's own abandon (`SendFailed`) stays private to it.
+        member this.Abandon
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (reason: PromptAbandonReason)
+            : Result<unit, string> =
+            AgentFact.PluginPromptAbandoned
+                {| PromptKey = key
+                   SessionId = sessionId
+                   Reason = reason |}
+            |> this.Persist sessionId None
+
         /// PROMPT-005 `PhysicalAccepted` for an Authority Root claim.
         ///
         /// Two facts in order: the claim resolves, then the root takes effect. The

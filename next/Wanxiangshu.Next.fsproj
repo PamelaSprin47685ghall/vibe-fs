@@ -112,6 +112,7 @@
     <Compile Include="OpenCode/PromptDispatcherSend.fs"/>
     <Compile Include="OpenCode/PromptIngressCodec.fs"/>
     <Compile Include="OpenCode/PromptIngress.fs"/>
+    <Compile Include="OpenCode/PromptRecovery.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>

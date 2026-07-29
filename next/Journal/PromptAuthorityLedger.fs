@@ -110,7 +110,21 @@ module PromptAuthorityLedger =
     /// durable in the journal; the projection only needs to know the claim is
     /// still open, which it already does. Present as a named no-op so the fold's
     /// four-fact coverage is visible rather than inferred from an absence.
-    let foldPromptSubmitted (projection: PromptAuthority.PromptAuthorityProjection) _fact = projection
+    /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
+    ///
+    /// The receipt lands on the pending claim. It used to be discarded (`_fact ->
+    /// projection`), which erased the distinction PROMPT-011 step 4 vs step 5 is
+    /// built on: "the Host accepted something we cannot locate" and "we never got a
+    /// receipt at all" both stay pending, but only the first means a logical effect
+    /// may already exist.
+    let foldPromptSubmitted
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        (fact:
+            {| PromptKey: PromptKey
+               SessionId: SessionId
+               Receipt: TransportReceipt |})
+        =
+        PromptAuthorityRun.submitClaim fact.PromptKey fact.Receipt projection
 
     /// PROMPT-005 `PhysicalAccepted`: a real physical message resolved the claim.
     let foldPromptPhysicalAccepted
