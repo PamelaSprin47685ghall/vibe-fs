@@ -131,7 +131,7 @@ module RoleDefinitions =
     let browserPrompt =
         "Browser system prompt SSOT: prompts/browser-system.md\n"
         + "Tools: read / glob / grep / network.\n"
-        + "Read-only research. Local + approved network. Never edit."
+        + "Browser-only web research. Host local-read permissions serve webpage access only; never inspect repository files."
 
     /// Full Meditator system prompt lives in prompts/meditator-system.md and is
     /// loaded into OpenCode AgentConfig.prompt (host system prompt).

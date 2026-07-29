@@ -122,6 +122,9 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.match(config.agent['fast-browser'].prompt, /Information Navigator/);
     assert.match(config.agent['fast-browser'].prompt, /`network`/);
     assert.match(config.agent['fast-browser'].prompt, /do \*\*not\*\* have/i);
+    assert.match(config.agent['fast-browser'].prompt, /Browser-only web access/i);
+    assert.match(config.agent['fast-browser'].prompt, /MUST NOT use [`']read[`'], [`']glob[`'], or [`']grep[`'] to read or search local workspace or repository files/i);
+    assert.match(config.agent['fast-manager'].prompt, /DO NOT delegate local workspace reading or search to [`']fast-browser[`'] \/ [`']deep-browser[`']/i);
     assert.equal(config.agent['fast-browser'].permission.read, 'allow');
     assert.equal(config.agent['fast-browser'].permission.glob, 'allow');
     assert.equal(config.agent['fast-browser'].permission.grep, 'allow');
