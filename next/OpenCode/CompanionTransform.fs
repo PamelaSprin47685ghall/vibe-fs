@@ -29,9 +29,13 @@ module CompanionTransform =
         =
         let rawMessages = unbox<obj array> rawOutObj?messages |> Array.toList
 
-        // Dual-hook safety: chat.transform and experimental.chat.messages.transform
-        // both invoke this path. Skip when companion-b-head is already present so a
-        // second invocation never stacks another synthetic head.
+        // COMPANION-013 idempotency: never stack a second synthetic head on a
+        // message array that already carries one.
+        //
+        // This used to be load-bearing for a real defect: the plugin registered the
+        // transform under two hook names, so both fired over the same array. That is
+        // fixed at the registration site (HOST-009), and the guard remains as the
+        // invariant itself — one B head per request view, whoever calls.
         let alreadyHasBHead =
             rawMessages
             |> List.exists (fun message ->

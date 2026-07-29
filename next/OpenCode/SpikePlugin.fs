@@ -44,19 +44,6 @@ module SpikePlugin =
                 let wired =
                     HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
-                let bindRunStarted =
-                    box (fun (sessionId: string) (role: string) (directory: string) ->
-                        match AgentRoleIdentity.roleOfString role with
-                        | None -> ()
-                        | Some agentRole ->
-                            wired.BindActiveRun
-                                (SessionId.create sessionId)
-                                agentRole
-                                (if String.IsNullOrWhiteSpace directory then
-                                     None
-                                 else
-                                     Some directory))
-
                 let transform inObj outObj : Task<unit> =
                     let projectionSessionIdOpt =
                         if
@@ -114,25 +101,33 @@ module SpikePlugin =
 
                 let chatParams = ChatParamsHook.create journal
 
+                // HOST-009: the object handed to the Host carries Host hooks and
+                // nothing else.
+                //
+                // Six extra keys used to hang here — `projection`, `events`,
+                // `sessions`, `journal`, `hostEventsSubscription`, `bindRunStarted`.
+                // None is a hook name in the Host's `Hooks` type, so the Host never
+                // read any of them; they were internal ports exposed for test
+                // visibility, which is the one thing VERIFY-008 names as forbidden.
+                // Two had no reader at all. Layer 1–3 tests reach these modules
+                // directly through `build/next`.
                 let hooks =
                     createObj
-                        [ "projection", box Projection.projectMessages
-                          "events", box eventPort
-                          "sessions", box sessionPort
-                          "journal", box journal
-                          "hostEventsSubscription", box wired.Subscription
-                          "bindRunStarted", bindRunStarted
-                          "chat.message", box (uncurriedExecute wired.ChatMessageHook)
+                        [ "chat.message", box (uncurriedExecute wired.ChatMessageHook)
                           // Host built-in retry reuses the same user message;
                           // 0.5.0 relies on Agent bindings — chat.params is a no-op.
                           "chat.params", box (uncurriedExecute chatParams)
-                          "chat.transform", box (uncurriedExecute (box transform))
-                          // Both hooks are registered for compatibility: some
-                          // OpenCode host versions call chat.transform while
-                          // others call experimental.chat.messages.transform.
-                          // The idempotency guard in handleCompanionTransform
-                          // detects companion-b-head already present and skips
-                          // the second invocation, preventing duplicate B heads.
+                          // ONE transform registration.
+                          //
+                          // Both `chat.transform` and this key used to point at the
+                          // same function "for compatibility". Host source has only
+                          // the experimental name — the other is absent from the
+                          // `Hooks` type and triggered nowhere; `prompt.ts:1255` and
+                          // `compaction.ts:350` are the only trigger sites. So the
+                          // extra key was never a fallback; it was a second live
+                          // registration of one hook, and every provider step ran the
+                          // Companion rewrite and the REVIEW-010 seal twice over the
+                          // same message array.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform",
                           box (
@@ -141,6 +136,11 @@ module SpikePlugin =
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 hooks?event <- box wired.ObserveEvent
+
+                // HOST-009 dispose: cancel owned Tasks, kill PTYs/processes, dispose
+                // sessions. `scope.Dispose` owns all of it, and the Host awaits this
+                // hook (`plugin/index.ts:266`), so teardown completes before shutdown
+                // proceeds.
                 hooks?dispose <- box (fun () -> scope.Dispose())
 
                 let client = if isNull input then null else input?client
@@ -192,37 +192,3 @@ module SpikePlugin =
 
                 return box hooks
         }
-
-    let createSpikePlugin (config: SpikePluginConfig) : obj =
-        let input: obj =
-            createObj
-                [ "directory", box config.Directory
-                  "port", box (config.Port |> Option.map box |> Option.defaultValue null) ]
-
-        createObj
-            [ "hooks",
-              box (fun (inputObj: obj) ->
-                  let mergedInput =
-                      if isNull inputObj then
-                          input
-                      else
-                          createObj
-                              [ "directory",
-                                box (
-                                    if isNull inputObj?directory then
-                                        config.Directory
-                                    else
-                                        inputObj?directory
-                                )
-                                "port",
-                                box (
-                                    if isNull inputObj?port then
-                                        box config.Port
-                                    else
-                                        inputObj?port
-                                )
-                                "client", box inputObj?client
-                                "events", box inputObj?events
-                                "gitTreePort", box inputObj?gitTreePort ]
-
-                  initSpikePlugin mergedInput) ]

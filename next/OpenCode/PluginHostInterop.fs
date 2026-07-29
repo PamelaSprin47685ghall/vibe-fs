@@ -12,10 +12,6 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 open CompanionProjection
 
-type SpikePluginConfig =
-    { Directory: string
-      Port: IOpenCodePort option }
-
 module PluginHostInterop =
 
     [<Emit("import('@opencode-ai/plugin/tool')")>]
@@ -23,8 +19,6 @@ module PluginHostInterop =
 
     [<Emit("(args, context) => $0(args)(context)")>]
     let uncurriedExecute (fn: obj) : obj = jsNative
-
-    let createSpikeHost (portOpt: IOpenCodePort option) = PluginHost.createSpikeHost portOpt
 
     let systemTransformHook
         (sessionBudgets: Dictionary<string, int>)

@@ -12,15 +12,17 @@ open Wanxiangshu.Next.Session
 
 module HostSignalBootstrap =
 
+    /// What the composition root needs back from `wire`.
+    ///
+    /// Exactly the members `SpikePlugin` calls. Six more used to hang here —
+    /// `Reconciler`, `SignalRouter`, `Subscription`, `UnregisterOwned`,
+    /// `RegisterSource`, `BindUserMessage` — with no consumer anywhere: the
+    /// subscription is already tracked by the scope inside `wire`, and the three
+    /// functions are called internally by the binding helpers. Handing them out as
+    /// well made the signal stack look like it had six more entry points than it does.
     type WiredSignals =
-        { Reconciler: ReconcileSupervisor.Supervisor
-          SignalRouter: HostSignalRouter
-          Subscription: IDisposable option
-          RegisterOwned: string -> unit
-          UnregisterOwned: string -> unit
+        { RegisterOwned: string -> unit
           CancelSignals: SessionId seq -> unit
-          RegisterSource: string -> SessionSignalSource -> unit
-          BindUserMessage: string -> string -> unit
           BindActiveRun: SessionId -> AgentRole -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
@@ -184,18 +186,12 @@ module HostSignalBootstrap =
         let cancelSignals (ids: SessionId seq) =
             ids |> Seq.iter (fun id -> signalRouter.UnregisterOwned id)
 
-        { Reconciler = reconciler
-          SignalRouter = signalRouter
-          Subscription = subscription
-          RegisterOwned = registerOwned
-          UnregisterOwned = (fun sessionId -> signalRouter.UnregisterOwned(SessionId.create sessionId))
+        { RegisterOwned = registerOwned
           CancelSignals = cancelSignals
-          BindUserMessage = bindUserMessage
           BindActiveRun = bindActiveRun
           CurrentPhysicalUserMessage =
             (fun sessionId ->
                 reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                 |> Option.map PhysicalUserMessageId.value)
           ChatMessageHook = chatMessageHook
-          RegisterSource = registerSource
           ObserveEvent = signalRouter.ObserveLocal }

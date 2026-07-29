@@ -50,11 +50,6 @@ module PluginHost =
         else
             Some { GetTreeHash = (fun () -> unbox<string> (input?gitTreePort?getTreeHash ())) }
 
-    let createSpikeHost (portOpt: IOpenCodePort option) =
-        let eventPort = Events.DeterministicEventPort() :> IEventObservationPort
-        let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
-        eventPort, sessionPort
-
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)

@@ -76,37 +76,13 @@ module Events =
                 | true, segments -> segments |> Seq.toList
                 | false, _ -> [])
 
-    type DeterministicEventPort() =
-        let listeners = ResizeArray<TerminalCompletionListener>()
-        let accumulator = SessionAccumulator()
-        let lockObj = obj ()
-
-        interface IEventObservationPort with
-            member _.SubscribeTerminalListener(listener) =
-                lock lockObj (fun () -> listeners.Add(listener))
-
-                { new IDisposable with
-                    member _.Dispose() =
-                        lock lockObj (fun () -> listeners.Remove(listener) |> ignore) }
-
-            member _.NotifyTerminal sessionId outcome =
-                let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
-
-                if List.isEmpty handlers then
-                    false
-                else
-                    for h in handlers do
-                        h sessionId outcome
-
-                    true
-
-            member _.IsCompleted sessionId = false
-
-            member _.RecordSessionA sessionId providerRun text =
-                accumulator.Record sessionId providerRun text
-
-            member _.SessionARecords sessionId = accumulator.Records sessionId
-
+    /// The one event port.
+    ///
+    /// `DeterministicEventPort` used to sit beside this with an identical
+    /// implementation — same listener list, same accumulator, and a `NotifyTerminal`
+    /// that computed the same answer by a different spelling. It had no production
+    /// consumer at all; only tests constructed it, so it was a second definition of
+    /// this class kept alive by its test callers.
     type HostEventPort() =
         let listeners = ResizeArray<TerminalCompletionListener>()
         let accumulator = SessionAccumulator()
