@@ -39,7 +39,12 @@ module AgentPairCursor =
     /// FALLBACK-005. Default 12; an administrator may configure another finite
     /// positive value. Infinite is not a legal setting — that is the "keeps
     /// requesting after the budget" No-Go.
-    [<Literal>]
+    ///
+    /// Plain `let`, not `[<Literal>]`. Fable inlines a literal at every use and
+    /// emits no export, so the value becomes unreadable from a layer 1 test — and a
+    /// clause constant no test can assert is a clause with no gate. Nothing here
+    /// needs literal semantics: it is never a match pattern or an attribute
+    /// argument.
     let DefaultAutoRecoveryBudget = 12
 
     /// What the controller may do after a failure has been recorded.

@@ -13,10 +13,11 @@ module ReviewChallenge =
 
     /// REVIEW-003. Bump only with a migration: an older run's seal contains the
     /// older digest, and the version is what tells them apart.
-    [<Literal>]
+    ///
+    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
+    /// so a layer 1 test could not read the value it must pin.
     let TextVersion = 1
 
-    [<Literal>]
     let Text =
         "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 

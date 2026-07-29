@@ -359,12 +359,13 @@ module PromptAuthority =
     /// a pending claim is minutes old at most. Scanning further would not find a
     /// message that is genuinely absent, and PROMPT-011 forbids resending either
     /// way — so a wider window buys nothing and costs an unbounded read.
-    [<Literal>]
+    ///
+    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
+    /// leaving the clause value unassertable from a layer 1 test.
     let RecoveryTailWindow = 50
 
     /// After this many plugin starts an unresolved claim is abandoned rather than
     /// carried forever.
-    [<Literal>]
     let RecoveryAttemptBudget = 3
 
     /// PROMPT-011: a plugin start was observed, so every still-pending claim has

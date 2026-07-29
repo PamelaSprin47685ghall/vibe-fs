@@ -11,6 +11,11 @@
 //     ordinal from cases() at load time, so a renamed case fails loudly
 //   - never build a DateTimeOffset with `new Date(...)`; use utcOffset()
 //   - never touch FSharpMap/FSharpList internals; use mapEntries()/listItems()
+//
+// Emitted-name rule, applied throughout: when a module shares its name with a
+// type in the same file, Fable suffixes the module (`FallbackProjectionModule_`);
+// otherwise the members are plain exports. That is the single Fable convention
+// this file exists to absorb.
 
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -38,19 +43,74 @@ const prod = (name) => import(join(BUILD_ROOT, `${name}.js`))
 
 const [DateOffset, FsMap, FsList] = await Promise.all([lib('DateOffset.js'), lib('Map.js'), lib('List.js')])
 
-const [Identity, FactModule, Outcome, EnvelopeModule, FoldModule, FactCodec, Cursor, Authority, Witness, DeadlineModule] =
-  await Promise.all([
-    prod('Kernel/Identity'),
-    prod('Kernel/Fact'),
-    prod('Kernel/Outcome'),
-    prod('Journal/Envelope'),
-    prod('Journal/Fold'),
-    prod('Journal/FactCodec'),
-    prod('Domain/AgentPairCursor'),
-    prod('Domain/PromptAuthority'),
-    prod('Domain/ReviewWitness'),
-    prod('Process/Deadline'),
-  ])
+const [
+  Identity,
+  FactModule,
+  Outcome,
+  EnvelopeModule,
+  FoldModule,
+  FactCodec,
+  FallbackProj,
+  ReviewProj,
+  LinkageProj,
+  OrchestratorProj,
+  Cursor,
+  Authority,
+  AuthorityRun,
+  Witness,
+  Challenge,
+  ProviderProj,
+  DeadlineModule,
+  ProcessRequest,
+] = await Promise.all([
+  prod('Kernel/Identity'),
+  prod('Kernel/Fact'),
+  prod('Kernel/Outcome'),
+  prod('Journal/Envelope'),
+  prod('Journal/Fold'),
+  prod('Journal/FactCodec'),
+  prod('Journal/FallbackProjection'),
+  prod('Journal/ReviewProjection'),
+  prod('Journal/LinkageProjection'),
+  prod('Journal/OrchestratorProjection'),
+  prod('Domain/AgentPairCursor'),
+  prod('Domain/PromptAuthority'),
+  prod('Domain/PromptAuthorityRun'),
+  prod('Domain/ReviewWitness'),
+  prod('Domain/ReviewChallenge'),
+  prod('Domain/ProviderProjection'),
+  prod('Process/Deadline'),
+  prod('Process/ProcessRequest'),
+])
+
+// ── the one Fable naming convention ──────────────────────────────────────────
+//
+// Fable suffixes a module's members with `<Name>Module_` exactly when the module
+// shares its name with a type declared in the same file (`FallbackProjection` is
+// both a record and a module, so its members emit as
+// `FallbackProjectionModule_forAuthority`). With no collision the members emit
+// under their plain name.
+//
+// `member()` absorbs that one rule and THROWS when neither spelling exists. It is
+// deliberately not a `A ?? B` fallback at each call site: a silent alternative
+// would let a renamed or deleted production function read as `undefined` and take
+// the other branch, which is the class of failure this facade exists to prevent.
+
+const member = (mod, moduleName, name) => {
+  const suffixed = `${moduleName}Module_${name}`
+  const fn = mod[suffixed] ?? mod[name]
+  if (fn === undefined) {
+    const available = Object.keys(mod)
+      .filter((key) => key.includes(name) || key.startsWith(`${moduleName}Module_`))
+      .join(', ')
+    throw new Error(`${moduleName} exports neither '${suffixed}' nor '${name}'. Near matches: ${available || '(none)'}`)
+  }
+  return fn
+}
+
+/** Bind a module's members by name, resolved once at load time. */
+const bind = (mod, moduleName, names) =>
+  Object.fromEntries(names.map((name) => [name, member(mod, moduleName, name)]))
 
 // ── values that cross the boundary ───────────────────────────────────────────
 
@@ -133,54 +193,141 @@ export const unwrapOption = (value) => value
 export const isNone = (value) => value === undefined || value === null
 export const isSome = (value) => !isNone(value)
 
+/** F# `Result` → { ok, value } | { ok: false, error }. */
+export const resultOf = (value) =>
+  caseOf(value) === 'Ok' ? { ok: true, value: payloadOf(value) } : { ok: false, error: payloadOf(value) }
+
 // ── case-name resolution ─────────────────────────────────────────────────────
 // A union's tag ordinal is positional and silently shifts when a case is added
 // in the middle. Resolving name → ordinal from cases() at load time turns that
 // shift into an immediate, named failure.
 
-const caseIndexer = (unionClass, label) => {
-  const probe = Object.create(unionClass.prototype)
-  const names = probe.cases()
-  return (caseName) => {
+const caseNames = (unionClass) => Object.create(unionClass.prototype).cases()
+
+/**
+ * Construct a union case by NAME.
+ *
+ * Two emitted shapes, and the difference is invisible at the call site:
+ *   - multi-case: `constructor(tag, fields)`
+ *   - single-case: `constructor(Item)` — no tag parameter at all
+ *
+ * Passing `(0, [x])` to a single-case union therefore builds `fields = [0]` and
+ * silently discards `x`. Resolving the shape from `cases().length` here is what
+ * keeps that mistake out of every test.
+ *
+ * A name that does not exist throws. That is the whole point: a case renamed in
+ * production must fail loudly rather than land on a neighbouring ordinal.
+ */
+const unionCase = (unionClass, label) => {
+  const names = caseNames(unionClass)
+  return (caseName, fields = []) => {
     const index = names.indexOf(caseName)
-    if (index < 0) {
-      throw new Error(`${label} has no case '${caseName}'. Available: ${names.join(', ')}`)
-    }
-    return index
+    if (index < 0) throw new Error(`${label} has no case '${caseName}'. Available: ${names.join(', ')}`)
+    return names.length === 1 ? new unionClass(fields[0]) : new unionClass(index, fields)
   }
 }
 
-const agentFactCase = caseIndexer(FactModule.AgentFact, 'AgentFact')
-const factCase = caseIndexer(FactModule.Fact, 'Fact')
-const streamCase = caseIndexer(EnvelopeModule.StreamId, 'StreamId')
-const verdictCase = caseIndexer(FactModule.ReviewGuardVerdict, 'ReviewGuardVerdict')
+const buildAgentFact = unionCase(FactModule.AgentFact, 'AgentFact')
+const buildFact = unionCase(FactModule.Fact, 'Fact')
+const buildRuntimeFact = unionCase(FactModule.RuntimeFact, 'RuntimeFact')
+const buildStream = unionCase(EnvelopeModule.StreamId, 'StreamId')
+const buildVerdict = unionCase(FactModule.ReviewGuardVerdict, 'ReviewGuardVerdict')
+const buildAbandonReason = unionCase(FactModule.PromptAbandonReason, 'PromptAbandonReason')
+const buildCompletionKind = unionCase(FactModule.HandleCompletionKind, 'HandleCompletionKind')
 
-export const agentFactCaseNames = () => Object.create(FactModule.AgentFact.prototype).cases()
+export const agentFactCaseNames = () => caseNames(FactModule.AgentFact)
 
 // ── identity ─────────────────────────────────────────────────────────────────
+// PROMPT-001: no generic message id. `role=user` on the wire is a
+// PhysicalUserMessageId; the semantic root is an AuthorityRootUserMessageId; a
+// `role=assistant` message is a ProviderRunIdentity. The absence of a
+// `messageId(...)` helper here is the clause, not an omission.
 
-export const sessionId = (value) => Identity.SessionIdModule_create(value)
-export const messageId = (value) => Identity.MessageIdModule_create(value)
-export const runtimeId = (value) => Identity.RuntimeIdModule_create(value)
-export const eventId = (value) => Identity.EventIdModule_create(value)
-export const childId = (value) => Identity.ChildIdModule_create(value)
-export const processId = (value) => Identity.ProcessIdModule_create(value)
-export const dispatchId = (value) => Identity.DispatchIdModule_create(value)
-export const promptKeyRef = (value) => Identity.PromptKeyRefModule_create(value)
+const idModule = (name) => ({
+  create: (value) => Identity[`${name}Module_create`](value),
+  value: (id) => Identity[`${name}Module_value`](id),
+})
+
+const Ids = {
+  runtime: idModule('RuntimeId'),
+  session: idModule('SessionId'),
+  child: idModule('ChildId'),
+  process: idModule('ProcessId'),
+  event: idModule('EventId'),
+  logicalRun: idModule('LogicalRunId'),
+  authorityRoot: idModule('AuthorityRootUserMessageId'),
+  physicalUser: idModule('PhysicalUserMessageId'),
+  promptKey: idModule('PromptKey'),
+  transportReceipt: idModule('TransportReceipt'),
+  providerRun: idModule('ProviderRunIdentity'),
+  toolCall: idModule('ToolCallId'),
+  systemPrompt: idModule('SystemPromptId'),
+  reviewBarrier: idModule('ReviewBarrierId'),
+  gitTree: idModule('GitTreeHash'),
+  sealDigest: idModule('SealDigest'),
+  agentHandle: idModule('AgentHandleId'),
+  ptyHandle: idModule('PtyHandleId'),
+  managerJob: idModule('ManagerJobId'),
+  worktreeIdentity: idModule('WorktreeIdentity'),
+  worktreePath: idModule('WorktreePath'),
+  targetRef: idModule('TargetRef'),
+  commit: idModule('CommitHash'),
+}
+
+export const runtimeId = (v) => Ids.runtime.create(v)
+export const sessionId = (v) => Ids.session.create(v)
+export const childId = (v) => Ids.child.create(v)
+export const processId = (v) => Ids.process.create(v)
+export const eventId = (v) => Ids.event.create(v)
+export const logicalRunId = (v) => Ids.logicalRun.create(v)
+export const authorityRoot = (v) => Ids.authorityRoot.create(v)
+export const physicalUser = (v) => Ids.physicalUser.create(v)
+export const promptKey = (v) => Ids.promptKey.create(v)
+export const transportReceipt = (v) => Ids.transportReceipt.create(v)
+export const providerRun = (v) => Ids.providerRun.create(v)
+export const toolCallId = (v) => Ids.toolCall.create(v)
+export const systemPromptId = (v) => Ids.systemPrompt.create(v)
+export const reviewBarrierId = (v) => Ids.reviewBarrier.create(v)
+export const gitTreeHash = (v) => Ids.gitTree.create(v)
+export const sealDigest = (v) => Ids.sealDigest.create(v)
+export const agentHandleId = (v) => Ids.agentHandle.create(v)
+export const ptyHandleId = (v) => Ids.ptyHandle.create(v)
+export const managerJobId = (v) => Ids.managerJob.create(v)
+export const worktreeIdentity = (v) => Ids.worktreeIdentity.create(v)
+export const worktreePath = (v) => Ids.worktreePath.create(v)
+export const targetRef = (v) => Ids.targetRef.create(v)
+export const commitHash = (v) => Ids.commit.create(v)
+
 export const localSeq = (value) => Identity.LocalSeqModule_create(BigInt(value))
-export const reviewBarrierId = (value) => Witness.ReviewBarrierIdModule_create(value)
 
-export const idValue = {
-  session: (id) => Identity.SessionIdModule_value(id),
-  message: (id) => Identity.MessageIdModule_value(id),
-  runtime: (id) => Identity.RuntimeIdModule_value(id),
-  event: (id) => Identity.EventIdModule_value(id),
-  child: (id) => Identity.ChildIdModule_value(id),
-  process: (id) => Identity.ProcessIdModule_value(id),
-  dispatch: (id) => Identity.DispatchIdModule_value(id),
-  promptKeyRef: (id) => Identity.PromptKeyRefModule_value(id),
-  localSeq: (id) => Identity.LocalSeqModule_value(id),
-  reviewBarrier: (id) => Witness.ReviewBarrierIdModule_value(id),
+export const idValue = Object.fromEntries(
+  Object.entries(Ids).map(([name, module]) => [name, module.value]),
+)
+idValue.localSeq = (id) => Identity.LocalSeqModule_value(id)
+
+/** PROMPT-002: one-way promotion. There is deliberately no inverse. */
+export const promoteToAuthorityRoot = (physical) => Identity.PhysicalUserMessageIdModule_promoteToAuthorityRoot(physical)
+
+/** PROMPT-005: is this receipt `accepted-*` shaped. */
+export const isAdmissionShaped = (receipt) => Identity.TransportReceiptModule_isAdmissionShaped(receipt)
+
+const buildHandleId = unionCase(Identity.HandleId, 'HandleId')
+
+export const handleId = {
+  agent: (value) => buildHandleId('Agent', [agentHandleId(value)]),
+  pty: (value) => buildHandleId('Pty', [ptyHandleId(value)]),
+  managerJob: (value) => buildHandleId('ManagerJob', [managerJobId(value)]),
+  describe: (handle) => Identity.HandleIdModule_describe(handle),
+  tryAgent: (handle) => unwrapOption(Identity.HandleIdModule_tryAgent(handle)),
+}
+
+export const fallbackAttemptIdentity = {
+  dedupeKey: (identity) => Identity.FallbackAttemptIdentityModule_dedupeKey(identity),
+}
+
+export const reviewAttemptIdentity = {
+  dedupeKey: (identity) => Identity.ReviewAttemptIdentityModule_dedupeKey(identity),
+  isDistinctAttempt: (a, b) => Identity.ReviewAttemptIdentityModule_isDistinctAttempt(a, b),
 }
 
 // ── facts ────────────────────────────────────────────────────────────────────
@@ -188,24 +335,45 @@ export const idValue = {
 export const verdict = {
   perfect: FactModule.ReviewGuardVerdict.Perfect,
   revise: FactModule.ReviewGuardVerdict.Revise,
-  of: (name) => new FactModule.ReviewGuardVerdict(verdictCase(name), []),
+  of: (name) => buildVerdict(name),
+}
+
+export const abandonReason = {
+  sendFailed: (error) => buildAbandonReason('SendFailed', [error]),
+  unresolvedAfterRecovery: () => buildAbandonReason('UnresolvedAfterRecovery'),
+}
+
+export const completionKind = {
+  of: (name) => buildCompletionKind(name),
 }
 
 /** Build an AgentFact by case name with an anonymous-record payload. */
-export const agentFact = (caseName, payload) =>
-  new FactModule.AgentFact(agentFactCase(caseName), [payload])
+export const agentFact = (caseName, payload) => buildAgentFact(caseName, [payload])
 
 /** Wrap an AgentFact as the top-level Fact union. */
-export const asFact = (inner) => new FactModule.Fact(factCase('Agent'), [inner])
+export const asFact = (inner) => buildFact('Agent', [inner])
 
 /** Convenience: build and wrap in one step. */
 export const fact = (caseName, payload) => asFact(agentFact(caseName, payload))
 
+/**
+ * `RuntimeStarted`, wrapped as a top-level Fact.
+ *
+ * Its own helper because PROMPT-011 counts recovery attempts by folding this
+ * fact, so a test needs to emit plugin starts without reaching for ordinals.
+ */
+export const runtimeStartedFact = ({ runtime = 'rt-test', pid = 1, startedAt = '2026-01-01T00:00:00Z' } = {}) =>
+  buildFact('Runtime', [
+    buildRuntimeFact('RuntimeStarted', [
+      { RuntimeId: runtimeId(runtime), ProcessId: pid, StartedAt: utcOffset(startedAt) },
+    ]),
+  ])
+
 export const stream = {
-  workspace: () => new EnvelopeModule.StreamId(streamCase('Workspace'), []),
-  session: (id) => new EnvelopeModule.StreamId(streamCase('Session'), [id]),
-  child: (id) => new EnvelopeModule.StreamId(streamCase('Child'), [id]),
-  process: (id) => new EnvelopeModule.StreamId(streamCase('Process'), [id]),
+  workspace: () => buildStream('Workspace'),
+  session: (id) => buildStream('Session', [id]),
+  child: (id) => buildStream('Child', [id]),
+  process: (id) => buildStream('Process', [id]),
 }
 
 // ── journal ──────────────────────────────────────────────────────────────────
@@ -213,13 +381,17 @@ export const stream = {
 /**
  * Build an envelope. `seq` counts from 1; `observedAt` is an ISO string so a
  * test never constructs a clock value by hand.
+ *
+ * `run` is the ProviderRunIdentity this fact was observed during, or omitted for
+ * facts belonging to no run (HOST-010). It replaced `TurnId`, which was a third
+ * name for the same thing.
  */
 export const envelope = ({
   runtime = 'rt-test',
   seq = 1,
   observedAt = '2026-01-01T00:00:00Z',
   stream: streamId,
-  turn,
+  run,
   fact: envelopeFact,
 }) => ({
   RuntimeId: runtimeId(runtime),
@@ -227,30 +399,15 @@ export const envelope = ({
   ObservedAt: utcOffset(observedAt),
   EventId: eventId(`e${seq}`),
   Stream: streamId,
-  TurnId: turn,
+  ProviderRun: run === undefined ? undefined : providerRun(run),
   Fact: envelopeFact,
 })
 
 export const journal = {
   serialize: (env) => EnvelopeModule.EnvelopeModule_serialize(env),
-
-  /** Decode one NDJSON line. Returns { ok, value } or { ok: false, error }. */
-  deserialize: (line) => {
-    const result = EnvelopeModule.EnvelopeModule_deserialize(line)
-    return caseOf(result) === 'Ok'
-      ? { ok: true, value: payloadOf(result) }
-      : { ok: false, error: payloadOf(result) }
-  },
-
+  deserialize: (line) => resultOf(EnvelopeModule.EnvelopeModule_deserialize(line)),
   serializeFact: (value) => FactCodec.serializeFact(value),
-
-  deserializeFact: (json) => {
-    const result = FactCodec.deserializeFact(json)
-    return caseOf(result) === 'Ok'
-      ? { ok: true, value: payloadOf(result) }
-      : { ok: false, error: payloadOf(result) }
-  },
-
+  deserializeFact: (json) => resultOf(FactCodec.deserializeFact(json)),
   containsLegacyFallbackFields: (json) => FactCodec.containsLegacyFallbackFields(json),
   pre050MigrationMessage: FactCodec.pre050MigrationMessage,
   compareSortKey: (a, b) => EnvelopeModule.EnvelopeModule_compareSortKey(a, b),
@@ -260,7 +417,9 @@ export const fold = {
   empty: FoldModule.empty,
 
   /** `envelopes` may be a JS array; it is converted to an FSharpList here. */
-  apply: (projection, envelopes) => FoldModule.apply(projection, requireList(toList(envelopes), 'fold.apply')),
+  apply: (projection, envelopes) => resultOf(FoldModule.apply(projection, requireList(toList(envelopes), 'fold.apply'))),
+
+  one: (projection, env) => resultOf(FoldModule.foldEnvelope(projection, env)),
 
   /** Round-trip through NDJSON, then fold. Proves the persisted shape folds. */
   replay: (envelopes) => {
@@ -269,73 +428,300 @@ export const fold = {
       if (!result.ok) throw new Error(`envelope did not survive a round trip: ${result.error}`)
       return result.value
     })
-    return FoldModule.apply(FoldModule.empty, toList(decoded))
+    return resultOf(FoldModule.apply(FoldModule.empty, toList(decoded)))
   },
 
   /** Sessions map of a folded projection, keyed by session id string. */
   sessions: (projection) => mapToObject(projection.AgentProjections.Sessions, idValue.session),
+
+  /** One session's bounded projections, or undefined. */
+  session: (projection, id) => mapTryFind(sessionId(id), projection.AgentProjections.Sessions),
+
+  orchestrator: (projection) => projection.AgentProjections.Orchestrator,
 }
 
-// ── fallback cursor ──────────────────────────────────────────────────────────
+// ── fallback (SSOT/04) ───────────────────────────────────────────────────────
 
 export const cursor = {
   initial: Cursor.initial,
   atOffset: (offset) => Cursor.atOffset(offset),
   advance: (offset) => Cursor.advance(offset),
-  advanceCursor: (value, providerAttempt) => Cursor.advanceCursor(value, BigInt(providerAttempt)),
+  recordFailure: (value) => Cursor.recordFailure(value),
+  recordSuccess: (value) => Cursor.recordSuccess(value),
   side: (offset) => caseOf(Cursor.side(offset)),
   sideSequence: (count) => listItems(Cursor.sideSequence(count)).map(caseOf),
   effectiveAgent: (pair, value) => Cursor.effectiveAgent(pair, value),
-  attemptIdentity: (logicalRunId, authorityRoot, providerAttempt) =>
-    Cursor.attemptIdentity(logicalRunId, authorityRoot, providerAttempt),
-  failureIdentity: (identity) => Cursor.failureIdentity(identity),
+  isValidAdvance: (prevOffset, nextOffset, prevCount, nextCount) =>
+    Cursor.isValidAdvance(prevOffset, nextOffset, prevCount, nextCount),
+  attemptIdentity: (session, run, root, providerRunId) => Cursor.attemptIdentity(session, run, root, providerRunId),
+
+  /** FALLBACK-005: `MayContinue` | `Exhausted`, with the cursor as payload. */
+  recoveryVerdict: (budget, value) => caseOf(Cursor.recoveryVerdict(budget, value)),
+
+  defaultBudget: Cursor.DefaultAutoRecoveryBudget,
 }
 
-// ── prompt authority ─────────────────────────────────────────────────────────
+export const fallbackProjection = (() => {
+  const m = bind(FallbackProj, 'FallbackProjection', ['forAuthority', 'applyAdvance', 'mayContinue'])
+  return {
+    forAuthority: (runId, root) => m.forAuthority(runId, root),
+    applyAdvance: (identity, prevOffset, nextOffset, count, current) =>
+      resultOf(m.applyAdvance(identity, prevOffset, nextOffset, count, current)),
+    mayContinue: (budget, current) => m.mayContinue(budget, current),
+  }
+})()
 
-export const authority = {
-  empty: Authority.empty,
-  newPromptKey: (...args) => Authority.newPromptKey(...args),
-  stableLogicalRunId: (...args) => Authority.stableLogicalRunId(...args),
-  parseAgentName: (name) => Authority.parseAgentName(name),
-  tryParseRole: (name) => Authority.tryParseRole(name),
-  tryParseTier: (name) => Authority.tryParseTier(name),
-  agentPair: (...args) => Authority.agentPair(...args),
-  effectiveAgentAt: (...args) => Authority.effectiveAgentAt(...args),
-  roleLabel: (role) => Authority.roleLabel(role),
-  tierLabel: (tier) => Authority.tierLabel(tier),
-  originLabel: (origin) => Authority.originLabel(origin),
-  repairIdentity: (...args) => Authority.repairIdentity(...args),
-}
-
-// ── review witness ───────────────────────────────────────────────────────────
+// ── review (SSOT/05) ─────────────────────────────────────────────────────────
 
 export const reviewWitness = {
   isConfirmed: (value) => Witness.ReviewWitnessModule_isConfirmed(value),
   isPerfectPending: (value) => Witness.ReviewWitnessModule_isPerfectPending(value),
   isRevision: (value) => Witness.ReviewWitnessModule_isRevision(value),
-  isDistinct: (a, b) => Witness.ReviewWitnessModule_isDistinctWitness(a, b),
-  canConfirm: (...args) => Witness.ReviewWitnessModule_canConfirm(...args),
-  gitTreeHash: (value) => Witness.ReviewWitnessModule_getGitTreeHash(value),
-  invalidateByTreeChange: (...args) => Witness.ReviewWitnessModule_invalidateByTreeChange(...args),
+  gitTreeHash: (value) => unwrapOption(Witness.ReviewWitnessModule_gitTreeHash(value)),
+  confirmedReviewer: (value) => unwrapOption(Witness.ReviewWitnessModule_confirmedReviewer(value)),
+  isValidForTree: (tree, value) => Witness.ReviewWitnessModule_isValidForTree(tree, value),
+  attemptIdentity: (barrier, witness) => Witness.ReviewWitnessModule_attemptIdentity(barrier, witness),
+  isDistinctAttempt: (barrier, a, b) => Witness.ReviewWitnessModule_isDistinctAttempt(barrier, a, b),
+  confirm: (barrier, challengeDigest, secondInputDigest, first, second) =>
+    unwrapOption(Witness.ReviewWitnessModule_confirm(barrier, challengeDigest, secondInputDigest, first, second)),
+  noReview: Witness.ReviewWitness.NoReview,
 }
 
-// ── process deadline ─────────────────────────────────────────────────────────
+/** REVIEW-003: the fixed challenge, its version, and its digest. */
+export const reviewChallenge = {
+  text: Challenge.Text,
+  textVersion: Challenge.TextVersion,
+  contentDigest: (sha256) => Challenge.contentDigest(sha256),
+}
+
+export const reviewProjection = (() => {
+  const m = bind(ReviewProj, 'ReviewProjection', [
+    'empty',
+    'startBarrier',
+    'applySeal',
+    'applyChallengeIssued',
+    'applyVerdict',
+    'applyConfirmedWitness',
+    'hasObservedAttempt',
+    'satisfiesGuard',
+  ])
+
+  return {
+    empty: m.empty,
+    startBarrier: (barrier, tree, current) => m.startBarrier(barrier, tree, current),
+    applySeal: (seal, current) => m.applySeal(seal, current),
+    applyChallengeIssued: (challenge, current) => m.applyChallengeIssued(challenge, current),
+    applyVerdict: (attempt, value, current) => resultOf(m.applyVerdict(attempt, value, current)),
+    applyConfirmedWitness: (barrier, challengeDigest, secondInputDigest, first, second, current) =>
+      resultOf(m.applyConfirmedWitness(barrier, challengeDigest, secondInputDigest, first, second, current)),
+    hasObservedAttempt: (attempt, current) => m.hasObservedAttempt(attempt, current),
+    satisfiesGuard: (tree, current) => m.satisfiesGuard(tree, current),
+  }
+})()
+
+export const reviewRequirements = (() => {
+  const m = bind(ReviewProj, 'ReviewRequirementProjection', ['empty', 'addRequirement', 'clearOnConfirmation'])
+
+  return {
+    empty: m.empty,
+    addRequirement: (session, root, current) => m.addRequirement(session, root, current),
+    clearOnConfirmation: (run, current) => m.clearOnConfirmation(run, current),
+  }
+})()
+
+/** VERIFY-007: the two provider projections, and the one-way downgrade. */
+export const providerProjection = {
+  canonicalVersion: ProviderProj.CanonicalVersion,
+  toSemantic: (wire) => ProviderProj.toSemantic(wire),
+  renderWire: (wire) => ProviderProj.renderWire(wire),
+  renderSemantic: (semantic) => ProviderProj.renderSemantic(semantic),
+  isAppendOnlyPrefix: (previous, next) => ProviderProj.isAppendOnlyPrefix(previous, next),
+  sealDigest: (sha256, wire) => ProviderProj.sealDigest(sha256, wire),
+  toolResultDigest: (sha256, canonical) => ProviderProj.toolResultDigest(sha256, canonical),
+  toolResultDigests: (sha256, wire) => listItems(ProviderProj.toolResultDigests(sha256, wire)),
+  fixtureKey: (semantic) => ProviderProj.fixtureKey(semantic),
+  semanticallyEqual: (a, b) => ProviderProj.semanticallyEqual(a, b),
+}
+
+// ── execution handles (SSOT/09) ──────────────────────────────────────────────
+
+export const handleProjection = (() => {
+  const m = bind(LinkageProj, 'HandleProjection', [
+    'empty',
+    'link',
+    'complete',
+    'retire',
+    'tryFind',
+    'isRetired',
+    'listable',
+    'joinable',
+    'activeHandles',
+    'tryFindByChildSession',
+    'linkedChildren',
+  ])
+
+  return {
+    empty: m.empty,
+    link: (handle, child, targetAgent, role, current) => resultOf(m.link(handle, child, targetAgent, role, current)),
+    complete: (handle, kind, current) => resultOf(m.complete(handle, kind, current)),
+    retire: (handle, current) => resultOf(m.retire(handle, current)),
+    tryFind: (handle, current) => unwrapOption(m.tryFind(handle, current)),
+    isRetired: (handle, current) => m.isRetired(handle, current),
+    listable: (current) => listItems(m.listable(current)),
+    joinable: (current) => listItems(m.joinable(current)),
+    activeHandles: (current) => listItems(m.activeHandles(current)),
+    tryFindByChildSession: (child, current) => unwrapOption(m.tryFindByChildSession(child, current)),
+    linkedChildren: (current) => listItems(m.linkedChildren(current)),
+    lifecycleOf: (record) => caseOf(record.Lifecycle),
+  }
+})()
+
+// ── orchestrator (SSOT/06) ───────────────────────────────────────────────────
+
+export const orchestratorProjection = (() => {
+  const m = bind(OrchestratorProj, 'OrchestratorProjection', [
+    'empty',
+    'tryFind',
+    'tryFindByManagerSession',
+    'activeJobs',
+    'createJob',
+    'recordProgress',
+    'recoveryAction',
+  ])
+
+  return {
+    empty: m.empty,
+    tryFind: (jobId, current) => unwrapOption(m.tryFind(jobId, current)),
+    tryFindByManagerSession: (session, current) => unwrapOption(m.tryFindByManagerSession(session, current)),
+    activeJobs: (current) => listItems(m.activeJobs(current)),
+    createJob: (job, current) => m.createJob(job, current),
+    recordProgress: (jobId, progress, current) => m.recordProgress(jobId, progress, current),
+
+    /** ORCH-007: the single recovery action, by case name. */
+    recoveryAction: (currentHead, job) => caseOf(m.recoveryAction(currentHead, job)),
+    recoveryActionPayload: (currentHead, job) => payloadOf(m.recoveryAction(currentHead, job)),
+    progressOf: (job) => caseOf(job.Progress),
+  }
+})()
+
+export const jobProgress = (() => {
+  const build = unionCase(OrchestratorProj.JobProgress, 'JobProgress')
+  return { of: (name, payload) => build(name, payload === undefined ? [] : [payload]) }
+})()
+
+// ── prompt authority (SSOT/03) ───────────────────────────────────────────────
+
+export const authority = {
+  empty: Authority.empty,
+  originLabel: (origin) => Authority.originLabel(origin),
+  tryParseContinuationKind: (name) => unwrapOption(Authority.tryParseContinuationKind(name)),
+  roleLabel: (role) => Authority.roleLabel(role),
+  tryParseRole: (name) => unwrapOption(Authority.tryParseRole(name)),
+  tierLabel: (tier) => Authority.tierLabel(tier),
+  tryParseTier: (name) => unwrapOption(Authority.tryParseTier(name)),
+
+  /** AGENT-002/003. Typed rejection form; `caseOf` the error to name it. */
+  parseAgentName: (name) => resultOf(Authority.parseAgentNameTyped(name)),
+
+  stableLogicalRunId: (sha256, runtime, session, root) => Authority.stableLogicalRunId(sha256, runtime, session, root),
+  agentPair: (profile) => Authority.agentPair(profile),
+  effectiveAgentAt: (profile, offset) => Authority.effectiveAgentAt(profile, offset),
+  effectiveAgentFor: (profile, value) => Authority.effectiveAgentFor(profile, value),
+  claimScopeDigest: (sha256, session, runId, origin, payloadDigest) =>
+    Authority.claimScopeDigest(sha256, session, runId, origin, payloadDigest),
+  nextClaimSequence: (scope, projection) => Authority.nextClaimSequence(scope, projection),
+  derivePromptKey: (...args) => Authority.derivePromptKey(...args),
+  repairPayloadDigest: (run, kind) => Authority.repairPayloadDigest(run, kind),
+  repairAlreadyClaimed: (...args) => Authority.repairAlreadyClaimed(...args),
+  systemPromptIdFor: (role) => Authority.systemPromptIdFor(role),
+  buildAttemptExecutionProfile: (...args) => Authority.buildAttemptExecutionProfile(...args),
+
+  /** COMPANION-001/002: eligibility from the Logical Run's CanonicalRole alone. */
+  hasCompanion: (profile) => Authority.hasCompanion(profile),
+  allowsTool: (permission, profile) => Authority.allowsTool(permission, profile),
+
+  /** PROMPT-011 bounds. */
+  recoveryTailWindow: Authority.RecoveryTailWindow,
+  recoveryAttemptBudget: Authority.RecoveryAttemptBudget,
+  countRecoveryAttempt: (projection) => Authority.countRecoveryAttempt(projection),
+  recoveryBudgetSpent: (claim) => Authority.recoveryBudgetSpent(claim),
+}
+
+export const authorityRun = {
+  createAuthorityRoot: (sha256, runtime, session, kind, physical, agent) =>
+    resultOf(AuthorityRun.createAuthorityRoot(sha256, runtime, session, kind, physical, agent)),
+  claimAgentOwnerRoot: (key, session, payloadDigest, agent) =>
+    resultOf(AuthorityRun.claimAgentOwnerRoot(key, session, payloadDigest, agent)),
+  claimContinuation: (key, session, kind, profile, effectiveAgent, payloadDigest) =>
+    AuthorityRun.claimContinuation(key, session, kind, profile, effectiveAgent, payloadDigest),
+  registerAuthority: (profile, projection) => AuthorityRun.registerAuthority(profile, projection),
+  registerClaim: (claim, projection) => AuthorityRun.registerClaim(claim, projection),
+  submitClaim: (key, receipt, projection) => AuthorityRun.submitClaim(key, receipt, projection),
+  acceptClaim: (key, physical, projection) => AuthorityRun.acceptClaim(key, physical, projection),
+  abandonClaim: (key, projection) => AuthorityRun.abandonClaim(key, projection),
+  resolveKnownOrigin: (physical, key, hostCompact, projection) =>
+    caseOf(AuthorityRun.resolveKnownOrigin(physical, key, hostCompact, projection)),
+}
+
+export const rootKind = {
+  human: Authority.RootAuthorityKind.HumanRoot,
+  agentOwner: Authority.RootAuthorityKind.AgentOwnerRoot,
+}
+
+export const continuationKind = {
+  of: (name) => {
+    const parsed = unwrapOption(Authority.tryParseContinuationKind(name))
+    if (isNone(parsed)) throw new Error(`unknown ContinuationKind '${name}'`)
+    return parsed
+  },
+}
+
+export const promptOrigin = (() => {
+  const build = unionCase(Authority.PromptOrigin, 'PromptOrigin')
+  return {
+    authorityRoot: (kind) => build('AuthorityRoot', [kind]),
+    continuation: (kind) => build('Continuation', [kind]),
+    hostInternal: Authority.PromptOrigin.HostInternal,
+    unknown: Authority.PromptOrigin.UnknownOrigin,
+  }
+})()
+
+// ── process (SSOT/09) ────────────────────────────────────────────────────────
 
 /** A frozen clock. Deadline takes `unit -> DateTimeOffset`, i.e. a thunk. */
 export const clockAt = (iso) => () => utcOffset(iso)
 
-export const deadline = {
-  /** `budgetMs` is milliseconds; Fable represents TimeSpan as a number of ms. */
-  ofBudget: (nowIso, budgetMs) => DeadlineModule.DeadlineModule_ofBudget(utcOffset(nowIso), budgetMs),
-  remainingMs: (clock, value) => DeadlineModule.DeadlineModule_remaining(clock, value),
-  isExpired: (clock, value) => DeadlineModule.DeadlineModule_isExpired(clock, value),
-  nextWaitMs: (clock, value) => DeadlineModule.DeadlineModule_nextWaitMs(clock, value),
-}
+export const deadline = (() => {
+  const m = bind(DeadlineModule, 'Deadline', ['MaxTimerWaitMs', 'ofBudget', 'remaining', 'isExpired', 'nextWaitMs'])
+
+  return {
+    maxTimerWaitMs: m.MaxTimerWaitMs,
+    /** `budgetMs` is milliseconds; Fable represents TimeSpan as a number of ms. */
+    ofBudget: (nowIso, budgetMs) => m.ofBudget(utcOffset(nowIso), budgetMs),
+    remainingMs: (clock, value) => m.remaining(clock, value),
+    isExpired: (clock, value) => m.isExpired(clock, value),
+    nextWaitMs: (clock, value) => m.nextWaitMs(clock, value),
+  }
+})()
+
+/** EXEC-011: `min(3 × estimate, administrator ceiling)`. */
+export const processEstimate = (() => {
+  const m = bind(ProcessRequest, 'ProcessEstimate', ['DefaultHardLimit', 'effectiveDeadline', 'outputThreshold'])
+  const runtimeSecondsOf = unionCase(ProcessRequest.EstimatedRuntime, 'EstimatedRuntime')
+  const outputBytesOf = unionCase(ProcessRequest.EstimatedOutput, 'EstimatedOutput')
+
+  return {
+    defaultHardLimitMs: m.DefaultHardLimit,
+    effectiveDeadlineMs: (runtimeSeconds, hardLimitMs) =>
+      m.effectiveDeadline(runtimeSecondsOf('RuntimeSeconds', [runtimeSeconds]), hardLimitMs),
+    outputThreshold: (bytes) => m.outputThreshold(outputBytesOf('OutputBytes', [BigInt(bytes)])),
+  }
+})()
 
 // ── outcomes ─────────────────────────────────────────────────────────────────
 
 export const outcome = {
+  /** EXEC-006: a completed run must carry session-wide A. */
   isValidAgentRunResult: (value) => Outcome.AgentRunResult__get_IsValid(value),
 }
 
@@ -344,4 +730,15 @@ export const outcome = {
 export const introspect = {
   fableLibraryDir,
   buildRoot: BUILD_ROOT,
+  caseNames,
+  unions: {
+    AgentFact: FactModule.AgentFact,
+    Fact: FactModule.Fact,
+    RuntimeFact: FactModule.RuntimeFact,
+    StreamId: EnvelopeModule.StreamId,
+    ReviewGuardVerdict: FactModule.ReviewGuardVerdict,
+    PromptAbandonReason: FactModule.PromptAbandonReason,
+    HandleCompletionKind: FactModule.HandleCompletionKind,
+    JobProgress: OrchestratorProj.JobProgress,
+  },
 }

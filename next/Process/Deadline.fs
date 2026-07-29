@@ -7,8 +7,11 @@ type Deadline = private Deadline of expiresAt: DateTimeOffset
 module Deadline =
 
     /// JS/Int32 ceiling for setTimeout: a larger delay is clamped/rejected by the
-    /// runtime, so any wait longer than this must be segmented. ponytail: 0x7FFFFFFF ms (~24.8 days).
-    [<Literal>]
+    /// runtime, so any wait longer than this must be segmented. 0x7FFFFFFF ms
+    /// (~24.8 days).
+    ///
+    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
+    /// so a layer 1 test could not read the bound it must assert against.
     let MaxTimerWaitMs = 2147483647
 
     /// Build a deadline from the current clock and a time budget, clamping to
@@ -18,8 +21,8 @@ module Deadline =
             try
                 let maxBudget = DateTimeOffset.MaxValue - now
                 if budget > maxBudget then maxBudget else budget
-            with
-            | _ -> budget
+            with _ ->
+                budget
 
         Deadline(now.Add(safeBudget))
 

@@ -210,7 +210,8 @@ module ProviderProjection =
     /// REVIEW-010 `CanonicalVersion`. Bump when `renderWire` changes shape, so an
     /// old seal is recognisable as having been produced by a different renderer
     /// rather than silently compared against new bytes.
-    [<Literal>]
+    ///
+    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export.
     let CanonicalVersion = 1
 
     /// REVIEW-010: the digest that becomes a `ProviderInputSeal`.
