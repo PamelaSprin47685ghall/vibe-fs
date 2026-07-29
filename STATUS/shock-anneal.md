@@ -200,6 +200,41 @@
 
 本包与包 0–H 正交：它换的是验证层的语言与入口，不改任何生产语义。因此工装部分（facade、runner 门禁、architecture-gate）在封炉期即可完成并验证；测试内容本身在休克三按条款重建。
 
+#### 必须在 mjs 侧重建覆盖的 15 个静默失效测试
+
+`architecture-gate.mjs` 新增的 `fsproj-drift` 门禁发现 5 个测试文件在 `c3c35756`（`refactor: unify authority fallback and process flows`）从 `.fsproj` 移除但文件留在磁盘上。**它们从那时起就没有运行过**，`test:next` 的绿灯不覆盖这 15 个断言。
+
+其中 2 个断言的正是 SSOT 现在禁止的语义，属于旧世界的保护罩，不得重建：
+
+```text
+PromptAuthoritySendTests
+  SendAgentOwnerRoot with accepted-* still accepts authority and sets ActiveLogicalRun
+  AcceptAgentOwnerRoot is idempotent after SendAgentOwnerRoot accepted-*
+      ↑ 与 PROMPT-005 直接冲突：accepted-* 不是 Authority Root
+```
+
+其余 13 个是真实语义，必须在 `tests-mjs` 按条款重建：
+
+| 原测试 | 条款 |
+|--------|------|
+| Prompt authority continuation never replaces authority root | PROMPT-003 |
+| Chat_message_recovers_prompt_key_from_text_part_metadata | PROMPT-011 |
+| Chat_message_accepts_single_pending_claim_without_transport_metadata | PROMPT-011 |
+| AcceptHumanRoot builds managed agent profile without model fields | PROMPT-002 PROMPT-006 |
+| SendAgentOwnerRoot sends EffectiveAgent with Model None | PROMPT-006 |
+| Stable logical run id is deterministic for same host message | PROMPT-011 |
+| Interaction repair identity is claimed only once | PROMPT-005 |
+| Continuation acceptance preserves last authority profile | PROMPT-003 |
+| Dispatcher claims continuation and preserves authority metadata | PROMPT-005 |
+| Unknown physical user message never becomes authority | PROMPT-004 |
+| New authority root replaces profile while continuation does not | PROMPT-002 PROMPT-003 |
+| createAuthorityRoot rejects bare legacy agent names | AGENT-004 AGENT-005 |
+| Chat_message_maps_keyed_continuation_without_becoming_human_root | PROMPT-009 |
+
+`tests-next/Agent/ProgramsTests.fs` 只剩一行注释（`// DELETED - Tests for dead Programs module`），无需重建。
+
+文件本身在封炉期删除；内容由 Git 历史保存（`c3c35756^`）。
+
 ### 包 K：剧本森林重建
 
 | 项 | 值 |

@@ -102,7 +102,17 @@ const HOST_INTEROP_ALLOWLIST = new Map([
   ['next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
   ['next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
   ['next/OpenCode/ExecutorSummarize.fs', 'Executor summarization Host adapter'],
+  [
+    'next/Kernel/Flow.fs',
+    'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',
+  ],
 ])
+
+// Kernel and Domain are the pure core. VERIFY-005 hard-blocks "Kernel 引用 Host
+// raw obj", so these directories never earn the filename-pattern excuse — an
+// entry must be explicit and reasoned. Without this, next/Kernel/Flow.fs passed
+// only because "Flow" happens to appear in HOST_INTEROP_NAME.
+const PURE_CORE_DIRS = ['next/Kernel/', 'next/Domain/']
 
 // ── single writer ───────────────────────────────────────────────────────────
 
@@ -342,12 +352,53 @@ for (const file of productionFiles.filter(isFs)) {
   const hasInterop = HOST_INTEROP_MARKERS.some((marker) => text.includes(marker)) || DYNAMIC_ACCESS.test(text)
   if (!hasInterop) continue
 
-  const allowed = HOST_INTEROP_ALLOWLIST.has(norm(file)) || HOST_INTEROP_NAME.test(basename(file))
-  if (!allowed) {
+  const path = norm(file)
+  const explicitlyAllowed = HOST_INTEROP_ALLOWLIST.has(path)
+  const isPureCore = PURE_CORE_DIRS.some((dir) => path.startsWith(dir))
+
+  if (isPureCore && !explicitlyAllowed) {
     fail(
       'host-boundary',
-      `${file}: raw Host/Fable dynamic access outside an adapter/codec (VERIFY-005)`,
+      `${file}: pure core (Kernel/Domain) must not touch Host/Fable interop; an explicit reasoned allowlist entry is required (VERIFY-005 hard block)`,
     )
+    continue
+  }
+
+  if (!explicitlyAllowed && !HOST_INTEROP_NAME.test(basename(file))) {
+    fail('host-boundary', `${file}: raw Host/Fable dynamic access outside an adapter/codec (VERIFY-005)`)
+  }
+}
+
+// ── gate: fsproj matches the tree ───────────────────────────────────────────
+// F# compiles in declared order, so a file present on disk but absent from the
+// project is silently dead, and a declared-but-missing file breaks the build.
+// Both are invisible to every text gate above.
+
+const declaredCompileItems = (fsprojPath, root) => {
+  const text = read(fsprojPath)
+  return [...text.matchAll(/Include="([^"]+\.fs)"/g)].map((match) => `${root}/${norm(match[1])}`)
+}
+
+const fsprojDrift = [
+  { project: PRODUCTION_FSPROJ, root: PRODUCTION_ROOT, files: productionFiles },
+  {
+    project: `${TESTS_ROOT}/Wanxiangshu.Next.Tests.fsproj`,
+    root: TESTS_ROOT,
+    files: testFiles,
+  },
+]
+
+for (const { project, root, files } of fsprojDrift) {
+  if (!existsSync(project)) continue
+
+  const declared = new Set(declaredCompileItems(project, root))
+  const onDisk = new Set(files.filter(isFs).map(norm))
+
+  for (const path of declared) {
+    if (!onDisk.has(path)) fail('fsproj-drift', `${project}: declares '${path}' which does not exist`)
+  }
+  for (const path of onDisk) {
+    if (!declared.has(path)) fail('fsproj-drift', `${path}: on disk but not compiled by ${project} (dead file)`)
   }
 }
 
