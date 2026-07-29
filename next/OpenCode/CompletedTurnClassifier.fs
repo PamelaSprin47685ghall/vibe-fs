@@ -7,11 +7,33 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 /// Pure classification of a fully-loaded assistant message.
-/// Empty/XML-only is interaction repair (continuation), never durable fallback.
+/// Empty formal text or formal text that contains XML markup (including broken
+/// tags) is interaction repair (continuation), never durable fallback.
 module CompletedTurnClassifier =
 
-    let private xmlTag =
-        Regex("<(?:tool_call|use_tool|call|function_call|invoke)[^>]*>", RegexOptions.Compiled)
+    // Containment, not well-formedness: broken/partial tags still count.
+    let private xmlMarkup =
+        Regex(
+            "<(?:/?\\s*(?:tool_call|use_tool|call|function_call|invoke)\\b[^>]*>?)|</(?:tool_call|use_tool|call|function_call|invoke)\\s*>",
+            RegexOptions.Compiled ||| RegexOptions.IgnoreCase
+        )
+
+    let private containsXmlMarkup (text: string) =
+        not (String.IsNullOrWhiteSpace text) && xmlMarkup.IsMatch text
+
+    let private supportsInteractionRepair =
+        function
+        | Some AgentRole.Manager
+        | Some AgentRole.Orchestrator
+        | Some AgentRole.Coder
+        | Some AgentRole.Reviewer
+        | Some AgentRole.Inspector
+        | Some AgentRole.DevOps
+        | Some AgentRole.Browser
+        | Some AgentRole.Meditator -> true
+        | Some AgentRole.Executor
+        | Some AgentRole.Blogger
+        | None -> false
 
     let private asString (value: obj) =
         if isNull value then
@@ -21,7 +43,7 @@ module CompletedTurnClassifier =
             if String.IsNullOrWhiteSpace text then None else Some text
 
     /// Formal visible assistant text only (no reasoning/thinking).
-    /// Used for empty/XML-only repair classification and finish=stop emptiness.
+    /// Used for empty / contains-XML repair classification and finish=stop emptiness.
     let partsText (parts: obj array) : string =
         Projection.formalTextFromParts parts
 
@@ -91,10 +113,15 @@ module CompletedTurnClassifier =
                 let text = partsText parts
 
                 // A terminal provider step is not a final answer unless it has
-                // formal text. Reasoning, tool calls, and step bookkeeping may
-                // all be present while the model-visible answer is still empty.
+                // formal natural-language text. Reasoning/tool bookkeeping may
+                // be present while the model-visible answer is still empty.
+                // Formal text that contains XML markup (including broken tags)
+                // is also not a final report; it is interaction repair, not
+                // durable provider fallback.
                 if String.IsNullOrWhiteSpace text then
                     TurnNeedsContinuation "assistant stop without formal text"
+                elif containsXmlMarkup text then
+                    TurnNeedsContinuation "assistant stop with XML markup"
                 else
                     TurnCompleted
             | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnInProgress
@@ -105,31 +132,15 @@ module CompletedTurnClassifier =
             // abort/error may still be racing the idle wake-up.
             | None -> TurnUnknown
 
-    let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (parts: obj array) =
-        match outcome, role with
-        | TurnInProgress, _ -> true
-        | TurnNeedsContinuation _, Some AgentRole.Manager
-        | TurnNeedsContinuation _, Some AgentRole.Orchestrator
-        | TurnNeedsContinuation _, Some AgentRole.Coder
-        | TurnNeedsContinuation _, Some AgentRole.Reviewer
-        | TurnNeedsContinuation _, Some AgentRole.Inspector
-        | TurnNeedsContinuation _, Some AgentRole.DevOps
-        | TurnNeedsContinuation _, Some AgentRole.Browser
-        | TurnNeedsContinuation _, Some AgentRole.Meditator -> true
-        | TurnCompleted, Some AgentRole.Manager
-        | TurnCompleted, Some AgentRole.Orchestrator
-        | TurnCompleted, Some AgentRole.Coder
-        | TurnCompleted, Some AgentRole.Reviewer
-        | TurnCompleted, Some AgentRole.Inspector
-        | TurnCompleted, Some AgentRole.DevOps
-        | TurnCompleted, Some AgentRole.Browser
-        | TurnCompleted, Some AgentRole.Meditator ->
-            let text = partsText parts
-            let hasTool = hasToolCallPart parts
-
-            (String.IsNullOrWhiteSpace text && not hasTool)
-            || (xmlTag.IsMatch text && not hasTool)
-        | _ -> false
+    let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (_parts: obj array) =
+        supportsInteractionRepair role
+        && (match outcome with
+            | TurnInProgress
+            | TurnNeedsContinuation _ -> true
+            | TurnCompleted
+            | TurnAborted _
+            | TurnFailed _
+            | TurnUnknown -> false)
 
     let roleOfAgent (agent: string option) (fallback: AgentRole option) =
         match agent with

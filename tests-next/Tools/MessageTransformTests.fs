@@ -2,6 +2,8 @@ namespace Wanxiangshu.Next.Tests.Tools
 
 open Xunit
 open Wanxiangshu.Next.Tools
+open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.OpenCode
 
 module MessageTransformTests =
 
@@ -105,6 +107,16 @@ module MessageTransformTests =
                 Metadata = None } ],
             result
         )
+
+    [<Fact>]
+    let ``Manager role starts a companion Blogger`` () =
+        let manager = RoleDefinitions.forRole Role.Manager
+
+        Assert.True(manager.IsSome)
+        Assert.True(manager.Value.Companion)
+        Assert.True(MessageTransform.shouldCreateCompanion (Some "fast-manager"))
+        Assert.True(MessageTransform.shouldCreateCompanion (Some "deep-manager"))
+        Assert.False(MessageTransform.shouldCreateCompanion (Some "fast-blogger"))
 
     [<Fact>]
     let ``MessageTransform_replacePrefix_watermark_not_found_noop`` () =

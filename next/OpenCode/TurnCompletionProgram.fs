@@ -13,8 +13,32 @@ open Wanxiangshu.Next.Session
 /// (NotifyTerminal, dispose runtime, nudges).
 module TurnCompletionProgram =
 
-    let private roleName (role: AgentRole option) =
-        role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
+    let private repairDirectory (turn: ReconciledTurn) =
+        if String.IsNullOrWhiteSpace turn.Directory then None else Some turn.Directory
+
+    let private sendRepair
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (continuationAccepted: SessionId -> MessageId -> unit)
+        (turn: ReconciledTurn)
+        (prompt: string)
+        (repairKind: string)
+        =
+        let sent =
+            HostSessionNudge.trySendInteractionRepair
+                sessionPort
+                turn.SessionId
+                prompt
+                (repairDirectory turn)
+                journal
+                turn.AssistantMessageId
+                repairKind
+                (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+        if not sent then
+            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+            |> ignore
 
     /// Apply the full terminal completion program for a reconciled turn.
     let applyWithContinuation
@@ -29,7 +53,7 @@ module TurnCompletionProgram =
         (disposeExecutorRuntime: string -> unit)
         (abortedSessions: HashSet<string>)
         (continuationAccepted: SessionId -> MessageId -> unit)
-        (fallbackFailures: HashSet<string>)
+        (_fallbackFailures: HashSet<string>)
         (turn: ReconciledTurn)
         =
         let sessionKey = SessionId.value turn.SessionId
@@ -50,56 +74,40 @@ module TurnCompletionProgram =
         match turn.Outcome with
         | TurnUnknown -> ()
         | TurnInProgress ->
-            // Tool-calls in progress: never complete the run. Send zero-width
-            // continuation so the model continues its work.
+            // Host finished a provider step with tool-calls only. Idle means the
+            // step is settled; interaction repair continues the Logical Run.
+            // This is never durable provider fallback.
             if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                let sent =
-                    HostSessionNudge.trySendInteractionRepair
-                        sessionPort
-                        turn.SessionId
-                        "\u200B"
-                        (if String.IsNullOrWhiteSpace turn.Directory then
-                             None
-                         else
-                             Some turn.Directory)
-                        journal
-                        turn.AssistantMessageId
-                        "zero-width"
-                        (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
-
-                if not sent then
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
-                    |> ignore
+                sendRepair
+                    sessionPort
+                    eventPort
+                    journal
+                    continuationAccepted
+                    turn
+                    "\u200B"
+                    "zero-width"
         | TurnNeedsContinuation _ ->
             // Absorb text+reasoning into session-wide A even when this turn is
-            // not yet completable (e.g. reasoning-only / empty formal text).
+            // not yet completable (empty formal text / contains-XML formal text).
             TerminalSessionA.accumulateTurn eventPort turn |> ignore
 
-            // No final formal report yet or length limit. Do NOT complete the run.
-            // Send a repair prompt to get the final report.
+            // No final natural-language report yet or length limit. Do NOT complete
+            // the run. Interaction repair continues the same Logical Run; this is
+            // never a durable fallback advance.
             let repairPrompt =
                 "Your tool work is complete, but no final task report was produced. "
                 + "Return a concise final report containing:\n"
                 + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
                 + "Do not call another tool unless necessary."
 
-            let sent =
-                HostSessionNudge.trySendInteractionRepair
-                    sessionPort
-                    turn.SessionId
-                    repairPrompt
-                    (if String.IsNullOrWhiteSpace turn.Directory then
-                         None
-                     else
-                         Some turn.Directory)
-                    journal
-                    turn.AssistantMessageId
-                    "missing-final-report"
-                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
-
-            if not sent then
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
-                |> ignore
+            sendRepair
+                sessionPort
+                eventPort
+                journal
+                continuationAccepted
+                turn
+                repairPrompt
+                "missing-final-report"
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
@@ -218,25 +226,6 @@ module TurnCompletionProgram =
                     | HostReviewGuard.ReviewGuardUnavailable reason ->
                         raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
                 | _ -> ()
-
-                if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                    let sent =
-                        HostSessionNudge.trySendInteractionRepair
-                            sessionPort
-                            turn.SessionId
-                            "​"
-                            (if String.IsNullOrWhiteSpace turn.Directory then
-                                 None
-                             else
-                                 Some turn.Directory)
-                            journal
-                            turn.AssistantMessageId
-                            "zero-width"
-                            (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
-
-                    if not sent then
-                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
-                        |> ignore
 
     /// Apply without a continuation-accepted callback (tests / simple callers).
     let apply

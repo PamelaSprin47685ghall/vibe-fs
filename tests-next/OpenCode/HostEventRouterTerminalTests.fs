@@ -81,6 +81,19 @@ module HostEventRouterTerminalTests =
           Model = None
           Outcome = TurnOutcome.TurnCompleted }
 
+    let private needsContinuationTurn sessionId role parts reason =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = parts
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnNeedsContinuation reason }
+
     let private abortedTurn sessionId role =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
@@ -241,11 +254,15 @@ module HostEventRouterTerminalTests =
                     (HashSet())
                     (HashSet())
                     (Dictionary())
-                    (completedTurn sessionId AgentRole.Coder [| textPart "" |])
+                    (needsContinuationTurn
+                        sessionId
+                        AgentRole.Coder
+                        [| textPart "" |]
+                        "assistant stop without formal text")
 
                 do! drainMicrotasks 16
                 Assert.Single(prompts) |> ignore
-                Assert.equal ("\u200B", snd prompts.[0])
+                Assert.Contains("no final task report was produced", snd prompts.[0])
 
                 let authority =
                     (AgentJournal.snapshot journal).AgentProjections.Sessions

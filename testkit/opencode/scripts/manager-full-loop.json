@@ -25,6 +25,9 @@
       "wait": "manager-fork-inspector"
     },
     {
+      "wait": "session-blogger"
+    },
+    {
       "bindChild": {
         "agent": "fast-inspector",
         "aliases": [

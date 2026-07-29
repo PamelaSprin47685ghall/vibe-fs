@@ -78,6 +78,19 @@ module HostEventRouterSessionDeadTests =
           Model = None
           Outcome = TurnOutcome.TurnCompleted }
 
+    let private needsContinuationTurn sessionId role parts reason =
+        { SessionId = SessionId.create sessionId
+          UserMessageId = MessageId.create "u1"
+          RootUserMessageId = MessageId.create "u1"
+          AssistantMessageId = MessageId.create "a1"
+          AgentRole = Some role
+          Directory = "/tmp/ws"
+          Parts = parts
+          Finish = Some "stop"
+          ErrorName = None
+          Model = None
+          Outcome = TurnOutcome.TurnNeedsContinuation reason }
+
     let private abortedTurn sessionId role =
         { SessionId = SessionId.create sessionId
           UserMessageId = MessageId.create "u1"
@@ -152,11 +165,16 @@ module HostEventRouterSessionDeadTests =
                     (HashSet())
                     (HashSet())
                     (Dictionary())
-                    (completedTurn sid AgentRole.Coder [| textPart "" |])
+                    (needsContinuationTurn
+                        sid
+                        AgentRole.Coder
+                        [| textPart "" |]
+                        "assistant stop without formal text")
 
                 do! drainMicrotasks 16
-                // Infinite cycle: empty coder terminal may still nudge; must not be gated by Dead.
+                // Infinite cycle: empty coder terminal may still repair; must not be gated by Dead.
                 Assert.NotEmpty(prompts)
+                Assert.Contains("no final task report was produced", snd prompts.[0])
             })
 
     [<Fact>]

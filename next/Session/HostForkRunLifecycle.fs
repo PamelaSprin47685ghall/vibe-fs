@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -70,6 +71,14 @@ module HostForkRunLifecycle =
         (outcome: TerminalOutcome)
         (workRecord: WorkRecordSnapshot option)
         =
+        let suppliedWorkRecord = workRecord
+
+        // Completion always exposes a work record: companion B when available,
+        // otherwise the completed Session's full A output.
+        let completedWorkRecord (result: AgentRunResult) =
+            suppliedWorkRecord
+            |> Option.orElseWith (fun () -> AgentCompletion.snapshotOption (Some result.FinalText))
+
         // Only the first matching terminal may claim the run. Duplicate idle/
         // abort from dual event streams must not SetResult twice.
         let claimed, subscriptionToDispose =
@@ -110,7 +119,7 @@ module HostForkRunLifecycle =
                             (MessageId.value result.RootUserMessageId)
                             (MessageId.value result.AssistantMessageId)
                             result.FinalText
-                            workRecord
+                            (completedWorkRecord result)
                             result.Directory
                     )
             | Aborted reason ->
@@ -132,6 +141,7 @@ module HostForkRunLifecycle =
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (sessions: ISessionHostPort)
+        (childWorkRecordFor: SessionId -> string option)
         (agentId: string)
         (childId: SessionId)
         (role: AgentRole)
@@ -148,8 +158,16 @@ module HostForkRunLifecycle =
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
+        let terminalWorkRecord outcome =
+            match outcome with
+            | Completed _ -> AgentCompletion.snapshotOption (childWorkRecordFor childId)
+            | _ -> None
+
         let subscription =
-            sessions.SubscribeTerminal(childId, (fun _ outcome -> complete gate pendingRuns sessions run outcome None))
+            sessions.SubscribeTerminal(
+                childId,
+                (fun _ outcome -> complete gate pendingRuns sessions run outcome (terminalWorkRecord outcome))
+            )
 
         let disposeImmediately =
             lock gate (fun () ->

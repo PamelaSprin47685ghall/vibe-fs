@@ -142,6 +142,7 @@ module HostForkRuntimeFork =
                                 this.Gate
                                 this.PendingRuns
                                 this.Sessions
+                                this.ChildWorkRecordOf
                                 this.Runtime
                                 this.SendChildPrompt
                                 this.SendBusyNudge
@@ -276,6 +277,7 @@ module HostForkRuntimeFork =
                                     this.Gate
                                     this.PendingRuns
                                     this.Sessions
+                                    this.ChildWorkRecordOf
                                     this.Runtime
                                     this.SendChildPrompt
                                     this.SendBusyNudge

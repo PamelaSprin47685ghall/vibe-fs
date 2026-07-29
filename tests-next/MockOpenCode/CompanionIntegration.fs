@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.OpenCode
@@ -68,4 +69,61 @@ module CompanionIntegration =
             // Blogger child session was created through MockOpenCodePort.CreateChildSession
             trueThat (state.Created.Length > 0) "Companion must create a blogger child session via MockOpenCodePort"
             trueThat (state.Sent.Length > 0) "Companion must send prompt via MockOpenCodePort"
+        }
+
+    [<Fact>]
+    let ``Manager companion is created as the manager subagent`` () =
+        task {
+            let state, eventPort, sessionPort = MockOpenCode.createHost ()
+            let rootId = SessionId.create "orchestrator-root"
+
+            let! managerResult =
+                sessionPort.CreateChildSession(
+                    rootId,
+                    { Title = Some "manager"
+                      Agent = Some "fast-manager"
+                      Directory = None }
+                )
+
+            let managerId =
+                match managerResult with
+                | Ok value -> value
+                | Error error -> failwith error
+
+            state.SendHandler <-
+                Some(fun sessionId _ _ ->
+                    task {
+                        let messageId = MessageId.create "manager-blogger-message"
+
+                        eventPort.NotifyTerminal
+                            sessionId
+                            (TerminalOutcome.Completed(
+                                { SessionId = sessionId
+                                  RootUserMessageId = messageId
+                                  AssistantMessageId = messageId
+                                  Role = "blogger"
+                                  Directory = ""
+                                  FinalText = "manager work log"
+                                  Parts = [| createObj [ "type", box "text"; "text", box "manager work log" ] |] }
+                            ))
+                        |> ignore
+
+                        return Delivered messageId
+                    })
+
+            let companion = new CompanionHost(managerId, sessionPort)
+            Assert.Equal(Submitted, companion.SubmitProjection("{\"manager\":1}"))
+            do! companion.WaitInFlightAsync()
+
+            let bloggerId =
+                state.Created
+                |> List.tryPick (fun (_, options) ->
+                    match options.Agent with
+                    | Some "fast-blogger" -> state.CreatedSessions |> Seq.tryFind (fun id -> id <> managerId)
+                    | _ -> None)
+                |> Option.defaultWith (fun () -> failwith "manager blogger was not created")
+
+            trueThat
+                (state.ParentChild.[bloggerId] = managerId)
+                "Manager blogger must be visible as a direct manager subagent"
         }

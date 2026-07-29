@@ -23,6 +23,7 @@ module HostForkChildDispatch =
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (sessions: ISessionHostPort)
+        (childWorkRecordFor: SessionId -> string option)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> AgentRole -> string -> string -> Task<Result<unit, string>>)
         (sendBusyNudge: string -> SessionId -> AgentRole -> string -> string -> Task<Result<unit, string>>)
@@ -52,7 +53,7 @@ module HostForkChildDispatch =
             | None ->
                 // Idle existing child: new AgentOwnerRoot work via ordinary send.
                 let run =
-                    HostForkRunLifecycle.installRun gate pendingRuns sessions agentId childId role
+                    HostForkRunLifecycle.installRun gate pendingRuns sessions childWorkRecordFor agentId childId role
 
                 onRunStarted childId role
 

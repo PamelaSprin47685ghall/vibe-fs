@@ -24,17 +24,7 @@ module MessageTransform =
         | Some value -> ManagedAgent.tryParse value |> Option.map (fun managed -> managed.Role)
 
     let companionAllowedRole (role: Role) : bool =
-        match role with
-        | Role.Manager
-        | Role.Coder
-        | Role.Orchestrator -> true
-        | Role.Blogger
-        | Role.Executor
-        | Role.Inspector
-        | Role.DevOps
-        | Role.Browser
-        | Role.Meditator
-        | Role.Reviewer -> false
+        RoleDefinitions.forRole role |> Option.exists (fun definition -> definition.Companion)
 
     let shouldCreateCompanion (agent: string option) : bool =
         agent |> roleOfAgent |> Option.exists companionAllowedRole

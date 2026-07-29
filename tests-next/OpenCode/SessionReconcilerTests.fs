@@ -269,11 +269,29 @@ module SessionReconcilerTests =
         let parts = [| createObj [ "id", box "p"; "type", box "text"; "text", box "" ] |]
 
         Assert.False(
-            CompletedTurnClassifier.needsZeroWidthContinuation (Some AgentRole.Executor) TurnOutcome.TurnCompleted parts
+            CompletedTurnClassifier.needsZeroWidthContinuation
+                (Some AgentRole.Executor)
+                (TurnOutcome.TurnNeedsContinuation "assistant stop without formal text")
+                parts
         )
 
-        Assert.False(CompletedTurnClassifier.needsZeroWidthContinuation None TurnOutcome.TurnCompleted parts)
+        Assert.False(
+            CompletedTurnClassifier.needsZeroWidthContinuation
+                None
+                (TurnOutcome.TurnNeedsContinuation "assistant stop without formal text")
+                parts
+        )
 
         Assert.True(
-            CompletedTurnClassifier.needsZeroWidthContinuation (Some AgentRole.Coder) TurnOutcome.TurnCompleted parts
+            CompletedTurnClassifier.needsZeroWidthContinuation
+                (Some AgentRole.Coder)
+                (TurnOutcome.TurnNeedsContinuation "assistant stop without formal text")
+                parts
+        )
+
+        Assert.False(
+            CompletedTurnClassifier.needsZeroWidthContinuation
+                (Some AgentRole.Coder)
+                TurnOutcome.TurnCompleted
+                parts
         )

@@ -166,11 +166,11 @@ module RoleDefinitions =
 
         [ { Role = Role.Manager
             Prompt = managerPrompt
-            Companion = false
+            Companion = true
             Tools = mgrTools }
           { Role = Role.Coder
             Prompt = coderPrompt
-            Companion = false
+            Companion = true
             Tools = cdrTools }
           { Role = Role.Inspector
             Prompt = inspectorPrompt
@@ -197,7 +197,7 @@ module RoleDefinitions =
               "Orchestrator system prompt SSOT: prompts/orchestrator-system.md\n"
               + "Tools: fork-manager / join.\n"
               + "Parallel ManagerJobs, serial integration, host-owned dual PERFECT."
-            Companion = false
+            Companion = true
             Tools = orchTools }
           { Role = Role.Executor
             Prompt =
@@ -209,7 +209,7 @@ module RoleDefinitions =
             Prompt =
               "Blogger system prompt SSOT: prompts/blogger-system.md\n"
               + "Tools: none. Dense work log for Session X prefix memory."
-            Companion = true
+            Companion = false
             Tools = blgTools } ]
 
     let forRole (role: Role) : RoleDefinition option =
