@@ -19,13 +19,11 @@ module OrchestratorGit =
                 { WorkingDirectory = cmd.WorkingDirectory
                   DefaultTimeout = None }
 
-            let! res = Runner.execute cmd estimate ctx CancellationToken.None
+            let! res = ProcessRunner.run cmd estimate ctx CancellationToken.None
 
             match res with
-            | Ok(RunnerOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
-            | Ok(RunnerOutcome.Spooled(code, _, _, _)) -> return (code, "", "output spooled")
-            | Ok(RunnerOutcome.OutputExceeded(bytes, _)) ->
-                return (1, "", sprintf "git output exceeded (%d bytes)" bytes)
+            | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
+            | Ok(ProcessOutcome.Spooled(code, _, _, _)) -> return (code, "", "output spooled")
             | Error err -> return (1, "", sprintf "%A" err)
         }
 

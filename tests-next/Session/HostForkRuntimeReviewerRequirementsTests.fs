@@ -45,8 +45,7 @@ module HostForkRuntimeReviewerRequirementsTests =
                       Finish = None
                       ErrorName = None
                       Model = None
-                      Parts = [| createObj [ "type", box "text"; "text", box text ] |]
-                      Raw = null }
+                      Parts = [| MessagePart.Text text |] }
 
                 let snapshot =
                     { new ISessionSnapshotPort with

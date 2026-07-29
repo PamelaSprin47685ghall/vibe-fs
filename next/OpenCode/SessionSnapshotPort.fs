@@ -13,8 +13,7 @@ type SessionMessage =
       Finish: string option
       ErrorName: string option
       Model: OpencodeModel option
-      Parts: obj array
-      Raw: obj }
+      Parts: MessagePart array }
 
 type ISessionSnapshotPort =
     abstract GetMessages: sessionId: SessionId -> Task<Result<SessionMessage list, string>>
@@ -33,12 +32,12 @@ module SessionSnapshotPort =
         elif not (isNull raw?info) then raw?info
         else raw
 
-    let private partsOf (raw: obj) : obj array =
+    let private partsOf (raw: obj) : MessagePart array =
         if isNull raw || isNull raw?parts then
             [||]
         else
             try
-                unbox<obj array> raw?parts
+                HostMessageCodec.decodeParts (unbox<obj array> raw?parts)
             with _ ->
                 [||]
 
@@ -104,8 +103,7 @@ module SessionSnapshotPort =
                       Finish = finish
                       ErrorName = errorNameOf info raw
                       Model = modelOf info
-                      Parts = partsOf raw
-                      Raw = raw }
+                      Parts = partsOf raw }
 
     let projectMessages (rawMessages: obj array) =
         rawMessages |> Array.toList |> List.choose projectMessage

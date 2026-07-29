@@ -70,6 +70,7 @@
         "turn": 3
       },
       "match": {
+        "user": "Ship publish_proof.txt to the target branch.",
         "requiredTools": [
           "fork-manager",
           "join"
@@ -131,11 +132,59 @@
       }
     },
     {
-      "id": "manager-terminal",
+      "id": "manager-guard-fork-reviewer",
       "lane": {
         "session": "fast-manager",
         "role": "manager",
         "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "user": "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "fork",
+        "args": {
+          "agent": "fast-reviewer",
+          "prompt": "Review the current worktree for correctness"
+        }
+      }
+    },
+    {
+      "id": "manager-join-reviewer",
+      "lane": {
+        "session": "fast-manager",
+        "role": "manager",
+        "turn": 4,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ]
+      },
+      "respond": {
+        "type": "tool-call",
+        "tool": "join",
+        "args": {}
+      }
+    },
+    {
+      "id": "manager-terminal",
+      "lane": {
+        "session": "fast-manager",
+        "role": "manager",
+        "turn": 5,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },

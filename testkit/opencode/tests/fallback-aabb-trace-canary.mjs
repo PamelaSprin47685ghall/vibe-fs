@@ -157,7 +157,7 @@ try {
       [
         'provider-visible same-run AABB',
         `models=${JSON.stringify(models)}`,
-        `fallbackFailures=${countFact(scenario.host.workDir, 'FallbackFailureRecorded')}`,
+        `fallbackFailures=${countFact(scenario.host.workDir, 'FallbackCursorAdvanced')}`,
         `requests=${traj.length}`,
         ...traj.map((r, i) => `${i + 1} model=${modelOf(r)} user=${JSON.stringify(lastUserText(r).slice(0, 80))}`),
       ].join('\n') + '\n',

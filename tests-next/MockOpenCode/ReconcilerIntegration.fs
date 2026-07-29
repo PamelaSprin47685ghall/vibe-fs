@@ -3,7 +3,6 @@ namespace Wanxiangshu.Next.Tests.MockOpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Outcome
 open Wanxiangshu.Next.OpenCode
@@ -22,8 +21,7 @@ module ReconcilerIntegration =
         if not condition then
             failwith message
 
-    let private textPart text =
-        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
+    let private textPart text = MessagePart.Text text
 
     let private msg id role agent finish parts errorName =
         { Id = MessageId.create id
@@ -32,8 +30,7 @@ module ReconcilerIntegration =
           Finish = finish
           ErrorName = errorName
           Model = None
-          Parts = parts
-          Raw = createObj [] }
+          Parts = parts }
 
     /// Reconciler + InjectedSessionPort + TerminalPolicies: reconcile
     /// triggers guard nudge through mock port.

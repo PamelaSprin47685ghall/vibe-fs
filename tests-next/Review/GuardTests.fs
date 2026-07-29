@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Tests.ReviewTests
 
 open Xunit
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -35,14 +36,14 @@ module GuardTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Revise |}
 
-        let proj1 = AgentFacts.foldAgentFact AgentFacts.empty fact1
+        let proj1 = Fold.foldAgentFact AgentProjection.empty fact1
         let rg1 = proj1.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(1, rg1.ConsecutivePerfects)
+        Assert.True(ReviewWitness.isPerfectPending rg1.Witness)
         Assert.False(rg1.IsConfirmed)
 
-        let proj2 = AgentFacts.foldAgentFact proj1 fact2
+        let proj2 = Fold.foldAgentFact proj1 fact2
         let rg2 = proj2.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(0, rg2.ConsecutivePerfects)
+        Assert.True(ReviewWitness.isRevision rg2.Witness)
         Assert.False(rg2.IsConfirmed)
 
     [<Fact>]
@@ -91,18 +92,18 @@ module GuardTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
-        let proj1 = AgentFacts.foldAgentFact AgentFacts.empty fact1
+        let proj1 = Fold.foldAgentFact AgentProjection.empty fact1
         let rg1 = proj1.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(1, rg1.ConsecutivePerfects)
+        Assert.True(ReviewWitness.isPerfectPending rg1.Witness)
         Assert.False(rg1.IsConfirmed)
 
         let projPrompt =
-            AgentFacts.foldAgentFact (AgentFacts.foldAgentFact proj1 confirmClaim) confirmAccepted
+            Fold.foldAgentFact (Fold.foldAgentFact proj1 confirmClaim) confirmAccepted
 
-        let proj2 = AgentFacts.foldAgentFact projPrompt fact2
+        let proj2 = Fold.foldAgentFact projPrompt fact2
         let rg2 = proj2.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(2, rg2.ConsecutivePerfects)
         Assert.True(rg2.IsConfirmed)
+        Assert.True(ReviewWitness.isConfirmed rg2.Witness)
 
     [<Fact>]
     let ``Pure fold: second perfect without confirmation prompt does not confirm`` () =
@@ -136,8 +137,8 @@ module GuardTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
-        let proj1 = AgentFacts.foldAgentFact AgentFacts.empty fact1
-        let proj2 = AgentFacts.foldAgentFact proj1 fact2
+        let proj1 = Fold.foldAgentFact AgentProjection.empty fact1
+        let proj2 = Fold.foldAgentFact proj1 fact2
         let rg2 = proj2.Sessions.[sid].ReviewGuard.Value
         Assert.False(rg2.IsConfirmed)
 
@@ -154,7 +155,7 @@ module GuardTests =
                    GitTreeHash = treeHash
                    Verdict = ReviewGuardVerdict.Perfect |}
 
-        let proj3 = AgentFacts.foldAgentFact proj2 fact3
+        let proj3 = Fold.foldAgentFact proj2 fact3
         Assert.False(proj3.Sessions.[sid].ReviewGuard.Value.IsConfirmed)
 
     [<Fact>]
@@ -204,14 +205,14 @@ module GuardTests =
                    Verdict = ReviewGuardVerdict.Perfect |}
 
         let proj2 =
-            AgentFacts.foldAgentFact
-                (AgentFacts.foldAgentFact (AgentFacts.foldAgentFact AgentFacts.empty fact1) confirmPrompt)
+            Fold.foldAgentFact
+                (Fold.foldAgentFact (Fold.foldAgentFact AgentProjection.empty fact1) confirmPrompt)
                 fact2
 
         Assert.True(proj2.Sessions.[sid].ReviewGuard.Value.IsConfirmed)
 
-        let proj3 = AgentFacts.foldAgentFact proj2 fact3
+        let proj3 = Fold.foldAgentFact proj2 fact3
         let rg3 = proj3.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(1, rg3.ConsecutivePerfects)
+        Assert.True(ReviewWitness.isPerfectPending rg3.Witness)
         Assert.False(rg3.IsConfirmed)
         Assert.Equal(Some(GitTreeHash.create "treeB"), rg3.LastGitTreeHash)

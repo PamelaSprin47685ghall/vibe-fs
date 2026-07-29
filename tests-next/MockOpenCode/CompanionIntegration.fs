@@ -45,12 +45,7 @@ module CompanionIntegration =
                               AssistantMessageId = mid
                               Role = "blogger"
                               Directory = ""
-                              FinalText = "blogger private thought\n\nblog paragraph"
-                              Parts =
-                                [| createObj
-                                       [ "type", box "reasoning"
-                                         "text", box "blogger private thought" ]
-                                   createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
+                              FinalText = "blogger private thought\n\nblog paragraph" }
 
                         eventPort.NotifyTerminal sId (TerminalOutcome.Completed fakeResult) |> ignore
                         return Delivered mid

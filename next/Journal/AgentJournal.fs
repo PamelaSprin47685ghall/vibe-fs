@@ -36,7 +36,7 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
             // Fallback append boundary: dedupe only. 0.5.0 never refuses for Dead.
             let refuseFallback =
                 match fact with
-                | AgentFact.FallbackFailureRecorded p ->
+                | AgentFact.FallbackCursorAdvanced p ->
                     match Map.tryFind p.SessionId proj.AgentProjections.Sessions with
                     | Some { Fallback = Some fb } ->
                         List.contains

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Journal
 
 open System
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.OpenCode
 
@@ -11,7 +12,6 @@ module internal ReviewConfirmation =
         (existing: ReviewGuardProjection)
         (reviewerSessionId: SessionId)
         (providerRunId: string)
-        (userPromptText: string option)
         (userMessageId: string option)
         =
         let providerRunUsed = List.contains providerRunId existing.RecentProviderRunIds
@@ -33,35 +33,15 @@ module internal ReviewConfirmation =
                         not (String.IsNullOrWhiteSpace confirmMsg) && userMsg = confirmMsg))
             | _ -> false
 
-        let confirmationPending =
-            match existing.AcceptedGuardKey with
-            | Some key when key.IndexOf("confirm-perfect", StringComparison.OrdinalIgnoreCase) >= 0 -> true
-            | _ -> existing.ConfirmationPhysicalMessageId.IsSome
-
-        let markerConfirmationMatched =
-            match userPromptText with
-            | Some text when
-                not (String.IsNullOrWhiteSpace text)
-                && confirmationPending
-                && text.IndexOf("Nope, let's re-evaluate:", StringComparison.Ordinal) >= 0
-                ->
-                true
-            | _ -> false
-
         let samePhysicalRootReevaluationMatched =
             match existing.AuthorityRootUserMessageId, userMessageId with
             | Some firstRoot, Some currentRoot ->
-                existing.ConsecutivePerfects = 1
+                ReviewWitness.isPerfectPending existing.Witness
                 && not (String.IsNullOrWhiteSpace firstRoot)
                 && firstRoot = currentRoot
             | _ -> false
 
-        let acceptedConfirmSecondPerfect =
-            confirmationPending && existing.ConsecutivePerfects = 1 && not providerRunUsed
-
         hasValidProviderRunId
         && not providerRunUsed
-        && (physicalConfirmationMatched
-            || markerConfirmationMatched
-            || samePhysicalRootReevaluationMatched
-            || acceptedConfirmSecondPerfect)
+        && ReviewWitness.isPerfectPending existing.Witness
+        && (physicalConfirmationMatched || samePhysicalRootReevaluationMatched)

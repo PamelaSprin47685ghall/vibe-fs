@@ -27,7 +27,7 @@ module GuardDurableTests =
                     Ok("msg-" + string hostCalls) }
 
         let mutable currentProj =
-            { AgentProjections = AgentFacts.empty
+            { AgentProjections = AgentProjection.empty
               RuntimeId = None }
 
         let journalPort: JournalPort =
@@ -35,7 +35,7 @@ module GuardDurableTests =
                 fun _ fact ->
                     currentProj <-
                         { currentProj with
-                            AgentProjections = AgentFacts.foldAgentFact currentProj.AgentProjections fact }
+                            AgentProjections = Fold.foldAgentFact currentProj.AgentProjections fact }
 
                     Ok currentProj }
 

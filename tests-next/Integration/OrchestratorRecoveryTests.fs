@@ -45,10 +45,10 @@ module private GitTestRepo =
 
 module OrchestratorRecoveryTests =
     let private makePort (facts: AgentFact list) =
-        let mutable projection = AgentFacts.empty
+        let mutable projection = AgentProjection.empty
 
         for fact in facts do
-            projection <- AgentFacts.foldAgentFact projection fact
+            projection <- Fold.foldAgentFact projection fact
 
         let recorded = ResizeArray<AgentFact>()
 
@@ -56,7 +56,7 @@ module OrchestratorRecoveryTests =
             { AppendFact =
                 fun _ fact ->
                     recorded.Add fact
-                    projection <- AgentFacts.foldAgentFact projection fact
+                    projection <- Fold.foldAgentFact projection fact
 
                     Ok
                         { AgentProjections = projection
@@ -92,7 +92,9 @@ module OrchestratorRecoveryTests =
           HasRebaseHead = fun _ -> Task.FromResult false
           ListWorktrees = fun () -> Task.FromResult(Ok [])
           ListManagerBranches = fun () -> Task.FromResult(Ok [])
-          DeleteBranch = fun _ -> Task.FromResult(Ok()) }
+          DeleteBranch = fun _ -> Task.FromResult(Ok())
+          ReadHead = fun _ -> Task.FromResult(Ok reverifyHead)
+          GetTargetHead = fun _ -> Task.FromResult(Ok reverifyHead) }
 
     let private runRecovery facts git authorityPort managerId worktree prompt =
         task {

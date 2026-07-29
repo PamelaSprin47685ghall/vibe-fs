@@ -99,8 +99,7 @@ module SpikeHostTests =
               AssistantMessageId = msgId
               Role = "test"
               Directory = ""
-              FinalText = "done"
-              Parts = [||] }
+              FinalText = "done" }
 
         let firstNotify =
             eventPort.NotifyTerminal sId (TerminalOutcome.Completed fakeResult)
@@ -114,8 +113,7 @@ module SpikeHostTests =
               AssistantMessageId = msgId
               Role = "test"
               Directory = ""
-              FinalText = "done"
-              Parts = [||] }
+              FinalText = "done" }
 
         let secondNotify =
             eventPort.NotifyTerminal sId (TerminalOutcome.Completed fakeResult2)
@@ -143,8 +141,7 @@ module SpikeHostTests =
               AssistantMessageId = idleMid
               Role = "test"
               Directory = ""
-              FinalText = "done"
-              Parts = [||] }
+              FinalText = "done" }
 
         (eventPort :> IEventObservationPort).NotifyTerminal idleSid (TerminalOutcome.Completed idleResult)
         |> ignore

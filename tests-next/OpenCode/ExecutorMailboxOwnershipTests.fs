@@ -15,6 +15,7 @@ module ExecutorMailboxOwnershipTests =
             let completion agentId text =
                 { RunId = "run-" + agentId
                   AgentId = agentId
+                  AgentName = "fast-executor"
                   Role = AgentRole.Executor
                   Outcome = AgentCompletion.ofSimpleText agentId ("run-" + agentId) AgentRole.Executor text
                   CompletedAt = System.DateTimeOffset.UtcNow }

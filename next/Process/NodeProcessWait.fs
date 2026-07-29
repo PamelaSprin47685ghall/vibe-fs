@@ -7,58 +7,73 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.AsyncSupport
 
-/// Deadline-aware wait-for-exit logic extracted from NodeProcessHost to
-/// keep each unit under the 300-line ArchitectureGate limit.
+/// Segmented deadline-aware wait-for-exit. Uses Deadline.nextWaitMs so that
+/// huge legal estimates are never clamped to a single 24.8-day timeout.
 module NodeProcessWait =
 
     let waitForExit (child: NodeProcessHost.ChildProcess) (deadline: Deadline) (ct: CancellationToken) : Task<int * bool> =
-        task {
-            if child.Exited.Value then
-                return! child.Exit.Task
-            elif ct.IsCancellationRequested then
-                child.Kill()
-                trySetCanceled child.Exit |> ignore
-                return! child.Exit.Task
-            else
-                let clock = fun () -> DateTimeOffset.UtcNow
-                let ms = Deadline.nextWaitMs clock deadline
+        let clock = fun () -> DateTimeOffset.UtcNow
 
-                if ms <= 0 then
+        let rec loop () =
+            task {
+                if child.Exited.Value then
+                    return! child.Exit.Task
+                elif ct.IsCancellationRequested then
                     child.Kill()
-                    trySetResult child.Exit (-1, true) |> ignore
+                    trySetCanceled child.Exit |> ignore
                     return! child.Exit.Task
                 else
-                    let mutable timerCleared = false
-                    let mutable timerId = None
+                    let ms = Deadline.nextWaitMs clock deadline
 
-                    let clearTimer () =
-                        if not timerCleared then
-                            timerCleared <- true
+                    if ms <= 0 then
+                        child.Kill()
+                        trySetResult child.Exit (-1, true) |> ignore
+                        return! child.Exit.Task
+                    else
+                        let delayTcs = TaskCompletionSource<unit>()
+                        let mutable timerId = None
+                        let mutable timerCleared = false
 
-                            match timerId with
-                            | Some id -> emitJsExpr id "clearTimeout($0)" |> ignore
-                            | None -> ()
+                        let clearTimer () =
+                            if not timerCleared then
+                                timerCleared <- true
 
-                    let onTimeout =
-                        fun () ->
+                                match timerId with
+                                | Some id -> emitJsExpr id "clearTimeout($0)" |> ignore
+                                | None -> ()
+
+                        let onExited _ =
                             clearTimer ()
-                            child.Kill()
-                            trySetResult child.Exit (-1, true) |> ignore
+                            trySetResult delayTcs () |> ignore
 
-                    let id = emitJsExpr (ms, onTimeout) "setTimeout($1, $0)"
+                        child.OnExited.Add onExited
 
-                    timerId <- Some id
-
-                    use _ =
-                        ct.Register(fun () ->
+                        if child.Exited.Value then
                             clearTimer ()
-                            child.Kill()
-                            trySetCanceled child.Exit |> ignore)
+                            child.OnExited.Remove onExited |> ignore
+                            return! child.Exit.Task
+                        else
+                            let onTimeout _ =
+                                clearTimer ()
+                                trySetResult delayTcs () |> ignore
 
-                    try
-                        let! result = child.Exit.Task
-                        clearTimer ()
-                        return result
-                    finally
-                        clearTimer ()
-        }
+                            let id = emitJsExpr (ms, onTimeout) "setTimeout($1, $0)"
+                            timerId <- Some id
+
+                            use _ =
+                                ct.Register(fun () ->
+                                    clearTimer ()
+                                    child.Kill()
+                                    trySetCanceled child.Exit |> ignore
+                                    trySetCanceled delayTcs |> ignore)
+
+                            try
+                                do! delayTcs.Task
+                                child.OnExited.Remove onExited |> ignore
+                                return! loop ()
+                            finally
+                                clearTimer ()
+                                child.OnExited.Remove onExited |> ignore
+            }
+
+        loop ()

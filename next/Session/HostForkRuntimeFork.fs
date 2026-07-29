@@ -2,7 +2,6 @@ namespace Wanxiangshu.Next.Session
 
 open System
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -13,25 +12,11 @@ open Wanxiangshu.Next.Session.AgentRoleHelpers
 [<AutoOpen>]
 module HostForkRuntimeFork =
 
-    let private textValue (value: obj) =
-        if isNull value then
-            None
-        else
-            try
-                let text = unbox<string> value
-                if String.IsNullOrWhiteSpace text then None else Some text
-            with _ ->
-                None
-
     let private userPromptText (message: SessionMessage) =
         message.Parts
-        |> Array.choose (fun part ->
-            if isNull part then
-                None
-            else
-                match textValue part?``type`` with
-                | Some "text" -> textValue part?text
-                | _ -> None)
+        |> Array.choose (function
+            | MessagePart.Text text -> Some text
+            | _ -> None)
         |> String.concat "\n"
         |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
 

@@ -31,7 +31,9 @@ module OrchestratorIntegrationTests =
           HasRebaseHead = fun _ -> Task.FromResult false
           ListWorktrees = fun () -> Task.FromResult(Ok [])
           ListManagerBranches = fun () -> Task.FromResult(Ok [])
-          DeleteBranch = fun _ -> Task.FromResult(Ok()) }
+          DeleteBranch = fun _ -> Task.FromResult(Ok())
+          ReadHead = fun _ -> Task.FromResult(Ok "commit-123456")
+          GetTargetHead = fun _ -> Task.FromResult(Ok "commit-123456") }
 
     let private createStubManagerPort () =
         { RunManager = fun _ _ _ -> Task.FromResult(Ok())
@@ -107,7 +109,7 @@ module OrchestratorIntegrationTests =
             falseThat (path.Contains "/repo/") "worktree must not be inside repo"
         }
 
-    let ``ProcessGitPort builds expected git command records`` () =
+    let ``GitOperations builds expected git command records`` () =
         task {
             let commands = ResizeArray<Command>()
 
@@ -132,7 +134,7 @@ module OrchestratorIntegrationTests =
                 else
                     Task.FromResult(0, "", "")
 
-            let git = ProcessGitPort.createWithRunner runner
+            let git = GitOperations.createWithRunner runner
             let! dirty = git.IsDirty "/my/repo"
             trueThat dirty "Expected dirty status"
             equal [ "status"; "--porcelain" ] commands.[0].Arguments
@@ -159,15 +161,15 @@ module OrchestratorIntegrationTests =
             // Same repo+branch → same lock path. Runtime A holds the lock at a
             // barrier; Runtime B must WAIT (not fail, not enter the critical
             // section); after A releases, B must proceed.
-            let lockPath = PublishLock.lockPath "/tmp/wanxiangshu-contention-repo" "main"
+            let lockPath = IntegrationGate.lockPath "/tmp/wanxiangshu-contention-repo" "main"
 
-            let! releaseA = PublishLock.acquire lockPath
+            let! releaseA = IntegrationGate.acquire lockPath
 
             let mutable bAcquired = false
 
             let bTask =
                 task {
-                    let! releaseB = PublishLock.acquire lockPath
+                    let! releaseB = IntegrationGate.acquire lockPath
                     bAcquired <- true
                     return releaseB
                 }
@@ -175,8 +177,8 @@ module OrchestratorIntegrationTests =
             do! PtyTiming.timerTask 600
             trueThat (not bAcquired) "contender B must not acquire the lock while A holds it"
 
-            do! PublishLock.release releaseA
+            do! releaseA.Release()
             let! releaseB = bTask
-            do! PublishLock.release releaseB
+            do! releaseB.Release()
             trueThat bAcquired "contender B must acquire the lock after A releases"
         }

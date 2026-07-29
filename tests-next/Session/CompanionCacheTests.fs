@@ -46,12 +46,7 @@ module CompanionCacheTests =
                               AssistantMessageId = MessageId.create "blog"
                               Role = "test"
                               Directory = ""
-                              FinalText = fullOutput
-                              Parts =
-                                [| createObj
-                                       [ "type", box "reasoning"
-                                         "text", box "blogger private thought" ]
-                                   createObj [ "type", box "text"; "text", box text ] |] }
+                              FinalText = fullOutput }
                         )))
 
                 Task.FromResult(Ok(MessageId.create "accepted"))
@@ -200,6 +195,7 @@ module CompanionCacheTests =
                 let sessionBudgets = Dictionary<string, int>()
                 sessionBudgets.["primary"] <- 100
                 let sessionOutputLimits = Dictionary<string, int>()
+                let budgetStore = CompanionBudgetStore()
 
                 let companion = new CompanionHost(SessionId.create sid, host)
 
@@ -216,6 +212,7 @@ module CompanionCacheTests =
                     (Some journal)
                     sessionBudgets
                     sessionOutputLimits
+                    budgetStore
                     sessionRoles
                     None
                     inObj
@@ -234,6 +231,7 @@ module CompanionCacheTests =
                     (Some journal)
                     sessionBudgets
                     sessionOutputLimits
+                    budgetStore
                     sessionRoles
                     None
                     inObj
@@ -250,6 +248,7 @@ module CompanionCacheTests =
                     (Some journal)
                     sessionBudgets
                     sessionOutputLimits
+                    budgetStore
                     sessionRoles
                     None
                     inObj

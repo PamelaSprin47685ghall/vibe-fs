@@ -18,47 +18,27 @@ module SpikePlugin =
         task {
             let portOpt = OpenCodePort.create input
             let journal = PluginHost.createJournal input
-            let sessionDirectories = Dictionary<string, string>()
-            let ownedSessions = HashSet<string>()
-            let userMessageBindings = Dictionary<string, MessageId>()
-            let fallbackFailures = HashSet<string>()
-            let sessionRoles = Dictionary<string, string>()
-            let sessionParents = Dictionary<string, string>()
+            let scope = new PluginRuntimeScope(journal)
 
-            PluginHost.restoreSessionRoles journal sessionRoles
-            PluginHost.restoreSessionParents journal sessionParents
+            PluginHost.restoreSessionRoles journal scope.SessionRoles
+            PluginHost.restoreSessionParents journal scope.SessionParents
 
             let familyParent (sessionId: SessionId) =
-                match sessionParents.TryGetValue(SessionId.value sessionId) with
+                match scope.SessionParents.TryGetValue(SessionId.value sessionId) with
                 | true, parentId -> Some(SessionId.create parentId)
                 | false, _ -> None
 
             match PluginHost.createHost input portOpt (Some familyParent) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt) ->
-                let companions = Dictionary<string, CompanionHost>()
-                let companionGate = obj ()
-                let verdictSessions = HashSet<string>()
-                let nudgeSent = HashSet<string>()
-                let managerGuardNudges = HashSet<string>()
-
-                for KeyValue(childId, parentId) in sessionParents do
-                    ownedSessions.Add childId |> ignore
-                    ownedSessions.Add parentId |> ignore
+                for KeyValue(childId, parentId) in scope.SessionParents do
+                    scope.OwnedSessions.Add childId |> ignore
+                    scope.OwnedSessions.Add parentId |> ignore
 
                 let gitTreePort =
                     match PluginHost.gitTreePortFromInput input with
                     | Some port -> Some port
                     | None -> PluginHost.workspaceDirectory input |> Option.map GitTree.create
-
-                let sessionBudgets = Dictionary<string, int>()
-                let sessionOutputLimits = Dictionary<string, int>()
-                let mutable toolSurfaceRef: obj option = None
-
-                let disposeExecutorRuntimeCb (sid: string) =
-                    match toolSurfaceRef with
-                    | Some ts -> ts?disposeExecutorRuntime (sid) |> ignore
-                    | None -> ()
 
                 let wired =
                     HostSignalBootstrap.wire
@@ -67,15 +47,7 @@ module SpikePlugin =
                         snapshotOpt
                         journal
                         gitTreePort
-                        sessionRoles
-                        sessionParents
-                        verdictSessions
-                        nudgeSent
-                        managerGuardNudges
-                        ownedSessions
-                        userMessageBindings
-                        fallbackFailures
-                        disposeExecutorRuntimeCb
+                        scope
                         input
 
                 let bindRunStarted =
@@ -106,20 +78,21 @@ module SpikePlugin =
                     | Some projectionSessionId ->
                         wired.RegisterOwned projectionSessionId
 
-                        // sessionRoles is display/tool-surface cache only.
+                        // scope.SessionRoles is display/tool-surface cache only.
                         // Companion eligibility must not be inferred here.
                         if not (isNull inObj) && isNull inObj?sessionID then
                             inObj?sessionID <- projectionSessionId
                     | None -> ()
 
                     CompanionTransform.handleCompanionTransform
-                        companions
-                        companionGate
+                        scope.Companions
+                        scope.CompanionGate
                         sessionPort
                         journal
-                        sessionBudgets
-                        sessionOutputLimits
-                        sessionRoles
+                        scope.SessionBudgets
+                        scope.SessionOutputLimits
+                        scope.CompanionBudgets
+                        scope.SessionRoles
                         (Some(fun bloggerId ->
                             // Register ownership + ActiveRun so idle→reconcile
                             // emits TerminalOutcome.Completed for this child.
@@ -151,10 +124,15 @@ module SpikePlugin =
                           // the second invocation, preventing duplicate B heads.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform",
-                          box (systemTransformHook sessionBudgets sessionOutputLimits)
+                          box
+                              (systemTransformHook
+                                  scope.SessionBudgets
+                                  scope.SessionOutputLimits
+                                  scope.CompanionBudgets)
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 hooks?event <- box wired.ObserveEvent
+                hooks?dispose <- box (fun () -> scope.Dispose())
 
                 let client = if isNull input then null else input?client
 
@@ -169,7 +147,7 @@ module SpikePlugin =
                         let backgroundBFor =
                             Some(fun sessionId ->
                                 let fromB =
-                                    match companions.TryGetValue sessionId with
+                                    match scope.Companions.TryGetValue sessionId with
                                     | true, host ->
                                         match host.Memory.ActivePrefixEpoch with
                                         | Some epoch when not (String.IsNullOrWhiteSpace epoch.FrozenB) ->
@@ -183,25 +161,22 @@ module SpikePlugin =
                                 | Some text -> Some text
                                 | None -> TerminalSessionA.fullText eventPort (SessionId.create sessionId))
 
-                        let toolSurface =
+                        let toolRegistration =
                             toolHooks
                                 toolModule
                                 sessionPort
                                 journal
                                 gitTreePort
                                 (PluginHost.workspaceDirectory input)
-                                sessionParents
-                                sessionRoles
+                                scope
                                 wired.CurrentPhysicalUserMessage
-                                verdictSessions
-                                sessionDirectories
                                 onRunStarted
                                 backgroundBFor
                                 snapshotOpt
                                 (Some wired.CancelSignals)
 
-                        toolSurfaceRef <- Some toolSurface
-                        hooks?tool <- toolSurface
+                        scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
+                        hooks?tool <- toolRegistration.Tools
                     with ex ->
                         raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
 

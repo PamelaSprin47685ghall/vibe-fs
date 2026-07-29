@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System.Collections.Generic
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
@@ -39,12 +40,15 @@ module ReviewerGuardState =
         guard sessionParents journal reviewerKey
         |> Option.exists (fun reviewGuard ->
             reviewGuard.IsConfirmed
-            || reviewGuard.ConsecutivePerfects > 0
+            || ReviewWitness.isPerfectPending reviewGuard.Witness
+            || ReviewWitness.isRevision reviewGuard.Witness
             || not (List.isEmpty reviewGuard.RecentToolCallIds))
 
     let pendingConfirmation sessionParents journal reviewerKey =
         guard sessionParents journal reviewerKey
-        |> Option.exists (fun reviewGuard -> reviewGuard.ConsecutivePerfects = 1 && not reviewGuard.IsConfirmed)
+        |> Option.exists (fun reviewGuard ->
+            ReviewWitness.isPerfectPending reviewGuard.Witness
+            && not reviewGuard.IsConfirmed)
 
     let confirmedOwner sessionParents journal reviewerKey physicalUserMessageId =
         match reviewOwner sessionParents journal reviewerKey, guard sessionParents journal reviewerKey with

@@ -1,32 +1,93 @@
 # Wanxiangshu.Next 语义内聚重构清单
 
-## 实施进度（自动更新）
+## 当前重启盘点（2026-07-29）
 
-### 2026-07-29 当前状态
+> 此节取代下面的“停工交接”作为后续工作的起点。它只陈述本次重启直接观察到的事实；未重新编译或测试的 WIP 一律不视为完成。
 
-- **P1 Correctness 已完成**：
-  - Fallback 统一为单一 cursor：`next/Domain/AgentPairCursor.fs` 拥有 `ModelSide`、`FallbackCursor`、`advance`、`effectiveAgent`、`failureIdentity`；删除 `Session/Fallback.fs` 与 `OpenCode/EffectiveAgentResolver.fs`。
-  - Prompt Authority 收敛为四模块：`next/Domain/PromptAuthority.fs`（类型与纯规则）、`next/Domain/PromptAuthorityRun.fs`（claim/run/projection 纯操作）、`next/Journal/PromptAuthorityLedger.fs`（durable fold）、`next/OpenCode/PromptIngress.fs`（chat.message 分类）、`next/OpenCode/PromptDispatcher.fs`（runtime/claim/accept）+ `next/OpenCode/PromptDispatcherSend.fs`（claim→send 扩展）。
-  - Host Event/Reconcile 三层拆分：`HostEventCodec.fs` 唯一 raw `session.status` 解码点，`TurnBinding.fs` 管理 root/physical/continuation 绑定，`TurnReconcile.fs` 纯 snapshot 分类，`ReconcileSupervisor.fs` 每 session single-flight（dirty latch + ≤3 causal yields），`TurnCompletionProgram.fs` 连续可读 terminal 主程序。
-- **修复与门禁**：
-  - `PromptDispatcher.fs` 从 395 行拆至 267 行，`Domain/PromptAuthority.fs` 从 345 行拆至 231 行，重新满足 300 行硬门禁。
-  - `HostEventCodec.fs` 加入 `sessionStatusAllowlist`，SSE 门禁通过。
-  - `ProcessRunner` 取消分类改为 token-based，`Runner_launcher_cancellation` 通过。
-  - `DurableFallbackTests` 改为显式 `ProviderAttempt`，不再共享可变计数器。
-  - `PromptDispatcher.SendContinuation` 不再在 send-admission 时接受 synthetic id；claim 保持 pending，等待 `chat.message` 接受真实 HostMessageId；`TurnReconcile` 将 admission root/continuation 重新绑定到 SDK snapshot 中的真实 physical user message。
-  - Host 停止原生 retry 时，`ProviderErrorFallback` 只在后续 settled-idle 因果边界发送 `ProviderRetryAttempt`；无 debounce/timeout。Cursor 仍仅经 `RetrySignalHandler` 写入，真实 canary 已证明同一 Logical Run 的 `A→A→B→B` provider request 轨迹且无第五次请求。
-  - Process 横切文件已收敛为 `ProcessRequest`、`ProcessOutput`、`NodeProcessHost`、`ProcessRunner` 四个纵向职责；删除旧 `ProcessTypes/Command/ProcessBudget/Pump/RunnerCore/RunnerPrimitives`，`Runner.fs` 仅保留兼容 facade。
-- **验证（当前通过）**：
-  - `dotnet build next/Wanxiangshu.Next.fsproj`
-  - `dotnet build tests-next/Wanxiangshu.Next.Tests.fsproj`
-  - `npm run build`（Fable 150 源文件）
-  - `npm run test:compile`（70 测试源文件）
-  - `npm run test:next`：269 passed, 0 failed
-  - `npm run test:manager-tools`：1 passed, 0 failed
-  - `node testkit/opencode/tests/gate-testkit.mjs`：29 passed, 0 failed
-  - `npm run test:e2e:p0:three`：18 个 canary × 3 轮全部通过
-  - `npm run test:release`：完整 release gate 通过
-- **下一步**：P2 ChildRun/Review、P3 Companion、P4 Process/PTY、P5 Tools/Orchestrator/Journal、P6 清理与文档。
+### 已执行
+
+- 用户要求后已停止全部并行代理；没有运行中的委派工作。
+- 已两次执行 `git merge master`：分支先从 `6e5f0489` fast-forward 至 `9fc81135`，随后至 `9b3bdfe3`。每次均先 stash 全部本地 WIP 并在 fast-forward 后重新应用；stash pop 的冲突已人工合并。
+  - `next/OpenCode/CompletedTurnClassifier.fs` 保留 typed `MessagePart` 分类路径与 master 的 `TurnNeedsContinuation` 语义，未恢复 raw `obj array`；
+  - `tests-next/OpenCode/EventsTests.fs` 保留可编译的 typed `parts` fixture。
+- 重启盘点时工作树含 **123 staged、5 unstaged、44 untracked** 路径。这些变更混合了先前已完成主体、未验证 WIP 与被取消代理留下的半成品；不得按文件名或 staged 状态推断其已交付。
+
+### 当前阻断（直接验证）
+
+`dotnet build next/Wanxiangshu.Next.fsproj` 于重启盘点中失败，尚未运行 test build、Fable 或任何 suite。初始的 `Roles.fs` record-list 与 `ProcessRunner.fs` reserved-name 阻断已修正后，下一轮仍报告 **40 个错误**；它们明确暴露被取消的半迁移边界：`ReviewProjection` 新 witness 字段未补齐、`ChildRun`/`ForkRuntime`/`ForkRecovery` API 不一致、`ProcessRunner`/`NodeProcessWait` task 类型不一致、`OrchestratorProgram`/`Orchestrator.fs` 依赖 record 不一致、`CompanionHostBlogger` 仍按旧 `AgentRunResult` 字段读取。首要编译错误：
+
+1. `next/Kernel/Roles.fs` 第 165–215 行存在未完成的 record/list 绑定（`FS0010` / `FS3118`）。
+2. `next/Process/ProcessRunner.fs` 把 `process` 当作值/参数名；这是 F# future reserved identifier（`FS0046`，第 19、40、65、88 行）。
+
+因此，下列已写入但未编译的路径全部回到待审计状态：typed Host boundary、ChildRun/targeted completion、PluginRuntimeScope、ReviewWitness、Process/PTY、ToolRegistry、Orchestrator、Journal projections、Fallback canaries 与架构门禁。必须先恢复 production build，再逐项验证，不得宣称本轮完成。
+
+> 盘点后修复：production build 已在修正上述首轮阻断后通过。test project 仍失败（30 个错误）：多数测试 fixture 仍构造已移除的 `AgentRunResult.Parts` 或 `SessionMessage.Parts.Raw`，以及 GitPort 新增 `ReadHead`/`GetTargetHead` 后的 mock records 未补字段；另有 `EventsTests` 缺少 `createObj` import、`SpikeHostTests` context record 类型混用。下一步是完成 typed Host migration 的测试侧 cutover，而不是恢复 raw compatibility 字段。
+
+### 重启顺序
+
+1. 修复当前 production build 的语法/命名阻断；随后编译 test project，记录所有继发错误。
+2. 从当前文件与引用图重新分类 123+5+44 个 WIP：保留完整的垂直切片，删除半迁移兼容层和孤立文件。
+3. 按 TASK 的 P0→P4 出口逐项完成，完成一项即运行对应 focused test；最后运行本文件列出的全量验证命令。
+4. 仅在全量验证后更新“完成”陈述、README、SSOT 与迁移说明。
+
+## 上一轮停工交接（2026-07-29；仅作历史基线）
+
+> 以下记录的是 merge/restart 前的最后一次已知状态，不覆盖“当前重启盘点”。
+
+### 已完成并在当时会话验证过
+
+
+### 已完成并在当前会话验证过
+
+- **P0/P1 正确性主线**：Fallback 单一 cursor、Prompt Authority 四模块、Host signal/reconcile 三层、Review Witness、Companion、Process/PTY 与五种 Flow DSL 的生产接线保持完成状态。
+- **Tools 垂直切片完成**：
+  - 新增并接线 `ToolHostCodec.fs`、`ToolRuntimeScope.fs`、`OneShotAgentTool.fs`、`ForkTool.fs`、`JoinTool.fs`、`ListTool.fs`、`PtyTool.fs`、`ExecutorTool.fs`、`InspectorTool.fs`、`CoderTool.fs`、`VerdictTool.fs`、`ToolRegistry.fs`。
+  - `SpikePlugin` 已改用 `ToolRegistry.create`；旧 `ToolSurface*.fs` 与 `VerdictSurface.fs` 已删除；相关测试已迁移。
+- **Child/Fork 生命周期收敛完成主体**：新增 `CompletionMailbox.fs`、`ChildRunProjection.fs`、`ForkRecovery.fs`；`ForkRuntime.fs` 不再承担恢复、状态渲染和邮箱的重复实现；中断恢复投影为 `AgentStatus.Interrupted`。
+- **Journal 限界投影完成**：新增 Authority/Fallback/Review/Companion/Linkage/Orchestrator/Effect/Agent/ProjectionState 垂直投影；`Fold.fs` 只做 envelope/fact 路由；旧 `AgentFacts*.fs` 已删除；双 PERFECT 不再按文本推断。
+- **Orchestrator 顺序程序完成**：`OrchestratorProgram.fs` 已成为 manager → pre-review → candidate → rebase → post-review → ff-only 的主程序；新增 IntegrationGate、WorktreeResource、ManagerJob、Recovery、GitOperations；旧 PublishChain/PublishStages/PublishLock/GitPort* 路径已删除。
+- **Plugin composition-root 主体已接线**：
+  - 新增 `PluginRuntimeScope.fs`，显式拥有 journal、Tool runtime、Host subscription、Companion、session association/cache 与 teardown。
+  - `HostSignalBootstrap`、`SpikePlugin`、`CompanionTransform` 已改为使用同一 Scope；session delete 统一进入 `scope.DisposeSession`。
+  - `PluginHost` 的隐藏 journal 全局 registry 与 `PromptDispatcher` 的隐藏 runtime registry 已删除。
+  - Blogger budget 改为每个 plugin scope 独立，不再使用进程全局字典。
+  - `sessionRoles` 不再用于新 user-message authority 绑定；绑定读取 durable active authority profile。
+
+### 最近一次完整通过的验证点
+
+以下结果发生在 PluginRuntimeScope/Bootstrap/SpikePlugin 接线完成之后、今日最后一批 targeted-completion 与新测试修改之前：
+
+- `dotnet build next/Wanxiangshu.Next.fsproj` — 通过。
+- `dotnet build tests-next/Wanxiangshu.Next.Tests.fsproj` — 通过。
+- `npm run build` — 通过（Fable production）。
+- tests-next Fable `--noCache` 编译 — 通过。
+- `npm run test:next` — **283 passed, 0 failed, 0 skipped**。
+
+### 今日停工时的未验证 WIP（下次必须从这里继续）
+
+- `ForkRuntime`/`HostForkRuntime` 新增 targeted `AwaitAgent` completion；`OrchestratorHost` 已删除 generic join stash，并以 `publishToMailbox = false` 隔离内部 completion。新增对应 `ForkRuntimeTests`，**尚未重新 build/test**。
+- 新增 `PluginRuntimeScopeTests.fs` 并加入 tests fsproj，覆盖 plugin 间 budget 隔离和幂等 disposal，**尚未重新 build/test**。
+- 新建 `next/OpenCode/HostMessageCodec.fs`，准备把 `ReconciledTurn`/`SessionMessage` 的 raw `obj array` 改为 typed `MessagePart`；该文件目前**尚未加入 fsproj、尚未接线、尚未编译**，不能视为已交付。
+
+### 后续剩余工作（不得缩减）
+
+1. 先完成或回退 `HostMessageCodec.fs` WIP，再运行 production/test .NET build、Fable production/test 和 `test:next`，确认今日最后改动。
+2. 完成 `PluginRuntimeScope` 审计：消除其余 feature-level hidden registry/HashSet 业务状态，确认 subscription、journal、Tool/Executor/Reviewer/Orchestrator/Companion 都恰好释放一次。
+3. 完成 raw Host 边界类型化：`ReconciledTurn` 与业务分类器不得继续接收动态 `obj`；业务 program 不得直接使用 JS dynamic access。
+4. 审计并处理机械/兼容候选：`SpikePluginHelpers.fs`、`TerminalPolicyHelpers.fs`、未编译的 `CompanionTransformHelpers.fs`、`AgentRoleHelpers.fs`、`FallbackDetect.fs` 旧 terminal 检测、重复 Review 查询层及其余仅转发文件。
+5. 新增并启用 TASK §17 的语义架构门禁：机械文件名 allowlist、Host interop 边界、单一写入口、DSL 生产调用、依赖方向、重复算法、260/280/300 行规则。
+6. 更新唯一架构文档和迁移说明；逐项审计本 TASK 每个出口标准。
+7. 最终完整验证仍必须包括：
+   - production/test .NET build；
+   - Fable production/test compilation；
+   - `npm run test:next`；
+   - `npm run test:manager-tools`；
+   - `node testkit/opencode/tests/gate-testkit.mjs`；
+   - `npm run test:e2e:p0:three`；
+   - `npm run test:release`；
+   - production/test line-count 与全部语义架构门禁。
+
+> 停工原因：用户于 2026-07-29 明确要求记录进度并结束今日工作。当前 WIP 未宣称完成；下次应从“未验证 WIP”第一项恢复。
 
 ## 一、重构目标
 

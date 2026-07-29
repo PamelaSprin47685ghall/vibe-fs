@@ -3,7 +3,8 @@ namespace Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 
 /// Typed completion payload for a successful agent run.
-/// Carries the full result from ReconciledTurn directly.
+/// Carries the completion payload for a successful agent run.
+/// No transport parts are kept; business programs inspect the typed turn directly.
 type AgentRunResult =
     { SessionId: SessionId
       RootUserMessageId: MessageId
@@ -12,8 +13,7 @@ type AgentRunResult =
       Directory: string
       /// Session-wide A: cumulative formal text + reasoning/thinking across the
       /// whole Session, not the last turn alone. Excludes tool raw streams.
-      FinalText: string
-      Parts: obj array }
+      FinalText: string }
 
     /// Hard invariant: completed runs must have non-empty session-wide A text.
     member this.IsValid = not (System.String.IsNullOrWhiteSpace this.FinalText)

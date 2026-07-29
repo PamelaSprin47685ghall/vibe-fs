@@ -20,29 +20,14 @@ module PluginHost =
             let d = unbox<string> input?directory
             if String.IsNullOrWhiteSpace d then None else Some d
 
-    let private journalGate = obj ()
-    let private journals = Dictionary<string, AgentJournal>()
-
     let createJournal (input: obj) : AgentJournal option =
         match workspaceDirectory input with
         | None -> None
         | Some workspace ->
             let dir = RuntimePath.forWorkspace workspace
-
-            lock journalGate (fun () ->
-                match journals.TryGetValue dir with
-                | true, journal -> Some journal
-                | false, _ ->
-                    // ponytail: one process/runtime writer per Git common dir;
-                    // add reference counting only if hosts unload repos in-process.
-                    let boot = Boot.boot dir
-                    let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
-
-                    let journal =
-                        AgentJournal.createFromBoot dir runtimeId processId DateTimeOffset.UtcNow boot
-
-                    journals.[dir] <- journal
-                    Some journal)
+            let boot = Boot.boot dir
+            let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
+            Some(AgentJournal.createFromBoot dir runtimeId processId DateTimeOffset.UtcNow boot)
 
     let restoreSessionRoles (journal: AgentJournal option) (sessionRoles: Dictionary<string, string>) =
         match journal with

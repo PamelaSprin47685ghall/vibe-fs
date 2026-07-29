@@ -32,15 +32,7 @@ module HostSignalBootstrap =
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
         (gitTreePort: GitTreePort option)
-        (sessionRoles: Dictionary<string, string>)
-        (sessionParents: Dictionary<string, string>)
-        (verdictSessions: HashSet<string>)
-        (nudgeSent: HashSet<string>)
-        (managerGuardNudges: HashSet<string>)
-        (ownedSessions: HashSet<string>)
-        (userMessageBindings: Dictionary<string, MessageId>)
-        (fallbackFailures: HashSet<string>)
-        (disposeExecutorRuntime: string -> unit)
+        (scope: PluginRuntimeScope)
         (input: obj)
         : WiredSignals =
         let snapshot =
@@ -50,8 +42,6 @@ module HostSignalBootstrap =
                 { new ISessionSnapshotPort with
                     member _.GetMessages _ =
                         Task.FromResult(Ok([]: SessionMessage list)) }
-
-        let abortedSessions = HashSet<string>()
 
         let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
             match journal with
@@ -72,14 +62,14 @@ module HostSignalBootstrap =
                 eventPort
                 journal
                 gitTreePort
-                verdictSessions
-                nudgeSent
-                managerGuardNudges
-                sessionParents
-                disposeExecutorRuntime
-                abortedSessions
+                scope.VerdictSessions
+                scope.NudgeSent
+                scope.ManagerGuardNudges
+                scope.SessionParents
+                scope.DisposeExecutorRuntime
+                scope.AbortedSessions
                 continuationAccepted
-                fallbackFailures
+                scope.FallbackFailures
                 turn
 
         let reconciler =
@@ -119,8 +109,8 @@ module HostSignalBootstrap =
                         | Error _ -> return false
                         | Ok profile ->
                             let key = SessionId.value sessionId
-                            userMessageBindings.[key] <- messageId
-                            sessionRoles.[key] <- PromptAuthority.roleLabel profile.CanonicalRole
+                            scope.UserMessageBindings.[key] <- messageId
+                            scope.SessionRoles.[key] <- PromptAuthority.roleLabel profile.CanonicalRole
                             reconciler.BindUserMessage(sessionId, messageId)
                             return true
             }
@@ -129,7 +119,7 @@ module HostSignalBootstrap =
             ProviderErrorFallback(
                 sessionPort,
                 journal,
-                fallbackFailures,
+                scope.FallbackFailures,
                 reconciler.RootBindings,
                 ensureAuthorityFromSnapshot,
                 continuationAccepted
@@ -139,25 +129,28 @@ module HostSignalBootstrap =
             match signal with
             | ProviderRetry retry ->
                 // Provider retry is the only durable fallback writer.
-                RetrySignalHandler.handle journal fallbackFailures reconciler.RootBindings retry
+                RetrySignalHandler.handle journal scope.FallbackFailures reconciler.RootBindings retry
             | ProviderError error -> providerErrors.Observe error
             | SessionIdle sessionId ->
                 reconciler.Signal(signal)
                 providerErrors.OnIdle sessionId
             | SessionDeleted sessionId ->
                 providerErrors.Remove sessionId
+                scope.DisposeSession(SessionId.value sessionId)
                 reconciler.Signal(signal)
 
-        let signalRouter = HostSignalRouter(ownedSessions, onSignal)
+        let signalRouter = HostSignalRouter(scope.OwnedSessions, onSignal)
 
         let subscription =
             match HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal with
             | Error err -> raise (InvalidOperationException err)
             | Ok(sub, _source) -> sub
 
+        do scope.TrackSubscription subscription
+
         let registerOwned (sessionId: string) =
             if not (String.IsNullOrWhiteSpace sessionId) then
-                ownedSessions.Add sessionId |> ignore
+                scope.OwnedSessions.Add sessionId |> ignore
                 signalRouter.RegisterOwned(SessionId.create sessionId)
 
         let registerSource (sessionId: string) (source: SessionSignalSource) =
@@ -171,15 +164,17 @@ module HostSignalBootstrap =
             then
                 let sid = SessionId.create sessionId
                 let mid = MessageId.create messageId
-                userMessageBindings.[sessionId] <- mid
+                scope.UserMessageBindings.[sessionId] <- mid
 
                 let agentRole =
-                    match sessionRoles.TryGetValue(sessionId) with
-                    | true, role -> AgentRoleHelpers.roleOfString role
-                    | false, _ -> None
+                    HostSessionNudge.tryActiveProfile journal sid
+                    |> Option.bind (fun profile ->
+                        profile.CanonicalRole
+                        |> PromptAuthority.roleLabel
+                        |> AgentRoleHelpers.roleOfString)
 
                 reconciler.BindUserMessage(sid, mid, ?agentRole = agentRole)
-                abortedSessions.Remove sessionId |> ignore
+                scope.AbortedSessions.Remove sessionId |> ignore
                 registerOwned sessionId
                 registerSource sessionId LocalPluginEvent
 
@@ -213,11 +208,11 @@ module HostSignalBootstrap =
                 { SessionId = sessionId
                   RunId = None
                   RootUserMessageId =
-                    match userMessageBindings.TryGetValue(SessionId.value sessionId) with
+                    match scope.UserMessageBindings.TryGetValue(SessionId.value sessionId) with
                     | true, mid -> Some mid
                     | false, _ -> None
                   PhysicalUserMessageId =
-                    match userMessageBindings.TryGetValue(SessionId.value sessionId) with
+                    match scope.UserMessageBindings.TryGetValue(SessionId.value sessionId) with
                     | true, mid -> Some mid
                     | false, _ -> None
                   ContinuationMessageIds = Set.empty
@@ -226,7 +221,7 @@ module HostSignalBootstrap =
 
         let onAuthorityResolved (sessionId: SessionId) (profile: PromptAuthority.AuthorityExecutionProfile) =
             let key = SessionId.value sessionId
-            sessionRoles.[key] <- PromptAuthority.roleLabel profile.CanonicalRole
+            scope.SessionRoles.[key] <- PromptAuthority.roleLabel profile.CanonicalRole
 
         let chatMessageHook =
             PromptIngress.createHook journal bindUserMessage bindContinuationMessage registerOwned onAuthorityResolved

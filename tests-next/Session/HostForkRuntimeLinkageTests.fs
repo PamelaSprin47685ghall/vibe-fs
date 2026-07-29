@@ -164,8 +164,8 @@ module HostForkRuntimeLinkageTests =
         let c = ChildId.create "child-idem"
 
         let linked =
-            AgentFacts.foldAgentFactWithEnvelope
-                AgentFacts.empty
+            Fold.foldAgentEnvelope
+                AgentProjection.empty
                 { RuntimeId = RuntimeId.create "r-idem"
                   LocalSeq = LocalSeq.create 1L
                   ObservedAt = DateTimeOffset.UtcNow
@@ -190,8 +190,8 @@ module HostForkRuntimeLinkageTests =
               TurnId = None
               Fact = Fact.Agent(AgentFact.AgentUnlinked {| ParentId = p; ChildId = c |}) }
 
-        let once = AgentFacts.foldAgentFactWithEnvelope linked (unlink 2L)
-        let twice = AgentFacts.foldAgentFactWithEnvelope once (unlink 3L)
+        let once = Fold.foldAgentEnvelope linked (unlink 2L)
+        let twice = Fold.foldAgentEnvelope once (unlink 3L)
 
         Assert.Equal(once, twice)
 

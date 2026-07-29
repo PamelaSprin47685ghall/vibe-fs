@@ -180,6 +180,15 @@ module Flow =
                 return Ok res
             })
 
+    /// Lift a plain async function into the Flow monad, wrapping its result
+    /// in Ok. Cancellation or exception escapes as an uncatchable
+    /// OperationCanceledException / exception (caller may use TryWith).
+    let lift (f: 'ctx -> CancellationToken -> Task<'a>) : Flow<'ctx, 'error, 'a> =
+        create (fun ctx ct -> task {
+            let! r = f ctx ct
+            return Ok r
+        })
+
 type JsTcs<'T>() =
     let mutable completed = false
     let mutable resolveFn: ('T -> unit) option = None

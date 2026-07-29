@@ -1,8 +1,6 @@
-namespace Wanxiangshu.Next.Process
+namespace rec Wanxiangshu.Next.Process
 
 open System
-open System.Threading
-open System.Threading.Tasks
 
 /// PTY geometry, kept on the command record for round-trip but ignored by the
 /// process runner (handled by the PTY pipeline).
@@ -39,7 +37,6 @@ type ProcessContext =
 type ProcessOutcome =
     | Completed of exitCode: int * stdout: string * stderr: string * spooled: bool
     | Spooled of exitCode: int * spoolPath: string * totalBytes: int64 * chunkCount: int
-    | OutputExceeded of bytesWritten: int64 * spoolPath: string option
 
 [<RequireQualifiedAccess>]
 type ProcessError =
@@ -49,7 +46,15 @@ type ProcessError =
     | ExecutionFailed of reason: string
 
 module ProcessEstimate =
-    let budget (RuntimeSeconds seconds) = TimeSpan.FromSeconds(3.0 * seconds)
+    let private maxBudgetSeconds = TimeSpan.MaxValue.TotalSeconds
+
+    let budget (RuntimeSeconds seconds) =
+        let total = 3.0 * seconds
+        if Double.IsNaN total || Double.IsInfinity total then
+            TimeSpan.MaxValue
+        else
+            let safe = Math.Min(total, maxBudgetSeconds)
+            TimeSpan.FromSeconds safe
 
     let outputThreshold (OutputBytes bytes) =
         if bytes <= 0L then 0L

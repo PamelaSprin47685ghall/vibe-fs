@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Next.Tests.OpenCode
 
-open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.OpenCode
@@ -8,8 +7,7 @@ open Wanxiangshu.Next.Session
 
 module TurnReconcileAdmissionTests =
 
-    let private textPart text =
-        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
+    let private textPart text = MessagePart.Text text
 
     let private msg id role agent finish parts =
         { Id = MessageId.create id
@@ -18,8 +16,7 @@ module TurnReconcileAdmissionTests =
           Finish = finish
           ErrorName = None
           Model = None
-          Parts = parts
-          Raw = createObj [] }
+          Parts = parts }
 
     let private binding root physical continuations role =
         { SessionId = SessionId.create "s-admission"

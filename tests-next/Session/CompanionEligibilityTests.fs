@@ -54,6 +54,7 @@ module CompanionEligibilityTests =
             let sessionRoles = Dictionary<string, string>()
             let sessionBudgets = Dictionary<string, int>()
             let sessionOutputLimits = Dictionary<string, int>()
+            let budgetStore = CompanionBudgetStore()
             let gate = obj ()
             sessionRoles.[sid] <- "manager"
             let inObj = createObj [ "sessionID", box sid; "agent", box "fast-manager" ]
@@ -69,6 +70,7 @@ module CompanionEligibilityTests =
                         None
                         sessionBudgets
                         sessionOutputLimits
+                        budgetStore
                         sessionRoles
                         None
                         inObj

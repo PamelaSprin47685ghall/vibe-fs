@@ -40,10 +40,10 @@ module ProcessBoundedTests =
                   Deadline = None
                   PtyOptions = None }
 
-            let! outcome = Runner.executeWithLauncher launcher cmd estimate defaultCtx CancellationToken.None
+            let! outcome = ProcessRunner.runWithLauncher launcher cmd estimate defaultCtx CancellationToken.None
 
             match outcome with
-            | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
+            | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                 if exitCode <> 0 then
                     failwithf "Expected exit code 0, got %d" exitCode
 
@@ -138,12 +138,12 @@ module ProcessBoundedTests =
                   PtyOptions = None }
 
             use cts = new CancellationTokenSource()
-            let running = Runner.executeWithLauncher launcher cmd estimate defaultCtx cts.Token
+            let running = ProcessRunner.runWithLauncher launcher cmd estimate defaultCtx cts.Token
             cts.Cancel()
             let! outcome = running
 
             match outcome with
-            | Error(RunnerError.ProcessCancelled reason) ->
+            | Error(ProcessError.ProcessCancelled reason) ->
                 trueThat (reason.Contains("Cancelled")) "Expected cancellation"
             | other -> failwithf "Expected ProcessCancelled, got %A" other
         }
@@ -194,13 +194,13 @@ module ProcessBoundedTests =
                   Deadline = None
                   PtyOptions = None }
 
-            let! outcome = Runner.execute cmd estimate defaultCtx CancellationToken.None
+            let! outcome = ProcessRunner.run cmd estimate defaultCtx CancellationToken.None
 
             match outcome with
-            | Ok(RunnerOutcome.Completed(exitCode, stdout, _, _)) ->
+            | Ok(ProcessOutcome.Completed(exitCode, stdout, _, _)) ->
                 trueThat (exitCode = 0) "Expected exit code 0"
                 trueThat (stdout.Contains("huge-deadline-ok")) "Expected command output"
-            | Error(RunnerError.TimeoutExceeded _) -> failwith "Huge estimate must not time out immediately"
+            | Error(ProcessError.TimeoutExceeded _) -> failwith "Huge estimate must not time out immediately"
             | Error err -> failwithf "Expected completion, got %A" err
             | _ -> failwith "Expected Completed outcome from huge-deadline command"
         }

@@ -3,7 +3,6 @@ namespace Wanxiangshu.Next.Tests.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -47,14 +46,11 @@ module HostEventRouterTests =
 
             member _.GetSessionOutput(_) = [] }
 
-    let private textPart text =
-        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
+    let private textPart text = MessagePart.Text text
 
-    let private reasoningPart text =
-        createObj [ "id", box "reasoning-1"; "type", box "reasoning"; "text", box text ]
+    let private reasoningPart text = MessagePart.Reasoning text
 
-    let private bookkeepingPart kind =
-        createObj [ "id", box ("bookkeeping-" + kind); "type", box kind ]
+    let private bookkeepingPart kind = MessagePart.Activity kind
 
     let private applyDecide sessionPort journal git verdict nudgeSent managerGuard parents turn =
         let eventPort = Events.HostEventPort()
@@ -238,8 +234,7 @@ module HostEventRouterTests =
                       Finish = Some "stop"
                       ErrorName = None
                       Model = None
-                      Parts = parts
-                      Raw = createObj [] }
+                      Parts = parts }
 
                 let turn =
                     CompletedTurnClassifier.buildTurn

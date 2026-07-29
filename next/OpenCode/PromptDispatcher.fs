@@ -29,6 +29,8 @@ module PromptDispatcher =
                   PendingClaims = Map.fold (fun m k v -> Map.add k v m) acc.PendingClaims proj.PendingClaims
                   AcceptedContinuationIds =
                     Map.fold (fun m k v -> Map.add k v m) acc.AcceptedContinuationIds proj.AcceptedContinuationIds
+                  AcceptedContinuationRoots =
+                    Map.fold (fun m k v -> Map.add k v m) acc.AcceptedContinuationRoots proj.AcceptedContinuationRoots
                   RepairClaims = Set.union acc.RepairClaims proj.RepairClaims })
             PromptAuthority.empty
 
@@ -258,22 +260,8 @@ module PromptDispatcher =
         member internal this.SubscribeNoOp (port: ISessionHostPort) (sessionId: SessionId) =
             port.SubscribeTerminal(sessionId, (fun _ _ -> ()))
 
-    let private runtimes = Dictionary<string, Runtime>()
-    let private gate = obj ()
-
     let forRuntime (runtimeId: string) (journal: AgentJournal option) =
-        let key =
-            match journal with
-            | Some j -> "journal:" + RuntimeId.value (AgentJournal.runtimeId j)
-            | None -> "ephemeral:" + runtimeId
-
-        lock gate (fun () ->
-            match runtimes.TryGetValue key with
-            | true, r -> r
-            | false, _ ->
-                let r = Runtime(runtimeId, ?journal = journal)
-                runtimes.[key] <- r
-                r)
+        Runtime(runtimeId, ?journal = journal)
 
     let forJournal (journal: AgentJournal) =
         forRuntime (RuntimeId.value (AgentJournal.runtimeId journal)) (Some journal)

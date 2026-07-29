@@ -3,7 +3,6 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
@@ -13,22 +12,14 @@ open Wanxiangshu.Next.Session.AgentRoleHelpers
 /// transcript when possible; otherwise mark Interrupted instead of faking Busy.
 module HostForkRestart =
 
-    let private textOfParts (parts: obj array) =
+    let private textOfParts (parts: MessagePart array) =
         if isNull parts then
             ""
         else
             parts
-            |> Array.choose (fun part ->
-                if isNull part then
-                    None
-                elif
-                    not (isNull part?``type``)
-                    && unbox<string> part?``type`` = "text"
-                    && not (isNull part?text)
-                then
-                    Some(unbox<string> part?text)
-                else
-                    None)
+            |> Array.choose (function
+                | MessagePart.Text text -> Some text
+                | _ -> None)
             |> String.concat ""
 
     let private lastByRole (messages: SessionMessage list) (role: string) =
@@ -85,6 +76,7 @@ module HostForkRestart =
                         runtime.PublishCompletion
                             { RunId = "run-restored-" + agentId
                               AgentId = agentId
+                              AgentName = agent
                               Role = role
                               Outcome = payload
                               CompletedAt = DateTimeOffset.UtcNow }

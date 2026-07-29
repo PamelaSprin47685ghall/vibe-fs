@@ -2,7 +2,6 @@ namespace Wanxiangshu.Next.Tests.OpenCode
 
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.OpenCode
@@ -42,8 +41,7 @@ module SessionReconcilerTests =
 
         member _.Calls = calls
 
-    let private textPart text =
-        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
+    let private textPart text = MessagePart.Text text
 
     let private msg id role agent finish parts errorName =
         { Id = MessageId.create id
@@ -52,8 +50,7 @@ module SessionReconcilerTests =
           Finish = finish
           ErrorName = errorName
           Model = None
-          Parts = parts
-          Raw = createObj [] }
+          Parts = parts }
 
     let private bind (reconciler: SessionReconciler) sessionId userId role =
         reconciler.BindActiveRun
@@ -266,7 +263,7 @@ module SessionReconcilerTests =
 
     [<Fact>]
     let ``Wrong_role_does_not_need_continuation`` () =
-        let parts = [| createObj [ "id", box "p"; "type", box "text"; "text", box "" ] |]
+        let parts = [| MessagePart.Text "" |]
 
         Assert.False(
             CompletedTurnClassifier.needsZeroWidthContinuation

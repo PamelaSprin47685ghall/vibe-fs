@@ -8,9 +8,9 @@ open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Orchestrator
 open Wanxiangshu.Next.Session
 
-/// Durable ManagerJob lifecycle helpers for OrchestratorHost: review-barrier
+/// Durable ManagerJobProjection lifecycle helpers for OrchestratorHost: review-barrier
 /// emission plus lazy journal recovery and conflict-resumption prompt building
-/// for persisted ManagerJobs.
+/// for persisted ManagerJobProjections.
 module OrchestratorManagerJob =
     /// Emit a ReviewBarrierStarted fact that resets the review guard so the
     /// phase requires two FRESH PERFECT verdicts on the current tree.
@@ -40,7 +40,7 @@ module OrchestratorManagerJob =
 
     /// Build the recovery prompt for a manager job: conflict-resumption prompt
     /// when REBASE_HEAD exists and no candidate, otherwise the original prompt.
-    let recoveryPrompt (gitPort: GitPort) (job: ManagerJob) : Task<string> =
+    let recoveryPrompt (gitPort: GitPort) (job: ManagerJobProjection) : Task<string> =
         task {
             let! hasRb = gitPort.HasRebaseHead job.WorktreePath
 
@@ -54,7 +54,7 @@ module OrchestratorManagerJob =
                 return job.Prompt
         }
 
-    /// Reconcile and recover durable ManagerJobs from the journal into a freshly
+    /// Reconcile and recover durable ManagerJobProjections from the journal into a freshly
     /// built Orchestrator. Runs only during on-demand engine initialization
     /// (lazy engine load): it persists no Task/handle/phase and performs no
     /// boot-time scan — recovery is the idempotent publish-chain re-run.

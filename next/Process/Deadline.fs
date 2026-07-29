@@ -11,7 +11,17 @@ module Deadline =
     [<Literal>]
     let MaxTimerWaitMs = 2147483647
 
-    let ofBudget (now: DateTimeOffset) (budget: TimeSpan) : Deadline = Deadline(now.Add(budget))
+    /// Build a deadline from the current clock and a time budget, clamping to
+    /// DateTimeOffset.MaxValue so the calculation cannot overflow.
+    let ofBudget (now: DateTimeOffset) (budget: TimeSpan) : Deadline =
+        let safeBudget =
+            try
+                let maxBudget = DateTimeOffset.MaxValue - now
+                if budget > maxBudget then maxBudget else budget
+            with
+            | _ -> budget
+
+        Deadline(now.Add(safeBudget))
 
     let remaining (clock: unit -> DateTimeOffset) (Deadline expiresAt: Deadline) : TimeSpan =
         let rem = expiresAt - clock ()

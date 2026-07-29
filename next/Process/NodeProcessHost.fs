@@ -78,11 +78,21 @@ module NodeProcessHost =
     """)>]
     let private consumeStreamAsync (stream: obj) (consume: byte[] -> Task<unit>) : Task<unit> = jsNative
 
+    /// Handle returned by spawn. Exit and OnExited are single-assignment: the
+    /// close/error handler completes the exit TCS, then wakes any waiters.
     type ChildProcess =
         { Process: obj
           Exit: TaskCompletionSource<int * bool>
           Kill: unit -> unit
-          Exited: bool ref }
+          Exited: bool ref
+          OnExited: (unit -> unit) ResizeArray }
+
+    let private notifyExitedList (callbacks: (unit -> unit) ResizeArray) =
+        let cbs = callbacks |> Seq.toList
+        callbacks.Clear()
+        for cb in cbs do cb ()
+
+    let notifyExited (child: ChildProcess) = notifyExitedList child.OnExited
 
     let private buildEnv (envOpt: Map<string, string> option) : obj =
         let jsEnv = processEnv ()
@@ -141,6 +151,7 @@ module NodeProcessHost =
                     return Error(sprintf "Failed to spawn process: %s" cmd.FileName)
                 else
                     let exitTcs = TaskCompletionSource<int * bool>()
+                    let onExited = ResizeArray<unit -> unit>()
 
                     let stdout = stdoutOf child
                     let stderr = stderrOf child
@@ -153,16 +164,17 @@ module NodeProcessHost =
 
                     let exitedRef = ref false
 
-
                     emitJsExpr
                         (child,
                          (fun (code: obj) ->
                              let c = if isNull code then 0 else unbox<int> code
                              exitedRef.Value <- true
-                             trySetResult exitTcs (c, false) |> ignore),
+                             trySetResult exitTcs (c, false) |> ignore
+                             notifyExitedList onExited),
                          (fun _err ->
                              exitedRef.Value <- true
-                             trySetResult exitTcs (-1, false) |> ignore))
+                             trySetResult exitTcs (-1, false) |> ignore
+                             notifyExitedList onExited))
                         "if ($0) { $0.on('close', function(code) { $1(typeof code === 'number' ? code : 0); }); $0.on('error', function(err) { $2(err); }); }"
                     |> ignore
 
@@ -187,30 +199,9 @@ module NodeProcessHost =
                                         killProcessGroup child
                                     with _ ->
                                         ()
-                              Exited = exitedRef }
+                              Exited = exitedRef
+                              OnExited = onExited }
         }
-
-    let private taskDelay (ms: int) (ct: CancellationToken) : Task<unit> =
-        let tcs = TaskCompletionSource<unit>()
-        let mutable completed = false
-
-        let timerId =
-            emitJsExpr
-                (ms,
-                 (fun () ->
-                     if not completed then
-                         completed <- true
-                         tcs.SetResult()))
-                "setTimeout($1, $0)"
-
-        use _ =
-            ct.Register(fun () ->
-                if not completed then
-                    completed <- true
-                    emitJsExpr timerId "clearTimeout($0)" |> ignore
-                    trySetCanceled tcs |> ignore)
-
-        tcs.Task
 
     let tempPath () : string =
         pathJoin (tmpdir ()) (sprintf "spool-%s.tmp" (Guid.NewGuid().ToString("N").Substring(0, 8)))

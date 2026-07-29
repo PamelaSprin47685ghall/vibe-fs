@@ -3,7 +3,6 @@ namespace Wanxiangshu.Next.Tests.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -41,8 +40,7 @@ module ReviewRequirementBoundaryTests =
             member _.CreateChildSession(_, _) = Task.FromResult(Ok(SessionId.create "child"))
             member _.GetSessionOutput(_) = [] }
 
-    let private textPart text =
-        createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
+    let private textPart text = MessagePart.Text text
 
     let private applyDecide sessionPort journal parents turn =
         let eventPort = Events.HostEventPort()

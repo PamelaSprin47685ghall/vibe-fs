@@ -10,6 +10,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
+open CompanionProjection
 
 type SpikePluginConfig =
     { Directory: string
@@ -28,9 +29,12 @@ module SpikePluginHelpers =
     let systemTransformHook
         (sessionBudgets: Dictionary<string, int>)
         (sessionOutputLimits: Dictionary<string, int>)
+        (budgetStore: CompanionBudgetStore)
         : obj =
+        let remember = fun sessionId budget -> budgetStore.Remember(sessionId, budget)
+
         emitJsExpr
-            (sessionBudgets, sessionOutputLimits, CompanionTransformHelpers.rememberBloggerBudget)
+            (sessionBudgets, sessionOutputLimits, remember)
             """
           (input, output) => {
             if (input && input.sessionID && input.model && input.model.limit) {
@@ -73,27 +77,24 @@ module SpikePluginHelpers =
         (journal: AgentJournal option)
         (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
-        (sessionParents: Dictionary<string, string>)
-        (sessionRoles: Dictionary<string, string>)
+        (scope: PluginRuntimeScope)
         (currentPhysicalUserMessage: string -> string option)
-        (verdictSessions: HashSet<string>)
-        (sessionDirectories: Dictionary<string, string>)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
         (backgroundBFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
-        : obj =
-        ToolSurface.create
+        : ToolRegistration =
+        ToolRegistry.create
             toolModule
             sessionPort
             journal
             gitTreePort
             workspaceDirectory
-            sessionParents
-            sessionRoles
+            scope.SessionParents
+            scope.SessionRoles
             currentPhysicalUserMessage
-            verdictSessions
-            sessionDirectories
+            scope.VerdictSessions
+            scope.SessionDirectories
             onRunStarted
             backgroundBFor
             snapshot

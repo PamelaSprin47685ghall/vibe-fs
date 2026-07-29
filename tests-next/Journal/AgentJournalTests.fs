@@ -29,7 +29,7 @@ module AgentJournalTests =
                 Assert.True(initSnap.AgentProjections.Sessions.IsEmpty)
 
                 let fact =
-                    AgentFact.FallbackFailureRecorded
+                    AgentFact.FallbackCursorAdvanced
                         {| SessionId = sid
                            LogicalRunId = "run-test"
                            AuthorityRootUserMessageId = "root-test"
@@ -73,7 +73,7 @@ module AgentJournalTests =
                 (journal :> IDisposable).Dispose()
 
                 let fact =
-                    AgentFact.FallbackFailureRecorded
+                    AgentFact.FallbackCursorAdvanced
                         {| SessionId = sid
                            LogicalRunId = "run-test"
                            AuthorityRootUserMessageId = "root-test"
@@ -161,7 +161,7 @@ module AgentJournalTests =
                 let sessionId = SessionId.create "s-boot-history"
 
                 let fact =
-                    AgentFact.FallbackFailureRecorded
+                    AgentFact.FallbackCursorAdvanced
                         {| SessionId = sessionId
                            LogicalRunId = "run-test"
                            AuthorityRootUserMessageId = "root-test"

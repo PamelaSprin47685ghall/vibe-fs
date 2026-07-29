@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Session
 
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
@@ -61,7 +62,7 @@ type ReviewerHost
                             session.ReviewGuard
                             |> Option.exists (fun existing ->
                                 existing.LastGitTreeHash = Some(GitTreeHash.create treeHash)
-                                && existing.ConsecutivePerfects >= 1
+                                && ReviewWitness.isPerfectPending existing.Witness
                                 && not existing.IsConfirmed
                                 && not (
                                     ReviewConfirmation.isSecondPerfectConfirmed
@@ -69,7 +70,6 @@ type ReviewerHost
                                         existing
                                         reviewerSessionId
                                         providerRunId
-                                        promptText
                                         userMsg
                                 ))
                         | None -> false

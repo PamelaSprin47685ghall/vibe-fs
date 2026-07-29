@@ -33,7 +33,7 @@ module JournalWriterTests =
 
                 let agentFact =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = sid
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -87,7 +87,7 @@ module JournalWriterTests =
 
                 let fact =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = SessionId.create "s1"
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -119,7 +119,7 @@ module JournalWriterTests =
                     |> Array.map (fun i ->
                         let fact =
                             Fact.Agent(
-                                AgentFact.FallbackFailureRecorded
+                                AgentFact.FallbackCursorAdvanced
                                     {| SessionId = SessionId.create (sprintf "s%d" i)
                                        LogicalRunId = "run-test"
                                        AuthorityRootUserMessageId = "root-test"

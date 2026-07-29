@@ -38,10 +38,10 @@ module PromptAuthorityFactTests =
                    HostMessageId = "repair-physical" |}
 
         let projection =
-            AgentFacts.empty
-            |> fun projection -> AgentFacts.foldAgentFact projection root
-            |> fun projection -> AgentFacts.foldAgentFact projection claim
-            |> fun projection -> AgentFacts.foldAgentFact projection accepted
+            AgentProjection.empty
+            |> fun projection -> Fold.foldAgentFact projection root
+            |> fun projection -> Fold.foldAgentFact projection claim
+            |> fun projection -> Fold.foldAgentFact projection accepted
 
         let authority = projection.Sessions.[sessionId].PromptAuthority |> Option.get
 

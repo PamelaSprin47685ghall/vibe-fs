@@ -37,7 +37,6 @@
     <Compile Include="Process/PtyTests.fs"/>
     <Compile Include="Process/PtyOwnershipTests.fs"/>
     <Compile Include="Process/PtyLifecycleTests.fs"/>
-    <Compile Include="Agent/ProgramsTests.fs"/>
     <Compile Include="Session/ForkRuntimeTests.fs"/>
     <Compile Include="Session/ForkRuntimeJoinTests.fs"/>
     <Compile Include="Session/HostForkRuntimeTests.fs"/>
@@ -52,10 +51,12 @@
     <Compile Include="Session/CompanionResetTests.fs"/>
     <Compile Include="Session/RolesTests.fs"/>
     <Compile Include="Session/ReviewGuardTests.fs"/>
+    <Compile Include="OpenCode/VerdictToolTests.fs"/>
     <Compile Include="Session/ReviewerHostTests.fs"/>
     <Compile Include="Session/DurableFallbackTests.fs"/>
     <Compile Include="Review/GuardTests.fs"/>
     <Compile Include="Review/GuardDurableTests.fs"/>
+    <Compile Include="OpenCode/PluginRuntimeScopeTests.fs"/>
     <Compile Include="OpenCode/EventsTests.fs"/>
     <Compile Include="OpenCode/ProjectionCanonicalTests.fs"/>
     <Compile Include="OpenCode/SpikeHostTests.fs"/>
@@ -79,7 +80,7 @@
     <Compile Include="OpenCode/ManagedAgentTests.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeTests.fs"/>
     <Compile Include="OpenCode/ExecutorMailboxOwnershipTests.fs"/>
-    <Compile Include="OpenCode/ToolSurfaceJoinAbortTests.fs"/>
+    <Compile Include="OpenCode/ToolRegistryAbortTests.fs"/>
     <Compile Include="OpenCode/ManagerEscCancelE2ETests.fs"/>
     <Compile Include="MockOpenCode/MockOpenCode.fs"/>
     <Compile Include="MockOpenCode/ForkRuntimeIntegration.fs"/>
@@ -94,6 +95,7 @@
     <Compile Include="Integration/ManagerCanaryTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>
     <Compile Include="Gates/ArchitectureGates.fs"/>
+    <Compile Include="Gates/ArchitectureGates17.fs"/>
     <Compile Include="GuideContract/Signatures.fs"/>
   </ItemGroup>
 </Project>

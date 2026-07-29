@@ -33,10 +33,7 @@ module CompanionResetTests =
                   AssistantMessageId = MessageId.create "blog"
                   Role = "test"
                   Directory = ""
-                  FinalText = "blogger private thought\n\nblog paragraph"
-                  Parts =
-                    [| createObj [ "type", box "reasoning"; "text", box "blogger private thought" ]
-                       createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
+                  FinalText = "blogger private thought\n\nblog paragraph" }
             )
 
         let mutable growOutput = true
@@ -173,8 +170,7 @@ module CompanionResetTests =
                           AssistantMessageId = MessageId.create "empty"
                           Role = "test"
                           Directory = ""
-                          FinalText = ""
-                          Parts = [||] }
+                          FinalText = "" }
                     )
                 )
 
@@ -191,12 +187,7 @@ module CompanionResetTests =
                           AssistantMessageId = MessageId.create "success"
                           Role = "test"
                           Directory = ""
-                          FinalText = "blogger private thought\n\nblog paragraph"
-                          Parts =
-                            [| createObj
-                                   [ "type", box "reasoning"
-                                     "text", box "blogger private thought" ]
-                               createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
+                          FinalText = "blogger private thought\n\nblog paragraph" }
                     )
                 )
 

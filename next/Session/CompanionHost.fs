@@ -159,6 +159,7 @@ type CompanionHost
             if started then Submitted else SkippedBusy
 
     member _.Memory = companion.Memory
+    member _.ReplacementActive = companion.ReplacementActive
 
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
 
@@ -202,7 +203,7 @@ type CompanionHost
 
         let memory = companion.Memory
 
-        match memory.ReplacementActive, memory.ActivePrefixEpoch with
+        match companion.ReplacementActive, memory.ActivePrefixEpoch with
         | true, Some epoch ->
             // Coverage proof before deleting raw prefix. Fail closed on mismatch.
             if epoch.CutoffMessageIndex <= 0 || epoch.CutoffMessageIndex > List.length messages then

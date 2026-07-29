@@ -176,21 +176,17 @@ module StaticTools =
                           EstimatedOutput = OutputBytes 200000L
                           EstimatedMemory = EstimatedMemory.Medium }
 
-                    let! res = Runner.execute cmd estimate procCtx ctx.Cancellation
+                    let! res = ProcessRunner.run cmd estimate procCtx ctx.Cancellation
 
                     match res with
-                    | Ok(RunnerOutcome.Completed(code, stdout, stderr, _)) ->
+                    | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) ->
                         return
                             { Result = sprintf "Exit: %d\nStdout: %s\nStderr: %s" code stdout stderr
                               Truncated = false }
-                    | Ok(RunnerOutcome.Spooled(code, path, totalBytes, chunks)) ->
+                    | Ok(ProcessOutcome.Spooled(code, path, totalBytes, chunks)) ->
                         return
                             { Result = sprintf "Exit: %d\nSpool: %s\nBytes: %d\nChunks: %d" code path totalBytes chunks
                               Truncated = false }
-                    | Ok(RunnerOutcome.OutputExceeded(bytes, path)) ->
-                        return
-                            { Result = sprintf "Output exceeded budget: %d (%A)" bytes path
-                              Truncated = true }
                     | Error err ->
                         return
                             { Result = sprintf "Error: %A" err

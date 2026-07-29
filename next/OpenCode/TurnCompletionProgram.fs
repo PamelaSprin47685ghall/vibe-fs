@@ -140,8 +140,7 @@ module TurnCompletionProgram =
                   AssistantMessageId = turn.AssistantMessageId
                   Role = roleStr
                   Directory = turn.Directory
-                  FinalText = finalA
-                  Parts = turn.Parts }
+                  FinalText = finalA }
 
             // A first PERFECT is not a child completion. Keep the reviewer's
             // physical handle live until the confirmation prompt causes a

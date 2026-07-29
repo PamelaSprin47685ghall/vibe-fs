@@ -17,8 +17,7 @@ module HostForkRestartTests =
           Finish = finish
           ErrorName = None
           Model = None
-          Parts = [| box ({| ``type`` = "text"; text = text |}) |]
-          Raw = null }
+          Parts = [| MessagePart.Text text |] }
 
     let private snapshotOf (messages: Map<string, SessionMessage list>) =
         { new ISessionSnapshotPort with

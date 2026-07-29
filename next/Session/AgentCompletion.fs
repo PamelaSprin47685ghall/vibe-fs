@@ -123,10 +123,28 @@ module AgentCompletion =
         | Some value when not (System.String.IsNullOrWhiteSpace value) -> Some(snapshotFromText value)
         | _ -> None
 
+/// A completed (or failed/aborted) agent run.
+///
+/// Future: AgentId will be removed in P6 since the agent identity is the
+/// key in ForkRuntime's Map<string, ChildRun>. AgentName is the preferred
+/// field for consumer code that needs the managed agent name.
 type RunCompletion =
-    { RunId: string
+    { /// Unique identity for this run attempt.
+      RunId: string
+
+      /// DEPRECATED: The agentId that owns this completion. Kept for HostFork*
+      /// backward compatibility. New code should use the Map key or AgentName.
       AgentId: string
+
+      /// The managed agent name (e.g. "fast-coder", "deep-reviewer").
+      AgentName: string
+
+      /// Canonical role of the agent.
       Role: AgentRole
+
+      /// The completion outcome (completed/failed/aborted payload).
       Outcome: AgentCompletionOutcome
+
+      /// When the run reached terminal state.
       CompletedAt: DateTimeOffset }
 

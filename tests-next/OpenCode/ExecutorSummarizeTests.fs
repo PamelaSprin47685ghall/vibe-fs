@@ -18,6 +18,7 @@ module ExecutorSummarizeTests =
     let private mkCompletion (agentId: string) (outcome: AgentCompletionOutcome) =
         { RunId = "run-" + agentId
           AgentId = agentId
+          AgentName = "fast-executor"
           Role = AgentRole.Executor
           Outcome = outcome
           CompletedAt = DateTimeOffset.UtcNow }
@@ -227,8 +228,7 @@ module ExecutorSummarizeTests =
                           AssistantMessageId = MessageId.create "m-1"
                           Role = "test"
                           Directory = ""
-                          FinalText = "done"
-                          Parts = [||] }
+                          FinalText = "done" }
                     )))
 
         host, trigger, (fun () -> childCount), (fun () -> childPromptCount)

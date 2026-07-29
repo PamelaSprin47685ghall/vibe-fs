@@ -50,7 +50,7 @@ module AgentFactsOrchestratorTests =
         let env1 = createTestEnv 1L t0 regFact rt
         let env2 = createTestEnv 2L (t0.AddSeconds 1.0) pubFact rt
 
-        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
+        let proj = Fold.applyAgentFacts AgentProjection.empty [ env1; env2 ]
 
         let mgrId = ManagerId.create mgrIdStr
         // Terminal facts remove the manager from both active maps; only the
@@ -82,7 +82,7 @@ module AgentFactsOrchestratorTests =
         let env1 = createTestEnv 1L t0 regFact rt
         let env2 = createTestEnv 2L (t0.AddSeconds 1.0) rejFact rt
 
-        let proj = AgentFacts.apply AgentFacts.empty [ env1; env2 ]
+        let proj = Fold.applyAgentFacts AgentProjection.empty [ env1; env2 ]
 
         let mgrId = ManagerId.create mgrIdStr
         Assert.False(proj.Orchestrator.Managers.ContainsKey mgrId)
@@ -131,7 +131,7 @@ module AgentFactsOrchestratorTests =
             facts
             |> List.mapi (fun i f -> createTestEnv (int64 (i + 1)) (t0.AddSeconds(float i)) f rt)
 
-        let proj = AgentFacts.apply AgentFacts.empty envs
+        let proj = Fold.applyAgentFacts AgentProjection.empty envs
         let mgrId = ManagerId.create mgrIdStr
         let job = proj.Orchestrator.ManagerJobs.[mgrId]
         Assert.Equal(Some "h1", job.PreRebaseReviewCommit)
@@ -173,7 +173,7 @@ module AgentFactsOrchestratorTests =
             facts
             |> List.mapi (fun i f -> createTestEnv (int64 (i + 1)) (t0.AddSeconds(float i)) f rt)
 
-        let proj = AgentFacts.apply AgentFacts.empty envs
+        let proj = Fold.applyAgentFacts AgentProjection.empty envs
         let mgrId = ManagerId.create mgrIdStr
         Assert.False(proj.Orchestrator.ManagerJobs.ContainsKey mgrId)
         Assert.False(proj.Orchestrator.Managers.ContainsKey mgrId)

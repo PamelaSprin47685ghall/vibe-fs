@@ -31,7 +31,9 @@ module OrchestratorTests =
           HasRebaseHead = fun _ -> Task.FromResult false
           ListWorktrees = fun () -> Task.FromResult(Ok [])
           ListManagerBranches = fun () -> Task.FromResult(Ok [])
-          DeleteBranch = fun _ -> Task.FromResult(Ok()) }
+          DeleteBranch = fun _ -> Task.FromResult(Ok())
+          ReadHead = fun _ -> Task.FromResult(Ok "commit-123456")
+          GetTargetHead = fun _ -> Task.FromResult(Ok "commit-123456") }
 
     let private createStubManagerPort () =
         { RunManager = fun _ _ _ -> Task.FromResult(Ok())
@@ -175,5 +177,5 @@ module OrchestratorTests =
             | other -> failwithf "Expected NeedsReview, got %A" other
 
             falseThat ffCalled "FF merge must not run after review failure"
-            falseThat removeCalled "cleanup must not run after review failure"
+            trueThat removeCalled "worktree resource must release after review failure"
         }

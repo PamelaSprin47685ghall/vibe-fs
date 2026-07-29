@@ -28,13 +28,13 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     let mutable activePrefixEpoch: ActivePrefixEpoch option =
         restoredMemory |> Option.bind (fun m -> m.ActivePrefixEpoch)
 
-    let mutable replacementActive: bool =
+    let mutable prefixReplacementEnabled =
         restoredMemory
-        |> Option.map (fun m -> m.ReplacementActive)
+        |> Option.map (fun m -> m.PrefixReplacementEnabled || m.ActivePrefixEpoch.IsSome)
         |> Option.defaultValue false
 
     let mutable inFlightTask: Task<unit> option = None
-    let mutable busy = false
+    let mutable inFlightCompleted: bool = true
 
     let persistSuccessful (projection: ProjectionSnapshot) (content: BlogText) =
         match durable, sessionId with
@@ -54,20 +54,24 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     let startAsTask (work: Async<unit>) : Task<unit> =
         let completion = TaskCompletionSource<unit>()
+        inFlightCompleted <- false
 
         Async.StartImmediate(
             async {
                 try
                     do! work
                 finally
-                    busy <- false
+                    inFlightCompleted <- true
                     completion.SetResult(())
             }
         )
 
         completion.Task
 
-    let isBusyUnlocked () = busy
+    let isBusyUnlocked () =
+        match inFlightTask with
+        | Some _ when not inFlightCompleted -> true
+        | _ -> false
 
     let makeEpoch (cutoff: int) (digest: string) (frozenB: BlogText) : ActivePrefixEpoch =
         let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
@@ -82,8 +86,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             { LastSuccessfulProjection = lastSuccessfulProjection
               LatestB = latestB
               ActivePrefixEpoch = activePrefixEpoch
-              BloggerBusy = isBusyUnlocked ()
-              ReplacementActive = replacementActive })
+              PrefixReplacementEnabled = prefixReplacementEnabled })
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory
@@ -97,24 +100,23 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         | Some t -> t :> Task
         | None -> Task.FromResult(()) :> Task
 
-    member _.ReplacementActive
-        with get () = lock lockObj (fun () -> replacementActive)
-        and set value = lock lockObj (fun () -> replacementActive <- value)
+    member _.ReplacementActive =
+        lock lockObj (fun () -> prefixReplacementEnabled)
 
-    member this.TryEnableReplacement() : bool =
+    member _.TryEnableReplacement() : bool =
         lock lockObj (fun () ->
-            if replacementActive then
+            if prefixReplacementEnabled then
                 true
             else
                 match durable, sessionId with
                 | Some port, Some sid ->
                     match port.EnableReplacement sid with
                     | Ok() ->
-                        replacementActive <- true
+                        prefixReplacementEnabled <- true
                         true
                     | Error _ -> false
                 | _ ->
-                    replacementActive <- true
+                    prefixReplacementEnabled <- true
                     true)
 
     member this.TryRebase(rebaseFn: unit -> Async<BlogText * ProjectionSnapshot>) : bool =
@@ -122,8 +124,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             if isBusyUnlocked () then
                 false
             else
-                busy <- true
-
                 let t =
                     async {
                         try
@@ -150,8 +150,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             if isBusyUnlocked () then
                 false
             else
-                busy <- true
-
                 let t =
                     async {
                         try
@@ -182,6 +180,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                 let epoch = makeEpoch cutoffMessageIndex coveredPrefixDigest b
                 persistEpochSwitched epoch
                 activePrefixEpoch <- Some epoch
+                prefixReplacementEnabled <- true
                 true)
 
     /// Explicit cold-cache epoch switch from a coverage-validated cutoff and digest.
@@ -194,6 +193,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                 let epoch = makeEpoch cutoffMessageIndex coveredPrefixDigest b
                 persistEpochSwitched epoch
                 activePrefixEpoch <- Some epoch
+                prefixReplacementEnabled <- true
                 true)
 
 
@@ -207,8 +207,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                 match Companion.jsonDelta lastSuccessfulProjection currentProjection with
                 | None -> Submitted
                 | Some delta ->
-                    busy <- true
-
                     let t =
                         async {
                             try

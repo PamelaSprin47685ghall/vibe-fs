@@ -4,7 +4,7 @@
  * resets Failures=0/Side=A. Omit-model inherits LastAuthority.BaseModel only,
  * never old Side B.
  *
- * This canary proves durable FallbackFailureRecorded facts under host retry
+ * This canary proves durable FallbackCursorAdvanced facts under host retry
  * signals + omit-model BaseModel inheritance.
  *
  * Final 0.4.0 still requires provider-visible same-run A→A→B→B request

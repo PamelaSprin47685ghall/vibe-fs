@@ -7,15 +7,13 @@ open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
-open CompanionTransformHelpers
+open CompanionProjection
 
 module CompanionTransform =
 
-    let bloggerSelfRebaseDue = CompanionTransformHelpers.bloggerSelfRebaseDue
-    let shouldSwitchEpoch = CompanionTransformHelpers.shouldSwitchEpoch
-    let rememberedBloggerBudget = CompanionTransformHelpers.rememberBloggerBudget
-    let bloggerBudgetForPrimary = CompanionTransformHelpers.bloggerBudgetForPrimary
-    let estimateTokensUtf8 = CompanionTransformHelpers.estimateTokensUtf8
+    let bloggerSelfRebaseDue = CompanionProjection.bloggerSelfRebaseDue
+    let shouldSwitchEpoch = CompanionProjection.shouldSwitchEpoch
+    let estimateTokensUtf8 = CompanionProjection.estimateTokensUtf8
 
     let handleCompanionTransform
         (companions: Dictionary<string, CompanionHost>)
@@ -24,6 +22,7 @@ module CompanionTransform =
         (journal: AgentJournal option)
         (sessionBudgets: Dictionary<string, int>)
         (sessionOutputLimits: Dictionary<string, int>)
+        (budgetStore: CompanionBudgetStore)
         (sessionRoles: Dictionary<string, string>)
         (onBloggerCreated: (SessionId -> unit) option)
         (inObj: obj)
@@ -198,7 +197,7 @@ module CompanionTransform =
                                     shouldSwitchEpoch budgetFacts rawMessages (Some latestB) coverageCutoff digest
                                 with
                                 | Some candidate ->
-                                    if not memory.ReplacementActive then
+                                    if not companion.ReplacementActive then
                                         companion.EnablePrefixReplacement() |> ignore
 
                                     companion.FreezeEpoch(candidate.CutoffMessageIndex, candidate.CoveredPrefixDigest)
@@ -251,12 +250,12 @@ module CompanionTransform =
                 // sets the companion busy for that delta; if we check afterwards,
                 // every non-empty turn permanently skips self-rebase and Y never
                 // condenses even after crossing its own budget.
-                let bloggerBudget = bloggerBudgetForPrimary sessionId
+                let bloggerBudget = budgetStore.BudgetFor sessionId
 
                 // If the host never recorded a blogger-model budget for this
                 // primary (e.g. system.transform omitted parentID), still honour
                 // the operator/test override so threshold canaries stay deterministic.
-                rememberBloggerBudget sessionId bloggerBudget
+                budgetStore.Remember(sessionId, bloggerBudget)
 
                 match companion.Memory.LatestB with
                 | Some blog when bloggerSelfRebaseDue bloggerBudget blog -> companion.SelfRebase() |> ignore

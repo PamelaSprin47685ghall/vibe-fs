@@ -31,7 +31,9 @@ module ManagerCanaryTests =
           HasRebaseHead = fun _ -> Task.FromResult false
           ListWorktrees = fun () -> Task.FromResult(Ok [])
           ListManagerBranches = fun () -> Task.FromResult(Ok [])
-          DeleteBranch = fun _ -> Task.FromResult(Ok()) }
+          DeleteBranch = fun _ -> Task.FromResult(Ok())
+          ReadHead = fun _ -> Task.FromResult(Ok "commit-canary-123")
+          GetTargetHead = fun _ -> Task.FromResult(Ok "commit-canary-123") }
 
     let private createStubManagerPort () =
         { RunManager = fun _ _ _ -> Task.FromResult(Ok())

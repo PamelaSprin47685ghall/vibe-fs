@@ -28,9 +28,10 @@ type HostForkRuntime
         ?childWorkRecordFor: SessionId -> string option,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelFallbackRetries: SessionId seq -> unit,
-        ?cancelSignals: SessionId seq -> unit
+        ?cancelSignals: SessionId seq -> unit,
+        ?publishToMailbox: bool
     ) as this =
-    let runtime = ForkRuntime()
+    let runtime = ForkRuntime(publishToMailbox = defaultArg publishToMailbox true)
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
@@ -156,6 +157,12 @@ type HostForkRuntime
         task {
             do! this.AwaitRecovery()
             return! runtime.Join()
+        }
+
+    member this.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =
+        task {
+            do! this.AwaitRecovery()
+            return! runtime.AwaitAgent agentId
         }
 
     member _.List() = runtime.List()

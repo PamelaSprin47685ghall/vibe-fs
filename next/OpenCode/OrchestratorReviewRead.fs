@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 
@@ -36,7 +37,7 @@ module OrchestratorReviewRead =
                         return Ok Confirmed
                     | Some guard when
                         guard.LastGitTreeHash = Some(GitTreeHash.create tree)
-                        && guard.ConsecutivePerfects = 1
+                        && ReviewWitness.isPerfectPending guard.Witness
                         && not guard.IsConfirmed
                         ->
                         return Ok PendingConfirmation

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Tests.JournalTests
 
 open System
 open Xunit
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -81,4 +82,4 @@ module JournalFoldTests =
         Assert.Equal(Some rt, proj.RuntimeId)
         Assert.True(proj.AgentProjections.Sessions.ContainsKey sid)
         let rg = proj.AgentProjections.Sessions.[sid].ReviewGuard.Value
-        Assert.Equal(1, rg.ConsecutivePerfects)
+        Assert.True(ReviewWitness.isPerfectPending rg.Witness)

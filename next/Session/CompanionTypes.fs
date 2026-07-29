@@ -23,10 +23,7 @@ type CompanionMemory =
     { LastSuccessfulProjection: ProjectionSnapshot option
       LatestB: BlogText option
       ActivePrefixEpoch: ActivePrefixEpoch option
-      BloggerBusy: bool
-      ReplacementActive: bool }
-
-    member this.PrefixReplacementEnabled = this.ReplacementActive
+      PrefixReplacementEnabled: bool }
 
 type ICompanionDurablePort =
     abstract Load: SessionId -> CompanionMemory option

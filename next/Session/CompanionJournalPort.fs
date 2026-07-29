@@ -30,8 +30,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                                 FrozenB = epoch.FrozenB
                                 CutoffMessageIndex = epoch.CutoffMessageIndex
                                 CoveredPrefixDigest = epoch.CoveredPrefixDigest })
-                      BloggerBusy = false
-                      ReplacementActive = companion.ReplacementActive }))
+                      PrefixReplacementEnabled = companion.ReplacementActive }))
 
         member _.AppendSuccessful(sessionId, projection, content) =
             append sessionId

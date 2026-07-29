@@ -31,7 +31,9 @@ type GitPort =
       HasRebaseHead: string -> Task<bool>
       ListWorktrees: unit -> Task<Result<(string * string option) list, string>>
       ListManagerBranches: unit -> Task<Result<string list, string>>
-      DeleteBranch: string -> Task<Result<unit, string>> }
+      DeleteBranch: string -> Task<Result<unit, string>>
+      ReadHead: string -> Task<Result<string, string>>
+      GetTargetHead: string -> Task<Result<string, string>> }
 
 type ManagerPort =
     { RunManager: string -> string -> string -> Task<Result<unit, string>>
@@ -49,6 +51,14 @@ module OrchestratorJournalPort =
                 | Ok projection -> Ok projection
                 | Error failure -> Error(sprintf "%A" failure.Failure)
           Snapshot = fun () -> AgentJournal.snapshot journal }
+
+type OrchestratorProgramDeps =
+    { Git: GitPort
+      Manager: ManagerPort
+      AppendFact: StreamId -> AgentFact -> Result<unit, string>
+      Snapshot: unit -> ProjectionSet
+      TargetBranch: string
+      GatePath: string }
 
 type GitAuthorityPort =
     { GetHead: string -> Task<Result<string, string>>

@@ -82,7 +82,7 @@ module HostForkRuntimeSessionDeadTests =
             AgentJournal.appendAgent
                 (StreamId.Session childId)
                 None
-                (AgentFact.FallbackFailureRecorded
+                (AgentFact.FallbackCursorAdvanced
                     {| SessionId = childId
                        LogicalRunId = "run-test"
                        AuthorityRootUserMessageId = "root-test"

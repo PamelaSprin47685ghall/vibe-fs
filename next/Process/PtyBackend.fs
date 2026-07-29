@@ -1,24 +1,20 @@
 namespace Wanxiangshu.Next.Process
 
 open System
-open System.Collections.Generic
-open System.Text
+open System.Threading
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Session
 
 /// Production PTY backend: drives bun-pty under the OpenCode/Bun host.
-/// All per-port backend state lives inside the record built by createPort so
-/// that two PtyPorts never share live/pending/spawn state. The live-handle
-/// registry and spawn bookkeeping live in PtyBackendRegistry; this file keeps
-/// the command pipeline (handle) and the port assembly (createPort).
+/// All per-PTY state lives in PtySession/PtySupervisor; this file keeps the
+/// command pipeline and the port assembly.
 module PtyBackend =
 
-    open PtyBackendRegistry
+    open PtySession
+    open PtySupervisor
 
     let private handle
-        (state: BackendState)
+        (super: PtySupervisor)
         (port: PtyPort)
         (id: PtyId)
         (command: PtyCommand)
@@ -30,9 +26,9 @@ module PtyBackend =
                 port.RegisterExitTask(id, exitTcs.Task)
 
                 try
-                    do! ensureSpawn state
-                    let term = spawnSync state cmd cwd
-                    attach state port id term exitTcs
+                    do! ensureSpawn super
+                    let term = spawnSync super cmd cwd
+                    attach super port id term exitTcs
                     return Ok()
                 with ex ->
                     try
@@ -44,25 +40,25 @@ module PtyBackend =
                     // Flush any parked reader and pending pre-attach writes.
                     port.FailRead(id, msg)
 
-                    for (_, tcsOpt) in takePending state id do
+                    for (_, tcsOpt) in takePending super id do
                         tcsOpt |> Option.iter (fun t -> t.SetResult(Error msg))
 
-                    drop state id |> ignore
+                    drop super id |> ignore
                     port.Complete(id, Error msg)
                     return Error msg
-            | other -> return! applyLive state port id other
+            | other -> return! applyLive super port id other
         }
 
     /// Builds a PtyPort whose handler drives real bun-pty sessions. Each call
     /// yields a port with fully isolated backend state.
     let createPort () : PtyPort =
-        let state = BackendState.Create()
+        let super = create ()
         let mutable portRef: PtyPort option = None
 
         let handler (id: PtyId) (command: PtyCommand) : Task<Result<unit, string>> =
             match portRef with
             | None -> Task.FromResult(Ok())
-            | Some port -> handle state port id command
+            | Some port -> handle super port id command
 
         let port = PtyPort(handler = handler)
         portRef <- Some port

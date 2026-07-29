@@ -33,7 +33,7 @@ module OrchestratorSweep =
 
         loop branches
 
-    let sweepStaleArtifacts (git: GitPort) (activeJobs: Map<ManagerId, ManagerJob>) : Task<Result<unit, string>> =
+    let sweepStaleArtifacts (git: GitPort) (activeJobs: Map<ManagerId, ManagerJobProjection>) : Task<Result<unit, string>> =
         task {
             let activeIds =
                 activeJobs
@@ -71,10 +71,10 @@ module OrchestratorSweep =
     let sweepLocked
         (lockPath: string)
         (git: GitPort)
-        (activeJobs: Map<ManagerId, ManagerJob>)
+        (activeJobs: Map<ManagerId, ManagerJobProjection>)
         : Task<Result<unit, string>> =
         task {
-            let! release = PublishLock.acquire lockPath
+            let! gate = IntegrationGate.acquire lockPath
 
             let! outcome =
                 task {
@@ -84,6 +84,6 @@ module OrchestratorSweep =
                         return Error ex.Message
                 }
 
-            do! PublishLock.release release
+            do! gate.Release()
             return outcome
         }

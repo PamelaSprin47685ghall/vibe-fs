@@ -142,7 +142,7 @@ module OrchestratorHostTests =
             let activePath = "/wt/active"
             let stalePath = "/wt/stale"
 
-            let activeJob: ManagerJob =
+            let activeJob: ManagerJobProjection =
                 { WorktreePath = activePath
                   Branch = "manager/active"
                   CandidateId = None

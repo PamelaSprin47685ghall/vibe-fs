@@ -21,7 +21,7 @@ type ReconciledTurn =
         AssistantMessageId: MessageId
         AgentRole: AgentRole option
         Directory: string
-        Parts: obj array
+        Parts: MessagePart array
         Finish: string option
         ErrorName: string option
         Model: OpencodeModel option

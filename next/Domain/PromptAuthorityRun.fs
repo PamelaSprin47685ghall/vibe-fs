@@ -68,6 +68,7 @@ module PromptAuthorityRun =
             ActiveLogicalRun = Some profile
             PendingClaims = Map.empty
             AcceptedContinuationIds = Map.empty
+            AcceptedContinuationRoots = Map.empty
             RepairClaims = Set.empty }
 
     let registerClaim (claim: PromptAuthority.PromptClaim) (projection: PromptAuthority.PromptAuthorityProjection) =
@@ -80,13 +81,25 @@ module PromptAuthorityRun =
         (projection: PromptAuthority.PromptAuthorityProjection)
         =
         match Map.tryFind key projection.PendingClaims with
-        | Some { Origin = PromptAuthority.PromptOrigin.Continuation continuation } ->
+        | Some { Origin = PromptAuthority.PromptOrigin.Continuation continuation; AuthorityRootUserMessageId = authorityRoot } ->
+            let root =
+                match authorityRoot with
+                | Some rootId -> rootId
+                | None -> hostMessageId
+
             { projection with
                 PendingClaims = Map.remove key projection.PendingClaims
-                AcceptedContinuationIds = Map.add hostMessageId continuation projection.AcceptedContinuationIds }
-        | Some _ ->
+                AcceptedContinuationIds = Map.add hostMessageId continuation projection.AcceptedContinuationIds
+                AcceptedContinuationRoots = Map.add hostMessageId root projection.AcceptedContinuationRoots }
+        | Some { AuthorityRootUserMessageId = authorityRoot } ->
+            let root =
+                match authorityRoot with
+                | Some rootId -> rootId
+                | None -> hostMessageId
+
             { projection with
-                PendingClaims = Map.remove key projection.PendingClaims }
+                PendingClaims = Map.remove key projection.PendingClaims
+                AcceptedContinuationRoots = Map.add hostMessageId root projection.AcceptedContinuationRoots }
         | None -> projection
 
     let abandonClaim (key: PromptKeyRef) (projection: PromptAuthority.PromptAuthorityProjection) =

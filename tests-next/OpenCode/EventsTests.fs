@@ -4,7 +4,6 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Xunit
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
@@ -79,7 +78,7 @@ module EventsTests =
             (System.Collections.Generic.Dictionary<string, string>())
             (fun _ -> ())
             (System.Collections.Generic.HashSet<string>())
-            (completed [| createObj [ "type", box "text"; "text", box "first formal paragraph" ] |] "a1")
+            (completed [| MessagePart.Text "first formal paragraph" |] "a1")
 
         TerminalPolicies.apply
             sessionPort
@@ -93,8 +92,8 @@ module EventsTests =
             (fun _ -> ())
             (System.Collections.Generic.HashSet<string>())
             (completed
-                [| createObj [ "type", box "reasoning"; "text", box "second turn reasoning" ]
-                   createObj [ "type", box "text"; "text", box "second formal paragraph" ] |]
+                [| MessagePart.Reasoning "second turn reasoning"
+                   MessagePart.Text "second formal paragraph" |]
                 "a2")
 
         Assert.Equal(

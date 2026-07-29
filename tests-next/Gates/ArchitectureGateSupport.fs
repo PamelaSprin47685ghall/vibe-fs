@@ -57,35 +57,15 @@ module ArchitectureGateSupport =
 
         walk root []
 
+    let readFileSync (path: string) = NodeFsGatesSupport.readFileSync (path, "utf-8")
+
     let forbiddenTokens =
-        [ "idleProposals"
-          "callOnce"
-          "FallbackPhase"
-          "FallbackState"
-          "ContinuationStage"
-          "ReviewPhase"
-          "ReviewStages"
-          "SessionStage"
-          "JoinOwner"
-          "NudgeLease"
-          "CompactionGeneration"
-          "SessionActor"
-          "SubsessionActor"
-          "WorkflowRegistry"
-          "JournalDrivenWorkflow"
-          "TodoState"
-          "Methodology"
-          "SquadWave"
-          "EventStore"
-          "SessionDriverRegistry"
-          "EventBus"
-          "MailboxProcessor"
-          "workspace lockfile"
-          "Wait(predicate)"
-          "sleepJs"
-          "type ReviewState"
-          "recordFailureForTests"
-          "Advisor" ]
+        [ "idleProposals"; "callOnce"; "FallbackPhase"; "FallbackState"; "ContinuationStage"
+          "ReviewPhase"; "ReviewStages"; "SessionStage"; "JoinOwner"; "NudgeLease"
+          "CompactionGeneration"; "SessionActor"; "SubsessionActor"; "WorkflowRegistry"
+          "JournalDrivenWorkflow"; "TodoState"; "Methodology"; "SquadWave"; "EventStore"
+          "SessionDriverRegistry"; "EventBus"; "MailboxProcessor"; "workspace lockfile"
+          "Wait(predicate)"; "sleepJs"; "type ReviewState"; "recordFailureForTests"; "Advisor" ]
 
     let containsForbiddenToken (text: string) (token: string) =
         if token.Contains("(") || token.Contains(")") || token.Contains(" ") then
@@ -94,23 +74,93 @@ module ArchitectureGateSupport =
             Regex.IsMatch(text, @"\b" + Regex.Escape(token) + @"\b", RegexOptions.IgnoreCase)
 
     let forbiddenSseEventTokens =
-        [ "message.part.delta"
-          "message.part.updated"
-          "message.updated"
-          "session.diff"
-          "session.updated" ]
+        [ "message.part.delta"; "message.part.updated"; "message.updated"; "session.diff"; "session.updated" ]
 
     let sessionStatusAllowlist =
-        [ "next/OpenCode/HostEventCodec.fs"
-          "next/OpenCode/HostSignalAdapter.fs"
-          "next/OpenCode/RetrySignalHandler.fs"
-          "next/OpenCode/HostSignalSubscribe.fs" ]
+        [ "next/OpenCode/HostEventCodec.fs"; "next/OpenCode/HostSignalAdapter.fs"
+          "next/OpenCode/RetrySignalHandler.fs"; "next/OpenCode/HostSignalSubscribe.fs" ]
 
-    // Non-retryable provider failures without assistant messages.
     let sessionErrorAllowlist =
-        [ "next/OpenCode/HostSignalAdapter.fs"
-          "next/OpenCode/HostSignal.fs"
-          "next/OpenCode/HostSignalBootstrap.fs" ]
+        [ "next/OpenCode/HostSignalAdapter.fs"; "next/OpenCode/HostSignal.fs"; "next/OpenCode/HostSignalBootstrap.fs" ]
 
     let isNextDocPath (file: string) : bool =
         file.Replace("\\", "/").Contains("/next/Doc/")
+
+    // TASK §17 allowlists and helpers
+
+    let mechanicalSuffixes = [ "Helpers"; "Primitives"; "Fields"; "Emit"; "Service"; "Core" ]
+
+    let mechanicalAllowlist =
+        Map
+            [ "next/Session/AgentRoleHelpers.fs", "legacy: pending rename to a semantic module"
+              "next/OpenCode/SpikePluginHelpers.fs", "legacy: pending rename to a semantic module"
+              "next/OpenCode/TerminalPolicyHelpers.fs", "legacy: pending rename to a semantic module"
+              "next/OpenCode/CompanionTransformHelpers.fs", "legacy: pending rename to a semantic module" ]
+
+    let hasHostInterop (text: string) =
+        [ "Fable.Core.JsInterop"; "jsNative"; "createObj"; "unbox" ]
+        |> List.exists text.Contains
+        || Regex.IsMatch(text, @"[\w\)]\?[a-zA-Z]")
+
+    let private hostInteropNamePattern =
+        Regex(
+            @"(Host|Port|Codec|Adapter|Boot|Runtime|Writer|Node|Plugin|Supervisor|Backend|Projection|Transform|Signal|Json|Git|Flow|Pty|Tool|Subscribe|Canonical|Process)",
+            RegexOptions.IgnoreCase)
+
+    let private hostInteropExplicitAllowlist =
+        Map
+            [ "next/Session/CompanionDelta.fs", "companion canonical hash and projection delta"
+              "next/Orchestrator.IntegrationGate.fs", "external lockfile host adapter"
+              "next/Orchestrator.WorktreeResource.fs", "external worktree/ValueTask adapter" ]
+
+    let isAllowedHostInteropFile (path: string) =
+        let n = path.Replace("\\", "/")
+        if Map.containsKey n hostInteropExplicitAllowlist then true
+        else hostInteropNamePattern.IsMatch(System.IO.Path.GetFileName(path))
+
+    let singleWriterFacts =
+        [ ("FallbackFailureRecorded",
+           [ "OpenCode/FallbackDetect.fs"; "Journal/AgentJournal.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           "only RetrySignalHandler may build the fallback failure fact")
+          ("ReviewConfirmedIdle",
+           [ "Journal/AgentJournal.fs"; "OpenCode/TurnCompletionProgram.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           "only TurnCompletionProgram may record a confirmed reviewer idle")
+          ("PluginPromptClaimed",
+           [ "OpenCode/PromptDispatcherSend.fs"; "OpenCode/PromptDispatcher.fs"; "Journal/PromptAuthorityLedger.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           "only PromptDispatcher may claim a plugin prompt")
+          ("PluginPromptAccepted",
+           [ "OpenCode/PromptDispatcher.fs"; "Journal/PromptAuthorityLedger.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           "only PromptDispatcher may accept a plugin prompt")
+          ("PluginPromptAbandoned",
+           [ "OpenCode/PromptDispatcherSend.fs"; "OpenCode/PromptDispatcher.fs"; "Journal/PromptAuthorityLedger.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           "only PromptDispatcher may abandon a plugin prompt") ]
+
+    let dslPrograms =
+        [ ("agent", "Agent/AgentProgram.fs", [ "forkAgent"; "validateSession"; "runAgentFlow" ])
+          ("companion", "Session/CompanionProgram.fs", [ "buildDelta"; "shouldReplacePrefix"; "runCompanionFlow" ])
+          ("review", "Review/ReviewProgram.fs", [ "recordVerdict"; "confirmPerfect"; "runReviewFlow" ])
+          ("orchestrator", "Orchestrator/OrchestratorProgram.fs", [ "run" ])
+          ("process", "Process/ProcessRunner.fs", [ "run"; "runWithHost" ]) ]
+
+    let guideContractPath = "tests-next/GuideContract/Signatures.fs"
+
+    let lowerLayerDirs = [ "next/Kernel/"; "next/Domain/" ]
+
+    let upperLayerOpens =
+        [ "Wanxiangshu.Next.OpenCode"; "Wanxiangshu.Next.Session"; "Wanxiangshu.Next.Process"
+          "Wanxiangshu.Next.Journal"; "Wanxiangshu.Next.Orchestrator"; "Wanxiangshu.Next.Review"
+          "Wanxiangshu.Next.Agent"; "Wanxiangshu.Next.Tools" ]
+
+    let duplicateAlgorithmSymbols =
+        [ ("advance", [ "Domain/AgentPairCursor.fs" ])
+          ("effectiveAgent", [ "Domain/AgentPairCursor.fs"; "Domain/PromptAuthority.fs" ])
+          ("peerAgent", [ "Domain/PromptAuthority.fs" ])
+          ("sha256Hex", [ "Domain/PromptAuthority.fs" ])
+          ("reviewWitness", [ "Domain/ReviewWitness.fs" ])
+          ("confirmPerfect", [ "Review/ReviewProgram.fs" ]) ]
+
+    let codecAllowlistFor280 =
+        [ "next/OpenCode/HostEventCodec.fs"; "next/OpenCode/HostMessageCodec.fs"; "next/OpenCode/CanonicalJson.fs"
+          "next/OpenCode/ToolHostCodec.fs"; "next/OpenCode/Projection.fs"; "next/OpenCode/PromptIngress.fs"
+          "next/OpenCode/HostSessionContext.fs"; "next/OpenCode/HostSignalAdapter.fs"
+          "next/OpenCode/HostSignalSubscribe.fs" ]

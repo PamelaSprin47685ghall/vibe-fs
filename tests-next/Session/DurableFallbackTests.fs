@@ -15,7 +15,7 @@ open JournalTestSupport
 module private DurableFallbackTestSupport =
     let recordFailure (journalPort: FallbackJournalPort) (sessionId: SessionId) (reason: string) (attempt: int64) =
         let fact =
-            AgentFact.FallbackFailureRecorded
+            AgentFact.FallbackCursorAdvanced
                 {| SessionId = sessionId
                    LogicalRunId = "run-test"
                    AuthorityRootUserMessageId = "root-test"

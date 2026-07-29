@@ -42,7 +42,7 @@ module JournalIsolationTests =
 
                 let factA =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = session1
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -53,7 +53,7 @@ module JournalIsolationTests =
 
                 let factB =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = session1
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -106,7 +106,7 @@ module JournalIsolationTests =
 
                 let factB1 =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = session1
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -122,7 +122,7 @@ module JournalIsolationTests =
 
                 let factB2 =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = session1
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -151,7 +151,7 @@ module JournalIsolationTests =
 
                 let factA =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = session1
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"
@@ -194,7 +194,7 @@ module JournalIsolationTests =
 
                 let factA =
                     Fact.Agent(
-                        AgentFact.FallbackFailureRecorded
+                        AgentFact.FallbackCursorAdvanced
                             {| SessionId = session1
                                LogicalRunId = "run-test"
                                AuthorityRootUserMessageId = "root-test"

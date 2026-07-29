@@ -2,229 +2,133 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Threading
-open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
+open Thoth.Json
 open Wanxiangshu.Next.Process
-open Wanxiangshu.Next.Session
 
+/// Non-interactive command execution with the request's sole 3x deadline and
+/// private Executor-agent summary mailbox.
 module ExecutorTool =
-    [<Emit("$0.schema.string()")>]
-    let private stringSchema (tool: obj) : obj = jsNative
 
-    [<Emit("$0.schema.number()")>]
-    let private numberSchema (tool: obj) : obj = jsNative
+    type Request =
+        { Command: string
+          EstimatedOutputBytes: int64
+          EstimatedRunningSeconds: float
+          EstimatedMemory: EstimatedMemory }
 
-    [<Emit("$0.schema.enum($1)")>]
-    let private enumSchema (tool: obj) (values: string array) : obj = jsNative
-
-    [<Emit("$0($1)")>]
-    let private applyTool (factory: obj) (definition: obj) : obj = jsNative
-
-    [<Emit("(args, context) => $0(args, context)")>]
-    let private uncurriedExecute (fn: obj) : obj = jsNative
-
-    [<Emit("JSON.stringify($0)")>]
-    let private stringify (value: obj) : string = jsNative
-
-    let private attachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) =
-        let signal =
-            if isNull context then
-                null
-            else
-                let a = context?("abort")
-
-                if not (isNull a) then
-                    a
-                else
-                    let b = context?("abortSignal")
-                    if not (isNull b) then b else context?("signal")
-
-        if isNull signal || isNull (signal?("addEventListener")) then
-            fun () -> ()
+    let private finitePositive (name: string) (value: float) =
+        if Double.IsNaN value || Double.IsInfinity value || value <= 0.0 then
+            Error(sprintf "%s must be a finite positive number" name)
         else
-            let aborted = signal?("aborted")
+            Ok value
 
-            if not (isNull aborted) && unbox<bool> aborted then
-                callback ()
-                fun () -> ()
-            else
-                let cb = fun (_: obj) -> callback ()
-                signal?addEventListener ("abort", cb, createObj [ "once", box true ])
-                fun () -> signal?removeEventListener ("abort", cb)
-
-    let private textArg (args: obj) name =
-        if isNull args || isNull args?(name) then
-            ""
+    let private finiteOutput (name: string) (value: float) =
+        if Double.IsNaN value || Double.IsInfinity value || value < 0.0 || value > float Int64.MaxValue then
+            Error(sprintf "%s must be a finite non-negative integer" name)
+        elif value <> Math.Floor value then
+            Error(sprintf "%s must be an integer" name)
         else
-            unbox<string> args?(name)
+            Ok(int64 value)
 
-    let private intArg (args: obj) name fallback =
-        if isNull args || isNull args?(name) then
-            fallback
+    let private decode (args: HostToolArguments) =
+        let command = args.Text "command"
+        let runtime = args.OptionalNumber "estimated_running_secs" |> Option.defaultValue 30.0
+        let output = args.OptionalNumber "estimated_output_bytes" |> Option.defaultValue 65536.0
+
+        let memory =
+            match args.Text "estimated_mem_usage" with
+            | "large" -> Ok EstimatedMemory.Large
+            | "medium"
+            | "" -> Ok EstimatedMemory.Medium
+            | _ -> Error "estimated_mem_usage must be medium or large"
+
+        if String.IsNullOrWhiteSpace command then
+            Error "Missing command"
         else
-            unbox<int> args?(name)
+            match finitePositive "estimated_running_secs" runtime, finiteOutput "estimated_output_bytes" output, memory with
+            | Ok runtimeSeconds, Ok outputBytes, Ok estimatedMemory ->
+                Ok
+                    { Command = command
+                      EstimatedOutputBytes = outputBytes
+                      EstimatedRunningSeconds = runtimeSeconds
+                      EstimatedMemory = estimatedMemory }
+            | Error error, _, _
+            | _, Error error, _
+            | _, _, Error error -> Error error
 
-    let private runtimeArg (args: obj) name fallback =
-        if isNull args || isNull args?(name) then
-            Ok fallback
-        else
-            let value = unbox<float> args?(name)
+    let private error (message: string) = ToolHostCodec.jsonObject [ "error", Encode.string message ]
 
-            if Double.IsNaN value || Double.IsInfinity value || value <= 0.0 then
-                Error(sprintf "%s must be a finite positive number" name)
-            else
-                Ok value
-
-    let private outputArg (args: obj) name fallback =
-        if isNull args || isNull args?(name) then
-            Ok fallback
-        else
-            let value = unbox<float> args?(name)
-
-            if
-                Double.IsNaN value
-                || Double.IsInfinity value
-                || value < 0.0
-                || value > float Int64.MaxValue
-            then
-                Error(sprintf "%s must be a finite non-negative integer" name)
-            elif value <> Math.Floor value then
-                Error(sprintf "%s must be an integer" name)
-            else
-                Ok(int64 value)
-
-    let private memoryArg (args: obj) =
-        match textArg args "estimated_mem_usage" with
-        | "large" -> EstimatedMemory.Large
-        | _ -> EstimatedMemory.Medium
-
-    let create
-        (toolModule: obj)
-        (runtimeFor: obj -> Result<HostForkRuntime, string>)
-        (executorRuntimeFor: obj -> HostForkRuntime)
-        (workspaceDirectory: string option)
-        (directoryFor: (string -> string option) option)
-        : obj =
-        let factory = toolModule?tool
-
-        let execute (args: obj) (context: obj) =
-            task {
-                match runtimeFor context with
-                | Error error -> return box (stringify (createObj [ "error", box error ]))
-                | Ok runtime ->
-                    let sid =
-                        if isNull context || isNull context?sessionID then
-                            ""
-                        else
-                            unbox<string> context?sessionID
-
-                    let targetDir =
-                        if not (String.IsNullOrWhiteSpace sid) then
-                            match directoryFor with
-                            | Some dirFn -> dirFn sid |> Option.orElse workspaceDirectory
-                            | None -> workspaceDirectory
-                        else
-                            workspaceDirectory
-
-                    let commandText = textArg args "command"
-
-                    if String.IsNullOrWhiteSpace commandText then
-                        return box (stringify (createObj [ "error", box "Missing command" ]))
+    let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
+        task {
+            match scope.RuntimeFor context with
+            | Error runtimeError -> return error runtimeError
+            | Ok _ ->
+                let directory =
+                    if String.IsNullOrWhiteSpace context.SessionId then
+                        scope.WorkspaceDirectory
                     else
-                        match
-                            runtimeArg args "estimated_running_secs" 30.0,
-                            outputArg args "estimated_output_bytes" 65536L
-                        with
-                        | Error error, _
-                        | _, Error error -> return box (stringify (createObj [ "error", box error ]))
-                        | Ok runtimeSeconds, Ok outputBytes ->
-                            let estimate =
-                                { EstimatedRuntime = RuntimeSeconds runtimeSeconds
-                                  EstimatedOutput = OutputBytes outputBytes
-                                  EstimatedMemory = memoryArg args }
+                        scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
 
-                            let command =
-                                { FileName = "sh"
-                                  Arguments = [ "-lc"; commandText ]
-                                  WorkingDirectory = targetDir
-                                  Environment = None
-                                  Stdin = None
-                                  Deadline = None
-                                  PtyOptions = None }
+                let estimate =
+                    { EstimatedRuntime = RuntimeSeconds request.EstimatedRunningSeconds
+                      EstimatedOutput = OutputBytes request.EstimatedOutputBytes
+                      EstimatedMemory = request.EstimatedMemory }
 
-                            use cancellation = new CancellationTokenSource()
-                            let detachAbort = attachAbort context (fun () -> cancellation.Cancel())
+                let command =
+                    { FileName = "sh"
+                      Arguments = [ "-lc"; request.Command ]
+                      WorkingDirectory = directory
+                      Environment = None
+                      Stdin = None
+                      Deadline = None
+                      PtyOptions = None }
 
-                            let procCtx: ProcessContext =
-                                { WorkingDirectory = targetDir
-                                  DefaultTimeout = None }
+                use cancellation = new CancellationTokenSource()
+                let detachAbort = context.AttachAbort cancellation.Cancel
 
-                            let! result =
-                                try
-                                    Runner.execute command estimate procCtx cancellation.Token
-                                finally
-                                    detachAbort ()
+                let processContext: ProcessContext =
+                    { WorkingDirectory = directory
+                      DefaultTimeout = None }
 
-                            match result with
-                            | Error error -> return box (stringify (createObj [ "error", box (error.ToString()) ]))
-                            | Ok(RunnerOutcome.Completed(exitCode, stdout, stderr, _)) ->
-                                return
-                                    box (
-                                        stringify (
-                                            createObj
-                                                [ "exitCode", box exitCode; "stdout", box stdout; "stderr", box stderr ]
-                                        )
-                                    )
-                            | Ok(RunnerOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
-                                try
-                                    let execRuntime = executorRuntimeFor context
+                let! result =
+                    try
+                        ProcessRunner.run command estimate processContext cancellation.Token
+                    finally
+                        detachAbort ()
 
-                                    let! summary =
-                                        ExecutorSummarize.summarizeSpool
-                                            (ExecutorSummarize.asExecutorRuntime execRuntime)
-                                            spoolPath
+                match result with
+                | Error processError -> return error (processError.ToString())
+                | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
+                    return
+                        ToolHostCodec.jsonObject
+                            [ "exitCode", Encode.int exitCode
+                              "stdout", Encode.string stdout
+                              "stderr", Encode.string stderr ]
+                | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
+                    try
+                        let runtime = scope.ExecutorRuntimeFor context
+                        let! summary = ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
 
-                                    // Partial summary still preserves ProcessResult metadata.
-                                    return
-                                        box (
-                                            stringify (
-                                                createObj
-                                                    [ "exitCode", box exitCode
-                                                      "summary", box summary
-                                                      "spoolPath", box spoolPath
-                                                      "totalBytes", box totalBytes
-                                                      "chunkCount", box chunkCount ]
-                                            )
-                                        )
-                                finally
-                                    Spool.delete spoolPath
-                            | Ok(RunnerOutcome.OutputExceeded(bytesWritten, spoolPathOpt)) ->
-                                match spoolPathOpt with
-                                | Some path -> Spool.delete path
-                                | None -> ()
+                        return
+                            ToolHostCodec.jsonObject
+                                [ "exitCode", Encode.int exitCode
+                                  "summary", Encode.string summary
+                                  "spoolPath", Encode.string spoolPath
+                                  "totalBytes", Encode.int64 totalBytes
+                                  "chunkCount", Encode.int chunkCount ]
+                    finally
+                        Spool.delete spoolPath
+        }
 
-                                return
-                                    box (
-                                        stringify (
-                                            createObj
-                                                [ "error", box "Output exceeded hard limit"
-                                                  "bytesWritten", box bytesWritten
-                                                  "spoolPath", box (defaultArg spoolPathOpt "") ]
-                                        )
-                                    )
-            }
-
-        let args =
-            createObj
-                [ "command", box (stringSchema factory)
-                  "estimated_output_bytes", box (numberSchema factory)
-                  "estimated_running_secs", box (numberSchema factory)
-                  "estimated_mem_usage", box (enumSchema factory [| "medium"; "large" |]) ]
-
-        applyTool
-            factory
-            (createObj
-                [ "description", box "Execute a shell command with explicit output, time, and memory estimates."
-                  "args", box args
-                  "execute", uncurriedExecute (box execute) ])
+    let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "executor"
+          Description = "Execute a shell command with explicit output, time, and memory estimates."
+          Arguments =
+            [ "command", ToolHostCodec.stringSchema factory
+              "estimated_output_bytes", ToolHostCodec.numberSchema factory
+              "estimated_running_secs", ToolHostCodec.numberSchema factory
+              "estimated_mem_usage", ToolHostCodec.enumSchema [ "medium"; "large" ] factory ]
+          Execute =
+            fun args context ->
+                match decode args with
+                | Ok request -> execute scope request context
+                | Error decodeError -> task { return error decodeError } }

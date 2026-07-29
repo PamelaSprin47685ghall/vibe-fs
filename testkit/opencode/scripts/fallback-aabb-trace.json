@@ -149,7 +149,7 @@
     },
     {
       "waitFact": {
-        "name": "FallbackFailureRecorded",
+        "name": "FallbackCursorAdvanced",
         "eq": 4
       }
     },

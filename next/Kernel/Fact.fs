@@ -71,7 +71,7 @@ module Fact =
             {| TargetSessionId: SessionId
                GuardKey: string
                HostMessageId: string |}
-        | FallbackFailureRecorded of
+        | FallbackCursorAdvanced of
             {| SessionId: SessionId
                LogicalRunId: string
                AuthorityRootUserMessageId: string

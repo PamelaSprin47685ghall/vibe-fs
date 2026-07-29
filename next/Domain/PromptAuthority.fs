@@ -56,6 +56,10 @@ module PromptAuthority =
           ActiveLogicalRun: AuthorityExecutionProfile option
           PendingClaims: Map<PromptKeyRef, PromptClaim>
           AcceptedContinuationIds: Map<MessageId, ContinuationKind>
+          /// Physical user message id -> authority root user message id for every
+          /// accepted continuation. Used by the review witness to prove that a
+          /// second PERFECT physical message is a Host-accepted ReviewConfirmation.
+          AcceptedContinuationRoots: Map<MessageId, MessageId>
           RepairClaims: Set<string> }
 
     let empty: PromptAuthorityProjection =
@@ -63,6 +67,7 @@ module PromptAuthority =
           ActiveLogicalRun = None
           PendingClaims = Map.empty
           AcceptedContinuationIds = Map.empty
+          AcceptedContinuationRoots = Map.empty
           RepairClaims = Set.empty }
 
     let newPromptKey () =

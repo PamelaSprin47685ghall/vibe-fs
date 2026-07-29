@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Tests.JournalTests
 
 open System
 open Xunit
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -90,11 +91,11 @@ module AgentFactsOrchestratorBarrierTests =
             [ fact1; confirmFact1; fact2; barrierFact; fact3; confirmFact2; fact4 ]
             |> List.mapi (fun i f -> createSessionEnv (int64 (i + 1)) (t0.AddSeconds(float i)) f rt sid)
 
-        let proj = AgentFacts.apply AgentFacts.empty envs
+        let proj = Fold.applyAgentFacts AgentProjection.empty envs
         let rg = proj.Sessions.[sid].ReviewGuard.Value
 
         Assert.True(rg.IsConfirmed)
-        Assert.Equal(2, rg.ConsecutivePerfects)
+        Assert.True(ReviewWitness.isConfirmed rg.Witness)
         Assert.Equal(Some "post-rebase", rg.CurrentBarrierKey)
         Assert.Equal(Some(GitTreeHash.create treeHash), rg.LastGitTreeHash)
 
@@ -136,9 +137,10 @@ module AgentFactsOrchestratorBarrierTests =
             [ fact1; fact2; barrierFact ]
             |> List.mapi (fun i f -> createSessionEnv (int64 (i + 1)) (t0.AddSeconds(float i)) f rt sid)
 
-        let proj = AgentFacts.apply AgentFacts.empty envs
+        let proj = Fold.applyAgentFacts AgentProjection.empty envs
         let rg = proj.Sessions.[sid].ReviewGuard.Value
 
         Assert.False(rg.IsConfirmed)
-        Assert.Equal(0, rg.ConsecutivePerfects)
+        Assert.False(ReviewWitness.isPerfectPending rg.Witness)
+        Assert.False(ReviewWitness.isRevision rg.Witness)
         Assert.Equal(Some "pre-rebase", rg.CurrentBarrierKey)

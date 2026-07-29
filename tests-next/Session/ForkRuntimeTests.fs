@@ -75,6 +75,7 @@ module ForkRuntimeTests =
             let bloggerCompletion : RunCompletion =
                 { RunId = "run-system-blogger"
                   AgentId = "system-blogger"
+                  AgentName = "fast-blogger"
                   Role = AgentRole.Blogger
                   Outcome = AgentCompletion.ofSimpleText "system-blogger" "run-system-blogger" AgentRole.Blogger "blog"
                   CompletedAt = DateTimeOffset.UtcNow }
@@ -156,4 +157,34 @@ module ForkRuntimeTests =
             let (agentList, _) = runtime.List()
             let agent = agentList |> List.find (fun record' -> record'.AgentId = agentId)
             Assert.Equal(AgentStatus.Idle, agent.Status)
+        }
+
+    [<Fact>]
+    let ``targeted completion bypasses model join mailbox`` () =
+        task {
+            let agentId = "internal-manager"
+            let runtime = ForkRuntime(publishToMailbox = false)
+
+            runtime.Fork(
+                agentId,
+                AgentRole.Manager,
+                runWork =
+                    (fun () ->
+                        task {
+                            return
+                                AgentCompletion.ofSimpleText
+                                    agentId
+                                    "run-internal"
+                                    AgentRole.Manager
+                                    "published"
+                        })
+            )
+            |> ignore
+
+            let! completed = runtime.AwaitAgent agentId
+            Assert.True(completed.IsOk, sprintf "Expected targeted completion, got: %A" completed)
+            Assert.Equal(0, runtime.PendingCompletionCount)
+
+            let! joined = runtime.Join()
+            Assert.Equal(Error ForkError.NothingToJoin, joined)
         }

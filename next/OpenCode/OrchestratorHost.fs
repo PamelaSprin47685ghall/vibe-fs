@@ -16,9 +16,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let orchestratorKey = SessionId.value orchestratorId
     let worktrees = Dictionary<string, string>()
     let managerAgents = Dictionary<string, string>()
-    let stash = Dictionary<string, RunCompletion>()
 
-    let gitPort = ProcessGitPort.createWithRepo deps.RepoPath OrchestratorGit.run
+    let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
     let authorityPort = OrchestratorAuthority.createPort ()
 
     let onChildCreated (agentId: string) (role: AgentRole) (childId: SessionId) =
@@ -44,28 +43,11 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | false, _ -> None),
             ?sessionSnapshot = deps.SessionSnapshot,
             onRunStarted = deps.OnRunStarted,
-            cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
+            cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor),
+            publishToMailbox = false
         )
 
-    let awaitAgent (agentId: string) : Task<Result<RunCompletion, string>> =
-        task {
-            match stash.TryGetValue agentId with
-            | true, completion ->
-                stash.Remove agentId |> ignore
-                return Ok completion
-            | false, _ ->
-                let mutable found = None
-
-                while found.IsNone do
-                    let! joined = runtime.Join()
-
-                    match joined with
-                    | Error err -> found <- Some(Error(sprintf "%A" err))
-                    | Ok c when c.AgentId = agentId -> found <- Some(Ok c)
-                    | Ok c -> stash.[c.AgentId] <- c
-
-                return found.Value
-        }
+    let awaitAgent (agentId: string) : Task<Result<RunCompletion, string>> = runtime.AwaitAgent agentId
 
     let runManager (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
         task {
@@ -167,7 +149,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     // Sweep orphaned manager artifacts before resuming jobs.
                     // Best-effort: failures are skipped, engine init is never blocked.
                     let sweepLockPath =
-                        PublishLock.lockPath (RuntimePath.gitCommonDir deps.RepoPath) branch
+                        IntegrationGate.lockPath (RuntimePath.gitCommonDir deps.RepoPath) branch
 
                     let! sweepResult =
                         match deps.Journal with

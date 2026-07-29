@@ -80,9 +80,17 @@ type PtyPort
                     | Ok text -> AgentCompletion.ofSimpleText agentId id.Value role text
                     | Error err -> AgentCompletion.ofSimpleError agentId id.Value role err
 
+                // AgentName derived from role without AgentRoleHelpers dependency
+                // (Pty.fs is compiled before AgentRoleHelpers.fs).
+                let agentName =
+                    sprintf
+                        "fast-%s"
+                        (role.ToString().ToLowerInvariant())
+
                 let completion =
                     { RunId = id.Value
                       AgentId = agentId
+                      AgentName = agentName
                       Role = role
                       Outcome = typedOutcome
                       CompletedAt = DateTimeOffset.UtcNow }

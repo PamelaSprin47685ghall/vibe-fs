@@ -57,8 +57,7 @@ module HostForkRuntimeTests =
                           AssistantMessageId = MessageId.create "m-1"
                           Role = "test"
                           Directory = ""
-                          FinalText = "A version output"
-                          Parts = [||] }
+                          FinalText = "A version output" }
                     )))
 
         host, trigger, (fun () -> childCount), (fun () -> childPromptCount)

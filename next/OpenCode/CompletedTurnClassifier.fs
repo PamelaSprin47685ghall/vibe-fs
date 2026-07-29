@@ -2,7 +2,6 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Text.RegularExpressions
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
@@ -35,57 +34,41 @@ module CompletedTurnClassifier =
         | Some AgentRole.Blogger
         | None -> false
 
-    let private asString (value: obj) =
-        if isNull value then
-            None
-        else
-            let text = unbox<string> value
-            if String.IsNullOrWhiteSpace text then None else Some text
-
     /// Formal visible assistant text only (no reasoning/thinking).
-    /// Used for empty / contains-XML repair classification and finish=stop emptiness.
-    let partsText (parts: obj array) : string =
-        Projection.formalTextFromParts parts
-
-    /// Session A material: formal text + host-visible reasoning/thinking.
-    /// Still excludes tool raw streams / tool results.
-    let partsSessionA (parts: obj array) : string =
+    /// Used for empty/XML-only repair classification and finish=stop emptiness.
+    let partsText (parts: MessagePart array) : string =
         if isNull parts then
             ""
         else
             parts
-            |> Array.choose (fun part ->
-                if isNull part then
-                    None
-                else
-                    match asString part?``type`` with
-                    | Some "text" -> asString part?text
-                    | Some "reasoning"
-                    | Some "thinking" ->
-                        asString part?text
-                        |> Option.orElse (asString part?reasoning)
-                        |> Option.orElse (asString part?thinking)
-                    | _ -> None)
+            |> Array.choose (function
+                | MessagePart.Text text -> Some text
+                | _ -> None)
+            |> String.concat ""
+
+    /// Session A material: formal text + host-visible reasoning/thinking.
+    /// Still excludes tool raw streams / tool results.
+    let partsSessionA (parts: MessagePart array) : string =
+        if isNull parts then
+            ""
+        else
+            parts
+            |> Array.choose (function
+                | MessagePart.Text text
+                | MessagePart.Reasoning text -> Some text
+                | _ -> None)
             |> String.concat "\n\n"
 
-    let hasToolCallPart (parts: obj array) : bool =
+    let hasToolCallPart (parts: MessagePart array) : bool =
         if isNull parts then
             false
         else
             parts
-            |> Array.exists (fun part ->
-                if isNull part then
-                    false
-                else
-                    match asString part?``type`` with
-                    | Some kind ->
-                        kind = "tool-call"
-                        || kind = "tool_call"
-                        || kind = "tool"
-                        || kind = "patch"
-                        || kind = "step-start"
-                        || kind = "step-finish"
-                    | None -> false)
+            |> Array.exists (function
+                | MessagePart.ToolCall _ -> true
+                | MessagePart.Activity kind ->
+                    kind = "patch" || kind = "step-start" || kind = "step-finish"
+                | _ -> false)
 
     let isAbortErrorName (name: string option) =
         match name with
@@ -94,7 +77,7 @@ module CompletedTurnClassifier =
             lower.Contains("abort")
         | None -> false
 
-    let classifyOutcome (finish: string option) (errorName: string option) (parts: obj array) : TurnOutcome =
+    let classifyOutcome (finish: string option) (errorName: string option) (parts: MessagePart array) : TurnOutcome =
         if isAbortErrorName errorName then
             TurnAborted(defaultArg errorName "aborted")
         elif
@@ -132,7 +115,7 @@ module CompletedTurnClassifier =
             // abort/error may still be racing the idle wake-up.
             | None -> TurnUnknown
 
-    let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (_parts: obj array) =
+    let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (_parts: MessagePart array) =
         supportsInteractionRepair role
         && (match outcome with
             | TurnInProgress

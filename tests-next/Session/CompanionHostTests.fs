@@ -34,10 +34,7 @@ module CompanionHostTests =
                   AssistantMessageId = MessageId.create "blog"
                   Role = "test"
                   Directory = ""
-                  FinalText = "blogger private thought\n\nblog paragraph"
-                  Parts =
-                    [| createObj [ "type", box "reasoning"; "text", box "blogger private thought" ]
-                       createObj [ "type", box "text"; "text", box "blog paragraph" ] |] }
+                  FinalText = "blogger private thought\n\nblog paragraph" }
             )
 
         let mutable growOutput = true
@@ -235,12 +232,7 @@ module CompanionHostTests =
                                       AssistantMessageId = MessageId.create "blog"
                                       Role = "test"
                                       Directory = ""
-                                      FinalText = "blogger private thought\n\n" + text
-                                      Parts =
-                                        [| createObj
-                                               [ "type", box "reasoning"
-                                                 "text", box "blogger private thought" ]
-                                           createObj [ "type", box "text"; "text", box text ] |] }
+                                      FinalText = "blogger private thought\n\n" + text }
                                 )))
 
                         Task.FromResult(Ok(MessageId.create "accepted"))
