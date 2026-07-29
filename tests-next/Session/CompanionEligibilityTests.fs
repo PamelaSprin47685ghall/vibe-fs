@@ -7,6 +7,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 
@@ -55,6 +56,9 @@ module CompanionEligibilityTests =
             let sessionBudgets = Dictionary<string, int>()
             let sessionOutputLimits = Dictionary<string, int>()
             let gate = obj ()
+            let tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+            System.IO.Directory.CreateDirectory(tempDir) |> ignore
+            use journal = AgentJournal.create tempDir (RuntimeId.create "eligibility-rt") 1 DateTimeOffset.UtcNow
             sessionRoles.[sid] <- "manager"
             let inObj = createObj [ "sessionID", box sid; "agent", box "fast-manager" ]
             let outObj = createObj [ "messages", box [| message sid |] ]
@@ -66,7 +70,7 @@ module CompanionEligibilityTests =
                         companions
                         gate
                         host
-                        None
+                        (Some journal)
                         sessionBudgets
                         sessionOutputLimits
                         sessionRoles

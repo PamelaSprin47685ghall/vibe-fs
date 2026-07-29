@@ -94,15 +94,18 @@ module CompanionTransform =
                 match fromJournal with
                 | Some agent -> Some agent
                 | None ->
-                    // Fallback to inObj/message agent when no journal is active
-                    // (e.g. test harness / ephemeral session).
-                    let inputAgent =
-                        if not (isNull inObj) && not (isNull inObj?agent) then
-                            Some(unbox<string> inObj?agent)
-                        else
-                            messageContext |> Option.bind snd
+                    match journal with
+                    | Some _ -> None
+                    | None ->
+                        // Fallback to inObj/message agent when no journal is active
+                        // (e.g. test harness / ephemeral session).
+                        let inputAgent =
+                            if not (isNull inObj) && not (isNull inObj?agent) then
+                                Some(unbox<string> inObj?agent)
+                            else
+                                messageContext |> Option.bind snd
 
-                    inputAgent |> Option.filter (fun a -> PromptAuthority.parseAgentName a |> Result.isOk)
+                        inputAgent |> Option.filter (fun a -> PromptAuthority.parseAgentName a |> Result.isOk)
 
             let agentRole = authorityAgent |> Option.bind HostSessionContext.canonicalRole
 

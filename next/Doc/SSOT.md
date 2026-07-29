@@ -154,19 +154,19 @@ Blogger/Executor 名称进入 LLM tool schema
 旧 journal 被猜测性迁移
 ```
 
-## OpenCode Session 家族资源扁平化与 Blogger 展示父级 [NORMATIVE]
+## OpenCode Session 家族资源扁平化 [NORMATIVE]
 
-OpenCode Session 的资源所有权保持家族扁平：普通 Agent、ManagerJob、one-shot Inspector/Coder、Executor summarizer 与其他内部 child 的 `parentID` 解析为当前 Session 家族最上层 root。**Companion Blogger 是唯一展示例外**：它的 Host `parentID` 指向被记录的 primary Session，使 Blogger 在 OpenCode 中可直接作为该 Agent（包括 Manager）的 subagent 查看；取消和清理仍归属家族 root。重启后两种关系都必须从 durable linkage 恢复，不能猜测。
+OpenCode Session 的资源所有权与 Host parentID 保持家族扁平：普通 Agent、ManagerJob、one-shot Inspector/Coder、Executor summarizer、Companion Blogger 与其他内部 child 的 `parentID` 均解析为当前 Session 家族最上层 root。
 
 创建与资源清理遵循：
 
-- 普通 descendant 的 Host 父级扁平到 root；Companion Blogger 的 Host 父级是自己的 primary Session；
-- root abort 收敛全部家族资源，包括以 primary 为展示父级的 Blogger；
+- 所有 descendant（包含 Companion Blogger）的 Host 父级均扁平解析为最上层 root；
+- root abort 收敛全部家族资源，包括全部 child Session 与 Blogger；
 - 单个 child abort 只关闭该 child；作用域资源必须按自己的 child ID 精确关闭；
 - `join` completion、Review owner、Prompt Authority 等局部执行所有权仍由创建它的结构化程序持有，不以 Host `parentID` 反推。
 - durable session association 不等于 join ownership：`AgentLinked` 可关联 Blogger 等系统 child，但不可恢复进任何 ForkRuntime mailbox；只有该 runtime 发出的 `AgentForked` 进入 `ForkedChildren`，才可在重启后恢复并由该 runtime 的 `join()` 消费。PTY completion 同样必须按创建它的 runtime 过滤。
 
-验收：普通 `root → child → grandchild` 的两次 Host `CreateChildSession` 均收到同一个 `root` 作为 `parentID`；`CompanionHost(child)` 创建的 Blogger 收到 `child` 作为 `parentID`，并仍随 root 家族清理；进程重启后两种关系均成立。
+验收：普通 `root → child → grandchild` 的 Host `CreateChildSession` 均收到同一个 `root` 作为 `parentID`；`CompanionHost(child)` 创建的 Blogger 同样收到 `root` 作为 `parentID`，并随 root 家族清理；进程重启后对应关系均成立。
 
 ## 父/Join 取消语义 [NORMATIVE]
 

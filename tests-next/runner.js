@@ -90,7 +90,7 @@ async function runTests() {
         if (file !== "fable_modules" && file !== "node_modules" && file !== "fixtures") {
           results = results.concat(findJsFiles(fullPath));
         }
-      } else if (file.endsWith(".js") && !file.endsWith("TestSupport.js") && !file.endsWith("GateSupport.js") && !file.endsWith("Signatures.js") && !file.endsWith("Assert.js") && !file.endsWith("EventDrivenHarness.js") && !file.includes(".nuget")) {
+      } else if (file.endsWith(".js") && !file.endsWith("Support.js") && !file.endsWith("Signatures.js") && !file.endsWith("Assert.js") && !file.endsWith("EventDrivenHarness.js") && !file.includes(".nuget")) {
         results.push(fullPath);
       }
     }

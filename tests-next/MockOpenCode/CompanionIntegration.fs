@@ -72,7 +72,7 @@ module CompanionIntegration =
         }
 
     [<Fact>]
-    let ``Manager companion is created as the manager subagent`` () =
+    let ``Manager companion is created with the family root as parentID`` () =
         task {
             let state, eventPort, sessionPort = MockOpenCode.createHost ()
             let rootId = SessionId.create "orchestrator-root"
@@ -124,6 +124,6 @@ module CompanionIntegration =
                 |> Option.defaultWith (fun () -> failwith "manager blogger was not created")
 
             trueThat
-                (state.ParentChild.[bloggerId] = managerId)
-                "Manager blogger must be visible as a direct manager subagent"
+                (state.ParentChild.[bloggerId] = rootId)
+                "Manager blogger must be created with the family root as parentID"
         }
