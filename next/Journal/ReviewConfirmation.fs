@@ -48,9 +48,20 @@ module internal ReviewConfirmation =
                 true
             | _ -> false
 
+        let samePhysicalRootReevaluationMatched =
+            match existing.AuthorityRootUserMessageId, userMessageId with
+            | Some firstRoot, Some currentRoot ->
+                existing.ConsecutivePerfects = 1
+                && not (String.IsNullOrWhiteSpace firstRoot)
+                && firstRoot = currentRoot
+            | _ -> false
+
         let acceptedConfirmSecondPerfect =
             confirmationPending && existing.ConsecutivePerfects = 1 && not providerRunUsed
 
         hasValidProviderRunId
         && not providerRunUsed
-        && (physicalConfirmationMatched || markerConfirmationMatched || acceptedConfirmSecondPerfect)
+        && (physicalConfirmationMatched
+            || markerConfirmationMatched
+            || samePhysicalRootReevaluationMatched
+            || acceptedConfirmSecondPerfect)

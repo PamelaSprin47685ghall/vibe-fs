@@ -132,6 +132,7 @@ module internal AgentFactsReview =
                                         IsConfirmed = false
                                         ConfirmedReviewerSessionId = None
                                         ConfirmedProviderRunId = None
+                                        AuthorityRootUserMessageId = p.UserMessageId
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Perfect ->
@@ -147,6 +148,7 @@ module internal AgentFactsReview =
                                         ConfirmedReviewerSessionId = None
                                         ConfirmedProviderRunId = None
                                         ConfirmationPhysicalMessageId = None
+                                        AuthorityRootUserMessageId = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                             | _ ->
@@ -160,6 +162,7 @@ module internal AgentFactsReview =
                                         ConfirmedProviderRunId = None
                                         // Tree changed: prior confirmation is stale.
                                         ConfirmationPhysicalMessageId = None
+                                        AuthorityRootUserMessageId = p.UserMessageId
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                                 | ReviewGuardVerdict.Perfect ->
@@ -175,6 +178,7 @@ module internal AgentFactsReview =
                                         ConfirmedReviewerSessionId = None
                                         ConfirmedProviderRunId = None
                                         ConfirmationPhysicalMessageId = None
+                                        AuthorityRootUserMessageId = None
                                         RecentToolCallIds = recentToolCallIds
                                         RecentProviderRunIds = recentProviderRunIds }
                         | None ->
@@ -183,6 +187,7 @@ module internal AgentFactsReview =
                                 { emptyGuard None with
                                     LastGitTreeHash = Some hash
                                     ConsecutivePerfects = 1
+                                    AuthorityRootUserMessageId = p.UserMessageId
                                     RecentToolCallIds = [ p.ToolCallId ]
                                     RecentProviderRunIds = [ p.ProviderRunId ] }
                             | ReviewGuardVerdict.Revise ->

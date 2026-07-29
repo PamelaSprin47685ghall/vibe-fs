@@ -27,10 +27,10 @@
       "wait": "review-perfect-1"
     },
     {
-      "wait": "reviewer-after-first-perfect"
+      "wait": "review-perfect-2-same-root"
     },
     {
-      "wait": "review-perfect-confirmed"
+      "wait": "reviewer-after-confirmed-perfect"
     },
     {
       "wait": "manager-join-reviewer"
@@ -47,6 +47,9 @@
         "name": "ReviewVerdictRecorded",
         "eq": 2
       }
+    },
+    {
+      "custom": "oracle"
     },
     {
       "createSession": {
@@ -82,7 +85,7 @@
     {
       "assertFacts": {
         "name": "GuardPromptAccepted",
-        "eq": 2
+        "eq": 1
       }
     },
     {
@@ -265,11 +268,10 @@
         "args": {
           "verdict": "PERFECT"
         }
-      },
-      "reusable": true
+      }
     },
     {
-      "id": "reviewer-after-first-perfect",
+      "id": "review-perfect-2-same-root",
       "lane": {
         "session": "fast-reviewer",
         "role": "reviewer",
@@ -281,19 +283,19 @@
         "requiredTools": [
           "verdict"
         ],
+        "user": "Review review_target.txt",
         "afterToolResult": true
       },
       "respond": {
-        "type": "text",
-        "text": "The first PERFECT was submitted; I await an explicit confirmation request."
-      },
-      "blocking": false,
-      "pathless": true,
-      "reusable": true,
-      "neverEnd": false
+        "type": "tool-call",
+        "tool": "verdict",
+        "args": {
+          "verdict": "PERFECT"
+        }
+      }
     },
     {
-      "id": "review-perfect-confirmed",
+      "id": "reviewer-after-confirmed-perfect",
       "lane": {
         "session": "fast-reviewer",
         "role": "reviewer",
@@ -305,17 +307,13 @@
         "requiredTools": [
           "verdict"
         ],
-        "afterToolResult": false,
-        "userRegex": "Nope, let's re-evaluate:"
+        "user": "Review review_target.txt",
+        "afterToolResult": true
       },
       "respond": {
-        "type": "tool-call",
-        "tool": "verdict",
-        "args": {
-          "verdict": "PERFECT"
-        }
-      },
-      "reusable": true
+        "type": "text",
+        "text": "The second independent PERFECT was accepted for this tree."
+      }
     },
     {
       "id": "guard-manager-title",

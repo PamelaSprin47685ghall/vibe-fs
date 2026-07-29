@@ -60,15 +60,18 @@ type ReviewGuardProjection =
         IsConfirmed: bool
         /// Reviewer that supplied the currently confirmed double-PERFECT witness.
         ConfirmedReviewerSessionId: SessionId option
-        /// Provider run that made the second PERFECT; its terminal idle closes the review.
+        /// Provider run that made the second PERFECT; retained as part of the witness.
+        /// Terminal idle is bound to the same physical review root, because tool-result
+        /// follow-ups use a later assistant message id.
         ConfirmedProviderRunId: string option
         AcceptedGuardKey: string option
         RecentToolCallIds: string list
         RecentProviderRunIds: string list
-        /// Physical Host message id of the confirmation prompt. Second PERFECT is
-        /// proven only when its root user message id equals this id.
+        /// Physical Host message id when confirmation used the terminal-then-continuation path.
+        /// Same-root tool-result reevaluation leaves this empty.
         ConfirmationPhysicalMessageId: string option
-        /// Authority root of the original reviewer task (informational / restart).
+        /// Physical authority root of the first PERFECT; proves same-root reevaluation
+        /// and survives restart.
         AuthorityRootUserMessageId: string option
         CurrentBarrierKey: string option
     }

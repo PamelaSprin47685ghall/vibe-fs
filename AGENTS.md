@@ -347,7 +347,7 @@ Fallback 第四次失败仍判死
 14. `actual_output_bytes > 3 × estimated_output_bytes` 时触发 spool；摘要按 200KB 块做在线 ripple-carry reduce（fan-in=8，按 chunk index 排序，Executor ID 由 processId+level+range hash 生成），不积存全部 map summary。
 15. `estimated_mem_usage=large` 全 OpenCode 进程同时最多一个；medium 不限并发。
 16. Fallback 属于 Logical Run：A/B 是 SelectedAgent/PeerAgent 对。`session.status=retry` 推进 `FallbackCursor.Offset`：`(offset+1) mod 4` → 永久 `A/A/B/B/...`，**不存在**因累计 retry 数而产生的 Dead。成功不推进、不重置 cursor。新 Authority Root 始终新 cursor（`Offset=0`，A=SelectedAgent）。公开创建必须显式 `fast-*`/`deep-*`；发送 Prompt 时 `Agent=EffectiveAgent`、`Model=None`。唯一写 durable cursor advance 的入口是 `session.status=retry`；空/XML-only 不进入 A/B 计数。`currentUserMessageId` 必须是 AuthorityRootUserMessageId，不包括插件 synthetic 消息。
-17. Review：REVISE 一次立即生效；PERFECT 必须来自不同 ProviderRunIdentity 且第二次的 user 输入包含第一次后的确认请求。每个审查屏障要求两个不同的 ProviderRunIdentity。
+17. Review：REVISE 一次立即生效；两个 PERFECT 必须来自不同 ProviderRunIdentity。首次 `PERFECT` 的 tool result 进入下一次 provider request 后，同一 Authority Root 下的第二个 ProviderRun 可直接确认；若 Reviewer 先 terminal，则 Host 发送 `ReviewConfirmation` physical continuation 后确认。一个 assistant message 内的重复 tool call 不算第二次。
 18. ReviewGuard 同时守 Manager 结束和 Reviewer 未给出有效 verdict。
 19. PTY 使用独立工具 `fork-pty`（仅 DevOps），signal 使用结构化 enum，不使用魔法字符串。PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
 20. Orchestrator 只有 `fork / join`；fork Manager 自动建 worktree、进入 ReviewGuard；发布前 rebase、复审、串行 ff。Rebase 后的审查必须是全新的双 PERFECT（两个新 ToolCallId），不得复用 rebase 前的确认。
@@ -2449,12 +2449,12 @@ Schema：
 规则：
 
 - `REVISE`：第一次调用立即生效。
-- `PERFECT`：第一次返回 `AWAITING_CONFIRMATION`，明确要求结束当前 turn 并等待新的 ReviewConfirmation user message；确认消息到达后的第二次 PERFECT 才生效。
-- ReviewConfirmation 接受前，同一物理 root 中过早重复的 PERFECT 不写 Journal、不占用第二次确认。
-- 第二次 PERFECT 必须来自不同 ProviderRunIdentity，
-  且该 Run 的 user 输入必须包含第一次 PERFECT 后由 ReviewGuard 发出的确认请求。
+- `PERFECT`：第一次返回普通 skeptical tool result。该 tool result 触发的下一次 provider request 若在同一 Authority Root 下以新的 ProviderRunIdentity 再次调用 PERFECT，则立即生效；Reviewer 若先 terminal，Host 改用新的 ReviewConfirmation user message 继续，随后第二次 PERFECT 生效。
+- 同一个 ProviderRunIdentity（包括同一 assistant message 内的并行/重复 tool call）中的额外 PERFECT 不写 Journal、不占用第二次确认。
+- 第二次 PERFECT 必须来自不同 ProviderRunIdentity，并满足以下因果路径之一：
+  1. 与第一次相同的 AuthorityRootUserMessageId，证明模型已消费第一次 skeptical tool result 后重新运行；
+  2. 当前 PhysicalUserMessageId 等于 Host 已接受的 ReviewConfirmation continuation。
   仅 ToolCallId 不同不足以证明独立确认。
-  同一个 assistant message 内连续调用两次 PERFECT 无效。
   两次之间出现普通文本、read、grep 不打断确认序列。
   verdict tool 自身失败不改变当前确认状态。
   REVISE 后立即建立新 barrier。

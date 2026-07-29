@@ -46,11 +46,12 @@ module ReviewerGuardState =
         guard sessionParents journal reviewerKey
         |> Option.exists (fun reviewGuard -> reviewGuard.ConsecutivePerfects = 1 && not reviewGuard.IsConfirmed)
 
-    let confirmedOwner sessionParents journal reviewerKey providerRunId =
+    let confirmedOwner sessionParents journal reviewerKey physicalUserMessageId =
         match reviewOwner sessionParents journal reviewerKey, guard sessionParents journal reviewerKey with
         | Some owner, Some reviewGuard
             when reviewGuard.IsConfirmed
                  && reviewGuard.ConfirmedReviewerSessionId = Some(SessionId.create reviewerKey)
-                 && reviewGuard.ConfirmedProviderRunId = Some providerRunId ->
+                 && (reviewGuard.AuthorityRootUserMessageId = Some physicalUserMessageId
+                     || reviewGuard.ConfirmationPhysicalMessageId = Some physicalUserMessageId) ->
             Some owner
         | _ -> None

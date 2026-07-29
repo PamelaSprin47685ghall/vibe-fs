@@ -163,6 +163,54 @@ module ReviewerHostTests =
             })
 
     [<Fact>]
+    let ``ReviewerHost confirms reevaluation in a second provider run under the same user root`` () =
+        withTempDir (fun directory ->
+            task {
+                let manager = SessionId.create "review-manager-same-root"
+                let reviewer = SessionId.create "reviewer-same-root"
+                let now = DateTimeOffset.UtcNow
+
+                use journal =
+                    AgentJournal.createFromBoot
+                        directory
+                        (RuntimeId.create "review-runtime-same-root")
+                        1
+                        now
+                        (Boot.boot directory)
+
+                let host = ReviewerHost(journal, manager, reviewer)
+
+                Assert.Equal(
+                    Ok ReviewFinishResult.NeedsReview,
+                    host.RecordVerdict(
+                        "call-1",
+                        "tree-a",
+                        ReviewGuardVerdict.Perfect,
+                        "run-1",
+                        userMessageId = "root-a"
+                    )
+                )
+
+                Assert.Equal(
+                    Ok ReviewFinishResult.Confirmed,
+                    host.RecordVerdict(
+                        "call-2",
+                        "tree-a",
+                        ReviewGuardVerdict.Perfect,
+                        "run-2",
+                        userMessageId = "root-a"
+                    )
+                )
+
+                let guard =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions.[manager].ReviewGuard.Value
+
+                Assert.True(guard.IsConfirmed)
+                Assert.Equal(2, guard.ConsecutivePerfects)
+                Assert.Equal(Some "root-a", guard.AuthorityRootUserMessageId)
+            })
+
+    [<Fact>]
     let ``SubmitVerdict_reads_tree_from_port_and_appends_to_journal`` () =
         withTempDir (fun directory ->
             task {

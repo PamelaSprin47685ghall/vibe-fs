@@ -152,7 +152,7 @@ module TurnCompletionProgram =
                     sessionParents
                     journal
                     sessionKey
-                    (MessageId.value turn.AssistantMessageId),
+                    (MessageId.value turn.UserMessageId),
                 journal
             with
             | Some AgentRole.Reviewer, Some reviewOwner, Some j ->

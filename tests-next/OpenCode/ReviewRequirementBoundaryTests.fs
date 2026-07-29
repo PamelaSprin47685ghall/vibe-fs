@@ -148,11 +148,13 @@ module ReviewRequirementBoundaryTests =
                 let parents = Dictionary<string, string>()
                 parents.[SessionId.value reviewerId] <- SessionId.value managerId
 
-                applyDecide
-                    sessionPort
-                    (Some journal)
-                    parents
-                    (completedTurn (SessionId.value reviewerId) AgentRole.Reviewer [| textPart "review complete" |])
+                let confirmedTerminal =
+                    { completedTurn (SessionId.value reviewerId) AgentRole.Reviewer [| textPart "review complete" |] with
+                        UserMessageId = MessageId.create "review-confirmation"
+                        RootUserMessageId = MessageId.create "review-root"
+                        AssistantMessageId = MessageId.create "terminal-after-verdict" }
+
+                applyDecide sessionPort (Some journal) parents confirmedTerminal
 
                 do! drainMicrotasks 4
                 Assert.Empty(pendingIds ())
@@ -162,6 +164,8 @@ module ReviewRequirementBoundaryTests =
 
                 let unrelatedReviewerTerminal =
                     { completedTurn (SessionId.value reviewerId) AgentRole.Reviewer [| textPart "later output" |] with
+                        UserMessageId = MessageId.create "later-user"
+                        RootUserMessageId = MessageId.create "later-user"
                         AssistantMessageId = MessageId.create "later-reviewer-run" }
 
                 applyDecide sessionPort (Some journal) parents unrelatedReviewerTerminal

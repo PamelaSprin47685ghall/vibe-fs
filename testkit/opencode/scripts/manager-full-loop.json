@@ -612,7 +612,7 @@
         "requiredTools": [
           "write"
         ],
-        "userRegex": "edit src/main.txt"
+        "userRegex": "Edit src/main.txt"
       },
       "respond": {
         "type": "tool-call",
@@ -636,7 +636,7 @@
         "requiredTools": [
           "write"
         ],
-        "userRegex": "edit src/main.txt"
+        "userRegex": "Edit src/main.txt"
       },
       "respond": {
         "type": "text",
@@ -966,8 +966,7 @@
         "args": {
           "verdict": "PERFECT"
         }
-      },
-      "reusable": true
+      }
     },
     {
       "id": "reviewer-after-first-perfect",
@@ -983,15 +982,13 @@
           "verdict"
         ],
         "afterToolResult": true,
-        "userRegex": "Re-review the fixed tree and submit dual PERFECT|PERFECT"
+        "userRegex": "Re-review the fixed tree and submit dual PERFECT"
       },
       "respond": {
         "type": "text",
         "text": "First PERFECT submitted; await confirmation request."
       },
-      "blocking": false,
-      "pathless": true,
-      "reusable": true
+      "blocking": false
     },
     {
       "id": "review-perfect-confirmed",
@@ -1006,6 +1003,7 @@
         "requiredTools": [
           "verdict"
         ],
+        "afterToolResult": false,
         "userRegex": "Nope, let's re-evaluate:"
       },
       "respond": {
@@ -1014,8 +1012,7 @@
         "args": {
           "verdict": "PERFECT"
         }
-      },
-      "reusable": true
+      }
     },
     {
       "id": "reviewer-final-report",

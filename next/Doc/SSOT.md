@@ -127,7 +127,7 @@ identity = logicalRunId + AuthorityRootUserMessageId + providerAttempt
 ### Interaction Repair / Review witness / Companion
 
 - Interaction Repair：同一 identity 最多一次；第二次仍空 → `MISSING_FINAL_REPORT`
-- Review witness：首次 PERFECT 的 tool result 直接返回普通英文句子 `Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?`，不返回 JSON/status envelope；Host 以同一句作为新的物理 continuation，建立第二次复审的因果身份。ReviewConfirmation 接受前的过早重复 PERFECT 不写 Journal。第二次有效 PERFECT 同时记录 PhysicalUserMessageId（confirmation）与 AuthorityRootUserMessageId；双 PERFECT + tree witness 不变
+- Review witness：首次 PERFECT 的 tool result 直接返回普通英文句子 `Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?`，不返回 JSON/status envelope。该 tool result 被模型消费后，同一 AuthorityRootUserMessageId 下、不同 ProviderRunIdentity 的第二次 PERFECT 立即有效；同一个 ProviderRunIdentity 内的重复 tool call 不计数。若 Reviewer 在第一次后先 terminal，Host 仍以同一句发送新的物理 ReviewConfirmation continuation，第二次 PERFECT 以其 PhysicalUserMessageId 证明因果。双 PERFECT + tree witness 不变
 - Companion eligibility **唯一** 读 `ActiveLogicalRun` 的 CanonicalRole / SelectedAgent；缺 ActiveLogicalRun → 不创建 Blogger
 
 ### 删除清单（语义层）

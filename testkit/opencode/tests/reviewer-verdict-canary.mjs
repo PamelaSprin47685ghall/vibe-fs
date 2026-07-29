@@ -36,19 +36,41 @@ function toolNames(request) {
   return request.tools?.map(t => t.function?.name || t.name).filter(Boolean) || [];
 }
 
+function uniqueVerdictToolResults(requests) {
+  const results = new Map();
+  for (const request of requests) {
+    for (const message of request.messages || []) {
+      if (message.role !== 'tool' && message.role !== 'toolResult') continue;
+      const content = typeof message.content === 'string'
+        ? message.content
+        : JSON.stringify(message.content || '');
+      if (!content.includes('Nope, let\'s re-evaluate:') && !content.includes('PERFECT recorded for the current tree.')) continue;
+      const key = message.tool_call_id || message.toolCallId || content;
+      results.set(key, content);
+    }
+  }
+  return [...results.values()];
+}
+
 async function oracleCheck(scenario, ctx, step) {
-  // Oracle: review facts
+  // Oracle: the real regression is two provider runs under one physical user
+  // root. The old canary ended the first turn, so it never exercised the loop
+  // that made every subsequent PERFECT return the skeptical sentence.
   const reviewerReqs = scenario.provider.requests.filter(r => toolNames(r).includes('verdict'));
-  assert.ok(reviewerReqs.length >= 3, 'Reviewer must submit two verdicts then finish');
+  assert.equal(reviewerReqs.length, 3, 'reviewer must make exactly two verdict calls and one terminal follow-up');
   const rvFacts = factsIn(scenario.host.workDir, 'ReviewVerdictRecorded');
   assert.ok(!fs.existsSync(path.join(scenario.host.workDir, '.wanxiangshu-next')), 'Journal must not dirty workspace');
   assert.equal(rvFacts.length, 2, 'two distinct PERFECT verdict facts required');
   assert.ok(rvFacts.every(f => JSON.stringify(f).includes('Perfect')), 'both persisted facts must be PERFECT');
   assert.equal(new Set(valuesOf(rvFacts, 'ToolCallId')).size, 2, 'two verdict facts require distinct tool call IDs');
+  assert.equal(new Set(valuesOf(rvFacts, 'ProviderRunId')).size, 2, 'two verdict facts require distinct provider runs');
+  assert.equal(new Set(valuesOf(rvFacts, 'UserMessageId')).size, 1, 'second PERFECT must be accepted in the same physical user turn');
   assert.equal(new Set(valuesOf(rvFacts, 'GitTreeHash')).size, 1, 'double PERFECT must bind one tree hash');
+  assert.equal(factsIn(scenario.host.workDir, 'ReviewConfirmedIdle').length, 1, 'confirmed reviewer must reach durable terminal idle');
 
-  const guards = factsIn(scenario.host.workDir, 'GuardPromptAccepted');
-  assert.equal(guards.length, 1, 'missing durable Manager guard acceptance');
+  const verdictResults = uniqueVerdictToolResults(scenario.provider.requests);
+  assert.equal(verdictResults.filter(x => x.includes('Nope, let\'s re-evaluate:')).length, 1, 'only the first PERFECT may request re-evaluation');
+  assert.equal(verdictResults.filter(x => x.includes('PERFECT recorded for the current tree.')).length, 1, 'second PERFECT must be accepted');
 }
 
 if (!runStaticGate([__filename]).passed) process.exit(1);
