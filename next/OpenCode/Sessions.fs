@@ -159,7 +159,8 @@ type InjectedSessionPort
                               AssistantMessageId = msgId
                               Role = "test"
                               Directory = ""
-                              FinalText = "test output" }
+                              FinalText = "test output"
+                              FormalText = "test output" }
 
                         eventPort.NotifyTerminal sessionId (TerminalOutcome.Completed fakeResult)
                         |> ignore

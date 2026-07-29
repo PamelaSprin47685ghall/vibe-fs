@@ -45,7 +45,8 @@ module CompanionIntegration =
                               AssistantMessageId = mid
                               Role = "blogger"
                               Directory = ""
-                              FinalText = "blogger private thought\n\nblog paragraph" }
+                              FinalText = "blogger private thought\n\nblog paragraph"
+                              FormalText = "blog paragraph" }
 
                         eventPort.NotifyTerminal sId (TerminalOutcome.Completed fakeResult) |> ignore
                         return Delivered mid
@@ -98,7 +99,8 @@ module CompanionIntegration =
                                   AssistantMessageId = messageId
                                   Role = "blogger"
                                   Directory = ""
-                                  FinalText = "manager work log" }
+                                  FinalText = "manager work log"
+                                  FormalText = "manager work log" }
                             ))
                         |> ignore
 

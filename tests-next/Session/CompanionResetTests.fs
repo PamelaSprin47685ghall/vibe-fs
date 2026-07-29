@@ -33,7 +33,8 @@ module CompanionResetTests =
                   AssistantMessageId = MessageId.create "blog"
                   Role = "test"
                   Directory = ""
-                  FinalText = "blogger private thought\n\nblog paragraph" }
+                  FinalText = "blogger private thought\n\nblog paragraph"
+                  FormalText = "blog paragraph" }
             )
 
         let mutable growOutput = true
@@ -170,7 +171,8 @@ module CompanionResetTests =
                           AssistantMessageId = MessageId.create "empty"
                           Role = "test"
                           Directory = ""
-                          FinalText = "" }
+                          FinalText = ""
+                          FormalText = "" }
                     )
                 )
 
@@ -187,7 +189,8 @@ module CompanionResetTests =
                           AssistantMessageId = MessageId.create "success"
                           Role = "test"
                           Directory = ""
-                          FinalText = "blogger private thought\n\nblog paragraph" }
+                          FinalText = "blogger private thought\n\nblog paragraph"
+                          FormalText = "blog paragraph" }
                     )
                 )
 

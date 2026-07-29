@@ -80,28 +80,14 @@ module CompanionTransform =
             // Eligibility source of truth: ActiveLogicalRun.SelectedAgent only.
             // No production fallback to sessionRoles / message agent / transform input.
             let authorityAgent =
-                let fromJournal =
-                    match journal with
-                    | None -> None
-                    | Some j ->
-                        (AgentJournal.snapshot j).AgentProjections.Sessions
-                        |> Map.tryFind (SessionId.create sessionId)
-                        |> Option.bind (fun s -> s.PromptAuthority)
-                        |> Option.bind (fun auth -> auth.ActiveLogicalRun)
-                        |> Option.map (fun run -> run.SelectedAgent)
-
-                match fromJournal with
-                | Some agent -> Some agent
-                | None ->
-                    // Fallback to inObj/message agent when no journal is active
-                    // (e.g. test harness / ephemeral session).
-                    let inputAgent =
-                        if not (isNull inObj) && not (isNull inObj?agent) then
-                            Some(unbox<string> inObj?agent)
-                        else
-                            messageContext |> Option.bind snd
-
-                    inputAgent |> Option.filter (fun a -> PromptAuthority.parseAgentName a |> Result.isOk)
+                match journal with
+                | None -> None
+                | Some j ->
+                    (AgentJournal.snapshot j).AgentProjections.Sessions
+                    |> Map.tryFind (SessionId.create sessionId)
+                    |> Option.bind (fun s -> s.PromptAuthority)
+                    |> Option.bind (fun auth -> auth.ActiveLogicalRun)
+                    |> Option.map (fun run -> run.SelectedAgent)
 
             let agentRole = authorityAgent |> Option.bind HostSessionContext.canonicalRole
 

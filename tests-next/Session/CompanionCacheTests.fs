@@ -46,7 +46,8 @@ module CompanionCacheTests =
                               AssistantMessageId = MessageId.create "blog"
                               Role = "test"
                               Directory = ""
-                              FinalText = fullOutput }
+                              FinalText = fullOutput
+                              FormalText = text }
                         )))
 
                 Task.FromResult(Ok(MessageId.create "accepted"))

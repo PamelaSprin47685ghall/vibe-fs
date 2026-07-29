@@ -11,6 +11,7 @@
   - `next/OpenCode/CompletedTurnClassifier.fs` 保留 typed `MessagePart` 分类路径与 master 的 `TurnNeedsContinuation` 语义，未恢复 raw `obj array`；
   - `tests-next/OpenCode/EventsTests.fs` 保留可编译的 typed `parts` fixture。
 - 重启盘点时工作树含 **123 staged、5 unstaged、44 untracked** 路径。这些变更混合了先前已完成主体、未验证 WIP 与被取消代理留下的半成品；不得按文件名或 staged 状态推断其已交付。
+- Orphan/compat 文件审计发现 `next/OpenCode/CompanionTransformHelpers.fs` 存在于磁盘但未被 `next/Wanxiangshu.Next.fsproj` 或 `tests-next/Wanxiangshu.Next.Tests.fsproj` 引用，为孤立文件；其余候选路径均已确认归属。
 
 ### WIP checkpoint
 
@@ -18,14 +19,21 @@
 
 ### 当前阻断（直接验证）
 
-`dotnet build next/Wanxiangshu.Next.fsproj` 于重启盘点中失败，尚未运行 test build、Fable 或任何 suite。初始的 `Roles.fs` record-list 与 `ProcessRunner.fs` reserved-name 阻断已修正后，下一轮仍报告 **40 个错误**；它们明确暴露被取消的半迁移边界：`ReviewProjection` 新 witness 字段未补齐、`ChildRun`/`ForkRuntime`/`ForkRecovery` API 不一致、`ProcessRunner`/`NodeProcessWait` task 类型不一致、`OrchestratorProgram`/`Orchestrator.fs` 依赖 record 不一致、`CompanionHostBlogger` 仍按旧 `AgentRunResult` 字段读取。首要编译错误：
+`dotnet build next/Wanxiangshu.Next.fsproj` 与 `dotnet build tests-next/Wanxiangshu.Next.Tests.fsproj` 均已通过，0 errors、0 warnings。Fable production build（`npm run build`）已通过，0 errors。
 
-1. `next/Kernel/Roles.fs` 第 165–215 行存在未完成的 record/list 绑定（`FS0010` / `FS3118`）。
-2. `next/Process/ProcessRunner.fs` 把 `process` 当作值/参数名；这是 F# future reserved identifier（`FS0046`，第 19、40、65、88 行）。
+`npm run test:next` **285 passed / 19 failed / 0 skipped**。失败可分为五组：
 
-因此，下列已写入但未编译的路径全部回到待审计状态：typed Host boundary、ChildRun/targeted completion、PluginRuntimeScope、ReviewWitness、Process/PTY、ToolRegistry、Orchestrator、Journal projections、Fallback canaries 与架构门禁。必须先恢复 production build，再逐项验证，不得宣称本轮完成。
+1. **ArchitectureGates（2 failures）**：`tests-next/Integration/OrchestratorRecoveryTests.fs` 301 行超出 300 行硬门禁；§17 语义门禁报告 23 个文件含 raw Host/Fable dynamic access、10 个文件违反单一写入口、3 个孤立 DSL program、3 个重复算法、11 个文件 > 280 行。
 
-> 盘点后修复：production build 已在修正上述首轮阻断后通过。test project 仍失败（30 个错误）：多数测试 fixture 仍构造已移除的 `AgentRunResult.Parts` 或 `SessionMessage.Parts.Raw`，以及 GitPort 新增 `ReadHead`/`GetTargetHead` 后的 mock records 未补字段；另有 `EventsTests` 缺少 `createObj` import、`SpikeHostTests` context record 类型混用。下一步是完成 typed Host migration 的测试侧 cutover，而不是恢复 raw compatibility 字段。
+2. **ReconcileContinuationSupport（5 failures）**：`GatedSnapshot`、`bind`、`fallbackFailures`、`outcomeOf` 等测试抛出 `Cannot read properties of undefined`——mock/fixture 初始化缺口。
+
+3. **Companion B 记录污染（5 failures）**：Blogger 的 `reasoning`/`private thought` 内容泄漏到正式 B 输出，违反 KISS-N02 §II 排除规则。
+
+4. **CompanionEligibility（1 failure）**：缺少 authority 时应 fail-closed（返回 0），实际返回 1（fail-open）。
+
+5. **ForkRuntime / HostForkRuntime / HostForkRestart（6 failures）**：完成路由与重启恢复中 DU `tag` 属性无法读取——mock host 响应缺少必要的区分联合 case。
+
+> 盘点后修复：production build、test project 与 Fable 编译均已通过（0 errors、0 warnings）。`npm run test:next` 当前 285 passed / 19 failed。重点整治五个失败组后再继续其他 P0–P4 事项。
 
 ### 重启顺序
 

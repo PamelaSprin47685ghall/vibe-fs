@@ -34,7 +34,8 @@ module CompanionHostTests =
                   AssistantMessageId = MessageId.create "blog"
                   Role = "test"
                   Directory = ""
-                  FinalText = "blogger private thought\n\nblog paragraph" }
+                  FinalText = "blogger private thought\n\nblog paragraph"
+                  FormalText = "blog paragraph" }
             )
 
         let mutable growOutput = true
@@ -232,7 +233,8 @@ module CompanionHostTests =
                                       AssistantMessageId = MessageId.create "blog"
                                       Role = "test"
                                       Directory = ""
-                                      FinalText = "blogger private thought\n\n" + text }
+                                      FinalText = "blogger private thought\n\n" + text
+                                      FormalText = text }
                                 )))
 
                         Task.FromResult(Ok(MessageId.create "accepted"))

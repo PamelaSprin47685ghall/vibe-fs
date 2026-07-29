@@ -228,7 +228,8 @@ module ExecutorSummarizeTests =
                           AssistantMessageId = MessageId.create "m-1"
                           Role = "test"
                           Directory = ""
-                          FinalText = "done" }
+                          FinalText = "done"
+                          FormalText = "done" }
                     )))
 
         host, trigger, (fun () -> childCount), (fun () -> childPromptCount)

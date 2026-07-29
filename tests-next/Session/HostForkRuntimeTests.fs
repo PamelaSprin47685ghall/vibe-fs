@@ -57,7 +57,8 @@ module HostForkRuntimeTests =
                           AssistantMessageId = MessageId.create "m-1"
                           Role = "test"
                           Directory = ""
-                          FinalText = "A version output" }
+                          FinalText = "A version output"
+                          FormalText = "A version output" }
                     )))
 
         host, trigger, (fun () -> childCount), (fun () -> childPromptCount)
@@ -220,7 +221,8 @@ module HostForkRuntimeTests =
                                   AssistantMessageId = MessageId.create "model-terminal"
                                   Role = "test"
                                   Directory = ""
-                                  FinalText = "A version output" }
+                                  FinalText = "A version output"
+                                  FormalText = "A version output" }
                             )))
 
                 use journal =

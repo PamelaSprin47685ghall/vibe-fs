@@ -13,7 +13,10 @@ type AgentRunResult =
       Directory: string
       /// Session-wide A: cumulative formal text + reasoning/thinking across the
       /// whole Session, not the last turn alone. Excludes tool raw streams.
-      FinalText: string }
+      FinalText: string
+      /// Current turn's formal assistant text only (no reasoning/thinking).
+      /// B record for blogger companions is built from this field.
+      FormalText: string }
 
     /// Hard invariant: completed runs must have non-empty session-wide A text.
     member this.IsValid = not (System.String.IsNullOrWhiteSpace this.FinalText)

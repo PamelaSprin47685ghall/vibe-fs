@@ -133,6 +133,7 @@ module TurnCompletionProgram =
             // expose the full Session accumulation. Empty intermediate turns do
             // not wipe prior A.
             let finalA = TerminalSessionA.accumulateTurn eventPort turn
+            let formalText = CompletedTurnClassifier.partsText turn.Parts
 
             let runResult: AgentRunResult =
                 { SessionId = turn.SessionId
@@ -140,7 +141,8 @@ module TurnCompletionProgram =
                   AssistantMessageId = turn.AssistantMessageId
                   Role = roleStr
                   Directory = turn.Directory
-                  FinalText = finalA }
+                  FinalText = finalA
+                  FormalText = formalText }
 
             // A first PERFECT is not a child completion. Keep the reviewer's
             // physical handle live until the confirmation prompt causes a

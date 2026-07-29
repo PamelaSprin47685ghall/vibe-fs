@@ -91,6 +91,7 @@
     <Compile Include="MockOpenCode/ReconcilerIntegration.fs"/>
     <Compile Include="Integration/OrchestratorTests.fs"/>
     <Compile Include="Integration/OrchestratorIntegrationTests.fs"/>
+    <Compile Include="Integration/OrchestratorRecoveryFixtures.fs"/>
     <Compile Include="Integration/OrchestratorRecoveryTests.fs"/>
     <Compile Include="Integration/ManagerCanaryTests.fs"/>
     <Compile Include="Gates/ArchitectureGateSupport.fs"/>
