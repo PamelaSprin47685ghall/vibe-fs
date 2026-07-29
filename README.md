@@ -2,25 +2,17 @@
 
 OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
 
-**当前版本：`0.5.0`（OpenCode Agent DSL）** — 唯一产品语义见 [`next/Doc/SSOT.md`](next/Doc/SSOT.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
+当前版本：`0.5.0-rc.1`（OpenCode Agent DSL） — 唯一产品语义见 [`SSOT/00.md`](SSOT/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
 
-产品语义：[`next/Doc/SSOT.md`](next/Doc/SSOT.md)。工程执行状态与纠偏顺序：[`AGENTS.md`](AGENTS.md)。
+产品语义：[`SSOT/00.md`](SSOT/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前迁移总账：[`STATUS/shock-anneal.md`](STATUS/shock-anneal.md)。
 
 ## 当前边界
 
-当前分支已回滚测试驱动的生产污染：没有生产进程台账、全局进程 kill、传输层 prompt 重试/伪造失败、fail-open Git tree 或伪 PTY 工具面。
+本仓库正在进行 SSOT 休克-退火迁移。 生产代码与测试正在从旧语义整体迁移到 `SSOT/` 条款。迁移期间编译与测试反馈按阶段关闭与恢复；当前进度、每个工作包状态、旧符号灭绝表见 [`STATUS/shock-anneal.md`](STATUS/shock-anneal.md)。
 
-直接验证过：
+休克开始前的最后一次完整机器反馈保存在 [`STATUS/evidence/pre-shock/`](STATUS/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 同时记录多个中心协议处于 `CONTRADICTS` 或 `NOT_IMPLEMENTED`。
 
-```text
-npm run build
-npm run test:manager-tools
-node testkit/opencode/tests/gate-testkit.mjs
-npm run test:e2e:p0:three
-npm run test:e2e:p0:parallel
-```
-
-TestKit 以 provider-visible 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容。Manager→Coder→Join 使用真实 child、terminal、join barrier；Companion 成功回合原子持久 B 与 projection，replacement restart canary 验证 FrozenB 与 raw tail。Host 事件只唤醒 reconcile，`session.status=retry` 是唯一 durable cursor 推进入口。P0 保持并行，最多重复 3 次；每个场景使用 2 秒 causal-progress Watchdog。
+TestKit 以 `ProviderSemanticProjection` 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容（VERIFY-003、VERIFY-007）。P0 保持并行，release gate 恰好 3 轮；每个场景使用 2 秒 causal-progress Watchdog（VERIFY-004）。
 
 ## 角色模型
 
@@ -43,14 +35,17 @@ Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git �
 
 ## 核心不变量
 
-1. Busy existing agent 的 `fork` 是同 child fire-and-forget nudge；不得创建 prompt queue。
-2. completion 先写 mailbox；`join()` 消费任意可用 completion。
-3. 进程只有一个 `3 × estimated_running_secs` deadline；进程资源只由拥有者清理。
-4. Review 必须由同一 Git tree 的两个不同 ProviderRunIdentity / ToolCallId `PERFECT` witness 确认。
-5. Fallback 属于 Logical Run，按 SelectedAgent/PeerAgent 永久 A/A/B/B 循环；成功不重置，第四次后不判死，只有 typed `session.status=retry` 推进。
-6. 插件 Prompt 必须经 PromptDispatcher；发送时 `Model=None`，未知来源 fail-closed。
-7. Git tree 读取失败必须 fail closed。
-8. PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
+条款 ID 为规范位置；此处只是索引，冲突时以 `SSOT/` 为准。
+
+1. Busy existing agent 的 `fork` 是同 child fire-and-forget nudge；不得创建 prompt queue（EXEC-002）。
+2. completion 先写 mailbox；`join()` 消费任意可用 completion，消费后写 `HandleRetired` tombstone（EXEC-004、EXEC-009）。
+3. 进程 deadline = `min(3 × estimated_running_secs, 管理员 hard limit)`；进程资源只由拥有者清理（EXEC-011）。
+4. Review 必须由同一 Git tree 的两个不同 ProviderRunIdentity / ToolCallId `PERFECT` 确认，且第二次的 provider input seal 必须证明包含第一次 challenge（REVIEW-003、REVIEW-010）。
+5. Fallback 属于 Logical Run。Offset 按 A/A/B/B 无界循环，成功不重置 Offset 只清零 `ConsecutiveFailureCount`；自动恢复预算默认 12 连续失败后写 `FallbackExhausted`（FALLBACK-002、FALLBACK-004、FALLBACK-005）。
+6. Host 事件只负责唤醒；唯一的 `FallbackCursorAdvanced` 写入口是 FallbackController（FALLBACK-003）。
+7. 插件 Prompt 必须经 PromptDispatcher；发送时 `Model=None`，未知来源 fail-closed（PROMPT-005、PROMPT-006）。
+8. Git tree 读取失败必须 fail closed（ORCH-008）。
+9. PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成（EXEC-015）。
 
 ## 构建与测试
 
@@ -80,11 +75,10 @@ wanxiangshu
 
 ```text
 next/                 生产 Agent DSL
- tests-next/           Fable contract/Port tests
- testkit/opencode/     独立 OpenCode harness
- next/Doc/SSOT.md      产品语义
- AGENTS.md             工程纪律与当前证据
- MIGRATION.md          行为迁移总账
+tests-next/           Fable contract/Port tests
+testkit/opencode/     独立 OpenCode harness
+SSOT/                 产品语义（唯一规范，条款 ID 寻址）
+STATUS/               实现状态、合规表、迁移总账
 ```
 
 旧实现不作为生产依赖。历史代码仅可作逐符号行为证据；禁止整版本 checkout 或无审查覆盖。

@@ -93,8 +93,7 @@ module ArchitectureGates =
                         )
 
                 if containsForbiddenToken text "session.status" then
-                    let allowed =
-                        sessionStatusAllowlist |> List.exists (fun a -> norm.EndsWith(a))
+                    let allowed = sessionStatusAllowlist |> List.exists (fun a -> norm.EndsWith(a))
 
                     if not allowed then
                         violations.Add(
@@ -164,37 +163,6 @@ module ArchitectureGates =
         Assert.False(text.Contains("ProjectReference"))
         Assert.False(text.Contains("wanxiangshu.fsproj"))
         Assert.False(text.Contains("../src"))
-
-    [<Fact>]
-    let ``Next_source_files_do_not_exceed_300_lines`` () =
-        let repoRoot = findRepoRoot ()
-        let nextDir = NodeFsGatesSupport.pathJoin (repoRoot, "next")
-        let testsNextDir = NodeFsGatesSupport.pathJoin (repoRoot, "tests-next")
-        let nextFsFiles = collectFsFiles nextDir
-        let testsFsFiles = collectFsFiles testsNextDir
-        let violations = List<string>()
-
-        for file in (List.append nextFsFiles testsFsFiles) do
-            if file.EndsWith(".fs") then
-                let text = NodeFsGatesSupport.readFileSync (file, "utf-8")
-
-                let lineCount =
-                    text.Split([| "\r\n"; "\n" |], System.StringSplitOptions.None).Length
-
-                if lineCount > 300 then
-                    violations.Add(
-                        sprintf
-                            "File '%s' has %d lines (exceeds maximum of 300 lines): split the file; deleting blank lines or compressing statements to evade the gate is forbidden"
-                            file
-                            lineCount
-                    )
-
-        Assert.True(
-            violations.Count = 0,
-            sprintf
-                "Next_source_files_do_not_exceed_300_lines violations:\n%s"
-                (String.concat "\n" (violations |> Seq.toList))
-        )
 
     [<Fact>]
     let ``Next_recursive_scan_includes_subdirectory_files`` () =

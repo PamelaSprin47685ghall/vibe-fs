@@ -219,23 +219,3 @@ module ArchitectureGateSupport =
           ("sha256Hex", [ "Domain/PromptAuthority.fs" ])
           ("reviewWitness", [ "Domain/ReviewWitness.fs" ])
           ("confirmPerfect", [ "Review/ReviewProgram.fs" ]) ]
-
-    let codecAllowlistFor280 =
-        [ "next/OpenCode/HostEventCodec.fs"
-          "next/OpenCode/HostMessageCodec.fs"
-          "next/OpenCode/CanonicalJson.fs"
-          "next/OpenCode/ToolHostCodec.fs"
-          "next/OpenCode/Projection.fs"
-          "next/OpenCode/PromptIngress.fs"
-          "next/OpenCode/HostSessionContext.fs"
-          "next/OpenCode/HostSignalAdapter.fs"
-          "next/OpenCode/HostSignalSubscribe.fs" ]
-
-    // Complete semantic lifecycles may exceed the warning band while their
-    // boundary is being migrated; they remain below the hard 300-line gate.
-    let semanticBoundaryAllowlistFor280 =
-        [ "next/Process/PtySupervisor.fs"
-          "next/Process/Pty.fs"
-          "next/OpenCode/TurnCompletionProgram.fs"
-          "next/OpenCode/OpenCodePort.fs"
-          "next/Kernel/Flow.fs" ]

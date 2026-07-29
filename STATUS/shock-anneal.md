@@ -1,0 +1,352 @@
+# STATUS/shock-anneal — 休克-退火迁移总账
+
+分支 `refactor/ssot-shock-anneal`。封炉基线 `STATUS/evidence/pre-shock/`。
+
+## 阶段
+
+| 期 | 名称 | 机器反馈 | 当前 |
+|----|------|---------|------|
+| 0 | 封炉：冻结 SSOT、基线、迁移地图、验证层工装 | 静态检查 + 最后一次完整编译测试 | 完成 |
+| 1 | 休克一：领域内核与持久事实（包 0） | 关闭 | 未开始 |
+| 2 | 休克二：生产代码全部调用链（包 A–H） | 关闭 | 未开始 |
+| 3 | 清场：删除旧语义与临时标记 | 静态检查 | 未开始 |
+| 4 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 | 未开始 |
+| 5 | 退火一：恢复生产编译 | dotnet build → npm run build | 未开始 |
+| 6 | 退火二：恢复 mjs 单元套件 | test:next | 未开始 |
+| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
+| 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
+
+包 K 排在退火二之后、退火三之前：剧本的 lane 划分与 step 序列反映迁移后的生产行为，先重写会锁定旧语义；而它必须早于任何 canary 运行，因为旧剧本无法匹配新语义的请求。
+
+休克期只允许第 0 层反馈：`ssot-lint.mjs`、`shock-audit.mjs`、`architecture-gate.mjs`、`git diff --check`、`git status --short`、`rg`。
+
+### 测试语言迁移（VERIFY-008）
+
+休克三不再是「重写 F# 测试」，而是换语言重建：生产保持 `.fs`，第 1–3 层测试全部改为 `.mjs`，直接消费 `build/next` 发布产物。
+
+理由不是省编译时间，而是让语言边界物理性地阻止测试触碰实现内部——能从 mjs 干净进入的恰好是 SSOT 认定为事实的契约面，碰不到的恰好是实现自由部分。
+
+因为休克三本来就要徒手重建全部测试，换语言的边际成本≈0，但删掉了一整层：
+
+```text
+迁移前：F# 测试 → Fable 编译 → 自制 Assert shim → 自制导出发现 runner → node
+迁移后：mjs → node:test
+```
+
+连带删除：`tests-next/Wanxiangshu.Next.Tests.fsproj`、`tests-next/Assert.fs`（手写 xunit 替身）、`npm run test:compile`、`build/tests-next`、runner 的 Fable 导出发现逻辑。
+
+退火期形态因此改变：
+
+| 原计划 | 现计划 |
+|--------|--------|
+| 退火一 4 波（Domain/Journal、callers、Host/Fable、tests） | 退火一 2 波（Domain+Journal、callers+Host/Fable）。测试不参与编译 |
+| 退火二先 `test:compile` 再 `test:next` | 退火二直接 `test:next` |
+
+语义升级：生产入口 `build/next/OpenCode/Plugin.js` 与测试入口同为 `build/next`，测的是同一份字节。当前 F# 测试走 `--precompiledLib` 链接，测的是另一次编译结果。
+
+新增的两条 mjs 专属风险与对策（`.mjs` 无编译期重命名保护的对价）：
+
+| 风险 | 对策 |
+|------|------|
+| 字段改名后断言静默读到 `undefined` | 禁止只断言真值；必须比对完整结构或完整序列化文本 |
+| Fable 命名约定与容器形状泄漏进测试 | 全部隔离在 `tests-mjs/domain.mjs` 单一 facade，等价于生产侧 Adapter/Codec 门禁 |
+| `DateTimeOffset` 用裸 `new Date()` 导致时间比较反向错误且不报错（已实证） | facade 提供构造器；facade 自身有元测试断言值携带 offset |
+| `build/next` 陈旧时给出假绿灯 | runner 比对产物与 `next/**/*.fs` 时间戳，陈旧则拒绝运行 |
+
+### Architecture Gates 迁出测试套件
+
+`tests-next/Gates/ArchitectureGates.fs`、`ArchitectureGates17.fs`、`ArchitectureGateSupport.fs` 做的是文件系统加正则判断，与 `ssot-lint.mjs` / `shock-audit.mjs` 同类。迁入 `scripts/architecture-gate.mjs`，成为 VERIFY-001 第 0 层。
+
+净收益：门禁不再需要先编译才能检查源码；门禁红灯与行为红灯分离，退火期可以分层打开反馈。
+
+## 工作包状态
+
+状态取值：`UNTOUCHED` `DOMAIN_MIGRATED` `CALLERS_MIGRATED` `LEGACY_REMOVED` `TESTS_REWRITTEN` `COMPILES` `UNIT_GREEN` `E2E_GREEN`。禁止「差不多完成」。
+
+### 包 0：Identity 与基础类型
+
+| 项 | 值 |
+|----|----|
+| 条款 | PROMPT-008 ARCH-006 EXEC-009 ORCH-006 |
+| 目标模块 | `next/Kernel/Identity.fs` `next/Kernel/Fact.fs` `next/Domain/` |
+| 旧入口 | 裸 `string` 承载 LogicalRunId / AuthorityRoot / ProviderRunId / ToolCallId / HandleId / ManagerId |
+| 新入口 | typed identity：`LogicalRunId` `AuthorityRootUserMessageId` `PhysicalUserMessageId` `PromptKey` `ProviderAttemptIdentity` `ProviderRunIdentity` `ReviewBarrierId` `GitTreeHash` `HandleId` `ManagerJobId` `WorktreeIdentity` `TargetRef` |
+| 必须删除 | `LogicalRunId: string` 等所有 record 中的裸 string 身份字段 |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+先做，破坏面最大。
+
+### 包 A：PromptDispatcher
+
+| 项 | 值 |
+|----|----|
+| 条款 | PROMPT-001 PROMPT-005 PROMPT-006 PROMPT-007 PROMPT-009 PROMPT-011 |
+| 目标模块 | `PromptDispatcher.fs` `PromptDispatcherSend.fs` `PromptIngress.fs` `PromptMetadataCodec.fs` |
+| 旧入口 | `PluginPromptAccepted`（单一 accepted 事实，混淆 receipt 与物理落地）；`OpenCodePort` 裸 `prompt_async` 多点调用 |
+| 新入口 | 四事实 `PluginPromptClaimed` / `PluginPromptSubmitted` / `PluginPromptPhysicalAccepted` / `PluginPromptAbandoned`；单一 sender |
+| 必须删除 | `PluginPromptAccepted`；`accepted-*` 参与 Authority 的所有路径；生产模块中除唯一 Host adapter 外的 `prompt_async` |
+| 静态验收 | `prompt_async` 在 `next/` 只出现在唯一 Host adapter |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+### 包 B：AttemptExecutionProfile
+
+| 项 | 值 |
+|----|----|
+| 条款 | PROMPT-008 AGENT-001 AGENT-007 AGENT-010 |
+| 目标模块 | `Domain/PromptAuthority.fs` `Session/AgentRoleIdentity.fs` `ToolRuntimeScope.fs` `ToolRegistry.fs` |
+| 旧入口 | 各模块自行从 Agent 字符串解析 Role；`sessionRoles: Dictionary<string,string>`；`RoleFor context` |
+| 新入口 | 唯一 `buildAttemptExecutionProfile`，所有模块接收 profile |
+| 必须删除 | 任何在 profile 构造之外解析 `fast-`/`deep-` 前缀得出 Role 的代码 |
+| 允许出现 Agent 字符串 | 配置解析、Authority Root 创建、profile 构造、Host 发送边界 |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+### 包 C：FallbackController
+
+| 项 | 值 |
+|----|----|
+| 条款 | FALLBACK-002 FALLBACK-003 FALLBACK-004 FALLBACK-005 FALLBACK-007 FALLBACK-010 |
+| 目标模块 | `FallbackDetect.fs` `RetrySignalHandler.fs` `ProviderFailureWakeup.fs` `Session/DurableFallback.fs` `Journal/FallbackProjection.fs` |
+| 旧入口 | 两个 writer：`RetrySignalHandler:84` 与 `ProviderFailureWakeup:51` 都调 `recordFallbackFailure` |
+| 新入口 | 唯一 `FallbackController`；Host 信号只 MarkDirty |
+| 必须删除 | `ProviderFailureContinuation.recordDurableAdvance`；`FallbackCursorAdvanced` 事实中缺 `PreviousOffset`/`NextOffset`/`ConsecutiveFailureCount` 的旧形状 |
+| 必须新增 | `FallbackExhausted`；`AutoRecoveryBudget = 12`；Offset 与 ConsecutiveFailureCount 分离 |
+| 静态验收 | `FallbackCursorAdvanced` 在 `next/` 除类型/codec/fold 外恰好一个 append site |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+### 包 D：Review
+
+| 项 | 值 |
+|----|----|
+| 条款 | REVIEW-003 REVIEW-004 REVIEW-005 REVIEW-006 REVIEW-008 REVIEW-010 HOST-010 HOST-011 |
+| 目标模块 | `Journal/ReviewConfirmation.fs` `Journal/ReviewProjection.fs` `Domain/ReviewWitness.fs` `VerdictTool.fs` `Review/Guard.fs` `Session/ReviewerHost.fs` `CompanionTransform.fs` |
+| 旧入口 | `physicalConfirmationMatched`（三种弱代理：AcceptedContinuationIds / AcceptedContinuationRoots / ConfirmationPhysicalMessageId）；`samePhysicalRootReevaluationMatched` |
+| 新入口 | `PerfectChallengeIssued` → `ProviderInputSealed` → `ConfirmedReviewWitness`；seal 按 HOST-010 判据绑定 ProviderRunIdentity |
+| 必须删除 | same-root matcher；physical-message-as-proof matcher；`ConfirmationPhysicalMessageId` 字段；`RecentProviderRunIds` 作为唯一去重依据 |
+| 必须新增 | 固定版本化 challenge text（`ChallengeTextVersion = 1`）；transform 内 seal 生成；fail-closed 三条件 |
+| Host 前提 | 已证明可实现，见 `STATUS/evidence/host-transform-run-binding.md`。不需 SSOT 例外 |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+整体迁移，不能分半。
+
+### 包 E：Companion
+
+| 项 | 值 |
+|----|----|
+| 条款 | COMPANION-001 COMPANION-002 COMPANION-008 COMPANION-009 COMPANION-010 COMPANION-013 EXEC-008 HOST-005 HOST-006 |
+| 目标模块 | `Tools/MessageTransform.fs` `Session/Companion*.fs` `CompanionTransform.fs` `Journal/CompanionProjection.fs` |
+| 旧入口 | `MessageTransform.shouldCreateCompanion(agent)` 从 Agent 字符串判定 |
+| 新入口 | eligibility 只读 ActiveLogicalRun 的 `AttemptExecutionProfile.CanonicalRole` |
+| 必须删除 | `shouldCreateCompanion(agent)`；三次 busy skip 计数；child background 使用 FrozenB 的路径 |
+| 必须修正 | 六角色开启 Companion（含 Reviewer、Meditator、DevOps）；ARecord 按 ProviderRun 分段；child background 用最新 durable LatestB |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+### 包 F：Execution / Handle
+
+| 项 | 值 |
+|----|----|
+| 条款 | EXEC-004 EXEC-005 EXEC-009 EXEC-011 EXEC-015 |
+| 目标模块 | `Session/ChildDispatch.fs` `Session/ChildRun*.fs` `Session/ForkRuntime.fs` `JoinTool.fs` `ListTool.fs` `Process/Deadline.fs` |
+| 旧入口 | `AgentLinked` / `AgentForked` / `AgentUnlinked` 三事实无 completed/retired 区分；`ChildDispatch.tryCancel` 占位 |
+| 新入口 | `HandleLinked` / `HandleCompleted` / `HandleRetired`；active / completed-awaiting-join / retired 三态分离 |
+| 必须删除 | retired handle 回退成 Agent 名称重新 fork 的路径 |
+| 必须新增 | join 消费后写 tombstone；真实单 child cancel；parent abort 逐项取消；process 管理员 hard limit |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+### 包 G：Orchestrator
+
+| 项 | 值 |
+|----|----|
+| 条款 | ORCH-003 ORCH-004 ORCH-005 ORCH-006 ORCH-007 ORCH-008 REVIEW-009 |
+| 目标模块 | `Orchestrator*.fs` `next/OpenCode/Orchestrator*.fs` `Journal/OrchestratorProjection.fs` |
+| 旧入口 | `OrchestratorCandidateRegistered` / `OrchestratorRebased` / `OrchestratorRejected` / `OrchestratorPre|PostRebaseReviewConfirmed` — stage-like 恢复投影 |
+| 新入口 | `ManagerJobCreated`（含 `ManagerAgent` `WorktreeIdentity` `TargetBranchFrozen`）/ `CandidateReady` / `ConflictDetected` / `RebasedCandidateReady` / `PublishClaimed` / `Published` / `JobFailed` / `JobAbandoned` |
+| 必须删除 | 跨 review 持有 Integration Gate；旧 stage-like recovery projection |
+| 必须新增 | 短 CAS 发布窗口；`PublishClaimed` 三分支恢复（ORCH-007 固定顺序）；barrier 事实携带 witness ID |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+最后迁移，依赖前面几乎全部协议。
+
+### 包 H：Plugin Composition Root
+
+| 项 | 值 |
+|----|----|
+| 条款 | HOST-009 VERIFY-005 |
+| 目标模块 | `SpikePlugin.fs` `PluginRuntimeScope.fs` `PluginHost.fs` `HostSignalBootstrap.fs` |
+| 旧入口 | 双 transform hook 注册 + 幂等 guard；多处 Dictionary 充当 session 状态 |
+| 新入口 | 单 Journal / 单 PromptDispatcher / 单 FallbackController / 单 profile builder / 单 HostSignal adapter / 单 ToolRegistry；显式 dispose |
+| 生产 | UNTOUCHED |
+| 测试 | UNTOUCHED |
+
+### 包 T：测试语言迁移
+
+| 项 | 值 |
+|----|----|
+| 条款 | VERIFY-001 VERIFY-005 VERIFY-008 |
+| 目标模块 | `tests-mjs/`（新建）、`tests-next/`（删除）、`scripts/architecture-gate.mjs`（新建）、`package.json` |
+| 旧入口 | `tests-next/**/*.fs` + `Wanxiangshu.Next.Tests.fsproj` + `Assert.fs` 手写 xunit 替身 + `npm run test:compile` + runner 的 Fable 导出发现 |
+| 新入口 | `tests-mjs/**/*.mjs` 走 `node:test`，import `build/next`；Fable 约定隔离在 `tests-mjs/domain.mjs` |
+| 必须删除 | `tests-next/` 全部 `.fs`、tests `.fsproj`、`Assert.fs`、`EventDrivenHarness.fs`、`MockOpenCode/*.fs`、`Gates/*.fs`、`npm run test:compile`、`build/tests-next` 相关清理 |
+| 必须新增 | `domain.mjs` facade + 其元测试；runner 陈旧产物 fail-closed；`architecture-gate.mjs` |
+| 生产 | 不涉及（本包不改 `next/`） |
+| 测试 | UNTOUCHED |
+
+本包与包 0–H 正交：它换的是验证层的语言与入口，不改任何生产语义。因此工装部分（facade、runner 门禁、architecture-gate）在封炉期即可完成并验证；测试内容本身在休克三按条款重建。
+
+### 包 K：剧本森林重建
+
+| 项 | 值 |
+|----|----|
+| 条款 | VERIFY-003 VERIFY-004 VERIFY-007 ARCH-004 |
+| 目标模块 | `testkit/opencode/strict-mock-*.js`、`script-loader.js`、`scripts/*.json` → `*.toml` |
+| 旧入口 | 谓词合取匹配 + `specificity` 打分消歧 + `pathCursor` 游标 + `lane.turn` 排序 + 四标志（`reusable`/`pathless`/`blocking`/`neverEnd`）+ 对 error 删除 seal 缓存 + `requestRoleOf` 从 wire 反推角色 + `loadScripts` 运行期换剧本 + `epochCold`/`modelSideCold` 嗅探式冷边界豁免 |
+| 新入口 | 静态单 TOML 文件；运行时键 `(lane, turn, step)` 皆为请求纯函数；内容/故障/冷边界/断言四份独立声明；载入期六项校验 |
+| 必须删除 | `specificity`、`pathCursor`、`sealToEdgeId` 删除逻辑、`templateFingerprint`、`aliasToEdge`、`claimCount`/`matchCount` 双计数、`requestRoleOf`、`NUDGE_MARKERS`、`__testkitHeaders` 参与内容匹配、`epochCold`/`modelSideCold`、`loadScripts`、`extractLastUserMsg` 2000 字符截断 |
+| 必须新增 | TOML schema + 载入期编译器 + 根键顺序硬检查 + formatter + 旧字段拒绝器 + 森林纯函数性自检 |
+| 设计定稿 | `STATUS/design-script-forest.md`（第一性原理分析 + TOML schema） |
+| 生产 | 不涉及（本包不改 `next/`，唯一例外是删除生产 prompt 中的 `Role canary` 类测试标记） |
+| 测试 | UNTOUCHED |
+
+子步骤 K1–K10 见设计文档第十二节。K8（22 个 canary 手工重写为 TOML）是唯一大量手工劳动，禁止脚本批量转换。
+
+本包依赖包 A–H 完成：剧本的 lane 划分与 step 序列反映的是迁移后的生产行为，先重写剧本会锁定旧语义。因此排在休克三之后、退火三之前。
+
+## 旧符号灭绝表
+
+残留数由 `node scripts/shock-audit.mjs` 测量。休克结束时全部为 0（除标注「允许 1」的唯一入口）。
+
+基线测量：commit `274a30aa`，2026-07-29。
+
+### 生产与测试侧
+
+| 旧符号 / 行为 | 新语义 | 条款 | next | tests | testkit | 目标 |
+|--------------|--------|------|------|-------|---------|------|
+| `PostPromptFireAndForget` | `Dispatch(_, Detached)` | PROMPT-007 | 0 | 0 | 0 | 0（已达成） |
+| 裸 `prompt_async` 调用 | 唯一 Host adapter sender | PROMPT-005 | 5 | 2 | 12 | next 允许 1 |
+| `PluginPromptAccepted` | Submitted + PhysicalAccepted 两事实 | PROMPT-005 | 7 | 5 | 0 | 0 |
+| `recordDurableAdvance` | `FallbackController` | FALLBACK-003 | 2 | 0 | 0 | 0 |
+| `ProviderFailureContinuation` | Host 信号只 MarkDirty | FALLBACK-003 | 2 | 0 | 0 | 0 |
+| `ProviderFailureWakeup` | reconcile 从 snapshot 识别失败 | FALLBACK-003 | 5 | 0 | 0 | 0 |
+| `FallbackCursorAdvanced` 旧形状 | 含 Previous/Next Offset + count | FALLBACK-007 | 5 | 17 | 7 | next 允许 1 append site |
+| `ConfirmationPhysicalMessageId` | `ProviderInputSeal` | REVIEW-010 | 11 | 0 | 0 | 0 |
+| `samePhysicalRootReevaluation` | seal 含 challenge digest | REVIEW-003 | 2 | 0 | 0 | 0 |
+| `AcceptedContinuationIds` 作确认依据 | seal 因果证明 | REVIEW-003 | 9 | 6 | 0 | 0 |
+| `AcceptedContinuationRoots` 作确认依据 | seal 因果证明 | REVIEW-003 | 8 | 0 | 0 | 0 |
+| `RecentProviderRunIds` 作唯一去重 | `ReviewAttemptIdentity` | REVIEW-004 | 5 | 0 | 0 | 0 |
+| `ReviewConfirmedIdle` | `ConfirmedReviewWitness` | REVIEW-006 | 6 | 1 | 1 | 0 |
+| `GuardPromptAccepted` | Dispatcher 四事实 | PROMPT-005 | 6 | 12 | 1 | 0 |
+| `InteractionRepairClaimed` | Dispatcher `Claimed` + Origin | PROMPT-005 | 5 | 0 | 0 | 0 |
+| `HumanPromptAccepted` | `AuthorityRootAccepted` | PROMPT-004 | 5 | 0 | 0 | 0 |
+| `shouldCreateCompanion(agent)` | ActiveLogicalRun CanonicalRole | COMPANION-002 | 2 | 3 | 0 | 0 |
+| `ToolContext.userMessageID` 读取 | `CurrentPhysicalUserMessage` | HOST-011 | 1 | 0 | 0 | 0 |
+| `AgentLinked`/`AgentForked`/`AgentUnlinked` | Handle 三事实 | EXEC-009 | 12 | 26 | 0 | 0 |
+| `OrchestratorCandidateRegistered` | `CandidateReady` | ORCH-006 | 3 | 8 | 0 | 0 |
+| `OrchestratorRebased` | `RebasedCandidateReady` | ORCH-006 | 3 | 3 | 0 | 0 |
+| `OrchestratorRejected` | `JobFailed` | ORCH-006 | 2 | 1 | 0 | 0 |
+| `OrchestratorPreRebaseReviewConfirmed` | `CandidateReady.PreRebaseReviewWitnessId` | ORCH-006 | 3 | 4 | 3 | 0 |
+| `OrchestratorPostRebaseReviewConfirmed` | `RebasedCandidateReady.PostRebaseReviewWitnessId` | ORCH-006 | 3 | 2 | 2 | 0 |
+| 双 transform hook 注册 | 单 hook | HOST-009 | 2 | 0 | 0 | 1 |
+
+### 剧本森林侧（包 K）
+
+`testkit` 列统计 `.js`/`.mjs`，`剧本` 列统计 `testkit/opencode/scripts/`。
+
+| 旧符号 / 行为 | 新语义 | 条款 | testkit | 剧本 | 目标 |
+|--------------|--------|------|---------|------|------|
+| `specificity` 打分消歧 | 最长前缀唯一命中 | VERIFY-003 | 6 | 0 | 0 |
+| `pathCursor` 游标推进 | `step` = assistant 消息条数 | VERIFY-003 | 8 | 0 | 0 |
+| `lane.turn` 排序键 | `turn` = user 语义内容 | VERIFY-003 | — | 254 | 0 |
+| `reusable` 标志 | 纯函数天然可复用 | VERIFY-003 | 17 | 46 | 0 |
+| `pathless` 标志 | 无游标可豁免 | VERIFY-003 | 18 | 8 | 0 |
+| `blocking` 参与匹配 | 迁到 `must` 断言 | VERIFY-003 | 53 | 36 | 0 |
+| `sealToEdgeId` 失败时删除 | 故障轴独立于内容 | VERIFY-003 | 6 | 0 | 0 |
+| `templateFingerprint` 模板去重 | 无需去重 | VERIFY-003 | 3 | 0 | 0 |
+| `aliasToEdge` 别名映射 | 两次 PERFECT 是两个 step | REVIEW-003 | 5 | 0 | 0 |
+| `claimCount`/`matchCount` 双计数 | 每个 step 独立可 wait | VERIFY-003 | 8 | 0 | 0 |
+| `requestRoleOf` 反推角色 | 角色由 profile 决定 | PROMPT-008 | 9 | 0 | 0 |
+| `NUDGE_MARKERS` prose 常量 | 无（跨产品死启发式） | VERIFY-003 | 1 | 0 | 0 |
+| `__testkitHeaders` 参与匹配 | harness 记账单向 | VERIFY-003 | 4 | 0 | 0 |
+| `epochCold` 嗅探豁免 | `[[epoch]]` 显式声明 | COMPANION-009 | 3 | 0 | 0 |
+| `modelSideCold` 嗅探豁免 | `[[epoch]]` 显式声明 | FALLBACK-004 | 2 | 0 | 0 |
+| `loadScripts` 运行期换剧本 | 静态单文件 | VERIFY-003 | 8 | 3 | 0 |
+| `.json` 剧本 | `.toml` 剧本 | VERIFY-003 | — | 22 文件 | 0 |
+
+`blocking` 的 53 处含大量非剧本用途（HTTP、进程），实施时需按用途分辨；剧本侧 36 处必须清零。
+
+### 单一写入口实测
+
+`shock-audit` 不只数事实名，还追 append helper 的调用方——否则一个 helper 就能把多个 writer 藏在一次调用后面。这正是当前 FALLBACK-003 的违规形态：
+
+```text
+FallbackCursorAdvanced   FALLBACK-003   3 writers
+  next/OpenCode/FallbackDetect.fs                          （helper 定义 + append）
+  next/OpenCode/ProviderFailureWakeup.fs:50  via recordFallbackFailure
+  next/OpenCode/RetrySignalHandler.fs:84     via recordFallbackFailure
+
+FallbackExhausted        FALLBACK-005   absent (fact not defined yet)
+  next/Kernel/Outcome.fs 有同名但无关的 terminal-outcome case
+```
+
+包 C 完成时这两行必须变成 `ok (1)` 与 `ok (1)`。
+
+## 熔断条件
+
+出现任一项立即暂停新增迁移，回到本总账重新切分工作包：
+
+1. SSOT 同一概念出现第二种解释
+2. 新生产代码添加兼容 shim
+3. 同一领域出现两个 writer
+4. `SHOCK-UNMIGRATED` 数量连续两个工作包不下降
+5. 一个工作包改动超过三个不相关领域
+6. 无法解释某条物理副作用的 crash window
+7. 为绕过 Host 限制依赖未公开 API
+8. 测试迁移开始复制生产实现
+9. 为通过编译重新引入旧 union case
+10. STATUS 与实际 commit 不再对应
+
+## SSOT 例外协议
+
+休克期原则上不改 SSOT。确认无法实现时：
+
+1. 停止相关代码迁移
+2. 写 `STATUS/blocker-<条款>.md`
+3. 证明是 Host 能力或逻辑矛盾，不是实现困难（必须引用 `../opencode` 源码行号）
+4. 修改 SSOT
+5. 在本文件追加 supersedes 记录
+6. 重新冻结
+
+禁止一边改代码一边悄悄降低条款。
+
+已触发次数：0。
+
+## 封炉期已完成
+
+| 项 | 结果 |
+|----|------|
+| 基线保存 | `STATUS/evidence/pre-shock/`。prod/tests build 绿，test:next 290/3，gate-testkit 29/0 |
+| SSOT 矛盾修复 | FALLBACK-005 循环无界 vs 预算有界；新增 FALLBACK-010（Host Attempt ≠ count）；FALLBACK-007 成功不写事实；VERIFY-006 重写；PROMPT-005 四事实 + Abandon reason；PROMPT-011 PromptKey 定义 + 恢复边界；ORCH-006 补 ManagerAgent/WorktreeIdentity/TargetBranchFrozen；ORCH-007 三分支固定顺序；VERIFY-003 改用 Semantic projection；VERIFY-007 单向有损关系；新增 HOST-010、HOST-011 |
+| Host 能力证明 | REVIEW-010 seal→run 绑定可实现，不需例外。证据 `STATUS/evidence/host-transform-run-binding.md` |
+| 悬空引用清理 | README 指向已删除的 `next/Doc/SSOT.md`、`AGENTS.md`、`MIGRATION.md`；已改指 `SSOT/00.md` 与 `STATUS/` |
+| 行数门禁废除 | 删除 `Next_source_files_do_not_exceed_300_lines` 与 §17.7 行数带；VERIFY-005 改为只阻断语义。机械后缀 allowlist 保留 |
+| 测试语言边界确立 | 新增 VERIFY-008：生产 `.fs`，第 1–3 层测试 `.mjs` 消费 `build/next`；VERIFY-001 增设第 0 层静态检查；VERIFY-005 规定 Gate 不得实现为测试 |
+| Fable 边界实证 | 探针验证契约面可从 mjs 干净进入：JS 对象字面量可作 F# record 参数、Envelope 序列化/反序列化/fold 全链路可驱动、纯函数直接可调。同时实证 `DateTimeOffset` 裸 `new Date()` 会让 `isExpired` 反向错误且静默 |
+| 静态检查工具 | `scripts/ssot-lint.mjs`（条款唯一性、悬空引用、前缀归属、规范/状态分离）；`scripts/shock-audit.mjs`（灭绝表残留 + 单一写入口 + SHOCK 标记）；`scripts/repo-scan.mjs`（共享遍历） |
+
+行数门禁删除后重测：`291 passed / 1 failed / 292 total`。变化可完全解释——删掉 1 个行数测试（293→292），§17 语义门禁不再因行数失败而转绿（3 failed→1 failed）。剩余 1 个失败是 `ReviewRequirementBoundaryTests`，属 Review 语义，由包 D 覆盖。
+
+## 封炉期剩余
+
+- [ ] `scripts/architecture-gate.mjs`：迁移 Gates 的文件/正则检查
+- [ ] `tests-mjs/domain.mjs`：Fable 约定 facade
+- [ ] `tests-mjs/domain.meta.test.mjs`：facade 元测试（offset 构造）
+- [ ] runner 陈旧产物 fail-closed 门禁
+- [ ] tag `ssot-freeze-0.5.0`
+
+上述四项属于封炉工装，不改生产语义，因此允许在休克开始前运行编译与测试验证其自身正确。
