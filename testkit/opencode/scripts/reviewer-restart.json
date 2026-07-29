@@ -126,7 +126,7 @@
       },
       "respond": {
         "type": "text",
-        "text": "NEEDS_REVIEW"
+        "text": "The review requires another pass."
       }
     },
     {
@@ -166,7 +166,7 @@
       },
       "respond": {
         "type": "text",
-        "text": "CONFIRMED"
+        "text": "The review is complete."
       }
     }
   ]

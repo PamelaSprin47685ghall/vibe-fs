@@ -51,7 +51,7 @@ module PromptAuthorityChatMessageTests =
                 svc.SendContinuation
                     (AdmissionPort() :> ISessionHostPort)
                     sessionId
-                    "PERFECT requires confirmation."
+                    "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
                     PromptAuthority.ReviewConfirmation
                     profile
                     (PromptAuthority.selectedEffectiveAgent profile)
@@ -130,7 +130,7 @@ module PromptAuthorityChatMessageTests =
                           box
                               [| createObj
                                      [ "type", box "text"
-                                       "text", box "PERFECT requires confirmation."
+                                       "text", box "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
                                        "metadata",
                                        createObj
                                            [ "wanxiangshu_prompt_key", box pendingKey
@@ -178,7 +178,7 @@ module PromptAuthorityChatMessageTests =
                     (createObj
                         [ "message", createObj [ "id", box "physical-confirm-bare"; "agent", box "deep-reviewer" ]
                           "parts",
-                          box [| createObj [ "type", box "text"; "text", box "PERFECT requires confirmation." ] |] ])
+                          box [| createObj [ "type", box "text"; "text", box "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" ] |] ])
 
                 assertContinuation journal session humanRoot "physical-confirm-bare" bound
             })

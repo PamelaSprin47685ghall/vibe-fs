@@ -5,7 +5,6 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -14,9 +13,6 @@ open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
 
 module VerdictSurface =
-
-    [<Emit("JSON.stringify($0)")>]
-    let private stringify (value: obj) : string = jsNative
 
     let private contextString (ctx: obj) (name: string) =
         if isNull ctx || isNull ctx?(name) then
@@ -122,7 +118,7 @@ module VerdictSurface =
                             Error "verdict must be exactly PERFECT or REVISE"
 
                 match vResult, sid, callId with
-                | Error err, _, _ -> return box (stringify (createObj [ "error", box err ]))
+                | Error err, _, _ -> return box (sprintf "Verdict rejected: %s." err)
                 | Ok verdict, Some reviewerId, Some toolCallId ->
                     let mgrId =
                         match sessionParents.TryGetValue reviewerId with
@@ -144,11 +140,9 @@ module VerdictSurface =
                                     | _ -> None)
 
                     match journal, mgrId, gitTreePortFor reviewerId with
-                    | None, _, _ ->
-                        return box (stringify (createObj [ "error", box "Reviewer verdict requires a journal" ]))
-                    | _, None, _ -> return box (stringify (createObj [ "error", box "Missing manager session" ]))
-                    | _, _, None ->
-                        return box (stringify (createObj [ "error", box "Reviewer verdict requires a GitTreePort" ]))
+                    | None, _, _ -> return box "Verdict rejected because the reviewer journal is unavailable."
+                    | _, None, _ -> return box "Verdict rejected because the manager session is missing."
+                    | _, _, None -> return box "Verdict rejected because the Git tree is unavailable."
                     | Some j, Some mId, Some gtp ->
                         let host =
                             lock gate (fun () ->
@@ -191,7 +185,7 @@ module VerdictSurface =
                             }
 
                         match providerRunId with
-                        | None -> return box (stringify (createObj [ "error", box "Missing ProviderRunId" ]))
+                        | None -> return box "Verdict rejected because the provider run is missing."
                         | Some providerRunId ->
                             match
                                 host.SubmitVerdict(
@@ -202,38 +196,17 @@ module VerdictSurface =
                                     ?userMessageId = physicalUserMessageId
                                 )
                             with
-                            | Error err -> return box (stringify (createObj [ "error", box err ]))
+                            | Error err -> return box (sprintf "Verdict rejected: %s." err)
                             | Ok result ->
                                 lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
 
-                                let vText =
-                                    if verdict = ReviewGuardVerdict.Perfect then
-                                        "PERFECT"
-                                    else
-                                        "REVISE"
-
                                 match result, verdict with
-                                | ReviewFinishResult.Confirmed, _ ->
-                                    return
-                                        box (
-                                            stringify (createObj [ "verdict", box vText; "status", box "CONFIRMED" ])
-                                        )
-                                | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Perfect ->
-                                    return
-                                        box (
-                                            stringify (
-                                                createObj
-                                                    [ "verdict", box vText
-                                                      "status", box "AWAITING_CONFIRMATION"
-                                                      "message",
-                                                      box
-                                                          "PERFECT requires confirmation. End this turn now. Do not call verdict again until a new ReviewConfirmation user message arrives." ]
-                                            )
-                                        )
+                                | ReviewFinishResult.Confirmed, ReviewGuardVerdict.Perfect ->
+                                    return box "PERFECT recorded for the current tree."
+                                | ReviewFinishResult.Confirmed, ReviewGuardVerdict.Revise
                                 | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Revise ->
-                                    return
-                                        box (
-                                            stringify (createObj [ "verdict", box vText; "status", box "NEEDS_REVIEW" ])
-                                        )
-                | Ok _, _, _ -> return box (stringify (createObj [ "error", box "Missing reviewer tool context" ]))
+                                    return box "REVISE recorded for the current tree."
+                                | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Perfect ->
+                                    return box HostReviewGuard.skepticalReevaluationPrompt
+                | Ok _, _, _ -> return box "Verdict rejected because reviewer context is missing."
             }

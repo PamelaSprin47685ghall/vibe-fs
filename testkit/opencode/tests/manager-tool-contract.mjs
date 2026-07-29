@@ -104,7 +104,10 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(typeof config.agent['fast-coder'].prompt, 'string');
     assert.match(config.agent['fast-coder'].prompt, /Coder edits/);
     assert.match(config.agent['fast-coder'].prompt, /Surgical Precision/);
+    assert.match(config.agent['fast-coder'].prompt, /Use Inspector only for a genuinely necessary investigation/);
     assert.match(config.agent['fast-coder'].prompt, /inspector\(agent: "fast-inspector", prompts\)/);
+    assert.match(config.agent['fast-coder'].prompt, /DO NOT use `inspector` as a routine verification proxy/);
+    assert.doesNotMatch(config.agent['fast-coder'].prompt, /executor/i);
     assert.equal(typeof config.agent['fast-devops'].prompt, 'string');
     assert.match(config.agent['fast-devops'].prompt, /DevOps executes/);
     assert.match(config.agent['fast-devops'].prompt, /fork-pty/);
@@ -115,13 +118,17 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.match(config.agent['fast-inspector'].prompt, /Strict Read-Only Invariant/);
     assert.equal(typeof config.agent['fast-reviewer'].prompt, 'string');
     assert.match(config.agent['fast-reviewer'].prompt, /Uncompromising Reviewer/);
-    assert.match(config.agent['fast-reviewer'].prompt, /Double-PERFECT/);
+    assert.match(config.agent['fast-reviewer'].prompt, /Render a Verdict Only After Rigorous Review/);
     assert.match(config.agent['fast-reviewer'].prompt, /verdict\("PERFECT"\)/);
     assert.match(config.agent['fast-reviewer'].prompt, /verdict\("REVISE"\)/);
+    assert.doesNotMatch(config.agent['fast-reviewer'].prompt, /Double-PERFECT|two consecutive `PERFECT`|confirmation|Nope, let's re-evaluate/i);
     assert.equal(typeof config.agent['fast-browser'].prompt, 'string');
     assert.match(config.agent['fast-browser'].prompt, /Information Navigator/);
     assert.match(config.agent['fast-browser'].prompt, /`network`/);
     assert.match(config.agent['fast-browser'].prompt, /do \*\*not\*\* have/i);
+    assert.match(config.agent['fast-browser'].prompt, /Browser-only web access/i);
+    assert.match(config.agent['fast-browser'].prompt, /MUST NOT use [`']read[`'], [`']glob[`'], or [`']grep[`'] to read or search local workspace or repository files/i);
+    assert.match(config.agent['fast-manager'].prompt, /DO NOT delegate local workspace reading or search to [`']fast-browser[`'] \/ [`']deep-browser[`']/i);
     assert.equal(config.agent['fast-browser'].permission.read, 'allow');
     assert.equal(config.agent['fast-browser'].permission.glob, 'allow');
     assert.equal(config.agent['fast-browser'].permission.grep, 'allow');
@@ -189,6 +196,7 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(config.agent['fast-devops'].permission.edit, 'deny');
     assert.equal(config.agent['fast-devops'].permission.fork, 'deny');
     assert.equal(config.agent['fast-coder'].permission.inspector, 'allow');
+    assert.equal(config.agent['fast-coder'].permission.executor, 'deny');
     assert.equal(config.agent['fast-orchestrator'].permission['*'], 'deny');
     assert.equal(config.agent['fast-orchestrator'].permission.fork, 'deny');
     assert.equal(config.agent['fast-orchestrator'].permission['fork-manager'], 'allow');

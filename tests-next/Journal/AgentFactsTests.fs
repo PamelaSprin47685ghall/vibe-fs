@@ -53,7 +53,7 @@ module AgentFactsTests =
                    ProviderRunId = "pr-2"
                    UserPromptText =
                     Some
-                        "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+                        "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
                    UserMessageId = None
                    ToolCallId = "call-2"
                    GitTreeHash = treeHash

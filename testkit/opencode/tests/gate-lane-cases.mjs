@@ -320,7 +320,7 @@ async function runHistorySplitsSameLastUser() {
       lane: lane('reviewer', 2),
       tool: 'verdict',
       args: { verdict: 'PERFECT' },
-      match: { requiredTools: ['verdict'], user: 'PERFECT requires confirmation' },
+      match: { requiredTools: ['verdict'], user: "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" },
     });
     const tools = [{ type: 'function', function: { name: 'verdict' } }];
     const first = await postJson(`${provider.url}/v1/chat/completions`, {
@@ -335,8 +335,8 @@ async function runHistorySplitsSameLastUser() {
       messages: [
         { role: 'user', content: 'Review the current worktree for correctness.' },
         { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'verdict', arguments: '{}' } }] },
-        { role: 'tool', tool_call_id: 'c1', content: 'NEEDS_REVIEW' },
-        { role: 'user', content: 'PERFECT requires confirmation. Call again.' },
+        { role: 'tool', tool_call_id: 'c1', content: "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" },
+        { role: 'user', content: "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" },
       ],
     }, { 'x-session-affinity': 'rev-1' });
     assertTrue(confirm.ok, 'confirm user matches different edge');
