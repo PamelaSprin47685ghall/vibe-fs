@@ -30,6 +30,7 @@ module ToolRegistry =
         (backgroundFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
+        (eventPort: IEventObservationPort option)
         =
         let factory = ToolHostCodec.factory toolModule
 
@@ -47,7 +48,8 @@ module ToolRegistry =
                 onRunStarted,
                 backgroundFor,
                 snapshot,
-                cancelSignals
+                cancelSignals,
+                ?eventPort = eventPort
             )
 
         let baseSpecs =
@@ -85,9 +87,7 @@ module ToolRegistry =
                         return
                             ToolHostCodec.jsonObject
                                 [ "error",
-                                  Encode.string (
-                                      sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role
-                                  ) ]
+                                  Encode.string (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
                     | None ->
                         // In test/unresolved contexts, allow the read-only inspector
                         // tool (broadly permitted across Coder, Meditator, Reviewer,
@@ -105,7 +105,9 @@ module ToolRegistry =
 
         let specs =
             baseSpecs
-            |> List.map (fun spec -> { spec with Execute = gateExecute spec (rolePredicate spec) })
+            |> List.map (fun spec ->
+                { spec with
+                    Execute = gateExecute spec (rolePredicate spec) })
 
         { Tools = ToolHostCodec.registry factory specs
           Runtime = runtime }

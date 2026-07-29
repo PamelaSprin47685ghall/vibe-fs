@@ -25,9 +25,8 @@ module PluginHost =
         | None -> None
         | Some workspace ->
             let dir = RuntimePath.forWorkspace workspace
-            let boot = Boot.boot dir
-            let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
-            Some(AgentJournal.createFromBoot dir runtimeId processId DateTimeOffset.UtcNow boot)
+            Some(SharedAgentJournal.acquire dir processId DateTimeOffset.UtcNow)
+
 
     let restoreSessionRoles (journal: AgentJournal option) (sessionRoles: Dictionary<string, string>) =
         match journal with
@@ -72,11 +71,29 @@ module PluginHost =
         (input: obj)
         (portOpt: IOpenCodePort option)
         (familyParent: (SessionId -> SessionId option) option)
-        : Result<IEventObservationPort * ISessionHostPort * ISessionSnapshotPort option, string> =
-        // Completion/output port is local and driven by SessionReconciler.
-        // Host SSE is only used as a coarse idle/retry/deleted signal source.
-        let hostEventPort = Events.HostEventPort()
+        : Result<
+              IEventObservationPort *
+              ISessionHostPort *
+              ISessionSnapshotPort option *
+              string option *
+              Events.HostEventPort option,
+              string
+           >
+        =
+        // Completion/output port is process-local per workspace runtime path so
+        // root + worktree plugin instances share AwaitAgent / NotifyTerminal.
+        // Host SSE remains only a coarse idle/retry/deleted signal source.
+        let shared = SharedTerminalBus.tryAcquireForWorkspace (workspaceDirectory input)
+
+        let hostEventPort, terminalKey =
+            match shared with
+            | Some(key, port) -> port, Some key
+            | None -> Events.HostEventPort(), None
+
         let eventPort = hostEventPort :> IEventObservationPort
-        let sessionPort = InjectedSessionPort(portOpt, eventPort, ?familyParent = familyParent) :> ISessionHostPort
+
+        let sessionPort =
+            InjectedSessionPort(portOpt, eventPort, ?familyParent = familyParent) :> ISessionHostPort
+
         let snapshotPort = SessionSnapshotPort.create input
-        Ok(eventPort, sessionPort, snapshotPort)
+        Ok(eventPort, sessionPort, snapshotPort, terminalKey, Some hostEventPort)

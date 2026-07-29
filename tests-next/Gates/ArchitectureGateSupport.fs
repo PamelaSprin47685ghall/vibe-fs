@@ -57,15 +57,38 @@ module ArchitectureGateSupport =
 
         walk root []
 
-    let readFileSync (path: string) = NodeFsGatesSupport.readFileSync (path, "utf-8")
+    let readFileSync (path: string) =
+        NodeFsGatesSupport.readFileSync (path, "utf-8")
 
     let forbiddenTokens =
-        [ "idleProposals"; "callOnce"; "FallbackPhase"; "FallbackState"; "ContinuationStage"
-          "ReviewPhase"; "ReviewStages"; "SessionStage"; "JoinOwner"; "NudgeLease"
-          "CompactionGeneration"; "SessionActor"; "SubsessionActor"; "WorkflowRegistry"
-          "JournalDrivenWorkflow"; "TodoState"; "Methodology"; "SquadWave"; "EventStore"
-          "SessionDriverRegistry"; "EventBus"; "MailboxProcessor"; "workspace lockfile"
-          "Wait(predicate)"; "sleepJs"; "type ReviewState"; "recordFailureForTests"; "Advisor" ]
+        [ "idleProposals"
+          "callOnce"
+          "FallbackPhase"
+          "FallbackState"
+          "ContinuationStage"
+          "ReviewPhase"
+          "ReviewStages"
+          "SessionStage"
+          "JoinOwner"
+          "NudgeLease"
+          "CompactionGeneration"
+          "SessionActor"
+          "SubsessionActor"
+          "WorkflowRegistry"
+          "JournalDrivenWorkflow"
+          "TodoState"
+          "Methodology"
+          "SquadWave"
+          "EventStore"
+          "SessionDriverRegistry"
+          "EventBus"
+          "MailboxProcessor"
+          "workspace lockfile"
+          "Wait(predicate)"
+          "sleepJs"
+          "type ReviewState"
+          "recordFailureForTests"
+          "Advisor" ]
 
     let containsForbiddenToken (text: string) (token: string) =
         if token.Contains("(") || token.Contains(")") || token.Contains(" ") then
@@ -74,21 +97,30 @@ module ArchitectureGateSupport =
             Regex.IsMatch(text, @"\b" + Regex.Escape(token) + @"\b", RegexOptions.IgnoreCase)
 
     let forbiddenSseEventTokens =
-        [ "message.part.delta"; "message.part.updated"; "message.updated"; "session.diff"; "session.updated" ]
+        [ "message.part.delta"
+          "message.part.updated"
+          "message.updated"
+          "session.diff"
+          "session.updated" ]
 
     let sessionStatusAllowlist =
-        [ "next/OpenCode/HostEventCodec.fs"; "next/OpenCode/HostSignalAdapter.fs"
-          "next/OpenCode/RetrySignalHandler.fs"; "next/OpenCode/HostSignalSubscribe.fs" ]
+        [ "next/OpenCode/HostEventCodec.fs"
+          "next/OpenCode/HostSignalAdapter.fs"
+          "next/OpenCode/RetrySignalHandler.fs"
+          "next/OpenCode/HostSignalSubscribe.fs" ]
 
     let sessionErrorAllowlist =
-        [ "next/OpenCode/HostSignalAdapter.fs"; "next/OpenCode/HostSignal.fs"; "next/OpenCode/HostSignalBootstrap.fs" ]
+        [ "next/OpenCode/HostSignalAdapter.fs"
+          "next/OpenCode/HostSignal.fs"
+          "next/OpenCode/HostSignalBootstrap.fs" ]
 
     let isNextDocPath (file: string) : bool =
         file.Replace("\\", "/").Contains("/next/Doc/")
 
     // TASK §17 allowlists and helpers
 
-    let mechanicalSuffixes = [ "Helpers"; "Primitives"; "Fields"; "Emit"; "Service"; "Core" ]
+    let mechanicalSuffixes =
+        [ "Helpers"; "Primitives"; "Fields"; "Emit"; "Service"; "Core" ]
 
     let mechanicalAllowlist =
         Map
@@ -104,7 +136,8 @@ module ArchitectureGateSupport =
     let private hostInteropNamePattern =
         Regex(
             @"(Host|Port|Codec|Adapter|Boot|Runtime|Writer|Node|Plugin|Supervisor|Backend|Projection|Transform|Signal|Json|Git|Flow|Pty|Tool|Subscribe|Canonical|Process)",
-            RegexOptions.IgnoreCase)
+            RegexOptions.IgnoreCase
+        )
 
     let private hostInteropExplicitAllowlist =
         Map
@@ -118,24 +151,44 @@ module ArchitectureGateSupport =
 
     let isAllowedHostInteropFile (path: string) =
         let n = path.Replace("\\", "/")
-        if Map.containsKey n hostInteropExplicitAllowlist then true
-        else hostInteropNamePattern.IsMatch(System.IO.Path.GetFileName(path))
+
+        if Map.containsKey n hostInteropExplicitAllowlist then
+            true
+        else
+            hostInteropNamePattern.IsMatch(System.IO.Path.GetFileName(path))
 
     let singleWriterFacts =
-        [ ("FallbackFailureRecorded",
-           [ "OpenCode/FallbackDetect.fs"; "Journal/AgentJournal.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
-           "only RetrySignalHandler may build the fallback failure fact")
+        [ ("FallbackCursorAdvanced",
+           [ "OpenCode/FallbackDetect.fs"
+             "Journal/AgentJournal.fs"
+             "Journal/Fold.fs"
+             "Kernel/Fact.fs" ],
+           "only RetrySignalHandler may build the durable fallback cursor fact")
           ("ReviewConfirmedIdle",
-           [ "Journal/AgentJournal.fs"; "OpenCode/TurnCompletionProgram.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           [ "Journal/AgentJournal.fs"
+             "OpenCode/TurnCompletionProgram.fs"
+             "Journal/Fold.fs"
+             "Kernel/Fact.fs" ],
            "only TurnCompletionProgram may record a confirmed reviewer idle")
           ("PluginPromptClaimed",
-           [ "OpenCode/PromptDispatcherSend.fs"; "OpenCode/PromptDispatcher.fs"; "Journal/PromptAuthorityLedger.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           [ "OpenCode/PromptDispatcherSend.fs"
+             "OpenCode/PromptDispatcher.fs"
+             "Journal/PromptAuthorityLedger.fs"
+             "Journal/Fold.fs"
+             "Kernel/Fact.fs" ],
            "only PromptDispatcher may claim a plugin prompt")
           ("PluginPromptAccepted",
-           [ "OpenCode/PromptDispatcher.fs"; "Journal/PromptAuthorityLedger.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           [ "OpenCode/PromptDispatcher.fs"
+             "Journal/PromptAuthorityLedger.fs"
+             "Journal/Fold.fs"
+             "Kernel/Fact.fs" ],
            "only PromptDispatcher may accept a plugin prompt")
           ("PluginPromptAbandoned",
-           [ "OpenCode/PromptDispatcherSend.fs"; "OpenCode/PromptDispatcher.fs"; "Journal/PromptAuthorityLedger.fs"; "Journal/Fold.fs"; "Kernel/Fact.fs" ],
+           [ "OpenCode/PromptDispatcherSend.fs"
+             "OpenCode/PromptDispatcher.fs"
+             "Journal/PromptAuthorityLedger.fs"
+             "Journal/Fold.fs"
+             "Kernel/Fact.fs" ],
            "only PromptDispatcher may abandon a plugin prompt") ]
 
     let dslPrograms =
@@ -150,9 +203,14 @@ module ArchitectureGateSupport =
     let lowerLayerDirs = [ "next/Kernel/"; "next/Domain/" ]
 
     let upperLayerOpens =
-        [ "Wanxiangshu.Next.OpenCode"; "Wanxiangshu.Next.Session"; "Wanxiangshu.Next.Process"
-          "Wanxiangshu.Next.Journal"; "Wanxiangshu.Next.Orchestrator"; "Wanxiangshu.Next.Review"
-          "Wanxiangshu.Next.Agent"; "Wanxiangshu.Next.Tools" ]
+        [ "Wanxiangshu.Next.OpenCode"
+          "Wanxiangshu.Next.Session"
+          "Wanxiangshu.Next.Process"
+          "Wanxiangshu.Next.Journal"
+          "Wanxiangshu.Next.Orchestrator"
+          "Wanxiangshu.Next.Review"
+          "Wanxiangshu.Next.Agent"
+          "Wanxiangshu.Next.Tools" ]
 
     let duplicateAlgorithmSymbols =
         [ ("advance", [ "Domain/AgentPairCursor.fs" ])
@@ -163,9 +221,14 @@ module ArchitectureGateSupport =
           ("confirmPerfect", [ "Review/ReviewProgram.fs" ]) ]
 
     let codecAllowlistFor280 =
-        [ "next/OpenCode/HostEventCodec.fs"; "next/OpenCode/HostMessageCodec.fs"; "next/OpenCode/CanonicalJson.fs"
-          "next/OpenCode/ToolHostCodec.fs"; "next/OpenCode/Projection.fs"; "next/OpenCode/PromptIngress.fs"
-          "next/OpenCode/HostSessionContext.fs"; "next/OpenCode/HostSignalAdapter.fs"
+        [ "next/OpenCode/HostEventCodec.fs"
+          "next/OpenCode/HostMessageCodec.fs"
+          "next/OpenCode/CanonicalJson.fs"
+          "next/OpenCode/ToolHostCodec.fs"
+          "next/OpenCode/Projection.fs"
+          "next/OpenCode/PromptIngress.fs"
+          "next/OpenCode/HostSessionContext.fs"
+          "next/OpenCode/HostSignalAdapter.fs"
           "next/OpenCode/HostSignalSubscribe.fs" ]
 
     // Complete semantic lifecycles may exceed the warning band while their

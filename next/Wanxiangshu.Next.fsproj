@@ -44,6 +44,7 @@
     <Compile Include="Journal/Writer.fs"/>
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/AgentJournal.fs"/>
+    <Compile Include="Journal/SharedAgentJournal.fs"/>
     <Compile Include="Journal/RuntimePath.fs"/>
     <Compile Include="Agent/AgentProgram.fs"/>
     <Compile Include="Session/ForkTypes.fs"/>
@@ -73,7 +74,6 @@
     <Compile Include="Process/PtySupervisor.fs"/>
     <Compile Include="Process/PtyBackend.fs"/>
     <Compile Include="Process/PtyApi.fs"/>
-
     <Compile Include="Review/Guard.fs"/>
     <Compile Include="Review/ReviewProgram.fs"/>
     <Compile Include="Orchestrator.Types.fs"/>
@@ -99,6 +99,7 @@
     <Compile Include="OpenCode/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Projection.fs"/>
     <Compile Include="OpenCode/Events.fs"/>
+    <Compile Include="OpenCode/SharedTerminalBus.fs"/>
     <Compile Include="OpenCode/HostSignal.fs"/>
     <Compile Include="OpenCode/HostEventCodec.fs"/>
     <Compile Include="OpenCode/HostMessageCodec.fs"/>
@@ -145,8 +146,8 @@
     <Compile Include="OpenCode/TerminalPolicy.fs"/>
     <Compile Include="OpenCode/TurnCompletionProgram.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
-    <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
+    <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeRuntime.fs"/>
     <Compile Include="OpenCode/ExecutorSummarize.fs"/>
     <Compile Include="OpenCode/OrchestratorGit.fs"/>

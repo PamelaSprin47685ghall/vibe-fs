@@ -11,13 +11,13 @@ open Wanxiangshu.Next.Journal
 /// Never reads message parts and never invents empty-output failures.
 module RetrySignalHandler =
 
-    type private AuthorityIdentity =
+    type AuthorityIdentity =
         { LogicalRunId: string
           AuthorityRootUserMessageId: MessageId }
 
     /// Prefer durable ActiveLogicalRun. Fall back to human-root bindings only when
     /// no authority projection exists yet (stable hash of bound root).
-    let private authorityIdentity
+    let authorityIdentity
         (journal: AgentJournal option)
         (bindings: Dictionary<string, MessageId>)
         (sessionId: SessionId)
@@ -91,4 +91,3 @@ module RetrySignalHandler =
                 signal.Attempt
                 signal.Reason
             |> ignore
-

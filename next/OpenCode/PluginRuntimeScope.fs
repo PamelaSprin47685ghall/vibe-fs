@@ -19,6 +19,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let toolRuntimeGate = obj ()
     let mutable toolRuntime: ISessionRuntimeOwner option = None
     let mutable subscription: IDisposable option = None
+    let mutable sharedTerminalKey: string option = None
+    let mutable sharedTerminalPort: Events.HostEventPort option = None
     let mutable disposed = false
 
     member _.Journal = journal
@@ -43,13 +45,16 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.TrackSubscription(value: IDisposable option) = subscription <- value
 
+    member _.AttachSharedTerminal(key: string option, port: Events.HostEventPort option) =
+        sharedTerminalKey <- key
+        sharedTerminalPort <- port
+
     member _.DisposeExecutorRuntime(sessionId: string) =
         lock toolRuntimeGate (fun () ->
             toolRuntime |> Option.iter (fun owner -> owner.DisposeExecutorRuntime sessionId))
 
     member this.DisposeSession(sessionId: string) =
-        lock toolRuntimeGate (fun () ->
-            toolRuntime |> Option.iter (fun owner -> owner.DisposeSession sessionId))
+        lock toolRuntimeGate (fun () -> toolRuntime |> Option.iter (fun owner -> owner.DisposeSession sessionId))
 
         match this.Companions.TryGetValue sessionId with
         | true, companion ->
@@ -80,7 +85,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 (companion :> IDisposable).Dispose()
 
             this.Companions.Clear()
-            journal |> Option.iter (fun durable -> (durable :> IDisposable).Dispose())
+            SharedAgentJournal.release journal
+            SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
+            sharedTerminalKey <- None
+            sharedTerminalPort <- None
 
     interface IDisposable with
         member this.Dispose() = this.Dispose()

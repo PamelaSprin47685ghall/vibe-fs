@@ -82,3 +82,8 @@ diagnostics-archive/
 ## Runtime state snapshots (万象术 next runtime)
 .sdd/
 
+.slim/deepwork/
+
+## Coding-agent scratch state (not product artifacts)
+.omo/
+

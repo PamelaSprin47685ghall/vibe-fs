@@ -16,12 +16,19 @@ module VerdictToolTests =
     let private hostPort () =
         { new ISessionHostPort with
             member _.SubscribeTerminal(_, _) =
-                { new IDisposable with member _.Dispose() = () }
-            member _.SendPrompt(_, _, _) = Task.FromResult(Ok(MessageId.create "accepted"))
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SendPrompt(_, _, _) =
+                Task.FromResult(Ok(MessageId.create "accepted"))
+
             member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
             member _.AbortSession(_) = Task.FromResult(Ok())
             member _.AbortChildren(_) = Task.FromResult(()) :> Task
-            member _.CreateChildSession(_, _) = Task.FromResult(Ok(SessionId.create "child"))
+
+            member _.CreateChildSession(_, _) =
+                Task.FromResult(Ok(SessionId.create "child"))
+
             member _.GetSessionOutput(_) = [] }
 
     [<Emit("(() => { const node = {}; node.optional = () => node; node.describe = () => node; const schema = { string: () => node, number: () => node, enum: () => node, union: () => node, array: () => node }; const factory = definition => definition; factory.schema = schema; return { tool: factory }; })()")>]
@@ -64,6 +71,7 @@ module VerdictToolTests =
                         (fun _ -> None)
                         (HashSet<string>())
                         (Dictionary<string, string>())
+                        None
                         None
                         None
                         None

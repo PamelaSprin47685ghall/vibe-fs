@@ -214,7 +214,7 @@
         "requestKind": "chat"
       },
       "match": {
-        "user": "Ship publish_proof.txt to the target branch.",
+        "user": "Continue the publish job and join its result.",
         "requiredTools": [
           "fork-manager",
           "join"

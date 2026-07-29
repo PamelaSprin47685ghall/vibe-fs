@@ -14,7 +14,10 @@ open Wanxiangshu.Next.Session
 module TurnCompletionProgram =
 
     let private repairDirectory (turn: ReconciledTurn) =
-        if String.IsNullOrWhiteSpace turn.Directory then None else Some turn.Directory
+        if String.IsNullOrWhiteSpace turn.Directory then
+            None
+        else
+            Some turn.Directory
 
     let private sendRepair
         (sessionPort: ISessionHostPort)
@@ -96,63 +99,7 @@ module TurnCompletionProgram =
                 (AgentRoleIdentity.defaultFastManagedName agent)
         | _ -> ()
 
-        match turn.Outcome with
-        | TurnUnknown -> ()
-        | TurnInProgress ->
-            // Host finished a provider step with tool-calls only. Idle means the
-            // step is settled; interaction repair continues the Logical Run.
-            // This is never durable provider fallback.
-            if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                sendRepair
-                    sessionPort
-                    eventPort
-                    journal
-                    continuationAccepted
-                    turn
-                    "\u200B"
-                    "zero-width"
-        | TurnNeedsContinuation _ ->
-            // Absorb text+reasoning into session-wide A even when this turn is
-            // not yet completable (empty formal text / contains-XML formal text).
-            TerminalSessionA.accumulateTurn eventPort turn |> ignore
-
-            // No final natural-language report yet or length limit. Do NOT complete
-            // the run. Interaction repair continues the same Logical Run; this is
-            // never a durable fallback advance.
-            let repairPrompt =
-                "Your tool work is complete, but no final task report was produced. "
-                + "Return a concise final report containing:\n"
-                + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
-                + "Do not call another tool unless necessary."
-
-            sendRepair
-                sessionPort
-                eventPort
-                journal
-                continuationAccepted
-                turn
-                repairPrompt
-                "missing-final-report"
-        | TurnAborted reason ->
-            abortedSessions.Add sessionKey |> ignore
-            Pty.abortParent sessionKey
-            sessionPort.AbortChildren turn.SessionId |> ignore
-
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-            |> ignore
-        | TurnFailed error ->
-            // A settled failed turn continues the same Logical Run. The next
-            // typed provider-retry signal, if emitted by the Host, is the only
-            // durable fallback cursor advance; this continuation itself cannot
-            // reset or mutate its A/A/B/B attempt profile.
-            continueAfterProviderFailure
-                sessionPort
-                eventPort
-                journal
-                continuationAccepted
-                turn
-                error
-        | TurnCompleted ->
+        let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
@@ -167,13 +114,24 @@ module TurnCompletionProgram =
             let finalA = TerminalSessionA.accumulateTurn eventPort turn
             let formalText = CompletedTurnClassifier.partsText turn.Parts
 
+            let finalText =
+                if not (String.IsNullOrWhiteSpace finalA) then
+                    finalA
+                elif forceConfirmedReviewer then
+                    // Dual-PERFECT confirmation often ends on a tool-only frame.
+                    // The durable witness is already Confirmed; expose a minimal
+                    // A so AwaitAgent can resolve without a prose stop frame.
+                    "Review confirmed."
+                else
+                    finalA
+
             let runResult: AgentRunResult =
                 { SessionId = turn.SessionId
                   RootUserMessageId = turn.RootUserMessageId
                   AssistantMessageId = turn.AssistantMessageId
                   Role = roleStr
                   Directory = turn.Directory
-                  FinalText = finalA
+                  FinalText = finalText
                   FormalText = formalText }
 
             // A first PERFECT is not a child completion. Keep the reviewer's
@@ -183,17 +141,14 @@ module TurnCompletionProgram =
             let awaitingReviewerConfirmation =
                 turn.AgentRole = Some AgentRole.Reviewer
                 && ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey
+                && not forceConfirmedReviewer
 
             // This path runs only after an idle signal reconciles a terminal
             // reviewer turn. A first PERFECT remains pending; only the reviewer
             // that supplied the confirmed double-PERFECT clears prior inputs.
             match
                 turn.AgentRole,
-                ReviewerGuardState.confirmedOwner
-                    sessionParents
-                    journal
-                    sessionKey
-                    (MessageId.value turn.UserMessageId),
+                ReviewerGuardState.confirmedOwner sessionParents journal sessionKey (MessageId.value turn.UserMessageId),
                 journal
             with
             | Some AgentRole.Reviewer, Some reviewOwner, Some j ->
@@ -201,6 +156,18 @@ module TurnCompletionProgram =
                 | Ok() -> ()
                 | Error err ->
                     raise (InvalidOperationException(sprintf "Failed to checkpoint confirmed reviewer idle: %s" err))
+            | Some AgentRole.Reviewer, None, Some j when forceConfirmedReviewer ->
+                match ReviewerGuardState.reviewOwner sessionParents journal sessionKey with
+                | Some reviewOwner ->
+                    match
+                        AgentJournal.recordReviewConfirmedIdle j reviewOwner turn.SessionId turn.AssistantMessageId
+                    with
+                    | Ok() -> ()
+                    | Error err ->
+                        raise (
+                            InvalidOperationException(sprintf "Failed to checkpoint confirmed reviewer idle: %s" err)
+                        )
+                | None -> ()
             | _ -> ()
 
             if not awaitingReviewerConfirmation then
@@ -214,6 +181,57 @@ module TurnCompletionProgram =
                     // FinalText is full Session A (incl. reasoning), not last-turn only.
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
+
+            wasAborted
+
+        let reviewerAlreadyConfirmed =
+            turn.AgentRole = Some AgentRole.Reviewer
+            && ReviewerGuardState.isConfirmedReviewer sessionParents journal sessionKey
+
+        match turn.Outcome with
+        | TurnUnknown -> ()
+        | TurnInProgress when reviewerAlreadyConfirmed ->
+            // Second PERFECT is frequently a tool-only provider step. Once the
+            // durable witness is Confirmed, finish the physical reviewer run so
+            // OrchestratorHost.reverify / Manager join can observe completion.
+            completeReviewerOrAssistant true |> ignore
+        | TurnInProgress ->
+            // Host finished a provider step with tool-calls only. Idle means the
+            // step is settled; interaction repair continues the Logical Run.
+            // This is never durable provider fallback.
+            if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
+                sendRepair sessionPort eventPort journal continuationAccepted turn "\u200B" "zero-width"
+        | TurnNeedsContinuation _ when reviewerAlreadyConfirmed -> completeReviewerOrAssistant true |> ignore
+        | TurnNeedsContinuation _ ->
+            // Absorb text+reasoning into session-wide A even when this turn is
+            // not yet completable (empty formal text / contains-XML formal text).
+            TerminalSessionA.accumulateTurn eventPort turn |> ignore
+
+            // No final natural-language report yet or length limit. Do NOT complete
+            // the run. Interaction repair continues the same Logical Run; this is
+            // never a durable fallback advance.
+            let repairPrompt =
+                "Your tool work is complete, but no final task report was produced. "
+                + "Return a concise final report containing:\n"
+                + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
+                + "Do not call another tool unless necessary."
+
+            sendRepair sessionPort eventPort journal continuationAccepted turn repairPrompt "missing-final-report"
+        | TurnAborted reason ->
+            abortedSessions.Add sessionKey |> ignore
+            Pty.abortParent sessionKey
+            sessionPort.AbortChildren turn.SessionId |> ignore
+
+            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+            |> ignore
+        | TurnFailed error ->
+            // A settled failed turn continues the same Logical Run. The next
+            // typed provider-retry signal, if emitted by the Host, is the only
+            // durable fallback cursor advance; this continuation itself cannot
+            // reset or mutate its A/A/B/B attempt profile.
+            continueAfterProviderFailure sessionPort eventPort journal continuationAccepted turn error
+        | TurnCompleted ->
+            let wasAborted = completeReviewerOrAssistant reviewerAlreadyConfirmed
 
             if wasAborted then
                 ()

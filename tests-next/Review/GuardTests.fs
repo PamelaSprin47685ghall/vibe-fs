@@ -47,6 +47,62 @@ module GuardTests =
         Assert.False(rg2.IsConfirmed)
 
     [<Fact>]
+    let ``Pure fold: journal-shaped ReviewConfirmation ids confirm second perfect`` () =
+        let manager = SessionId.create "ses_mgr"
+        let reviewer = SessionId.create "ses_rev"
+        let treeHash = "ebbd261d65c875ed070d86c4d7403176fb701fe0"
+        let firstRoot = "msg_first_root"
+        let confirmMsg = "msg_confirm_physical"
+
+        let first =
+            AgentFact.ReviewVerdictRecorded
+                {| ManagerSessionId = manager
+                   ReviewerSessionId = reviewer
+                   ProviderRunId = "prov_first"
+                   UserPromptText = Some "review"
+                   UserMessageId = Some firstRoot
+                   ToolCallId = "call_13"
+                   GitTreeHash = treeHash
+                   Verdict = ReviewGuardVerdict.Perfect |}
+
+        let claim =
+            AgentFact.PluginPromptClaimed
+                {| PromptKey = "confirm-key"
+                   SessionId = reviewer
+                   LogicalRunId = "review-run"
+                   AuthorityRootUserMessageId = firstRoot
+                   ContinuationKind = "ReviewConfirmation"
+                   EffectiveAgent = Some "deep-reviewer" |}
+
+        let accepted =
+            AgentFact.PluginPromptAccepted
+                {| PromptKey = "confirm-key"
+                   SessionId = reviewer
+                   HostMessageId = confirmMsg |}
+
+        let second =
+            AgentFact.ReviewVerdictRecorded
+                {| ManagerSessionId = manager
+                   ReviewerSessionId = reviewer
+                   ProviderRunId = "prov_second"
+                   UserPromptText = Some "Nope, let's re-evaluate"
+                   UserMessageId = Some confirmMsg
+                   ToolCallId = "call_17"
+                   GitTreeHash = treeHash
+                   Verdict = ReviewGuardVerdict.Perfect |}
+
+        let proj =
+            AgentProjection.empty
+            |> fun p -> Fold.foldAgentFact p first
+            |> fun p -> Fold.foldAgentFact p claim
+            |> fun p -> Fold.foldAgentFact p accepted
+            |> fun p -> Fold.foldAgentFact p second
+
+        let guard = proj.Sessions.[manager].ReviewGuard.Value
+        Assert.True(guard.IsConfirmed)
+        Assert.True(ReviewWitness.isConfirmed guard.Witness)
+
+    [<Fact>]
     let ``Pure fold: first and second perfect on same tree`` () =
         let sid = SessionId.create "mgr-2"
         let revSid = SessionId.create "rev-1"
@@ -205,9 +261,7 @@ module GuardTests =
                    Verdict = ReviewGuardVerdict.Perfect |}
 
         let proj2 =
-            Fold.foldAgentFact
-                (Fold.foldAgentFact (Fold.foldAgentFact AgentProjection.empty fact1) confirmPrompt)
-                fact2
+            Fold.foldAgentFact (Fold.foldAgentFact (Fold.foldAgentFact AgentProjection.empty fact1) confirmPrompt) fact2
 
         Assert.True(proj2.Sessions.[sid].ReviewGuard.Value.IsConfirmed)
 

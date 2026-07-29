@@ -132,11 +132,33 @@
       }
     },
     {
-      "id": "manager-guard-fork-reviewer",
+      "id": "manager-terminal",
       "lane": {
         "session": "fast-manager",
         "role": "manager",
         "turn": 3,
+        "requestKind": "chat",
+        "parentSession": "orchestrator"
+      },
+      "match": {
+        "requiredTools": [
+          "fork",
+          "join",
+          "list"
+        ],
+        "user": "Ship publish_proof.txt to the target branch."
+      },
+      "respond": {
+        "type": "text",
+        "text": "Manager finished."
+      }
+    },
+    {
+      "id": "manager-guard-fork-reviewer",
+      "lane": {
+        "session": "fast-manager",
+        "role": "manager",
+        "turn": 4,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
@@ -162,7 +184,7 @@
       "lane": {
         "session": "fast-manager",
         "role": "manager",
-        "turn": 4,
+        "turn": 5,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
@@ -180,11 +202,11 @@
       }
     },
     {
-      "id": "manager-terminal",
+      "id": "manager-terminal-after-review",
       "lane": {
         "session": "fast-manager",
         "role": "manager",
-        "turn": 5,
+        "turn": 6,
         "requestKind": "chat",
         "parentSession": "orchestrator"
       },
@@ -193,12 +215,16 @@
           "fork",
           "join",
           "list"
-        ]
+        ],
+        "user": "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
       },
       "respond": {
         "type": "text",
         "text": "Manager finished."
-      }
+      },
+      "pathless": true,
+      "reusable": true,
+      "blocking": false
     },
     {
       "id": "coder-write",
@@ -524,13 +550,7 @@
       "wait": "reviewer-perfect-1"
     },
     {
-      "wait": "reviewer-after-tool-text"
-    },
-    {
       "wait": "reviewer-perfect-2"
-    },
-    {
-      "wait": "reviewer-after-tool-text"
     },
     {
       "waitFact": {
@@ -542,13 +562,7 @@
       "wait": "reviewer-perfect-3"
     },
     {
-      "wait": "reviewer-after-tool-text"
-    },
-    {
       "wait": "reviewer-perfect-4"
-    },
-    {
-      "wait": "reviewer-after-tool-text"
     },
     {
       "waitFact": {

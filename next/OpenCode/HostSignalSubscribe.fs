@@ -54,9 +54,7 @@ module HostSignalSubscribe =
                     let onEvent = box onSignalEvent
 
                     let options =
-                        createObj
-                            [ "signal", abortCtrl?signal
-                              "onSseEvent", box onSignalEvent ]
+                        createObj [ "signal", abortCtrl?signal; "onSseEvent", box onSignalEvent ]
 
                     emitJsExpr
                         (globalApi, options, onEvent, abortCtrl)
@@ -103,16 +101,20 @@ module HostSignalSubscribe =
 
         let client = if isNull input then null else input?client
 
-        match listenTarget with
-        | Some events ->
-            match subscribeListen events onSignalEvent with
-            | Error err -> Error err
-            | Ok localSub ->
-                logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
-                Ok(Some localSub, "events.listen")
-        | None ->
-            match subscribeGlobalEvent client onSignalEvent with
-            | Ok sub ->
-                logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
-                Ok(Some sub, "global.event")
-            | Error err -> Error err
+        // Global SSE carries sessions from manager worktrees whose directory
+        // differs from this plugin instance. Prefer it whenever available;
+        // fall back to the directory-scoped listener for older hosts without
+        // /global/event.
+        match subscribeGlobalEvent client onSignalEvent with
+        | Ok sub ->
+            logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
+            Ok(Some sub, "global.event")
+        | Error globalError ->
+            match listenTarget with
+            | Some events ->
+                match subscribeListen events onSignalEvent with
+                | Error err -> Error err
+                | Ok localSub ->
+                    logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                    Ok(Some localSub, "events.listen")
+            | None -> Error globalError

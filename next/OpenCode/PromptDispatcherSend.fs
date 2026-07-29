@@ -62,11 +62,20 @@ module PromptDispatcherSend =
                             this.Update(PromptAuthorityRun.abandonClaim key)
                             return Error e
                         | Ok hostMessageId ->
-                            match this.AcceptPhysicalAgentOwnerRoot key sessionId hostMessageId agent with
-                            | Error e -> return Error e
-                            | Ok _profile ->
+                            // prompt_async may only admit the request as accepted-*.
+                            // That transport token is never a durable Authority Root;
+                            // chat.message later accepts with the real physical id.
+                            let hostId = MessageId.value hostMessageId
+
+                            if hostId.StartsWith("accepted-") then
                                 onAccepted |> Option.iter (fun cb -> cb hostMessageId)
                                 return Ok hostMessageId
+                            else
+                                match this.AcceptPhysicalAgentOwnerRoot key sessionId hostMessageId agent with
+                                | Error e -> return Error e
+                                | Ok _profile ->
+                                    onAccepted |> Option.iter (fun cb -> cb hostMessageId)
+                                    return Ok hostMessageId
             }
 
         member this.SendContinuation

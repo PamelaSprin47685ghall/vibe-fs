@@ -32,6 +32,7 @@ module PluginHostInterop =
         (budgetStore: CompanionBudgetStore)
         : obj =
         let remember = fun sessionId budget -> budgetStore.Remember(sessionId, budget)
+
         emitJsExpr
             (sessionBudgets, sessionOutputLimits, remember)
             """
@@ -54,14 +55,17 @@ module PluginHostInterop =
         """
 
     let projectionSessionIdFromMessages (output: obj) =
-        if isNull output || isNull output?messages then None
+        if isNull output || isNull output?messages then
+            None
         else
             let messages = unbox<obj array> output?messages
+
             messages
             |> Array.tryPick (fun msg ->
                 if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
                     Some(unbox<string> msg?info?sessionID)
-                else None)
+                else
+                    None)
 
     let toolHooks
         (toolModule: obj)
@@ -75,9 +79,21 @@ module PluginHostInterop =
         (backgroundBFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
+        (eventPort: IEventObservationPort option)
         : ToolRegistration =
         ToolRegistry.create
-            toolModule sessionPort journal gitTreePort workspaceDirectory
-            scope.SessionParents scope.SessionRoles currentPhysicalUserMessage
-            scope.VerdictSessions scope.SessionDirectories onRunStarted
-            backgroundBFor snapshot cancelSignals
+            toolModule
+            sessionPort
+            journal
+            gitTreePort
+            workspaceDirectory
+            scope.SessionParents
+            scope.SessionRoles
+            currentPhysicalUserMessage
+            scope.VerdictSessions
+            scope.SessionDirectories
+            onRunStarted
+            backgroundBFor
+            snapshot
+            cancelSignals
+            eventPort

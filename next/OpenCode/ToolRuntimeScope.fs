@@ -24,7 +24,8 @@ type ToolRuntimeScope
         onRunStarted: (SessionId -> AgentRole -> string option -> unit) option,
         backgroundFor: (string -> string option) option,
         snapshot: ISessionSnapshotPort option,
-        cancelSignals: (SessionId seq -> unit) option
+        cancelSignals: (SessionId seq -> unit) option,
+        ?eventPort: IEventObservationPort
     ) =
 
     let gate = obj ()
@@ -36,6 +37,7 @@ type ToolRuntimeScope
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
     let background = defaultArg backgroundFor (fun _ -> None)
+    let terminalPort = eventPort
     let mutable disposed = false
 
     let registerChild parentSid role childId =
@@ -99,13 +101,12 @@ type ToolRuntimeScope
     let roleOfName (name: string) =
         match PromptAuthority.tryParseRole name with
         | Some role -> Some role
-        | None ->
-            AgentRoleIdentity.roleOfString name
-            |> Option.map AgentRoleIdentity.toRole
+        | None -> AgentRoleIdentity.roleOfString name |> Option.map AgentRoleIdentity.toRole
 
     member _.Sessions = sessions
     member _.Journal = journal
     member _.Snapshot = snapshot
+    member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
@@ -227,7 +228,8 @@ type ToolRuntimeScope
     member this.Dispose() =
         let sessionIds =
             lock gate (fun () ->
-                if disposed then []
+                if disposed then
+                    []
                 else
                     disposed <- true
                     Seq.append runtimes.Keys executorRuntimes.Keys |> Seq.distinct |> Seq.toList)

@@ -30,7 +30,9 @@ module SpikePlugin =
 
             match PluginHost.createHost input portOpt (Some familyParent) with
             | Error err -> return raise (InvalidOperationException err)
-            | Ok(eventPort, sessionPort, snapshotOpt) ->
+            | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
+                scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
+
                 for KeyValue(childId, parentId) in scope.SessionParents do
                     scope.OwnedSessions.Add childId |> ignore
                     scope.OwnedSessions.Add parentId |> ignore
@@ -41,14 +43,7 @@ module SpikePlugin =
                     | None -> PluginHost.workspaceDirectory input |> Option.map GitTree.create
 
                 let wired =
-                    HostSignalBootstrap.wire
-                        sessionPort
-                        eventPort
-                        snapshotOpt
-                        journal
-                        gitTreePort
-                        scope
-                        input
+                    HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
                 let bindRunStarted =
                     box (fun (sessionId: string) (role: string) (directory: string) ->
@@ -124,11 +119,9 @@ module SpikePlugin =
                           // the second invocation, preventing duplicate B heads.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
                           "experimental.chat.system.transform",
-                          box
-                              (systemTransformHook
-                                  scope.SessionBudgets
-                                  scope.SessionOutputLimits
-                                  scope.CompanionBudgets)
+                          box (
+                              systemTransformHook scope.SessionBudgets scope.SessionOutputLimits scope.CompanionBudgets
+                          )
                           "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
 
                 hooks?event <- box wired.ObserveEvent
@@ -174,6 +167,7 @@ module SpikePlugin =
                                 backgroundBFor
                                 snapshotOpt
                                 (Some wired.CancelSignals)
+                                (Some eventPort)
 
                         scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                         hooks?tool <- toolRegistration.Tools

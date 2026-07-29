@@ -7,8 +7,8 @@
  *   request4 test-model-b (B)
  *   no 5th chat request
  *
- * Non-retryable provider failures → durable FallbackFailure + deferred
- * ProviderRetryAttempt after SessionIdle (host runner must be free).
+ * Non-retryable provider failures are followed by ProviderRetryAttempt
+ * continuation; the durable cursor advances once per failure identity.
  *
  * Script: scripts/fallback-aabb-trace.json
  */
@@ -127,12 +127,9 @@ try {
   // Keep only this scenario's Logical Run user turns (initial + plugin continues).
   const traj = (scenario.provider.requests || []).filter((r) => {
     const u = lastUserText(r);
-    return u.includes('Prove same-run provider AABB') || u.includes('Continue after provider failure.');
+    return u.includes('Prove same-run provider AABB trajectory.') || u.includes('Continue after provider failure.');
   });
   const rawModels = traj.map(modelOf);
-  // Host may emit the first user prompt twice (busy status double-entry) before
-  // the first non-retryable error settles. Collapse a leading duplicate so the
-  // durable failure chain is still A→A→B→B for the four Logical Run attempts.
   const models =
     rawModels.length === 5
     && rawModels[0] === 'test-model'
@@ -146,7 +143,6 @@ try {
   );
   assert.ok(traj.length === 4 || traj.length === 5, `expected 4 or 5 trajectory requests, got ${traj.length}`);
   assert.ok(!rawModels.includes(undefined) && !rawModels.includes(null), 'every request has a model id');
-  // No fifth *Logical Run attempt* after B2: normalized length must stay 4.
   assert.equal(models.length, 4, 'no fifth Logical Run provider attempt');
 
   // Evidence file for release package (optional env path).

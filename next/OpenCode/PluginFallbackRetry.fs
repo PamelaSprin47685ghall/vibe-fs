@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
@@ -19,9 +20,9 @@ module PluginFallbackRetry =
         (recorded: System.Collections.Generic.HashSet<string>)
         (sessionId: SessionId)
         (onAccepted: (MessageId -> unit) option)
-        =
-        if recorded.Remove(pendingKey sessionId) then
-            task {
+        : Task<bool> =
+        task {
+            if recorded.Remove(pendingKey sessionId) then
                 let! result =
                     HostSessionNudge.sendContinuationResult
                         sessionPort
@@ -33,10 +34,13 @@ module PluginFallbackRetry =
                         onAccepted
 
                 match result with
-                | Ok _ -> ()
-                | Error _ -> markPending recorded sessionId
-            }
-            |> ignore
+                | Ok _ -> return true
+                | Error _ ->
+                    markPending recorded sessionId
+                    return false
+            else
+                return false
+        }
 
     /// Signal routing is unregistered before cancellation; retained diagnostic
     /// identities cannot emit another physical request.

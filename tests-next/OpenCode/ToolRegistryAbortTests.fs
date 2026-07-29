@@ -49,7 +49,7 @@ module ToolRegistryAbortTests =
 
             member _.CreateChildSession(_, _) =
                 childNumber <- childNumber + 1
-                Task.FromResult(Ok(SessionId.create(sprintf "child-after-esc-%d" childNumber)))
+                Task.FromResult(Ok(SessionId.create (sprintf "child-after-esc-%d" childNumber)))
 
             member _.GetSessionOutput(_) = [] }
 
@@ -90,6 +90,7 @@ module ToolRegistryAbortTests =
                     None
                     None
                     (Some(fun ids -> signalCaptured.AddRange ids))
+                    None
 
             let join = toolNamed registration.Tools "join"
 
@@ -130,6 +131,7 @@ module ToolRegistryAbortTests =
                     (fun _ -> None)
                     (HashSet<string>())
                     sessionDirectories
+                    None
                     None
                     None
                     None

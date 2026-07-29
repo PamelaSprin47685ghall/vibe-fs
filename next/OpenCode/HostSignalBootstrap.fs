@@ -57,11 +57,22 @@ module HostSignalBootstrap =
             |> Option.iter (fun reconciler -> reconciler.BindContinuationUserMessage(sessionId, messageId))
 
         let onTurn (turn: ReconciledTurn) =
+            // Manager sessions run inside their own worktree, not the plugin's
+            // root workspace. The review-guard tree check must resolve that
+            // worktree's GitTreePort; otherwise it compares against a
+            // different Git object graph and can never see the confirmed tree.
+            let sessionKey = SessionId.value turn.SessionId
+
+            let managerGitTreePort =
+                match scope.SessionDirectories.TryGetValue sessionKey with
+                | true, directory when not (String.IsNullOrWhiteSpace directory) -> Some(GitTree.create directory)
+                | _ -> gitTreePort
+
             TurnCompletionProgram.applyWithContinuation
                 sessionPort
                 eventPort
                 journal
-                gitTreePort
+                managerGitTreePort
                 scope.VerdictSessions
                 scope.NudgeSent
                 scope.ManagerGuardNudges
@@ -120,6 +131,7 @@ module HostSignalBootstrap =
                 sessionPort,
                 journal,
                 scope.FallbackFailures,
+                scope.UserMessageBindings,
                 ensureAuthorityFromSnapshot,
                 continuationAccepted
             )
@@ -127,8 +139,9 @@ module HostSignalBootstrap =
         let onSignal (signal: HostSignal) =
             match signal with
             | ProviderFailure failure ->
+                // session.error is only a wakeup; wait for the following idle
+                // admission before sending so the Host is no longer busy.
                 providerContinuation.Observe failure
-                providerContinuation.OnIdle failure.SessionId
             | ProviderRetry retry ->
                 // Provider retry is the only durable fallback writer.
                 RetrySignalHandler.handle journal scope.FallbackFailures reconciler.RootBindings retry

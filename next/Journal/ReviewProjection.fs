@@ -42,7 +42,11 @@ module ReviewProjection =
             values
         else
             let next = values @ [ value ]
-            if List.length next > recentWindowSize then List.skip (List.length next - recentWindowSize) next else next
+
+            if List.length next > recentWindowSize then
+                List.skip (List.length next - recentWindowSize) next
+            else
+                next
 
     let empty barrierKey =
         { LastGitTreeHash = None
@@ -120,8 +124,9 @@ module ReviewProjection =
                 | ReviewWitness.PerfectPending first when secondPerfectConfirmed && not providerRunUsed ->
                     let barrier =
                         baseline.CurrentBarrierKey
-                        |> Option.defaultValue
-                            (sprintf "implicit:%s:%s" (SessionId.value p.ManagerSessionId) first.ToolCallId)
+                        |> Option.defaultValue (
+                            sprintf "implicit:%s:%s" (SessionId.value p.ManagerSessionId) first.ToolCallId
+                        )
 
                     { baseline with
                         Witness =
@@ -129,34 +134,41 @@ module ReviewProjection =
                                 {| BarrierId = ReviewBarrierId barrier
                                    First = first
                                    Second =
-                                       { ProviderRunId = p.ProviderRunId
-                                         ToolCallId = p.ToolCallId
-                                         GitTreeHash = p.GitTreeHash
-                                         AuthorityRootUserMessageId = p.UserMessageId
-                                         UserMessageId = p.UserMessageId }
+                                    { ProviderRunId = p.ProviderRunId
+                                      ToolCallId = p.ToolCallId
+                                      GitTreeHash = p.GitTreeHash
+                                      AuthorityRootUserMessageId = p.UserMessageId
+                                      UserMessageId = p.UserMessageId }
                                    TreeHash = p.GitTreeHash |}
                         ConfirmedReviewerSessionId = Some p.ReviewerSessionId
                         ConfirmedProviderRunId = Some p.ProviderRunId }
                 | ReviewWitness.PerfectPending _ -> baseline
                 | _ when providerRunUsed -> baseline
-                | _ ->
-                    firstPerfect
-                        p.ProviderRunId
-                        p.ToolCallId
-                        p.GitTreeHash
-                        p.UserMessageId
-                        baseline
+                | _ -> firstPerfect p.ProviderRunId p.ToolCallId p.GitTreeHash p.UserMessageId baseline
 
     let acceptGuard guardKey hostMessageId isConfirmation current =
         let existing = defaultArg current (empty None)
 
+        let isAdmission (value: string option) =
+            match value with
+            | Some text -> text.StartsWith("accepted-")
+            | None -> false
+
+        let confirmationId =
+            if not isConfirmation then
+                existing.ConfirmationPhysicalMessageId
+            elif isAdmission hostMessageId then
+                // Keep any real Host message id already recorded; admission ids
+                // are temporary transport tokens and must not replace them.
+                match existing.ConfirmationPhysicalMessageId with
+                | Some currentId when not (isAdmission (Some currentId)) -> Some currentId
+                | _ -> hostMessageId
+            else
+                hostMessageId
+
         { existing with
             AcceptedGuardKey = Some guardKey
-            ConfirmationPhysicalMessageId =
-                if isConfirmation then
-                    hostMessageId
-                else
-                    existing.ConfirmationPhysicalMessageId }
+            ConfirmationPhysicalMessageId = confirmationId }
 
     let addRequirement sourceSessionId messageId current =
         let input =
@@ -165,7 +177,9 @@ module ReviewProjection =
 
         match current with
         | Some existing when List.contains input existing.HumanPromptInputs -> existing
-        | Some existing -> { existing with HumanPromptInputs = existing.HumanPromptInputs @ [ input ] }
+        | Some existing ->
+            { existing with
+                HumanPromptInputs = existing.HumanPromptInputs @ [ input ] }
         | None ->
             { HumanPromptInputs = [ input ]
               LastConfirmedIdleAssistantMessageId = None }

@@ -17,22 +17,38 @@ module internal ReviewConfirmation =
         let providerRunUsed = List.contains providerRunId existing.RecentProviderRunIds
         let hasValidProviderRunId = not (String.IsNullOrWhiteSpace providerRunId)
 
+        let reviewerAuthority =
+            Map.tryFind reviewerSessionId projection.Sessions
+            |> Option.bind (fun reviewer -> reviewer.PromptAuthority)
+
         let physicalConfirmationMatched =
             match userMessageId with
             | Some userMsg when not (String.IsNullOrWhiteSpace userMsg) ->
+                let messageId = MessageId.create userMsg
+
                 let acceptedReviewConfirmation =
-                    Map.tryFind reviewerSessionId projection.Sessions
-                    |> Option.bind (fun reviewer -> reviewer.PromptAuthority)
-                    |> Option.bind (fun authority ->
-                        Map.tryFind (MessageId.create userMsg) authority.AcceptedContinuationIds)
+                    reviewerAuthority
+                    |> Option.bind (fun authority -> Map.tryFind messageId authority.AcceptedContinuationIds)
                     |> Option.exists ((=) PromptAuthority.ReviewConfirmation)
 
+                let confirmationRootMatchesFirst =
+                    match existing.AuthorityRootUserMessageId, reviewerAuthority with
+                    | Some firstRoot, Some authority ->
+                        match Map.tryFind messageId authority.AcceptedContinuationRoots with
+                        | Some root -> MessageId.value root = firstRoot
+                        | None -> false
+                    | _ -> false
+
                 acceptedReviewConfirmation
+                || confirmationRootMatchesFirst
                 || (existing.ConfirmationPhysicalMessageId
                     |> Option.exists (fun confirmMsg ->
                         not (String.IsNullOrWhiteSpace confirmMsg) && userMsg = confirmMsg))
             | _ -> false
 
+        // Same-root reevaluation is valid only when the second physical user
+        // message is still the first PERFECT root. A ReviewConfirmation has a
+        // distinct physical id and must go through the confirmation path above.
         let samePhysicalRootReevaluationMatched =
             match existing.AuthorityRootUserMessageId, userMessageId with
             | Some firstRoot, Some currentRoot ->

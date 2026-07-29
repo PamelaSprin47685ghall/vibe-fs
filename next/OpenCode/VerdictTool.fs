@@ -63,13 +63,9 @@ module VerdictTool =
                     | Some linkage when Map.containsKey child linkage.LinkedChildren -> Some(SessionId.value parentId)
                     | _ -> None)
 
-    let private execute
-        (scope: ToolRuntimeScope)
-        (args: HostToolArguments)
-        (context: HostToolContext)
-        =
+    let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let verdict = StaticTools.reviewerVerdictOfString(args.Text "verdict")
+            let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
 
             let validation =
                 if scope.RoleFor context <> Some Role.Reviewer then
@@ -96,7 +92,8 @@ module VerdictTool =
                 | _, _, _, None -> return "Verdict rejected because the provider run is missing."
                 | Some _, Some owner, Some gitTree, Some providerRunId ->
                     let physicalUserMessageId =
-                        scope.CurrentPhysicalUserMessage reviewerId |> Option.orElse context.UserMessageId
+                        scope.CurrentPhysicalUserMessage reviewerId
+                        |> Option.orElse context.UserMessageId
 
                     let! promptText =
                         match context.PromptText with
@@ -120,6 +117,40 @@ module VerdictTool =
 
                         match result, value with
                         | ReviewFinishResult.Confirmed, ReviewGuardVerdict.Perfect ->
+                            // Dual-PERFECT is a durable external fact written by this
+                            // tool call. Do not wait for a later prose stop frame or
+                            // idle reconcile: OrchestratorHost.reverify / Manager join
+                            // already own the AwaitAgent subscription.
+                            match scope.EventPort with
+                            | Some eventPort ->
+                                let sessionId = SessionId.create reviewerId
+
+                                let rootUser =
+                                    physicalUserMessageId
+                                    |> Option.defaultValue (defaultArg context.UserMessageId "")
+
+                                let assistant = context.ProviderRunId |> Option.defaultValue toolCallId
+
+                                let finalText =
+                                    match TerminalSessionA.fullText eventPort sessionId with
+                                    | Some text when not (String.IsNullOrWhiteSpace text) -> text
+                                    | _ -> "Review confirmed."
+
+                                let directory = scope.DirectoryFor reviewerId |> Option.defaultValue ""
+
+                                let runResult: AgentRunResult =
+                                    { SessionId = sessionId
+                                      RootUserMessageId = MessageId.create rootUser
+                                      AssistantMessageId = MessageId.create assistant
+                                      Role = "reviewer"
+                                      Directory = directory
+                                      FinalText = finalText
+                                      FormalText = finalText }
+
+                                eventPort.NotifyTerminal sessionId (TerminalOutcome.Completed runResult)
+                                |> ignore
+                            | None -> ()
+
                             return "PERFECT recorded for the current tree."
                         | ReviewFinishResult.Confirmed, ReviewGuardVerdict.Revise
                         | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Revise ->

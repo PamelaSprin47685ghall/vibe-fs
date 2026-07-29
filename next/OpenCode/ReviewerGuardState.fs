@@ -7,11 +7,7 @@ open Wanxiangshu.Next.Journal
 
 module ReviewerGuardState =
 
-    let reviewOwner
-        (sessionParents: Dictionary<string, string>)
-        (journal: AgentJournal option)
-        (reviewerKey: string)
-        =
+    let reviewOwner (sessionParents: Dictionary<string, string>) (journal: AgentJournal option) (reviewerKey: string) =
         match journal with
         | None -> None
         | Some j ->
@@ -50,12 +46,22 @@ module ReviewerGuardState =
             ReviewWitness.isPerfectPending reviewGuard.Witness
             && not reviewGuard.IsConfirmed)
 
+    /// True once this reviewer has already produced a durable dual-PERFECT
+    /// witness. Used to finish tool-only confirmation turns without waiting for
+    /// a separate natural-language stop frame.
+    let isConfirmedReviewer sessionParents journal reviewerKey =
+        guard sessionParents journal reviewerKey
+        |> Option.exists (fun reviewGuard ->
+            reviewGuard.IsConfirmed
+            && reviewGuard.ConfirmedReviewerSessionId = Some(SessionId.create reviewerKey))
+
     let confirmedOwner sessionParents journal reviewerKey physicalUserMessageId =
         match reviewOwner sessionParents journal reviewerKey, guard sessionParents journal reviewerKey with
-        | Some owner, Some reviewGuard
-            when reviewGuard.IsConfirmed
-                 && reviewGuard.ConfirmedReviewerSessionId = Some(SessionId.create reviewerKey)
-                 && (reviewGuard.AuthorityRootUserMessageId = Some physicalUserMessageId
-                     || reviewGuard.ConfirmationPhysicalMessageId = Some physicalUserMessageId) ->
+        | Some owner, Some reviewGuard when
+            reviewGuard.IsConfirmed
+            && reviewGuard.ConfirmedReviewerSessionId = Some(SessionId.create reviewerKey)
+            && (reviewGuard.AuthorityRootUserMessageId = Some physicalUserMessageId
+                || reviewGuard.ConfirmationPhysicalMessageId = Some physicalUserMessageId)
+            ->
             Some owner
         | _ -> None
