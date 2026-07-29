@@ -43,7 +43,7 @@ AABBAABB 永久循环。
 公开工作 Agent 可选择 fast/deep。
 Blogger 和 Executor 内部固定 fast 起步。
 
-角色权限仍然由静态源码控制。
+角色权限仍然由静态源码控制。Inspector 的模型可见工具集合精确为 `read / glob / grep / executor`；`write`、`edit`、fork/join/list、PTY、委派与 verdict 继续 fail-closed。
 Coder 暴露文件工具和不透明的 Inspector 调查；不暴露 Executor 或 PTY。Coder prompt 不得泄露 Inspector 的执行权限，也不得把 Inspector 当作常规验证代理；验证仍由 DevOps 或 Reviewer 负责。
 模型绑定只由 opencode.json 控制。
 ```

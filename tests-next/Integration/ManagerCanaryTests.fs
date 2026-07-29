@@ -66,8 +66,10 @@ module ManagerCanaryTests =
         falseThat (Roles.isAllowed Role.Coder ToolPermission.Join) "Coder must not join"
 
         // Inspector remains an independently authorized diagnostic role.
+        trueThat (Roles.isAllowed Role.Inspector ToolPermission.Read) "Inspector must allow read"
+        trueThat (Roles.isAllowed Role.Inspector ToolPermission.Glob) "Inspector must allow glob"
+        trueThat (Roles.isAllowed Role.Inspector ToolPermission.Grep) "Inspector must allow grep"
         trueThat (Roles.isAllowed Role.Inspector ToolPermission.Exec) "Inspector must allow exec"
-        falseThat (Roles.isAllowed Role.Inspector ToolPermission.Read) "Inspector must not read"
         falseThat (Roles.isAllowed Role.Inspector ToolPermission.Write) "Inspector must not write"
         falseThat (Roles.isAllowed Role.Inspector ToolPermission.Edit) "Inspector must not edit"
 

@@ -111,7 +111,7 @@ new Authority Root（显式另一 Agent）→ 新 cursor Offset=0，Side A = 新
 
 - Coder 的 schema 含 Inspector 但不含 Executor；Coder prompt 只将 Inspector 视为不透明调查服务，且不得将其作为常规验证代理。
 - Inspector session `Directory` 与 Executor `pwd` 必须等于请求方所在 worktree。
-- Inspector schema 精确为 `{executor}`，没有 fork/join/list/PTY。
+- Inspector schema 精确为 `{read, glob, grep, executor}`，没有 write/edit、fork/join/list、PTY、委派或 verdict。
 - 并发两个 Inspector；结果顺序保持与 prompts 顺序一致；不污染 Manager join mailbox。
 - 取消请求方后等待 Inspector abort，确认 child session/listener 不遗留。
 - 捕获 Parent B snapshot digest；create retry 必须复用同一 snapshot。

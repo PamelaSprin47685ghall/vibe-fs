@@ -340,7 +340,7 @@ Fallback 第四次失败仍判死
 8b. **OpenCode Session 家族扁平化**：儿子的儿子仍是家族 root 的儿子。所有 Agent、ManagerJob、经授权的 one-shot Inspector 或 Coder、Blogger 与 Executor child 的 Host `parentID` 都解析为最上层 root；重启恢复同一 root。root abort 收敛全部 child，单 child 精确关闭；`join`/Review/Authority 的结构化程序所有权不从 Host `parentID` 反推。
 9. `join()` 等任意一个完成项；不指定对象。每个 RunIdentity 对应 single-assignment completion cell。Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。join 消费后永久删除 completed handle。
 10. `list()` 统一显示 Agent 与 PTY，但内部资源实现保持独立。
-11. Inspector 同步调用 Executor Tool；Coder 可为具体且必要的代码事实创建一次性 Inspector，但 Coder prompt 不得暴露 Inspector 的 Executor 权限。Coder 不得把 Inspector 当作常规测试/构建代理；验证由 DevOps 或 Reviewer 负责。
+11. Inspector 直接使用 `read / glob / grep` 获取静态代码事实，并可同步调用 Executor Tool 查询 Git、历史与其他直接文件工具无法提供的只读事实；Coder 可为具体且必要的代码事实创建一次性 Inspector，但 Coder prompt 不得暴露 Inspector 的 Executor 权限。Coder 不得把 Inspector 当作常规测试/构建代理；验证由 DevOps 或 Reviewer 负责。
 12. Executor Agent 只负责命令输出摘要；无工具、无伴随。Executor Tool 负责真实进程。
 12b. **DevOps** 独占 `fork-pty`，并可 `executor` / `read` / `glob` / `grep` / `inspector` / 同步 `coder` / `join` / `list`。不得直接 write/edit。Manager 通过 `fork(fast-devops|deep-devops, prompt)` 委派终端操作。
 13. `3 × estimated_running_secs` 是进程唯一时限；无其他 timeout 层。模型允许用巨大 estimate 主动申请巨大预算。
@@ -1685,7 +1685,7 @@ let executeFork input =
 |`orchestrator`|是|`fork`, `join`|只 fork ManagerJob|
 |`manager`|是|`fork`, `join`, `list`|不直接读写仓库；无终端|
 |`coder`|是|`read`, `write`, `edit`, `glob`, `grep`, `inspector`|真正修改代码；Inspector 仅用于窄范围事实调查|
-|`inspector`|否|`executor`|命令调查；无直接 Python/JS execute|
+|`inspector`|否|`read`, `glob`, `grep`, `executor`|只读静态调查；命令查询仅经 Executor；无直接 Python/JS execute|
 |`devops`|否|`fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list`|终端操作员；文件改动仅经 coder 工具|
 |`browser`|否|`read`, web tools|仓库读取与上网|
 |`meditator`|否|`read`, `glob`, `grep`, `inspector`|推理、方案、权衡|
@@ -1699,7 +1699,7 @@ let executeFork input =
 
 ```text
 Coder      = read, write, edit, glob, grep, inspector
-Inspector  = executor
+Inspector  = read, glob, grep, executor
 DevOps     = fork-pty, executor, read, glob, grep, inspector, coder, join, list
 Browser    = read, glob, grep, web tools
 Meditator  = read, glob, grep, inspector
@@ -1714,14 +1714,14 @@ Blogger    = （无）
 
 [NORMATIVE]
 
-1. **Inspector 只能使用 Executor Tool。**
+1. **Inspector 可直接使用只读文件工具，并可使用 Executor Tool。**
    * Inspector 不得拥有 `fork`、`join`、`list`。
    * Inspector 不得创建、读取、写入、发送信号或关闭 PTY。
    * Inspector 不得创建任何 subagent。
    * Inspector 的完整工具集合必须严格等于：
 
 ```text
-executor
+read, glob, grep, executor
 ```
 
 2. **只有 DevOps 可以创建和操作 PTY。**
@@ -1890,7 +1890,7 @@ Fork prompt / local request
 3. Reviewer 无写工具。
 4. Blogger/Executor Agent 无工具。
 5. Coder 的 schema 含 `inspector` 但不含 `executor`/PTY；Coder prompt 不泄露 Inspector 的内部 Executor 权限，且不把 Inspector 作为常规验证代理。
-6. Inspector only Executor Tool。
+6. Inspector 精确拥有 `read` / `glob` / `grep` / `executor`；无其他工具。
 7. 新 child 背景：父 B 优先；无 B 则父 session-wide A。
 8. 未注册工具在 schema 层不可见。
 
@@ -3387,7 +3387,7 @@ tests-next/
 2. Manager only fork/join/list。
 3. Orchestrator only fork/join。
 4. Coder 普通文件工具与不透明 Inspector 调查；schema 不暴露 Executor 或终端能力。
-5. Inspector Executor Tool。
+5. Inspector `read` / `glob` / `grep` / Executor Tool。
 6. Browser/Meditator/Reviewer 权限。
 7. Blogger/Executor Agent no tools。
 

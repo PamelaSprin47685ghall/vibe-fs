@@ -28,7 +28,7 @@ TestKit 以 scenario/session/role/turn/request-kind lane 匹配真实 OpenCode s
 Orchestrator (fork/join)
   └── Manager (fork/join/list)
         ├── Coder (file tools + opaque inspector)
-        ├── Inspector (executor)
+        ├── Inspector (read/glob/grep/executor)
         ├── DevOps (fork-pty/executor/read/glob/grep/inspector/coder/join/list)
         ├── Browser
         ├── Meditator

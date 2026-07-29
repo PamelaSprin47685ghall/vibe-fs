@@ -26,6 +26,8 @@ Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infi
 
 ### Runtime fixes
 
+- Expanded both `fast-inspector` and `deep-inspector` from `{executor}` to the exact model-visible tool set `{read, glob, grep, executor}`. Direct file inspection no longer requires shell commands; write/edit, delegation, PTY, verdict, build, test, and runtime execution boundaries remain denied, with role prompts, Host permission contracts, tests, and normative docs updated together.
+
 - Fixed Companion B extraction to persist only the Blogger turn's formal `text` parts. Blogger reasoning/thinking no longer enters `LatestB` or self-rebased B, while ordinary Agent A records continue to accumulate formal text plus reasoning/thinking.
 - Fixed reasoning-only terminal turns (including OpenCode `step-start`/`step-finish` bookkeeping) being mistaken for completed output. Public work agents such as `deep-meditator` now retain the same Authority Root and EffectiveAgent while dispatching one `InteractionRepair` continuation for a formal final report.
 - Removed the repeated `companion eligibility denied` stderr message from pre-authority and host-internal transforms. Missing `ActiveLogicalRun` still fails closed without creating a Blogger, while eligible sessions continue to use the durable authority projection.

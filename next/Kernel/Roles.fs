@@ -49,7 +49,12 @@ module Roles =
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Inspector ]
-        | Role.Inspector -> set [ ToolPermission.Exec ]
+        | Role.Inspector ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Exec ]
         | Role.Browser ->
             set
                 [ ToolPermission.Read
@@ -115,7 +120,7 @@ module RoleDefinitions =
     /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let inspectorPrompt =
         "Inspector system prompt SSOT: prompts/inspector-system.md\n"
-        + "Tools: executor only.\n"
+        + "Tools: read / glob / grep / executor.\n"
         + "Read-only static queries only. Never mutate, compile, build, typecheck, lint, test, run project code, or spawn sub-agents."
 
     /// Full DevOps system prompt lives in prompts/devops-system.md and is loaded

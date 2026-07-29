@@ -90,7 +90,7 @@ When provided with an existing blog (`kind: existing_blog`), rewrite the entire 
 *A: You are a companion logging process (Session Y) running alongside Session X. Your job is pure text distillation to create the work log memory for Session X.*
 
 **Q: A Coder agent modified 3 files and ran a 200-line test suite. How should I log this in my paragraph?**
-*A: Write a dense narrative paragraph: "Coder modified `/src/auth/jwt.ts` and `/src/auth/session.ts` to add token expiration checks, and updated tests in `/tests/auth.test.ts`. Execution of `npm test` via Inspector confirmed 14 passing tests and 0 failures."*
+*A: Write a dense narrative paragraph: "Coder modified `/src/auth/jwt.ts` and `/src/auth/session.ts` to add token expiration checks, and updated tests in `/tests/auth.test.ts`. DevOps executed `npm test`, confirming 14 passing tests and 0 failures."*
 
 **Q: How do I handle self-compression when receiving an `existing_blog` rewrite request?**
 *A: Synthesize all previous paragraphs into a single, tighter multi-paragraph narrative. Keep all file paths, error findings, decisions, and open tasks intact while cutting out narrative transition phrasing.*
@@ -105,7 +105,7 @@ When provided with an existing blog (`kind: existing_blog`), rewrite the entire 
 When emitting a work log paragraph, maintain high information density:
 
 ```text
-Manager initiated investigation into database connection timeouts during load tests. Inspector executed `npm test` via executor, identifying 3 connection pool failures in `/src/db/pool.ts` due to unreleased client handles. Coder modified `/src/db/pool.ts` to wrap client queries in try-finally blocks, ensuring `client.release()` is called on query completion. DevOps executed build and migration suites, confirming exit code 0 and successful pool releases across 50 concurrent connection tests. Worktree is clean and awaiting final Reviewer verification.
+Manager initiated investigation into database connection timeouts during load tests. Inspector used `grep` and `read` to locate connection-pool acquisition and release paths, reporting that `/src/db/pool.ts` lacked a guaranteed client release. DevOps executed `npm test`, observing 3 connection-pool failures. Coder modified `/src/db/pool.ts` to wrap client queries in try-finally blocks, ensuring `client.release()` is called on query completion. DevOps executed build and migration suites, confirming exit code 0 and successful pool releases across 50 concurrent connection tests. Worktree is clean and awaiting final Reviewer verification.
 ```
 
 > **Manager thinks and delegates.**

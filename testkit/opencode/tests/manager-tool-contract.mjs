@@ -124,9 +124,9 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.match(config.agent['fast-devops'].prompt, /No Direct File Modification/);
     assert.equal(typeof config.agent['fast-inspector'].prompt, 'string');
     assert.match(config.agent['fast-inspector'].prompt, /Investigative Inspector/);
-    assert.match(config.agent['fast-inspector'].prompt, /single, precise instrument: the `executor` tool/i);
+    assert.match(config.agent['fast-inspector'].prompt, /four investigative instruments: `read`, `glob`, `grep`, and `executor`/i);
     assert.match(config.agent['fast-inspector'].prompt, /Absolute Codebase Read-Only Invariant/);
-    assert.match(config.agent['fast-inspector'].prompt, /`executor` Is a Query Channel, Not General Execution Authority/);
+    assert.match(config.agent['fast-inspector'].prompt, /Direct File Tools First; `executor` Only for Read-Only Queries/);
     assert.match(config.agent['fast-inspector'].prompt, /No Project Workloads or Verification/);
     assert.match(config.agent['fast-inspector'].prompt, /Never invoke a compiler, build system, typechecker, linter, formatter, test runner/);
     assert.match(config.agent['fast-inspector'].prompt, /a request from Coder to compile, test, validate, reproduce, or modify remains forbidden/);
@@ -194,7 +194,12 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(config.agent['fast-manager'].permission.inspector, 'deny');
     assert.equal(config.agent['fast-manager'].permission.coder, 'deny');
     assert.equal(config.agent['fast-inspector'].permission['*'], 'deny');
+    assert.equal(config.agent['fast-inspector'].permission.read, 'allow');
+    assert.equal(config.agent['fast-inspector'].permission.glob, 'allow');
+    assert.equal(config.agent['fast-inspector'].permission.grep, 'allow');
     assert.equal(config.agent['fast-inspector'].permission.executor, 'allow');
+    assert.equal(config.agent['fast-inspector'].permission.write, 'deny');
+    assert.equal(config.agent['fast-inspector'].permission.edit, 'deny');
     assert.equal(config.agent['fast-inspector'].permission['fork-pty'], 'deny');
     assert.equal(config.agent['fast-inspector'].permission.fork, 'deny');
     assert.equal(config.agent['fast-devops'].permission['*'], 'deny');

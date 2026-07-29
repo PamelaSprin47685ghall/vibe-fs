@@ -81,11 +81,21 @@ module RolesTests =
 
     [<Fact>]
     let ``Inspector_role_permission_matrix`` () =
-        let allowed = set [ ToolPermission.Exec ]
+        let allowed =
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Exec ]
+
         Assert.equal<ToolPermission Set>(allowed, Roles.permissions Role.Inspector)
+        Assert.True(Roles.isAllowed Role.Inspector ToolPermission.Read)
+        Assert.True(Roles.isAllowed Role.Inspector ToolPermission.Glob)
+        Assert.True(Roles.isAllowed Role.Inspector ToolPermission.Grep)
         Assert.True(Roles.isAllowed Role.Inspector ToolPermission.Exec)
 
-        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Read)
+        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Write)
+        Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Edit)
         Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Fork)
         Assert.False(Roles.isAllowed Role.Inspector ToolPermission.Pty)
 

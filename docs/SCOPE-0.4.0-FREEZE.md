@@ -22,7 +22,7 @@ This document is the 0.4.0 feature freeze line. Anything not listed as in-scope 
 - Parent background: B preferred, else session-wide formal A
 - Logical-Run Fallback A/A/B/B with durable `session.status=retry` writer
 - ReviewGuard + dual PERFECT with physical confirmation + ProviderRunIdentity binding
-- Inspector = `{executor}` only; one-shot from Coder; private executor mailbox
+- Historical 0.4.0 boundary: Inspector = `{executor}` only; 0.5.0 supersedes it with `{read, glob, grep, executor}`. One-shot Coder delegation and the private executor mailbox remain unchanged.
 - Process/Executor: `3× estimate` deadline, large gate, 200KB ripple-carry summary
 - PTY via DevOps `fork-pty` only; onExit-only completion; structured signals
 - Orchestrator clean gate, worktree, serial publish lock, rebase, re-review, ff-only, crash facts
