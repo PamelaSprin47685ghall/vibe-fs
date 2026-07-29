@@ -12,6 +12,10 @@
   - `tests-next/OpenCode/EventsTests.fs` 保留可编译的 typed `parts` fixture。
 - 重启盘点时工作树含 **123 staged、5 unstaged、44 untracked** 路径。这些变更混合了先前已完成主体、未验证 WIP 与被取消代理留下的半成品；不得按文件名或 staged 状态推断其已交付。
 
+### WIP checkpoint
+
+- 当前重启盘点与已修正的 production build 状态已提交并推送：`0217c7c3`（`WIP semantic cohesion refactor restart`）至 `origin/wanxiangshu-2`。该 commit 是可恢复检查点，**不是完成声明**；test project、Fable、canary 与 release gate 均尚未通过。
+
 ### 当前阻断（直接验证）
 
 `dotnet build next/Wanxiangshu.Next.fsproj` 于重启盘点中失败，尚未运行 test build、Fable 或任何 suite。初始的 `Roles.fs` record-list 与 `ProcessRunner.fs` reserved-name 阻断已修正后，下一轮仍报告 **40 个错误**；它们明确暴露被取消的半迁移边界：`ReviewProjection` 新 witness 字段未补齐、`ChildRun`/`ForkRuntime`/`ForkRecovery` API 不一致、`ProcessRunner`/`NodeProcessWait` task 类型不一致、`OrchestratorProgram`/`Orchestrator.fs` 依赖 record 不一致、`CompanionHostBlogger` 仍按旧 `AgentRunResult` 字段读取。首要编译错误：
