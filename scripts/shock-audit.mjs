@@ -81,14 +81,16 @@ const EXTINCTION = [
 
 // Facts whose production append site must be unique.
 //
-// Two independent checks are needed. Counting the fact name alone is not
-// enough: an append helper hides the real writer count behind one call, which
-// is exactly how FALLBACK-003 is currently violated.
+// Two independent signals are needed, and neither alone is sufficient:
 //
-//   declarationFiles — type/codec/fold/projection files that name the fact
-//                      without appending it
-//   appendHelpers    — functions that perform the append; their call sites
-//                      outside the defining module are the real writers
+//   constructor sites — `AgentFact.<Name>` applied in a module that is not a
+//                       declaration/codec/fold file. Counting bare mentions
+//                       instead would score doc comments as writers, which is
+//                       how this check first reported "ok (1)" for a fact that
+//                       had no append site at all.
+//   append helpers    — a function that performs the append hides its callers
+//                       behind one constructor site, which is exactly how
+//                       FALLBACK-003 is violated today.
 const SINGLE_WRITER = [
   {
     fact: 'FallbackCursorAdvanced',
@@ -113,9 +115,78 @@ const SINGLE_WRITER = [
       'next/Journal/FallbackProjection.fs',
     ],
     appendHelpers: [],
-    // Kernel/Outcome.fs carries an unrelated terminal-outcome case of the same
-    // name. Until the journal fact exists this row reports `absent`.
-    unrelatedNames: ['next/Kernel/Outcome.fs'],
+  },
+  {
+    fact: 'ConfirmedReviewWitness',
+    clause: 'REVIEW-006',
+    declarationFiles: [
+      'next/Kernel/Fact.fs',
+      'next/Journal/FactCodec.fs',
+      'next/Journal/Fold.fs',
+      'next/Journal/AgentJournal.fs',
+      'next/Journal/ReviewProjection.fs',
+    ],
+    appendHelpers: [],
+  },
+  {
+    fact: 'ProviderInputSealed',
+    clause: 'REVIEW-010',
+    declarationFiles: [
+      'next/Kernel/Fact.fs',
+      'next/Journal/FactCodec.fs',
+      'next/Journal/Fold.fs',
+      'next/Journal/AgentJournal.fs',
+      'next/Journal/ReviewProjection.fs',
+    ],
+    appendHelpers: [],
+  },
+  {
+    fact: 'PluginPromptClaimed',
+    clause: 'PROMPT-005',
+    declarationFiles: [
+      'next/Kernel/Fact.fs',
+      'next/Journal/FactCodec.fs',
+      'next/Journal/Fold.fs',
+      'next/Journal/AgentJournal.fs',
+      'next/Journal/PromptAuthorityLedger.fs',
+    ],
+    appendHelpers: [],
+  },
+  {
+    fact: 'PluginPromptPhysicalAccepted',
+    clause: 'PROMPT-005',
+    declarationFiles: [
+      'next/Kernel/Fact.fs',
+      'next/Journal/FactCodec.fs',
+      'next/Journal/Fold.fs',
+      'next/Journal/AgentJournal.fs',
+      'next/Journal/PromptAuthorityLedger.fs',
+    ],
+    appendHelpers: [],
+  },
+  {
+    fact: 'HandleRetired',
+    clause: 'EXEC-009',
+    declarationFiles: [
+      'next/Kernel/Fact.fs',
+      'next/Journal/FactCodec.fs',
+      'next/Journal/Fold.fs',
+      'next/Journal/AgentJournal.fs',
+      'next/Journal/LinkageProjection.fs',
+    ],
+    appendHelpers: [],
+  },
+  {
+    fact: 'PublishClaimed',
+    clause: 'ORCH-005',
+    declarationFiles: [
+      'next/Kernel/Fact.fs',
+      'next/Journal/FactCodec.fs',
+      'next/Journal/Fold.fs',
+      'next/Journal/AgentJournal.fs',
+      'next/Journal/OrchestratorProjection.fs',
+    ],
+    appendHelpers: [],
   },
 ]
 
@@ -173,44 +244,50 @@ const endsWithAny = (file, suffixes) => {
 }
 
 for (const entry of SINGLE_WRITER) {
-  const { fact, clause, declarationFiles, appendHelpers, unrelatedNames = [] } = entry
+  const { fact, clause, declarationFiles, appendHelpers } = entry
+
+  // A write is a CONSTRUCTOR APPLICATION, not a mention. Counting mentions
+  // scored a doc comment as a writer and reported "ok (1)" for a fact with no
+  // append site whatsoever — a gate that answers "fine" for both zero and one
+  // writer cannot detect the transition it exists to protect.
+  const constructorPattern = `AgentFact.${fact}`
 
   const declared = files.next.some(
     (file) => endsWithAny(file, declarationFiles) && countLiteral([file], fact).length > 0,
   )
 
-  if (!declared) {
-    console.log(`${pad(fact, 40)}${pad(clause, 14)}absent (fact not defined yet)`)
-    for (const file of unrelatedNames) {
-      console.log(`${' '.repeat(54)}unrelated same-name symbol in ${file}`)
-    }
-    continue
-  }
+  const directWriters = [
+    ...new Set(countLiteral(files.next, constructorPattern).map((hit) => hit.file)),
+  ].filter((file) => !endsWithAny(file, declarationFiles))
 
-  // Direct append sites: the fact is named in a module that is neither a
-  // declaration file nor a known unrelated-name carrier.
-  const directWriters = [...new Set(countLiteral(files.next, fact).map((hit) => hit.file))].filter(
-    (file) => !endsWithAny(file, [...declarationFiles, ...unrelatedNames]),
-  )
-
-  // Indirect append sites: callers of an append helper, excluding the module
-  // that defines the helper.
   const indirectWriters = new Set()
   for (const helper of appendHelpers) {
     const hits = countLiteral(files.next, helper)
-    const definingFiles = new Set(
-      hits.filter((hit) => /^\s*let\s+/.test(hit.text.replace(/^\s*/, (m) => m))).map((hit) => hit.file),
-    )
+    const definingFiles = new Set(hits.filter((hit) => /^let\s/.test(hit.text)).map((hit) => hit.file))
     for (const hit of hits) {
       if (!definingFiles.has(hit.file)) indirectWriters.add(`${hit.file}:${hit.line} (via ${helper})`)
     }
   }
 
   const writers = [...directWriters, ...indirectWriters]
-  const verdict = writers.length <= 1 ? `ok (${writers.length})` : `${writers.length} writers`
+
+  // Zero writers is reported separately from one. During the shock phase a
+  // declared-but-unwritten fact is expected; at --gate time it means the
+  // migration declared a type and never wired it.
+  let verdict
+  if (!declared) verdict = 'absent (not declared)'
+  else if (writers.length === 0) verdict = 'declared, no writer yet'
+  else if (writers.length === 1) verdict = 'ok (1)'
+  else verdict = `${writers.length} writers`
+
   console.log(`${pad(fact, 40)}${pad(clause, 14)}${verdict}`)
   for (const writer of writers) console.log(`${' '.repeat(54)}${writer}`)
-  if (writers.length > 1) {
+
+  if (!declared) {
+    failures.push(`${clause} ${fact}: fact is not declared in ${declarationFiles[0]}`)
+  } else if (writers.length === 0) {
+    failures.push(`${clause} ${fact}: declared but no production writer constructs it`)
+  } else if (writers.length > 1) {
     failures.push(`${clause} ${fact}: ${writers.length} production writers, expected 1`)
   }
 }

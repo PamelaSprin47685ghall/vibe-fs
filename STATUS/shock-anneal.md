@@ -111,6 +111,77 @@ SSOT 对同一概念用了两个名字：PROMPT-008 与 FALLBACK-007 写 `Provid
 
 `Outcome.SessionError.FallbackExhausted` 改名 `AutoRecoveryExhausted`：同名的 journal 事实（FALLBACK-005）是另一回事，一个名字两个概念正是双模型的起点。
 
+### 包 0b：Journal 事实集
+
+| 项 | 值 |
+|----|----|
+| 条款 | PROMPT-002 PROMPT-005 FALLBACK-007 REVIEW-003 REVIEW-006 REVIEW-010 EXEC-009 ORCH-005 ORCH-006 ORCH-007 PERSIST-009 |
+| 目标模块 | `Kernel/Fact.fs` |
+| 生产 | DOMAIN_MIGRATED（事实集完成；codec / fold / 写入方属 0c 与 A–H） |
+| 测试 | UNTOUCHED |
+
+旧 union 33 case → 新 union 32 case。数量接近，但语义分布完全不同。
+
+#### 事实级替换
+
+| 旧 case | 新事实 | 为什么不是改名 |
+|---------|--------|--------------|
+| `PluginPromptAccepted` | `PluginPromptSubmitted` + `PluginPromptPhysicalAccepted` | PROMPT-005 的核心区分。单一 accepted 事实无法表达「Host 收下了但只给了 receipt」与「真实物理消息已存在」，而 Authority 只在后者生效 |
+| `HumanPromptAccepted` | `AuthorityRootAccepted` | 前者按来源命名，后者按效力命名。PROMPT-004 的 AgentOwnerRoot 同样是 Authority Root，旧名字容纳不下 |
+| `GuardPromptAccepted` | Dispatcher 四事实 | Guard 不是特殊的发送通道，它是一种 Continuation（PROMPT-003）。独立事实等于承认存在第二个 sender |
+| `InteractionRepairClaimed` | `PluginPromptClaimed` + Origin | 同上 |
+| `AgentLinked` / `AgentUnlinked` | `HandleLinked` / `HandleCompleted` / `HandleRetired` | 两事实只有两态，无法表达 completed-awaiting-join。EXEC-005 要求 `list` 显示该状态，旧模型下它与 running 不可区分 |
+| `AgentForked` | `HandleLinked` | 「fork 的」与「link 的」区别是 join mailbox 归属，属 projection 判断，不是两个事实 |
+| `ReviewConfirmedIdle` | `ConfirmedReviewWitness` | 前者记录「reviewer 空闲了」——这是信号不是事实（ARCH-002）。后者记录证据 |
+| `OrchestratorCandidateRegistered` | `CandidateReady` | ORCH-006 禁止「注册后等 review 或走 publish」这种恢复动作不确定的分支 |
+| `OrchestratorRebased` | `RebasedCandidateReady` | 同上，且必须携带 post-rebase barrier |
+| `OrchestratorRejected` | `JobFailed` | Rejected 描述 review 结果，Job 失败是另一层 |
+| `OrchestratorPre`/`PostRebaseReviewConfirmed` | `CandidateReady.PreRebaseReviewBarrierId` / `RebasedCandidateReady.PostRebaseReviewBarrierId` | 两个独立的「已确认」事实是 stage 标记。barrier id 内联进候选事实后，恢复动作由候选事实本身决定 |
+
+#### 新增事实
+
+| 事实 | 条款 | 空缺后果 |
+|------|------|---------|
+| `FallbackExhausted` | FALLBACK-005 | 预算耗尽无终局记录，重启后无法区分「还能重试」与「已放弃」 |
+| `PerfectChallengeIssued` | REVIEW-003 | 第一次 PERFECT 的 challenge digest 无处存放，第二次无从校验 |
+| `ProviderInputSealed` | REVIEW-010 | 因果证明的载体。缺它则只能退回 same-root 猜测 |
+| `ConfirmedReviewWitness` | REVIEW-006 | 自包含 witness |
+| `ConflictDetected` | ORCH-007 | 恢复时无法区分「Manager 正在解冲突」与「尚未产出 candidate」 |
+| `JobAbandoned` | ORCH-006 | 主动放弃与失败混为一谈 |
+
+#### 字段级修正
+
+`FallbackCursorAdvanced` 补 `PreviousOffset` / `NextOffset` / `ConsecutiveFailureCount`，使 FALLBACK-007 的 fold 校验可执行——旧形状只有 `ProviderAttempt: string`，fold 无从验证模四后继关系。
+
+`AuthorityRootAccepted` 确认无 model 字段。VERIFY-006 把「Authority journal 仍保存 model ID」列为 No-Go，缺字段即是执行。
+
+`ManagerJobCreated` 补 `ManagerAgent`（ORCH-003 防降级）、`WorktreeIdentity`（ORCH-006 恢复按身份）、`TargetBranchFrozen`（ORCH-008）。
+
+`PromptAbandonReason` 与 `HandleCompletionKind` 是判别联合而非字符串：前者决定运维是否需要排查双效果，后者是 EXEC-004 的三方竞争结果。
+
+#### shock-audit 单一写入口检测的缺陷（本包发现）
+
+新事实加入后，检测器对 `FallbackExhausted` 报 `ok (1)`，指向 `next/Domain/AgentPairCursor.fs`。那里只有一句文档注释提到该名字。
+
+根因：检测器统计的是符号提及，不是构造器应用。因此
+
+```text
+0 个写入口 → 匹配到注释 → 报 ok (1)
+1 个写入口 → 报 ok (1)
+```
+
+两种状态输出相同。一个对 0 和 1 都回答「正常」的门禁，无法察觉它唯一要保护的那次跃变。
+
+修正：改为匹配 `AgentFact.<Name>` 构造器应用，并把 0 与 1 分开报告。`--gate` 下「已声明但无写入口」判失败——迁移声明了类型却没接线，与双写同样是缺陷。
+
+同时把八个单一写入口事实全部纳入检测（原先只有两个）。当前实测：
+
+```text
+FallbackCursorAdvanced        3 writers（FALLBACK-003 违规，包 C 修）
+PluginPromptClaimed           ok (1)
+其余六个                       declared, no writer yet（包 A/C/D/F/G 接线）
+```
+
 ### 包 A：PromptDispatcher
 
 | 项 | 值 |
