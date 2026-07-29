@@ -94,9 +94,6 @@
     <Compile Include="Integration/OrchestratorRecoveryFixtures.fs"/>
     <Compile Include="Integration/OrchestratorRecoveryTests.fs"/>
     <Compile Include="Integration/ManagerCanaryTests.fs"/>
-    <Compile Include="Gates/ArchitectureGateSupport.fs"/>
-    <Compile Include="Gates/ArchitectureGates.fs"/>
-    <Compile Include="Gates/ArchitectureGates17.fs"/>
     <Compile Include="GuideContract/Signatures.fs"/>
   </ItemGroup>
 </Project>
