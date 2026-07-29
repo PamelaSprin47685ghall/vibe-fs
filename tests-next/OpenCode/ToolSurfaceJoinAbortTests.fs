@@ -32,6 +32,37 @@ module ToolSurfaceJoinAbortTests =
 
             member _.GetSessionOutput(_) = [] }
 
+    let private restartableHostPort () =
+        let mutable childNumber = 0
+
+        { new ISessionHostPort with
+            member _.SubscribeTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SendPrompt(_, _, _) =
+                Task.FromResult(Ok(MessageId.create "accepted"))
+
+            member _.SendChildPromptFireAndForget(_, _, _, _) = Task.FromResult(Ok())
+
+            member _.AbortSession(_) = Task.FromResult(Ok())
+            member _.AbortChildren(_) = Task.FromResult(()) :> Task
+
+            member _.CreateChildSession(_, _) =
+                childNumber <- childNumber + 1
+                Task.FromResult(Ok(SessionId.create(sprintf "child-after-esc-%d" childNumber)))
+
+            member _.GetSessionOutput(_) = [] }
+
+    [<Emit("(() => { const node = {}; node.optional = () => node; node.describe = () => node; const schema = { string: () => node, number: () => node, enum: () => node, union: () => node, array: () => node }; const factory = definition => definition; factory.schema = schema; return { tool: factory }; })()")>]
+    let private fakeToolModule () : obj = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private toolNamed (tools: obj) (name: string) : obj = jsNative
+
+    [<Emit("$0.execute($1, $2)")>]
+    let private executeTool (tool: obj) (args: obj) (context: obj) : Task<obj> = jsNative
+
     [<Fact>]
     let ``join_execute_with_aborted_signal_cancels_runtime_and_returns_CANCELLED`` () =
         task {
@@ -73,4 +104,53 @@ module ToolSurfaceJoinAbortTests =
             Assert.True(runtime.IsCancelled, "runtime was not cancelled by abort signal")
             Assert.True(captured.Contains(parentId), "fallback cancel was not invoked for parent")
             Assert.True(signalCaptured.Contains(parentId), "signal cancel was not invoked for parent")
+        }
+
+    [<Fact>]
+    let ``fork_execute_replaces_cancelled_runtime_after_Esc`` () =
+        task {
+            let sessionId = "parent-fork-after-esc"
+            let sessionParents = Dictionary<string, string>()
+            let sessionRoles = Dictionary<string, string>()
+            let sessionDirectories = Dictionary<string, string>()
+
+            let tools =
+                ToolSurface.create
+                    (fakeToolModule ())
+                    (restartableHostPort ())
+                    None
+                    None
+                    None
+                    sessionParents
+                    sessionRoles
+                    (fun _ -> None)
+                    (HashSet<string>())
+                    sessionDirectories
+                    None
+                    None
+                    None
+                    None
+
+            let fork = toolNamed tools "fork"
+            let join = toolNamed tools "join"
+            let normalContext = createObj [ "sessionID", box sessionId ]
+            let forkArgs = createObj [ "agent", box "fast-coder"; "prompt", box "implement" ]
+
+            let! initialFork = executeTool fork forkArgs normalContext
+            Assert.True(initialFork.ToString().Contains("fast-coder"), initialFork.ToString())
+
+            let abortSignal =
+                createObj
+                    [ "aborted", box true
+                      "addEventListener", box (fun (_: string) (_: obj) (_: obj) -> ())
+                      "removeEventListener", box (fun (_: obj) (_: obj) -> ()) ]
+
+            let interruptedContext =
+                createObj [ "sessionID", box sessionId; "abort", box abortSignal ]
+
+            let! cancelledJoin = executeTool join (createObj []) interruptedContext
+            Assert.True(cancelledJoin.ToString().Contains("CANCELLED"), cancelledJoin.ToString())
+
+            let! forkAfterEsc = executeTool fork forkArgs normalContext
+            Assert.True(forkAfterEsc.ToString().Contains("fast-coder"), forkAfterEsc.ToString())
         }
