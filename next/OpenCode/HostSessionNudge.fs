@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Next.OpenCode
 
-open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Host
@@ -9,19 +8,18 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
 
+/// Continuation sends against an already-accepted Authority Root.
+///
+/// Every entry point takes `AgentJournal option` because the host callbacks that
+/// reach here do, but none of them substitutes a journal-less dispatcher when it
+/// is `None`. PROMPT-005 makes a plugin prompt a durable act: with nowhere to
+/// record the claim there is nothing legitimate to send, so these fail closed.
 module HostSessionNudge =
 
-    let private runtime (journal: AgentJournal option) =
-        match journal with
-        | Some j -> PromptDispatcher.forJournal j
-        | None -> PromptDispatcher.ephemeral ()
-
     let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =
-        match journal with
-        | None -> None
-        | Some j ->
-            let snapshot = AgentJournal.snapshot j
-            PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+        journal
+        |> Option.bind (fun j ->
+            PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections)
 
     /// Look up the agent the current cursor selects.
     ///
@@ -48,15 +46,17 @@ module HostSessionNudge =
     let ensureAgentOwnerAuthority
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (rootUserMessageId: MessageId)
+        (rootUserMessageId: PhysicalUserMessageId)
         (agent: string)
-        =
-        match tryActiveProfile journal sessionId with
-        | Some _ -> ()
-        | None ->
-            let rt = runtime journal
+        : Result<unit, string> =
+        match journal with
+        | None -> Error "No journal: an Authority Root cannot be accepted without somewhere to record it"
+        | Some durable ->
+            match tryActiveProfile journal sessionId with
+            | Some _ -> Ok()
+            | None ->
+                let rt = PromptDispatcher.forJournal durable
 
-            match
                 PromptAuthorityRun.createAuthorityRoot
                     HostDigest.sha256Hex
                     rt.RuntimeId
@@ -64,9 +64,7 @@ module HostSessionNudge =
                     PromptAuthority.RootAuthorityKind.AgentOwnerRoot
                     rootUserMessageId
                     agent
-            with
-            | Ok profile -> rt.RegisterAuthority profile
-            | Error _ -> ()
+                |> Result.bind rt.RegisterAuthority
 
     let sendContinuationResult
         (sessionPort: ISessionHostPort)
@@ -75,20 +73,24 @@ module HostSessionNudge =
         (kind: PromptAuthority.ContinuationKind)
         (directory: string option)
         (journal: AgentJournal option)
-        (onAccepted: (MessageId -> unit) option)
-        =
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        : Task<Result<PromptKey, string>> =
         task {
-            match tryActiveProfile journal sessionId with
-            | None -> return Error "No active authority profile"
-            | Some profile ->
+            match journal, tryActiveProfile journal sessionId with
+            | None, _ -> return Error "No journal: a continuation cannot be claimed"
+            | Some _, None -> return Error "No active authority profile"
+            | Some durable, Some profile ->
                 let agent = agentForActiveCursor journal sessionId profile
-                let rt = runtime journal
+                let rt = PromptDispatcher.forJournal durable
 
                 return! rt.SendContinuation sessionPort sessionId prompt kind profile agent directory onAccepted
         }
 
-    /// Sends a continuation only when a durable Authority Root exists. Unknown
-    /// physical user messages fail closed rather than manufacturing a new root.
+    /// PROMPT-007 fire-and-forget: the caller does not await physical acceptance.
+    ///
+    /// The task is still observed. Discarding it — as `|> ignore` on the task did
+    /// — also discarded the claim/abandon bookkeeping inside it, so a send that
+    /// failed left a Claimed fact with nothing following it and no log line.
     let sendContinuation
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -96,45 +98,50 @@ module HostSessionNudge =
         (kind: PromptAuthority.ContinuationKind)
         (directory: string option)
         (journal: AgentJournal option)
-        (onAccepted: (MessageId -> unit) option)
-        =
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        : Task<Result<PromptKey, string>> =
         sendContinuationResult sessionPort sessionId prompt kind directory journal onAccepted
-        |> ignore
 
+    /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
+    ///
+    /// `terminalProviderRun` is the provider run that produced the unusable
+    /// terminal, which is what FALLBACK-008 counts against — not the session and
+    /// not the Logical Run, both of which would let one bad run consume or reset
+    /// another's budget.
+    ///
+    /// The budget check is a read of durable `ClaimSequences`, so a repair claimed
+    /// before a crash is still spent after it.
     let trySendInteractionRepair
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
         (journal: AgentJournal option)
-        (terminalAssistantMessageId: MessageId)
+        (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
-        (onAccepted: (MessageId -> unit) option)
-        : bool =
-        match tryActiveProfile journal sessionId with
-        | None -> false
-        | Some profile ->
-            let rt = runtime journal
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        : Task<Result<PromptKey, string>> =
+        task {
+            match journal, tryActiveProfile journal sessionId with
+            | None, _ -> return Error "No journal: an interaction repair cannot be claimed"
+            | Some _, None -> return Error "No active authority profile"
+            | Some durable, Some profile ->
+                let rt = PromptDispatcher.forJournal durable
 
-            if not (rt.TryClaimInteractionRepair profile terminalAssistantMessageId repairKind) then
-                false
-            else
-                let agent = agentForActiveCursor journal sessionId profile
+                if rt.RepairAlreadyClaimed profile terminalProviderRun repairKind then
+                    return Error "Interaction repair already claimed for this provider run"
+                else
+                    let agent = agentForActiveCursor journal sessionId profile
 
-                task {
-                    let! _ =
-                        rt.SendContinuation
+                    return!
+                        rt.SendInteractionRepair
                             sessionPort
                             sessionId
                             prompt
-                            PromptAuthority.InteractionRepair
+                            terminalProviderRun
+                            repairKind
                             profile
                             agent
                             directory
                             onAccepted
-
-                    ()
-                }
-                |> ignore
-
-                true
+        }

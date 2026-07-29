@@ -20,6 +20,20 @@ const SCOPES = {
 // where SSOT sanctions them and forbidden elsewhere — a whole-repo count would
 // then be a gate that can never reach zero, which eventually forces a wrong
 // deletion. The scope IS the violation.
+
+// The one file where an extinct fact NAME must survive as a string literal.
+//
+// PERSIST-004 requires a pre-0.5.0 journal to stop startup with a precise
+// diagnosis, and the only way to recognise one is by the case names it contains.
+// Counting those literals as residue makes every migrated fact permanently
+// non-zero, so the gate would eventually force deleting the very check that
+// tells an operator to archive the old file.
+//
+// The tradeoff is that a genuine violation inside this file goes unseen here.
+// That is acceptable because the file holds nothing but the codec and this
+// rejection list; the architecture and ssot gates still read it.
+const LEGACY_NAME_SENTINEL = 'next/Journal/FactCodec.fs'
+
 const EXTINCTION = [
   { symbol: 'PostPromptFireAndForget', clause: 'PROMPT-007' },
   { symbol: 'prompt_async', clause: 'PROMPT-005', target: { next: 1, testkit: Infinity } },
@@ -206,7 +220,7 @@ const pad = (value, width) => String(value).padEnd(width)
 
 /** Restrict a scope's file list to the paths where the symbol is a violation. */
 const filesFor = (entry, scope) => {
-  const all = files[scope]
+  const all = files[scope].filter((file) => file.replace(/\\/g, '/') !== LEGACY_NAME_SENTINEL)
   if (!entry.scopedTo) return all
   return all.filter((file) => entry.scopedTo.some((fragment) => file.replace(/\\/g, '/').includes(fragment)))
 }

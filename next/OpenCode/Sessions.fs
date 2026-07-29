@@ -12,12 +12,19 @@ type SessionPromptOptions = OpenCodePromptOptions
 type ISessionHostPort =
     abstract SubscribeTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
 
-    abstract SendPrompt:
-        sessionId: SessionId * text: string * opts: SessionPromptOptions -> Task<Result<MessageId, string>>
+    /// PROMPT-005/PROMPT-011: the outcome, not a `Result`.
+    ///
+    /// `Result<MessageId, string>` had to invent a message id on every success and
+    /// had one failure shape for every failure. Both erasures matter: a transport
+    /// receipt is not a physical message, and `AcceptanceUnknown` is not
+    /// `Retryable` — resending the former can produce two logical effects.
+    abstract SendPrompt: sessionId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
 
+    /// EXEC-002 nudge. Fire-and-forget in that no id is returned, not in that the
+    /// outcome is unexamined — the caller still may not resend on
+    /// `AcceptanceUnknown`.
     abstract SendChildPromptFireAndForget:
-        parentId: SessionId * childId: SessionId * text: string * opts: SessionPromptOptions ->
-            Task<Result<unit, string>>
+        parentId: SessionId * childId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
 
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
@@ -137,46 +144,32 @@ type InjectedSessionPort
                 let hasListener = lock lockObj (fun () -> activeListeners.Contains(sessionId))
 
                 if not hasListener then
-                    return Error "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
+                    // Fatal, not Retryable: the listener is registered by the caller
+                    // before it sends, so this is a call-order defect. Retrying the
+                    // same wrong order cannot fix it.
+                    return Fatal "AG-LISTENER-BEFORE-SEND: Listener must be registered before sending prompt"
                 else
                     recordOutput sessionId (sprintf "Prompt: %s" text)
 
                     match underlyingPort with
                     | Some port ->
-                        let! res = port.SendPrompt sessionId text opts
-
-                        match res with
-                        | Delivered msgId -> return Ok msgId
-                        | AcceptanceUnknown(reason, _) -> return Error reason
-                        | Retryable err -> return Error err
-                        | Fatal err -> return Error err
+                        // Pass the outcome through unchanged. This layer knows less
+                        // about acceptance than the port does; narrowing here is how
+                        // AcceptanceUnknown used to become a plain error.
+                        return! port.SendPrompt sessionId text opts
                     | None ->
-                        let msgId = MessageId.create (Guid.NewGuid().ToString("N"))
-
-                        let fakeResult: AgentRunResult =
-                            { SessionId = sessionId
-                              RootUserMessageId = msgId
-                              AssistantMessageId = msgId
-                              Role = "test"
-                              Directory = ""
-                              FinalText = "test output"
-                              FormalText = "test output" }
-
-                        eventPort.NotifyTerminal sessionId (TerminalOutcome.Completed fakeResult)
-                        |> ignore
-
-                        return Ok msgId
+                        // No Host transport was resolved from the plugin input. The
+                        // previous code fabricated a completed AgentRunResult with
+                        // "test output" here, which made a misconfigured runtime
+                        // indistinguishable from a finished agent.
+                        return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
             }
 
         member me.SendChildPromptFireAndForget(parentId, childId, text, opts) =
             task {
                 registerChild parentId childId
                 recordOutput childId (sprintf "ChildPrompt: %s" text)
-                let! result = (me :> ISessionHostPort).SendPrompt(childId, text, opts)
-
-                match result with
-                | Ok _ -> return Ok()
-                | Error err -> return Error err
+                return! (me :> ISessionHostPort).SendPrompt(childId, text, opts)
             }
 
         member me.AbortSession(sessionId) =
@@ -210,9 +203,10 @@ type InjectedSessionPort
                         return Ok childId
                     | Error err -> return Error err
                 | None ->
-                    let childId = SessionId.create (Guid.NewGuid().ToString("N"))
-                    registerChild rootId childId
-                    return Ok childId
+                    // Same defect class as the SendPrompt None branch: minting a
+                    // SessionId the Host never issued hands the caller an identity
+                    // that every later operation silently no-ops against.
+                    return Error "No Host transport: cannot create a child session"
             }
 
         member me.GetSessionOutput(sessionId) =

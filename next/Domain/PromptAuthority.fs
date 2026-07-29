@@ -120,7 +120,17 @@ module PromptAuthority =
             /// confirmation evidence — a continuation being accepted says nothing
             /// about whether a model consumed the challenge.
             AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
-            RepairClaims: Set<string>
+            /// PROMPT-011 ClaimSequence, keyed by claim scope digest.
+            ///
+            /// Counts claims ever registered for one
+            /// (LogicalRunId, Origin, PayloadDigest) triple, so "the same Guard
+            /// fired twice against the same tree" yields two distinct PromptKeys
+            /// instead of one that looks like a duplicate.
+            ///
+            /// Bounded by the current Logical Run: `registerAuthority` clears it,
+            /// so it grows with the number of distinct payloads in one run, not
+            /// with session lifetime (PERSIST-008).
+            ClaimSequences: Map<string, int>
         }
 
     let empty: PromptAuthorityProjection =
@@ -128,7 +138,7 @@ module PromptAuthority =
           ActiveLogicalRun = None
           PendingClaims = Map.empty
           AcceptedContinuationIds = Map.empty
-          RepairClaims = Set.empty }
+          ClaimSequences = Map.empty }
 
     let originLabel (origin: PromptOrigin) =
         match origin with
@@ -275,27 +285,113 @@ module PromptAuthority =
         { AgentPairCursor.AuthorityAgentPair.SelectedAgent = profile.SelectedAgent
           AgentPairCursor.AuthorityAgentPair.PeerAgent = profile.PeerAgent }
 
+    // ── PromptKey derivation (PROMPT-011) ───────────────────────────────────
+    //
+    // The key must be a STABLE idempotency anchor: after a crash, recovery looks
+    // for it in Host metadata to decide whether a dispatch physically landed.
+    // A random GUID cannot serve that purpose — a restarted process would derive
+    // a different key for the same logical dispatch and conclude nothing was
+    // sent.
+
+    /// Absent identities participate in the digest as an explicit marker rather
+    /// than an empty string, so "no Logical Run yet" cannot collide with "a run
+    /// whose id happens to be blank".
+    let private digestField (value: string option) =
+        match value with
+        | Some text -> text
+        | None -> "\u0000absent"
+
+    /// The scope a ClaimSequence counts within.
+    ///
+    /// PROMPT-011 names (SessionId, LogicalRunId, Origin, PayloadDigest). Two
+    /// dispatches agreeing on all four are the same logical act repeated, which
+    /// is exactly when a distinct sequence number is needed.
+    let claimScopeDigest
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId option)
+        (origin: PromptOrigin)
+        (payloadDigest: string)
+        =
+        String.Join(
+            "\u001f",
+            [| SessionId.value sessionId
+               digestField (logicalRunId |> Option.map LogicalRunId.value)
+               originLabel origin
+               payloadDigest |]
+        )
+
+    /// The ClaimSequence this scope's next claim would carry.
+    let nextClaimSequence (scope: string) (projection: PromptAuthorityProjection) =
+        (Map.tryFind scope projection.ClaimSequences |> Option.defaultValue 0) + 1
+
+    /// PROMPT-011's key. Deterministic in every input, so the same logical
+    /// dispatch derives the same key on any process that folds the same journal.
+    let derivePromptKey
+        (sha256: string -> string)
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId option)
+        (authorityRoot: AuthorityRootUserMessageId option)
+        (origin: PromptOrigin)
+        (effectiveAgent: string option)
+        (payloadDigest: string)
+        (claimSequence: int)
+        : PromptKey =
+        PromptKey.create (
+            sha256 (
+                String.Join(
+                    "\u001f",
+                    [| SessionId.value sessionId
+                       digestField (logicalRunId |> Option.map LogicalRunId.value)
+                       digestField (authorityRoot |> Option.map AuthorityRootUserMessageId.value)
+                       originLabel origin
+                       digestField effectiveAgent
+                       payloadDigest
+                       string claimSequence |]
+                )
+            )
+        )
+
     let effectiveAgentAt (profile: AuthorityExecutionProfile) (offset: byte) : string =
         AgentPairCursor.effectiveAgent (agentPair profile) (AgentPairCursor.atOffset offset)
 
     let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
         AgentPairCursor.effectiveAgent (agentPair profile) cursor
 
-    /// FALLBACK-008: an interaction repair fires at most once per terminal
-    /// assistant message, so the dedupe key names exactly that occasion.
-    let repairIdentity
+    /// FALLBACK-008: the payload digest of an interaction repair.
+    ///
+    /// A repair's prompt text is fixed per kind, so digesting the text would make
+    /// every repair of that kind one logical act. The occasion is what the clause
+    /// bounds — one terminal provider run earns one repair — so the run is what
+    /// the digest names.
+    ///
+    /// Using the payload digest for this is what makes the budget durable without
+    /// a new fact: the digest enters the claim scope, so `ClaimSequences` already
+    /// counts repairs per occasion. The previous design kept a `RepairClaims` set
+    /// that no fact wrote, so the guarantee died with the process.
+    let repairPayloadDigest (terminalProviderRun: ProviderRunIdentity) (repairKind: string) =
+        String.Join("\u001f", [| ProviderRunIdentity.value terminalProviderRun; repairKind |])
+
+    /// FALLBACK-008: has this occasion already spent its one repair.
+    ///
+    /// Derived, not stored. `nextClaimSequence` returns 1 for a scope no claim has
+    /// ever used, so anything above 1 means a repair was already claimed for this
+    /// terminal — whether or not it went on to succeed, which is the point:
+    /// a failed repair must not license a second attempt.
+    let repairAlreadyClaimed
+        (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
-        (authorityRoot: AuthorityRootUserMessageId)
         (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
+        (projection: PromptAuthorityProjection)
         =
-        String.Join(
-            "\u001f",
-            [| LogicalRunId.value logicalRunId
-               AuthorityRootUserMessageId.value authorityRoot
-               ProviderRunIdentity.value terminalProviderRun
-               repairKind |]
-        )
+        let scope =
+            claimScopeDigest
+                sessionId
+                (Some logicalRunId)
+                (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
+                (repairPayloadDigest terminalProviderRun repairKind)
+
+        nextClaimSequence scope projection > 1
 
     /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so the prompt
     /// identity is a function of CanonicalRole alone. Tier deliberately does not

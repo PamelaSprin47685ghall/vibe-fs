@@ -174,7 +174,6 @@ const DSL_PROGRAMS = [
     file: 'Session/CompanionProgram.fs',
     names: ['buildDelta', 'shouldReplacePrefix', 'runCompanionFlow'],
   },
-  { builder: 'review', file: 'Review/ReviewProgram.fs', names: ['recordVerdict', 'confirmPerfect', 'runReviewFlow'] },
   { builder: 'orchestrator', file: 'Orchestrator/OrchestratorProgram.fs', names: ['run'] },
   { builder: 'process', file: 'Process/ProcessRunner.fs', names: ['run', 'runWithHost'] },
 ]
@@ -204,10 +203,15 @@ const DUPLICATE_ALGORITHM_OWNERS = [
   // as a parameter, so Domain/ owns no hash implementation at all.
   { symbol: 'sha256Hex', owners: ['Host/HostDigest.fs'] },
   { symbol: 'reviewWitness', owners: ['Domain/ReviewWitness.fs'] },
-  { symbol: 'confirmPerfect', owners: ['Review/ReviewProgram.fs'] },
+  // REVIEW-003's confirmation decision. Domain/ReviewWitness.fs owns it because
+  // the decision is a pure function of the two verdict witnesses and the seal;
+  // the previous owner was a Flow program that compared tree hash strings.
+  { symbol: 'confirm', owners: ['Domain/ReviewWitness.fs'] }, // REVIEW-003
 
   // Each clause below names ONE source of truth, so each function has one owner.
   { symbol: 'buildAttemptExecutionProfile', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-008
+  { symbol: 'derivePromptKey', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-011
+  { symbol: 'claimScopeDigest', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-011
   { symbol: 'hasCompanion', owners: ['Domain/PromptAuthority.fs'] }, // COMPANION-002
   { symbol: 'systemPromptIdFor', owners: ['Domain/PromptAuthority.fs'] }, // AGENT-001
   { symbol: 'toSemantic', owners: ['Domain/ProviderProjection.fs'] }, // VERIFY-007

@@ -20,9 +20,10 @@ module TurnReconcile =
         if containsMessage messages root then
             Some root
         elif isAdmissionId root then
-            // prompt_async returns a session-scoped admission id. A newly
-            // registered AgentOwnerRoot is the first physical user in that
-            // child transcript; this is causal correlation, not text guessing.
+            // The Host's async prompt endpoint returns a session-scoped admission
+            // id, never a message identity. A newly registered AgentOwnerRoot is the
+            // first physical user in that child transcript; this is causal
+            // correlation, not text guessing.
             users messages |> List.tryHead |> Option.map (fun message -> message.Id)
         else
             None

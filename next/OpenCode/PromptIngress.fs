@@ -1,12 +1,13 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open Wanxiangshu.Next.Domain
-open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-/// chat.message authority policy. Raw host payloads are decoded by
-/// PromptIngressCodec; unknown origins remain fail-closed.
+/// chat.message authority policy (PROMPT-004).
+///
+/// This is the only place a physical user message becomes authority. Raw host
+/// payloads are decoded by PromptIngressCodec; unknown origins fail closed.
 [<RequireQualifiedAccess>]
 module PromptIngress =
 
@@ -14,6 +15,28 @@ module PromptIngress =
         match PromptAuthority.parseAgentName value with
         | Ok _ -> true
         | Error _ -> false
+
+    /// PROMPT-004 resolution order: what the journal already knows, then — only
+    /// for a message the journal has never seen — an explicit managed agent makes
+    /// it a HumanRoot.
+    ///
+    /// The order matters in one direction only. A message with a known origin must
+    /// never be reclassified by its `agent` field, because a continuation the
+    /// plugin itself sent also carries one, and treating that as a HumanRoot would
+    /// start a new Logical Run inside the run it was continuing.
+    let private resolveOrigin
+        (runtime: PromptDispatcher.Runtime)
+        (sessionId: SessionId)
+        (message: PromptIngressCodec.DecodedMessage)
+        (physicalMessageId: PhysicalUserMessageId)
+        =
+        match runtime.ResolveOrigin physicalMessageId message.PromptKey message.IsHostCompaction sessionId with
+        | PromptAuthority.PromptOrigin.UnknownOrigin ->
+            match message.ExplicitAgent with
+            | Some agent when isValidAgent agent ->
+                PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
+            | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
+        | resolved -> resolved
 
     let private handle
         (journal: AgentJournal option)
@@ -23,78 +46,54 @@ module PromptIngress =
         (onAuthorityResolved: SessionId -> PromptAuthority.AuthorityExecutionProfile -> unit)
         (message: PromptIngressCodec.DecodedMessage)
         =
-        match message.SessionId, message.MessageId with
-        | Some sessionId, Some messageId ->
-            let runtime =
-                match journal with
-                | Some value -> PromptDispatcher.forJournal value
-                | None -> PromptDispatcher.ephemeral ()
+        // PROMPT-005: accepting a prompt is a durable act. Without a journal there
+        // is nothing to accept into, and inventing an in-memory authority here
+        // would let a Logical Run exist that no restart could rediscover.
+        match journal, message.SessionId, message.PhysicalUserMessageId with
+        | Some durable, Some sessionId, Some physicalMessageId ->
+            let runtime = PromptDispatcher.forJournal durable
+            let sessionKey = SessionId.value sessionId
+            let messageKey = PhysicalUserMessageId.value physicalMessageId
 
-            let knownOrigin =
-                runtime.ResolveOrigin messageId message.PromptKey message.IsHostCompaction
+            let acceptedRoot (profile: PromptAuthority.AuthorityExecutionProfile) =
+                onAuthorityResolved sessionId profile
+                bindUserMessage sessionKey messageKey
+                registerOwned sessionKey
 
-            let origin =
-                match knownOrigin with
-                | PromptAuthority.PromptOrigin.UnknownOrigin ->
-                    match message.ExplicitAgent with
-                    | Some agent when isValidAgent agent ->
-                        PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
-                    | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
-                | resolved -> resolved
-
-            match origin with
+            match resolveOrigin runtime sessionId message physicalMessageId with
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot ->
-                match message.ExplicitAgent with
-                | Some agent ->
-                    match runtime.AcceptHumanRoot sessionId messageId (Some agent) with
-                    | Ok profile ->
-                        onAuthorityResolved sessionId profile
-                        bindUserMessage (SessionId.value sessionId) (MessageId.value messageId)
-                        registerOwned (SessionId.value sessionId)
-                    | Error _ -> ()
-                | None -> ()
+                match runtime.AcceptHumanRoot sessionId physicalMessageId message.ExplicitAgent with
+                | Ok profile -> acceptedRoot profile
+                | Error _ -> ()
+
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
+                // An AgentOwnerRoot is only recognisable by its PromptKey. Without
+                // one there is no claim to resolve, so this stays unknown rather
+                // than being promoted on the strength of the `agent` field.
                 match message.PromptKey with
                 | Some key ->
-                    match runtime.AcceptAgentOwnerRoot (PromptKeyRef.value key) sessionId messageId with
-                    | Ok profile ->
-                        onAuthorityResolved sessionId profile
-                        bindUserMessage (SessionId.value sessionId) (MessageId.value messageId)
-                        registerOwned (SessionId.value sessionId)
+                    match runtime.AcceptAgentOwnerRoot key sessionId physicalMessageId with
+                    | Ok profile -> acceptedRoot profile
                     | Error _ -> ()
                 | None -> ()
-            | PromptAuthority.PromptOrigin.Continuation kind ->
+
+            | PromptAuthority.PromptOrigin.Continuation _ ->
                 match message.PromptKey with
                 | Some key ->
-                    match runtime.AcceptContinuation (PromptKeyRef.value key) sessionId messageId with
+                    // `AcceptContinuation` writes PROMPT-005 `PhysicalAccepted` with
+                    // this real physical id, and that is the entire record of the
+                    // landing. Nothing further is written for review purposes:
+                    // REVIEW-003 forbids a continuation's acceptance as confirmation
+                    // evidence, since landing a prompt says nothing about whether a
+                    // model consumed the challenge. That proof is the provider input
+                    // seal (REVIEW-010).
+                    match runtime.AcceptContinuation key sessionId physicalMessageId with
                     | Ok _ ->
-                        // Host first admits plugin prompts as accepted-*; the
-                        // real physical user id arrives here via chat.message.
-                        // Upgrade ReviewConfirmation so second PERFECT can
-                        // match ConfirmationPhysicalMessageId.
-                        match journal, kind with
-                        | Some durable, PromptAuthority.ContinuationKind.ReviewConfirmation ->
-                            let guardKey =
-                                sprintf
-                                    "review-guard:%s:confirm-upgrade:%s"
-                                    (SessionId.value sessionId)
-                                    (MessageId.value messageId)
-
-                            AgentJournal.appendAgent
-                                (StreamId.Session sessionId)
-                                None
-                                (AgentFact.GuardPromptAccepted
-                                    {| TargetSessionId = sessionId
-                                       GuardKey = guardKey
-                                       HostMessageId = MessageId.value messageId |})
-                                durable
-                            |> ignore
-                        | _ -> ()
-
-                        bindContinuationMessage (SessionId.value sessionId) (MessageId.value messageId)
-                        registerOwned (SessionId.value sessionId)
+                        bindContinuationMessage sessionKey messageKey
+                        registerOwned sessionKey
                     | Error _ -> ()
                 | None -> ()
+
             | PromptAuthority.PromptOrigin.HostInternal
             | PromptAuthority.PromptOrigin.UnknownOrigin -> ()
         | _ -> ()

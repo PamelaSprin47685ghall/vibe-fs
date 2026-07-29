@@ -4,6 +4,8 @@
 
 绑定 commit：`274a30aa`（pre-shock baseline）。休克期开始后本表随工作包推进更新。
 
+休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
+
 ## 架构 DNA
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
@@ -18,11 +20,15 @@
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| PROMPT-004: 来源类型 | PARTIAL | `PromptAuthority.fs` | `HumanPromptAccepted` 事实需替换为 `AuthorityRootAccepted` |
-| PROMPT-005: 四阶段协议 | PARTIAL | `PromptDispatcherSend.fs` | 只有 Claimed/Accepted/Abandoned 三事实；缺 Submitted 与 PhysicalAccepted 分离，`accepted-*` 仍参与确认 |
-| PROMPT-007: Fire-and-forget 定义 | CONTRADICTS | `OpenCodePort.fs` 等 5 处 | 生产模块直接调 `prompt_async`，绕过 Dispatcher |
-| PROMPT-008: 原子 AttemptExecutionProfile | PARTIAL | 分散在多个模块 | 无唯一构造函数；各模块自行从 Agent 字符串解析 Role |
-| PROMPT-011: 未决发送恢复 | NOT_IMPLEMENTED | — | 无 PromptKey 幂等键定义、无 tail window 查找、无 RecoveryAttemptBudget |
+| PROMPT-002: Authority Root 固定执行画像 | UNVERIFIED | `PromptAuthorityRun.createAuthorityRoot` | 包 A：唯一构造入口；`AuthorityExecutionProfile` 无 model 字段，故「root 覆盖 model」不可表达 |
+| PROMPT-003: Continuation | UNVERIFIED | `PromptDispatcherSend.SendContinuation` | 包 A：继承 run 与 root，EffectiveAgent 参与 PromptKey |
+| PROMPT-004: 来源类型 | UNVERIFIED | `PromptIngress.fs` `Fact.AuthorityRootAccepted` | 包 A/0b：`HumanPromptAccepted` 已替换；解析顺序为「journal 已知 → 显式 managed agent」，已知来源不得被 agent 字段改判 |
+| PROMPT-005: 四阶段协议 | UNVERIFIED | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 包 A：四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生 |
+| PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定 |
+| PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
+| PROMPT-008: 原子 AttemptExecutionProfile | UNVERIFIED | `Domain/PromptAuthority.buildAttemptExecutionProfile` | 包 0d：唯一构造函数 + `single-constructor` 门禁。调用方贯通属包 B |
+| PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
+| PROMPT-011: 未决发送恢复 | PARTIAL | `Domain/PromptAuthority.derivePromptKey` | 包 A：PromptKey 已按条款派生并写入 Host metadata，`ClaimSequence` 由 fold 推进。仍缺启动期 tail window 查找与 `RecoveryAttemptBudget = 3`（属清场期） |
 
 ## Fallback
 
@@ -33,17 +39,19 @@
 | FALLBACK-004: 不变量 | PARTIAL | `FallbackProjection.fs` | Authority profile 不变已实现；成功清零 count 未实现（无 count） |
 | FALLBACK-005: 有限 Circuit Breaker | NOT_IMPLEMENTED | — | 无 `AutoRecoveryBudget`；无 `FallbackExhausted` journal 事实（`Kernel/Outcome.fs:44` 同名 case 是无关的 terminal outcome） |
 | FALLBACK-007: 持久事实 | PARTIAL | `Kernel/Fact.fs:74` | 缺 `PreviousOffset` / `NextOffset` / `ConsecutiveFailureCount` 字段；无 Fold 验证 |
+| FALLBACK-008: 空/XML-only terminal | UNVERIFIED | `HostSessionNudge.trySendInteractionRepair` | 包 A：预算改由 `ClaimSequences` 派生（PROMPT-005 `Claimed` 已写），不再依赖无事实支撑的 `RepairClaims` |
 | FALLBACK-010: Host Attempt ≠ ConsecutiveFailureCount | UNVERIFIED | `HostSignal.fs` | 当前无 count 概念，故无从混淆；建立 count 后需门禁 |
 
 ## Review
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| REVIEW-003: 因果证明 | NOT_IMPLEMENTED | `ReviewConfirmation.fs` | 三种弱代理并存：`AcceptedContinuationIds`、`AcceptedContinuationRoots`、`ConfirmationPhysicalMessageId`；另有 `samePhysicalRootReevaluationMatched` |
+| REVIEW-003: 因果证明 | PARTIAL | `Domain/ReviewWitness.fs` | 包 0c/A：四种弱代理已清除（`AcceptedContinuationRoots`、`samePhysicalRootReevaluation`、`GuardPromptAccepted`、`Review/Guard.fs`）。seal 因果判定本体属包 D |
 | REVIEW-004: ReviewAttemptIdentity | NOT_IMPLEMENTED | `ReviewProjection.fs` | 类型不存在；去重只靠 `RecentProviderRunIds` 列表 |
 | REVIEW-005: 因果单调状态 | PARTIAL | `ReviewProjection.fs` | 无链 A / 链 B 分离；admission ID 仍可参与确认 |
 | REVIEW-006: 自包含 Witness | PARTIAL | `ReviewWitness.fs` | Witness 依赖外围 Map 补齐身份 |
-| REVIEW-010: ProviderInputSeal | NOT_IMPLEMENTED | — | 类型与流程均不存在。可实现性已证明，见 `evidence/host-transform-run-binding.md` |
+| REVIEW-007: Manager Guard | UNVERIFIED | `HostReviewGuard.fs` | 包 A：nudge 去重改读 PROMPT-005 `PendingClaims`；`AcceptedGuardKey` 与 `GuardPromptAccepted` 已删 |
+| REVIEW-010: ProviderInputSeal | PARTIAL | `Journal/ReviewProjection.ProviderInputSeal` | 包 0b/0c：事实与投影类型已存在。`messages.transform` 侧封装与因果校验属包 D。可实现性见 `evidence/host-transform-run-binding.md` |
 
 ## Orchestrator
 
@@ -113,7 +121,7 @@
 ## 未列入本表的条款
 
 `AGENT-*`（20 个 Agent、能力矩阵、内部 Agent 不可见）与 `REVIEW-001` `REVIEW-002`
-`REVIEW-007` `REVIEW-008` `REVIEW-009`、`ORCH-004`、`EXEC-001` ~ `EXEC-003`
+`REVIEW-008` `REVIEW-009`、`ORCH-004`、`EXEC-001` ~ `EXEC-003`
 `EXEC-006` ~ `EXEC-008` `EXEC-010` `EXEC-012` ~ `EXEC-014`、`COMPANION-003` ~
 `COMPANION-007` `COMPANION-010` ~ `COMPANION-012`、`HOST-001` `HOST-006` `HOST-007`
 `HOST-008`、`ARCH-005` `ARCH-006` `ARCH-008`、`VERIFY-002` `VERIFY-006`、

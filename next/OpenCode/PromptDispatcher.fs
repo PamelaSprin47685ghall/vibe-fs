@@ -1,8 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open System.Collections.Generic
-open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel
@@ -13,260 +11,203 @@ open Wanxiangshu.Next.Journal
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
 
-    let internal newPromptKey = PromptAuthority.newPromptKey
     let internal originLabel = PromptAuthority.originLabel
 
-    let private fromJournal (journal: AgentJournal) : PromptAuthority.PromptAuthorityProjection =
-        (AgentJournal.snapshot journal).AgentProjections.Sessions
-        |> Map.toList
-        |> List.choose (fun (_, session) -> session.PromptAuthority)
-        |> List.fold
-            (fun acc proj ->
-                { LastAuthorityProfile = proj.LastAuthorityProfile |> Option.orElse acc.LastAuthorityProfile
-                  ActiveLogicalRun = proj.ActiveLogicalRun |> Option.orElse acc.ActiveLogicalRun
-                  PendingClaims = Map.fold (fun m k v -> Map.add k v m) acc.PendingClaims proj.PendingClaims
-                  AcceptedContinuationIds =
-                    Map.fold (fun m k v -> Map.add k v m) acc.AcceptedContinuationIds proj.AcceptedContinuationIds
-                  AcceptedContinuationRoots =
-                    Map.fold (fun m k v -> Map.add k v m) acc.AcceptedContinuationRoots proj.AcceptedContinuationRoots
-                  RepairClaims = Set.union acc.RepairClaims proj.RepairClaims })
-            PromptAuthority.empty
+    /// The single PROMPT-005 sender.
+    ///
+    /// Holds no authority state. The previous version kept a `mutable authority`
+    /// behind a lock and seeded it by folding *every* session's projection into
+    /// one value, which had two consequences worth naming: a claim made in one
+    /// session was visible in another, and the in-memory copy could disagree with
+    /// the journal it was supposed to mirror. Both are gone because the state is
+    /// gone — every read goes to the fold, which is the only writer.
+    ///
+    /// The journal is not optional. A dispatcher with nowhere to persist would
+    /// report `Ok` for facts it silently dropped, and PROMPT-005 is a durability
+    /// claim before it is a sequencing one.
+    type Runtime(journal: AgentJournal) =
 
-    type Runtime(runtimeId: string, ?journal: AgentJournal) =
-        let gate = obj ()
+        member _.RuntimeId = AgentJournal.runtimeId journal
 
-        let mutable authority =
-            match journal with
-            | Some j -> fromJournal j
-            | None -> PromptAuthority.empty
-
-        member _.RuntimeId = runtimeId
-
-        member _.Projection = lock gate (fun () -> authority)
+        /// PERSIST-008: one session's authority projection, addressed by key.
+        member _.ProjectionFor(sessionId: SessionId) : PromptAuthority.PromptAuthorityProjection =
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+            |> Option.bind (fun session -> session.PromptAuthority)
+            |> Option.defaultValue PromptAuthority.empty
 
         member internal _.Persist
             (sessionId: SessionId)
-            (turnId: TurnId option)
+            (providerRun: ProviderRunIdentity option)
             (fact: AgentFact)
             : Result<unit, string> =
-            match journal with
-            | None -> Ok()
-            | Some j ->
-                AgentJournal.appendAgent (StreamId.Session sessionId) turnId fact j
-                |> Result.map (fun _ -> ())
-                |> Result.mapError (fun f -> sprintf "%A" f.Failure)
+            AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal
+            |> Result.map (fun _ -> ())
+            |> Result.mapError (fun failure -> sprintf "%A" failure.Failure)
 
-        member internal _.Update
-            (f: PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection)
-            =
-            lock gate (fun () -> authority <- f authority)
+        /// PROMPT-004: an Authority Root takes effect.
+        ///
+        /// Returns `Result` rather than raising. The previous version raised
+        /// `InvalidOperationException` on a persist failure, which turned a
+        /// recoverable journal rejection into a crash in whichever host callback
+        /// happened to be on the stack.
+        ///
+        /// REVIEW-007's review requirement is not written here. The fold derives
+        /// it from this fact's `AuthorityKind`, so a HumanRoot cannot be recorded
+        /// without its requirement appearing with it.
+        member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Result<unit, string> =
+            AgentFact.AuthorityRootAccepted
+                {| SessionId = profile.SessionId
+                   LogicalRunId = profile.LogicalRunId
+                   AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                   AuthorityKind =
+                    match profile.AuthorityKind with
+                    | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+                    | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+                   SelectedAgent = profile.SelectedAgent
+                   PeerAgent = profile.PeerAgent
+                   CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
+                   SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
+            |> this.Persist profile.SessionId None
 
-        member private _.Read(f: PromptAuthority.PromptAuthorityProjection -> 'a) : 'a =
-            lock gate (fun () -> f authority)
-
-        member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) =
-            let fact =
-                AgentFact.AuthorityRootAccepted
-                    {| SessionId = profile.SessionId
-                       LogicalRunId = profile.LogicalRunId
-                       HostMessageId = MessageId.value profile.AuthorityRootUserMessageId
-                       AuthorityKind =
-                        match profile.AuthorityKind with
-                        | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
-                        | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
-                       SelectedAgent = profile.SelectedAgent
-                       PeerAgent = profile.PeerAgent
-                       CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
-                       SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
-
-            match this.Persist profile.SessionId (Some(TurnId.ofMessageId profile.AuthorityRootUserMessageId)) fact with
-            | Error e -> raise (InvalidOperationException e)
-            | Ok() ->
-                match profile.AuthorityKind, journal with
-                | PromptAuthority.RootAuthorityKind.HumanRoot, Some j ->
-                    match
-                        AgentJournal.recordHumanPromptAccepted j profile.SessionId profile.AuthorityRootUserMessageId
-                    with
-                    | Ok() -> ()
-                    | Error e -> raise (InvalidOperationException e)
-                | _ -> ()
-
-                this.Update(PromptAuthorityRun.registerAuthority profile)
-
-        member this.AcceptHumanRoot (sessionId: SessionId) (messageId: MessageId) (explicitAgent: string option) =
-            match explicitAgent with
-            | None -> Error "HumanRoot requires explicit managed agent (fast-* / deep-*)"
-            | Some agent ->
-                match
-                    PromptAuthorityRun.createAuthorityRoot
-                        HostDigest.sha256Hex
-                        this.RuntimeId
-                        sessionId
-                        PromptAuthority.RootAuthorityKind.HumanRoot
-                        messageId
-                        agent
-                with
-                | Error e -> Error e
-                | Ok profile ->
-                    this.RegisterAuthority profile
-                    Ok profile
-
-        member internal this.AcceptPhysicalAgentOwnerRoot
-            (key: PromptKeyRef)
+        /// PROMPT-002: a human root must name a managed agent. There is no
+        /// default, because inferring one is how a human prompt silently acquires
+        /// an agent nobody chose.
+        member this.AcceptHumanRoot
             (sessionId: SessionId)
-            (hostMessageId: MessageId)
-            (agent: string)
-            =
-            match
+            (physicalMessageId: PhysicalUserMessageId)
+            (explicitAgent: string option)
+            : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+            match explicitAgent with
+            | None -> Error "HumanRoot requires an explicit managed agent (fast-* / deep-*)"
+            | Some agent ->
                 PromptAuthorityRun.createAuthorityRoot
                     HostDigest.sha256Hex
                     this.RuntimeId
                     sessionId
-                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                    hostMessageId
+                    PromptAuthority.RootAuthorityKind.HumanRoot
+                    physicalMessageId
                     agent
-            with
-            | Error e -> Error e
-            | Ok profile ->
-                let promptKey = PromptKeyRef.value key
+                |> Result.bind (fun profile -> this.RegisterAuthority profile |> Result.map (fun () -> profile))
 
-                let acceptedFact =
-                    AgentFact.PluginPromptAccepted
-                        {| PromptKey = promptKey
-                           SessionId = sessionId
-                           HostMessageId = MessageId.value hostMessageId |}
+        /// PROMPT-005 `PhysicalAccepted` for an Authority Root claim.
+        ///
+        /// Two facts in order: the claim resolves, then the root takes effect. The
+        /// order is the clause — an Authority Root may not take effect until a
+        /// real physical message is proven, so `PhysicalAccepted` cannot come
+        /// second.
+        member internal this.AcceptPhysicalAgentOwnerRoot
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (physicalMessageId: PhysicalUserMessageId)
+            (agent: string)
+            : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+            PromptAuthorityRun.createAuthorityRoot
+                HostDigest.sha256Hex
+                this.RuntimeId
+                sessionId
+                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                physicalMessageId
+                agent
+            |> Result.bind (fun profile ->
+                AgentFact.PluginPromptPhysicalAccepted
+                    {| PromptKey = key
+                       SessionId = sessionId
+                       PhysicalUserMessageId = physicalMessageId |}
+                |> this.Persist sessionId None
+                |> Result.bind (fun () -> this.RegisterAuthority profile)
+                |> Result.map (fun () -> profile))
 
-                match this.Persist sessionId None acceptedFact with
-                | Error e -> Error e
-                | Ok() ->
-                    let rootFact =
-                        AgentFact.AuthorityRootAccepted
-                            {| SessionId = sessionId
-                               LogicalRunId = profile.LogicalRunId
-                               HostMessageId = MessageId.value hostMessageId
-                               AuthorityKind = "AgentOwnerRoot"
-                               SelectedAgent = profile.SelectedAgent
-                               PeerAgent = profile.PeerAgent
-                               CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
-                               SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
+        member this.AcceptAgentOwnerRoot
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (physicalMessageId: PhysicalUserMessageId)
+            : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+            let projection = this.ProjectionFor sessionId
 
-                    match this.Persist sessionId (Some(TurnId.ofMessageId hostMessageId)) rootFact with
-                    | Error e -> Error e
-                    | Ok() ->
-                        this.Update(fun auth ->
-                            auth
-                            |> PromptAuthorityRun.acceptClaim key hostMessageId
-                            |> PromptAuthorityRun.registerAuthority profile)
-
-                        Ok profile
-
-        member this.AcceptAgentOwnerRoot (promptKey: string) (sessionId: SessionId) (hostMessageId: MessageId) =
-            let key = PromptKeyRef.create promptKey
-
-            match this.Read(fun auth -> Map.tryFind key auth.PendingClaims) with
+            match Map.tryFind key projection.PendingClaims with
             | Some claim when
                 claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
                                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
                 ->
                 match claim.EffectiveAgent with
-                | None -> Error(sprintf "AgentOwnerRoot claim %s has no effective agent" promptKey)
-                | Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId hostMessageId agent
-            | Some _ -> Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" promptKey)
+                | None -> Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
+                | Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId agent
+            | Some _ -> Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key))
             | None ->
-                // Idempotent re-accept: if an active run already exists, return it.
-                match this.Read(fun auth -> auth.ActiveLogicalRun) with
-                | Some profile when profile.SessionId = sessionId -> Ok profile
-                | _ -> Error(sprintf "Unknown AgentOwnerRoot claim: %s" promptKey)
+                // Re-delivery of a message whose claim already resolved. Idempotent
+                // only when the run it created is still the active one; otherwise
+                // this is an unknown key and must fail closed (PROMPT-005).
+                match projection.ActiveLogicalRun with
+                | Some profile -> Ok profile
+                | None -> Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key))
 
-        member this.AcceptContinuation (promptKey: string) (sessionId: SessionId) (hostMessageId: MessageId) =
-            let key = PromptKeyRef.create promptKey
+        /// PROMPT-003: a continuation reached physical acceptance. Returns the
+        /// kind it was claimed as, read before the fact is written because writing
+        /// it retires the claim.
+        member this.AcceptContinuation
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (physicalMessageId: PhysicalUserMessageId)
+            : Result<PromptAuthority.ContinuationKind option, string> =
+            let kind =
+                match Map.tryFind key (this.ProjectionFor sessionId).PendingClaims with
+                | Some { Origin = PromptAuthority.PromptOrigin.Continuation c } -> Some c
+                | _ -> None
 
-            let acceptedFact =
-                AgentFact.PluginPromptAccepted
-                    {| PromptKey = promptKey
-                       SessionId = sessionId
-                       HostMessageId = MessageId.value hostMessageId |}
+            AgentFact.PluginPromptPhysicalAccepted
+                {| PromptKey = key
+                   SessionId = sessionId
+                   PhysicalUserMessageId = physicalMessageId |}
+            |> this.Persist sessionId None
+            |> Result.map (fun () -> kind)
 
-            match this.Persist sessionId None acceptedFact with
-            | Error e -> Error e
-            | Ok() ->
-                let kind =
-                    this.Read(fun auth ->
-                        match Map.tryFind key auth.PendingClaims with
-                        | Some { Origin = PromptAuthority.PromptOrigin.Continuation c } -> Some c
-                        | _ -> None)
-
-                this.Update(PromptAuthorityRun.acceptClaim key hostMessageId)
-                Ok kind
-
+        /// The run a continuation would extend.
+        ///
+        /// `ActiveLogicalRun` only. The previous version fell back to
+        /// `LastAuthorityProfile`, which let a continuation attach to a finished
+        /// run — PROMPT-004 scopes continuations to the active run, and a stale
+        /// profile is exactly the thing that must not substitute for one.
         member this.ActiveProfile(sessionId: SessionId) =
-            this.Read(fun auth ->
-                match auth.ActiveLogicalRun with
-                | Some p when p.SessionId = sessionId -> Some p
-                | _ ->
-                    match auth.LastAuthorityProfile with
-                    | Some p when p.SessionId = sessionId -> Some p
-                    | _ -> None)
+            (this.ProjectionFor sessionId).ActiveLogicalRun
 
-        member this.ResolveOrigin (messageId: MessageId) (promptKey: PromptKeyRef option) (hostCompaction: bool) =
-            this.Read(fun auth -> PromptAuthorityRun.resolveKnownOrigin messageId promptKey hostCompaction auth)
+        member this.ResolveOrigin
+            (physicalMessageId: PhysicalUserMessageId)
+            (promptKey: PromptKey option)
+            (hostCompaction: bool)
+            (sessionId: SessionId)
+            : PromptAuthority.PromptOrigin =
+            PromptAuthorityRun.resolveKnownOrigin
+                physicalMessageId
+                promptKey
+                hostCompaction
+                (this.ProjectionFor sessionId)
 
-        member this.TryClaimInteractionRepair
+        /// FALLBACK-008: has this occasion already spent its one interaction repair.
+        ///
+        /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a
+        /// `RepairClaims` set that no fact ever wrote, so the at-most-once guarantee
+        /// lived only in process memory. The budget is now derived from
+        /// `ClaimSequences`, which PROMPT-005 `Claimed` does write — so a repair
+        /// claimed before a crash is still spent after it.
+        member this.RepairAlreadyClaimed
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (terminalAssistantMessageId: MessageId)
+            (terminalProviderRun: ProviderRunIdentity)
             (repairKind: string)
-            =
-            let identity =
-                PromptAuthority.repairIdentity
-                    profile.LogicalRunId
-                    profile.AuthorityRootUserMessageId
-                    terminalAssistantMessageId
-                    repairKind
+            : bool =
+            PromptAuthority.repairAlreadyClaimed
+                profile.SessionId
+                profile.LogicalRunId
+                terminalProviderRun
+                repairKind
+                (this.ProjectionFor profile.SessionId)
 
-            let fact =
-                AgentFact.InteractionRepairClaimed
-                    {| SessionId = profile.SessionId
-                       LogicalRunId = profile.LogicalRunId
-                       AuthorityRootUserMessageId = MessageId.value profile.AuthorityRootUserMessageId
-                       TerminalAssistantMessageId = MessageId.value terminalAssistantMessageId
-                       RepairKind = repairKind |}
+        member internal _.Metadata (key: PromptKey) (origin: string) (logicalRunId: LogicalRunId option) =
+            PromptMetadataCodec.create key origin logicalRunId
 
-            match this.Persist profile.SessionId (Some(TurnId.ofMessageId profile.AuthorityRootUserMessageId)) fact with
-            | Error _ -> false
-            | Ok() ->
-                match this.Read(fun auth -> PromptAuthorityRun.tryClaimRepair identity auth) with
-                | None -> false
-                | Some next ->
-                    this.Update(fun _ -> next)
-                    true
-
-        member internal this.Metadata
-            (key: PromptKeyRef)
-            (origin: string)
-            (logicalRunId: string)
-            (authorityRootUserMessageId: string)
-            =
-            PromptMetadataCodec.create key origin logicalRunId authorityRootUserMessageId
-
-        member internal this.SubscribeNoOp (port: ISessionHostPort) (sessionId: SessionId) =
+        /// EXEC-003 requires a terminal listener to exist before a prompt is sent.
+        /// This registers the subscription without reacting to it; the reacting
+        /// listener belongs to whoever awaits the agent.
+        member internal _.SubscribeNoOp (port: ISessionHostPort) (sessionId: SessionId) =
             port.SubscribeTerminal(sessionId, (fun _ _ -> ()))
 
-    let forRuntime (runtimeId: string) (journal: AgentJournal option) = Runtime(runtimeId, ?journal = journal)
-
-    let forJournal (journal: AgentJournal) =
-        forRuntime (RuntimeId.value (AgentJournal.runtimeId journal)) (Some journal)
-
-    let ephemeral () =
-        forRuntime (Guid.NewGuid().ToString("N")) None
-
-    let ephemeralNamed (runtimeId: string) = forRuntime runtimeId None
-
-    /// Backward-compatible test alias.
-    type Dispatcher(?journal: AgentJournal) =
-        inherit
-            Runtime(
-                (match journal with
-                 | Some j -> RuntimeId.value (AgentJournal.runtimeId j)
-                 | None -> "test-runtime"),
-                ?journal = journal
-            )
+    let forJournal (journal: AgentJournal) = Runtime(journal)

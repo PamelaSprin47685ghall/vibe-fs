@@ -75,7 +75,10 @@ module OpenCodePort =
                         let sessObj = client?session
                         let promptFn = sessObj?promptAsync
                         let! _ = unbox<Task<obj>> (promptFn?call (sessObj, payload))
-                        return Delivered(MessageId.create (sprintf "accepted-%s" sId))
+                        // PROMPT-005: this endpoint admits the request and returns no
+                        // message identity. The receipt is a transport token, and its
+                        // own type is what stops it becoming an Authority Root.
+                        return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
                     with ex ->
                         return Retryable ex.Message
                 }
@@ -169,8 +172,8 @@ module OpenCodePort =
                     let status = unbox<int> response?status
 
                     if status >= 200 && status < 300 then
-                        // prompt_async and similar endpoints may return empty bodies.
-                        // Never treat a successful empty response as an error.
+                        // Some Host endpoints answer 2xx with an empty body. Never
+                        // treat a successful empty response as an error.
                         try
                             let! text = unbox<Task<string>> (response?text ())
 
@@ -214,12 +217,13 @@ module OpenCodePort =
 
                     match res with
                     | Ok data ->
-                        // prompt_async is fire-and-forget: many host versions return
-                        // 2xx with empty body. Treat that as accepted, matching SdkClientPort.
+                        // Many Host versions answer 2xx with an empty body. That is
+                        // admission, not a message identity — PROMPT-005 keeps the two
+                        // apart, so an empty body cannot be reported as delivery.
                         if not (isNull data) && not (isNull data?id) then
-                            return Delivered(MessageId.create (unbox<string> data?id))
+                            return AdmittedWithPhysicalMessage(PhysicalUserMessageId.create (unbox<string> data?id))
                         else
-                            return Delivered(MessageId.create (sprintf "accepted-%s" sId))
+                            return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
                     | Error err -> return Retryable err
                 }
 

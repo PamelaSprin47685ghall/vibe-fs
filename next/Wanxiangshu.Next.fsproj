@@ -73,8 +73,6 @@
     <Compile Include="Process/PtySupervisor.fs"/>
     <Compile Include="Process/PtyBackend.fs"/>
     <Compile Include="Process/PtyApi.fs"/>
-    <Compile Include="Review/Guard.fs"/>
-    <Compile Include="Review/ReviewProgram.fs"/>
     <Compile Include="Orchestrator.Types.fs"/>
     <Compile Include="Orchestrator.Prompts.fs"/>
     <Compile Include="Orchestrator.IntegrationGate.fs"/>

@@ -108,13 +108,15 @@ module HostSignalBootstrap =
                                     | Error _ -> None
                                 | _ -> None)
 
-                    match root with
-                    | None -> return false
-                    | Some(messageId, agent) ->
-                        let runtime =
-                            match journal with
-                            | Some j -> PromptDispatcher.forJournal j
-                            | None -> PromptDispatcher.ephemeral ()
+                    match root, journal with
+                    | None, _ -> return false
+                    // PROMPT-005: accepting an Authority Root is a durable act. With
+                    // nowhere to persist it there is nothing to accept, so this
+                    // reports failure rather than producing a profile that would
+                    // vanish with the process.
+                    | Some _, None -> return false
+                    | Some(messageId, agent), Some durable ->
+                        let runtime = PromptDispatcher.forJournal durable
 
                         match runtime.AcceptHumanRoot sessionId messageId (Some agent) with
                         | Error _ -> return false

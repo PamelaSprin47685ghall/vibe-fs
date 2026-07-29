@@ -53,142 +53,136 @@ module HostReviewGuard =
             with ex ->
                 ReviewGuardUnavailable(sprintf "Review guard dependency failed: %s" ex.Message)
 
-    let private hasAcceptedGuardKey (journal: AgentJournal) (targetSessionId: SessionId) (guardKey: string) =
-        AgentJournal.snapshot journal
-        |> fun projection ->
-            match Map.tryFind targetSessionId projection.AgentProjections.Sessions with
-            | Some session ->
-                match session.ReviewGuard with
-                | Some guard -> guard.AcceptedGuardKey = Some guardKey
-                | None -> false
-            | None -> false
+    /// REVIEW-007: is a guard continuation for this session already outstanding.
+    ///
+    /// Derived from PROMPT-005 `PendingClaims`, which is the durable record of a
+    /// continuation that was claimed and has not yet resolved. Deduplication must
+    /// read that record rather than a guard-specific acceptance flag: "a plugin
+    /// prompt landed" is a fact PROMPT-005 already owns, and a second name for it
+    /// can disagree with the first.
+    let private hasOutstandingGuardClaim
+        (journal: AgentJournal)
+        (targetSessionId: SessionId)
+        (kind: PromptAuthority.ContinuationKind)
+        =
+        AgentProjection.tryFind targetSessionId (AgentJournal.snapshot journal).AgentProjections
+        |> Option.bind (fun session -> session.PromptAuthority)
+        |> Option.map (fun authority ->
+            authority.PendingClaims
+            |> Map.exists (fun _ claim -> claim.Origin = PromptAuthority.PromptOrigin.Continuation kind))
+        |> Option.defaultValue false
 
-    let private createGuardKey (targetSessionId: SessionId) (triggerMessageId: string) (reason: string) =
-        sprintf "review-guard:%s:%s:%s" (SessionId.value targetSessionId) triggerMessageId reason
+    let private guardNudgeKey (targetSessionId: SessionId) (triggerProviderRun: ProviderRunIdentity) (reason: string) =
+        sprintf
+            "review-guard:%s:%s:%s"
+            (SessionId.value targetSessionId)
+            (ProviderRunIdentity.value triggerProviderRun)
+            reason
 
     let private sendGuardNudge
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
-        (sessionId: string)
-        (triggerMessageId: string)
+        (targetSessionId: SessionId)
+        (triggerProviderRun: ProviderRunIdentity)
         (reason: string)
         (prompt: string)
         (agent: string)
-        (onContinuationAccepted: SessionId -> MessageId -> unit)
-        =
-        let journal =
+        : Task<Result<PromptKey, string>> =
+        task {
             match journal with
-            | Some journal -> journal
-            | None -> raise (InvalidOperationException "Review guard nudge requires an AgentJournal")
+            | None -> return Error "Review guard nudge requires an AgentJournal"
+            | Some durable ->
+                let nudgeKey = guardNudgeKey targetSessionId triggerProviderRun reason
 
-        let targetSessionId = SessionId.create sessionId
-        let guardKey = createGuardKey targetSessionId triggerMessageId reason
+                let continuationKind =
+                    match agent, reason with
+                    | "reviewer", r when r.Contains("confirm-perfect") ->
+                        PromptAuthority.ContinuationKind.ReviewConfirmation
+                    | "reviewer", _ -> PromptAuthority.ContinuationKind.ReviewerGuard
+                    | _ -> PromptAuthority.ContinuationKind.ManagerGuard
 
-        // Durable + in-memory dedupe only after a successful send. Adding the
-        // key before SendPrompt permanently blocks retries when the host rejects
-        // the first attempt (SSOT: failure must not write acceptance).
-        if
-            not (hasAcceptedGuardKey journal targetSessionId guardKey)
-            && not (nudgeKeys.Contains guardKey)
-        then
-            let continuationKind =
-                match agent, reason with
-                | "reviewer", r when r.Contains("confirm-perfect") ->
-                    PromptAuthority.ContinuationKind.ReviewConfirmation
-                | "reviewer", _ -> PromptAuthority.ContinuationKind.ReviewerGuard
-                | _ -> PromptAuthority.ContinuationKind.ManagerGuard
+                // Dedupe before sending, never after. Recording the key on success
+                // only is deliberate: a rejected send must stay retryable, because
+                // acceptance is the thing being deduplicated and a failure is not one.
+                if
+                    hasOutstandingGuardClaim durable targetSessionId continuationKind
+                    || nudgeKeys.Contains nudgeKey
+                then
+                    return Error(sprintf "Guard nudge already outstanding: %s" nudgeKey)
+                else
+                    // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
+                    // Authority Root's fallback cursor, so it is not passed here.
+                    let! sent =
+                        HostSessionNudge.sendContinuation
+                            sessionPort
+                            targetSessionId
+                            prompt
+                            continuationKind
+                            None
+                            (Some durable)
+                            None
 
-            // 0.5.0: Model=None; HostSessionNudge binds Agent from Authority.
-            HostSessionNudge.sendContinuation
-                sessionPort
-                targetSessionId
-                prompt
-                continuationKind
-                None
-                (Some journal)
-                (Some(fun hostMessageId ->
-                    nudgeKeys.Add guardKey |> ignore
+                    // The claim is durable either way; the in-memory key only
+                    // suppresses a second send within this process lifetime.
+                    match sent with
+                    | Ok _ -> nudgeKeys.Add nudgeKey |> ignore
+                    | Error _ -> ()
 
-                    // Always persist GuardPromptAccepted after a successful send. Host may first
-                    // return an admission id (accepted-*); chat.message later upgrades the
-                    // physical confirmation id when PromptKey metadata is present. Without
-                    // this fact, dual PERFECT can never confirm (fail-closed forever).
-                    let hostId = MessageId.value hostMessageId
-
-                    let fact =
-                        AgentFact.GuardPromptAccepted
-                            {| TargetSessionId = targetSessionId
-                               GuardKey = guardKey
-                               HostMessageId = hostId |}
-
-                    match AgentJournal.appendAgent (StreamId.Session targetSessionId) None fact journal with
-                    | Ok _ -> onContinuationAccepted targetSessionId hostMessageId
-                    | Error failure ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf "Failed to persist review guard prompt acceptance: %A" failure.Failure
-                            )
-                        )))
+                    return sent
+        }
 
     let nudgeManager
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
-        sessionId
-        messageId
-        treeHash
-        (onContinuationAccepted: SessionId -> MessageId -> unit)
+        (sessionId: SessionId)
+        (triggerProviderRun: ProviderRunIdentity)
+        (treeHash: string)
         =
         sendGuardNudge
             sessionPort
             journal
             nudgeKeys
             sessionId
-            messageId
+            triggerProviderRun
             (sprintf "missing-review:%s" treeHash)
             "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
             "manager"
-            onContinuationAccepted
 
     let nudgeReviewer
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
-        sessionId
-        messageId
-        (onContinuationAccepted: SessionId -> MessageId -> unit)
+        (sessionId: SessionId)
+        (triggerProviderRun: ProviderRunIdentity)
         =
         sendGuardNudge
             sessionPort
             journal
             nudgeKeys
             sessionId
-            messageId
+            triggerProviderRun
             "missing-verdict"
             "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
             "reviewer"
-            onContinuationAccepted
 
-    /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07).
-    /// This is the ONLY code path that installs confirm-perfect GuardKey; the
-    /// accepted confirmation Host message id becomes ConfirmationPhysicalMessageId.
+    /// REVIEW-003: the first PERFECT is recorded but not confirmed. This is the only
+    /// path that issues the skeptical challenge, and the second PERFECT confirms only
+    /// if its provider input seal proves it consumed that challenge.
     let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
-        sessionId
-        messageId
-        (onContinuationAccepted: SessionId -> MessageId -> unit)
+        (sessionId: SessionId)
+        (triggerProviderRun: ProviderRunIdentity)
         =
-        let _barrierFlow = ReviewProgram.confirmPerfect messageId
         sendGuardNudge
             sessionPort
             journal
             nudgeKeys
             sessionId
-            messageId
+            triggerProviderRun
             "confirm-perfect"
             skepticalReevaluationPrompt
             "reviewer"
-            onContinuationAccepted

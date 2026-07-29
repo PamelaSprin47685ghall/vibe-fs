@@ -54,8 +54,6 @@
     <Compile Include="OpenCode/VerdictToolTests.fs"/>
     <Compile Include="Session/ReviewerHostTests.fs"/>
     <Compile Include="Session/DurableFallbackTests.fs"/>
-    <Compile Include="Review/GuardTests.fs"/>
-    <Compile Include="Review/GuardDurableTests.fs"/>
     <Compile Include="OpenCode/PluginRuntimeScopeTests.fs"/>
     <Compile Include="OpenCode/EventsTests.fs"/>
     <Compile Include="OpenCode/ProjectionCanonicalTests.fs"/>

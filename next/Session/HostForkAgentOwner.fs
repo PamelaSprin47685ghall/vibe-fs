@@ -7,6 +7,16 @@ open Wanxiangshu.Next.Journal
 
 module HostForkAgentOwner =
 
+    /// PROMPT-005: the first prompt of an AgentOwnerRoot work unit.
+    ///
+    /// Returns the `PromptKey`, not a message id. At send time no physical message
+    /// exists — that is the whole point of the four-fact protocol — and the key is
+    /// what lets the caller recognise the message when `chat.message` delivers it.
+    ///
+    /// A `None` journal is an error rather than a direct-send fallback. The old
+    /// fallback issued a real prompt with `Metadata = None`, so it carried no
+    /// PromptKey: PROMPT-011 had no anchor to recover it by, and PromptIngress
+    /// could only ever classify the reply as UnknownOrigin.
     let sendFirstPrompt
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
@@ -14,25 +24,11 @@ module HostForkAgentOwner =
         (agent: string)
         (directory: string option)
         (prompt: string)
-        : Task<Result<MessageId, string>> =
+        : Task<Result<PromptKey, string>> =
         task {
             match journal with
-            | Some j ->
-                let svc = PromptDispatcher.forJournal j
-
-                let! outcome = svc.SendAgentOwnerRoot sessions childId prompt agent directory None
-
-                match outcome with
-                | Ok messageId -> return Ok messageId
-                | Error err -> return Error err
-            | None ->
-                return!
-                    sessions.SendPrompt(
-                        childId,
-                        prompt,
-                        { Model = None
-                          Agent = Some agent
-                          Directory = directory
-                          Metadata = None }
-                    )
+            | None -> return Error "No journal: an AgentOwnerRoot prompt cannot be claimed"
+            | Some durable ->
+                let dispatcher = PromptDispatcher.forJournal durable
+                return! dispatcher.SendAgentOwnerRoot sessions childId prompt agent directory None
         }

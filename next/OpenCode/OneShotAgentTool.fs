@@ -23,33 +23,21 @@ module OneShotAgentTool =
         | None, Some prompts -> String.concat "\n" prompts
         | None, None -> ""
 
-    let private send (scope: ToolRuntimeScope) childId prompt agent directory =
-        match scope.Journal with
-        | Some journal ->
-            task {
+    /// PROMPT-005: a one-shot child is prompted through the Dispatcher like any
+    /// other agent-owned session.
+    ///
+    /// The previous version fell through to `scope.Sessions.SendPrompt` with
+    /// `Metadata = None` when the scope carried no journal. That prompt was real
+    /// but keyless, so PROMPT-011 could not recover it and PromptIngress could only
+    /// classify its reply as UnknownOrigin.
+    let private send (scope: ToolRuntimeScope) childId prompt agent directory : Task<Result<PromptKey, string>> =
+        task {
+            match scope.Journal with
+            | None -> return Error "No journal: a one-shot agent prompt cannot be claimed"
+            | Some journal ->
                 let dispatcher = PromptDispatcher.forJournal journal
-
-                match!
-                    dispatcher.SendAgentOwnerRoot
-                        scope.Sessions
-                        childId
-                        prompt
-                        agent
-                        directory
-                        None
-                with
-                | Ok messageId -> return Ok messageId
-                | Error error -> return Error error
-            }
-        | None ->
-            scope.Sessions.SendPrompt(
-                childId,
-                prompt,
-                { Model = None
-                  Agent = Some agent
-                  Directory = directory
-                  Metadata = None }
-            )
+                return! dispatcher.SendAgentOwnerRoot scope.Sessions childId prompt agent directory None
+        }
 
     let run
         (scope: ToolRuntimeScope)
@@ -116,8 +104,11 @@ module OneShotAgentTool =
                                 subscription <- None
                                 setResult ()
 
-                        let succeed text = finish (fun () -> completion.SetResult text)
-                        let fail (error: exn) = finish (fun () -> completion.SetException error)
+                        let succeed text =
+                            finish (fun () -> completion.SetResult text)
+
+                        let fail (error: exn) =
+                            finish (fun () -> completion.SetException error)
 
                         subscription <-
                             Some(
@@ -125,7 +116,13 @@ module OneShotAgentTool =
                                     childId,
                                     fun _ outcome ->
                                         match outcome with
-                                        | TerminalOutcome.Completed terminal -> succeed terminal.FinalText
+                                        // COMPANION-005 / HOST-005: a tool result is
+                                        // this turn's formal report, not session-wide
+                                        // A. The old `FinalText` was the cumulative
+                                        // text including host-visible reasoning, so
+                                        // the calling model received the child's
+                                        // reasoning stream as if it were the answer.
+                                        | TerminalOutcome.Completed terminal -> succeed terminal.TurnFormalText
                                         | TerminalOutcome.Aborted reason ->
                                             fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
                                         | TerminalOutcome.Failed error ->
@@ -137,7 +134,8 @@ module OneShotAgentTool =
                         | Error sendError -> succeed (sprintf "send failed: %s" sendError)
                         | Ok _ -> ()
 
-                        let mutable abortTask: Task<Microsoft.FSharp.Core.Result<unit, string>> option = None
+                        let mutable abortTask: Task<Microsoft.FSharp.Core.Result<unit, string>> option =
+                            None
 
                         let detachAbort =
                             context.AttachAbort(fun () ->

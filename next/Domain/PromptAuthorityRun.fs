@@ -89,11 +89,26 @@ module PromptAuthorityRun =
             ActiveLogicalRun = Some profile
             PendingClaims = Map.empty
             AcceptedContinuationIds = Map.empty
-            RepairClaims = Set.empty }
+            // PROMPT-011: ClaimSequence counts within one Logical Run, so a new
+            // root restarts the count. This is also what bounds the map
+            // (PERSIST-008) — it grows with distinct payloads in one run, not
+            // with session lifetime.
+            ClaimSequences = Map.empty }
 
+    /// Register a claim and consume its ClaimSequence.
+    ///
+    /// PROMPT-011: the sequence must advance whether or not the claim later
+    /// resolves. Advancing only on success would let an abandoned dispatch and its
+    /// retry derive the same PromptKey, so recovery would find one metadata anchor
+    /// for two distinct logical acts.
     let registerClaim (claim: PromptAuthority.PromptClaim) (projection: PromptAuthority.PromptAuthorityProjection) =
+        let scope =
+            PromptAuthority.claimScopeDigest claim.SessionId claim.LogicalRunId claim.Origin claim.PayloadDigest
+
         { projection with
-            PendingClaims = Map.add claim.PromptKey claim projection.PendingClaims }
+            PendingClaims = Map.add claim.PromptKey claim projection.PendingClaims
+            ClaimSequences =
+                Map.add scope (PromptAuthority.nextClaimSequence scope projection) projection.ClaimSequences }
 
     /// PROMPT-005 `PhysicalAccepted`: a real Host message id resolved a claim.
     ///
@@ -128,16 +143,6 @@ module PromptAuthorityRun =
     let abandonClaim (key: PromptKey) (projection: PromptAuthority.PromptAuthorityProjection) =
         { projection with
             PendingClaims = Map.remove key projection.PendingClaims }
-
-    /// FALLBACK-008: at most one interaction repair per occasion. Returns None
-    /// when this identity was already claimed, so the caller cannot double-send.
-    let tryClaimRepair (identity: string) (projection: PromptAuthority.PromptAuthorityProjection) =
-        if Set.contains identity projection.RepairClaims then
-            None
-        else
-            Some
-                { projection with
-                    RepairClaims = Set.add identity projection.RepairClaims }
 
     /// PROMPT-009 resolution order, evaluated top to bottom:
     ///

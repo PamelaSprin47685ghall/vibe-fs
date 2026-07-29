@@ -7,8 +7,8 @@
 | 期 | 名称 | 机器反馈 | 当前 |
 |----|------|---------|------|
 | 0 | 封炉：冻结 SSOT、基线、迁移地图、验证层工装 | 静态检查 + 最后一次完整编译测试 | 完成 |
-| 1 | 休克一：领域内核与持久事实（包 0） | 关闭 | 未开始 |
-| 2 | 休克二：生产代码全部调用链（包 A–H） | 关闭 | 未开始 |
+| 1 | 休克一：领域内核与持久事实（包 0） | 关闭 | 完成（包 0a–0e） |
+| 2 | 休克二：生产代码全部调用链（包 A–H） | 关闭 | 进行中（包 A 完成） |
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 未开始 |
 | 4 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 | 未开始 |
 | 5 | 退火一：恢复生产编译 | dotnet build → npm run build | 未开始 |
@@ -391,14 +391,78 @@ provider 与 model 保留在 Semantic 中：它们是配置而非身份，且 FA
 
 | 项 | 值 |
 |----|----|
-| 条款 | PROMPT-001 PROMPT-005 PROMPT-006 PROMPT-007 PROMPT-009 PROMPT-011 |
-| 目标模块 | `PromptDispatcher.fs` `PromptDispatcherSend.fs` `PromptIngress.fs` `PromptMetadataCodec.fs` |
+| 条款 | PROMPT-001 PROMPT-002 PROMPT-003 PROMPT-004 PROMPT-005 PROMPT-006 PROMPT-007 PROMPT-009 PROMPT-011 FALLBACK-008 REVIEW-003 REVIEW-007 |
+| 目标模块 | `OpenCode/{PromptDispatcher,PromptDispatcherSend,PromptIngress,PromptIngressCodec,PromptMetadataCodec,Sessions,OpenCodePort,HostSessionNudge,HostReviewGuard,HostSignalBootstrap,OneShotAgentTool,TurnReconcile}.fs`、`Session/{HostForkAgentOwner,HostForkRunLifecycle,CompanionHostBlogger}.fs`、`Domain/{PromptAuthority,PromptAuthorityRun}.fs`、`Kernel/DomainFlow.fs`、删除 `Review/{Guard,ReviewProgram}.fs` |
 | 旧入口 | `PluginPromptAccepted`（单一 accepted 事实，混淆 receipt 与物理落地）；`OpenCodePort` 裸 `prompt_async` 多点调用 |
 | 新入口 | 四事实 `PluginPromptClaimed` / `PluginPromptSubmitted` / `PluginPromptPhysicalAccepted` / `PluginPromptAbandoned`；单一 sender |
 | 必须删除 | `PluginPromptAccepted`；`accepted-*` 参与 Authority 的所有路径；生产模块中除唯一 Host adapter 外的 `prompt_async` |
-| 静态验收 | `prompt_async` 在 `next/` 只出现在唯一 Host adapter |
-| 生产 | UNTOUCHED |
-| 测试 | UNTOUCHED |
+| 静态验收 | `prompt_async` 在 `next/` 只出现在唯一 Host adapter（已达成：1） |
+| 生产 | DOMAIN_MIGRATED（发送与受理链完成；`TurnCompletionProgram` / `PluginFallbackRetry` / `TerminalPolicies` / `ProviderFailureWakeup` 侧调用方按其所属包 C/D/F 迁移） |
+| 测试 | 删除 `tests-next/Review/Guard{,Durable}Tests.fs`（被测模块已删），其余 UNTOUCHED |
+
+#### SendOutcome 必须穿透传输层
+
+`ISessionHostPort.SendPrompt` 原返回 `Task<Result<MessageId, string>>`。两处擦除：成功分支必须凭空造一个 message id，失败分支把四种结局压成一个字符串。
+
+`AcceptanceUnknown` 因此与 `Retryable` 同形。这不是精度问题——PROMPT-011 规定未决发送不得自动重发，而压平后调用方唯一能做的判断就是「失败了，重试」，正好是产生第二个物理效果的路径。
+
+现在端口原样传递 `SendOutcome`，`AdmittedWithReceipt` 与 `AdmittedWithPhysicalMessage` 是两个 case：receipt 是传输令牌，物理消息才可成为 Authority Root，类型本身阻止混用。
+
+#### 生产代码里的测试替身
+
+`InjectedSessionPort` 在 `underlyingPort = None` 时伪造一个 `AgentRunResult { FinalText = "test output" }` 并直接 `NotifyTerminal Completed`。`CreateChildSession` 同样在无端口时自造 GUID SessionId。
+
+后果不是「测试用的假数据」，而是配置错误的运行时与一个真正完成的 agent 不可区分：没有解析出 Host 传输的插件会立刻报告一次成功完成。两处改为 `Fatal` / `Error`（VERIFY-005）。
+
+#### 五条绕过 Dispatcher 的直发路径
+
+`OneShotAgentTool`、`CompanionHostBlogger`、`HostForkAgentOwner`、`HostForkRunLifecycle.sendChildPrompt` 各自带一条 `journal = None → sessions.SendPrompt(..., Metadata = None)` 兜底分支。
+
+这些分支发出的是真实 prompt，但没有 PromptKey：PROMPT-011 没有锚点可恢复，PromptIngress 只能判为 `UnknownOrigin`。全部改为 `Error`——PROMPT-005 使插件 prompt 成为持久行为，无处记录时没有合法的可发内容。
+
+`PromptDispatcher.ephemeral` / `ephemeralNamed` / `forRuntime` / `Dispatcher` 随之删除，`Runtime` 构造函数不再接受 `AgentJournal option`：一个无处持久化的 dispatcher 会为它静默丢弃的事实返回 `Ok`。
+
+#### Runtime 不再持有 authority 状态
+
+旧 `Runtime` 维护 `mutable authority`，并由 `fromJournal` 把每个 session 的投影 fold 成一个值作为种子。两个后果：一个 session 里的 claim 在另一个 session 可见（PERSIST-008 违规），且内存副本可与它本应镜像的 journal 分歧。
+
+现在每次读取走 `ProjectionFor sessionId`，fold 是唯一写者。`ActiveProfile` 同时删除了回退到 `LastAuthorityProfile` 的分支——PROMPT-004 把 continuation 限定在 active run，用陈旧 profile 顶替正是必须禁止的。
+
+#### PromptKey 派生而非生成
+
+`newPromptKey()` 是 GUID。恢复因此不可能：重启后无法重新导出同一个 key，Host metadata 里的锚点就成了一次性随机数。
+
+现在 `derivePromptKey` 取 (SessionId, LogicalRunId, AuthorityRoot, Origin, EffectiveAgent, PayloadDigest, ClaimSequence)，`ClaimSequence` 由 `registerClaim` 在 fold 中推进——无论该 claim 后来是否成立。只在成功时推进会让一次被放弃的发送与它的重试派生出同一个 key，恢复时就会为两个不同的逻辑行为找到同一个锚点。
+
+`AuthorityRoot` 的 LogicalRunId 与 AuthorityRootUserMessageId 传 `None` 而非空串：这次发送正是创造它们的行为，空串会让「尚无 run」与「名为空串的 run」派生同一个 key。
+
+#### FALLBACK-008 的预算此前只活在内存里
+
+`tryClaimRepair` 写 `PromptAuthorityProjection.RepairClaims`，而 32 个事实里没有任何一个写它。at-most-once 保证随进程消失。
+
+不新增第五个事实，而是让 repair 的 payload digest 命名场合（terminal ProviderRun + repairKind）而非 prompt 文本——repair 文本按 kind 固定，摘要文本会使同 kind 的每次 repair 成为同一个逻辑行为，per-terminal 预算退化成 per-session 预算。
+
+digest 进入 claim scope 后，PROMPT-005 `Claimed` 已经写入的 `ClaimSequences` 就是计数器，`repairAlreadyClaimed` 读回 `> 1` 即已用尽。`RepairClaims` 字段与 `tryClaimRepair` 删除。
+
+#### GuardPromptAccepted 是「插件 prompt 落地」的第二个名字
+
+Guard nudge 去重原先读 `ReviewGuardProjection.AcceptedGuardKey`，由 `GuardPromptAccepted` 事实写入；`PromptIngress` 另有一条 ReviewConfirmation 分支补写同一事实，用途是让第二次 PERFECT 匹配 `ConfirmationPhysicalMessageId`。
+
+这个用途 REVIEW-003 已禁止：continuation 落地不说明模型消费了 challenge。而「插件 prompt 落地」PROMPT-005 已经拥有，第二个名字只能与第一个分歧。
+
+去重改读 `PendingClaims` 中是否已有同 `ContinuationKind` 的未决 claim。`nudgeKeys` 内存集合保留但只抑制同进程内重复发送，且仅在发送成功后写入——失败必须保持可重试，被去重的是受理，失败不是受理。
+
+#### Review/Guard.fs 与 ReviewProgram.fs 是孤儿
+
+两文件的生产消费者为 0。`Guard.recordVerdict` 构造 `ReviewVerdictRecorded` 时使用的 `ProviderRunId` / `UserPromptText` / `UserMessageId` 字段在包 0b 后已不存在，`guardMissingVerdict` 读的 `AcceptedGuardKey` 亦已不存在；`ReviewProgram.confirmPerfect` 比较 `ctx.BarrierId = newTreeHash` 两个字符串，与 REVIEW-003 要求的 seal 因果证明无关。
+
+一并删除后 `ReviewFlow` / `ReviewContext` / `ReviewError` 与 `review {}` builder 无任何消费者，从 `Kernel/DomainFlow.fs` 移除；`architecture-gate` 的 `review` DSL 条目删除，`confirmPerfect` 的 owner 改为 `Domain/ReviewWitness.confirm`——确认判定是两个 verdict witness 与 seal 的纯函数，不是 Flow 程序。
+
+#### FactCodec 的旧事实名不是残留
+
+`shock-audit` 把 `FactCodec.pre050Markers` 里的 13 个旧 case 名字面量计为残留。但 PERSIST-004 要求 pre-0.5.0 journal 停止启动并给出精确诊断，识别它的唯一方式就是这些 case 名。
+
+按残留计数会让每个已迁移事实永久非零，门禁最终会逼出一次错误的删除——删掉那个告诉运维「归档旧文件」的检查本身。`shock-audit` 因此对该单一文件豁免残留计数（`LEGACY_NAME_SENTINEL`），代价是该文件内的真实违规在此项看不见；可接受，因为它只含 codec 与这份拒绝清单，且架构与 ssot 门禁仍读它。
 
 ### 包 B：AttemptExecutionProfile
 
@@ -623,8 +687,8 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 | 旧符号 / 行为 | 新语义 | 条款 | next | tests | testkit | 目标 |
 |--------------|--------|------|------|-------|---------|------|
 | `PostPromptFireAndForget` | `Dispatch(_, Detached)` | PROMPT-007 | 0 | 0 | 0 | 0（已达成） |
-| 裸 `prompt_async` 调用 | 唯一 Host adapter sender | PROMPT-005 | 5 | 2 | 12 | next 允许 1 |
-| `PluginPromptAccepted` | Submitted + PhysicalAccepted 两事实 | PROMPT-005 | 7 | 5 | 0 | 0 |
+| 裸 `prompt_async` 调用 | 唯一 Host adapter sender | PROMPT-005 | 5→1 | 2 | 12 | next 允许 1（已达成） |
+| `PluginPromptAccepted` | Submitted + PhysicalAccepted 两事实 | PROMPT-005 | 7→0 | 5 | 0 | 0 |
 | `recordDurableAdvance` | `FallbackController` | FALLBACK-003 | 2 | 0 | 0 | 0 |
 | `ProviderFailureContinuation` | Host 信号只 MarkDirty | FALLBACK-003 | 2 | 0 | 0 | 0 |
 | `ProviderFailureWakeup` | reconcile 从 snapshot 识别失败 | FALLBACK-003 | 5 | 0 | 0 | 0 |
@@ -635,9 +699,9 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 | `AcceptedContinuationRoots` | seal 因果证明 | REVIEW-003 | 3 | 0 | 0 | 0 |
 | `RecentProviderRunIds` 作唯一去重 | `ReviewAttemptIdentity` | REVIEW-004 | 5 | 0 | 0 | 0 |
 | `ReviewConfirmedIdle` | `ConfirmedReviewWitness` | REVIEW-006 | 6 | 1 | 1 | 0 |
-| `GuardPromptAccepted` | Dispatcher 四事实 | PROMPT-005 | 6 | 12 | 1 | 0 |
-| `InteractionRepairClaimed` | Dispatcher `Claimed` + Origin | PROMPT-005 | 5 | 0 | 0 | 0 |
-| `HumanPromptAccepted` | `AuthorityRootAccepted` | PROMPT-004 | 5 | 0 | 0 | 0 |
+| `GuardPromptAccepted` | Dispatcher 四事实 | PROMPT-005 | 6→0 | 8 | 0 | 0 |
+| `InteractionRepairClaimed` | Dispatcher `Claimed` + Origin | PROMPT-005 | 5→0 | 0 | 0 | 0 |
+| `HumanPromptAccepted` | `AuthorityRootAccepted` | PROMPT-004 | 5→0 | 0 | 0 | 0 |
 | `shouldCreateCompanion(agent)` | ActiveLogicalRun CanonicalRole | COMPANION-002 | 2 | 3 | 0 | 0 |
 | `ToolContext.userMessageID` 读取 | `CurrentPhysicalUserMessage` | HOST-011 | 1 | 0 | 0 | 0 |
 | `AgentLinked`/`AgentForked`/`AgentUnlinked` | Handle 三事实 | EXEC-009 | 12 | 26 | 0 | 0 |

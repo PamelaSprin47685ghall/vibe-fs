@@ -24,33 +24,24 @@ module internal CompanionHostBlogger =
     let failBlog (message: string) : string =
         raise (InvalidOperationException message)
 
+    /// COMPANION-002: the Blogger is prompted like any other agent-owned child.
+    ///
+    /// PROMPT-005 applies unchanged. The previous version sent directly through the
+    /// session port when no journal was present, producing a prompt with no
+    /// PromptKey in its metadata — unrecoverable by PROMPT-011 and unclassifiable
+    /// by PromptIngress. A Blogger prompt is not exempt from being a durable act.
     let private sendBloggerPrompt
         (deps: BloggerDeps)
         (childId: SessionId)
         (prompt: string)
-        : Task<Result<MessageId, string>> =
+        : Task<Result<PromptKey, string>> =
         task {
-            let agent = deps.EffectiveAgent
-
             match deps.Journal with
+            | None -> return Error "No journal: a Blogger prompt cannot be claimed"
             | Some journal ->
-                let svc = PromptDispatcher.forJournal journal
+                let dispatcher = PromptDispatcher.forJournal journal
 
-                let! outcome = svc.SendAgentOwnerRoot deps.Sessions childId prompt agent None None
-
-                match outcome with
-                | Ok messageId -> return Ok messageId
-                | Error err -> return Error err
-            | None ->
-                return!
-                    deps.Sessions.SendPrompt(
-                        childId,
-                        prompt,
-                        { Model = None
-                          Agent = Some agent
-                          Directory = None
-                          Metadata = None }
-                    )
+                return! dispatcher.SendAgentOwnerRoot deps.Sessions childId prompt deps.EffectiveAgent None None
         }
 
     let blog (deps: BloggerDeps) (currentProjection: ProjectionSnapshot) (delta: ProjectionSnapshot) : Task<BlogText> =

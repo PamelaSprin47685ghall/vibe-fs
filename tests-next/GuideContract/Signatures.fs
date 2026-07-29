@@ -12,7 +12,6 @@ open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Agent
-open Wanxiangshu.Next.Review
 open Wanxiangshu.Next.Orchestrator
 
 module Signatures =
@@ -24,7 +23,6 @@ module Signatures =
         ignore (typeof<RuntimeSnapshot>)
         ignore AgentProgram.runAgentFlow
         ignore CompanionProgram.runCompanionFlow
-        ignore ReviewProgram.runReviewFlow
         ignore OrchestratorProgram.run
         ignore ProcessRunner.run
 

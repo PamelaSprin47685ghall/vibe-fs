@@ -21,12 +21,6 @@ type CompanionError =
     | ProjectionFailed of string
     | BloggerFailed of string
 
-/// Review domain: single-worktree peer review with double PERFECT barrier.
-[<RequireQualifiedAccess>]
-type ReviewError =
-    | ReviewerFailed of string
-    | ParentCancelled
-
 /// Orchestrator domain: worktree lifecycle, rebase, integration, publish.
 [<RequireQualifiedAccess>]
 type OrchestratorError =
@@ -34,18 +28,21 @@ type OrchestratorError =
     | RebaseFailed of string
     | PublishFailed of string
 
-type AgentContext = { SessionId: string; AgentName: string }
+type AgentContext =
+    { SessionId: string; AgentName: string }
+
 type CompanionContext = { SessionId: string }
-type ReviewContext = { SessionId: string; BarrierId: string }
-type OrchestratorContext = { TargetBranch: string; WorktreePath: string }
+
+type OrchestratorContext =
+    { TargetBranch: string
+      WorktreePath: string }
 
 // ================================================================
-// Domain-specific flow type aliases (KISS-N01 §3 — five aliases)
+// Domain-specific flow type aliases
 // ================================================================
 
 type AgentFlow<'a> = Flow<AgentContext, AgentError, 'a>
 type CompanionFlow<'a> = Flow<CompanionContext, CompanionError, 'a>
-type ReviewFlow<'a> = Flow<ReviewContext, ReviewError, 'a>
 type OrchestratorFlow<'a> = Flow<OrchestratorContext, OrchestratorError, 'a>
 
 // ================================================================
@@ -62,10 +59,6 @@ module DomainFlowBuilders =
     /// Computation expression builder for CompanionFlow — projection, delta,
     /// blogger step, prefix-epoch management.
     let companion = FlowBuilder<CompanionContext, CompanionError>(None)
-
-    /// Computation expression builder for ReviewFlow — verdict confirmation,
-    /// tree-hash binding, double-PERFECT sequencing.
-    let review = FlowBuilder<ReviewContext, ReviewError>(None)
 
     /// Computation expression builder for OrchestratorFlow — clean gates,
     /// parallel ManagerJobs, serial integration, rebase/ff.

@@ -30,7 +30,6 @@ module PromptAuthority =
     let HostInternal = PromptOrigin.HostInternal
 
     let empty = Wanxiangshu.Next.Domain.PromptAuthority.empty
-    let newPromptKey = Wanxiangshu.Next.Domain.PromptAuthority.newPromptKey
     let originLabel = Wanxiangshu.Next.Domain.PromptAuthority.originLabel
 
     let tryParseContinuationKind =
@@ -45,8 +44,12 @@ module PromptAuthority =
     let registerClaim = Wanxiangshu.Next.Domain.PromptAuthorityRun.registerClaim
     let acceptClaim = Wanxiangshu.Next.Domain.PromptAuthorityRun.acceptClaim
     let abandonClaim = Wanxiangshu.Next.Domain.PromptAuthorityRun.abandonClaim
-    let repairIdentity = Wanxiangshu.Next.Domain.PromptAuthority.repairIdentity
-    let tryClaimRepair = Wanxiangshu.Next.Domain.PromptAuthorityRun.tryClaimRepair
+
+    let repairPayloadDigest =
+        Wanxiangshu.Next.Domain.PromptAuthority.repairPayloadDigest
+
+    let repairAlreadyClaimed =
+        Wanxiangshu.Next.Domain.PromptAuthority.repairAlreadyClaimed
 
     let resolveKnownOrigin messageId promptKey hostCompact projection =
         Wanxiangshu.Next.Domain.PromptAuthorityRun.resolveKnownOrigin messageId promptKey hostCompact projection
