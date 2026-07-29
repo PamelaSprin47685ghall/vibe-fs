@@ -15,6 +15,7 @@ module ToolSurfaceOrchestrator =
     type HostFactoryDeps =
         { Sessions: ISessionHostPort
           Journal: AgentJournal option
+          SessionSnapshot: ISessionSnapshotPort option
           WorkspaceDirectory: string option
           SessionParents: Dictionary<string, string>
           SessionRoles: Dictionary<string, string>
@@ -52,6 +53,7 @@ module ToolSurfaceOrchestrator =
                     OrchestratorHost(
                         { Sessions = deps.Sessions
                           Journal = deps.Journal
+                          SessionSnapshot = deps.SessionSnapshot
                           OnChildCreated =
                             fun _ role childId -> registerChild deps.SessionParents deps.SessionRoles sid role childId
                           RegisterChildDirectory =

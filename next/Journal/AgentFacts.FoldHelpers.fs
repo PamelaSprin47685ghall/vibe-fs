@@ -17,6 +17,7 @@ module internal AgentFactsFoldHelpers =
                 { Companion = None
                   Linkage = None
                   ReviewGuard = None
+                  ReviewRequirements = None
                   Fallback = None
                   PromptAuthority = None
                   Effects = None }

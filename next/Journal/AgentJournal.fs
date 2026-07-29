@@ -109,3 +109,99 @@ module AgentJournal =
     let runtimeId (journal: AgentJournal) : RuntimeId = journal.RuntimeId
 
     let isPoisoned (journal: AgentJournal) : bool = journal.IsPoisoned
+
+    /// User requirements belong to the logical session family root, not the
+    /// reviewer child that happens to consume them.
+    let reviewRequirementScope (journal: AgentJournal option) (sessionId: SessionId) : SessionId =
+        let parentOf (sessions: Map<SessionId, SessionAgentProjection>) childId =
+            let child = ChildId.create (SessionId.value childId)
+
+            sessions
+            |> Map.tryPick (fun parentId session ->
+                session.Linkage
+                |> Option.bind (fun linkage ->
+                    if Map.containsKey child linkage.LinkedChildren then Some parentId else None))
+
+        let rec root sessions seen current =
+            if Set.contains current seen then
+                current
+            else
+                match parentOf sessions current with
+                | Some parent -> root sessions (Set.add current seen) parent
+                | None -> current
+
+        match journal with
+        | None -> sessionId
+        | Some value ->
+            let sessions = (snapshot value).AgentProjections.Sessions
+            root sessions Set.empty sessionId
+
+    let pendingReviewRequirements
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        : ReviewRequirementInput list =
+        match journal with
+        | None -> []
+        | Some value ->
+            let scope = reviewRequirementScope journal sessionId
+
+            (snapshot value).AgentProjections.Sessions
+            |> Map.tryFind scope
+            |> Option.bind (fun session -> session.ReviewRequirements)
+            |> Option.map (fun requirements -> requirements.HumanPromptInputs)
+            |> Option.defaultValue []
+
+
+    let recordHumanPromptAccepted
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (messageId: MessageId)
+        : Result<unit, string> =
+        let scope = reviewRequirementScope (Some journal) sessionId
+
+        let input =
+            { SourceSessionId = sessionId
+              MessageId = messageId }
+
+        if List.contains input (pendingReviewRequirements (Some journal) scope) then
+            Ok()
+        else
+            appendAgent
+                (StreamId.Session scope)
+                (Some(TurnId.ofMessageId messageId))
+                (AgentFact.HumanPromptAccepted
+                    {| SessionId = scope
+                       SourceSessionId = sessionId
+                       MessageId = MessageId.value messageId |})
+                journal
+            |> Result.map (fun _ -> ())
+            |> Result.mapError (fun failure -> sprintf "%A" failure.Failure)
+
+    let recordReviewConfirmedIdle
+        (journal: AgentJournal)
+        (reviewOwnerSessionId: SessionId)
+        (reviewerSessionId: SessionId)
+        (assistantMessageId: MessageId)
+        : Result<unit, string> =
+        let scope = reviewRequirementScope (Some journal) reviewOwnerSessionId
+
+        let alreadyRecorded =
+            (snapshot journal).AgentProjections.Sessions
+            |> Map.tryFind scope
+            |> Option.bind (fun session -> session.ReviewRequirements)
+            |> Option.bind (fun requirements -> requirements.LastConfirmedIdleAssistantMessageId)
+            |> Option.exists ((=) assistantMessageId)
+
+        if alreadyRecorded then
+            Ok()
+        else
+            appendAgent
+                (StreamId.Session scope)
+                None
+                (AgentFact.ReviewConfirmedIdle
+                    {| SessionId = scope
+                       ReviewerSessionId = reviewerSessionId
+                       AssistantMessageId = MessageId.value assistantMessageId |})
+                journal
+            |> Result.map (fun _ -> ())
+            |> Result.mapError (fun failure -> sprintf "%A" failure.Failure)

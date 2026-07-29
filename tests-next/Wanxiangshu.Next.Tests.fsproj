@@ -40,6 +40,7 @@
     <Compile Include="Session/ForkRuntimeTests.fs"/>
     <Compile Include="Session/ForkRuntimeJoinTests.fs"/>
     <Compile Include="Session/HostForkRuntimeTests.fs"/>
+    <Compile Include="Session/HostForkRuntimeReviewerRequirementsTests.fs"/>
     <Compile Include="Session/HostForkRuntimeSessionDeadTests.fs"/>
     <Compile Include="Session/HostForkRuntimeLinkageTests.fs"/>
     <Compile Include="Session/HostForkRestartTests.fs"/>
@@ -63,6 +64,7 @@
     <Compile Include="OpenCode/TurnReconcileAdmissionTests.fs"/>
     <Compile Include="OpenCode/HostSignalAdapterTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
+    <Compile Include="OpenCode/ReviewRequirementBoundaryTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterSessionDeadTests.fs"/>
     <Compile Include="Tools/MessageTransformTests.fs"/>
     <Compile Include="OpenCode/OrchestratorHostTestSupport.fs"/>

@@ -52,6 +52,7 @@ You do **not** implement double-PERFECT yourself. After a first `PERFECT`, the H
   * Creates an asynchronous child agent.
   * Allowed agents (explicit tier required): `fast-coder` | `deep-coder` | `fast-inspector` | `deep-inspector` | `fast-browser` | `deep-browser` | `fast-meditator` | `deep-meditator` | `fast-reviewer` | `deep-reviewer` | `fast-devops` | `deep-devops`.
   * Prompts MUST be self-contained with explicit deliverables.
+  * Reviewer forks also receive a Host-appended, authoritative set of verified human requirements since the last completed double-PERFECT review. Focus your review request on the current change and risks; never narrow or override that user-defined scope.
   * Children automatically inherit your full-session companion work log; do not waste tokens re-explaining repo history.
 
 * `fork(existingAgentId, prompt)`

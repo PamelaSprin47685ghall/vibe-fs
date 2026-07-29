@@ -143,6 +143,25 @@ module TurnCompletionProgram =
                 turn.AgentRole = Some AgentRole.Reviewer
                 && ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey
 
+            // This path runs only after an idle signal reconciles a terminal
+            // reviewer turn. A first PERFECT remains pending; only the reviewer
+            // that supplied the confirmed double-PERFECT clears prior inputs.
+            match
+                turn.AgentRole,
+                ReviewerGuardState.confirmedOwner
+                    sessionParents
+                    journal
+                    sessionKey
+                    (MessageId.value turn.AssistantMessageId),
+                journal
+            with
+            | Some AgentRole.Reviewer, Some reviewOwner, Some j ->
+                match AgentJournal.recordReviewConfirmedIdle j reviewOwner turn.SessionId turn.AssistantMessageId with
+                | Ok() -> ()
+                | Error err ->
+                    raise (InvalidOperationException(sprintf "Failed to checkpoint confirmed reviewer idle: %s" err))
+            | _ -> ()
+
             if not awaitingReviewerConfirmation then
                 // Gate on session-wide A (text + reasoning). An empty intermediate
                 // turn does not wipe prior A; only a Session with no A fails empty.

@@ -53,6 +53,7 @@ module ToolSurface =
             ToolSurfaceOrchestrator.hostFor
                 { Sessions = sessionPort
                   Journal = journal
+                  SessionSnapshot = snapshot
                   WorkspaceDirectory = workspaceDirectory
                   SessionParents = sessionParents
                   SessionRoles = sessionRoles

@@ -20,6 +20,8 @@ module AgentFacts =
         { LastGitTreeHash = None
           ConsecutivePerfects = 0
           IsConfirmed = false
+          ConfirmedReviewerSessionId = None
+          ConfirmedProviderRunId = None
           AcceptedGuardKey = None
           RecentToolCallIds = []
           RecentProviderRunIds = []
@@ -47,6 +49,7 @@ module AgentFacts =
         { Companion = None
           Linkage = None
           ReviewGuard = None
+          ReviewRequirements = None
           Fallback = None
           PromptAuthority = None
           Effects = None }
@@ -180,6 +183,8 @@ module AgentFacts =
         | AgentFact.ReviewBarrierStarted p -> AgentFactsReview.foldReviewBarrierStarted proj p
 
         | AgentFact.ReviewVerdictRecorded p -> AgentFactsReview.foldReviewVerdictRecorded proj p
+        | AgentFact.HumanPromptAccepted p -> AgentFactsReviewInputs.foldHumanPromptAccepted proj p
+        | AgentFact.ReviewConfirmedIdle p -> AgentFactsReviewInputs.foldReviewConfirmedIdle proj p
 
         | AgentFact.FallbackFailureRecorded p -> AgentFactsFallback.foldFallbackFailureRecorded proj p
 

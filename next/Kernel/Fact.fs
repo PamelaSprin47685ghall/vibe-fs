@@ -49,6 +49,16 @@ module Fact =
                ToolCallId: string
                GitTreeHash: string
                Verdict: ReviewGuardVerdict |}
+        /// A verified HumanRoot message identity. Content remains in the Host transcript.
+        | HumanPromptAccepted of
+            {| SessionId: SessionId
+               SourceSessionId: SessionId
+               MessageId: string |}
+        /// A double-PERFECT reviewer reached its terminal idle turn.
+        | ReviewConfirmedIdle of
+            {| SessionId: SessionId
+               ReviewerSessionId: SessionId
+               AssistantMessageId: string |}
         | GuardPromptAccepted of
             {| TargetSessionId: SessionId
                GuardKey: string

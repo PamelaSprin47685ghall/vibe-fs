@@ -31,6 +31,7 @@
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
     <Compile Include="Journal/ReviewConfirmation.fs"/>
     <Compile Include="Journal/AgentFacts.Review.fs"/>
+    <Compile Include="Journal/AgentFacts.ReviewInputs.fs"/>
     <Compile Include="Journal/AgentFacts.Fallback.fs"/>
     <Compile Include="Journal/AgentFacts.Authority.fs"/>
     <Compile Include="Journal/AgentFacts.Linkage.fs"/>

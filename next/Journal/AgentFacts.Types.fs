@@ -54,6 +54,10 @@ type ReviewGuardProjection =
         LastGitTreeHash: GitTreeHash option
         ConsecutivePerfects: int
         IsConfirmed: bool
+        /// Reviewer that supplied the currently confirmed double-PERFECT witness.
+        ConfirmedReviewerSessionId: SessionId option
+        /// Provider run that made the second PERFECT; its terminal idle closes the review.
+        ConfirmedProviderRunId: string option
         AcceptedGuardKey: string option
         RecentToolCallIds: string list
         RecentProviderRunIds: string list
@@ -64,6 +68,17 @@ type ReviewGuardProjection =
         AuthorityRootUserMessageId: string option
         CurrentBarrierKey: string option
     }
+
+/// Verified HumanRoot prompt identity and the transcript session that owns its text.
+type ReviewRequirementInput =
+    { SourceSessionId: SessionId
+      MessageId: MessageId }
+
+/// Human prompts awaiting the next completed review. Prompt text stays in the
+/// Host transcript and is fetched only when creating a reviewer.
+type ReviewRequirementProjection =
+    { HumanPromptInputs: ReviewRequirementInput list
+      LastConfirmedIdleAssistantMessageId: MessageId option }
 
 type FallbackProjection =
     {
@@ -115,6 +130,7 @@ type SessionAgentProjection =
     { Companion: CompanionProjection option
       Linkage: AgentLinkageProjection option
       ReviewGuard: ReviewGuardProjection option
+      ReviewRequirements: ReviewRequirementProjection option
       Fallback: FallbackProjection option
       PromptAuthority: PromptAuthority.PromptAuthorityProjection option
       Effects: DurableEffectProjection option }

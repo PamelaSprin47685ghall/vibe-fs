@@ -42,6 +42,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     match worktrees.TryGetValue agentId with
                     | true, path -> Some path
                     | false, _ -> None),
+            ?sessionSnapshot = deps.SessionSnapshot,
             onRunStarted = deps.OnRunStarted,
             cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
         )

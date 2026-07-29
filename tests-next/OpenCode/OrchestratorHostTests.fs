@@ -62,6 +62,7 @@ module OrchestratorHostTests =
             let deps =
                 { Sessions = port :> ISessionHostPort
                   Journal = None
+                  SessionSnapshot = None
                   OnChildCreated =
                     fun agentId role childId -> created.Add(agentId, role.ToString(), SessionId.value childId)
                   RegisterChildDirectory = fun _ _ -> ()

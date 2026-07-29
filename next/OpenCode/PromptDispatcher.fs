@@ -81,7 +81,20 @@ module PromptDispatcher =
 
             match this.Persist profile.SessionId (Some(TurnId.ofMessageId profile.AuthorityRootUserMessageId)) fact with
             | Error e -> raise (InvalidOperationException e)
-            | Ok() -> this.Update(PromptAuthorityRun.registerAuthority profile)
+            | Ok() ->
+                match profile.AuthorityKind, journal with
+                | PromptAuthority.RootAuthorityKind.HumanRoot, Some j ->
+                    match
+                        AgentJournal.recordHumanPromptAccepted
+                            j
+                            profile.SessionId
+                            profile.AuthorityRootUserMessageId
+                    with
+                    | Ok() -> ()
+                    | Error e -> raise (InvalidOperationException e)
+                | _ -> ()
+
+                this.Update(PromptAuthorityRun.registerAuthority profile)
 
         member this.AcceptHumanRoot (sessionId: SessionId) (messageId: MessageId) (explicitAgent: string option) =
             match explicitAgent with
