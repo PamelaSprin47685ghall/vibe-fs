@@ -187,6 +187,18 @@ type HostForkRuntime
     member _.TryFindAgent(agentId: string) =
         runtime.List() |> fst |> List.tryFind (fun a -> a.AgentId = agentId)
 
+    /// The Host child session a forked agent id drives.
+    ///
+    /// ORCH-006 needs it right after a fork, to record `ManagerJobCreated`. The map is
+    /// the same one restart recovery repopulates from `HandleLinked.ChildSessionId`, so
+    /// a resumed job reads the session the Host actually issued rather than one derived
+    /// from the agent id.
+    member _.TryChildSession(agentId: string) : SessionId option =
+        lock gate (fun () ->
+            match children.TryGetValue agentId with
+            | true, childId -> Some childId
+            | false, _ -> None)
+
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
     member _.IsCancelled = runtime.IsCancelled

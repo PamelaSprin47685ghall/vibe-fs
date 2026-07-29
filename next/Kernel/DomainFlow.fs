@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Kernel
 
 open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel.Identity
 
 // ================================================================
 // Domain-specific context and error types (KISS-N01 §3)
@@ -34,8 +35,8 @@ type AgentContext =
 type CompanionContext = { SessionId: string }
 
 type OrchestratorContext =
-    { TargetBranch: string
-      WorktreePath: string }
+    { TargetRef: TargetRef
+      WorktreePath: WorktreePath }
 
 // ================================================================
 // Domain-specific flow type aliases

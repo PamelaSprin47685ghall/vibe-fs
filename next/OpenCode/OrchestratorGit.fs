@@ -36,27 +36,6 @@ module OrchestratorGit =
           Deadline = None
           PtyOptions = None }
 
-    let detectBranch
-        (runner: Command -> Task<int * string * string>)
-        (repoPath: string)
-        : Task<Result<string, string>> =
-        task {
-            let! code, stdout, stderr = runner (command repoPath [ "symbolic-ref"; "--short"; "HEAD" ])
-
-            if code = 0 && not (String.IsNullOrWhiteSpace stdout) then
-                return Ok(stdout.Trim())
-            else
-                // Fail closed: a detached HEAD or missing branch must not publish
-                // to a guessed branch name.
-                let reason =
-                    if String.IsNullOrWhiteSpace stderr then
-                        "could not determine current branch (detached HEAD or no branch)"
-                    else
-                        stderr.Trim()
-
-                return Error reason
-        }
-
     /// True when an in-progress rebase is present (REBASE_HEAD exists). Shared by
     /// the publish chain skip-check and finalizeWorktree so both agree on rebase
     /// state.

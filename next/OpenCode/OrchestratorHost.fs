@@ -2,23 +2,18 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
-open System.Threading
 open System.Threading.Tasks
-open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
-open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
-open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Orchestrator
 
+/// Host wiring for the Orchestrator: forks Managers and reviewers under one
+/// runtime, and supplies `ManagerPort` to the pure publish program.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
-    let orchestratorKey = SessionId.value orchestratorId
     let worktrees = Dictionary<string, string>()
-    let managerAgents = Dictionary<string, string>()
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
-    let authorityPort = OrchestratorAuthority.createPort ()
 
     let onChildCreated (agentId: string) (role: AgentRole) (childId: SessionId) =
         if role = AgentRole.Reviewer then
@@ -48,148 +43,183 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             publishToMailbox = false
         )
 
-    let awaitAgent (agentId: string) : Task<Result<RunCompletion, string>> = runtime.AwaitAgent agentId
+    let managerAgentId (jobId: ManagerJobId) = ManagerJobId.value jobId
 
-    let runManager (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
+    /// The durable job record. ORCH-003: the Manager's managed agent name lives here
+    /// and nowhere else, so a resumed `deep-manager` job never degrades to
+    /// `fast-manager` (PROMPT-008 forbids rebuilding it from the role).
+    let jobRecord (jobId: ManagerJobId) =
+        deps.Journal
+        |> Option.bind (fun journal ->
+            OrchestratorProjection.tryFind jobId (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+
+    let outcomeOf (run: RunCompletion) =
+        match run.Outcome with
+        | AgentCompleted _ -> Ok()
+        | AgentFailed payload
+        | AgentAborted payload -> Error payload.Message
+
+    /// Fork a child and hand back the Host session it created.
+    ///
+    /// The session comes from the runtime's own child map, not from the fork result:
+    /// only the Host can issue a session id, and ORCH-006 requires the real one.
+    let forkChild (agentId: string) (role: AgentRole) (agent: string) (worktree: WorktreePath) (prompt: string) =
         task {
-            if not (worktrees.ContainsKey managerId) then
-                worktrees.[managerId] <- worktree
+            worktrees.[agentId] <- WorktreePath.value worktree
 
-            // ORCH-003: the Manager's managed agent name is chosen at fork time and
-            // persisted in `ManagerJobProjection.ManagerAgent`. The previous version
-            // defaulted to `fast-manager` when this in-memory map had no entry,
-            // which is exactly the restart case the persisted field exists for — a
-            // `deep-manager` job resumed as `fast-manager`, and FALLBACK-002's A/B
-            // pair was then wrong for the rest of the Logical Run.
-            match managerAgents.TryGetValue managerId with
-            | false, _ -> return Error(sprintf "No managed agent recorded for manager job '%s'" managerId)
-            | true, managerAgent when String.IsNullOrWhiteSpace managerAgent ->
-                return Error(sprintf "Manager job '%s' has a blank managed agent name" managerId)
-            | true, managerAgent ->
-                match! runtime.Fork(managerId, AgentRole.Manager, managerAgent, prompt) with
-                | Error err -> return Error err
-                | Ok _ ->
-                    match! awaitAgent managerId with
-                    | Error err -> return Error err
-                    | Ok run ->
-                        match run.Outcome with
-                        | AgentCompleted _ ->
-                            return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
-                        | AgentFailed payload -> return Error payload.Message
-                        | AgentAborted payload -> return Error payload.Message
-        }
-
-    let runReviewerOnce (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
-        task {
-            let reviewerId = sprintf "%s-reviewer" managerId
-            // ORCH-009: post-rebase review is always deep-reviewer, and
-            // OrchestratorHostReview owns that constant. Spelling it a second time
-            // here would let the two drift while both still compiled.
-            let reviewerAgent = OrchestratorHostReview.DeepReviewerAgent
-            worktrees.[reviewerId] <- worktree
-            let! forked = runtime.Fork(reviewerId, AgentRole.Reviewer, reviewerAgent, prompt)
-
-            match forked with
-            | Error err -> return Error err
+            match! runtime.Fork(agentId, role, agent, prompt) with
+            | Error error -> return Error error
             | Ok _ ->
-                let! completion = awaitAgent reviewerId
-
-                match completion with
-                | Error err -> return Error err
-                | Ok run ->
-                    match run.Outcome with
-                    | AgentCompleted _ -> return Ok()
-                    | AgentFailed payload -> return Error payload.Message
-                    | AgentAborted payload -> return Error payload.Message
+                match runtime.TryChildSession agentId with
+                | Some childId -> return Ok childId
+                | None -> return Error(sprintf "Fork of '%s' produced no child session" agentId)
         }
 
-    let reverify (managerId: string) (worktree: string) (barrierKey: string) : Task<Result<unit, string>> =
-        OrchestratorHostReview.reverify deps.Journal orchestratorId runReviewerOnce managerId worktree barrierKey
+    let awaitChild (agentId: string) =
+        task {
+            match! runtime.AwaitAgent agentId with
+            | Error error -> return Error error
+            | Ok run -> return outcomeOf run
+        }
+
+    // ── ManagerPort ─────────────────────────────────────────────────────────
+
+    let startManager (start: ManagerStart) : Task<Result<SessionId, string>> =
+        forkChild (managerAgentId start.JobId) AgentRole.Manager start.ManagerAgent start.Worktree start.Prompt
+
+    /// Await the Manager, then stage its work into a candidate commit.
+    ///
+    /// `finalizeWorktree` runs only on a completed Manager: a failed or aborted run
+    /// has nothing to commit, and committing anyway would produce a candidate the
+    /// Manager never claimed was done.
+    let awaitManager (jobId: ManagerJobId) : Task<Result<unit, string>> =
+        task {
+            let agentId = managerAgentId jobId
+
+            match! awaitChild agentId with
+            | Error error -> return Error error
+            | Ok() ->
+                match worktrees.TryGetValue agentId with
+                | true, path -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+                | false, _ -> return Error(sprintf "No worktree registered for manager job '%s'" agentId)
+        }
+
+    /// ORCH-003/ORCH-007: hand work back to the SAME Manager in the SAME worktree.
+    ///
+    /// `Fork` on an existing agent nudges it (EXEC-002) rather than creating a second
+    /// child, so this is a continuation of that Manager's Logical Run.
+    let resumeManager (jobId: ManagerJobId) (worktree: WorktreePath) (prompt: string) =
+        task {
+            match jobRecord jobId with
+            | None -> return Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
+            | Some record ->
+                let agentId = managerAgentId jobId
+                worktrees.[agentId] <- WorktreePath.value worktree
+
+                match! runtime.Fork(agentId, AgentRole.Manager, record.ManagerAgent, prompt) with
+                | Error error -> return Error error
+                | Ok _ -> return! awaitManager jobId
+        }
+
+    /// One review barrier. A fresh reviewer agent id per barrier, so REVIEW-008's
+    /// "fresh dual PERFECT" is structural: a new session's guard starts empty.
+    let reverify
+        (jobId: ManagerJobId)
+        (managerSessionId: SessionId)
+        (worktree: WorktreePath)
+        (barrierId: ReviewBarrierId)
+        =
+        let reviewerAgentId =
+            sprintf "%s-%s" (OrchestratorManagerJob.reviewerAgentId jobId) (ReviewBarrierId.value barrierId)
+
+        OrchestratorHostReview.reverify
+            deps.Journal
+            (fun _ path prompt ->
+                forkChild reviewerAgentId AgentRole.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt)
+            (fun _ -> awaitChild reviewerAgentId)
+            (fun _ prompt ->
+                task {
+                    match!
+                        runtime.Fork(
+                            reviewerAgentId,
+                            AgentRole.Reviewer,
+                            OrchestratorHostReview.DeepReviewerAgent,
+                            prompt
+                        )
+                    with
+                    | Error error -> return Error error
+                    | Ok _ -> return! awaitChild reviewerAgentId
+                })
+            jobId
+            managerSessionId
+            worktree
+            barrierId
 
     let managerPort: ManagerPort =
-        { RunManager = runManager
-          Reverify = reverify }
+        { StartManager = startManager
+          AwaitManager = awaitManager
+          Reverify = reverify
+          ResumeManager = resumeManager }
 
-    let mutable detectedBranch: string option =
-        if String.IsNullOrWhiteSpace deps.TargetBranch then
-            None
-        else
-            Some deps.TargetBranch
-
-    let orchestratorBranch () : Task<Result<string, string>> =
-        task {
-            match detectedBranch with
-            | Some branch -> return Ok branch
-            | None ->
-                let! branchResult = OrchestratorGit.detectBranch OrchestratorGit.run deps.RepoPath
-
-                match branchResult with
-                | Ok branch -> detectedBranch <- Some branch
-                | Error _ -> ()
-
-                return branchResult
-        }
+    // ── engine ──────────────────────────────────────────────────────────────
 
     let mutable engineInstance: Orchestrator option = None
     let engineGate = obj ()
     let mutable engineTask: Task<Result<Orchestrator, string>> option = None
+
+    /// ORCH-008: freeze the publish target by `symbolic-ref` once, at engine start.
+    ///
+    /// A configured branch is still resolved through the same verb rather than trusted
+    /// as a string, so a configured name that does not exist fails here instead of at
+    /// publish time.
+    let frozenTarget () =
+        task {
+            match! gitPort.FreezeTargetBranch() with
+            | Ok target when String.IsNullOrWhiteSpace deps.TargetBranch -> return Ok target
+            | Ok _ -> return Ok(TargetRef.create deps.TargetBranch)
+            | Error error -> return Error error
+        }
 
     let initializeEngine () : Task<Result<Orchestrator, string>> =
         task {
             match engineInstance with
             | Some value -> return Ok value
             | None ->
-                let! branchResult = orchestratorBranch ()
-
-                match branchResult with
+                match! frozenTarget () with
                 | Error reason -> return Error reason
-                | Ok branch ->
-                    let! reconciledPublished =
-                        OrchestratorAuthority.reconcilePublishedFromAuthority
-                            deps.Journal
-                            authorityPort
-                            deps.RepoPath
-                            branch
+                | Ok target ->
+                    // Canonicalize the repo path via git common-dir so symlinked
+                    // spellings share one cross-process publish lock.
+                    let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
+                    let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
 
-                    // Sweep orphaned manager artifacts before resuming jobs.
-                    // Best-effort: failures are skipped, engine init is never blocked.
-                    let sweepLockPath =
-                        IntegrationGate.lockPath (RuntimePath.gitCommonDir deps.RepoPath) branch
+                    let activeJobs =
+                        deps.Journal
+                        |> Option.map (fun journal ->
+                            OrchestratorProjection.activeJobs
+                                (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+                        |> Option.defaultValue []
 
-                    let! sweepResult =
-                        match deps.Journal with
-                        | Some journal ->
-                            let jobs = (AgentJournal.snapshot journal).AgentProjections.Orchestrator.ManagerJobs
-                            OrchestratorSweep.sweepLocked sweepLockPath gitPort jobs
-                        | None -> Task.FromResult(Ok())
-
-                    match sweepResult with
+                    // Sweep orphaned manager artifacts before resuming jobs, so a
+                    // resumed job never adopts a worktree the sweep is about to remove.
+                    match! OrchestratorSweep.sweepLocked sweepLockPath gitPort activeJobs with
                     | Error error -> return Error(sprintf "orchestrator cleanup failed: %s" error)
                     | Ok() ->
-                        // Canonicalize the repo path via git common-dir so symlinked
-                        // spellings share one cross-process publish lock.
-                        let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
-
                         let value =
                             Orchestrator(
                                 gitPort,
                                 managerPort,
                                 deps.RepoPath,
-                                branch,
+                                target,
                                 ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
-                                ?authority = Some authorityPort,
                                 ?lockRepoPath = Some lockRepoPath
                             )
-
-                        for managerId, commitHash in reconciledPublished do
-                            value.RecoverPublished(managerId, commitHash)
 
                         match deps.Journal with
                         | Some journal ->
                             do!
                                 OrchestratorManagerJob.recoverJobs
                                     journal
-                                    gitPort
                                     orchestratorId
                                     worktrees
                                     deps.RegisterChildDirectory
@@ -213,26 +243,19 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     engineTask <- Some task
                     task)
 
-    member _.ForkManagerJob(managerId: string, managerAgent: string, prompt: string) : Task<Result<string, string>> =
+    member _.ForkManagerJob(jobId: ManagerJobId, managerAgent: string, prompt: string) : Task<Result<string, string>> =
         task {
-            managerAgents.[managerId] <- managerAgent
-            let! engineResult = engine ()
-
-            match engineResult with
+            match! engine () with
             | Error reason -> return Error reason
             | Ok engine ->
-                let! result = engine.ForkManager(managerId, prompt)
-
-                match result with
+                match! engine.ForkManager(jobId, managerAgent, prompt) with
                 | Error verdict -> return Error(sprintf "%A" verdict)
-                | Ok handle -> return Ok handle.WorktreePath
+                | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
         }
 
     member _.JoinPublished() : Task<string> =
         task {
-            let! engineResult = engine ()
-
-            match engineResult with
+            match! engine () with
             | Error reason -> return sprintf "Orchestrator init failed: %s" reason
             | Ok engine ->
                 let! verdict = engine.JoinPublished()

@@ -2,31 +2,32 @@ namespace Wanxiangshu.Next.Orchestrator
 
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel.Identity
 
 /// One Manager execution plus the worktree resource it owns through publish.
-type ManagerJob private
-    (managerId: string, prompt: string, worktree: WorktreeResource, completion: Task<Result<unit, string>>) =
+///
+/// Exactly the fields ORCH-006 persists, so a recovered job and a fresh one are the
+/// same value. There is deliberately no `Prompt`: `ManagerJobCreated` does not record
+/// one, so nothing after a restart may depend on it. The initial prompt goes straight
+/// to `StartManager`, and conflict resumption sends only the conflict instruction to a
+/// session that already holds the task (PROMPT-003).
+///
+/// No completion Task either. ORCH-006 requires `ManagerJobCreated` to carry the
+/// Manager's `SessionId`, which exists only after the fork, so the previous shape —
+/// start the Manager in the constructor, then persist — could only write the job fact
+/// after the Manager had already begun. A crash in that window left a live Manager with
+/// no durable job. Starting and awaiting are now two steps the program sequences, with
+/// the fact written between them.
+type ManagerJob =
+    { JobId: ManagerJobId
+      ManagerSessionId: SessionId
+      ManagerAgent: string
+      TargetRef: TargetRef
+      Worktree: WorktreeResource }
 
-    member _.ManagerId = managerId
-    member _.Prompt = prompt
-    member _.Worktree = worktree
-    member _.Completion = completion
-
-    member _.Handle =
-        { ManagerId = managerId
-          WorktreePath = worktree.Path }
-
-    static member Start(manager: ManagerPort, managerId: string, prompt: string, worktree: WorktreeResource) =
-        ManagerJob(managerId, prompt, worktree, manager.RunManager managerId worktree.Path prompt)
-
-    static member Recover
-        (manager: ManagerPort, managerId: string, prompt: string, worktree: WorktreeResource, completed: bool)
-        =
-        let completion =
-            if completed then Task.FromResult(Ok())
-            else manager.RunManager managerId worktree.Path prompt
-
-        ManagerJob(managerId, prompt, worktree, completion)
+    member this.Handle =
+        { JobId = this.JobId
+          WorktreePath = this.Worktree.Path }
 
 /// Completion mailbox for published verdicts. It only stores the final
 /// OrchestratorVerdict after FF; the publish program runs as an owned task.
@@ -36,7 +37,8 @@ type VerdictMailbox() =
     let waiters = Queue<TaskCompletionSource<OrchestratorVerdict>>()
     let mutable active = 0
 
-    member _.StartJob() = lock gate (fun () -> active <- active + 1)
+    member _.StartJob() =
+        lock gate (fun () -> active <- active + 1)
 
     member _.Publish(verdict: OrchestratorVerdict) =
         lock gate (fun () ->

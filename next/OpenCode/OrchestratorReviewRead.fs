@@ -1,48 +1,50 @@
 namespace Wanxiangshu.Next.OpenCode
 
-open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 
+/// REVIEW-007/008: what one reviewer session's guard says about the current tree.
 module OrchestratorReviewRead =
-    /// Manager review-guard state for the current worktree.
-    /// PendingConfirmation means a first PERFECT already landed and HostReviewGuard
-    /// owns the confirmation nudge — Orchestrator must not re-fork a full review.
+
+    /// Keyed by the REVIEWER session, which is where REVIEW-003's facts land.
+    ///
+    /// `PendingConfirmation` means a first PERFECT landed and its challenge is
+    /// outstanding, so the Orchestrator must nudge the same reviewer rather than fork
+    /// a second review — forking again would open a new barrier and discard the first
+    /// PERFECT.
     type ReviewStatus =
         | Confirmed
         | PendingConfirmation
         | NeedsReview
         | RevisionRequired
 
-    let read
-        (journal: AgentJournal option)
-        (reviewOwnerSessionId: SessionId)
-        (worktree: string)
-        : Task<Result<ReviewStatus, string>> =
-        task {
-            match journal with
-            | None -> return Error "Orchestrator review requires a journal"
-            | Some journal ->
-                let tree = (GitTree.create worktree).GetTreeHash()
-                let snapshot = AgentJournal.snapshot journal
+    /// Synchronous: this is one keyed projection lookup, no I/O.
+    ///
+    /// The tree is a parameter rather than a worktree path to hash here. The caller
+    /// reads it once per barrier and uses the same value for the barrier fact and for
+    /// this read; hashing again per call could observe a different tree mid-review and
+    /// silently answer about a different one.
+    let read (journal: AgentJournal option) (reviewerSessionId: SessionId) (tree: GitTreeHash) : ReviewStatus =
+        let guard =
+            journal
+            |> Option.bind (fun durable ->
+                AgentProjection.tryFind reviewerSessionId (AgentJournal.snapshot durable).AgentProjections)
+            |> Option.bind (fun session -> session.ReviewGuard)
 
-                // reviewOwnerSessionId = durable parent of the reviewer for this
-                // barrier (Orchestrator session when OrchestratorHost forks the
-                // reviewer; Manager session for Manager-owned reviewers).
-                match Map.tryFind reviewOwnerSessionId snapshot.AgentProjections.Sessions with
-                | Some session ->
-                    match session.ReviewGuard with
-                    | Some guard when guard.LastGitTreeHash = Some(GitTreeHash.create tree) && guard.IsConfirmed ->
-                        return Ok Confirmed
-                    | Some guard when
-                        guard.LastGitTreeHash = Some(GitTreeHash.create tree)
-                        && ReviewWitness.isPerfectPending guard.Witness
-                        && not guard.IsConfirmed
-                        ->
-                        return Ok PendingConfirmation
-                    | Some guard when guard.LastGitTreeHash = Some(GitTreeHash.create tree) ->
-                        return Ok RevisionRequired
-                    | _ -> return Ok NeedsReview
-                | None -> return Ok NeedsReview
-        }
+        match guard with
+        | None -> NeedsReview
+        | Some value ->
+            // REVIEW-008: a witness for another tree stays auditable but is not
+            // sufficient, so validity is asked against the tree in hand.
+            // `satisfiesGuard` owns that question; the previous version compared
+            // `LastGitTreeHash` inline in three branches, which is the same rule
+            // spelled a fourth time.
+            if ReviewProjection.satisfiesGuard tree value then
+                Confirmed
+            elif ReviewWitness.isRevision value.Witness then
+                RevisionRequired
+            elif ReviewWitness.isPerfectPending value.Witness then
+                PendingConfirmation
+            else
+                NeedsReview

@@ -2,10 +2,14 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
-open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Orchestrator
 
+/// Remove worktrees and branches no active ManagerJob owns.
+///
+/// Cleanup only. It never derives a recovery action from what it finds on disk —
+/// ORCH-007 forbids substituting filesystem state for a durable fact, and the
+/// active-job set here comes from the projection.
 module OrchestratorSweep =
     let private removeWorktrees git paths =
         let rec loop remaining =
@@ -15,42 +19,66 @@ module OrchestratorSweep =
                 | path :: tail ->
                     match! git.RemoveWorktree path with
                     | Ok() -> return! loop tail
-                    | Error error -> return Error(sprintf "stale worktree cleanup failed for %s: %s" path error)
+                    | Error error ->
+                        return Error(sprintf "stale worktree cleanup failed for %s: %s" (WorktreePath.value path) error)
             }
 
         loop paths
 
-    let private deleteBranches git branches =
+    let private deleteBranches git identities =
         let rec loop remaining =
             task {
                 match remaining with
                 | [] -> return Ok()
-                | branch :: tail ->
-                    match! git.DeleteBranch branch with
+                | identity :: tail ->
+                    match! git.DeleteBranch identity with
                     | Ok() -> return! loop tail
-                    | Error error -> return Error(sprintf "stale manager branch cleanup failed for %s: %s" branch error)
+                    | Error error ->
+                        return
+                            Error(
+                                sprintf
+                                    "stale manager branch cleanup failed for %s: %s"
+                                    (WorktreeIdentity.value identity)
+                                    error
+                            )
             }
 
-        loop branches
+        loop identities
 
-    let sweepStaleArtifacts (git: GitPort) (activeJobs: Map<ManagerId, ManagerJobProjection>) : Task<Result<unit, string>> =
+    /// `git worktree list` reports a branch as `refs/heads/manager/<job>`, while
+    /// `git branch --list` reports it as `manager/<job>`. Both name the same
+    /// identity, so stripping the ref prefix is the only normalisation needed.
+    ///
+    /// The job id is never parsed back out. The previous version cut at
+    /// `refs/heads/manager/` and at the first `/`, reconstructing an id to compare
+    /// against a set of ids — two different string surgeries for one question, and
+    /// ORCH-006 makes the identity opaque precisely so it is compared whole.
+    let private normalize (identity: WorktreeIdentity) =
+        let value = WorktreeIdentity.value identity
+        let prefix = "refs/heads/"
+
+        if value.StartsWith prefix then
+            WorktreeIdentity.create (value.Substring prefix.Length)
+        else
+            identity
+
+    let sweepStaleArtifacts (git: GitPort) (activeJobs: ManagerJobProjection list) : Task<Result<unit, string>> =
         task {
-            let activeIds =
-                activeJobs
-                |> Map.toList
-                |> List.map (fun (id, _) -> ManagerId.value id)
-                |> Set.ofList
+            let owned = activeJobs |> List.map (fun job -> job.WorktreeIdentity) |> Set.ofList
+
+            let isStale identity =
+                not (Set.contains (normalize identity) owned)
 
             match! git.ListWorktrees() with
             | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)
             | Ok entries ->
                 let staleWorktrees =
                     entries
-                    |> List.choose (fun (path, branchRef) ->
-                        match branchRef with
-                        | Some reference when reference.StartsWith("refs/heads/manager/") ->
-                            let id = reference.Substring("refs/heads/manager/".Length)
-                            if Set.contains id activeIds then None else Some path
+                    |> List.choose (fun (path, identity) ->
+                        // A worktree with no branch is not ours: every manager worktree is
+                        // created with `-b manager/<job>`.
+                        match identity with
+                        | Some value when isStale value -> Some path
                         | _ -> None)
 
                 match! removeWorktrees git staleWorktrees with
@@ -58,20 +86,13 @@ module OrchestratorSweep =
                 | Ok() ->
                     match! git.ListManagerBranches() with
                     | Error error -> return Error(sprintf "cannot list manager branches for cleanup: %s" error)
-                    | Ok branches ->
-                        let staleBranches =
-                            branches
-                            |> List.filter (fun branch ->
-                                let slash = branch.IndexOf('/')
-                                slash >= 0 && not (Set.contains (branch.Substring(slash + 1)) activeIds))
-
-                        return! deleteBranches git staleBranches
+                    | Ok branches -> return! deleteBranches git (branches |> List.filter isStale)
         }
 
     let sweepLocked
         (lockPath: string)
         (git: GitPort)
-        (activeJobs: Map<ManagerId, ManagerJobProjection>)
+        (activeJobs: ManagerJobProjection list)
         : Task<Result<unit, string>> =
         task {
             let! gate = IntegrationGate.acquire lockPath

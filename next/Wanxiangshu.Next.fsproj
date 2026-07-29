@@ -80,7 +80,6 @@
     <Compile Include="Orchestrator.IntegrationGate.fs"/>
     <Compile Include="Orchestrator.WorktreeResource.fs"/>
     <Compile Include="Orchestrator.ManagerJob.fs"/>
-    <Compile Include="Orchestrator.Recovery.fs"/>
     <Compile Include="Orchestrator/OrchestratorProgram.fs"/>
     <Compile Include="Orchestrator.fs"/>
     <Compile Include="Orchestrator.GitOperations.fs"/>
@@ -145,7 +144,6 @@
     <Compile Include="OpenCode/ExecutorSummarizeRuntime.fs"/>
     <Compile Include="OpenCode/ExecutorSummarize.fs"/>
     <Compile Include="OpenCode/OrchestratorGit.fs"/>
-    <Compile Include="OpenCode/OrchestratorAuthority.fs"/>
     <Compile Include="OpenCode/OrchestratorSweep.fs"/>
     <Compile Include="OpenCode/OrchestratorHost.Types.fs"/>
     <Compile Include="OpenCode/OrchestratorSessionDirectories.fs"/>
