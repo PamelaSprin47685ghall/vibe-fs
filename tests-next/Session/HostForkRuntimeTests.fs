@@ -220,8 +220,7 @@ module HostForkRuntimeTests =
                                   AssistantMessageId = MessageId.create "model-terminal"
                                   Role = "test"
                                   Directory = ""
-                                  FinalText = "A version output"
-                                  Parts = [||] }
+                                  FinalText = "A version output" }
                             )))
 
                 use journal =

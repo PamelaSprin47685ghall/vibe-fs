@@ -33,10 +33,11 @@ function shuffle(array) {
 // Dual-script restart canaries (e.g. orchestrator-restart-publish) need ~45s solo;
 // leave headroom for parallel host load. Override with CANARY_TIMEOUT_MS if needed.
 const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 90000, "CANARY_TIMEOUT_MS");
-const CANARY_COUNT = 16;
+const CANARY_COUNT = 17;
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
   "testkit/opencode/tests/manager-full-loop-canary.mjs",
+  "testkit/opencode/tests/manager-companion-canary.mjs",
   "testkit/opencode/tests/companion-canary.mjs",
   "testkit/opencode/tests/reviewer-verdict-canary.mjs",
   "testkit/opencode/tests/executor-canary.mjs",

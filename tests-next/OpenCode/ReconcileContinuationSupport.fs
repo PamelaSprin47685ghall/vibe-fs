@@ -11,14 +11,9 @@ open Wanxiangshu.Next.Session
 
 module ReconcileContinuationSupport =
 
-    let textPart text =
-        createObj [ "id", box "text-1"; "type", box "text"; "text", box text ]
+    let textPart text = MessagePart.Text text
 
-    let reasoningPart text =
-        createObj [ "id", box "reasoning-1"; "type", box "reasoning"; "text", box text ]
-
-    let bookkeepingPart kind =
-        createObj [ "id", box ("bookkeeping-" + kind); "type", box kind ]
+    let reasoningPart text = MessagePart.Reasoning text
 
     let msg id role agent finish parts : SessionMessage =
         { Id = MessageId.create id
@@ -27,8 +22,7 @@ module ReconcileContinuationSupport =
           Finish = finish
           ErrorName = None
           Model = None
-          Parts = parts
-          Raw = createObj [] }
+          Parts = parts }
 
     let reasoningOnlyMessages agent : SessionMessage list =
         [ msg "u1" "user" (Some agent) None [||]
@@ -37,9 +31,7 @@ module ReconcileContinuationSupport =
               "assistant"
               (Some agent)
               (Some "stop")
-              [| bookkeepingPart "step-start"
-                 reasoningPart "The work is complete, but no formal report was emitted."
-                 bookkeepingPart "step-finish" |] ]
+              [| reasoningPart "The work is complete, but no formal report was emitted." |] ]
 
     let brokenXmlMessages agent : SessionMessage list =
         [ msg "u1" "user" (Some agent) None [||]

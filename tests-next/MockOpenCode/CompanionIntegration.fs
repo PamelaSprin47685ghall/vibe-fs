@@ -98,8 +98,7 @@ module CompanionIntegration =
                                   AssistantMessageId = messageId
                                   Role = "blogger"
                                   Directory = ""
-                                  FinalText = "manager work log"
-                                  Parts = [| createObj [ "type", box "text"; "text", box "manager work log" ] |] }
+                                  FinalText = "manager work log" }
                             ))
                         |> ignore
 

@@ -27,6 +27,7 @@
     "test:e2e:p0:parallel": "CANARY_REPEAT=1 node scripts/run-canary-staggered.mjs",
     "test:e2e:p0:three": "CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs",
     "test:e2e:companion": "node testkit/opencode/tests/companion-canary.mjs",
+    "test:e2e:manager-companion": "node testkit/opencode/tests/manager-companion-canary.mjs",
     "test:e2e:reviewer": "node testkit/opencode/tests/reviewer-verdict-canary.mjs",
     "test:e2e:executor": "node testkit/opencode/tests/executor-canary.mjs",
     "test:release": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs && npm run test:e2e:p0:three",

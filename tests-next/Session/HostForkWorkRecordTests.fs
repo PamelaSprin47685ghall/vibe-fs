@@ -39,8 +39,7 @@ module HostForkWorkRecordTests =
                           AssistantMessageId = MessageId.create "manager-assistant"
                           Role = "manager"
                           Directory = ""
-                          FinalText = "manager session A"
-                          Parts = [||] }
+                          FinalText = "manager session A" }
                     )))
 
         host, complete

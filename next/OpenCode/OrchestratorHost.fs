@@ -43,6 +43,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | false, _ -> None),
             ?sessionSnapshot = deps.SessionSnapshot,
             onRunStarted = deps.OnRunStarted,
+            parentWorkRecordFor = deps.ParentWorkRecordFor,
+            childWorkRecordFor = deps.ChildWorkRecordFor,
             cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor),
             publishToMailbox = false
         )

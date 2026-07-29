@@ -166,7 +166,9 @@ type ToolRuntimeScope
                           RegisterReviewerTree = fun reviewerId port -> treePorts.[reviewerId] <- port
                           OnRunStarted = onStarted
                           RepoPath = defaultArg workspaceDirectory "."
-                          TargetBranch = "" },
+                          TargetBranch = ""
+                          ParentWorkRecordFor = (fun sid -> background (SessionId.value sid))
+                          ChildWorkRecordFor = (fun sid -> background (SessionId.value sid)) },
                         SessionId.create sessionId
                     )
 

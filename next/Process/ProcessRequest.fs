@@ -46,12 +46,13 @@ type ProcessError =
     | ExecutionFailed of reason: string
 
 module ProcessEstimate =
-    let private maxBudgetSeconds = TimeSpan.MaxValue.TotalSeconds
+    let private maxBudgetSeconds = 36500.0 * 86400.0
+    let private maxTimeSpan = TimeSpan.FromDays 36500.0
 
     let budget (RuntimeSeconds seconds) =
         let total = 3.0 * seconds
         if Double.IsNaN total || Double.IsInfinity total then
-            TimeSpan.MaxValue
+            maxTimeSpan
         else
             let safe = Math.Min(total, maxBudgetSeconds)
             TimeSpan.FromSeconds safe
