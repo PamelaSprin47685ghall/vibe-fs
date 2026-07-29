@@ -48,15 +48,44 @@ module PromptAuthority =
 
     /// One provider request (PROMPT-008).
     ///
-    /// Shock package B gives this its remaining fields (SystemPromptId,
-    /// ToolCapabilitySet) and the single `buildAttemptExecutionProfile`
-    /// constructor. Package 0 only retypes the identities.
+    /// Every field a request needs comes from this one immutable value. The
+    /// clause exists because the previous code assembled them separately from a
+    /// mutable session cache, the last user message, a Role map and the fallback
+    /// projection — four sources that can disagree, and did.
+    ///
+    /// Construct ONLY through `buildAttemptExecutionProfile`. The architecture
+    /// gate rejects a record expression for this type outside its owning module,
+    /// because a hand-assembled profile is exactly the "temporary assembly" the
+    /// clause forbids.
     type AttemptExecutionProfile =
-        { Authority: AuthorityExecutionProfile
-          PhysicalUserMessageId: PhysicalUserMessageId
-          ProviderRun: ProviderRunIdentity
-          EffectiveAgent: string
-          Origin: PromptOrigin }
+        {
+            Authority: AuthorityExecutionProfile
+            PhysicalUserMessageId: PhysicalUserMessageId
+            ProviderRun: ProviderRunIdentity
+            Origin: PromptOrigin
+            /// FALLBACK-002: the side the cursor currently selects. The only field
+            /// fallback may move (FALLBACK-004).
+            EffectiveAgent: string
+            /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so this
+            /// is derived from CanonicalRole alone.
+            SystemPromptId: SystemPromptId
+            /// AGENT-007 both layers read this same set: the Host-visible schema
+            /// and the ToolRegistry execution gate. Two sources would let an
+            /// unauthorised tool into the schema while the gate still refused it,
+            /// or worse, the reverse.
+            ToolCapabilitySet: Set<ToolPermission>
+        }
+
+        /// Convenience projections. Reading through the authority profile keeps
+        /// FALLBACK-004 visible: these never change for the Logical Run, while
+        /// EffectiveAgent does.
+        member this.SessionId = this.Authority.SessionId
+        member this.LogicalRunId = this.Authority.LogicalRunId
+        member this.AuthorityRootUserMessageId = this.Authority.AuthorityRootUserMessageId
+        member this.SelectedAgent = this.Authority.SelectedAgent
+        member this.PeerAgent = this.Authority.PeerAgent
+        member this.CanonicalRole = this.Authority.CanonicalRole
+        member this.SelectedTier = this.Authority.SelectedTier
 
     /// A dispatched prompt before the Host has confirmed anything (PROMPT-005
     /// `Claimed`).
@@ -267,3 +296,61 @@ module PromptAuthority =
                ProviderRunIdentity.value terminalProviderRun
                repairKind |]
         )
+
+    /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so the prompt
+    /// identity is a function of CanonicalRole alone. Tier deliberately does not
+    /// participate — if it did, `permissions(fast-coder) = permissions(deep-coder)`
+    /// (AGENT-010) would stop being structurally guaranteed.
+    let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
+
+    /// The ONLY way to build an AttemptExecutionProfile (PROMPT-008).
+    ///
+    /// Everything a provider request needs is derived here from two inputs: the
+    /// authority profile fixed by the Authority Root, and the fallback cursor
+    /// that selects a side. Nothing is passed in that could be derived, so a
+    /// caller cannot supply a CanonicalRole that disagrees with the agent name,
+    /// or a tool set that disagrees with the role.
+    ///
+    /// That is the whole clause. The previous code assembled these fields from a
+    /// mutable session cache, the last user message, a Role map and the fallback
+    /// projection — four sources that can disagree, and did (the B-side request
+    /// occasionally carried the wrong tool set).
+    let buildAttemptExecutionProfile
+        (authority: AuthorityExecutionProfile)
+        (cursor: AgentPairCursor.FallbackCursor)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (providerRun: ProviderRunIdentity)
+        (origin: PromptOrigin)
+        : AttemptExecutionProfile =
+        { Authority = authority
+          PhysicalUserMessageId = physicalUserMessageId
+          ProviderRun = providerRun
+          Origin = origin
+          EffectiveAgent = effectiveAgentFor authority cursor
+          SystemPromptId = systemPromptIdFor authority.CanonicalRole
+          ToolCapabilitySet = Roles.permissions authority.CanonicalRole }
+
+    /// COMPANION-002: Companion eligibility reads the CanonicalRole of the
+    /// active Logical Run and nothing else.
+    ///
+    /// Lives here because the profile is the single source COMPANION-002 names.
+    /// Answering from an agent string, a session cache or a message's agent field
+    /// is what the clause forbids, and those are all unreachable from a profile.
+    let hasCompanion (profile: AttemptExecutionProfile) : bool =
+        match profile.CanonicalRole with
+        | Role.Orchestrator
+        | Role.Manager
+        | Role.Coder
+        | Role.Meditator
+        | Role.DevOps
+        | Role.Reviewer -> true
+        // AGENT-008: internal agents never recursively create a Companion.
+        | Role.Inspector
+        | Role.Browser
+        | Role.Blogger
+        | Role.Executor -> false
+
+    /// AGENT-007 layer two: the runtime execution gate reads the same set the
+    /// Host-visible schema was built from.
+    let allowsTool (permission: ToolPermission) (profile: AttemptExecutionProfile) : bool =
+        Set.contains permission profile.ToolCapabilitySet

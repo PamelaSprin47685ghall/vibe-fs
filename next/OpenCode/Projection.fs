@@ -3,61 +3,72 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Domain.ProviderProjection
+open Wanxiangshu.Next.Kernel.Identity
 
-/// Provider-visible parts only. Unknown host noise is dropped, never raw-object
-/// embedded into canonical JSON (SSOT P0-3).
-type ProviderVisiblePart =
-    | Text of text: string
-    | Reasoning of text: string
-    | ToolCall of callId: string * name: string * argsCanonical: string
-    | ToolResult of callId: string * resultCanonical: string
-
-type ProviderVisibleMessage =
-    { Role: string
-      Parts: ProviderVisiblePart list }
-
+/// Host raw object → `ProviderWireProjection` (VERIFY-005 adapter boundary).
+///
+/// This module owns dynamic property access; `Domain.ProviderProjection` owns the
+/// types and the questions asked of them. It produces ONLY the wire projection —
+/// the semantic one is reached through `toSemantic`, so no second decoding path
+/// can disagree about what a message meant.
+///
+/// The previous version defined its own `ProviderVisibleMessage` used for both
+/// byte equality and cross-session comparison, which is why the canary matcher
+/// grew a separate normaliser beside it (VERIFY-007).
 module Projection =
-    let canonicalJson = CanonicalJson.canonicalJson
 
     let private readField (value: obj) (name: string) : obj =
-        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private readString (value: obj) (name: string) : string option =
         let field = readField value name
-        if isNull field then None
+
+        if isNull field then
+            None
         else
             let text = unbox<string> field
             if String.IsNullOrWhiteSpace text then None else Some text
 
+    let private firstString (value: obj) (names: string list) =
+        names |> List.tryPick (readString value)
+
+    /// Host messages arrive either bare or wrapped as `{ info, parts }`.
     let private infoObject (rawObj: obj) : obj =
         if isNull rawObj then null
         elif not (isNull rawObj?info) then rawObj?info
         else rawObj
 
-    let private rawParts (rawObj: obj) : obj list =
-        let parts = readField rawObj "parts"
-        if isNull parts then []
-        else emitJsExpr parts "Array.from($0)" |> unbox<obj array> |> Array.toList
-
-    let messageId (rawObj: obj) : string option =
-        let info = infoObject rawObj
-        readString info "id" |> Option.orElse (readString rawObj "id")
-
-    let private roleOf (rawObj: obj) : string =
-        let info = infoObject rawObj
-        readString rawObj "role"
-        |> Option.orElse (readString info "role")
-        |> Option.defaultValue ""
-        |> fun value -> value.ToLowerInvariant()
+    let private rawArray (value: obj) : obj list =
+        if isNull value then
+            []
+        else
+            emitJsExpr value "Array.from($0)" |> unbox<obj array> |> Array.toList
 
     let private canonicalArgs (value: obj) : string =
-        if isNull value then "{}"
-        elif emitJsExpr value "typeof $0 === 'string'" then unbox<string> value
-        else canonicalJson value
+        if isNull value then
+            "{}"
+        elif emitJsExpr value "typeof $0 === 'string'" then
+            unbox<string> value
+        else
+            CanonicalJson.canonicalJson value
 
-    /// Project one host part into provider-visible shape. Returns None for
-    /// bookkeeping-only parts (step markers, ids, synthetic flags, etc.).
-    let projectPart (partObj: obj) : ProviderVisiblePart option =
+    let private firstCanonical (partObj: obj) (names: string list) =
+        names
+        |> List.tryPick (fun name ->
+            let value = readField partObj name
+            if isNull value then None else Some(canonicalArgs value))
+
+    /// Decode one Host part.
+    ///
+    /// `None` for bookkeeping parts. ARCH-004 and COMPANION-012 both require that
+    /// step markers, patches, files and compaction entries never enter a
+    /// projection: the model never saw them, so including them would make the
+    /// prefix-cache check fail on content that was never sent.
+    let decodePart (partObj: obj) : WirePart option =
         if isNull partObj then
             None
         else
@@ -67,149 +78,109 @@ module Projection =
                 |> fun value -> value.ToLowerInvariant()
 
             match kind with
-            | "text" ->
-                readString partObj "text"
-                |> Option.map Text
+            | "text" -> readString partObj "text" |> Option.map WireText
+
             | "reasoning"
-            | "thinking" ->
-                readString partObj "text"
-                |> Option.orElse (readString partObj "reasoning")
-                |> Option.map Reasoning
+            | "thinking" -> firstString partObj [ "text"; "reasoning" ] |> Option.map WireReasoning
+
             | "tool-call"
             | "tool_call"
             | "tool" ->
-                let callId =
-                    readString partObj "callID"
-                    |> Option.orElse (readString partObj "callId")
-                    |> Option.orElse (readString partObj "id")
-                    |> Option.defaultValue ""
-
-                let name =
-                    readString partObj "tool"
-                    |> Option.orElse (readString partObj "name")
-                    |> Option.defaultValue ""
-
                 let args =
-                    let a = readField partObj "args"
-                    let b = readField partObj "arguments"
-                    if not (isNull a) then canonicalArgs a
-                    elif not (isNull b) then canonicalArgs b
-                    else "{}"
+                    firstCanonical partObj [ "args"; "arguments" ] |> Option.defaultValue "{}"
 
-                if String.IsNullOrWhiteSpace name && String.IsNullOrWhiteSpace callId then
-                    None
-                else
-                    Some(ToolCall(callId, name, args))
+                // REVIEW-004 needs the call id, so a tool call without one is not
+                // usable evidence. Dropped rather than given an empty id, which
+                // would let "no identity" look like a real one.
+                match firstString partObj [ "callID"; "callId"; "id" ], firstString partObj [ "tool"; "name" ] with
+                | Some callId, Some name -> Some(WireToolCall(ToolCallId.create callId, name, args))
+                | _ -> None
+
             | "tool-result"
             | "tool_result" ->
-                let callId =
-                    readString partObj "callID"
-                    |> Option.orElse (readString partObj "callId")
-                    |> Option.orElse (readString partObj "id")
-                    |> Option.defaultValue ""
-
                 let result =
-                    let r = readField partObj "result"
-                    let o = readField partObj "output"
-                    let c = readField partObj "content"
-                    if not (isNull r) then canonicalArgs r
-                    elif not (isNull o) then canonicalArgs o
-                    elif not (isNull c) then canonicalArgs c
-                    else "null"
+                    firstCanonical partObj [ "result"; "output"; "content" ]
+                    |> Option.defaultValue "null"
 
-                Some(ToolResult(callId, result))
-            // Host bookkeeping — never provider-visible.
-            | "step-start"
-            | "step-finish"
-            | "step_start"
-            | "step_finish"
-            | "compaction"
-            | "patch"
-            | "file"
-            | "image"
-            | "" -> None
+                firstString partObj [ "callID"; "callId"; "id" ]
+                |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
+
             | _ -> None
 
-    /// Formal visible assistant text only. Reasoning/thinking and tool parts are excluded.
-    let formalTextFromParts (parts: obj array) : string =
-        if isNull parts then
-            ""
-        else
-            parts
-            |> Array.choose (fun part ->
-                match projectPart part with
-                | Some(Text text) -> Some text
-                | _ -> None)
-            |> String.concat ""
-
-    let projectMessage (rawObj: obj) : ProviderVisibleMessage option =
+    let decodeMessage (rawObj: obj) : WireMessage option =
         if isNull rawObj then
             None
         else
-            let role = roleOf rawObj
-            let parts = rawParts rawObj |> List.choose projectPart
+            let info = infoObject rawObj
 
-            let parts =
-                if parts <> [] then
-                    parts
-                else
-                    // Fallback: plain text field on message root (legacy fixtures).
-                    let info = infoObject rawObj
-                    match readString rawObj "text" |> Option.orElse (readString info "text") with
-                    | Some text -> [ Text text ]
-                    | None -> []
+            let role =
+                firstString rawObj [ "role" ]
+                |> Option.orElse (firstString info [ "role" ])
+                |> Option.defaultValue ""
+                |> fun value -> value.ToLowerInvariant()
 
-            if String.IsNullOrWhiteSpace role && parts = [] then
+            let parts = rawArray (readField rawObj "parts") |> List.choose decodePart
+
+            if String.IsNullOrWhiteSpace role && List.isEmpty parts then
                 None
             else
                 Some { Role = role; Parts = parts }
 
-    let projectMessages (rawMsgs: obj list) : ProviderVisibleMessage list =
-        rawMsgs |> List.choose projectMessage
+    /// Decode a whole provider request.
+    ///
+    /// `System` stays a separate list rather than becoming a `role = "system"`
+    /// message, because that is how the Host sends it
+    /// (`experimental.chat.system.transform` takes `system: string[]`). Folding it
+    /// into messages would make the wire projection disagree with the bytes it
+    /// exists to mirror.
+    let decodeRequest (requestObj: obj) : ProviderWireProjection =
+        let model = readField requestObj "model"
 
-    let private partValue (part: ProviderVisiblePart) : obj =
-        match part with
-        | Text text -> createObj [ "type", box "text"; "text", box text ]
-        | Reasoning text -> createObj [ "type", box "reasoning"; "text", box text ]
-        | ToolCall(callId, name, args) ->
-            createObj
-                [ "type", box "tool-call"
-                  "callID", box callId
-                  "tool", box name
-                  "args", box args ]
-        | ToolResult(callId, result) ->
-            createObj
-                [ "type", box "tool-result"
-                  "callID", box callId
-                  "result", box result ]
+        { ProviderId = firstString model [ "providerID"; "providerId" ]
+          ModelId = firstString model [ "modelID"; "modelId"; "id" ]
+          Variant = firstString model [ "variant" ]
+          Tools =
+            rawArray (readField requestObj "tools")
+            |> List.choose (fun tool ->
+                firstString (readField tool "function") [ "name" ]
+                |> Option.orElse (firstString tool [ "name" ]))
+          System =
+            rawArray (readField requestObj "system")
+            |> List.choose (fun entry -> if isNull entry then None else Some(unbox<string> entry))
+          Messages = rawArray (readField requestObj "messages") |> List.choose decodeMessage }
 
-    /// Stable provider-visible JSON. Excludes id/sessionID/agent/synthetic/
-    /// timestamp/cost/usage/directory/status and any host bookkeeping.
-    let canonicalMessageJson (rawObj: obj) : string =
-        match projectMessage rawObj with
-        | None -> "null"
+    /// Build a wire projection from an already-extracted message list.
+    ///
+    /// Used at the `messages.transform` boundary, where the Host hands over the
+    /// message view while tools and system live elsewhere in the request.
+    let decodeMessageView (rawMessages: obj list) : ProviderWireProjection =
+        { ProviderId = None
+          ModelId = None
+          Variant = None
+          Tools = []
+          System = []
+          Messages = rawMessages |> List.choose decodeMessage }
+
+    /// The Host's own message id.
+    ///
+    /// Not part of either projection: an id identifies a message, it is not
+    /// content the model saw. HOST-010's binding needs it, so it is read
+    /// separately and stays out of both.
+    let hostMessageId (rawObj: obj) : string option =
+        let info = infoObject rawObj
+        readString info "id" |> Option.orElse (readString rawObj "id")
+
+    /// HOST-005: this turn's formal assistant text, excluding reasoning and tool
+    /// parts. The Companion B record is built from it (COMPANION-005).
+    let formalText (rawObj: obj) : string =
+        match decodeMessage rawObj with
+        | None -> ""
         | Some message ->
-            let normalized =
-                createObj
-                    [ "role", box message.Role
-                      "parts",
-                      box (message.Parts |> List.map partValue |> List.toArray) ]
-
-            canonicalJson normalized
-
-    let sameCanonicalMessage (left: obj) (right: obj) : bool =
-        canonicalMessageJson left = canonicalMessageJson right
-
-    let replaceRawPrefix (newPrefix: obj list) (prefixLen: int) (rawMsgs: obj list) : obj list =
-        let len = List.length rawMsgs
-
-        if prefixLen <= 0 then
-            List.append newPrefix rawMsgs
-        elif prefixLen >= len then
-            newPrefix
-        else
-            let rawTail = rawMsgs |> List.skip prefixLen
-            List.append newPrefix rawTail
-
-    let preserveRawTail (prefix: obj list) (rawTail: obj list) : obj list =
-        List.append prefix rawTail
+            message.Parts
+            |> List.choose (fun part ->
+                match part with
+                | WireText text -> Some text
+                | WireReasoning _
+                | WireToolCall _
+                | WireToolResult _ -> None)
+            |> String.concat ""

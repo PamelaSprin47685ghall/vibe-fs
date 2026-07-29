@@ -204,6 +204,34 @@ const DUPLICATE_ALGORITHM_OWNERS = [
   { symbol: 'sha256Hex', owners: ['Domain/PromptAuthority.fs'] },
   { symbol: 'reviewWitness', owners: ['Domain/ReviewWitness.fs'] },
   { symbol: 'confirmPerfect', owners: ['Review/ReviewProgram.fs'] },
+
+  // Each clause below names ONE source of truth, so each function has one owner.
+  { symbol: 'buildAttemptExecutionProfile', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-008
+  { symbol: 'hasCompanion', owners: ['Domain/PromptAuthority.fs'] }, // COMPANION-002
+  { symbol: 'systemPromptIdFor', owners: ['Domain/PromptAuthority.fs'] }, // AGENT-001
+  { symbol: 'toSemantic', owners: ['Domain/ProviderProjection.fs'] }, // VERIFY-007
+  { symbol: 'sealDigest', owners: ['Domain/ProviderProjection.fs'] }, // REVIEW-010
+  { symbol: 'renderWire', owners: ['Domain/ProviderProjection.fs'] }, // VERIFY-007
+  { symbol: 'renderSemantic', owners: ['Domain/ProviderProjection.fs'] }, // VERIFY-007
+  { symbol: 'isAppendOnlyPrefix', owners: ['Domain/ProviderProjection.fs'] }, // ARCH-004
+]
+
+/// Types whose construction is restricted to one module.
+///
+/// PROMPT-008 forbids assembling an AttemptExecutionProfile field by field: it
+/// must come from `buildAttemptExecutionProfile`, which derives everything
+/// derivable so a caller cannot supply a role that disagrees with the agent name.
+///
+/// F# record construction is structural, so there is no type name to grep for.
+/// The `fields` below exist on no other type in the codebase, so a file that
+/// assigns all of them IS building one — a real signal, not a heuristic.
+const SINGLE_CONSTRUCTOR_TYPES = [
+  {
+    type: 'AttemptExecutionProfile',
+    clause: 'PROMPT-008',
+    owner: 'next/Domain/PromptAuthority.fs',
+    fields: ['SystemPromptId =', 'ToolCapabilitySet ='],
+  },
 ]
 
 // The active test runner. VERIFY-008 replaces the Fable runner with a plain
@@ -491,6 +519,23 @@ for (const { symbol, owners } of DUPLICATE_ALGORITHM_OWNERS) {
     fail(
       'duplicate-algorithm',
       `'${symbol}' defined in ${hits.length} places (${hits.join(', ')}); owners: ${owners.join(', ')}`,
+    )
+  }
+}
+
+// ── gate: one constructor per restricted type ───────────────────────────────
+
+for (const { type, clause, owner, fields } of SINGLE_CONSTRUCTOR_TYPES) {
+  const builders = productionFiles.filter((file) => {
+    if (!isFs(file) || norm(file) === owner) return false
+    const text = read(file)
+    return fields.every((field) => text.includes(field))
+  })
+
+  for (const builder of builders) {
+    fail(
+      'single-constructor',
+      `${builder}: assembles ${type} field by field; ${clause} requires construction through ${owner}`,
     )
   }
 }

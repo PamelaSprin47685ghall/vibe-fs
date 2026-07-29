@@ -86,6 +86,14 @@ module Identity =
     /// make that check expressible but meaningless.
     type ToolCallId = private ToolCallId of string
 
+    /// Which system prompt a provider request carried (PROMPT-008).
+    ///
+    /// An id, not the text. The prompt body lives in `prompts/*.md` and is
+    /// loaded at the Host boundary; carrying it in the profile would put a
+    /// multi-kilobyte string into every diagnostic and every journal line that
+    /// mentions an attempt.
+    type SystemPromptId = private SystemPromptId of string
+
     // ── review (SSOT/05) ────────────────────────────────────────────────────
 
     /// One review barrier: the question "is this tree good?" asked once.
@@ -210,6 +218,10 @@ module Identity =
     module ToolCallId =
         let create (value: string) = ToolCallId value
         let value (ToolCallId v) = v
+
+    module SystemPromptId =
+        let create (value: string) = SystemPromptId value
+        let value (SystemPromptId v) = v
 
     module ReviewBarrierId =
         let create (value: string) = ReviewBarrierId value

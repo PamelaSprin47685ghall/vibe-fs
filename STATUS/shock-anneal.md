@@ -255,6 +255,76 @@ journal 与 fold 因此各持一份「什么算同一次 attempt」的定义。F
 
 `SessionAgentProjection.Linkage` 改名 `Handles`，类型从两张 map（linked / unlinked）变为一张 `Map<HandleId, HandleRecord>` 加三态生命周期。旧模型无法表达 completed-awaiting-join，而 EXEC-005 要求 `list` 显示该状态。
 
+### 包 0d：AttemptExecutionProfile 与两种 Provider Projection
+
+| 项 | 值 |
+|----|----|
+| 条款 | PROMPT-008 AGENT-001 AGENT-007 AGENT-010 COMPANION-002 COMPANION-012 ARCH-004 REVIEW-010 VERIFY-003 VERIFY-005 VERIFY-007 |
+| 目标模块 | `Domain/ProviderProjection.fs`（新建）`Domain/PromptAuthority.fs` `OpenCode/Projection.fs` `scripts/architecture-gate.mjs` |
+| 生产 | DOMAIN_MIGRATED（类型与唯一构造函数完成；贯通全链属包 B） |
+| 测试 | UNTOUCHED |
+
+#### 唯一构造函数
+
+`buildAttemptExecutionProfile` 只接收两个不可推导的输入——Authority Root 固定的 authority profile，与选边的 fallback cursor——其余全部在函数内派生：
+
+```text
+EffectiveAgent    ← effectiveAgentFor authority cursor
+SystemPromptId    ← systemPromptIdFor authority.CanonicalRole
+ToolCapabilitySet ← Roles.permissions authority.CanonicalRole
+```
+
+调用方因此无法传入与 agent 名不一致的 CanonicalRole，也无法传入与 role 不一致的工具集。PROMPT-008 禁止的「从 mutable session cache、最后一条 user message、Role map 和 fallback projection 临时拼装」在签名层面不可表达。
+
+`SystemPromptId` 只由 CanonicalRole 决定，tier 不参与：AGENT-010 要求 `permissions(fast-coder) = permissions(deep-coder)`，让 tier 参与会使这一等式失去结构保证。
+
+同时把两个判断移入 profile：
+
+```text
+hasCompanion  COMPANION-002：eligibility 只读 CanonicalRole，
+              从 profile 出发无法访问 agent 字符串或 session cache
+allowsTool    AGENT-007 第二层：runtime gate 与 provider schema 读同一个集合
+```
+
+#### 新增门禁：single-constructor
+
+F# record 构造是结构化的，没有类型名可搜。判据改为「同时赋值 `SystemPromptId =` 与 `ToolCapabilitySet =`」——这两个字段名在全仓不属于任何其它类型，因此同时出现即为在构造该 profile。
+
+已用探针验证门禁真的会红：临时写入一个手工拼装 profile 的文件，`architecture-gate` 报
+
+```text
+single-constructor (1)
+  next/Session/GateProbe.fs: assembles AttemptExecutionProfile field by field;
+  PROMPT-008 requires construction through next/Domain/PromptAuthority.fs
+```
+
+删除探针后恢复绿。声明了但没验证过会红的门禁，与包 W 记录的空 heartbeat 是同一类缺陷。
+
+#### 两种 Provider Projection 拆分
+
+旧实现只有一个 `ProviderVisibleMessage`，同时承担字节相等与语义相等。代价可见：canary 匹配器为此在 `strict-mock-matches.js` 里另写了一份 `sealProviderVisible` 规范化函数——同一知识的第二处实现，且两者对「什么算可见」的定义并不一致。
+
+现在是两个类型：
+
+| | 含 ID | 判断标准 | 可比范围 | 用途 |
+|---|---|---|---|---|
+| `ProviderWireProjection` | 是 | 字节相等 | 同一 Session 时间线内 | 前缀缓存（ARCH-004）、Seal（REVIEW-010） |
+| `ProviderSemanticProjection` | 否 | 语义相等 | 跨 Session、跨重启 | fixture 键（VERIFY-003）、Blogger delta（COMPANION-012） |
+
+`toSemantic` 是唯一的降级函数。全仓不存在返回 `ProviderWireProjection` 的函数（除类型定义本身），所以 `Semantic → Wire` 在签名层面不存在——丢弃的 ID 无法恢复，这一点由「没有那个函数」表达，而不是由注释表达。
+
+provider 与 model 保留在 Semantic 中：它们是配置而非身份，且 FALLBACK-002 的 A/B 切换会改变 model，看不见它的 fixture 无法区分两侧。
+
+#### 手写规范化而非反射序列化
+
+两个 `render*` 函数手工拼 JSON。序列化库的字段顺序与 optional 处理会随版本变化，而这两个输出都是持久判据：Wire digest 会成为 durable seal，Semantic 字符串会成为 fixture 键。依赖升级不得使任何一方失效。
+
+#### OpenCode/Projection.fs 降为纯 adapter
+
+它现在只做 Host raw object → Wire，不再定义自己的投影类型。语义投影只能经 `toSemantic` 得到，因此不存在第二条解码路径对「这条消息是什么意思」给出不同答案。
+
+顺带修正两处：tool call 缺 `callID` 时整个 part 被丢弃，而不是补一个空 id——REVIEW-004 需要 call id，空字符串会让「没有身份」看起来像一个真实身份。`system` 保持独立列表而不折进 messages，因为 Host 就是这样发的（`experimental.chat.system.transform` 收 `system: string[]`），折进去会让 wire projection 与它要镜像的字节不一致。
+
 ### 包 A：PromptDispatcher
 
 | 项 | 值 |

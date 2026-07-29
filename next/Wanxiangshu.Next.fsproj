@@ -21,6 +21,7 @@
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
+    <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
