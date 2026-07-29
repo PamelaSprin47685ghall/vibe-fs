@@ -237,6 +237,13 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(reviewerInspector.agent, 'fast-inspector');
     assert.equal(reviewerInspector.output, 'test output');
 
+    const devopsCoder = JSON.parse(await hooks.tool.coder.execute(
+      { agent: 'fast-coder', prompts: ['apply the requested edit'] },
+      { sessionID: 'devops-contract' },
+    ));
+    assert.equal(devopsCoder.agent, 'fast-coder');
+    assert.equal(devopsCoder.output, 'test output');
+
     const context = { sessionID: 'manager-contract' };
     const unknown = JSON.parse(await hooks.tool.fork.execute({ agent: 'deep-inspecter', prompt: 'work' }, context));
     assert.match(unknown.error, /Unknown managed agent 'deep-inspecter'/);
