@@ -1,0 +1,30 @@
+runner: build is current (166 sources, 164 artifacts)
+runner: 1 test file(s), 1000ms per test
+✔ utcOffset produces a value carrying an explicit offset (1.003257ms)
+✔ a bare Date lacks the offset that F# comparison depends on (0.109573ms)
+✔ deadline comparisons are correct through the facade clock (0.260338ms)
+✔ deadline verdict does not depend on the ambient timezone (0.244598ms)
+✔ a raw array folds to nothing, which is why toList exists (0.304481ms)
+✔ toList round-trips through listItems (0.675823ms)
+✔ fold.apply converts arrays instead of silently folding nothing (1.3721ms)
+✔ fold.apply rejects a single envelope passed where a sequence was meant (0.54899ms)
+✔ facts are built by case name, and an unknown name fails loudly (0.179046ms)
+✔ asFact wraps an AgentFact as the top-level Agent case (0.244122ms)
+✔ caseOf refuses a non-union value instead of returning undefined (0.130108ms)
+✔ stream cases resolve by name (0.11326ms)
+✔ an envelope survives NDJSON round trip and still folds (4.42592ms)
+✔ journal.deserialize reports a decode failure as data, not an exception (0.244418ms)
+✔ pre-0.5.0 journals are refused rather than guessed (PERSIST-005) (0.199788ms)
+✔ a current-schema journal line is not mistaken for a legacy one (0.575619ms)
+✔ fallback cursor exposes offsets as case names, not ordinals (0.439879ms)
+✔ cursor.effectiveAgent accepts a plain object as the F# record (0.118225ms)
+✔ the facade resolves exactly one versioned fable-library directory (0.15212ms)
+✔ the AgentFact union is non-empty, so case resolution is meaningful (0.076725ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 165.299714

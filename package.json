@@ -17,24 +17,34 @@
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
+    "format": "node scripts/pre-commit-formatter.mjs",
+
+    "gate:ssot": "node scripts/ssot-lint.mjs",
+    "gate:architecture": "node scripts/architecture-gate.mjs",
+    "gate:shock": "node scripts/shock-audit.mjs",
+    "gate:docs": "node scripts/strip-doc-bold.mjs",
+    "gate:static": "npm run gate:ssot && npm run gate:architecture && npm run gate:docs",
+
     "build": "node scripts/clean-fable-output.mjs build/next && dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next",
     "postbuild": "node scripts/postbuild.mjs",
+
+    "test:mjs": "node tests-mjs/runner.mjs",
     "test:compile": "node scripts/clean-fable-output.mjs build/tests-next && cd tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next",
     "test:next": "node --test tests-next/runner.test.mjs && node tests-next/runner.js --build-dir build/tests-next",
+    "test:unit": "npm run test:mjs && npm run test:compile && npm run test:next",
+
     "test:manager-tools": "node --test testkit/opencode/tests/manager-tool-contract.mjs",
-    "test": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs && npm run test:e2e:p0",
+    "test:harness": "node testkit/opencode/tests/gate-testkit.mjs",
+
     "test:e2e:p0": "CANARY_REPEAT=1 node scripts/run-canary-staggered.mjs",
-    "test:e2e:p0:parallel": "CANARY_REPEAT=1 node scripts/run-canary-staggered.mjs",
     "test:e2e:p0:three": "CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs",
     "test:e2e:companion": "node testkit/opencode/tests/companion-canary.mjs",
     "test:e2e:manager-companion": "node testkit/opencode/tests/manager-companion-canary.mjs",
     "test:e2e:reviewer": "node testkit/opencode/tests/reviewer-verdict-canary.mjs",
     "test:e2e:executor": "node testkit/opencode/tests/executor-canary.mjs",
-    "test:release": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs && npm run test:e2e:p0:three",
-    "format": "node scripts/pre-commit-formatter.mjs",
-    "test:e2e:p0:full": "CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs",
-    "test:release:full": "npm run test:full",
-    "test:full": "npm run build && npm run test:compile && npm run test:next && npm run test:manager-tools && node testkit/opencode/tests/gate-testkit.mjs && npm run test:e2e:p0:three"
+
+    "test": "npm run gate:static && npm run build && npm run test:unit && npm run test:manager-tools && npm run test:harness && npm run test:e2e:p0",
+    "test:release": "npm run gate:static && npm run build && npm run test:unit && npm run test:manager-tools && npm run test:harness && npm run test:e2e:p0:three"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.5.1",

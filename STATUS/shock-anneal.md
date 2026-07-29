@@ -202,7 +202,7 @@
 
 #### 必须在 mjs 侧重建覆盖的 15 个静默失效测试
 
-`architecture-gate.mjs` 新增的 `fsproj-drift` 门禁发现 5 个测试文件在 `c3c35756`（`refactor: unify authority fallback and process flows`）从 `.fsproj` 移除但文件留在磁盘上。**它们从那时起就没有运行过**，`test:next` 的绿灯不覆盖这 15 个断言。
+`architecture-gate.mjs` 新增的 `fsproj-drift` 门禁发现 5 个测试文件在 `c3c35756`（`refactor: unify authority fallback and process flows`）从 `.fsproj` 移除但文件留在磁盘上。它们从那时起就没有运行过，`test:next` 的绿灯不覆盖这 15 个断言。
 
 其中 2 个断言的正是 SSOT 现在禁止的语义，属于旧世界的保护罩，不得重建：
 
@@ -376,12 +376,42 @@ FallbackExhausted        FALLBACK-005   absent (fact not defined yet)
 
 行数门禁删除后重测：`291 passed / 1 failed / 292 total`。变化可完全解释——删掉 1 个行数测试（293→292），§17 语义门禁不再因行数失败而转绿（3 failed→1 failed）。剩余 1 个失败是 `ReviewRequirementBoundaryTests`，属 Review 语义，由包 D 覆盖。
 
+## 封炉期工装（已完成）
+
+不改生产语义，因此允许在休克开始前运行编译与测试验证其自身正确。
+
+| 项 | 结果 |
+|----|------|
+| tag `ssot-freeze-0.5.0` | 已打，指向 `0e2e4239` |
+| `scripts/architecture-gate.mjs` | 12 个门禁全部迁出测试套件；新增 `fsproj-drift`；Kernel/Domain 的 host-boundary 不再接受文件名豁免 |
+| `tests-next/Gates/*.fs` | 已删除，`.fsproj` 条目已移除 |
+| `fsproj-drift` 首次运行的产出 | 发现 6 个死文件并删除；其中 5 个是 `c3c35756` 起就未运行的 Prompt Authority 测试，15 个断言登记入包 T |
+| `tests-mjs/domain.mjs` | Fable 约定 facade。38 导出，封死三个静默陷阱 |
+| `tests-mjs/domain.meta.test.mjs` | facade 契约，20 测试全绿 |
+| `tests-mjs/runner.mjs` | 陈旧产物 fail closed + 每测试 1000ms 硬超时 + 300s 套件上限 |
+| `package.json` | 新增 `gate:static` / `gate:shock` / `test:mjs` / `test:unit` / `test:harness`；删除 `test:e2e:p0:parallel`、`test:e2e:p0:full`、`test:release:full`、`test:full` 四个重复别名 |
+
+### facade 封死的三个静默陷阱
+
+三者共同点：不抛异常、不报类型错误，只是答案错。
+
+| 陷阱 | 后果 | 出口 |
+|------|------|------|
+| `new Date(iso)` 无 `offset` 属性 | Fable `compareDates` 走 DateTime 分支加本地时区偏移；`Deadline.isExpired` 对未到期的 deadline 返回 true | `utcOffset()` / `clockAt()` |
+| JS 数组的 `tail` 是 `undefined` | `FSharpList__get_IsEmpty` 判其为空，`List.fold` 直接返回种子；投影全空而断言全过 | `toList()`，`fold.apply` 自动转换并拒绝单值 |
+| union tag 是位置序数 | 中间插入新 case 后按序数构造会静默造出另一个事实 | `fact(caseName, payload)`，名字从 `cases()` 解析，未知即抛错 |
+
+实测第二项：`List.fold((a,x)=>a+x, 0, [1,2,3])` 返回 `0`；换成 `ofArray` 返回 `6`。
+
+### 陈旧产物门禁实测
+
+```text
+build/next 落后 1465s → runner 拒绝运行，指出最新源与最新产物
+npm run build 之后    → runner: build is current (166 sources, 164 artifacts)
+```
+
+166 源 = 165 `.fs` + 1 `.fsproj`；`AssemblyInfo.fs` 不产出 JS，故 164 产物。差额可完全解释。
+
 ## 封炉期剩余
 
-- [ ] `scripts/architecture-gate.mjs`：迁移 Gates 的文件/正则检查
-- [ ] `tests-mjs/domain.mjs`：Fable 约定 facade
-- [ ] `tests-mjs/domain.meta.test.mjs`：facade 元测试（offset 构造）
-- [ ] runner 陈旧产物 fail-closed 门禁
-- [ ] tag `ssot-freeze-0.5.0`
-
-上述四项属于封炉工装，不改生产语义，因此允许在休克开始前运行编译与测试验证其自身正确。
+无。休克期可以开始，入口是包 0（Identity）。

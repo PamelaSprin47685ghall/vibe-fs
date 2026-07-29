@@ -166,16 +166,21 @@ assistant message 在 transform 之前已经创建并持久化。
 命令：
 
 ```bash
-node scripts/ssot-lint.mjs                          # 第 0 层：规范一致性
-node scripts/shock-audit.mjs                        # 第 0 层：旧符号灭绝 + 单一写入口
-node scripts/architecture-gate.mjs                  # 第 0 层：架构门禁
-dotnet build next/Wanxiangshu.Next.fsproj           # 生产 .NET
-npm run build                                       # 生产 Fable → build/next
-npm run test:next                                   # 第 1–3 层（mjs，无编译）
-node testkit/opencode/tests/gate-testkit.mjs        # harness 自检
-npm run test:e2e:p0:three                           # P0 三轮
-npm run test:release
+npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs
+npm run gate:shock             # 第 0 层：旧符号灭绝 + 单一写入口（休克期专用）
+
+dotnet build next/Wanxiangshu.Next.fsproj    # 生产 .NET
+npm run build                                # 生产 Fable → build/next
+
+npm run test:mjs               # 第 1–3 层（mjs，无编译步骤）
+npm run test:unit              # test:mjs + 残余 F# 套件（包 T 完成后收缩为 test:mjs）
+npm run test:harness           # gate-testkit：mock 森林与隔离自检
+npm run test:e2e:p0            # 单轮 canary
+npm run test:e2e:p0:three      # P0 三轮
+npm run test:release           # gate:static → build → unit → harness → P0×3
 ```
+
+`test:mjs` 拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
 
 先跑当前改动的最小目标测试；该阶段契约证明后才扩大范围。
 
@@ -189,6 +194,15 @@ repeat-until-pass 宣称成功、在测试中手工写 projection 终态。
 理由不是省编译时间，而是语言边界物理性地阻止测试触碰实现内部。能从 mjs 干净进入的
 恰好是 SSOT 认定为事实的契约面；碰不到的恰好是实现自由部分。
 
+布局：
+
+```text
+tests-mjs/runner.mjs              入口。陈旧产物 fail closed + 每测试 1000ms 硬超时
+tests-mjs/domain.mjs              唯一允许知道 Fable 输出形状的文件
+tests-mjs/domain.meta.test.mjs    facade 自身的契约（锁住三个静默陷阱）
+tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
+```
+
 铁律：
 
 - 禁止断言 DU tag 序数、Fable 命名约定（`Module_` 前缀、`$reflection`、`FSharpMap` 内部）
@@ -197,9 +211,17 @@ repeat-until-pass 宣称成功、在测试中手工写 projection 终态。
 - 禁止只断言真值。mjs 无编译期重命名保护，字段改名会静默读到 `undefined`；
   断言必须比对完整结构或完整序列化文本
 - 禁止为测试可见性新增生产 export。缺契约面就补契约，不补 export
-- `build/next` 早于 `next/**/*.fs` 时测试运行器必须拒绝运行（fail closed）
-- 已知陷阱：`DateTimeOffset` 必须由 facade 构造为携带 offset 的值。
-  直接传 `new Date()` 会让时间比较反向错误且不报错
+
+三个已实证的静默陷阱，全部由 facade 封死，`domain.meta.test.mjs` 锁住：
+
+| 陷阱 | 后果 | facade 出口 |
+|------|------|------------|
+| `new Date(iso)` 无 `offset` 属性 | Fable `compareDates` 走 DateTime 分支加本地时区偏移，`isExpired` 反向错误 | `utcOffset()` / `clockAt()` |
+| JS 数组的 `tail` 是 `undefined` | `FSharpList__get_IsEmpty` 判其为空，`List.fold` 返回种子，投影全空而断言全过 | `toList()`，`fold.apply` 自动转换 |
+| union tag 是位置序数 | 中间插入新 case 后按序数构造会静默造出另一个事实 | `fact(caseName, payload)`，未知名字抛错 |
+
+三者共同点：不抛异常、不报类型错误，只是答案错。一个写错的测试宣布错误的实现正确，
+比没有测试更危险。
 
 测试名直接引用条款：`FALLBACK_003_duplicate_signal_advances_once`。
 粒度原则：入口粗，覆盖细。一个测试只验证一条因果链。
