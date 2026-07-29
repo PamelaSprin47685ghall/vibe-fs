@@ -256,6 +256,18 @@ module Identity =
             | HandleId.Pty id -> "pty:" + PtyHandleId.value id
             | HandleId.ManagerJob id -> "manager-job:" + ManagerJobId.value id
 
+        /// The agent handle inside an agent handle, or None for the other kinds.
+        ///
+        /// Not the inverse of `describe`: this reads the typed case out of the
+        /// union, it does not parse a rendered string. EXEC-009's prohibition is on
+        /// reviving a retired id as a fork target, so callers must still ask
+        /// `HandleProjection.isRetired` before acting on the result.
+        let tryAgent (handle: HandleId) =
+            match handle with
+            | HandleId.Agent id -> Some id
+            | HandleId.Pty _
+            | HandleId.ManagerJob _ -> None
+
     module WorktreeIdentity =
         let create (value: string) = WorktreeIdentity value
         let value (WorktreeIdentity v) = v

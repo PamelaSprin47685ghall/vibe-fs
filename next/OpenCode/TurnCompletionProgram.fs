@@ -123,20 +123,26 @@ module TurnCompletionProgram =
         let sessionKey = SessionId.value turn.SessionId
         disposeExecutorRuntime sessionKey
 
-        // SHOCK-UNMIGRATED[EXEC-009]: a linked child's Authority Root must name the
-        // managed agent from the durable `HandleLinked.TargetAgent`, not one rebuilt
-        // from its AgentRole — rebuilding invented tier Fast, so a `deep-coder`
-        // child acquired a root naming `fast-coder` and FALLBACK-002's A/B pair was
-        // wrong for the whole Logical Run.
+        // EXEC-009 + PROMPT-008: a reconciled linked child has a host-proven physical
+        // user message even when the Host omitted agent metadata from `chat.message`,
+        // so its AgentOwner Root can be registered here. The managed agent name comes
+        // from the durable `HandleLinked.TargetAgent` and nowhere else — rebuilding it
+        // from the child's AgentRole invented tier Fast, so a `deep-coder` child
+        // acquired a root naming `fast-coder` and FALLBACK-002's A/B pair was wrong
+        // for the whole Logical Run.
         //
-        // Reaching that record needs handle → child session, which `HandleLinked`
-        // does not carry. `TerminalPolicy.isLinkedChild` is dangling on the same
-        // projection change, so both move together in package F.
-        if
-            TerminalPolicy.isLinkedChild journal sessionKey
-            || sessionParents.ContainsKey sessionKey
-        then
-            failwith "SHOCK-UNMIGRATED[EXEC-009]: linked-child authority needs the durable handle's TargetAgent"
+        // A session known only through the in-memory `sessionParents` map has no
+        // durable record and therefore no defensible agent name. It is skipped rather
+        // than registered from a guess: the turn still completes through its
+        // reconciled AgentRole, and the missing authority stays visibly missing.
+        TerminalPolicy.tryLinkedChild journal sessionKey
+        |> Option.iter (fun record ->
+            HostSessionNudge.ensureAgentOwnerAuthority
+                journal
+                turn.SessionId
+                turn.PhysicalUserMessageId
+                record.TargetAgent
+            |> ignore)
 
         let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =
             let wasAborted = abortedSessions.Contains sessionKey

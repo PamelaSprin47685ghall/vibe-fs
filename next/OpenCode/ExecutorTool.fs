@@ -22,7 +22,12 @@ module ExecutorTool =
             Ok value
 
     let private finiteOutput (name: string) (value: float) =
-        if Double.IsNaN value || Double.IsInfinity value || value < 0.0 || value > float Int64.MaxValue then
+        if
+            Double.IsNaN value
+            || Double.IsInfinity value
+            || value < 0.0
+            || value > float Int64.MaxValue
+        then
             Error(sprintf "%s must be a finite non-negative integer" name)
         elif value <> Math.Floor value then
             Error(sprintf "%s must be an integer" name)
@@ -31,8 +36,12 @@ module ExecutorTool =
 
     let private decode (args: HostToolArguments) =
         let command = args.Text "command"
-        let runtime = args.OptionalNumber "estimated_running_secs" |> Option.defaultValue 30.0
-        let output = args.OptionalNumber "estimated_output_bytes" |> Option.defaultValue 65536.0
+
+        let runtime =
+            args.OptionalNumber "estimated_running_secs" |> Option.defaultValue 30.0
+
+        let output =
+            args.OptionalNumber "estimated_output_bytes" |> Option.defaultValue 65536.0
 
         let memory =
             match args.Text "estimated_mem_usage" with
@@ -44,7 +53,9 @@ module ExecutorTool =
         if String.IsNullOrWhiteSpace command then
             Error "Missing command"
         else
-            match finitePositive "estimated_running_secs" runtime, finiteOutput "estimated_output_bytes" output, memory with
+            match
+                finitePositive "estimated_running_secs" runtime, finiteOutput "estimated_output_bytes" output, memory
+            with
             | Ok runtimeSeconds, Ok outputBytes, Ok estimatedMemory ->
                 Ok
                     { Command = command
@@ -55,7 +66,8 @@ module ExecutorTool =
             | _, Error error, _
             | _, _, Error error -> Error error
 
-    let private error (message: string) = ToolHostCodec.jsonObject [ "error", Encode.string message ]
+    let private error (message: string) =
+        ToolHostCodec.jsonObject [ "error", Encode.string message ]
 
     let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
@@ -87,7 +99,7 @@ module ExecutorTool =
 
                 let processContext: ProcessContext =
                     { WorkingDirectory = directory
-                      DefaultTimeout = None }
+                      HardLimit = scope.ProcessHardLimit }
 
                 let! result =
                     try
@@ -106,7 +118,9 @@ module ExecutorTool =
                 | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                     try
                         let runtime = scope.ExecutorRuntimeFor context
-                        let! summary = ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
+
+                        let! summary =
+                            ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
 
                         return
                             ToolHostCodec.jsonObject

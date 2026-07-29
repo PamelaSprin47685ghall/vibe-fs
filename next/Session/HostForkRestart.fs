@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
@@ -99,25 +100,48 @@ module HostForkRestart =
     /// EXEC-009 restart recovery: rebuild this parent's join mailbox from the
     /// durable handle records.
     ///
-    /// SHOCK-UNMIGRATED[EXEC-009]: `HandleLinked` cannot supply what this needs.
-    /// It carries `{ ParentSessionId; Handle; TargetAgent; CanonicalRole }`, and
-    /// recovery additionally needs the child's SessionId — the old projection had
-    /// it because `ForkedChildren` was keyed by ChildId, whereas `Handles` is keyed
-    /// by the agent handle id and records no session.
+    /// Retired handles are skipped. EXEC-009 makes the tombstone permanent and
+    /// forbids a retired id degrading back into a fork target, so restoring one
+    /// would put a consumed completion back on the mailbox and let `join` return it
+    /// a second time.
     ///
-    /// Inventing one is not available: a child session id is issued by the Host,
-    /// so deriving it from the handle id would fabricate an identity every later
-    /// operation silently no-ops against. Either `HandleLinked` gains the field or
-    /// EXEC-009 states that recovery re-resolves children some other way. Recorded
-    /// as a blocker for package F; SSOT exception protocol applies.
+    /// PTY and ManagerJob handles are skipped too: this rebuilds agent children, and
+    /// a PTY is re-owned by `PtyPort`, not by a transcript replay.
     let restoreLinkedChildren
-        (_runtime: ForkRuntime)
-        (_snapshot: ISessionSnapshotPort option)
-        (_journal: AgentJournal)
-        (_parentId: SessionId)
-        (_children: Dictionary<string, SessionId>)
-        (_childCreatedDir: string -> SessionId -> string option -> unit)
-        (_directoryOf: string -> string option)
+        (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (children: Dictionary<string, SessionId>)
+        (childCreatedDir: string -> SessionId -> string option -> unit)
+        (directoryOf: string -> string option)
         : Task =
-        failwith
-            "SHOCK-UNMIGRATED[EXEC-009]: HandleLinked records no child SessionId, so restart recovery cannot rebind children"
+        task {
+            let records =
+                AgentProjection.tryFind parentId (AgentJournal.snapshot journal).AgentProjections
+                |> Option.bind (fun session -> session.Handles)
+                |> Option.map HandleProjection.linkedChildren
+                |> Option.defaultValue []
+
+            for record in records do
+                match record.Lifecycle, HandleId.tryAgent record.Handle with
+                | HandleLifecycle.Retired, _
+                | _, None -> ()
+                | _, Some agentHandle ->
+                    let agentId = AgentHandleId.value agentHandle
+
+                    // The role is the durable CanonicalRole. `TargetAgent` carries the
+                    // managed agent name the fork selected, so neither is rebuilt from
+                    // the other — PROMPT-008's pair stays exactly as recorded.
+                    let role =
+                        record.CanonicalRole
+                        |> Option.bind PromptAuthority.tryParseRole
+                        |> Option.map AgentRoleIdentity.ofRole
+
+                    match role with
+                    | None -> ()
+                    | Some role ->
+                        children.[agentId] <- record.ChildSessionId
+                        childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
+                        do! recoverChild runtime snapshot agentId record.ChildSessionId role record.TargetAgent
+        }

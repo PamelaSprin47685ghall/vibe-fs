@@ -319,6 +319,7 @@ module Fold =
                 (fun session ->
                     HandleProjection.link
                         payload.Handle
+                        payload.ChildSessionId
                         payload.TargetAgent
                         payload.CanonicalRole
                         (Option.defaultValue HandleProjection.empty session.Handles)
@@ -468,6 +469,12 @@ module Fold =
 
         | AgentFact.CompanionReplacementActiveSet payload ->
             Ok(updateCompanion payload.SessionId (CompanionProjection.setReplacement payload.Active) projection)
+
+        | AgentFact.CompanionBloggerLinked payload ->
+            Ok(updateCompanion payload.SessionId (CompanionProjection.linkBlogger payload.BloggerSessionId) projection)
+
+        | AgentFact.CompanionBloggerClosed payload ->
+            Ok(updateCompanion payload.SessionId CompanionProjection.closeBlogger projection)
 
         // ── durable effects ─────────────────────────────────────────────────
 

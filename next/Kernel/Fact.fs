@@ -218,11 +218,25 @@ module Fact =
         // so a completed-but-unjoined child was indistinguishable from a live
         // one.
 
+        /// A handle was created and bound to a child session.
+        ///
+        /// `ChildSessionId` is what makes EXEC-009's "restart recovers the same
+        /// ID" achievable: a handle id is minted by the plugin and does not exist
+        /// on the Host side, so a recovered handle with no session recorded points
+        /// at nothing. It cannot be derived either — the session id is issued by
+        /// the Host, and deriving one from the handle would fabricate an identity
+        /// every later operation silently no-ops against.
+        ///
+        /// `CanonicalRole` is not optional. Every fork has a role fixed by its
+        /// Authority Root (PROMPT-008), so an absent role could only mean recovery
+        /// has to invent one — and an invented role decides the child's whole tool
+        /// surface.
         | HandleLinked of
             {| ParentSessionId: SessionId
+               ChildSessionId: SessionId
                Handle: HandleId
                TargetAgent: string
-               CanonicalRole: string option |}
+               CanonicalRole: Role |}
 
         | HandleCompleted of
             {| ParentSessionId: SessionId
@@ -306,6 +320,22 @@ module Fact =
                Content: string |}
 
         | CompanionReplacementActiveSet of {| SessionId: SessionId; Active: bool |}
+
+        /// COMPANION-003: Y is X's long-lived companion Blogger Session, so which
+        /// session that is must survive a restart.
+        ///
+        /// A Companion fact, deliberately NOT `HandleLinked`. A handle is something
+        /// `list` shows and `join` may consume (EXEC-004/005); the Blogger is an
+        /// internal agent the model never joins, and AGENT-008 keeps it out of the
+        /// resource view entirely. Recording it as a handle would put it there.
+        | CompanionBloggerLinked of
+            {| SessionId: SessionId
+               BloggerSessionId: SessionId
+               BloggerAgent: string |}
+
+        /// The Blogger child was aborted and unbound. A later transform creates a
+        /// fresh one rather than reviving this session.
+        | CompanionBloggerClosed of {| SessionId: SessionId |}
 
         /// COMPANION-009: an epoch switch creates a new SealRoot and is the one
         /// sanctioned prefix-cache cold boundary.

@@ -17,17 +17,28 @@ module TerminalPolicy =
     let roleName (role: Wanxiangshu.Next.Session.AgentRole option) =
         role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
 
-    let isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
+    /// The durable handle record for a child session, searched across parents.
+    ///
+    /// Returns the record rather than a bool because callers need `TargetAgent`:
+    /// PROMPT-008 forbids rebuilding a managed agent name from a role, so the only
+    /// legitimate source is what the fork recorded.
+    ///
+    /// Retired handles are included. EXEC-009 makes the tombstone permanent, so a
+    /// child that already finished is still a child — answering otherwise is how a
+    /// completed child gets treated as a fresh top-level session.
+    let tryLinkedChild (journal: AgentJournal option) (sessionKey: string) =
         match journal with
-        | None -> false
+        | None -> None
         | Some j ->
-            let child = ChildId.create sessionKey
+            let childSessionId = SessionId.create sessionKey
 
             (AgentJournal.snapshot j).AgentProjections.Sessions
-            |> Map.exists (fun _ session ->
-                match session.Linkage with
-                | Some linkage -> Map.containsKey child linkage.LinkedChildren
-                | None -> false)
+            |> Map.tryPick (fun _ session ->
+                session.Handles
+                |> Option.bind (HandleProjection.tryFindByChildSession childSessionId))
+
+    let isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
+        (tryLinkedChild journal sessionKey).IsSome
 
     /// Manager Guard applies to any manager that still owns the review loop for its
     /// worktree. Manager children of Orchestrator remain linked to the family root,

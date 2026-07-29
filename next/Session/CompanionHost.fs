@@ -92,13 +92,7 @@ type CompanionHost
 
                                     durable
                                     |> Option.iter (fun port ->
-                                        port.AppendLink(
-                                            primaryId,
-                                            ChildId.create (SessionId.value id),
-                                            "blogger",
-                                            Some bloggerEffectiveAgent
-                                        )
-                                        |> ignore)
+                                        port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) |> ignore)
 
                                     return id
                                 | Error error -> return raise (InvalidOperationException error)
@@ -260,9 +254,7 @@ type CompanionHost
                 | Ok() -> ()
                 | Error error -> raise (InvalidOperationException error)
 
-                durable
-                |> Option.iter (fun port ->
-                    port.AppendUnlink(primaryId, ChildId.create (SessionId.value childId)) |> ignore)
+                durable |> Option.iter (fun port -> port.CloseBlogger primaryId |> ignore)
             | None -> ()
         }
 

@@ -30,8 +30,16 @@ type ProcessEstimate =
       EstimatedMemory: EstimatedMemory }
 
 type ProcessContext =
-    { WorkingDirectory: string option
-      DefaultTimeout: TimeSpan option }
+    {
+        WorkingDirectory: string option
+        /// EXEC-011: the administrator's ceiling on any single process.
+        ///
+        /// Not optional. The clause requires a finite hard limit, and an `option` here
+        /// would make "no limit configured" expressible — which is the unbounded case
+        /// it forbids. Callers that have no configuration pass
+        /// `ProcessEstimate.DefaultHardLimit`.
+        HardLimit: TimeSpan
+    }
 
 [<RequireQualifiedAccess>]
 type ProcessOutcome =
@@ -46,16 +54,30 @@ type ProcessError =
     | ExecutionFailed of reason: string
 
 module ProcessEstimate =
-    let private maxBudgetSeconds = 36500.0 * 86400.0
-    let private maxTimeSpan = TimeSpan.FromDays 36500.0
 
-    let budget (RuntimeSeconds seconds) =
-        let total = 3.0 * seconds
-        if Double.IsNaN total || Double.IsInfinity total then
-            maxTimeSpan
-        else
-            let safe = Math.Min(total, maxBudgetSeconds)
-            TimeSpan.FromSeconds safe
+    /// EXEC-011 fallback ceiling: one hour.
+    ///
+    /// A real finite value, not a sentinel. The previous code clamped to 36500 days
+    /// and called that a bound; at that scale a runaway process is indistinguishable
+    /// from an unbounded one, which is exactly what "hard limit 必须有限" rules out.
+    let DefaultHardLimit = TimeSpan.FromHours 1.0
+
+    /// EXEC-011: `min(3 × estimated_running_secs, configured hard limit)`.
+    ///
+    /// The LLM's estimate may not exceed the administrator's ceiling, so this is a
+    /// `min` and not a `max`. Non-finite and negative estimates collapse to the
+    /// ceiling rather than being rejected here: the estimate is model-supplied, and
+    /// `validateEstimate` owns refusing a malformed one.
+    let effectiveDeadline (RuntimeSeconds seconds) (hardLimit: TimeSpan) =
+        let modelBudget =
+            let total = 3.0 * seconds
+
+            if Double.IsNaN total || Double.IsInfinity total || total <= 0.0 then
+                hardLimit
+            else
+                TimeSpan.FromSeconds total
+
+        min modelBudget hardLimit
 
     let outputThreshold (OutputBytes bytes) =
         if bytes <= 0L then 0L

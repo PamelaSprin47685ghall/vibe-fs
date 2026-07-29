@@ -17,7 +17,7 @@ module OrchestratorGit =
         task {
             let ctx =
                 { WorkingDirectory = cmd.WorkingDirectory
-                  DefaultTimeout = None }
+                  HardLimit = ProcessEstimate.DefaultHardLimit }
 
             let! res = ProcessRunner.run cmd estimate ctx CancellationToken.None
 

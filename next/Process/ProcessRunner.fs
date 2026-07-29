@@ -26,16 +26,17 @@ module ProcessRunner =
                     let! r = f ctx ct
                     return Ok r
                 with
-                | _ when ct.IsCancellationRequested ->
-                    return Error(ProcessError.ProcessCancelled "Cancelled by token")
+                | _ when ct.IsCancellationRequested -> return Error(ProcessError.ProcessCancelled "Cancelled by token")
                 | :? OperationCanceledException when ct.IsCancellationRequested ->
                     return Error(ProcessError.ProcessCancelled "Cancelled by token")
-                | ex ->
-                    return Error(ProcessError.ExecutionFailed ex.Message)
+                | ex -> return Error(ProcessError.ExecutionFailed ex.Message)
             })
 
-    let private budgetSpan (estimate: ProcessEstimate) =
-        ProcessEstimate.budget estimate.EstimatedRuntime
+    /// EXEC-011: the effective deadline is `min(3 × estimate, administrator ceiling)`.
+    /// Read from the context so the ceiling is the one the caller configured, not a
+    /// second copy of the rule here.
+    let private budgetSpan (estimate: ProcessEstimate) (ctx: ProcessContext) =
+        ProcessEstimate.effectiveDeadline estimate.EstimatedRuntime ctx.HardLimit
 
     let private validateEstimate (estimate: ProcessEstimate) : ProcessFlow<unit> =
         ``process`` {
@@ -43,7 +44,8 @@ module ProcessRunner =
             let (OutputBytes output) = estimate.EstimatedOutput
 
             if Double.IsNaN runtime || Double.IsInfinity runtime || runtime <= 0.0 then
-                return! Flow.fail (ProcessError.ExecutionFailed "estimated_running_secs must be a finite positive number")
+                return!
+                    Flow.fail (ProcessError.ExecutionFailed "estimated_running_secs must be a finite positive number")
             elif output < 0L then
                 return! Flow.fail (ProcessError.ExecutionFailed "estimated_output_bytes must be non-negative")
             elif output > Int64.MaxValue / 3L then
@@ -66,9 +68,7 @@ module ProcessRunner =
         ``process`` {
             let collector = create estimate
 
-            let! spawnResult =
-                fromTask (fun ctx ct ->
-                    hostSpawn cmd ctx (addStdout collector) (addStderr collector) ct)
+            let! spawnResult = fromTask (fun ctx ct -> hostSpawn cmd ctx (addStdout collector) (addStderr collector) ct)
 
             match spawnResult with
             | Ok child -> return (child, collector)
@@ -99,6 +99,7 @@ module ProcessRunner =
                                 do! LargeGate.acquire ct
                                 return ()
                             })
+
                     gateHeld <- true
 
                 let! (child, collector) = spawnFlow hostSpawn cmd estimate
@@ -106,19 +107,31 @@ module ProcessRunner =
                 try
                     let clock = fun () -> DateTimeOffset.UtcNow
 
-                    let! (exitCode, timedOut) =
-                        fromTask (fun _ ct ->
-                            let deadline = Deadline.ofBudget (clock ()) (budgetSpan estimate)
-                            waitForExit child deadline ct)
+                    // The applied budget is returned alongside the outcome so the
+                    // reported timeout is the one that actually fired. Recomputing it
+                    // for the error would be a second read of the ceiling, and a
+                    // TimeoutExceeded carrying a different duration than the deadline
+                    // that expired is a lie the operator cannot detect.
+                    let! (waited, budget) =
+                        fromTask (fun ctx ct ->
+                            task {
+                                let budget = budgetSpan estimate ctx
+                                let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
+                                return waited, budget
+                            })
 
-                    if timedOut then
-                        return! Flow.fail (ProcessError.TimeoutExceeded(budgetSpan estimate))
+                    if waited.TimedOut then
+                        return! Flow.fail (ProcessError.TimeoutExceeded budget)
                     else
-                        return buildResult collector exitCode
+                        return buildResult collector waited.ExitCode
                 finally
-                    try child.Kill() with _ -> ()
+                    try
+                        child.Kill()
+                    with _ ->
+                        ()
             finally
-                if gateHeld then LargeGate.release ()
+                if gateHeld then
+                    LargeGate.release ()
         }
 
     let runWithHost
@@ -162,13 +175,16 @@ module ProcessRunner =
             : Task<Result<ChildProcess, string>> =
             task {
                 let cts = new CancellationTokenSource()
-                let exitTcs = TaskCompletionSource<int * bool>()
+                let exitTcs = TaskCompletionSource<int>()
                 let onExited = ResizeArray<unit -> unit>()
                 let exited = ref false
 
+                // Mirrors the real host: kill only signals. `exited` is set by the
+                // launcher's own completion path below, which stands in for the
+                // close handler — a seam that marked the child exited on kill would
+                // let waitForExit return before the simulated process finished, and
+                // no test could then observe the EXEC-011 kill-then-wait order.
                 let kill () =
-                    exited.Value <- true
-
                     if not cts.IsCancellationRequested then
                         cts.Cancel()
 
@@ -179,12 +195,17 @@ module ProcessRunner =
                       Exited = exited
                       OnExited = onExited }
 
+                let finish (code: int) =
+                    exited.Value <- true
+                    trySetResult exitTcs code |> ignore
+                    NodeProcessHost.notifyExited child
+
                 task {
                     try
                         let! (exitCode, outBytes, errBytes) = launcher cmd cts.Token
-                        exited.Value <- true
 
                         if parentCt.IsCancellationRequested then
+                            exited.Value <- true
                             trySetCanceled exitTcs |> ignore
                         else
                             for chunk in chunkBytes 8192 outBytes do
@@ -193,16 +214,13 @@ module ProcessRunner =
                             for chunk in chunkBytes 8192 errBytes do
                                 onStderr chunk
 
-                            trySetResult exitTcs (exitCode, false) |> ignore
-                            NodeProcessHost.notifyExited child
+                            finish exitCode
                     with
-                    | _ when cts.IsCancellationRequested ->
-                        // Parent cancel or timeout: let waitForExit set the final signal.
-                        exited.Value <- true
-                    | _ ->
-                        exited.Value <- true
-                        trySetResult exitTcs (-1, false) |> ignore
-                        NodeProcessHost.notifyExited child
+                    // A killed process still reports an exit. Leaving the cell unset
+                    // here would hang every waiter, since only the real exit completes
+                    // it now.
+                    | _ when cts.IsCancellationRequested -> finish -1
+                    | _ -> finish -1
                 }
                 |> ignore
 

@@ -15,18 +15,27 @@ module OrchestratorSessionDirectories =
         =
         match Map.tryFind orchestratorId snapshot.AgentProjections.Sessions with
         | Some session ->
-            match session.Linkage with
-            | Some linkage ->
-                for KeyValue(childId, agentId) in linkage.LinkedChildren do
-                    match worktrees.TryGetValue agentId with
-                    | true, path ->
-                        let sessionId = SessionId.create (ChildId.value childId)
-                        register sessionId path
+            match session.Handles with
+            | Some handles ->
+                for record in HandleProjection.linkedChildren handles do
+                    // `worktrees` is keyed by the runtime agent id, which for an agent
+                    // child IS the handle's inner id. PTY and ManagerJob handles have
+                    // no agent id and no worktree entry, so they are skipped rather
+                    // than rendered into a lookup key.
+                    match HandleId.tryAgent record.Handle with
+                    | None -> ()
+                    | Some agentHandle ->
+                        match worktrees.TryGetValue(AgentHandleId.value agentHandle) with
+                        | true, path ->
+                            register record.ChildSessionId path
 
-                        match Map.tryFind childId linkage.LinkedRoles with
-                        | Some role when role.Equals("reviewer", System.StringComparison.OrdinalIgnoreCase) ->
-                            registerReviewerTree (ChildId.value childId) (GitTree.create path)
-                        | _ -> ()
-                    | false, _ -> ()
+                            // CanonicalRole is the durable role the fork selected.
+                            // The previous version consulted a separate `LinkedRoles`
+                            // map, which could disagree with the handle it described.
+                            match record.CanonicalRole with
+                            | Some role when role.Equals("reviewer", System.StringComparison.OrdinalIgnoreCase) ->
+                                registerReviewerTree (SessionId.value record.ChildSessionId) (GitTree.create path)
+                            | _ -> ()
+                        | false, _ -> ()
             | None -> ()
         | None -> ()

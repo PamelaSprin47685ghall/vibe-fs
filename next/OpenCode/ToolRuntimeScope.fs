@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
 /// Owns every per-session tool runtime.
@@ -88,6 +89,22 @@ type ToolRuntimeScope
     member _.Snapshot = snapshot
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
+
+    /// EXEC-011: the administrator's ceiling on any single process.
+    ///
+    /// Resolved once per scope so every executor call in a session shares one
+    /// ceiling. A non-positive or unparseable setting falls back to the default
+    /// rather than being treated as "no limit": the clause requires the hard limit
+    /// to be finite, so an unreadable configuration must not widen it.
+    member val ProcessHardLimit =
+        match Environment.GetEnvironmentVariable "WANXIANGSHU_PROCESS_HARD_LIMIT_SECS" with
+        | null
+        | "" -> ProcessEstimate.DefaultHardLimit
+        | value ->
+            match Double.TryParse value with
+            | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
+            | _ -> ProcessEstimate.DefaultHardLimit
+
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
     member _.DirectoryFor(sessionId) = directoryFor sessionId

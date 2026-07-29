@@ -84,44 +84,7 @@ module HostForkChildDispatch =
                         return Error err
         }
 
-    /// Persist AgentUnlinked facts for each distinct child BEFORE aborting, so a
-    /// crash mid-Cancel cannot leave a session aborted but still linked (which
-    /// would make a restart restore a dead child). A leaked abort is recoverable;
-    /// a leaked link is not.
-    ///
-    /// Timing adjudication: unlink is driven ONLY by the parent's Cancel (the sole
-    /// teardown path — HostForkRuntime has no other Dispose hook). There is no
-    /// child-normal-close host event (host docs confirm no durable child-close event), so
-    /// a child that completes normally intentionally KEEPS its link: the child
-    /// stays addressable for Reuse/nudge.
-    ///
-    let unlinkChildren
-        (journal: AgentJournal option)
-        (parentId: SessionId)
-        (childIds: SessionId list)
-        : Result<unit, string> =
-        match journal with
-        | None -> Ok()
-        | Some journal ->
-            let rec appendRemaining ids =
-                match ids with
-                | [] -> Ok()
-                | childId :: rest ->
-                    match
-                        AgentJournal.appendAgent
-                            (StreamId.Session parentId)
-                            None
-                            (AgentFact.AgentUnlinked
-                                {| ParentId = parentId
-                                   ChildId = ChildId.create (SessionId.value childId) |})
-                            journal
-                    with
-                    | Ok _ -> appendRemaining rest
-                    | Error failure -> Error(sprintf "%A" failure.Failure)
-
-            appendRemaining childIds
-
-    /// Abort linked child sessions.  Unlink facts have already been written
+    /// Abort linked child sessions. Handle retirement has already been written
     /// synchronously by the caller before the async cleanup begins.
     let teardownChildren
         (sessions: ISessionHostPort)
@@ -149,7 +112,7 @@ module HostForkChildDispatch =
             | None -> return Ok()
         }
 
-    /// Cancel parent: fail pending runs, durable-unlink children, clear maps.
+    /// Cancel parent: fail pending runs, retire child handles, clear maps.
     ///
     /// `cancelSignals` is invoked with parentId :: childIds so the signal router
     /// ignores further idle/retry events for the torn-down sessions. Unregistering
@@ -158,7 +121,7 @@ module HostForkChildDispatch =
     /// producing turns to reconcile.
     ///
     /// Side effects that must be visible before the call returns (ForkRuntime
-    /// cancellation, signal unrouting, durable unlink) run synchronously before
+    /// cancellation, signal unrouting, handle retirement) run synchronously before
     /// the async block starts.
     let cancelParent
         (cancelSignals: SessionId seq -> unit)
@@ -179,13 +142,22 @@ module HostForkChildDispatch =
         // callbacks) see cancellation immediately.
         runtime.Cancel()
 
-        let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
+        // Agent ids and child session ids come from the same snapshot of `children`.
+        // Two separate reads could disagree if a fork landed between them, and the
+        // handle retired would then not be the session aborted.
+        let owned =
+            lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+
+        let childIds = owned |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIds)
 
-        match unlinkChildren journal parentId childIds with
+        // EXEC-009: retire before aborting. A crash mid-Cancel must not leave a
+        // session aborted but still joinable, which is what makes a restart restore
+        // a dead child. A leaked abort is recoverable; a leaked live handle is not.
+        match HandleController.cancelChildren journal parentId (owned |> List.map fst) with
         | Error err ->
-            // Journal failure during unlink is a durable-state bug; surface it.
-            async { return raise (InvalidOperationException(sprintf "Parent unlink failed: %s" err)) }
+            // Journal failure during retirement is a durable-state bug; surface it.
+            async { return raise (InvalidOperationException(sprintf "Parent handle retirement failed: %s" err)) }
         | Ok() ->
             async {
                 do! Async.AwaitTask(ptyPort.CloseAll())

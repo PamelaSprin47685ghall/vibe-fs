@@ -150,10 +150,30 @@ type HostForkRuntime
                 (fun run outcome -> this.Complete(run, outcome))
         )
 
+    /// EXEC-004: consume any available completion, then retire its handle.
+    ///
+    /// Retirement is part of consuming, not a later cleanup step. The durable
+    /// projection keeps a consumed handle in `CompletedAwaitingJoin` until the
+    /// tombstone lands, so a restart between the two would restore it as joinable
+    /// and deliver the same completion twice.
+    ///
+    /// A PTY completion is skipped: `PtyPort` owns that lifecycle (EXEC-015), and
+    /// this runtime holds no agent handle for it.
     member this.Join() : Task<Result<RunCompletion, ForkError>> =
         task {
             do! this.AwaitRecovery()
-            return! runtime.Join()
+            let! joined = runtime.Join()
+
+            match joined with
+            | Ok completion when not (lock gate (fun () -> ptyRuns.Contains completion.RunId)) ->
+                match HandleController.retire journal parentId completion.AgentId with
+                | Ok() -> return joined
+                // A completion that cannot be retired must not be handed out: the
+                // caller would treat the work as consumed while the journal still
+                // offers it. Reported rather than raised, because `join` is a tool
+                // call and its failure belongs in the tool result.
+                | Error err -> return Error(ForkError.NotFound(sprintf "join could not retire handle: %s" err))
+            | _ -> return joined
         }
 
     member this.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =

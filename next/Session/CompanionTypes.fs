@@ -20,18 +20,28 @@ type ActivePrefixEpoch =
       CoveredPrefixDigest: string }
 
 type CompanionMemory =
-    { LastSuccessfulProjection: ProjectionSnapshot option
-      LatestB: BlogText option
-      ActivePrefixEpoch: ActivePrefixEpoch option
-      PrefixReplacementEnabled: bool }
+    {
+        LastSuccessfulProjection: ProjectionSnapshot option
+        LatestB: BlogText option
+        ActivePrefixEpoch: ActivePrefixEpoch option
+        /// COMPANION-003: the durable companion Blogger Session Y.
+        BloggerSessionId: SessionId option
+        PrefixReplacementEnabled: bool
+    }
 
 type ICompanionDurablePort =
     abstract Load: SessionId -> CompanionMemory option
     abstract AppendSuccessful: SessionId * ProjectionSnapshot * BlogText -> Result<unit, string>
     abstract AppendEpochSwitched: SessionId * ActivePrefixEpoch -> Result<unit, string>
     abstract EnableReplacement: SessionId -> Result<unit, string>
-    abstract AppendLink: SessionId * ChildId * string * string option -> Result<unit, string>
-    abstract AppendUnlink: SessionId * ChildId -> Result<unit, string>
+
+    /// COMPANION-003. Takes the Blogger's own SessionId, not a `ChildId` plus a
+    /// `"blogger"` target string: the previous shape recorded an EXEC-009 handle
+    /// link and then recovered Y by searching for the literal target `"blogger"`,
+    /// which is agent-string matching standing in for an identity.
+    abstract LinkBlogger: SessionId * SessionId * string -> Result<unit, string>
+
+    abstract CloseBlogger: SessionId -> Result<unit, string>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Companion =

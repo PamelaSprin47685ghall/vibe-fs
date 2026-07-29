@@ -21,10 +21,15 @@ type HandleLifecycle =
     | Retired
 
 type HandleRecord =
-    { Handle: HandleId
-      TargetAgent: string
-      CanonicalRole: string option
-      Lifecycle: HandleLifecycle }
+    {
+        Handle: HandleId
+        /// The Host session this handle drives. EXEC-009: recovery must rebind the
+        /// same handle id to the same session, and only the Host can issue that id.
+        ChildSessionId: SessionId
+        TargetAgent: string
+        CanonicalRole: Role
+        Lifecycle: HandleLifecycle
+    }
 
 /// Durable handle linkage for one parent session.
 ///
@@ -61,6 +66,7 @@ module HandleProjection =
 
     let link
         (handle: HandleId)
+        (childSessionId: SessionId)
         (targetAgent: string)
         (role: string option)
         (current: AgentLinkageProjection)
@@ -74,6 +80,7 @@ module HandleProjection =
                         Map.add
                             handle
                             { Handle = handle
+                              ChildSessionId = childSessionId
                               TargetAgent = targetAgent
                               CanonicalRole = normalizedRole role
                               Lifecycle = Active }
@@ -153,3 +160,25 @@ module HandleProjection =
             | Active -> true
             | CompletedAwaitingJoin _
             | Retired -> false)
+
+    /// The handle driving a child session, retired ones included.
+    ///
+    /// Retired records are deliberately visible: EXEC-009 makes the tombstone
+    /// permanent, and a caller asking "is this session one of my children" must get
+    /// yes for a child that already finished. Filtering here would make a retired
+    /// child look like one that never existed.
+    let tryFindByChildSession (childSessionId: SessionId) (current: AgentLinkageProjection) =
+        current.Handles
+        |> Map.tryPick (fun _ record ->
+            if record.ChildSessionId = childSessionId then
+                Some record
+            else
+                None)
+
+    /// Every child session this parent has ever linked.
+    ///
+    /// Replaces the old `LinkedChildren` map. That map was keyed by child and held
+    /// only live entries, so restart recovery and the retired-handle check needed
+    /// two different structures; one list of records answers both.
+    let linkedChildren (current: AgentLinkageProjection) =
+        current.Handles |> Map.toList |> List.map snd

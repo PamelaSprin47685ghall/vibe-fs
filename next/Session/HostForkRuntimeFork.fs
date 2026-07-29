@@ -164,22 +164,8 @@ module HostForkRuntimeFork =
                         | Error err -> return Error err
                         | Ok childId ->
                             let linkageResult =
-                                match this.Journal with
-                                | None -> Ok()
-                                | Some journal ->
-                                    let fact =
-                                        AgentFact.AgentForked
-                                            {| ParentId = this.ParentId
-                                               ChildId = ChildId.create (SessionId.value childId)
-                                               TargetAgent = agentId
-                                               Role = Some agentName |}
-
-                                    match
-                                        AgentJournal.appendAgent (StreamId.Session this.ParentId) None fact journal
-                                    with
-                                    | Ok _ -> Ok()
-                                    | Error failure ->
-                                        Error(sprintf "Failed to persist AgentForked: %A" failure.Failure)
+                                HandleController.link this.Journal this.ParentId agentId childId agentName role
+                                |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
 
                             match linkageResult with
                             | Error err ->

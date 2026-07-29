@@ -599,7 +599,21 @@ OpenCode/PluginHost.restoreSessionParents
 OpenCode/CompanionTransform                      blogger child 恢复
 ```
 
-child session id 由 Host 签发。从 handle id 派生会造出一个此后每次操作都静默空转的身份，因此不能就地补。本包开始时先决定二者之一：`HandleLinked` 增加 `ChildSessionId`（走 SSOT 例外协议），或 EXEC-009 明确恢复期以别的方式重新解析 children。前两处已标 `SHOCK-UNMIGRATED[EXEC-009]`。
+child session id 由 Host 签发。从 handle id 派生会造出一个此后每次操作都静默空转的身份，因此不能就地补。
+
+决定（包 F-1）：`HandleLinked` 增加 `ChildSessionId: SessionId`，不走 SSOT 例外协议。
+
+EXEC-009 只列出三个裸事实名，没有给出任何字段表：
+
+```fsharp
+HandleLinked
+HandleCompleted
+HandleRetired
+```
+
+条款正文规定的是行为——「HandleId 创建一次并持久化，重启恢复同一个 ID」。要满足「重启恢复同一个 ID」就必须能把该 ID 重新绑回它代表的 child session，否则恢复出的 handle 指向不了任何东西。加这个字段是实现该句的必要条件，不是降低条款，因此没有可供例外协议修改的对象。`STATUS/blocker-EXEC-009.md` 不需要创建，例外次数保持 0。
+
+反向验证：另一条路（EXEC-009 明确恢复期以别的方式重新解析 children）要求从 Host transcript 反推 handle↔session 对应关系，而 handle id 是插件自己签发的、Host 侧不存在，反推无据可依。该路不成立。
 
 `Process/Pty.fs` 的 `PtyHandle` 同样只记 `AgentRole`，故 completion 的 `AgentName` 只能拼 `fast-*`；本包应让它携带 forking profile 选定的 managed 名。
 

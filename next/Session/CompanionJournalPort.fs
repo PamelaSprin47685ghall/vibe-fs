@@ -16,6 +16,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
     interface ICompanionDurablePort with
         member _.Load(sessionId: SessionId) : CompanionMemory option =
             let projection = AgentJournal.snapshot journal
+
             projection.AgentProjections.Sessions
             |> Map.tryFind sessionId
             |> Option.bind (fun session ->
@@ -24,36 +25,47 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                     { LastSuccessfulProjection = companion.LastSuccessfulProjection
                       LatestB = companion.LatestB
                       ActivePrefixEpoch =
-                          companion.ActivePrefixEpoch
-                          |> Option.map (fun epoch ->
-                              { EpochId = epoch.EpochId
-                                FrozenB = epoch.FrozenB
-                                CutoffMessageIndex = epoch.CutoffMessageIndex
-                                CoveredPrefixDigest = epoch.CoveredPrefixDigest })
-                      PrefixReplacementEnabled = companion.ReplacementActive }))
+                        companion.ActivePrefixEpoch
+                        |> Option.map (fun epoch ->
+                            { EpochId = epoch.EpochId
+                              FrozenB = epoch.FrozenB
+                              CutoffMessageIndex = epoch.CutoffMessageIndex
+                              CoveredPrefixDigest = epoch.CoveredPrefixDigest })
+                      PrefixReplacementEnabled = companion.ReplacementActive
+                      BloggerSessionId = companion.BloggerSessionId }))
 
         member _.AppendSuccessful(sessionId, projection, content) =
-            append sessionId
+            append
+                sessionId
                 (AgentFact.CompanionAdvanced
-                    {| SessionId = sessionId; Projection = projection; Content = content |})
+                    {| SessionId = sessionId
+                       Projection = projection
+                       Content = content |})
 
         member _.AppendEpochSwitched(sessionId, epoch) =
-            append sessionId
+            append
+                sessionId
                 (AgentFact.CompanionEpochSwitched
-                    {| SessionId = sessionId; EpochId = epoch.EpochId; FrozenB = epoch.FrozenB
-                       CutoffMessageIndex = epoch.CutoffMessageIndex; CoveredPrefixDigest = epoch.CoveredPrefixDigest |})
+                    {| SessionId = sessionId
+                       EpochId = epoch.EpochId
+                       FrozenB = epoch.FrozenB
+                       CutoffMessageIndex = epoch.CutoffMessageIndex
+                       CoveredPrefixDigest = epoch.CoveredPrefixDigest |})
 
         member _.EnableReplacement(sessionId) =
-            append sessionId
+            append
+                sessionId
                 (AgentFact.CompanionReplacementActiveSet
-                    {| SessionId = sessionId; Active = true |})
+                    {| SessionId = sessionId
+                       Active = true |})
 
-        member _.AppendLink(sessionId, childId, targetAgent, role) =
-            append sessionId
-                (AgentFact.AgentLinked
-                    {| ParentId = sessionId; ChildId = childId; TargetAgent = targetAgent; Role = role |})
+        member _.LinkBlogger(sessionId, bloggerSessionId, bloggerAgent) =
+            append
+                sessionId
+                (AgentFact.CompanionBloggerLinked
+                    {| SessionId = sessionId
+                       BloggerSessionId = bloggerSessionId
+                       BloggerAgent = bloggerAgent |})
 
-        member _.AppendUnlink(sessionId, childId) =
-            append sessionId
-                (AgentFact.AgentUnlinked
-                    {| ParentId = sessionId; ChildId = childId |})
+        member _.CloseBlogger(sessionId) =
+            append sessionId (AgentFact.CompanionBloggerClosed {| SessionId = sessionId |})

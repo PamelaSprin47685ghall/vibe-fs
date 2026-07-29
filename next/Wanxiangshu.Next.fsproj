@@ -50,6 +50,7 @@
     <Compile Include="Session/ForkTypes.fs"/>
     <Compile Include="Session/AgentCompletion.fs"/>
     <Compile Include="Session/AgentRoleIdentity.fs"/>
+    <Compile Include="Session/HandleController.fs"/>
     <Compile Include="Session/ChildRun.fs"/>
     <Compile Include="Session/ChildRunProjection.fs"/>
     <Compile Include="Session/CompletionMailbox.fs"/>

@@ -112,17 +112,17 @@ module CompanionTransform =
                             let restoredBloggerId =
                                 match journal with
                                 | Some j ->
+                                    // COMPANION-003: Y is recorded as its own identity.
+                                    // The previous version searched the parent's handle
+                                    // links for the literal target `"blogger"`, which is
+                                    // agent-string matching standing in for an identity —
+                                    // and it also put an internal agent into the EXEC-005
+                                    // resource view that AGENT-008 keeps it out of.
                                     (AgentJournal.snapshot j).AgentProjections.Sessions
                                     |> Map.tryFind (SessionId.create sessionId)
-                                    |> Option.bind (fun s -> s.Linkage)
-                                    |> Option.bind (fun linkage ->
-                                        linkage.LinkedChildren
-                                        |> Map.toSeq
-                                        |> Seq.tryPick (fun (childId, target) ->
-                                            if target = "blogger" then
-                                                Some(ChildId.value childId)
-                                            else
-                                                None))
+                                    |> Option.bind (fun s -> s.Companion)
+                                    |> Option.bind (fun companion -> companion.BloggerSessionId)
+                                    |> Option.map SessionId.value
                                 | None -> None
 
                             let value =

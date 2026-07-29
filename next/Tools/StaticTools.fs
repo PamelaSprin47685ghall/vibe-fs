@@ -53,9 +53,24 @@ module StaticTools =
     /// filters and contract tests see concrete denies (not only "*").
     let permissionObj (role: Role) : obj =
         let allowed = Roles.permissions role |> Set.map toolName
+
         let known =
-            [ "fork"; "fork-manager"; "fork-pty"; "join"; "list"; "read"; "write"; "edit"; "glob"; "grep"
-              "inspector"; "coder"; "executor"; "network"; "verdict" ]
+            [ "fork"
+              "fork-manager"
+              "fork-pty"
+              "join"
+              "list"
+              "read"
+              "write"
+              "edit"
+              "glob"
+              "grep"
+              "inspector"
+              "coder"
+              "executor"
+              "network"
+              "verdict" ]
+
         let pairs =
             [ yield "*", box "deny"
               for name in known do
@@ -72,6 +87,7 @@ module StaticTools =
                   | "write", Role.DevOps
                   | "edit", Role.DevOps -> yield name, box "deny"
                   | _ -> yield name, box (if Set.contains name allowed then "allow" else "deny") ]
+
         createObj pairs
 
     /// OpenCode AgentConfig: mode + permission + optional system prompt.
@@ -79,10 +95,7 @@ module StaticTools =
     let private primaryAgent (role: Role) (systemPrompt: string option) : obj =
         match systemPrompt with
         | Some text when not (String.IsNullOrWhiteSpace text) ->
-            createObj
-                [ "mode", box "primary"
-                  "permission", permissionObj role
-                  "prompt", box text ]
+            createObj [ "mode", box "primary"; "permission", permissionObj role; "prompt", box text ]
         | _ -> createObj [ "mode", box "primary"; "permission", permissionObj role ]
 
     /// The only values accepted by the OpenCode reviewer tool.  Keep this
@@ -169,7 +182,7 @@ module StaticTools =
 
                     let procCtx: ProcessContext =
                         { WorkingDirectory = None
-                          DefaultTimeout = None }
+                          HardLimit = ProcessEstimate.DefaultHardLimit }
 
                     let estimate: ProcessEstimate =
                         { EstimatedRuntime = RuntimeSeconds 30.0

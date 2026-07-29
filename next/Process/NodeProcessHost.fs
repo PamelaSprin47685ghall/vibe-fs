@@ -78,11 +78,21 @@ module NodeProcessHost =
     """)>]
     let private consumeStreamAsync (stream: obj) (consume: byte[] -> Task<unit>) : Task<unit> = jsNative
 
-    /// Handle returned by spawn. Exit and OnExited are single-assignment: the
-    /// close/error handler completes the exit TCS, then wakes any waiters.
+    /// Handle returned by spawn.
+    ///
+    /// `Exit` carries the real exit code and nothing else. It used to be
+    /// `int * bool`, where the bool meant "timed out" — but a process does not know
+    /// whether someone was waiting on a deadline, so that flag was the waiter's
+    /// knowledge stored on the process. It let the timeout path complete the cell
+    /// itself with a fabricated `(-1, true)` instead of waiting for the real exit,
+    /// which EXEC-011 requires.
+    ///
+    /// `Exited` is set ONLY by the close/error handlers. `Kill` must not set it:
+    /// sending SIGKILL is not the process ending, and conflating the two makes
+    /// "kill sent" look like "exit observed" to every waiter.
     type ChildProcess =
         { Process: obj
-          Exit: TaskCompletionSource<int * bool>
+          Exit: TaskCompletionSource<int>
           Kill: unit -> unit
           Exited: bool ref
           OnExited: (unit -> unit) ResizeArray }
@@ -90,7 +100,9 @@ module NodeProcessHost =
     let private notifyExitedList (callbacks: (unit -> unit) ResizeArray) =
         let cbs = callbacks |> Seq.toList
         callbacks.Clear()
-        for cb in cbs do cb ()
+
+        for cb in cbs do
+            cb ()
 
     let notifyExited (child: ChildProcess) = notifyExitedList child.OnExited
 
@@ -150,7 +162,7 @@ module NodeProcessHost =
                 if isNull child then
                     return Error(sprintf "Failed to spawn process: %s" cmd.FileName)
                 else
-                    let exitTcs = TaskCompletionSource<int * bool>()
+                    let exitTcs = TaskCompletionSource<int>()
                     let onExited = ResizeArray<unit -> unit>()
 
                     let stdout = stdoutOf child
@@ -169,11 +181,11 @@ module NodeProcessHost =
                          (fun (code: obj) ->
                              let c = if isNull code then 0 else unbox<int> code
                              exitedRef.Value <- true
-                             trySetResult exitTcs (c, false) |> ignore
+                             trySetResult exitTcs c |> ignore
                              notifyExitedList onExited),
                          (fun _err ->
                              exitedRef.Value <- true
-                             trySetResult exitTcs (-1, false) |> ignore
+                             trySetResult exitTcs -1 |> ignore
                              notifyExitedList onExited))
                         "if ($0) { $0.on('close', function(code) { $1(typeof code === 'number' ? code : 0); }); $0.on('error', function(err) { $2(err); }); }"
                     |> ignore
@@ -191,10 +203,12 @@ module NodeProcessHost =
                         Ok
                             { Process = child
                               Exit = exitTcs
+                              // EXEC-011: SIGKILL the whole process group, then let
+                              // the close handler report the real exit. Marking the
+                              // child exited here would let a waiter return before
+                              // the process actually died.
                               Kill =
                                 fun () ->
-                                    exitedRef.Value <- true
-
                                     try
                                         killProcessGroup child
                                     with _ ->

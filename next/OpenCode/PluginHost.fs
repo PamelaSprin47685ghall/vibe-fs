@@ -35,10 +35,13 @@ module PluginHost =
             let snapshot = AgentJournal.snapshot journal
 
             for KeyValue(parentId, session) in snapshot.AgentProjections.Sessions do
-                match session.Linkage with
-                | Some linkage ->
-                    for KeyValue(childId, _) in linkage.LinkedChildren do
-                        sessionParents.[ChildId.value childId] <- SessionId.value parentId
+                match session.Handles with
+                | Some handles ->
+                    // Retired handles included: the parent relationship outlives the
+                    // run (EXEC-009 tombstone), and dropping it here would orphan a
+                    // finished child from its Manager.
+                    for record in HandleProjection.linkedChildren handles do
+                        sessionParents.[SessionId.value record.ChildSessionId] <- SessionId.value parentId
                 | None -> ()
 
     let gitTreePortFromInput (input: obj) : GitTreePort option =
