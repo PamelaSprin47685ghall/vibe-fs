@@ -81,5 +81,3 @@ module PromptAuthority =
     let effectiveAgentFromManaged (selected: ManagedAgent) (cursor: AgentPairCursor.FallbackCursor) : string =
         let peer = ManagedAgent.peer selected
         Wanxiangshu.Next.Domain.PromptAuthority.effectiveAgentFromManaged selected.Name peer.Name cursor
-
-    let sha256Hex = HostPromptHash.sha256

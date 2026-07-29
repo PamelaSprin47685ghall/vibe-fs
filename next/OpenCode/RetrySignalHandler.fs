@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
@@ -37,7 +38,7 @@ module RetrySignalHandler =
                         Some
                             { LogicalRunId =
                                 PromptAuthority.stableLogicalRunId
-                                    PromptAuthority.sha256Hex
+                                    HostDigest.sha256Hex
                                     (RuntimeId.value (AgentJournal.runtimeId j))
                                     sessionId
                                     messageId
@@ -49,7 +50,7 @@ module RetrySignalHandler =
                     Some
                         { LogicalRunId =
                             PromptAuthority.stableLogicalRunId
-                                PromptAuthority.sha256Hex
+                                HostDigest.sha256Hex
                                 (RuntimeId.value (AgentJournal.runtimeId j))
                                 sessionId
                                 messageId

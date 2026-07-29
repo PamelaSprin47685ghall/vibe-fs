@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs"/>
+    <Compile Include="Host/HostDigest.fs"/>
     <Compile Include="Kernel/Identity.fs"/>
     <Compile Include="Kernel/Roles.fs"/>
     <Compile Include="Kernel/Flow.fs"/>
@@ -26,7 +27,6 @@
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="OpenCode/ManagedAgent.fs"/>
-    <Compile Include="OpenCode/HostPromptHash.fs"/>
     <Compile Include="OpenCode/PromptAuthority.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>

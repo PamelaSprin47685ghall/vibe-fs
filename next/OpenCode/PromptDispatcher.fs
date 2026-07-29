@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -12,7 +13,6 @@ open Wanxiangshu.Next.Journal
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
 
-    let internal sha256Hex = PromptAuthority.sha256Hex
     let internal newPromptKey = PromptAuthority.newPromptKey
     let internal originLabel = PromptAuthority.originLabel
 
@@ -85,10 +85,7 @@ module PromptDispatcher =
                 match profile.AuthorityKind, journal with
                 | PromptAuthority.RootAuthorityKind.HumanRoot, Some j ->
                     match
-                        AgentJournal.recordHumanPromptAccepted
-                            j
-                            profile.SessionId
-                            profile.AuthorityRootUserMessageId
+                        AgentJournal.recordHumanPromptAccepted j profile.SessionId profile.AuthorityRootUserMessageId
                     with
                     | Ok() -> ()
                     | Error e -> raise (InvalidOperationException e)
@@ -102,7 +99,7 @@ module PromptDispatcher =
             | Some agent ->
                 match
                     PromptAuthorityRun.createAuthorityRoot
-                        sha256Hex
+                        HostDigest.sha256Hex
                         this.RuntimeId
                         sessionId
                         PromptAuthority.RootAuthorityKind.HumanRoot
@@ -122,7 +119,7 @@ module PromptDispatcher =
             =
             match
                 PromptAuthorityRun.createAuthorityRoot
-                    sha256Hex
+                    HostDigest.sha256Hex
                     this.RuntimeId
                     sessionId
                     PromptAuthority.RootAuthorityKind.AgentOwnerRoot
@@ -254,8 +251,7 @@ module PromptDispatcher =
         member internal this.SubscribeNoOp (port: ISessionHostPort) (sessionId: SessionId) =
             port.SubscribeTerminal(sessionId, (fun _ _ -> ()))
 
-    let forRuntime (runtimeId: string) (journal: AgentJournal option) =
-        Runtime(runtimeId, ?journal = journal)
+    let forRuntime (runtimeId: string) (journal: AgentJournal option) = Runtime(runtimeId, ?journal = journal)
 
     let forJournal (journal: AgentJournal) =
         forRuntime (RuntimeId.value (AgentJournal.runtimeId journal)) (Some journal)

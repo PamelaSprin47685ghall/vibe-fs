@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Session
 
 module GitTree =
@@ -14,12 +15,6 @@ module GitTree =
 
     [<Import("readFileSync", "node:fs")>]
     let private readFileSync (path: string) (encoding: string) : string = jsNative
-
-    [<Import("createHash", "node:crypto")>]
-    let private createHash (algorithm: string) : obj = jsNative
-
-    [<Emit("($0.update($1), $0.digest('hex'))")>]
-    let private digest (hash: obj) (content: string) : string = jsNative
 
     let private options = createObj [ "encoding", box "utf8" ]
 
@@ -58,7 +53,7 @@ module GitTree =
         if String.IsNullOrEmpty dirty then
             headTree
         else
-            digest (createHash "sha256") (headTree + "\n" + dirty)
+            HostDigest.sha256Hex (headTree + "\n" + dirty)
 
     let create (directory: string) : GitTreePort =
         { GetTreeHash = fun () -> treeHash directory }

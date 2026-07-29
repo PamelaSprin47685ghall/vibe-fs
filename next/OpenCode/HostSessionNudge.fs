@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
@@ -22,16 +23,23 @@ module HostSessionNudge =
             let snapshot = AgentJournal.snapshot j
             PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
 
-    let private effectiveAgent
+    /// Look up the agent the current cursor selects.
+    ///
+    /// Named for the lookup, not the algorithm: FALLBACK-002's side selection is
+    /// owned by AgentPairCursor, and this only fetches the cursor and asks. A
+    /// second `effectiveAgent` here would read as a competing implementation.
+    ///
+    /// No cursor means no accepted Authority Root (FALLBACK-001), so there is no
+    /// fallback state to consult and SelectedAgent is the only defensible answer.
+    let private agentForActiveCursor
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         =
-        match journal with
-        | None -> profile.SelectedAgent
-        | Some j ->
-            let cursor = DurableFallback.currentState sessionId (AgentJournal.snapshot j)
-            PromptAuthority.effectiveAgentAt profile cursor.Offset
+        journal
+        |> Option.bind (fun j -> DurableFallback.tryCurrentCursor sessionId (AgentJournal.snapshot j))
+        |> Option.map (PromptAuthority.effectiveAgentFor profile)
+        |> Option.defaultValue profile.SelectedAgent
 
     /// Reconciled linked children have a host-proven root user message even when
     /// the host omitted agent metadata from `chat.message`. Register that real
@@ -50,7 +58,7 @@ module HostSessionNudge =
 
             match
                 PromptAuthorityRun.createAuthorityRoot
-                    PromptAuthority.sha256Hex
+                    HostDigest.sha256Hex
                     rt.RuntimeId
                     sessionId
                     PromptAuthority.RootAuthorityKind.AgentOwnerRoot
@@ -73,7 +81,7 @@ module HostSessionNudge =
             match tryActiveProfile journal sessionId with
             | None -> return Error "No active authority profile"
             | Some profile ->
-                let agent = effectiveAgent journal sessionId profile
+                let agent = agentForActiveCursor journal sessionId profile
                 let rt = runtime journal
 
                 return! rt.SendContinuation sessionPort sessionId prompt kind profile agent directory onAccepted
@@ -111,7 +119,7 @@ module HostSessionNudge =
             if not (rt.TryClaimInteractionRepair profile terminalAssistantMessageId repairKind) then
                 false
             else
-                let agent = effectiveAgent journal sessionId profile
+                let agent = agentForActiveCursor journal sessionId profile
 
                 task {
                     let! _ =

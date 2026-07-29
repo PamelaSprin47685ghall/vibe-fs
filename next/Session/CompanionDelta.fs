@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.Session
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel.Identity
 
 type ProjectionSnapshot = string
@@ -111,9 +112,12 @@ module CompanionDelta =
 
                 parts
                 |> Array.choose (fun part ->
-                    if isNull part then None
-                    elif not (isNull part?text) then Some(unbox<string> part?text)
-                    else None)
+                    if isNull part then
+                        None
+                    elif not (isNull part?text) then
+                        Some(unbox<string> part?text)
+                    else
+                        None)
                 |> String.concat ""
             elif not (isNull message?text) then
                 unbox<string> message?text
@@ -126,9 +130,15 @@ module CompanionDelta =
         try
             if isNull message || isNull message?info then
                 false
-            elif not (isNull message?info?metadata) && not (isNull message?info?metadata?wanxiangshu_prompt_key) then
+            elif
+                not (isNull message?info?metadata)
+                && not (isNull message?info?metadata?wanxiangshu_prompt_key)
+            then
                 true
-            elif not (isNull message?metadata) && not (isNull message?metadata?wanxiangshu_prompt_key) then
+            elif
+                not (isNull message?metadata)
+                && not (isNull message?metadata?wanxiangshu_prompt_key)
+            then
                 true
             else
                 false
@@ -169,14 +179,6 @@ module CompanionDelta =
         // Bare continuation user messages never form a semantic delta alone.
         canonicalJson (List.toArray (semanticMessages messages))
 
-    [<Import("createHash", "node:crypto")>]
-    let private createHashImport: string -> obj = jsNative
-
-    let private sha256Hex (text: string) : string =
-        let hasher = createHashImport "sha256"
-        hasher?update (text) |> ignore
-        unbox<string> (hasher?digest ("hex"))
-
     /// SHA-256 hex of the canonical JSON of messages[0..cutoff).
     /// Used as CoveredPrefixDigest to verify prefix stability across TransformRaw calls.
     /// Returns empty string when cutoff <= 0 (no prefix to cover).
@@ -185,13 +187,13 @@ module CompanionDelta =
             ""
         else
             let prefix = messages |> List.truncate cutoff
-            jsonOfMessages canonicalJson prefix |> sha256Hex
+            jsonOfMessages canonicalJson prefix |> HostDigest.sha256Hex
 
     /// Deterministic synthetic B head id for companion injection.
     /// Format: companion-b-head-<first 16 hex chars of sha256(sessionId|epochId|companion-head)>.
     let bHeadDigest (sessionId: string) (epochId: string) : string =
         let input = sprintf "%s|%s|companion-head" sessionId epochId
-        let hash = sha256Hex input
+        let hash = HostDigest.sha256Hex input
         sprintf "companion-b-head-%s" (hash.Substring(0, 16))
 
     let prefixLength

@@ -5,6 +5,7 @@ open System.IO
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Host
 
 module private IntegrationGateDisposal =
 #if FABLE_COMPILER
@@ -27,26 +28,19 @@ type IntegrationGate(releaseFn: obj) =
         }
 
     interface IAsyncDisposable with
-        member this.DisposeAsync() = IntegrationGateDisposal.asValueTask (this.Release())
+        member this.DisposeAsync() =
+            IntegrationGateDisposal.asValueTask (this.Release())
 
 module IntegrationGate =
 
     [<Import("default", "proper-lockfile")>]
     let private lockfile: obj = jsNative
 
-    [<Import("createHash", "node:crypto")>]
-    let private createHashImport: string -> obj = jsNative
-
     [<Emit("$0($1, $2)")>]
     let private lockAsync (fn: obj) (path: string) (options: obj) : Task<obj> = jsNative
 
-    let private sha256 (text: string) =
-        let hasher = createHashImport "sha256"
-        hasher?update (text) |> ignore
-        unbox<string> (hasher?digest ("hex"))
-
     let lockPath (repoPath: string) (branch: string) =
-        let key = sha256 (repoPath + "\u0000" + branch)
+        let key = HostDigest.sha256Hex (repoPath + "\u0000" + branch)
         Path.Combine(Path.GetTempPath(), sprintf "wanxiangshu-publish-%s" key)
 
     let acquire (path: string) : Task<IntegrationGate> =
@@ -68,9 +62,5 @@ module IntegrationGate =
                 return IntegrationGate release
             with ex ->
                 return
-                    raise (
-                        InvalidOperationException(
-                            sprintf "publish lock acquire failed for %s: %s" path ex.Message
-                        )
-                    )
+                    raise (InvalidOperationException(sprintf "publish lock acquire failed for %s: %s" path ex.Message))
         }

@@ -101,7 +101,6 @@ const HOST_INTEROP_ALLOWLIST = new Map([
   ['next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
   ['next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
   ['next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
-  ['next/OpenCode/ExecutorSummarize.fs', 'Executor summarization Host adapter'],
   [
     'next/Kernel/Flow.fs',
     'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',
@@ -201,7 +200,9 @@ const DUPLICATE_ALGORITHM_OWNERS = [
   { symbol: 'advance', owners: ['Domain/AgentPairCursor.fs'] },
   { symbol: 'effectiveAgent', owners: ['Domain/AgentPairCursor.fs', 'Domain/PromptAuthority.fs'] },
   { symbol: 'peerAgent', owners: ['Domain/PromptAuthority.fs'] },
-  { symbol: 'sha256Hex', owners: ['Domain/PromptAuthority.fs'] },
+  // The single Host crypto adapter. Pure domains take `sha256: string -> string`
+  // as a parameter, so Domain/ owns no hash implementation at all.
+  { symbol: 'sha256Hex', owners: ['Host/HostDigest.fs'] },
   { symbol: 'reviewWitness', owners: ['Domain/ReviewWitness.fs'] },
   { symbol: 'confirmPerfect', owners: ['Review/ReviewProgram.fs'] },
 
@@ -510,12 +511,45 @@ for (const file of allFiles.filter(isFs)) {
 }
 
 // ── gate: one owner per algorithm ───────────────────────────────────────────
+//
+// Two things are checked, and the second was missing: a symbol defined ONCE but
+// in the wrong file is also a violation. The previous version guarded on
+// `hits.length > 1`, so a lone definition in a non-owner file passed silently —
+// exactly the state sha256Hex was in.
+//
+// Only MODULE-LEVEL definitions count. F# indents module members by four spaces
+// and local bindings deeper, so a `let peerAgent =` inside a function body is a
+// local variable that happens to share a name, not a second definition of the
+// algorithm. Matching those would push authors toward contorted local names to
+// appease a gate that misread the code.
+//
+// Modifiers must be admitted: `let private sha256Hex` is still a second
+// definition of the same knowledge. Hiding it changes who may call it, not
+// whether the knowledge exists twice.
+
+const MODULE_LEVEL_INDENT = 4
+const DEFINITION_MODIFIERS = String.raw`(?:private\s+|internal\s+|public\s+|inline\s+|rec\s+|mutable\s+)*`
+
+const definesAtModuleLevel = (text, symbol) => {
+  const pattern = new RegExp(
+    String.raw`^( {0,${MODULE_LEVEL_INDENT}})(?:let|member)\s+${DEFINITION_MODIFIERS}${escapeRegExp(symbol)}\b`,
+  )
+  return text.split('\n').some((line) => pattern.test(line))
+}
 
 for (const { symbol, owners } of DUPLICATE_ALGORITHM_OWNERS) {
-  const definition = new RegExp(`\\b(let|member|let\\s+rec)\\s+${escapeRegExp(symbol)}\\b`)
-  const hits = allFiles.filter((file) => isFs(file) && definition.test(read(file))).map(norm)
+  const hits = allFiles.filter((file) => isFs(file) && definesAtModuleLevel(read(file), symbol)).map(norm)
 
-  if (hits.length > 1 && !hits.every((hit) => owners.some((owner) => hit.endsWith(owner)))) {
+  if (hits.length === 0) continue
+
+  const strays = hits.filter((hit) => !owners.some((owner) => hit.endsWith(owner)))
+
+  if (strays.length > 0) {
+    fail(
+      'duplicate-algorithm',
+      `'${symbol}' defined outside its owner in ${strays.join(', ')}; owners: ${owners.join(', ')}`,
+    )
+  } else if (hits.length > owners.length) {
     fail(
       'duplicate-algorithm',
       `'${symbol}' defined in ${hits.length} places (${hits.join(', ')}); owners: ${owners.join(', ')}`,

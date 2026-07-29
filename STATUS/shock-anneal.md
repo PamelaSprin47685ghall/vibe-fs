@@ -325,6 +325,68 @@ provider 与 model 保留在 Semantic 中：它们是配置而非身份，且 FA
 
 顺带修正两处：tool call 缺 `callID` 时整个 part 被丢弃，而不是补一个空 id——REVIEW-004 需要 call id，空字符串会让「没有身份」看起来像一个真实身份。`system` 保持独立列表而不折进 messages，因为 Host 就是这样发的（`experimental.chat.system.transform` 收 `system: string[]`），折进去会让 wire projection 与它要镜像的字节不一致。
 
+### 包 0e：单一 Host 摘要适配器与读侧修正
+
+| 项 | 值 |
+|----|----|
+| 条款 | FALLBACK-001 FALLBACK-002 FALLBACK-005 PROMPT-011 VERIFY-005 VERIFY-008 ARCH-003 COMPANION-011 REVIEW-010 |
+| 目标模块 | `Host/HostDigest.fs`（新建）、`Journal/RuntimePath.fs`、`OpenCode/{GitTree,ExecutorSummarize,HostSessionNudge,RetrySignalHandler,PromptDispatcher,PromptMetadataCodec,PromptAuthority}.fs`、`Orchestrator.IntegrationGate.fs`、`Session/{CompanionDelta,DurableFallback}.fs`、`scripts/architecture-gate.mjs` |
+| 生产 | DOMAIN_MIGRATED |
+| 测试 | UNTOUCHED |
+
+#### 六个 crypto 适配器合一
+
+六个模块各自 `[<Import("createHash", "node:crypto")>]` 并写三行 sha256-hex 包装：prompt 身份、runtime 路径、Git tree、executor id、publish lock key、Companion 前缀 digest。同一知识六份，四个不同局部名（`sha256`、`sha256Hex`、`digest`、`createHashImport`）。
+
+摘要出现在持久事实里（REVIEW-010 的 seal、COMPANION-011 的 CoveredPrefixDigest）与派生身份里。第二份实现若在编码上有差异，不是「与另一份不一致」，而是让已存储的证据失效。
+
+现在 `node:crypto` 在全仓恰好一个导入点。纯领域不调用它，而是接收 `sha256: string -> string` 参数——这就是 `Domain/` 没有 `node:crypto` 且可以不带 Host 测试的原因（VERIFY-008）。
+
+新目录 `next/Host/` 而非放进 `OpenCode/`：摘要不是 OpenCode 概念，`Journal/RuntimePath.fs` 与 `Orchestrator.IntegrationGate.fs` 都要用它，让它们依赖 `OpenCode` 会造成反向依赖。fsproj 中排在 `Kernel/Identity.fs` 之前。
+
+`ExecutorSummarize.fs` 因此不再需要任何 Fable 符号，`open Fable.Core` 与 `open Fable.Core.JsInterop` 一并删除，并从 host-boundary allowlist 移除——allowlist 条目留着不删，就会在下一个人往该文件加动态访问时静默放行。
+
+#### duplicate-algorithm 门禁漏检单处误置
+
+旧判据是 `hits.length > 1`，因此「只定义一次但在错误文件里」静默通过。`sha256Hex` 正处于这个状态：`Domain/PromptAuthority.fs` 被声明为 owner，实际那里根本没有定义，唯一定义在 `OpenCode/PromptAuthority.fs`。门禁看到一处命中就放过了。
+
+三处修正：
+
+```text
+单处误置也判失败（strays 非空即报）
+定义正则接受修饰符——let private sha256Hex 仍是第二份实现，
+    private 改变谁能调用，不改变知识是否存在两份
+只匹配模块级定义（缩进 ≤ 4）——函数体内的 let peerAgent 是恰好同名的
+    局部变量，把它算作违规会逼作者为讨好门禁而扭曲局部命名
+```
+
+修正后立刻暴露两处真实违规：`HostSessionNudge.effectiveAgent` 与三处 `sha256Hex`。
+
+`HostSessionNudge.effectiveAgent` 改名 `agentForActiveCursor`：它只是取 cursor 再问 `AgentPairCursor`，按查询命名而非按算法命名，否则读者会以为存在第二个 side-selection 实现。
+
+#### DurableFallback 读侧两处缺陷
+
+其一，逐字段重建 cursor：
+
+```fsharp
+{ Offset = fb.Offset
+  LastProviderAttempt = fb.LastProviderAttempt }
+```
+
+包 0a 给 cursor 加了 `ConsecutiveFailureCount` 后，这里会静默漏抄，每次读出的 count 都是 0——FALLBACK-005 的预算永远满格。改为直接返回 `fallback.Cursor`。
+
+其二，未知 session 返回 `AgentPairCursor.initial`。FALLBACK-001 规定 cursor 由 Authority Root 创建，缺失意味着没有被接受的 root；返回 `initial` 会让「无已证明的 authority」看起来像「一个刚开始的 run」。改为返回 `option`，并新增 `mayContinue`，未知 session 一律 `false`：没有已证明的 authority 就没有自动物理请求。
+
+同时删除 `nextDecision`——它是 `currentState` 的同义转发，两个名字指向同一次读取，等于让读者猜哪个是权威。
+
+#### PromptMetadataCodec
+
+字段改 typed：`PromptKey`、`LogicalRunId option`。PROMPT-011 要求 PromptKey 进入 Host metadata，因为它是崩溃后调和未决 claim 的唯一锚点。
+
+`LogicalRunId` 用 `null` 而非 `""` 表示不存在：Authority Root claim 尚无 run（run id 由 Host 还未创建的物理消息派生），`""` 会让「无 run」与「名为空串的 run」在 wire 上同形。
+
+删除 `wanxiangshu_authority_root` 字段——它的唯一用途是让 review 从共享 authority root 推断确认，REVIEW-003 已禁止。
+
 ### 包 A：PromptDispatcher
 
 | 项 | 值 |

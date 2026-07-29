@@ -4,8 +4,7 @@ open System
 open System.Collections.Generic
 open System.Text
 open System.Threading.Tasks
-open Fable.Core.JsInterop
-open Fable.Core
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
@@ -21,16 +20,8 @@ module ExecutorSummarize =
     let asExecutorRuntime = ExecutorSummarizeRuntime.asExecutorRuntime
     let ofForkRuntime = ExecutorSummarizeRuntime.ofForkRuntime
 
-    [<Import("createHash", "node:crypto")>]
-    let private createHashImport: string -> obj = jsNative
-
     let private agentId (processId: string) (level: int) (startChunk: int) (endChunk: int) =
-        let hasher = createHashImport "sha256"
-
-        hasher?update (sprintf "%s|%d|%d|%d" processId level startChunk endChunk)
-        |> ignore
-
-        sprintf "exec-%s" (unbox<string> (hasher?digest "hex"))
+        sprintf "exec-%s" (HostDigest.sha256Hex (sprintf "%s|%d|%d|%d" processId level startChunk endChunk))
 
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
@@ -105,10 +96,7 @@ module ExecutorSummarize =
                 index
                 content
 
-        let rootDigest =
-            let hasher = createHashImport "sha256"
-            hasher?update (sprintf "%s|%d" spoolPath index) |> ignore
-            unbox<string> (hasher?digest "hex")
+        let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
         runExecutorPrompt runtime stash rootDigest 0 index index prompt
 
@@ -126,10 +114,7 @@ module ExecutorSummarize =
                 level
                 combined
 
-        let batchDigest =
-            let hasher = createHashImport "sha256"
-            hasher?update (String.concat "\n" batch) |> ignore
-            unbox<string> (hasher?digest "hex")
+        let batchDigest = HostDigest.sha256Hex (String.concat "\n" batch)
 
         runExecutorPrompt runtime stash batchDigest level 0 (List.length batch - 1) prompt
 

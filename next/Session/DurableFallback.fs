@@ -14,25 +14,42 @@ module FallbackJournalPort =
         { AppendFact =
             fun stream fact ->
                 match AgentJournal.appendAgent stream None fact journal with
-                | Ok proj -> Ok proj
-                | Error failure -> Error(sprintf "%A" failure.Failure) }
+                | Ok projection -> Ok projection
+                | Error failure -> Error(sprintf "%A" failure) }
 
+/// Reads the durable fallback cursor. Never writes it — FALLBACK-003 gives the
+/// only advance to the FallbackController.
 module DurableFallback =
 
-    let currentState (sessionId: SessionId) (projSet: ProjectionSet) : AgentPairCursor.FallbackCursor =
-        match Map.tryFind sessionId projSet.AgentProjections.Sessions with
-        | Some sessionProj ->
-            match sessionProj.Fallback with
-            | Some fb ->
-                { AgentPairCursor.FallbackCursor.Offset = fb.Offset
-                  AgentPairCursor.FallbackCursor.LastProviderAttempt = fb.LastProviderAttempt }
-            | None -> AgentPairCursor.initial
-        | None -> AgentPairCursor.initial
+    /// The cursor as the journal has it.
+    ///
+    /// Returns the projection's cursor directly. The previous version rebuilt one
+    /// field by field, so every new cursor field had to be copied here as well or
+    /// would silently read as its default — which is exactly how
+    /// ConsecutiveFailureCount would have arrived as 0 on every read, making
+    /// FALLBACK-005's budget permanently full.
+    ///
+    /// `None` when the session has no fallback projection. FALLBACK-001 says the
+    /// cursor is created by the Authority Root, so its absence means no root was
+    /// accepted; substituting `initial` would make "no proven authority" look like
+    /// "a fresh run at Offset 0".
+    let tryCurrentCursor (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.FallbackCursor option =
+        AgentProjection.tryFind sessionId projection.AgentProjections
+        |> Option.bind (fun session -> session.Fallback)
+        |> Option.map (fun fallback -> fallback.Cursor)
 
-    /// 0.5.0: provider retry count never kills a Logical Run.
-    /// Returns the cursor for the next provider attempt.
-    let nextDecision (sessionId: SessionId) (projSet: ProjectionSet) : AgentPairCursor.FallbackCursor =
-        currentState sessionId projSet
+    /// FALLBACK-002: which side the next attempt lands on.
+    let tryCurrentSide (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.ModelSide option =
+        tryCurrentCursor sessionId projection
+        |> Option.map (fun cursor -> AgentPairCursor.side cursor.Offset)
 
-    let currentSide (sessionId: SessionId) (projSet: ProjectionSet) : AgentPairCursor.ModelSide =
-        AgentPairCursor.side (currentState sessionId projSet).Offset
+    /// FALLBACK-005: whether the automatic recovery budget still permits an
+    /// attempt.
+    ///
+    /// `false` for an unknown session: no proven authority means no automatic
+    /// physical request.
+    let mayContinue (budget: int) (sessionId: SessionId) (projection: ProjectionSet) : bool =
+        AgentProjection.tryFind sessionId projection.AgentProjections
+        |> Option.bind (fun session -> session.Fallback)
+        |> Option.map (FallbackProjection.mayContinue budget)
+        |> Option.defaultValue false

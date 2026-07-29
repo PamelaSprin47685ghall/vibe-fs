@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.Journal
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Host
 
 module RuntimePath =
 
@@ -23,12 +24,6 @@ module RuntimePath =
 
     [<Import("homedir", "node:os")>]
     let private homeDirectory () : string = jsNative
-
-    [<Import("createHash", "node:crypto")>]
-    let private createHash (algorithm: string) : obj = jsNative
-
-    [<Emit("$0.update($1).digest('hex')")>]
-    let private digest (hash: obj) (value: string) : string = jsNative
 
     [<Emit("process.env.XDG_STATE_HOME || ''")>]
     let private xdgStateHome () : string = jsNative
@@ -51,7 +46,7 @@ module RuntimePath =
             else
                 configured
 
-        runtimeDirectory (joinPath stateRoot (digest (createHash "sha256") workspace))
+        runtimeDirectory (joinPath stateRoot (HostDigest.sha256Hex workspace))
 
     let internal gitCommonDir (workspace: string) : string =
         try
