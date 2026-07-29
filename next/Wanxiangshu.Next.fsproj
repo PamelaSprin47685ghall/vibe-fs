@@ -23,9 +23,10 @@
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
+    <Compile Include="Domain/ReviewWitness.fs"/>
+    <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
-    <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="OpenCode/ManagedAgent.fs"/>
     <Compile Include="OpenCode/PromptAuthority.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
@@ -57,7 +58,7 @@
     <Compile Include="Session/DurableFallback.fs"/>
     <Compile Include="Session/FallbackController.fs"/>
     <Compile Include="Session/ReviewTypes.fs"/>
-    <Compile Include="Session/ReviewerHost.fs"/>
+    <Compile Include="Session/ReviewController.fs"/>
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
     <Compile Include="Process/LargeGate.fs"/>
@@ -129,6 +130,7 @@
     <Compile Include="OpenCode/HostSessionNudge.fs"/>
     <Compile Include="OpenCode/TurnBinding.fs"/>
     <Compile Include="OpenCode/CompanionTransform.fs"/>
+    <Compile Include="OpenCode/ReviewSeal.fs"/>
     <Compile Include="OpenCode/HostReviewGuard.fs"/>
     <Compile Include="OpenCode/CompletedTurnClassifier.fs"/>
     <Compile Include="OpenCode/TurnReconcile.fs"/>

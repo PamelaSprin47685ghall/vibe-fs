@@ -12,31 +12,35 @@ open Wanxiangshu.Next.Session
 /// emission plus lazy journal recovery and conflict-resumption prompt building
 /// for persisted ManagerJobProjections.
 module OrchestratorManagerJob =
-    /// Emit a ReviewBarrierStarted fact that resets the review guard so the
-    /// phase requires two FRESH PERFECT verdicts on the current tree.
+    /// Open a review barrier so the phase requires two FRESH PERFECT verdicts on
+    /// the current tree (REVIEW-008).
+    ///
+    /// SHOCK-UNMIGRATED[REVIEW-008]: `ReviewBarrierStarted` now carries
+    /// `ReviewerSessionId`, `BarrierId` and `GitTreeHash`, and the fold keys
+    /// `ReviewGuardProjection` by the reviewer session. This call site has none of
+    /// the three: it runs BEFORE `runReviewerOnce` forks the reviewer, so no
+    /// reviewer session exists yet, and it receives an opaque `barrierKey` string
+    /// instead of a `ReviewBarrierId` and tree.
+    ///
+    /// Not an implementation difficulty — an ordering contradiction. A barrier is
+    /// opened for a (job, tree) before any reviewer exists, so it cannot be keyed
+    /// by a reviewer session at emission time. Two coherent resolutions exist and
+    /// both change code this package does not own:
+    ///
+    ///   1. Emit the barrier from the reviewer fork path, once the child session
+    ///      id exists. A fresh reviewer session per barrier also makes REVIEW-008's
+    ///      "fresh dual PERFECT" automatic, since its guard starts empty.
+    ///   2. Key `ReviewGuardProjection` by the review owner instead, reverting the
+    ///      per-reviewer keying that removed a full-scan parent lookup.
+    ///
+    /// `reverify` belongs to the Orchestrator package, so the choice is made there.
     let emitReviewBarrier
-        (journal: AgentJournal option)
-        (reviewOwnerSessionId: SessionId)
-        (barrierKey: string)
+        (_journal: AgentJournal option)
+        (_reviewOwnerSessionId: SessionId)
+        (_barrierKey: string)
         : Task<Result<unit, string>> =
-        task {
-            match journal with
-            | Some j ->
-                // reviewOwnerSessionId must be the durable session that receives
-                // ReviewVerdictRecorded for this barrier (the reviewer's parent
-                // in sessionParents / linkage). For OrchestratorHost reverify
-                // that is the Orchestrator session; for Manager-owned reviewers
-                // it is the Manager session.
-                let fact =
-                    AgentFact.ReviewBarrierStarted
-                        {| ManagerSessionId = reviewOwnerSessionId
-                           BarrierKey = barrierKey |}
-
-                match AgentJournal.appendAgent (StreamId.Session reviewOwnerSessionId) None fact j with
-                | Ok _ -> return Ok()
-                | Error failure -> return Error(sprintf "%A" failure.Failure)
-            | None -> return Ok()
-        }
+        failwith
+            "SHOCK-UNMIGRATED[REVIEW-008]: a review barrier cannot be keyed by a reviewer session that does not exist yet"
 
     /// Build the recovery prompt for a manager job: conflict-resumption prompt
     /// when REBASE_HEAD exists and no candidate, otherwise the original prompt.

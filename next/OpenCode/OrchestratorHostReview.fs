@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
@@ -46,7 +47,7 @@ module OrchestratorHostReview =
                     // spans the full double-PERFECT barrier.
                     let prompt =
                         match priorState with
-                        | Ok OrchestratorReviewRead.PendingConfirmation -> HostReviewGuard.skepticalReevaluationPrompt
+                        | Ok OrchestratorReviewRead.PendingConfirmation -> ReviewChallenge.Text
                         | _ -> "Review the current worktree for correctness. Submit your verdict with the verdict tool."
 
                     let! ran = runReviewerOnce managerId worktree prompt
@@ -61,7 +62,7 @@ module OrchestratorHostReview =
                         | Ok OrchestratorReviewRead.Confirmed -> return Ok()
                         | Ok OrchestratorReviewRead.RevisionRequired -> return Error "Reviewer requested revision"
                         | Ok OrchestratorReviewRead.PendingConfirmation ->
-                            let! nudged = runReviewerOnce managerId worktree HostReviewGuard.skepticalReevaluationPrompt
+                            let! nudged = runReviewerOnce managerId worktree ReviewChallenge.Text
 
                             match nudged with
                             | Error err -> return Error err

@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
+open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Fact
@@ -8,155 +10,125 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
 
-/// Reviewer verdict tool. ToolCallId, ProviderRunId, physical user id, and tree
-/// are passed as explicit witnesses; assistant prose never determines verdict.
+/// Reviewer verdict tool. ToolCallId, ProviderRunIdentity and the current tree
+/// are explicit witnesses; assistant prose never determines a verdict.
+///
+/// This module only gathers identities and reports. Every judgement — dedupe,
+/// causal proof, witness construction — belongs to `ReviewController`, which is
+/// the single writer (REVIEW-003/006).
 module VerdictTool =
 
-    let private textFromParts (parts: MessagePart array) = CompletedTurnClassifier.partsText parts
-
-    let private latestUserPromptText
-        (snapshot: ISessionSnapshotPort option)
-        (sessionId: string)
-        (preferredMessageId: string option)
-        =
-        task {
-            match snapshot with
-            | None -> return None
-            | Some port ->
-                match! port.GetMessages(SessionId.create sessionId) with
-                | Error _ -> return None
-                | Ok messages ->
-                    let users: SessionMessage list =
-                        messages |> List.filter (fun message -> message.Role = "user")
-
-                    let preferred =
-                        preferredMessageId
-                        |> Option.bind (fun messageId ->
-                            users
-                            |> List.tryFind (fun message -> message.Id = messageId)
-                            |> Option.bind (fun message ->
-                                let text = textFromParts message.Parts
-                                if String.IsNullOrWhiteSpace text then None else Some text))
-
-                    return
-                        preferred
-                        |> Option.orElseWith (fun () ->
-                            users
-                            |> List.rev
-                            |> List.tryPick (fun message ->
-                                let text = textFromParts message.Parts
-                                if String.IsNullOrWhiteSpace text then None else Some text))
-        }
-
+    /// The Manager that owns this reviewer.
+    ///
+    /// `sessionParents` only. The previous version fell back to scanning every
+    /// session's linkage for one containing this child, which is a full scan
+    /// (PERSIST-008) that also accepted a hit under the wrong parent. A reviewer
+    /// whose parent is unknown fails closed instead.
     let private reviewOwner (scope: ToolRuntimeScope) (reviewerId: string) =
         match scope.SessionParents.TryGetValue reviewerId with
-        | true, parentId -> Some parentId
-        | false, _ ->
-            match scope.Journal with
-            | None -> None
-            | Some journal ->
-                let child = ChildId.create reviewerId
+        | true, parentId -> Some(SessionId.create parentId)
+        | false, _ -> None
 
-                (AgentJournal.snapshot journal).AgentProjections.Sessions
-                |> Map.tryPick (fun parentId session ->
-                    match session.Linkage with
-                    | Some linkage when Map.containsKey child linkage.LinkedChildren -> Some(SessionId.value parentId)
-                    | _ -> None)
+    /// REVIEW-006 requires both in the witness, and both come from the durable
+    /// Manager job. `None` is legitimate for a Manager that is not running under an
+    /// Orchestrator job.
+    let private jobIdentity (scope: ToolRuntimeScope) (managerSessionId: SessionId) =
+        match scope.Journal with
+        | None -> None, None
+        | Some journal ->
+            match
+                OrchestratorProjection.tryFindByManagerSession
+                    managerSessionId
+                    (AgentJournal.snapshot journal).AgentProjections.Orchestrator
+            with
+            | None -> None, None
+            | Some job -> Some job.ManagerJobId, Some job.WorktreeIdentity
+
+    /// REVIEW-008: the barrier this verdict belongs to.
+    ///
+    /// Read from the reviewer's own guard rather than derived from the tree: a
+    /// barrier is opened explicitly, and post-rebase review must be a NEW barrier
+    /// even when the tree hash is unchanged. Deriving it from the tree would make
+    /// those two indistinguishable.
+    let private currentBarrier (scope: ToolRuntimeScope) (reviewerId: string) =
+        match scope.Journal with
+        | None -> None
+        | Some journal ->
+            AgentProjection.tryFind (SessionId.create reviewerId) (AgentJournal.snapshot journal).AgentProjections
+            |> Option.bind (fun session -> session.ReviewGuard)
+            |> Option.bind (fun guard -> guard.CurrentBarrierId)
+
+    let private report (decision: VerdictDecision) =
+        match decision with
+        | VerdictDecision.Revised -> "REVISE recorded for the current tree."
+        // The challenge text IS the tool result the second run must consume
+        // (REVIEW-003). Returning it here is what puts it into that run's input
+        // seal, so the string comes from the domain rather than being written again.
+        | VerdictDecision.ChallengeIssued challenge -> challenge
+        | VerdictDecision.Confirmed -> "PERFECT recorded for the current tree."
+        | VerdictDecision.ChallengeUnproven ->
+            "Verdict rejected: this provider run has no input seal proving it received the previous challenge."
+        | VerdictDecision.AlreadyCounted -> "Verdict already recorded for this provider run."
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
             let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
 
-            let validation =
+            let validated =
                 if scope.RoleFor context <> Some Role.Reviewer then
-                    Error "The verdict tool is available only to reviewer sessions"
+                    Error "the verdict tool is available only to reviewer sessions"
                 elif String.IsNullOrWhiteSpace context.SessionId then
-                    Error "Missing sessionID"
-                elif context.ToolCallId.IsNone then
-                    Error "Missing tool call id"
+                    Error "missing sessionID"
                 else
-                    verdict
+                    match verdict, context.ToolCallId, context.ProviderRunId with
+                    | Error error, _, _ -> Error error
+                    | _, None, _ -> Error "missing tool call id"
+                    | _, _, None -> Error "missing provider run id"
+                    | Ok value, Some toolCallId, Some providerRunId -> Ok(value, toolCallId, providerRunId)
 
-            match validation, context.ToolCallId with
-            | Error error, _ -> return sprintf "Verdict rejected: %s." error
-            | Ok _, None -> return "Verdict rejected because reviewer context is missing."
-            | Ok value, Some toolCallId ->
+            match validated with
+            | Error error -> return sprintf "Verdict rejected: %s." error
+            | Ok(value, toolCallId, providerRunId) ->
                 let reviewerId = context.SessionId
-                let managerId = reviewOwner scope reviewerId
-                let treePort = scope.TreePortFor reviewerId
 
-                match scope.Journal, managerId, treePort, context.ProviderRunId with
+                match
+                    scope.Journal,
+                    reviewOwner scope reviewerId,
+                    scope.TreePortFor reviewerId,
+                    currentBarrier scope reviewerId
+                with
                 | None, _, _, _ -> return "Verdict rejected because the reviewer journal is unavailable."
-                | _, None, _, _ -> return "Verdict rejected because the manager session is missing."
+                | _, None, _, _ -> return "Verdict rejected because the manager session is unknown."
                 | _, _, None, _ -> return "Verdict rejected because the Git tree is unavailable."
-                | _, _, _, None -> return "Verdict rejected because the provider run is missing."
-                | Some _, Some owner, Some gitTree, Some providerRunId ->
-                    let physicalUserMessageId =
-                        scope.CurrentPhysicalUserMessage reviewerId
-                        |> Option.orElse context.UserMessageId
+                // REVIEW-008 fail closed: without an open barrier there is nothing
+                // this verdict could confirm, and inventing one would let a
+                // post-rebase review reuse a pre-rebase confirmation.
+                | _, _, _, None -> return "Verdict rejected because no review barrier is open for this tree."
+                | Some journal, Some managerSessionId, Some gitTree, Some barrierId ->
+                    let managerJobId, worktreeIdentity = jobIdentity scope managerSessionId
 
-                    let! promptText =
-                        match context.PromptText with
-                        | Some text -> task { return Some text }
-                        | None -> latestUserPromptText scope.Snapshot reviewerId physicalUserMessageId
+                    let submission: VerdictSubmission =
+                        { BarrierId = barrierId
+                          GitTreeHash = GitTreeHash.create (gitTree.GetTreeHash())
+                          ManagerSessionId = managerSessionId
+                          ReviewerSessionId = SessionId.create reviewerId
+                          ManagerJobId = managerJobId
+                          WorktreeIdentity = worktreeIdentity
+                          ProviderRun = ProviderRunIdentity.create providerRunId
+                          ToolCallId = ToolCallId.create toolCallId
+                          Verdict = value }
 
-                    let host = scope.ReviewerHostFor(reviewerId, owner, gitTree)
-
-                    match
-                        host.SubmitVerdict(
-                            toolCallId,
-                            value,
-                            providerRunId,
-                            ?userPromptText = promptText,
-                            ?userMessageId = physicalUserMessageId
-                        )
-                    with
+                    // No terminal notification here. A confirmed dual-PERFECT
+                    // completes through the reconcile path's `reviewerAlreadyConfirmed`
+                    // branch, which reads the Authority Root from the durable
+                    // projection. The previous version notified inline and built the
+                    // root from this tool's physical user message id — fabricating a
+                    // PROMPT-002 identity from a PROMPT-001 one.
+                    match ReviewController.submit journal HostDigest.sha256Hex submission with
                     | Error error -> return sprintf "Verdict rejected: %s." error
-                    | Ok result ->
+                    | Ok decision ->
                         scope.MarkVerdictSubmitted reviewerId
-
-                        match result, value with
-                        | ReviewFinishResult.Confirmed, ReviewGuardVerdict.Perfect ->
-                            // Dual-PERFECT is a durable external fact written by this
-                            // tool call. Do not wait for a later prose stop frame or
-                            // idle reconcile: OrchestratorHost.reverify / Manager join
-                            // already own the AwaitAgent subscription.
-                            match scope.EventPort with
-                            | Some eventPort ->
-                                let sessionId = SessionId.create reviewerId
-
-                                let rootUser =
-                                    physicalUserMessageId
-                                    |> Option.defaultValue (defaultArg context.UserMessageId "")
-
-                                let assistant = context.ProviderRunId |> Option.defaultValue toolCallId
-
-                                let finalText =
-                                    match TerminalSessionA.fullText eventPort sessionId with
-                                    | Some text when not (String.IsNullOrWhiteSpace text) -> text
-                                    | _ -> "Review confirmed."
-
-                                let directory = scope.DirectoryFor reviewerId |> Option.defaultValue ""
-
-                                let runResult: AgentRunResult =
-                                    { SessionId = sessionId
-                                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create rootUser
-                                      ProviderRun = ProviderRunIdentity.create assistant
-                                      Role = Role.Reviewer
-                                      Directory = directory
-                                      SessionWideText = finalText
-                                      TurnFormalText = finalText }
-
-                                eventPort.NotifyTerminal sessionId (TerminalOutcome.Completed runResult)
-                                |> ignore
-                            | None -> ()
-
-                            return "PERFECT recorded for the current tree."
-                        | ReviewFinishResult.Confirmed, ReviewGuardVerdict.Revise
-                        | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Revise ->
-                            return "REVISE recorded for the current tree."
-                        | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Perfect ->
-                            return HostReviewGuard.skepticalReevaluationPrompt
+                        return report decision
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

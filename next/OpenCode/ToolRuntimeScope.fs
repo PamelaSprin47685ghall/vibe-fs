@@ -34,7 +34,6 @@ type ToolRuntimeScope
     let gate = obj ()
     let runtimes = Dictionary<string, HostForkRuntime>()
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
-    let reviewerHosts = Dictionary<string, ReviewerHost>()
     let treePorts = Dictionary<string, GitTreePort>()
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -161,25 +160,6 @@ type ToolRuntimeScope
         | true, port -> Some port
         | false, _ -> gitTreePort
 
-    member _.ReviewerHostFor(reviewerId: string, managerId: string, treePort: GitTreePort) =
-        lock gate (fun () ->
-            match reviewerHosts.TryGetValue reviewerId with
-            | true, host -> host
-            | false, _ ->
-                match journal with
-                | None -> invalidOp "Reviewer journal is unavailable"
-                | Some durable ->
-                    let host =
-                        ReviewerHost(
-                            durable,
-                            SessionId.create managerId,
-                            SessionId.create reviewerId,
-                            gitTreePort = treePort
-                        )
-
-                    reviewerHosts.[reviewerId] <- host
-                    host)
-
     member _.MarkVerdictSubmitted(reviewerId: string) =
         lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
 
@@ -201,7 +181,6 @@ type ToolRuntimeScope
 
             this.DisposeExecutorRuntime sessionId
 
-            reviewerHosts.Remove sessionId |> ignore
             orchestratorHosts.Remove sessionId |> ignore
             treePorts.Remove sessionId |> ignore)
 

@@ -108,6 +108,22 @@ module OrchestratorProjection =
 
     let tryFind (jobId: ManagerJobId) (projection: OrchestratorProjection) = Map.tryFind jobId projection.Jobs
 
+    /// The job a Manager session is running, for callers that hold only the
+    /// session id.
+    ///
+    /// REVIEW-006 requires `ManagerJobId` and `WorktreeIdentity` inside every
+    /// confirmed witness, and the reviewer path reaches the Manager by session.
+    /// Scanning `Jobs` is bounded by concurrently active jobs, not by history
+    /// length, so PERSIST-008 holds; keying by session as well would be a second
+    /// index to keep consistent with this one.
+    let tryFindByManagerSession (managerSessionId: SessionId) (projection: OrchestratorProjection) =
+        projection.Jobs
+        |> Map.tryPick (fun _ job ->
+            if job.ManagerSessionId = managerSessionId then
+                Some job
+            else
+                None)
+
     let private isTerminal (progress: JobProgress) =
         match progress with
         | Published _

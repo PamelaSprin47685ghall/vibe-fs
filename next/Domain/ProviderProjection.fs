@@ -207,12 +207,29 @@ module ProviderProjection =
         && List.length previous.Messages <= List.length next.Messages
         && (next.Messages |> List.truncate (List.length previous.Messages)) = previous.Messages
 
+    /// REVIEW-010 `CanonicalVersion`. Bump when `renderWire` changes shape, so an
+    /// old seal is recognisable as having been produced by a different renderer
+    /// rather than silently compared against new bytes.
+    [<Literal>]
+    let CanonicalVersion = 1
+
     /// REVIEW-010: the digest that becomes a `ProviderInputSeal`.
     ///
     /// Takes the hash as a parameter so this module stays pure — Domain owns what
     /// gets hashed, the Host boundary owns how.
     let sealDigest (sha256: string -> string) (wire: ProviderWireProjection) : SealDigest =
         SealDigest.create (sha256 (renderWire wire))
+
+    /// REVIEW-010: the digest of ONE tool result, as the wire projection renders it.
+    ///
+    /// REVIEW-003's challenge digest and REVIEW-010's seal contents must both come
+    /// from this function. If either side applied its own normalisation, a single
+    /// character of drift would make every confirmation fail closed — a defect that
+    /// is indistinguishable from correct fail-closed behaviour and therefore nearly
+    /// invisible. `resultCanonical` is already canonical: it is the value the codec
+    /// put into `WireToolResult`.
+    let toolResultDigest (sha256: string -> string) (resultCanonical: string) : SealDigest =
+        SealDigest.create (sha256 resultCanonical)
 
     /// REVIEW-010: which tool results this request carried, as digests.
     ///
@@ -224,7 +241,7 @@ module ProviderProjection =
         |> List.collect (fun message -> message.Parts)
         |> List.choose (fun part ->
             match part with
-            | WireToolResult(_callId, result) -> Some(SealDigest.create (sha256 result))
+            | WireToolResult(_callId, result) -> Some(toolResultDigest sha256 result)
             | WireText _
             | WireReasoning _
             | WireToolCall _ -> None)

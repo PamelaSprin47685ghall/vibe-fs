@@ -11,10 +11,15 @@ open Thoth.Json
 /// Opaque Host arguments. Dynamic property access is confined to this codec.
 type HostToolArguments internal (raw: obj) =
     member _.Text(name: string) =
-        if isNull raw || isNull raw?(name) then "" else unbox<string> raw?(name)
+        if isNull raw || isNull raw?(name) then
+            ""
+        else
+            unbox<string> raw?(name)
 
     member this.OptionalText(name: string) =
-        this.Text name |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        this.Text name
+        |> Option.ofObj
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
     member _.OptionalTexts(name: string) =
         if isNull raw || isNull raw?(name) then
@@ -23,8 +28,10 @@ type HostToolArguments internal (raw: obj) =
             try
                 unbox<obj array> raw?(name)
                 |> Array.choose (fun item ->
-                    if isNull item then None
-                    else string item |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not))
+                    if isNull item then
+                        None
+                    else
+                        string item |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not))
                 |> Array.toList
                 |> Some
             with _ ->
@@ -34,15 +41,25 @@ type HostToolArguments internal (raw: obj) =
         if isNull raw || isNull raw?(name) then
             None
         else
-            try Some(unbox<float> raw?(name)) with _ -> None
+            try
+                Some(unbox<float> raw?(name))
+            with _ ->
+                None
 
 /// Typed subset of the OpenCode tool invocation context used by domain tools.
+///
+/// No user-message field. HOST-011: the Host's `ToolContext` carries `sessionID`,
+/// `messageID` and `callID`, and never a user message id — verified against Host
+/// `tool/tool.ts` and the published `@opencode-ai/plugin` types
+/// (`STATUS/evidence/host-transform-run-binding.md`). The old optional field
+/// decoded a key that does not exist, so it was always `None`, and every
+/// `Option.orElse` fallback beside it was unreachable code that read as a working
+/// second source.
 type HostToolContext =
     { SessionId: string
       Agent: string option
       ToolCallId: string option
       ProviderRunId: string option
-      UserMessageId: string option
       PromptText: string option
       AttachAbort: (unit -> unit) -> (unit -> unit) }
 
@@ -103,13 +120,20 @@ module ToolHostCodec =
 
     let private attachAbort (raw: obj) (callback: unit -> unit) =
         let signal =
-            if isNull raw then null
+            if isNull raw then
+                null
             else
                 let abort = raw?("abort")
-                if not (isNull abort) then abort
+
+                if not (isNull abort) then
+                    abort
                 else
                     let abortSignal = raw?("abortSignal")
-                    if not (isNull abortSignal) then abortSignal else raw?("signal")
+
+                    if not (isNull abortSignal) then
+                        abortSignal
+                    else
+                        raw?("signal")
 
         if isNull signal || isNull (signal?("addEventListener")) then
             fun () -> ()
@@ -132,7 +156,10 @@ module ToolHostCodec =
                 try
                     unbox<obj array> raw?message?parts
                     |> Array.choose (fun part ->
-                        if isNull part || isNull part?text then None else Some(unbox<string> part?text))
+                        if isNull part || isNull part?text then
+                            None
+                        else
+                            Some(unbox<string> part?text))
                     |> String.concat ""
                     |> Option.ofObj
                     |> Option.filter (String.IsNullOrWhiteSpace >> not)
@@ -148,7 +175,6 @@ module ToolHostCodec =
           Agent = contextString raw "agent"
           ToolCallId = contextString raw "toolCallId" |> Option.orElse (contextString raw "callID")
           ProviderRunId = contextString raw "messageID" |> Option.orElse (contextString raw "messageId")
-          UserMessageId = contextString raw "userMessageID" |> Option.orElse (contextString raw "userMessageId")
           PromptText = promptText raw
           AttachAbort = attachAbort raw }
 
@@ -156,7 +182,9 @@ module ToolHostCodec =
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
     let numberSchema (HostToolFactory factory) = HostSchema(rawNumberSchema factory)
-    let enumSchema values (HostToolFactory factory) = HostSchema(rawEnumSchema factory (List.toArray values))
+
+    let enumSchema values (HostToolFactory factory) =
+        HostSchema(rawEnumSchema factory (List.toArray values))
 
     let optionalEnumSchema values (HostToolFactory factory) =
         HostSchema(rawOptionalEnumSchema factory (List.toArray values))
@@ -164,7 +192,8 @@ module ToolHostCodec =
     let managedOrHandleSchema values (HostToolFactory factory) =
         HostSchema(rawManagedOrHandleSchema factory (List.toArray values))
 
-    let optionalStringSchema (HostToolFactory factory) = HostSchema(rawOptionalStringSchema factory)
+    let optionalStringSchema (HostToolFactory factory) =
+        HostSchema(rawOptionalStringSchema factory)
 
     let optionalStringArraySchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringArraySchema factory)
@@ -191,9 +220,12 @@ module ToolHostCodec =
     let registry (factory: HostToolFactory) (specs: ToolSpec list) =
         specs |> List.map (fun spec -> spec.Name, register factory spec) |> createObj
 
-    let hide (registry: obj) name callback = defineHidden registry name (box callback)
+    let hide (registry: obj) name callback =
+        defineHidden registry name (box callback)
 
-    let jsonObject fields = Encode.object fields |> Encode.toString 0
+    let jsonObject fields =
+        Encode.object fields |> Encode.toString 0
+
     let jsonArray values = Encode.list values |> Encode.toString 0
     let jsonString value = Encode.string value
     let jsonBool value = Encode.bool value
@@ -207,11 +239,15 @@ module ToolHostCodec =
             false
         else
             let trimmed = value.Trim()
+
             trimmed.Length = 6
-            && trimmed |> Seq.forall (fun c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+            && trimmed
+               |> Seq.forall (fun c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
 
     let digest (text: string) =
         let mutable hash = 2166136261u
+
         for c in Text.Encoding.UTF8.GetBytes text do
             hash <- (hash ^^^ uint32 c) * 16777619u
+
         sprintf "fnv1a:%08x" hash

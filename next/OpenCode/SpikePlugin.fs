@@ -57,7 +57,7 @@ module SpikePlugin =
                                  else
                                      Some directory))
 
-                let transform inObj outObj =
+                let transform inObj outObj : Task<unit> =
                     let projectionSessionIdOpt =
                         if
                             not (isNull inObj)
@@ -94,6 +94,23 @@ module SpikePlugin =
                             wired.BindActiveRun bloggerId AgentRole.Blogger None))
                         inObj
                         outObj
+
+                    // REVIEW-010: seal LAST, and only after the Companion rewrite has
+                    // mutated `outObj`. The seal must digest the message view the
+                    // provider actually receives; sealing before the rewrite would
+                    // record bytes the Host never sends.
+                    //
+                    // Host source awaits every hook in turn (`plugin/index.ts:280-292`),
+                    // so returning a Task here makes the SDK read complete before the
+                    // provider request is built.
+                    match projectionSessionIdOpt with
+                    | None -> Task.FromResult()
+                    | Some projectionSessionId ->
+                        ReviewSeal.sealTransform
+                            snapshotOpt
+                            journal
+                            (SessionId.create projectionSessionId)
+                            (unbox<obj array> outObj?messages |> Array.toList)
 
                 let chatParams = ChatParamsHook.create journal
 

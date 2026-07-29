@@ -2,17 +2,13 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
-open Wanxiangshu.Next.Review
 
 module HostReviewGuard =
-
-    [<Literal>]
-    let skepticalReevaluationPrompt =
-        "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 
     type ReviewGuardAvailability =
         | ReviewGuardMissing of treeHash: string
@@ -167,9 +163,14 @@ module HostReviewGuard =
             "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
             "reviewer"
 
-    /// REVIEW-003: the first PERFECT is recorded but not confirmed. This is the only
-    /// path that issues the skeptical challenge, and the second PERFECT confirms only
-    /// if its provider input seal proves it consumed that challenge.
+    /// REVIEW-003: the first PERFECT is recorded but not confirmed. This nudge only
+    /// makes the Host start the next provider request; the confirmation itself comes
+    /// from the second run's input seal proving it consumed the challenge.
+    ///
+    /// The prompt text IS `ReviewChallenge.Text`. It is not spelled again here
+    /// because the digest of that exact string is what the seal is searched for —
+    /// a second copy that drifted by one character would fail every confirmation
+    /// while looking like correct fail-closed behaviour.
     let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -184,5 +185,5 @@ module HostReviewGuard =
             sessionId
             triggerProviderRun
             "confirm-perfect"
-            skepticalReevaluationPrompt
+            ReviewChallenge.Text
             "reviewer"

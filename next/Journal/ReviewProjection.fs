@@ -69,17 +69,15 @@ type ReviewRequirementProjection =
     { HumanPromptInputs: ReviewRequirementInput list
       LastConfirmedProviderRun: ProviderRunIdentity option }
 
-/// Why a verdict was not applied.
+/// Why a verdict or witness was not applied.
 type VerdictRejection =
     /// REVIEW-004: this exact (barrier, tree, reviewer, run, call) already
-    /// counted.
+    /// counted. Expected on replay, so it is absorbed.
     | DuplicateAttempt
-    /// REVIEW-004: another PERFECT from the same provider run. Does not count,
-    /// is not journalled.
-    | SameProviderRun
-    /// REVIEW-003 condition 6: no seal for the second run proves it consumed the
-    /// challenge. Fail closed — never fall back to same-root guessing.
-    | ChallengeNotProven
+    /// REVIEW-003 conditions 1-5 do not hold between the two witnesses. A
+    /// correct writer cannot produce this, so the journal line is rejected
+    /// rather than absorbed.
+    | NotDistinctAttempt
 
 module ReviewProjection =
 
@@ -141,10 +139,28 @@ module ReviewProjection =
             Seals = rememberSeal seal current.Seals }
 
     /// REVIEW-003: the first PERFECT issued its challenge.
+    ///
+    /// This is also what makes the witness pending. The previous version stored
+    /// only `PendingChallenge`, so `ReviewWitness.isPerfectPending` was never
+    /// true and both readers of it — the reviewer guard's confirmation nudge and
+    /// the Orchestrator's `PendingConfirmation` branch — waited for a state the
+    /// fold could not produce. A first PERFECT looked indistinguishable from no
+    /// review at all.
+    ///
+    /// The pending witness is built from the challenge rather than passed in: the
+    /// challenge already carries the whole first `VerdictWitness`, and a second
+    /// parameter would let the two disagree.
     let applyChallengeIssued (challenge: PerfectChallenge) (current: ReviewGuardProjection) =
+        let first =
+            { ProviderRun = challenge.FirstProviderRun
+              ToolCallId = challenge.FirstToolCallId
+              GitTreeHash = challenge.GitTreeHash
+              ReviewerSessionId = challenge.ReviewerSessionId }
+
         { current with
             PendingChallenge = Some challenge
-            LastGitTreeHash = Some challenge.GitTreeHash }
+            LastGitTreeHash = Some challenge.GitTreeHash
+            Witness = ReviewWitness.PerfectPending first }
 
     /// REVIEW-002: any REVISE clears an unfinished PERFECT confirmation.
     let private applyRevise (gitTreeHash: GitTreeHash) (current: ReviewGuardProjection) =
@@ -158,11 +174,15 @@ module ReviewProjection =
 
     /// Apply one verdict.
     ///
-    /// Returns a rejection reason rather than the unchanged projection: the old
-    /// fold returned `existing` on every refusal path, so "duplicate", "same
-    /// run" and "no causal proof" were indistinguishable from a successful
-    /// no-op — and the last of those is a REVIEW-003 violation that must be
-    /// visible.
+    /// Records that the attempt counted (REVIEW-004) and, for REVISE, clears any
+    /// unfinished confirmation (REVIEW-002). It deliberately does NOT judge
+    /// REVIEW-003's causal proof or build a `Confirmed` witness.
+    ///
+    /// Confirmation arrives as its own fact. Re-proving it here would mean asking
+    /// the seal window at replay time, and `Seals` is bounded to `SealWindow`
+    /// entries — an old journal's seal has long rolled out, so the fold would
+    /// reject a line that was fully proven when written and the whole replay
+    /// would fail. A writer proves; a fold applies.
     let applyVerdict
         (attempt: ReviewAttemptIdentity)
         (verdict: ReviewGuardVerdict)
@@ -180,53 +200,40 @@ module ReviewProjection =
 
             match verdict with
             | ReviewGuardVerdict.Revise -> Ok(applyRevise attempt.GitTreeHash observed)
-            | ReviewGuardVerdict.Perfect ->
-                match observed.PendingChallenge with
-                // No challenge outstanding: this is a first PERFECT. The
-                // challenge fact itself arrives separately, so the witness only
-                // becomes pending once that fact is folded.
-                | None -> Ok observed
-                | Some challenge when challenge.FirstProviderRun = attempt.ProviderRun -> Error SameProviderRun
-                | Some challenge ->
-                    match Map.tryFind attempt.ProviderRun observed.Seals with
-                    // HOST-010: a transform output that cannot be bound to this
-                    // provider run means no seal, and no seal means fail closed.
-                    | None -> Error ChallengeNotProven
-                    | Some seal when
-                        not (
-                            Set.contains
-                                (SealDigest.value challenge.ChallengeContentDigest)
-                                seal.IncludedToolResultDigests
-                        )
-                        ->
-                        Error ChallengeNotProven
-                    | Some seal ->
-                        let first =
-                            { ProviderRun = challenge.FirstProviderRun
-                              ToolCallId = challenge.FirstToolCallId
-                              GitTreeHash = challenge.GitTreeHash
-                              ReviewerSessionId = challenge.ReviewerSessionId }
+            | ReviewGuardVerdict.Perfect -> Ok observed
 
-                        let second =
-                            { ProviderRun = attempt.ProviderRun
-                              ToolCallId = attempt.ToolCallId
-                              GitTreeHash = attempt.GitTreeHash
-                              ReviewerSessionId = attempt.ReviewerSessionId }
+    /// REVIEW-003/006: the confirmed witness, already proven by its writer.
+    ///
+    /// Takes the two witnesses and both digests as given. That is the point of
+    /// REVIEW-006's self-containment: every identity the Guard needs is inline in
+    /// the fact, so this function never consults a surrounding map to complete
+    /// one. `ReviewWitness.confirm` still enforces conditions 1–5, which are pure
+    /// comparisons of the two witnesses and stay valid at any replay time.
+    let applyConfirmedWitness
+        (barrierId: ReviewBarrierId)
+        (challengeResultDigest: SealDigest)
+        (secondProviderInputDigest: SealDigest)
+        (first: VerdictWitness)
+        (second: VerdictWitness)
+        (current: ReviewGuardProjection)
+        : Result<ReviewGuardProjection, VerdictRejection> =
+        match ReviewWitness.confirm barrierId challengeResultDigest secondProviderInputDigest first second with
+        | None -> Error NotDistinctAttempt
+        | Some confirmed ->
+            Ok
+                { current with
+                    Witness = confirmed
+                    LastGitTreeHash = Some second.GitTreeHash
+                    PendingChallenge = None }
 
-                        match
-                            ReviewWitness.confirm
-                                challenge.BarrierId
-                                challenge.ChallengeContentDigest
-                                seal.SealDigest
-                                first
-                                second
-                        with
-                        | None -> Error ChallengeNotProven
-                        | Some confirmed ->
-                            Ok
-                                { observed with
-                                    Witness = confirmed
-                                    PendingChallenge = None }
+    /// REVIEW-004: has this exact attempt already counted.
+    ///
+    /// Exposed so the writer can decide before appending. `applyVerdict` answers
+    /// the same question, but only by rejecting a fact that has already been
+    /// written — and `Fold.verdictOutcome` turns one of its rejections into a
+    /// journal write failure.
+    let hasObservedAttempt (attempt: ReviewAttemptIdentity) (current: ReviewGuardProjection) =
+        List.contains (ReviewAttemptIdentity.dedupeKey attempt) current.ObservedAttemptKeys
 
     /// REVIEW-007: the Guard asks only whether the CURRENT tree has a confirmed
     /// PERFECT. A witness for another tree is auditable but not sufficient.

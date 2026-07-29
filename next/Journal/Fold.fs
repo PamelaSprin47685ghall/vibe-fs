@@ -43,10 +43,9 @@ module Fold =
     let private verdictOutcome factName projection result =
         match result with
         | Ok updated -> Ok updated
-        | Error DuplicateAttempt
-        | Error SameProviderRun -> Ok projection
-        | Error ChallengeNotProven ->
-            reject factName "second PERFECT has no provider input seal proving it consumed the challenge (REVIEW-003)"
+        | Error DuplicateAttempt -> Ok projection
+        | Error NotDistinctAttempt ->
+            reject factName "confirmed witness violates REVIEW-003 (same provider run or same tool call)"
 
     let private handleOutcome factName projection result =
         match result with
@@ -273,13 +272,43 @@ module Fold =
             |> verdictOutcome "ReviewVerdictRecorded" projection
 
         | AgentFact.ConfirmedReviewWitness payload ->
-            // REVIEW-007: a confirmed witness clears the requirements it covered.
-            // Recorded against the Manager session, which is where the Guard asks.
-            Ok(
+            // The witness lands on the reviewer session, where the rest of the
+            // review facts live; the requirement clearance lands on the Manager,
+            // where REVIEW-007's Guard asks. Two sessions, two updates — the
+            // previous version only did the second, so a confirmed dual-PERFECT
+            // never became a `Confirmed` witness anywhere and the Guard could not
+            // pass no matter how many PERFECT verdicts the reviewer submitted.
+            let first =
+                { ProviderRun = payload.FirstProviderRun
+                  ToolCallId = payload.FirstToolCallId
+                  GitTreeHash = payload.GitTreeHash
+                  ReviewerSessionId = payload.ReviewerSessionId }
+
+            let second =
+                { ProviderRun = payload.SecondProviderRun
+                  ToolCallId = payload.SecondToolCallId
+                  GitTreeHash = payload.GitTreeHash
+                  ReviewerSessionId = payload.ReviewerSessionId }
+
+            AgentProjection.tryUpdate
+                payload.ReviewerSessionId
+                (fun session ->
+                    ReviewProjection.applyConfirmedWitness
+                        payload.BarrierId
+                        payload.ChallengeResultDigest
+                        payload.SecondProviderInputDigest
+                        first
+                        second
+                        (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
+                    |> Result.map (fun updated ->
+                        { session with
+                            ReviewGuard = Some updated }))
+                projection
+            |> verdictOutcome "ConfirmedReviewWitness" projection
+            |> Result.map (
                 updateRequirements
                     payload.ManagerSessionId
                     (ReviewRequirementProjection.clearOnConfirmation payload.SecondProviderRun)
-                    projection
             )
 
         // ── execution handles ───────────────────────────────────────────────

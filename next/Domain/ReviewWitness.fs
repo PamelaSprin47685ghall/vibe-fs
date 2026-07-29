@@ -66,6 +66,19 @@ module ReviewWitness =
         | RevisionWitness revision -> Some revision.GitTreeHash
         | NoReview -> None
 
+    /// The reviewer whose dual-PERFECT produced a confirmation.
+    ///
+    /// `None` unless confirmed. Answered from the witness rather than from a
+    /// `ConfirmedReviewerSessionId` field beside it: REVIEW-005 forbids a stored
+    /// flag for confirmation, and a stored reviewer id is the same mistake one
+    /// step removed — it can name a reviewer while the witness says NoReview.
+    let confirmedReviewer (witness: ReviewWitness) : SessionId option =
+        match witness with
+        | Confirmed confirmed -> Some confirmed.Second.ReviewerSessionId
+        | NoReview
+        | RevisionWitness _
+        | PerfectPending _ -> None
+
     /// REVIEW-008: any Git tree change makes a pending challenge stale and a
     /// confirmed witness no longer sufficient for the Guard.
     ///

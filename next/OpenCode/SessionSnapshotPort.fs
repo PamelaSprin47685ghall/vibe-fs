@@ -17,13 +17,31 @@ open Wanxiangshu.Next.Kernel.Identity
 /// The reconcile layer constructs the typed identity at the point where the role
 /// is known. This is the Host-raw boundary the migration allows an adapter at.
 type SessionMessage =
-    { Id: string
-      Role: string
-      Agent: string option
-      Finish: string option
-      ErrorName: string option
-      Model: OpencodeModel option
-      Parts: MessagePart array }
+    {
+        Id: string
+        Role: string
+        Agent: string option
+        Finish: string option
+        ErrorName: string option
+        Model: OpencodeModel option
+        /// `parentID`. For an assistant message this is the user message that caused
+        /// the provider run (HOST-010 binding, condition 3).
+        ParentId: string option
+        /// `time.completed` is set. The Host writes it only when the run ends or is
+        /// interrupted, so an unset value at `messages.transform` time identifies the
+        /// run about to be sent (REVIEW-010).
+        Completed: bool
+        /// The Host's own compaction pseudo-run, recognised by any of `agent`,
+        /// `mode` = "compaction" or `summary` = true.
+        ///
+        /// Folded here rather than exposing three raw fields: "is this the compaction
+        /// path" is one question, and its answer decides whether the seal binding is
+        /// even attempted. Compaction triggers transform BEFORE creating its
+        /// assistant message, so the binding cannot succeed there and must fail
+        /// closed instead of guessing.
+        IsCompaction: bool
+        Parts: MessagePart array
+    }
 
 type ISessionSnapshotPort =
     abstract GetMessages: sessionId: SessionId -> Task<Result<SessionMessage list, string>>
@@ -91,6 +109,28 @@ module SessionSnapshotPort =
 
         candidates |> List.tryPick readString
 
+    let private isTrue (value: obj) = not (isNull value) && unbox<bool> value
+
+    let private completedOf (info: obj) (raw: obj) =
+        let timeOf (source: obj) =
+            if isNull source || isNull source?time then
+                null
+            else
+                source?time?completed
+
+        not (isNull (timeOf info)) || not (isNull (timeOf raw))
+
+    let private isCompactionOf (info: obj) (raw: obj) =
+        let field name =
+            [ if isNull info then null else info?(name)
+              if isNull raw then null else raw?(name) ]
+            |> List.tryPick readString
+
+        field "agent" = Some "compaction"
+        || field "mode" = Some "compaction"
+        || isTrue (if isNull info then null else info?summary)
+        || isTrue (if isNull raw then null else raw?summary)
+
     let projectMessage (raw: obj) : SessionMessage option =
         if isNull raw then
             None
@@ -125,6 +165,11 @@ module SessionSnapshotPort =
                       Finish = finish
                       ErrorName = errorNameOf info raw
                       Model = modelOf info
+                      ParentId =
+                        readString (if isNull info then null else info?parentID)
+                        |> Option.orElse (readString raw?parentID)
+                      Completed = completedOf info raw
+                      IsCompaction = isCompactionOf info raw
                       Parts = partsOf raw }
 
     let projectMessages (rawMessages: obj array) =

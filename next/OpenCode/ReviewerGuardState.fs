@@ -1,67 +1,51 @@
 namespace Wanxiangshu.Next.OpenCode
 
-open System.Collections.Generic
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
+/// Reviewer-side reads of the durable review guard.
+///
+/// Keyed by reviewer session, which is where REVIEW-003's facts land. The
+/// previous version took the reviewer's parent from `sessionParents`, and on a
+/// miss scanned every session's linkage to discover it — a full scan
+/// (PERSIST-008) that also silently accepted a hit under the wrong parent. The
+/// review conversation happens in the reviewer's session, so that is where its
+/// state is read.
 module ReviewerGuardState =
 
-    let reviewOwner (sessionParents: Dictionary<string, string>) (journal: AgentJournal option) (reviewerKey: string) =
+    let private guard (journal: AgentJournal option) (reviewerKey: string) =
         match journal with
         | None -> None
-        | Some j ->
-            let sessions = (AgentJournal.snapshot j).AgentProjections.Sessions
-
-            match sessionParents.TryGetValue reviewerKey with
-            | true, managerKey -> Some(SessionId.create managerKey)
-            | false, _ ->
-                let child = ChildId.create reviewerKey
-
-                sessions
-                |> Map.tryPick (fun parentId session ->
-                    match session.Linkage with
-                    | Some linkage when Map.containsKey child linkage.LinkedChildren -> Some parentId
-                    | _ -> None)
-
-    let guard (sessionParents: Dictionary<string, string>) (journal: AgentJournal option) (reviewerKey: string) =
-        match journal, reviewOwner sessionParents journal reviewerKey with
-        | Some j, Some owner ->
-            (AgentJournal.snapshot j).AgentProjections.Sessions
-            |> Map.tryFind owner
+        | Some durable ->
+            AgentProjection.tryFind (SessionId.create reviewerKey) (AgentJournal.snapshot durable).AgentProjections
             |> Option.bind (fun session -> session.ReviewGuard)
-        | _ -> None
 
-    let submitted sessionParents journal reviewerKey =
-        guard sessionParents journal reviewerKey
-        |> Option.exists (fun reviewGuard ->
-            reviewGuard.IsConfirmed
-            || ReviewWitness.isPerfectPending reviewGuard.Witness
-            || ReviewWitness.isRevision reviewGuard.Witness
-            || not (List.isEmpty reviewGuard.RecentToolCallIds))
+    /// Whether this reviewer has produced any verdict for the current barrier.
+    ///
+    /// Asked of `ObservedAttemptKeys` rather than of the witness: REVIEW-004
+    /// records every counted attempt there, including a REVISE that later got
+    /// superseded, so it answers "did the reviewer use the tool at all" without a
+    /// second list to keep in step.
+    let submitted journal reviewerKey =
+        guard journal reviewerKey
+        |> Option.exists (fun reviewGuard -> not (List.isEmpty reviewGuard.ObservedAttemptKeys))
 
-    let pendingConfirmation sessionParents journal reviewerKey =
-        guard sessionParents journal reviewerKey
+    /// REVIEW-003: a first PERFECT landed and its challenge is outstanding.
+    let pendingConfirmation journal reviewerKey =
+        guard journal reviewerKey
         |> Option.exists (fun reviewGuard ->
             ReviewWitness.isPerfectPending reviewGuard.Witness
             && not reviewGuard.IsConfirmed)
 
-    /// True once this reviewer has already produced a durable dual-PERFECT
-    /// witness. Used to finish tool-only confirmation turns without waiting for
-    /// a separate natural-language stop frame.
-    let isConfirmedReviewer sessionParents journal reviewerKey =
-        guard sessionParents journal reviewerKey
+    /// True once this reviewer's own dual-PERFECT is durably confirmed.
+    ///
+    /// Used to finish tool-only confirmation turns without waiting for a separate
+    /// natural-language stop frame. The reviewer identity comes from the witness
+    /// itself (REVIEW-006 self-containment), not from a stored
+    /// `ConfirmedReviewerSessionId` beside it — a stored id can name a reviewer
+    /// while the witness says there was no confirmation.
+    let isConfirmedReviewer journal reviewerKey =
+        guard journal reviewerKey
         |> Option.exists (fun reviewGuard ->
-            reviewGuard.IsConfirmed
-            && reviewGuard.ConfirmedReviewerSessionId = Some(SessionId.create reviewerKey))
-
-    let confirmedOwner sessionParents journal reviewerKey physicalUserMessageId =
-        match reviewOwner sessionParents journal reviewerKey, guard sessionParents journal reviewerKey with
-        | Some owner, Some reviewGuard when
-            reviewGuard.IsConfirmed
-            && reviewGuard.ConfirmedReviewerSessionId = Some(SessionId.create reviewerKey)
-            && (reviewGuard.AuthorityRootUserMessageId = Some physicalUserMessageId
-                || reviewGuard.ConfirmationPhysicalMessageId = Some physicalUserMessageId)
-            ->
-            Some owner
-        | _ -> None
+            ReviewWitness.confirmedReviewer reviewGuard.Witness = Some(SessionId.create reviewerKey))

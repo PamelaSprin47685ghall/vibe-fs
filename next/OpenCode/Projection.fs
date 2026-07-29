@@ -170,6 +170,22 @@ module Projection =
         let info = infoObject rawObj
         readString info "id" |> Option.orElse (readString rawObj "id")
 
+    /// The last `role=user` message's wire address in a transform output.
+    ///
+    /// REVIEW-010's seal binds to the physical user message this request answers
+    /// (PROMPT-001), and HOST-010's run binding matches it against the assistant's
+    /// `parentID`. Resolved here, from the raw payload, rather than by pairing the
+    /// projection's messages with a parallel id list: `decodeMessageView` drops
+    /// messages it cannot decode, so positional pairing silently shifts and would
+    /// seal against the wrong address.
+    let lastUserMessageId (rawMessages: obj list) : string option =
+        rawMessages
+        |> List.choose (fun raw ->
+            match decodeMessage raw with
+            | Some message when message.Role = "user" -> hostMessageId raw
+            | _ -> None)
+        |> List.tryLast
+
     /// HOST-005: this turn's formal assistant text, excluding reasoning and tool
     /// parts. The Companion B record is built from it (COMPANION-005).
     let formalText (rawObj: obj) : string =

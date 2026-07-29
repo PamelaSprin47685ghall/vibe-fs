@@ -158,15 +158,12 @@ module TurnCompletionProgram =
                 else
                     sessionWide
 
-            // SHOCK-UNMIGRATED[REVIEW-006]: `ReviewConfirmedIdle` and
-            // `ReviewGuardProjection.ConfirmationPhysicalMessageId` are both gone.
-            // REVIEW-006 replaces them with a self-contained `ConfirmedReviewWitness`
-            // whose confirmation evidence is the provider input seal (REVIEW-010),
-            // not a physical message id shared with the confirmation prompt.
-            // `ReviewerGuardState.confirmedOwner` still reads the deleted field.
-            if turn.AgentRole = Some AgentRole.Reviewer then
-                failwith "SHOCK-UNMIGRATED[REVIEW-006]: confirmed reviewer idle needs ConfirmedReviewWitness"
-
+            // REVIEW-006: nothing is written here. Confirmation is a fact
+            // ReviewController already journalled from the seal evidence, so the
+            // completion path only reports the run. The previous code wrote its own
+            // confirmation fact keyed by the confirmation prompt's physical message
+            // id, which is REVIEW-003's forbidden physical-message match wearing a
+            // different name.
             // PROMPT-008: the Role comes from the reconciled turn, and there is no
             // default. Defaulting to Coder — as the previous `"coder"` string did —
             // reports a completion under a role nobody selected.
@@ -200,7 +197,7 @@ module TurnCompletionProgram =
 
         let reviewerAlreadyConfirmed =
             turn.AgentRole = Some AgentRole.Reviewer
-            && ReviewerGuardState.isConfirmedReviewer sessionParents journal sessionKey
+            && ReviewerGuardState.isConfirmedReviewer journal sessionKey
 
         match turn.Outcome with
         | TurnUnknown -> Task.CompletedTask
@@ -253,7 +250,7 @@ module TurnCompletionProgram =
                 // round-trip before the generic missing-verdict branch.
                 // `verdictSessions` is terminal bookkeeping only and must never
                 // suppress the pending confirmation transition.
-                | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey ->
+                | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation journal sessionKey ->
                     verdictSessions.Remove sessionKey |> ignore
 
                     HostReviewGuard.requestPerfectConfirmation
@@ -265,7 +262,7 @@ module TurnCompletionProgram =
                     :> Task
                 | Some AgentRole.Reviewer when
                     not (verdictSessions.Remove sessionKey)
-                    && not (ReviewerGuardState.submitted sessionParents journal sessionKey)
+                    && not (ReviewerGuardState.submitted journal sessionKey)
                     ->
                     HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent turn.SessionId turn.ProviderRun :> Task
                 | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
