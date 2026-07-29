@@ -69,7 +69,9 @@ module OrchestratorHostTests =
                   RegisterReviewerTree = fun _ _ -> ()
                   OnRunStarted = (fun _ _ _ -> ())
                   RepoPath = "/nonexistent-path-xyz"
-                  TargetBranch = "" }
+                  TargetBranch = ""
+                  ParentWorkRecordFor = (fun _ -> None)
+                  ChildWorkRecordFor = (fun _ -> None) }
 
             let host = OrchestratorHost(deps, mkSid "orch-1")
             let! result = host.ForkManagerJob("m1", "fast-manager", "task")

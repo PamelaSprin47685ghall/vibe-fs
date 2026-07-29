@@ -59,7 +59,8 @@ module ToolSurface =
                   SessionRoles = sessionRoles
                   SessionDirectories = sessionDirectories
                   TreePorts = worktreeTreePorts
-                  OnRunStarted = onRunStarted }
+                  OnRunStarted = onRunStarted
+                  BackgroundBFor = backgroundBFor }
                 gate
                 orchestratorHosts
                 sid
