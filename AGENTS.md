@@ -158,7 +158,7 @@ type PromptOrigin =
 ```
 
 - **HumanRoot**：真实用户新任务。必须显式 `fast-*` 或 `deep-*`；无前缀旧名称 / `build` / `plan` / 隐式默认 fail-closed。
-- **AgentOwnerRoot**：Manager fork(new)/Idle 新任务/Coder one-shot Inspector 等。必须显式准确 Agent；新 Logical Run 与 completion。
+- **AgentOwnerRoot**：Manager fork(new)/Idle 新任务、经授权的 one-shot Inspector/Coder 等。必须显式准确 Agent；新 Logical Run 与 completion。
 - **Continuation**：只延续已有 Logical Run。不建新 RunId/completion；不改 AuthorityRoot/SelectedAgent/PeerAgent/CanonicalRole/SelectedTier；不更新 LastAuthorityProfile；不重置 Fallback/repair；不改变 Companion eligibility。物理请求使用当前 cursor 的 `EffectiveAgent`。
 
 ### 四、执行档案
@@ -337,10 +337,10 @@ Fallback 第四次失败仍判死
 6. Y 自身接近上限时，把旧 B 作为唯一正文输入重投影；Y 新输出 B' 替代旧 B。
 7. Manager 无 read/write/edit/grep/glob 等普通工具；只有 `fork / join / list`。无 PTY、无 executor。
 8. `fork(fast-*|deep-* agent, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。Nudge 成功 = Host 已确认接受 prompt。Busy→idle 竞态以 Host AcceptPrompt 返回的 run identity 为归属依据。若 Host 不支持 busy append，返回 BusyNudgeUnsupported。
-8b. **OpenCode Session 家族扁平化**：儿子的儿子仍是家族 root 的儿子。所有 Agent、ManagerJob、one-shot Inspector/Coder、Blogger 与 Executor child 的 Host `parentID` 都解析为最上层 root；重启恢复同一 root。root abort 收敛全部 child，单 child 精确关闭；`join`/Review/Authority 的结构化程序所有权不从 Host `parentID` 反推。
+8b. **OpenCode Session 家族扁平化**：儿子的儿子仍是家族 root 的儿子。所有 Agent、ManagerJob、经授权的 one-shot Inspector 或 Coder、Blogger 与 Executor child 的 Host `parentID` 都解析为最上层 root；重启恢复同一 root。root abort 收敛全部 child，单 child 精确关闭；`join`/Review/Authority 的结构化程序所有权不从 Host `parentID` 反推。
 9. `join()` 等任意一个完成项；不指定对象。每个 RunIdentity 对应 single-assignment completion cell。Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。join 消费后永久删除 completed handle。
 10. `list()` 统一显示 Agent 与 PTY，但内部资源实现保持独立。
-11. Inspector 同步调用 Executor Tool；Coder 每次同步 Inspector 调用创建一次性 Inspector Session，并可并行。
+11. Inspector 同步调用 Executor Tool；Coder 可为具体且必要的代码事实创建一次性 Inspector，但 Coder prompt 不得暴露 Inspector 的 Executor 权限。Coder 不得把 Inspector 当作常规测试/构建代理；验证由 DevOps 或 Reviewer 负责。
 12. Executor Agent 只负责命令输出摘要；无工具、无伴随。Executor Tool 负责真实进程。
 12b. **DevOps** 独占 `fork-pty`，并可 `executor` / `read` / `glob` / `grep` / `inspector` / 同步 `coder` / `join` / `list`。不得直接 write/edit。Manager 通过 `fork(fast-devops|deep-devops, prompt)` 委派终端操作。
 13. `3 × estimated_running_secs` 是进程唯一时限；无其他 timeout 层。模型允许用巨大 estimate 主动申请巨大预算。
@@ -380,9 +380,9 @@ Any companion-enabled Session X
        X context projection: B replaces covered prefix
 
 Coder
-    └─ one-shot Inspector(s)
-         └─ Executor Tool
-              └─ Process / optional Executor Agent summary
+    ├─ file read / write / edit
+    ├─ narrow opaque Inspector facts
+    └─ verification handoff → DevOps / Reviewer
 ```
 
 ## 四、最重要的代码审查问题
@@ -839,20 +839,7 @@ val parallel:
 - 全部 Task 被观察，不产生无人收割异常。
 - 结果顺序与输入顺序一致；完成事件若需要按物理先后，使用 `joinAny`，不要复用 `parallel`。
 
-Coder 并行 Inspector 示例：
-
-```fsharp
-coder {
-    let! findings =
-        parallel [
-            inspectOnce "定位写路径"
-            inspectOnce "定位测试缺口"
-            inspectOnce "检查宿主投影 hook"
-        ]
-
-    return! implement findings
-}
-```
+Coder 可用 Inspector 解决具体且必要的未知代码事实，但其 prompt 只将 Inspector 描述为不透明的只读调查服务，不暴露 Executor。不得把 Inspector 当作常规测试、typecheck 或 build 代理；这些验证仍交给 DevOps 或 Reviewer。
 
 ### 4.2 尾递归
 
@@ -1337,7 +1324,7 @@ Current fork prompt
   2. 若无 B（无 companion、LatestB 空、或尚未产生 B）：父 session-wide formal A
   3. B 与 A 皆空：省略背景
 
-任何需要「父工作记录背景」的路径（fork child、one-shot Inspector/Coder、新建 Y）都遵循该优先级；不得在无 B 时默默省略而可用 A 仍存在。
+任何需要「父工作记录背景」的路径（fork child、经授权的 one-shot Inspector 或 Coder、新建 Y）都遵循该优先级；不得在无 B 时默默省略而可用 A 仍存在。
 
 它只是背景，不声称父模型已经见过；
 必须记录 ParentBackgroundDigest（实际注入文本的 hash；兼容字段名 ParentBDigest）；
@@ -1697,7 +1684,7 @@ let executeFork input =
 |---|---:|---|---|
 |`orchestrator`|是|`fork`, `join`|只 fork ManagerJob|
 |`manager`|是|`fork`, `join`, `list`|不直接读写仓库；无终端|
-|`coder`|是|`read`, `write`, `edit`, `glob`, `grep`, `inspector`|真正修改代码|
+|`coder`|是|`read`, `write`, `edit`, `glob`, `grep`, `inspector`|真正修改代码；Inspector 仅用于窄范围事实调查|
 |`inspector`|否|`executor`|命令调查；无直接 Python/JS execute|
 |`devops`|否|`fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list`|终端操作员；文件改动仅经 coder 工具|
 |`browser`|否|`read`, web tools|仓库读取与上网|
@@ -1706,7 +1693,7 @@ let executeFork input =
 |`executor` Agent|否|无|命令大输出 summarizer|
 |`blogger`|否|无|增量工作记录|
 
-[NORMATIVE] 任何未列出的工具都必须在 schema 层不可见，不是 execute 时拒绝。
+[NORMATIVE] 任何未列出的工具都必须在 schema 层不可见，不是 execute 时拒绝。Coder 可见 `inspector`，但不得看到或调用 `executor`、PTY 或其他命令能力；Inspector 的内部 Executor 权限不向 Coder prompt 泄露。Coder 不得把 Inspector 当作常规验证代理。
 
 规范工具集合：
 
@@ -1816,66 +1803,16 @@ let roles : Map<AgentRole, RoleDefinition> =
 
 ---
 
-## 三、Coder → Inspector 是局部同步子程序
+## 三、Coder → Inspector 是窄范围、不透明的调查
 
-Coder 工具：
-
-```json
-{
-  "prompts": ["调查 A", "调查 B"]
-}
-```
-
-每个 prompt 创建一次性 Inspector Session：
-
-```fsharp
-let inspectOnce prompt =
-    coder {
-        use! inspector = createOneShotInspector (currentCoderB())
-        return! inspector.Run prompt
-    }
-```
-
-并行：
-
-```fsharp
-let inspectMany prompts =
-    prompts
-    |> List.map inspectOnce
-    |> parallel
-```
+Coder 的模型可见工具包括 `read`、`write`、`edit`、`glob`、`grep` 与 `inspector`。只有在自身文件工具不能确定一个具体、必要的代码事实时，Coder 才能创建一次性 Inspector 并消费其 findings。
 
 [NORMATIVE]
 
-- 一个 prompt 一个 Inspector Session。
-- 不复用同一个 Inspector 并发。
-- Inspector 完成后立即释放物理 session。
-- 每个 Inspector 用 Coder 当前 B 作为背景。
-- Coder 只接收 Inspector A 版结果。
-
-这是同步局部调用，不与 Manager 异步 fork 语义混用。
-
-[NORMATIVE] One-shot Inspector 契约：
-
-```text
-它是资源作用域，不是 ForkRuntime 的特殊模式。
-  use! inspector = createInspector snapshotB
-  let! result = inspector.Run request
-  return result
-
-约束：
-- 阻塞当前 Coder tool call
-- 使用独立 completion mailbox（不污染 Manager mailbox）
-- 不创建 Blogger
-- 继承 Coder fallback side
-- Inspector provider failure 作为 Coder 工具错误返回
-- Coder cancel 必须 await Inspector abort
-- 多个 Inspector 并发时结果顺序与输入 prompts 顺序一致
-- Inspector terminal 无正文 → 返回空结果（不是错误）
-- 完成后删除 session，不只解除关联
-- 不注册到 Manager 的 list/join
-- 不可持久化为可 nudge agent
-```
+- Coder prompt 只把 Inspector 描述为不透明、只读的调查服务；不得泄露 Inspector 的 Executor 权限或内部工具 schema。
+- Coder 必须先使用 `read`、`glob`、`grep`；不得以模糊的“检查一切”请求滥用 Inspector。
+- Coder 不得把 Inspector 当作常规 test、lint、typecheck 或 build 代理；这些验证仍由 DevOps 或 Reviewer 负责。
+- Coder 完成改动后交付文件变更与精确的验证交接；收到外部失败报告时可读取相关代码和测试并修复。
 
 ---
 
@@ -1952,7 +1889,7 @@ Fork prompt / local request
 2. Manager 无 read/write/edit。
 3. Reviewer 无写工具。
 4. Blogger/Executor Agent 无工具。
-5. Coder `inspectMany` 确实并发且每项独立 session。
+5. Coder 的 schema 含 `inspector` 但不含 `executor`/PTY；Coder prompt 不泄露 Inspector 的内部 Executor 权限，且不把 Inspector 作为常规验证代理。
 6. Inspector only Executor Tool。
 7. 新 child 背景：父 B 优先；无 B 则父 session-wide A。
 8. 未注册工具在 schema 层不可见。
@@ -3449,11 +3386,10 @@ tests-next/
 1. RoleDefinitions 静态表。
 2. Manager only fork/join/list。
 3. Orchestrator only fork/join。
-4. Coder 普通文件工具。
-5. Coder one-shot Inspector。
-6. Inspector Executor Tool。
-7. Browser/Meditator/Reviewer 权限。
-8. Blogger/Executor Agent no tools。
+4. Coder 普通文件工具与不透明 Inspector 调查；schema 不暴露 Executor 或终端能力。
+5. Inspector Executor Tool。
+6. Browser/Meditator/Reviewer 权限。
+7. Blogger/Executor Agent no tools。
 
 ### 出口
 
@@ -3652,7 +3588,7 @@ README 改写为新产品语义；旧文档移入 `docs-legacy/` 或直接删除
 - 长 session 真正不触发官方 compaction。
 - B 替换前缀后继续正确工作。
 - Manager 并行 fork/join。
-- Coder parallel inspector。
+- Coder 的不透明 Inspector 调查与 verification handoff。
 - 大命令摘要。
 - PTY。
 - reviewer REVISE/双 PERFECT。

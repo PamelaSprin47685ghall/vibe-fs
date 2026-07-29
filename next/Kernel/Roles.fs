@@ -109,7 +109,7 @@ module RoleDefinitions =
     let coderPrompt =
         "Coder system prompt SSOT: prompts/coder-system.md\n"
         + "Tools: read / write / edit / glob / grep / inspector.\n"
-        + "Only Coder modifies files. Verify with inspector before reporting."
+        + "Coder edits; use Inspector only for necessary, narrow investigation. DevOps and Reviewer own routine verification."
 
     /// Full Inspector system prompt lives in prompts/inspector-system.md and is
     /// loaded into OpenCode AgentConfig.prompt (host system prompt).
@@ -145,7 +145,7 @@ module RoleDefinitions =
     let reviewerPrompt =
         "Reviewer system prompt SSOT: prompts/reviewer-system.md\n"
         + "Tools: read / glob / grep / inspector / verdict.\n"
-        + "Read-only. Dual PERFECT on same tree. REVISE on any defect."
+        + "Read-only. Re-inspect the current tree; PERFECT only for flawless work and REVISE for any defect."
 
     let all =
         let mgrTools = Roles.permissions Role.Manager

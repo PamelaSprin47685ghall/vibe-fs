@@ -44,6 +44,7 @@ AABBAABB 永久循环。
 Blogger 和 Executor 内部固定 fast 起步。
 
 角色权限仍然由静态源码控制。
+Coder 暴露文件工具和不透明的 Inspector 调查；不暴露 Executor 或 PTY。Coder prompt 不得泄露 Inspector 的执行权限，也不得把 Inspector 当作常规验证代理；验证仍由 DevOps 或 Reviewer 负责。
 模型绑定只由 opencode.json 控制。
 ```
 
@@ -126,7 +127,7 @@ identity = logicalRunId + AuthorityRootUserMessageId + providerAttempt
 ### Interaction Repair / Review witness / Companion
 
 - Interaction Repair：同一 identity 最多一次；第二次仍空 → `MISSING_FINAL_REPORT`
-- Review witness：首次 PERFECT 返回 `AWAITING_CONFIRMATION` 并要求结束当前 turn；ReviewConfirmation 接受前的过早重复 PERFECT 不写 Journal。第二次有效 PERFECT 同时记录 PhysicalUserMessageId（confirmation）与 AuthorityRootUserMessageId；双 PERFECT + tree witness 不变
+- Review witness：首次 PERFECT 的 tool result 直接返回普通英文句子 `Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?`，不返回 JSON/status envelope；Host 以同一句作为新的物理 continuation，建立第二次复审的因果身份。ReviewConfirmation 接受前的过早重复 PERFECT 不写 Journal。第二次有效 PERFECT 同时记录 PhysicalUserMessageId（confirmation）与 AuthorityRootUserMessageId；双 PERFECT + tree witness 不变
 - Companion eligibility **唯一** 读 `ActiveLogicalRun` 的 CanonicalRole / SelectedAgent；缺 ActiveLogicalRun → 不创建 Blogger
 
 ### 删除清单（语义层）

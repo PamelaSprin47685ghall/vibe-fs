@@ -1,14 +1,82 @@
 namespace Wanxiangshu.Next.Tests.SessionTests
 
 open System
+open System.Collections.Generic
+open Fable.Core.JsInterop
 open Xunit
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
+open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module ReviewerHostTests =
+
+    [<Fact>]
+    let ``Verdict surface returns one plain skeptical sentence for first PERFECT`` () =
+        withTempDir (fun directory ->
+            task {
+                let managerId = "review-manager-surface"
+                let reviewerId = "reviewer-surface"
+                let now = DateTimeOffset.UtcNow
+
+                use journal =
+                    AgentJournal.createFromBoot
+                        directory
+                        (RuntimeId.create "review-runtime-surface")
+                        1
+                        now
+                        (Boot.boot directory)
+
+                let parents = Dictionary<string, string>()
+                parents.[reviewerId] <- managerId
+
+                let execute =
+                    VerdictSurface.create
+                        parents
+                        (Dictionary<string, string>())
+                        (fun _ -> None)
+                        (Some journal)
+                        (fun _ -> Some { GetTreeHash = fun () -> "tree-surface" })
+                        (Dictionary<string, ReviewerHost>())
+                        (HashSet<string>())
+                        None
+
+                let args = createObj [ "verdict", box "PERFECT" ]
+
+                let context =
+                    createObj
+                        [ "sessionID", box reviewerId
+                          "agent", box "reviewer"
+                          "toolCallId", box "call-surface-1"
+                          "messageID", box "provider-surface-1"
+                          "prompt", box "Review the current worktree for correctness." ]
+
+                let! result = execute args context
+
+                Assert.Equal(
+                    "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?",
+                    unbox<string> result
+                )
+
+                let reviseArgs = createObj [ "verdict", box "REVISE" ]
+
+                let reviseContext =
+                    createObj
+                        [ "sessionID", box reviewerId
+                          "agent", box "reviewer"
+                          "toolCallId", box "call-surface-2"
+                          "messageID", box "provider-surface-2"
+                          "prompt", box "Review the current worktree for correctness." ]
+
+                let! reviseResult = execute reviseArgs reviseContext
+                Assert.Equal("REVISE recorded for the current tree.", unbox<string> reviseResult)
+
+                let invalidArgs = createObj [ "verdict", box "MAYBE" ]
+                let! invalidResult = execute invalidArgs context
+                Assert.True((unbox<string> invalidResult).StartsWith("Verdict rejected:"))
+            })
 
     [<Fact>]
     let ``ReviewerHost_deduplicates_verdict_and_confirms_two_distinct_perfects`` () =
@@ -76,7 +144,7 @@ module ReviewerHostTests =
                         ReviewGuardVerdict.Perfect,
                         "run-2",
                         userPromptText =
-                            "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.",
+                            "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?",
                         userMessageId = "confirm-a"
                     ))
 
@@ -166,7 +234,7 @@ module ReviewerHostTests =
                         ReviewGuardVerdict.Perfect,
                         providerRunId = "run-2",
                         userPromptText =
-                            "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm.",
+                            "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?",
                         userMessageId = "confirm-a"
                     )
                 )

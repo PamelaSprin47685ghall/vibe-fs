@@ -44,13 +44,16 @@
       "match": {
         "requiredTools": [
           "inspector"
+        ],
+        "forbiddenTools": [
+          "executor"
         ]
       },
       "respond": {
         "type": "tool-call",
         "tool": "inspector",
         "args": {
-          "prompt": "Inspect workspace via executor."
+          "prompt": "Inspect the workspace and return factual findings relevant to the requested edit."
         }
       }
     },
@@ -65,11 +68,14 @@
       "match": {
         "requiredTools": [
           "inspector"
+        ],
+        "forbiddenTools": [
+          "executor"
         ]
       },
       "respond": {
         "type": "text",
-        "text": "Inspector oneshot complete."
+        "text": "Inspector investigation complete."
       }
     }
   ],
@@ -90,7 +96,7 @@
   },
   "prompt": {
     "agent": "fast-coder",
-    "text": "Call inspector once with prompt: Inspect workspace via executor. Then stop with a short summary."
+    "text": "Use inspector once to investigate a precise workspace fact needed for the edit. Then stop with a short summary."
   },
   "flow": [
     {
@@ -114,5 +120,5 @@
       "expectSatisfied": true
     }
   ],
-  "pass": "Inspector oneshot canary passed: coder invoked inspector tool."
+  "pass": "Inspector oneshot canary passed: coder invoked inspector for a narrow investigation."
 }

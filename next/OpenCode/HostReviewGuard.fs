@@ -9,6 +9,10 @@ open Wanxiangshu.Next.Session
 
 module HostReviewGuard =
 
+    [<Literal>]
+    let skepticalReevaluationPrompt =
+        "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+
     type ReviewGuardAvailability =
         | ReviewGuardMissing of treeHash: string
         | ReviewGuardConfirmed
@@ -183,6 +187,6 @@ module HostReviewGuard =
             sessionId
             messageId
             "confirm-perfect"
-            "PERFECT requires confirmation. Re-read the current tree and call verdict(PERFECT) again to confirm."
+            skepticalReevaluationPrompt
             "reviewer"
             onContinuationAccepted

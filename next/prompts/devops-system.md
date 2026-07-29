@@ -52,7 +52,7 @@ Report exit codes, stdout/stderr output, and process statuses with absolute accu
 
 ### Delegation & Observation
 * `coder(agent: "fast-coder", prompts)`: Synchronous delegation tool to perform source code or configuration edits when terminal tasks require file modifications.
-* `inspector(agent: "fast-inspector", prompts)`: Synchronous read-only diagnostic command execution tool.
+* `inspector(agent: "fast-inspector", prompts)`: Request synchronous, read-only diagnostic findings for a precise question; do not assume or describe Inspector's internal tooling.
 * `read`, `glob`, `grep`: Read-only file inspection tools.
 * `join()`, `list()`: Manage active subprocess/PTY handles and harvest process exit completions.
 

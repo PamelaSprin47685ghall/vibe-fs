@@ -47,7 +47,7 @@ module OrchestratorHostReview =
                     let prompt =
                         match priorState with
                         | Ok OrchestratorReviewRead.PendingConfirmation ->
-                            "Continue the confirmation: call verdict(PERFECT) again for the current tree."
+                            HostReviewGuard.skepticalReevaluationPrompt
                         | _ -> "Review the current worktree for correctness. Submit your verdict with the verdict tool."
 
                     let! ran = runReviewerOnce managerId worktree prompt
@@ -66,7 +66,7 @@ module OrchestratorHostReview =
                                 runReviewerOnce
                                     managerId
                                     worktree
-                                    "Continue the confirmation: call verdict(PERFECT) again for the current tree."
+                                    HostReviewGuard.skepticalReevaluationPrompt
 
                             match nudged with
                             | Error err -> return Error err

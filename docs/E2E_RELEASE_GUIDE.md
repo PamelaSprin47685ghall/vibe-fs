@@ -107,12 +107,13 @@ new Authority Root（显式另一 Agent）→ 新 cursor Offset=0，Side A = 新
 
 ## 6. Inspector 与 Executor
 
-在隔离 Manager worktree 内运行 Coder → Inspector：
+在隔离 Manager worktree 内运行经授权的 Inspector：
 
-- Inspector session `Directory` 与 Executor `pwd` 必须等于 Coder worktree。
+- Coder 的 schema 含 Inspector 但不含 Executor；Coder prompt 只将 Inspector 视为不透明调查服务，且不得将其作为常规验证代理。
+- Inspector session `Directory` 与 Executor `pwd` 必须等于请求方所在 worktree。
 - Inspector schema 精确为 `{executor}`，没有 fork/join/list/PTY。
 - 并发两个 Inspector；结果顺序保持与 prompts 顺序一致；不污染 Manager join mailbox。
-- 取消 Coder 后等待 Inspector abort，确认 child session/listener 不遗留。
+- 取消请求方后等待 Inspector abort，确认 child session/listener 不遗留。
 - 捕获 Parent B snapshot digest；create retry 必须复用同一 snapshot。
 - 对相同 `processId|level|start|end`，Executor ID 必须稳定为 SHA-256 派生值。
 - map/reduce 乱序完成时，以 chunk index 还原顺序；map/reduce 失败时返回 partial summary、已完成摘要和最后 200KB raw tail，不丢 ProcessResult。

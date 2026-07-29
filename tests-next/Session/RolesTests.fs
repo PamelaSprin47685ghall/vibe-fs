@@ -75,9 +75,8 @@ module RolesTests =
 
         Assert.Equal<ToolPermission Set>(allowed, Roles.permissions Role.Coder)
         Assert.True(Roles.isAllowed Role.Coder ToolPermission.Inspector)
-
-        Assert.False(Roles.isAllowed Role.Coder ToolPermission.Fork)
         Assert.False(Roles.isAllowed Role.Coder ToolPermission.Exec)
+        Assert.False(Roles.isAllowed Role.Coder ToolPermission.Fork)
         Assert.True(Roles.isAllowed Role.Coder ToolPermission.Read)
 
     [<Fact>]

@@ -43,7 +43,7 @@ module internal ReviewConfirmation =
             | Some text when
                 not (String.IsNullOrWhiteSpace text)
                 && confirmationPending
-                && text.IndexOf("PERFECT requires confirmation", StringComparison.Ordinal) >= 0
+                && text.IndexOf("Nope, let's re-evaluate:", StringComparison.Ordinal) >= 0
                 ->
                 true
             | _ -> false
