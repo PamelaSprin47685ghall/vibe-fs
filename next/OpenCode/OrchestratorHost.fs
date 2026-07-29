@@ -56,35 +56,39 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             if not (worktrees.ContainsKey managerId) then
                 worktrees.[managerId] <- worktree
 
-            let managerAgent =
-                match managerAgents.TryGetValue managerId with
-                | true, name when not (String.IsNullOrWhiteSpace name) -> name
-                | _ -> ManagedAgent.nameOf AgentTier.Fast Role.Manager
-
-            let! forked = runtime.Fork(managerId, AgentRole.Manager, prompt, agent = managerAgent)
-
-            match forked with
-            | Error err -> return Error err
-            | Ok _ ->
-                let! completion = awaitAgent managerId
-
-                match completion with
+            // ORCH-003: the Manager's managed agent name is chosen at fork time and
+            // persisted in `ManagerJobProjection.ManagerAgent`. The previous version
+            // defaulted to `fast-manager` when this in-memory map had no entry,
+            // which is exactly the restart case the persisted field exists for — a
+            // `deep-manager` job resumed as `fast-manager`, and FALLBACK-002's A/B
+            // pair was then wrong for the rest of the Logical Run.
+            match managerAgents.TryGetValue managerId with
+            | false, _ -> return Error(sprintf "No managed agent recorded for manager job '%s'" managerId)
+            | true, managerAgent when String.IsNullOrWhiteSpace managerAgent ->
+                return Error(sprintf "Manager job '%s' has a blank managed agent name" managerId)
+            | true, managerAgent ->
+                match! runtime.Fork(managerId, AgentRole.Manager, managerAgent, prompt) with
                 | Error err -> return Error err
-                | Ok run ->
-                    match run.Outcome with
-                    | AgentCompleted _ ->
-                        return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
-                    | AgentFailed payload -> return Error payload.Message
-                    | AgentAborted payload -> return Error payload.Message
+                | Ok _ ->
+                    match! awaitAgent managerId with
+                    | Error err -> return Error err
+                    | Ok run ->
+                        match run.Outcome with
+                        | AgentCompleted _ ->
+                            return! OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
+                        | AgentFailed payload -> return Error payload.Message
+                        | AgentAborted payload -> return Error payload.Message
         }
 
     let runReviewerOnce (managerId: string) (worktree: string) (prompt: string) : Task<Result<unit, string>> =
         task {
             let reviewerId = sprintf "%s-reviewer" managerId
-            // Host-owned post-rebase policy: always deep-reviewer (0.5.0 §10.3).
-            let reviewerAgent = ManagedAgent.nameOf AgentTier.Deep Role.Reviewer
+            // ORCH-009: post-rebase review is always deep-reviewer, and
+            // OrchestratorHostReview owns that constant. Spelling it a second time
+            // here would let the two drift while both still compiled.
+            let reviewerAgent = OrchestratorHostReview.DeepReviewerAgent
             worktrees.[reviewerId] <- worktree
-            let! forked = runtime.Fork(reviewerId, AgentRole.Reviewer, prompt, agent = reviewerAgent)
+            let! forked = runtime.Fork(reviewerId, AgentRole.Reviewer, reviewerAgent, prompt)
 
             match forked with
             | Error err -> return Error err

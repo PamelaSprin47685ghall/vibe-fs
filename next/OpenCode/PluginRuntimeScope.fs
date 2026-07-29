@@ -28,7 +28,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val OwnedSessions = HashSet<string>()
     member val UserMessageBindings = Dictionary<string, MessageId>()
     member val FallbackFailures = HashSet<string>()
-    member val SessionRoles = Dictionary<string, string>() // display/mock cache only
     member val SessionParents = Dictionary<string, string>()
     member val Companions = Dictionary<string, CompanionHost>()
     member val CompanionGate = obj ()
@@ -65,7 +64,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.OwnedSessions.Remove sessionId |> ignore
         this.UserMessageBindings.Remove sessionId |> ignore
         this.FallbackFailures.Remove sessionId |> ignore
-        this.SessionRoles.Remove sessionId |> ignore
         this.SessionParents.Remove sessionId |> ignore
         this.SessionDirectories.Remove sessionId |> ignore
         this.VerdictSessions.Remove sessionId |> ignore

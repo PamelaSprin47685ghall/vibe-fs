@@ -80,12 +80,18 @@ type PtyPort
                     | Ok text -> AgentCompletion.ofSimpleText agentId id.Value role text
                     | Error err -> AgentCompletion.ofSimpleError agentId id.Value role err
 
-                // AgentName derived directly from role; PTY is compiled before the
-                // managed-role identity adapter.
-                let agentName =
-                    sprintf
-                        "fast-%s"
-                        (role.ToString().ToLowerInvariant())
+                // AGENT-013 makes PTY DevOps-exclusive, but a PtyHandle records only
+                // an AgentRole, so the managed agent name has to be rebuilt here —
+                // and rebuilding it invents tier Fast. Two consequences: a
+                // `deep-devops` PTY reports `fast-devops`, and a handle forked
+                // without a role at all reports `fast-executor`.
+                //
+                // Package F owns the fix: PtyHandle must carry the managed name its
+                // forking profile selected (EXEC-009 typed handles). Left in place
+                // rather than marked unmigrated because the name reaches only the
+                // completion record's diagnostics, and failing here would break PTY
+                // completion, which EXEC-015 requires to come from `onExit` alone.
+                let agentName = sprintf "fast-%s" (role.ToString().ToLowerInvariant())
 
                 let completion =
                     { RunId = id.Value

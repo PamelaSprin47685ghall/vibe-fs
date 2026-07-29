@@ -88,7 +88,6 @@ module PluginHostInterop =
             gitTreePort
             workspaceDirectory
             scope.SessionParents
-            scope.SessionRoles
             currentPhysicalUserMessage
             scope.VerdictSessions
             scope.SessionDirectories

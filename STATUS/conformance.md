@@ -26,7 +26,7 @@
 | PROMPT-005: 四阶段协议 | UNVERIFIED | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 包 A：四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生 |
 | PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定 |
 | PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
-| PROMPT-008: 原子 AttemptExecutionProfile | UNVERIFIED | `Domain/PromptAuthority.buildAttemptExecutionProfile` | 包 0d：唯一构造函数 + `single-constructor` 门禁。调用方贯通属包 B |
+| PROMPT-008: 原子 AttemptExecutionProfile | PARTIAL | `Domain/PromptAuthority.buildAttemptExecutionProfile` | 包 0d 唯一构造函数 + `single-constructor` 门禁；包 B 消除了 Role 与 managed 名的旁路来源。profile 本身尚未作为参数贯通全链（各处仍分别读 `ActiveLogicalRun`） |
 | PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
 | PROMPT-011: 未决发送恢复 | PARTIAL | `Domain/PromptAuthority.derivePromptKey` | 包 A：PromptKey 已按条款派生并写入 Host metadata，`ClaimSequence` 由 fold 推进。仍缺启动期 tail window 查找与 `RecoveryAttemptBudget = 3`（属清场期） |
 
@@ -59,18 +59,24 @@
 |------|------|-------------|------|
 | ORCH-001: `fork-manager` 命名 | CONFORMANT | `ForkTool.fs` | — |
 | ORCH-002: Clean Gate | CONFORMANT | `OrchestratorGit.fs` | — |
-| ORCH-003: 一个 Job 一个 worktree 一个 Manager | PARTIAL | `OrchestratorManagerJob.fs` | 冲突路径复用同一 Manager；但 `ManagerAgent` 未持久化，恢复时降级为 `Role.Manager` |
+| ORCH-003: 一个 Job 一个 worktree 一个 Manager | PARTIAL | `Journal/OrchestratorProjection.fs` `OrchestratorHost.runManager` | 包 0c 持久化 `ManagerAgent`；包 B 删除了未命中时回落 `fast-manager` 的分支（改报错）。冲突路径复用同一 Manager 属包 G |
 | ORCH-005: 短 CAS Integration Gate | CONTRADICTS | `Orchestrator.IntegrationGate.fs` | 锁持有跨 review 期间 |
 | ORCH-006: 持久事实 | CONTRADICTS | `Kernel/Fact.fs:111-151` | 事实集是 stage-like（`CandidateRegistered` / `Rebased` / `Pre-` `PostRebaseReviewConfirmed`）；缺 `ManagerAgent`、`WorktreeIdentity`、`TargetBranchFrozen`、witness ID |
 | ORCH-007: 恢复逻辑 | PARTIAL | `Orchestrator.Recovery.fs` | `PublishClaimed` 恢复无三分支固定顺序判断 |
 | ORCH-008: target ref 安全 | CONFORMANT | `OrchestratorGit.fs` | `GetTargetHead` 失败 fail closed 已验证 |
 
+## Agent
+
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| AGENT-007: 工具权限双层 fail-closed | UNVERIFIED | `ToolRuntimeScope.RoleFor` `ToolRegistry.fs` | 包 B：Role 唯一来源为 `ActiveLogicalRun.CanonicalRole`；`sessionRoles` 三来源链与 Role 未解析时放行 `inspector` 的豁免均已删除 |
+
 ## Companion
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| COMPANION-001: 服务角色 | CONTRADICTS | `MessageTransform.shouldCreateCompanion` | 从 Agent 字符串解析角色 |
-| COMPANION-002: Eligibility 唯一来源 | CONTRADICTS | `MessageTransform.fs` | 未读 ActiveLogicalRun 的 CanonicalRole |
+| COMPANION-001: 服务角色 | PARTIAL | `MessageTransform.shouldCreateCompanion` | 仍从 Agent 字符串解析角色；改读 profile 属包 E |
+| COMPANION-002: Eligibility 唯一来源 | PARTIAL | `CompanionTransform.fs` | 判定已只读 `ActiveLogicalRun.SelectedAgent`（包 A/B），且包 B 删除了回写 `sessionRoles` 缓存的两处。六角色判据本体属包 E |
 | COMPANION-008: 忙时跳过 | PARTIAL | `CompanionHost.fs` | 存在「三次 busy skip」计数，规范只要求不推进 BlogBase |
 | COMPANION-009: PrefixEpoch | PARTIAL | `CompanionProjection.fs` | FrozenB/LatestB 分离已实现；epoch 切换未创建新 SealRoot |
 | COMPANION-013: Synthetic 稳定身份 | UNVERIFIED | `CompanionProjection.fs` | 需门禁证明无 GUID / random / 当前时间 |
@@ -81,7 +87,7 @@
 |------|------|-------------|------|
 | EXEC-004: Join 语义 | PARTIAL | `JoinTool.fs` `CompletionMailbox.fs` | single-assignment cell 已实现；join 后不写 `HandleRetired` tombstone |
 | EXEC-005: List 语义 | PARTIAL | `ListTool.fs` | 无 CompletedAwaitingJoin 状态 |
-| EXEC-009: Handle 持久化 + tombstone | PARTIAL | `ChildDispatch.tryCancel` | 事实是 `AgentLinked` / `AgentForked` / `AgentUnlinked`，无三态分离；逐 child cancel 是占位实现 |
+| EXEC-009: Handle 持久化 + tombstone | PARTIAL | `Journal/LinkageProjection.fs` | 包 0b/0c：三事实与三态投影已就位。读侧全部悬空——`HandleLinked` 不含 child SessionId，8 处消费者无法由 handle 找到 child。包 B 已删占位 `ChildDispatch.tryCancel`；其余属包 F，含一处 SSOT 例外决策 |
 | EXEC-011: Process Deadline | PARTIAL | `Process/Deadline.fs` | 3× estimate 已实现；无管理员 hard limit |
 | EXEC-015: PTY 行为 | CONFORMANT | `Process/Pty*.fs` | onExit-only completion 已验证 |
 
@@ -120,7 +126,7 @@
 
 ## 未列入本表的条款
 
-`AGENT-*`（20 个 Agent、能力矩阵、内部 Agent 不可见）与 `REVIEW-001` `REVIEW-002`
+`AGENT-*` 中除 AGENT-007 外的条款（20 个 Agent、能力矩阵、内部 Agent 不可见）与 `REVIEW-001` `REVIEW-002`
 `REVIEW-008` `REVIEW-009`、`ORCH-004`、`EXEC-001` ~ `EXEC-003`
 `EXEC-006` ~ `EXEC-008` `EXEC-010` `EXEC-012` ~ `EXEC-014`、`COMPANION-003` ~
 `COMPANION-007` `COMPANION-010` ~ `COMPANION-012`、`HOST-001` `HOST-006` `HOST-007`

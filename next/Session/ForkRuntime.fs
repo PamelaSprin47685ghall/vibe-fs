@@ -112,14 +112,15 @@ type ForkRuntime
         (
             agentId: string,
             role: AgentRole,
+            agent: string,
             ?prompt: string,
-            ?runWork: unit -> Task<AgentCompletionOutcome>,
-            ?agent: string
+            ?runWork: unit -> Task<AgentCompletionOutcome>
         ) : ForkResult =
-        let agentName =
-            match agent with
-            | Some name when not (String.IsNullOrWhiteSpace name) -> name.Trim()
-            | _ -> AgentRoleIdentity.defaultFastManagedName role
+        // PROMPT-008: the managed agent name is required, never defaulted.
+        // Defaulting to `fast-ROLE` invented a tier nobody selected, and the
+        // invented name then flowed into the completion record and the Host send
+        // boundary as if it had been chosen.
+        let agentName = agent.Trim()
 
         lock lockObj (fun () ->
             if mailbox.IsCancelled then
@@ -138,7 +139,10 @@ type ForkRuntime
                     agents <- agents |> Map.add agentId childRun
                     runTask () |> ignore
 
-                    if isNew then ForkResult.Created agentId else ForkResult.Nudged agentId)
+                    if isNew then
+                        ForkResult.Created agentId
+                    else
+                        ForkResult.Nudged agentId)
 
     // -----------------------------------------------------------------------
     // Public API — Join
@@ -165,13 +169,13 @@ type ForkRuntime
 
                 if known then
                     match agents |> Map.tryFind completion.AgentId with
-                    | Some run when not run.Completion.IsCompleted ->
-                        run.Completion.TrySet(completion) |> ignore
+                    | Some run when not run.Completion.IsCompleted -> run.Completion.TrySet(completion) |> ignore
                     | _ -> ()
 
                 known)
 
-        if owned then mailbox.Publish completion
+        if owned then
+            mailbox.Publish completion
 
     // -----------------------------------------------------------------------
     // Public API — PTY management
@@ -187,11 +191,8 @@ type ForkRuntime
     // Public API — agent lifecycle for restart recovery
     // -----------------------------------------------------------------------
 
-    member _.Restore(agentId: string, role: AgentRole, ?agent: string) : unit =
-        let agentName =
-            match agent with
-            | Some name when not (String.IsNullOrWhiteSpace name) -> name.Trim()
-            | _ -> AgentRoleIdentity.defaultFastManagedName role
+    member _.Restore(agentId: string, role: AgentRole, agent: string) : unit =
+        let agentName = agent.Trim()
 
         lock lockObj (fun () ->
             if not (Map.containsKey agentId agents) then
@@ -201,14 +202,12 @@ type ForkRuntime
         lock lockObj (fun () -> agents <- ForkRecovery.markInterrupted agentId reason agents)
 
     member _.BindChildSession(agentId: string, childSessionId: string) : unit =
-        lock lockObj (fun () ->
-            agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
+        lock lockObj (fun () -> agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
 
     /// Internal targeted completion handle. Model-visible join remains join-any.
     member _.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =
         let completion =
-            lock lockObj (fun () ->
-                agents |> Map.tryFind agentId |> Option.map (fun run -> run.Completion.Await))
+            lock lockObj (fun () -> agents |> Map.tryFind agentId |> Option.map (fun run -> run.Completion.Await))
 
         match completion with
         | None -> Task.FromResult(Error(sprintf "Unknown agent id: %s" agentId))
@@ -228,8 +227,7 @@ type ForkRuntime
             let agentList =
                 agents
                 |> Map.toList
-                |> List.map (fun (agentId, run) ->
-                    ChildRunProjection.toRecord mailbox.IsCancelled agentId run)
+                |> List.map (fun (agentId, run) -> ChildRunProjection.toRecord mailbox.IsCancelled agentId run)
 
             let ptyList = ptys |> Map.toList |> List.map snd
             (agentList, ptyList))
@@ -241,10 +239,7 @@ type ForkRuntime
     member _.IsCancelled = mailbox.IsCancelled
 
     member _.ActiveRunCount =
-        lock lockObj (fun () ->
-            agents
-            |> Map.filter (fun _ run -> ChildRun.isActive run)
-            |> Map.count)
+        lock lockObj (fun () -> agents |> Map.filter (fun _ run -> ChildRun.isActive run) |> Map.count)
 
     member _.PendingCompletionCount = mailbox.PendingCount
 

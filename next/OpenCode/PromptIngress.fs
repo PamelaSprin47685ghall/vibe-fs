@@ -43,7 +43,6 @@ module PromptIngress =
         (bindUserMessage: string -> string -> unit)
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
-        (onAuthorityResolved: SessionId -> PromptAuthority.AuthorityExecutionProfile -> unit)
         (message: PromptIngressCodec.DecodedMessage)
         =
         // PROMPT-005: accepting a prompt is a durable act. Without a journal there
@@ -55,15 +54,17 @@ module PromptIngress =
             let sessionKey = SessionId.value sessionId
             let messageKey = PhysicalUserMessageId.value physicalMessageId
 
-            let acceptedRoot (profile: PromptAuthority.AuthorityExecutionProfile) =
-                onAuthorityResolved sessionId profile
+            // AGENT-007: nothing is cached here. The accepted `AuthorityRootAccepted`
+            // fact is the record of the role, and every consumer reads it back from
+            // the projection — so there is no second copy to fall out of step.
+            let acceptedRoot () =
                 bindUserMessage sessionKey messageKey
                 registerOwned sessionKey
 
             match resolveOrigin runtime sessionId message physicalMessageId with
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot ->
                 match runtime.AcceptHumanRoot sessionId physicalMessageId message.ExplicitAgent with
-                | Ok profile -> acceptedRoot profile
+                | Ok _ -> acceptedRoot ()
                 | Error _ -> ()
 
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
@@ -73,7 +74,7 @@ module PromptIngress =
                 match message.PromptKey with
                 | Some key ->
                     match runtime.AcceptAgentOwnerRoot key sessionId physicalMessageId with
-                    | Ok profile -> acceptedRoot profile
+                    | Ok _ -> acceptedRoot ()
                     | Error _ -> ()
                 | None -> ()
 
@@ -103,8 +104,7 @@ module PromptIngress =
         (bindUserMessage: string -> string -> unit)
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
-        (onAuthorityResolved: SessionId -> PromptAuthority.AuthorityExecutionProfile -> unit)
         =
         fun (input: obj) (output: obj) ->
             PromptIngressCodec.decode input output
-            |> handle journal bindUserMessage bindContinuationMessage registerOwned onAuthorityResolved
+            |> handle journal bindUserMessage bindContinuationMessage registerOwned

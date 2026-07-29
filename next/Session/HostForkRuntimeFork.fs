@@ -21,11 +21,7 @@ module HostForkRuntimeFork =
         |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
 
     let private missingReviewRequirement (input: ReviewRequirementInput) : Result<string list, string> =
-        Error(
-            sprintf
-                "Cannot load original user requirement message %s for reviewer"
-                (MessageId.value input.MessageId)
-        )
+        Error(sprintf "Cannot load original user requirement message %s for reviewer" (MessageId.value input.MessageId))
 
     let rec private resolveReviewRequirementInputs
         (port: ISessionSnapshotPort)
@@ -51,14 +47,12 @@ module HostForkRuntimeFork =
                     let! messagesResult = port.GetMessages input.SourceSessionId
 
                     match messagesResult with
-                    | Error err ->
-                        return Error(sprintf "Cannot load original user requirements for reviewer: %s" err)
+                    | Error err -> return Error(sprintf "Cannot load original user requirements for reviewer: %s" err)
                     | Ok messages ->
                         let updated = Map.add input.SourceSessionId messages cached
 
                         match consume messages with
-                        | Some text ->
-                            return! resolveReviewRequirementInputs port remaining updated (text :: resolved)
+                        | Some text -> return! resolveReviewRequirementInputs port remaining updated (text :: resolved)
                         | None -> return missingReviewRequirement input
         }
 
@@ -76,7 +70,9 @@ module HostForkRuntimeFork =
             else
                 match snapshot with
                 | None ->
-                    return Error "Cannot start reviewer: original user requirements are unavailable without a session transcript"
+                    return
+                        Error
+                            "Cannot start reviewer: original user requirements are unavailable without a session transcript"
                 | Some port ->
                     let! resolved = resolveReviewRequirementInputs port promptInputs Map.empty []
 
@@ -100,13 +96,13 @@ module HostForkRuntimeFork =
 
     type HostForkRuntime with
 
+        /// PROMPT-008: `agent` is the managed agent name the caller selected, and
+        /// it is required. Defaulting it to `fast-ROLE` invented a tier, and the
+        /// invented name then travelled to the Host send boundary as if chosen.
         member this.Fork
-            (agentId: string, role: AgentRole, prompt: string, ?agent: string)
+            (agentId: string, role: AgentRole, agent: string, prompt: string)
             : Task<Result<ForkResult, string>> =
-            let agentName =
-                match agent with
-                | Some name when not (System.String.IsNullOrWhiteSpace name) -> name.Trim()
-                | _ -> defaultFastManagedName role
+            let agentName = agent.Trim()
 
             task {
                 do! this.AwaitRecovery()
@@ -169,9 +165,12 @@ module HostForkRuntimeFork =
                                                TargetAgent = agentId
                                                Role = Some agentName |}
 
-                                    match AgentJournal.appendAgent (StreamId.Session this.ParentId) None fact journal with
+                                    match
+                                        AgentJournal.appendAgent (StreamId.Session this.ParentId) None fact journal
+                                    with
                                     | Ok _ -> Ok()
-                                    | Error failure -> Error(sprintf "Failed to persist AgentForked: %A" failure.Failure)
+                                    | Error failure ->
+                                        Error(sprintf "Failed to persist AgentForked: %A" failure.Failure)
 
                             match linkageResult with
                             | Error err ->
@@ -186,12 +185,7 @@ module HostForkRuntimeFork =
                                 this.ChildCreatedDir agentId childId (this.DirectoryOf agentId)
 
                                 let result =
-                                    this.Runtime.Fork(
-                                        agentId,
-                                        role,
-                                        runWork = (fun () -> run.Source.Task),
-                                        agent = agentName
-                                    )
+                                    this.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
 
                                 match result with
                                 | ForkResult.NotFound _ ->
@@ -241,21 +235,21 @@ module HostForkRuntimeFork =
                     match HostPendingRun.sessionDeadRefusal this.Journal childId with
                     | Some refusal -> return Error refusal
                     | None ->
-                        let roleOpt =
+                        // The record carries the managed name this handle was forked
+                        // with. Rebuilding it from the role would silently downgrade a
+                        // deep-* agent to fast-* on reuse.
+                        let recordOpt =
                             this.Runtime.List()
                             |> fst
                             |> List.tryFind (fun agent -> agent.AgentId = agentId)
-                            |> Option.map (fun agent -> agent.Role)
 
-                        match roleOpt with
+                        match recordOpt with
                         | None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                        | Some role ->
-                            let agentName =
-                                this.Runtime.List()
-                                |> fst
-                                |> List.tryFind (fun a -> a.AgentId = agentId)
-                                |> Option.map (fun a -> a.Agent)
-                                |> Option.defaultValue (defaultFastManagedName role)
+                        | Some record when System.String.IsNullOrWhiteSpace record.Agent ->
+                            return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
+                        | Some record ->
+                            let role = record.Role
+                            let agentName = record.Agent
 
                             return!
                                 HostForkChildDispatch.sendToExistingChild

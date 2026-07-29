@@ -21,13 +21,14 @@ module ForkTool =
     let private forkPayload (agentId: string) (managed: ManagedAgent) extra =
         let peer = ManagedAgent.peer managed
 
-        ToolHostCodec.jsonObject
-            ([ "agentId", Encode.string agentId
-               "agent", Encode.string managed.Name
-               "role", Encode.string (ManagedAgent.roleName managed.Role)
-               "tier", Encode.string (ManagedAgent.tierName managed.Tier)
-               "fallbackPeer", Encode.string peer.Name ]
-             @ extra)
+        ToolHostCodec.jsonObject (
+            [ "agentId", Encode.string agentId
+              "agent", Encode.string managed.Name
+              "role", Encode.string (ManagedAgent.roleName managed.Role)
+              "tier", Encode.string (ManagedAgent.tierName managed.Tier)
+              "fallbackPeer", Encode.string peer.Name ]
+            @ extra
+        )
 
     let private unknownAgentError (raw: string) =
         match ManagedAgent.parse raw with
@@ -35,7 +36,10 @@ module ForkTool =
         | Ok _ -> sprintf "Unknown managed agent '%s'." raw
 
     let private managedForRecord (record: AgentRecord) =
-        if String.IsNullOrWhiteSpace record.Agent then None else ManagedAgent.tryParse record.Agent
+        if String.IsNullOrWhiteSpace record.Agent then
+            None
+        else
+            ManagedAgent.tryParse record.Agent
 
     let private forbiddenManagerRole (managed: ManagedAgent) =
         match managed.Role with
@@ -77,10 +81,9 @@ module ForkTool =
                             match ManagedAgent.tryParse request.Agent with
                             | Some managed when forbiddenManagerRole managed ->
                                 return
-                                    error
-                                        (sprintf
-                                            "Manager may not fork role '%s'"
-                                            (ManagedAgent.roleName managed.Role))
+                                    error (
+                                        sprintf "Manager may not fork role '%s'" (ManagedAgent.roleName managed.Role)
+                                    )
                             | Some managed when
                                 managed.Visibility = AgentVisibility.Public
                                 && List.contains managed.Name ManagedAgent.publicForkableNames
@@ -88,21 +91,13 @@ module ForkTool =
                                 let role = AgentRoleIdentity.ofManaged managed
 
                                 match!
-                                    runtime.Fork(
-                                        ToolHostCodec.newHandleId (),
-                                        role,
-                                        request.Prompt,
-                                        agent = managed.Name
-                                    )
+                                    runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, request.Prompt)
                                 with
                                 | Ok result -> return forkPayload result.AgentId managed []
                                 | Error forkError -> return error forkError
                             | Some managed ->
                                 return
-                                    error
-                                        (sprintf
-                                            "Managed agent '%s' is not creatable via Manager fork"
-                                            managed.Name)
+                                    error (sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name)
                             | None when ToolHostCodec.looksLikeHandleId request.Agent ->
                                 return error (sprintf "Unknown agent id: %s" request.Agent)
                             | None -> return error (unknownAgentError request.Agent)

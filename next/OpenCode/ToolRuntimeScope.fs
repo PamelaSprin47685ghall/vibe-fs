@@ -7,9 +7,13 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
-/// Owns every per-session tool runtime. Role authorization comes from Prompt
-/// Authority (or the typed Host context when no journal exists), never the
-/// display-only sessionRoles cache.
+/// Owns every per-session tool runtime.
+///
+/// AGENT-007: Role comes from the Authority Root's CanonicalRole and nothing
+/// else. The previous version consulted three sources in order — authority, a
+/// per-session role cache, then the Host context's `agent` field — so a session
+/// whose authority said Coder could still be gated as DevOps because a cache
+/// entry or a message field said so. Two of the three are gone.
 type ToolRuntimeScope
     (
         sessions: ISessionHostPort,
@@ -17,7 +21,6 @@ type ToolRuntimeScope
         gitTreePort: GitTreePort option,
         workspaceDirectory: string option,
         sessionParents: Dictionary<string, string>,
-        sessionRoles: Dictionary<string, string>,
         currentPhysicalUserMessage: string -> string option,
         verdictSessions: HashSet<string>,
         sessionDirectories: Dictionary<string, string>,
@@ -40,11 +43,8 @@ type ToolRuntimeScope
     let terminalPort = eventPort
     let mutable disposed = false
 
-    let registerChild parentSid role childId =
-        let childKey = SessionId.value childId
-        sessionParents.[childKey] <- parentSid
-        // Display/strict-mock cache; RoleFor also consults it as a runtime role hint.
-        sessionRoles.[childKey] <- role.ToString().ToLowerInvariant()
+    let registerChild parentSid (_role: AgentRole) childId =
+        sessionParents.[SessionId.value childId] <- parentSid
 
     let directoryFor sid =
         match sessionDirectories.TryGetValue sid with
@@ -70,38 +70,20 @@ type ToolRuntimeScope
             cancelSignals = onCancelSignals
         )
 
-    let roleName (ctx: HostToolContext) =
-        let fromAuthority =
-            match journal with
-            | None -> None
-            | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
-                let projection = AgentJournal.snapshot durable
-
-                PromptAuthorityLedger.activeProfile (SessionId.create ctx.SessionId) projection.AgentProjections
-                |> Option.map (fun profile -> PromptAuthority.roleLabel profile.CanonicalRole)
-            | Some _ -> None
-
-        let fromSessionRoles () =
-            if String.IsNullOrWhiteSpace ctx.SessionId then
-                None
-            else
-                match sessionRoles.TryGetValue ctx.SessionId with
-                | true, role when not (String.IsNullOrWhiteSpace role) -> Some role
-                | _ -> None
-
-        fromAuthority
-        |> Option.orElseWith fromSessionRoles
-        |> Option.orElseWith (fun () ->
-            ctx.Agent
-            |> Option.bind (fun agent ->
-                ManagedAgent.tryParse agent
-                |> Option.map (fun managed -> ManagedAgent.roleName managed.Role)
-                |> Option.orElseWith (fun () -> HostSessionContext.canonicalRole agent)))
-
-    let roleOfName (name: string) =
-        match PromptAuthority.tryParseRole name with
-        | Some role -> Some role
-        | None -> AgentRoleIdentity.roleOfString name |> Option.map AgentRoleIdentity.toRole
+    /// AGENT-007: the single Role source, or `None`.
+    ///
+    /// `None` means the tool set is empty — the clause says so explicitly, and
+    /// names the "allow inspector while the role is unresolved" exemption the old
+    /// code had as the thing to delete. A read-only tool executed under an
+    /// unknown role is still an unauthorised execution.
+    let private roleFor (ctx: HostToolContext) =
+        match journal with
+        | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
+            PromptAuthorityLedger.activeProfile
+                (SessionId.create ctx.SessionId)
+                (AgentJournal.snapshot durable).AgentProjections
+            |> Option.map (fun profile -> profile.CanonicalRole)
+        | _ -> None
 
     member _.Sessions = sessions
     member _.Journal = journal
@@ -115,7 +97,7 @@ type ToolRuntimeScope
 
     member _.RegisterDirectory(sessionId, path) = sessionDirectories.[sessionId] <- path
 
-    member _.RoleFor(ctx: HostToolContext) = roleName ctx |> Option.bind roleOfName
+    member _.RoleFor(ctx: HostToolContext) = roleFor ctx
 
     member this.IsRole(ctx: HostToolContext, expected: Role) = this.RoleFor ctx = Some expected
 

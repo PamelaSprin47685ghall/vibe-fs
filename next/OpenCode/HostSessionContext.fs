@@ -16,9 +16,6 @@ module HostSessionContext =
         else
             AgentRoleIdentity.roleOfString agent
 
-    let canonicalRole (agent: string) =
-        roleOf agent |> Option.map (fun role -> role.ToString().ToLowerInvariant())
-
     let read raw =
         let event = if isNull raw || isNull raw?event then raw else raw?event
         let properties = if isNull event then null else event?properties

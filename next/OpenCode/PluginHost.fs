@@ -28,21 +28,6 @@ module PluginHost =
             Some(SharedAgentJournal.acquire dir processId DateTimeOffset.UtcNow)
 
 
-    let restoreSessionRoles (journal: AgentJournal option) (sessionRoles: Dictionary<string, string>) =
-        match journal with
-        | None -> ()
-        | Some journal ->
-            let snapshot = AgentJournal.snapshot journal
-
-            for KeyValue(sid, session) in snapshot.AgentProjections.Sessions do
-                match session.Linkage with
-                | Some linkage ->
-                    sessionRoles.[SessionId.value sid] <- "manager"
-
-                    for KeyValue(childId, role) in linkage.LinkedRoles do
-                        sessionRoles.[ChildId.value childId] <- role.Trim().ToLowerInvariant()
-                | None -> ()
-
     let restoreSessionParents (journal: AgentJournal option) (sessionParents: Dictionary<string, string>) =
         match journal with
         | None -> ()

@@ -58,7 +58,7 @@ module HostForkChildDispatch =
                 onRunStarted childId role
 
                 let result =
-                    runtime.Fork(agentId, role, runWork = (fun () -> run.Source.Task), agent = agent)
+                    runtime.Fork(agentId, role, agent, runWork = (fun () -> run.Source.Task))
 
                 match result with
                 | ForkResult.NotFound _ ->

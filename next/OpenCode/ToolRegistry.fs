@@ -22,7 +22,6 @@ module ToolRegistry =
         (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
-        (sessionRoles: Dictionary<string, string>)
         (currentPhysicalUserMessage: string -> string option)
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
@@ -41,7 +40,6 @@ module ToolRegistry =
                 gitTreePort,
                 workspaceDirectory,
                 sessionParents,
-                sessionRoles,
                 currentPhysicalUserMessage,
                 verdictSessions,
                 sessionDirectories,
@@ -76,6 +74,8 @@ module ToolRegistry =
             | "coder" -> fun r -> r = Role.DevOps
             | _ -> fun _ -> false
 
+        // AGENT-007 layer two. Both layers read the same CanonicalRole, so a tool
+        // the schema admitted is exactly a tool the gate admits.
         let gateExecute spec allowed =
             let original = spec.Execute
 
@@ -89,18 +89,19 @@ module ToolRegistry =
                                 [ "error",
                                   Encode.string (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
                     | None ->
-                        // In test/unresolved contexts, allow the read-only inspector
-                        // tool (broadly permitted across Coder, Meditator, Reviewer,
-                        // and DevOps) rather than rejecting it outright.
-                        match spec.Name with
-                        | "inspector" -> return! original args ctx
-                        | _ ->
-                            return
-                                ToolHostCodec.jsonObject
-                                    [ "error",
-                                      Encode.string (
-                                          sprintf "Tool '%s' rejected: session role could not be determined" spec.Name
-                                      ) ]
+                        // AGENT-007: an unresolved Role means an empty tool set. The
+                        // previous version exempted `inspector` here on the grounds
+                        // that it is read-only and broadly permitted — the exemption
+                        // the clause names explicitly. Read-only or not, executing
+                        // under an unknown role is an unauthorised execution.
+                        return
+                            ToolHostCodec.jsonObject
+                                [ "error",
+                                  Encode.string (
+                                      sprintf
+                                          "Tool '%s' rejected: no Authority Root fixes this session's role"
+                                          spec.Name
+                                  ) ]
                 }
 
         let specs =

@@ -54,7 +54,6 @@
     <Compile Include="Session/CompletionMailbox.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
-    <Compile Include="Session/ChildDispatch.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
     <Compile Include="Session/ReviewTypes.fs"/>
     <Compile Include="Session/ReviewerHost.fs"/>

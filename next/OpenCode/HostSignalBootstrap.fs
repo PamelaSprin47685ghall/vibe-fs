@@ -120,10 +120,8 @@ module HostSignalBootstrap =
 
                         match runtime.AcceptHumanRoot sessionId messageId (Some agent) with
                         | Error _ -> return false
-                        | Ok profile ->
-                            let key = SessionId.value sessionId
-                            scope.UserMessageBindings.[key] <- messageId
-                            scope.SessionRoles.[key] <- PromptAuthority.roleLabel profile.CanonicalRole
+                        | Ok _ ->
+                            scope.UserMessageBindings.[SessionId.value sessionId] <- messageId
                             reconciler.BindUserMessage(sessionId, messageId)
                             return true
             }
@@ -235,12 +233,8 @@ module HostSignalBootstrap =
                   AgentRole = Some role
                   Directory = defaultArg directory "" }
 
-        let onAuthorityResolved (sessionId: SessionId) (profile: PromptAuthority.AuthorityExecutionProfile) =
-            let key = SessionId.value sessionId
-            scope.SessionRoles.[key] <- PromptAuthority.roleLabel profile.CanonicalRole
-
         let chatMessageHook =
-            PromptIngress.createHook journal bindUserMessage bindContinuationMessage registerOwned onAuthorityResolved
+            PromptIngress.createHook journal bindUserMessage bindContinuationMessage registerOwned
 
         let cancelSignals (ids: SessionId seq) =
             ids |> Seq.iter (fun id -> signalRouter.UnregisterOwned id)

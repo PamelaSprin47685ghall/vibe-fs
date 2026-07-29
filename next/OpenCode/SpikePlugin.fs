@@ -20,7 +20,6 @@ module SpikePlugin =
             let journal = PluginHost.createJournal input
             let scope = new PluginRuntimeScope(journal)
 
-            PluginHost.restoreSessionRoles journal scope.SessionRoles
             PluginHost.restoreSessionParents journal scope.SessionParents
 
             let familyParent (sessionId: SessionId) =
@@ -73,8 +72,9 @@ module SpikePlugin =
                     | Some projectionSessionId ->
                         wired.RegisterOwned projectionSessionId
 
-                        // scope.SessionRoles is display/tool-surface cache only.
-                        // Companion eligibility must not be inferred here.
+                        // Filling in the session id lets the transform address a
+                        // session; it says nothing about eligibility, which
+                        // COMPANION-002 reads from ActiveLogicalRun alone.
                         if not (isNull inObj) && isNull inObj?sessionID then
                             inObj?sessionID <- projectionSessionId
                     | None -> ()
@@ -87,7 +87,6 @@ module SpikePlugin =
                         scope.SessionBudgets
                         scope.SessionOutputLimits
                         scope.CompanionBudgets
-                        scope.SessionRoles
                         (Some(fun bloggerId ->
                             // Register ownership + ActiveRun so idle→reconcile
                             // emits TerminalOutcome.Completed for this child.

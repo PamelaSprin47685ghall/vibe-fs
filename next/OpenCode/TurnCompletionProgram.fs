@@ -87,16 +87,21 @@ module TurnCompletionProgram =
         let sessionKey = SessionId.value turn.SessionId
         disposeExecutorRuntime sessionKey
 
+        // SHOCK-UNMIGRATED[EXEC-009]: the managed agent name must come from the
+        // durable `HandleLinked.TargetAgent` of this child's handle, not be rebuilt
+        // from its AgentRole. The old `defaultFastManagedName` invented tier Fast,
+        // so a `deep-coder` child acquired an Authority Root naming `fast-coder`
+        // and FALLBACK-002's A/B pair was wrong for the whole Logical Run.
+        //
+        // Reaching the record needs the parent session and handle id, which is the
+        // read layer package F builds. `isLinkedChild` above is already dangling on
+        // the same projection change, so both move together.
         match turn.AgentRole with
-        | Some agent when
+        | Some _ when
             TerminalPolicy.isLinkedChild journal sessionKey
             || sessionParents.ContainsKey sessionKey
             ->
-            HostSessionNudge.ensureAgentOwnerAuthority
-                journal
-                turn.SessionId
-                turn.RootUserMessageId
-                (AgentRoleIdentity.defaultFastManagedName agent)
+            failwith "SHOCK-UNMIGRATED[EXEC-009]: linked-child authority needs the durable handle's TargetAgent"
         | _ -> ()
 
         let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =

@@ -468,14 +468,61 @@ Guard nudge 去重原先读 `ReviewGuardProjection.AcceptedGuardKey`，由 `Guar
 
 | 项 | 值 |
 |----|----|
-| 条款 | PROMPT-008 AGENT-001 AGENT-007 AGENT-010 |
-| 目标模块 | `Domain/PromptAuthority.fs` `Session/AgentRoleIdentity.fs` `ToolRuntimeScope.fs` `ToolRegistry.fs` |
+| 条款 | PROMPT-008 AGENT-001 AGENT-007 AGENT-010 ORCH-003 COMPANION-002 EXEC-009 |
+| 目标模块 | `OpenCode/{ToolRuntimeScope,ToolRegistry,CompanionTransform,PluginRuntimeScope,PluginHost,PluginHostInterop,SpikePlugin,HostSignalBootstrap,HostSessionContext,PromptIngress,OrchestratorHost,ExecutorSummarizeRuntime,ForkTool,TurnCompletionProgram}.fs`、`Session/{AgentRoleIdentity,ForkRuntime,HostForkRuntimeFork,HostForkChildDispatch,HostForkRestart}.fs`、`Process/Pty.fs`、删除 `Session/ChildDispatch.fs` |
 | 旧入口 | 各模块自行从 Agent 字符串解析 Role；`sessionRoles: Dictionary<string,string>`；`RoleFor context` |
 | 新入口 | 唯一 `buildAttemptExecutionProfile`，所有模块接收 profile |
 | 必须删除 | 任何在 profile 构造之外解析 `fast-`/`deep-` 前缀得出 Role 的代码 |
 | 允许出现 Agent 字符串 | 配置解析、Authority Root 创建、profile 构造、Host 发送边界 |
-| 生产 | UNTOUCHED |
+| 静态验收 | `sessionRoles` / `SessionRoles` / `defaultFastManagedName` 在 `next/` 为 0 |
+| 生产 | DOMAIN_MIGRATED（Role 读侧与 fork 发送侧完成；两处 EXEC-009 阻塞见下） |
 | 测试 | UNTOUCHED |
+
+#### Role 有三个来源，AGENT-007 只允许一个
+
+`ToolRuntimeScope.roleName` 依次尝试 Authority、`sessionRoles` Dictionary、Host context 的 `agent` 字段。三者任一命中即返回，因此一个 Authority 说 Coder 的 session 仍可能因为缓存条目或消息字段而被当作 DevOps 授权。
+
+AGENT-007 要求两层权限门读同一个 `CanonicalRole`，且 Role 无法确定时工具集为空。现在只剩 `ActiveLogicalRun.CanonicalRole`，返回 `Role option`；`sessionRoles` 整个 Dictionary 连同 `PluginRuntimeScope.SessionRoles`、`restoreSessionRoles`、四个写入点一并删除。
+
+条款还点名了要删的东西：ToolRegistry 在 Role 未解析时放行 `inspector`，理由是它只读且多角色可用。只读与否不改变「在未知 Role 下执行」这件事——该豁免删除。
+
+#### fork 的 managed agent 名不得由 Role 反推
+
+`ForkRuntime.Fork` / `Restore` 与 `HostForkRuntime.Fork` 的 `?agent` 缺省走 `defaultFastManagedName role`，即凭空造出 Fast 层。造出来的名字随后进入 completion 记录与 Host 发送边界，看起来与真正被选中的名字无异。
+
+三处签名改为必填 `agent: string`。`defaultFastManagedName` 删除。
+
+`HostForkRuntime.Reuse` 原先也会在记录里没有名字时回落到该函数，等于一次 reuse 就把 `deep-coder` 降级为 `fast-coder`；现在读 `AgentRecord.Agent`，空则报错。
+
+`OrchestratorHost.runManager` 同类：`managerAgents` 内存 map 未命中时回落 `fast-manager`。未命中正是重启场景，而 ORCH-003 持久化 `ManagerJobProjection.ManagerAgent` 就是为了这个场景——回落使 `deep-manager` 作业以 `fast-manager` 恢复。改为报错。
+
+`ExecutorSummarizeRuntime` 与 `CompanionHost` 的固定名保留：Executor 与 Blogger 是 AGENT-008 的内部 Agent，其角色是常量而非推断。`OrchestratorHost.runReviewerOnce` 改为复用 `OrchestratorHostReview.DeepReviewerAgent`，不再第二次拼写同一策略。
+
+#### COMPANION-002 的缓存回写
+
+`CompanionTransform` 从 `ActiveLogicalRun.SelectedAgent` 判定 eligibility（正确），但随后把推得的 role 写回 `sessionRoles`，并在 Blogger 创建时写入 `"blogger"`。写入本身就是那条被禁止的第二来源的供给方。两处删除，`handleCompanionTransform` 不再接收该参数。
+
+#### PromptIngress.onAuthorityResolved 回调
+
+其唯一实现体是往 `sessionRoles` 写 CanonicalRole。`AuthorityRootAccepted` 事实已经是该 Role 的记录，每个消费者都从投影读回。回调连同参数删除。
+
+#### Session/ChildDispatch.fs 是孤儿
+
+12 个函数无任何生产或测试消费者，其中 `tryCancel` 是注释为 P6 占位、恒返回 `false` 的假实现。整文件删除（包 F 的「`ChildDispatch.tryCancel` 占位」条目随之作废）。
+
+#### 两处 EXEC-009 阻塞
+
+`HostForkRestart.restoreLinkedChildren` 与 `TurnCompletionProgram` 的 linked-child authority 都需要「由 handle 找到 child session 与其 managed agent 名」。
+
+包 0c 把 `AgentLinkageProjection` 从 `LinkedChildren`/`LinkedRoles`/`ForkedChildren` 换成按 `HandleId` 键入的 `Handles`，而 `HandleLinked` 只携带 `{ ParentSessionId; Handle; TargetAgent; CanonicalRole }`——没有 child SessionId。
+
+child session id 由 Host 签发，从 handle id 派生只会造出一个此后每次操作都静默空转的身份，因此不能就地补。两处写 `SHOCK-UNMIGRATED[EXEC-009]`，留给包 F：要么 `HandleLinked` 增加该字段（需 SSOT 例外协议），要么 EXEC-009 明确恢复期以别的方式重新解析 children。
+
+`TerminalPolicy.isLinkedChild`、`VerdictTool`、`ReviewerGuardState`、`OrchestratorSessionDirectories`、`PluginHost.restoreSessionParents`、`CompanionTransform` 的 blogger 恢复也都还在读旧 `Linkage` 字段，同属包 F 的连带面。
+
+#### Process/Pty.fs 的 `fast-%s`
+
+PTY completion 的 `AgentName` 由 `AgentRole` 拼出 `fast-*`，无角色时得到 `fast-executor`。未标记 unmigrated：该名字只进入 completion 记录的诊断字段，而 EXEC-015 要求 PTY completion 只由 backend `onExit` 触发，在此处失败会破坏该条款。改为注释说明并留给包 F 让 `PtyHandle` 携带 managed 名。
 
 ### 包 C：FallbackController
 
@@ -525,13 +572,36 @@ Guard nudge 去重原先读 `ReviewGuardProjection.AcceptedGuardKey`，由 `Guar
 | 项 | 值 |
 |----|----|
 | 条款 | EXEC-004 EXEC-005 EXEC-009 EXEC-011 EXEC-015 |
-| 目标模块 | `Session/ChildDispatch.fs` `Session/ChildRun*.fs` `Session/ForkRuntime.fs` `JoinTool.fs` `ListTool.fs` `Process/Deadline.fs` |
-| 旧入口 | `AgentLinked` / `AgentForked` / `AgentUnlinked` 三事实无 completed/retired 区分；`ChildDispatch.tryCancel` 占位 |
+| 目标模块 | `Session/{ChildRun*,ForkRuntime,HostForkRestart}.fs` `OpenCode/{JoinTool,ListTool,TerminalPolicy,VerdictTool,ReviewerGuardState,OrchestratorSessionDirectories,PluginHost,CompanionTransform,TurnCompletionProgram}.fs` `Process/{Deadline,Pty}.fs` |
+| 旧入口 | `AgentLinked` / `AgentForked` / `AgentUnlinked` 三事实无 completed/retired 区分 |
 | 新入口 | `HandleLinked` / `HandleCompleted` / `HandleRetired`；active / completed-awaiting-join / retired 三态分离 |
 | 必须删除 | retired handle 回退成 Agent 名称重新 fork 的路径 |
 | 必须新增 | join 消费后写 tombstone；真实单 child cancel；parent abort 逐项取消；process 管理员 hard limit |
 | 生产 | UNTOUCHED |
 | 测试 | UNTOUCHED |
+
+包 B 已删除 `Session/ChildDispatch.fs`（12 个函数无消费者，`tryCancel` 是恒返回 `false` 的 P6 占位），故原「`ChildDispatch.tryCancel` 占位」条目作废；真实单 child cancel 仍需新建。
+
+#### 先决：`HandleLinked` 缺 child SessionId
+
+包 0c 把 `AgentLinkageProjection` 换成按 `HandleId` 键入的 `Handles` 后，`LinkedChildren` / `LinkedRoles` / `ForkedChildren` 全部消失，而 `HandleLinked` 只携带 `{ ParentSessionId; Handle; TargetAgent; CanonicalRole }`。
+
+以下读侧全部悬空，且都需要「handle → child session」这一步：
+
+```text
+Session/HostForkRestart.restoreLinkedChildren    重启恢复 join mailbox
+OpenCode/TurnCompletionProgram                   linked-child AgentOwner authority
+OpenCode/TerminalPolicy.isLinkedChild
+OpenCode/VerdictTool
+OpenCode/ReviewerGuardState
+OpenCode/OrchestratorSessionDirectories
+OpenCode/PluginHost.restoreSessionParents
+OpenCode/CompanionTransform                      blogger child 恢复
+```
+
+child session id 由 Host 签发。从 handle id 派生会造出一个此后每次操作都静默空转的身份，因此不能就地补。本包开始时先决定二者之一：`HandleLinked` 增加 `ChildSessionId`（走 SSOT 例外协议），或 EXEC-009 明确恢复期以别的方式重新解析 children。前两处已标 `SHOCK-UNMIGRATED[EXEC-009]`。
+
+`Process/Pty.fs` 的 `PtyHandle` 同样只记 `AgentRole`，故 completion 的 `AgentName` 只能拼 `fast-*`；本包应让它携带 forking profile 选定的 managed 名。
 
 ### 包 G：Orchestrator
 

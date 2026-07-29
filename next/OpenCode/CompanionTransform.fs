@@ -23,7 +23,6 @@ module CompanionTransform =
         (sessionBudgets: Dictionary<string, int>)
         (sessionOutputLimits: Dictionary<string, int>)
         (budgetStore: CompanionBudgetStore)
-        (sessionRoles: Dictionary<string, string>)
         (onBloggerCreated: (SessionId -> unit) option)
         (inObj: obj)
         (rawOutObj: obj)
@@ -77,8 +76,10 @@ module CompanionTransform =
             && not (String.IsNullOrWhiteSpace sessionId)
             && not (isNull rawOutObj?messages)
         then
-            // Eligibility source of truth: ActiveLogicalRun.SelectedAgent only.
-            // No production fallback to sessionRoles / message agent / transform input.
+            // COMPANION-002 eligibility source of truth: ActiveLogicalRun only.
+            // Neither the message's `agent` field nor the transform input is a
+            // production source — both describe what the Host is about to send,
+            // not what an Authority Root fixed.
             let authorityAgent =
                 match journal with
                 | None -> None
@@ -88,16 +89,6 @@ module CompanionTransform =
                     |> Option.bind (fun s -> s.PromptAuthority)
                     |> Option.bind (fun auth -> auth.ActiveLogicalRun)
                     |> Option.map (fun run -> run.SelectedAgent)
-
-            let agentRole = authorityAgent |> Option.bind HostSessionContext.canonicalRole
-
-            match agentRole with
-            | Some role -> sessionRoles.[sessionId] <- role
-            | None ->
-                // No ActiveLogicalRun.Profile.Agent: fail closed for companion.
-                // This is expected for host-internal and pre-authority transforms;
-                // sessionRoles/message agent/transform input are not production sources.
-                ()
 
             if Companion.shouldCreateForAgent authorityAgent then
                 let companion =
@@ -132,8 +123,6 @@ module CompanionTransform =
                                     ?durable = durable,
                                     onBloggerCreated =
                                         (fun bloggerId ->
-                                            let key = SessionId.value bloggerId
-                                            sessionRoles.[key] <- "blogger"
                                             // Own + bind the blogger run so idle
                                             // reconcile can NotifyTerminal and
                                             // complete the pending blog Submit.
