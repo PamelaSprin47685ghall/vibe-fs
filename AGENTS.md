@@ -288,7 +288,7 @@ tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
 ## 9. Git
 
 - 不推 main/master
-- 只在明确要求时提交
+- 保持自动 git commit 提交
 - 优先 stage 具体文件而非 `git add .`
 - 破坏性操作（force push、`reset --hard`、`clean -f`、`branch -D`）需显式许可
 - 保留 hooks，不用 `--no-verify`
