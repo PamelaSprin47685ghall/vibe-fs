@@ -124,6 +124,14 @@ type CompanionHost
         let deps = this.BloggerDeps
         companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps projection delta))
 
+    /// Exposes the canonical CompanionFlow calculation for adapters and tests;
+    /// SubmitProjection remains the non-blocking side-effecting operation.
+    member _.PreviewDelta(projection: ProjectionSnapshot) =
+        CompanionProgram.runCompanionFlow
+            { SessionId = SessionId.value primaryId }
+            System.Threading.CancellationToken.None
+            (CompanionProgram.buildDelta companion.Memory.LastSuccessfulProjection projection)
+
     member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
 
 

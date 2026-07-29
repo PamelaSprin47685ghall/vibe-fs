@@ -206,7 +206,7 @@ module ReconcileSupervisor =
             | SessionIdle sessionId -> this.Kick(sessionId)
             | SessionDeleted sessionId -> this.ClearSession(sessionId)
             | ProviderRetry _
-            | ProviderError _ -> ()
+            | ProviderFailure _ -> ()
 
         /// Bind a new authority root (human or agent owner).
         member _.BindUserMessage(sessionId: SessionId, messageId: MessageId, ?agentRole: AgentRole) =

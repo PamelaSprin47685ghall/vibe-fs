@@ -25,6 +25,7 @@
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="OpenCode/ManagedAgent.fs"/>
+    <Compile Include="OpenCode/HostPromptHash.fs"/>
     <Compile Include="OpenCode/PromptAuthority.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
@@ -44,9 +45,10 @@
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/AgentJournal.fs"/>
     <Compile Include="Journal/RuntimePath.fs"/>
+    <Compile Include="Agent/AgentProgram.fs"/>
     <Compile Include="Session/ForkTypes.fs"/>
     <Compile Include="Session/AgentCompletion.fs"/>
-    <Compile Include="Session/AgentRoleHelpers.fs"/>
+    <Compile Include="Session/AgentRoleIdentity.fs"/>
     <Compile Include="Session/ChildRun.fs"/>
     <Compile Include="Session/ChildRunProjection.fs"/>
     <Compile Include="Session/CompletionMailbox.fs"/>
@@ -88,7 +90,6 @@
     <Compile Include="Session/CompanionTypes.fs"/>
     <Compile Include="Session/Companion.fs"/>
     <Compile Include="Session/CompanionProgram.fs"/>
-    <Compile Include="Agent/AgentProgram.fs"/>
     <Compile Include="Tools/ToolContext.fs"/>
     <Compile Include="Tools/PromptAssets.fs"/>
     <Compile Include="Tools/StaticTools.fs"/>
@@ -107,8 +108,10 @@
     <Compile Include="OpenCode/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
+    <Compile Include="OpenCode/PromptMetadataCodec.fs"/>
     <Compile Include="OpenCode/PromptDispatcher.fs"/>
     <Compile Include="OpenCode/PromptDispatcherSend.fs"/>
+    <Compile Include="OpenCode/PromptIngressCodec.fs"/>
     <Compile Include="OpenCode/PromptIngress.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
@@ -136,10 +139,10 @@
     <Compile Include="OpenCode/SessionReconciler.fs"/>
     <Compile Include="OpenCode/RetrySignalHandler.fs"/>
     <Compile Include="OpenCode/PluginFallbackRetry.fs"/>
-    <Compile Include="OpenCode/ProviderErrorFallback.fs"/>
+    <Compile Include="OpenCode/ProviderFailureWakeup.fs"/>
     <Compile Include="OpenCode/ReviewerGuardState.fs"/>
     <Compile Include="OpenCode/TerminalSessionA.fs"/>
-    <Compile Include="OpenCode/TerminalPolicyHelpers.fs"/>
+    <Compile Include="OpenCode/TerminalPolicy.fs"/>
     <Compile Include="OpenCode/TurnCompletionProgram.fs"/>
     <Compile Include="OpenCode/TerminalPolicies.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>
@@ -170,7 +173,7 @@
     <Compile Include="OpenCode/PluginHost.fs"/>
     <Compile Include="OpenCode/ManagerConfig.fs"/>
     <Compile Include="OpenCode/ChatParamsHook.fs"/>
-    <Compile Include="OpenCode/SpikePluginHelpers.fs"/>
+    <Compile Include="OpenCode/PluginHostInterop.fs"/>
     <Compile Include="OpenCode/SpikePlugin.fs"/>
     <Compile Include="OpenCode/Plugin.fs"/>
   </ItemGroup>

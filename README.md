@@ -2,7 +2,7 @@
 
 OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
 
-**当前版本：`0.4.0`（私有最终版）** — 见 [`docs/RELEASE-0.4.0.md`](docs/RELEASE-0.4.0.md)、[`docs/evidence/0.4.0/`](docs/evidence/0.4.0/)。包保持 `private: true`，按 `LICENSE` 仅限书面商业协议分发。
+**当前版本：`0.5.0`（OpenCode Agent DSL）** — 唯一产品语义见 [`next/Doc/SSOT.md`](next/Doc/SSOT.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
 
 产品语义：[`next/Doc/SSOT.md`](next/Doc/SSOT.md)。工程执行状态与纠偏顺序：[`AGENTS.md`](AGENTS.md)。
 
@@ -16,11 +16,11 @@ OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧�
 npm run build
 npm run test:manager-tools
 node testkit/opencode/tests/gate-testkit.mjs
-npm run test:e2e:p0
+npm run test:e2e:p0:three
 npm run test:e2e:p0:parallel
 ```
 
-TestKit 以 scenario/session/role/turn/request-kind lane 匹配真实 OpenCode session/parent headers；每个实际产生的 title、zero-width continuation、Blogger、Reviewer 请求均须显式 expectation。Manager→Coder→Join 使用 child、write、terminal、join、terminal 的真实 Host barrier；Companion 成功回合原子持久完整 B 与 projection，replacement restart canary 验证 B 恢复与 raw tail。`HostEventRouter` 用 terminal 前的 text/tool part 还原 assistant，并在未确认的 Manager terminal 以 listener-before-send 发送 durable ReviewGuard；Reviewer 无 verdict 同样 nudge，abort terminal 不发送 guard 或 continuation。P0 保持并行，最多重复 3 次；每个场景使用 2 秒 causal-progress Watchdog（仅接受阻塞 expectation 消费、显式 session/restart/barrier；background Blogger 与普通 SSE/HTTP 不延长它）。500 provider retry 会写入 durable failure fact，且 restart canary 验证其累计；上述不构成 release 资格，也不证明 Fallback A/A/B/B、PTY fork surface 或 Orchestrator Git 发布。
+TestKit 以 provider-visible 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容。Manager→Coder→Join 使用真实 child、terminal、join barrier；Companion 成功回合原子持久 B 与 projection，replacement restart canary 验证 FrozenB 与 raw tail。Host 事件只唤醒 reconcile，`session.status=retry` 是唯一 durable cursor 推进入口。P0 保持并行，最多重复 3 次；每个场景使用 2 秒 causal-progress Watchdog。
 
 ## 角色模型
 
@@ -46,10 +46,11 @@ Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git �
 1. Busy existing agent 的 `fork` 是同 child fire-and-forget nudge；不得创建 prompt queue。
 2. completion 先写 mailbox；`join()` 消费任意可用 completion。
 3. 进程只有一个 `3 × estimated_running_secs` deadline；进程资源只由拥有者清理。
-4. Review 必须同 Git tree 的连续两次 `PERFECT`。
-5. Fallback 是每 session 累计 A/A/B/B/Dead；Transport 不得归因。
-6. Git tree 读取失败必须 fail closed。
-7. 真实 PTY 未接入前，不得把 shell command 宣称为 PTY。
+4. Review 必须由同一 Git tree 的两个不同 ProviderRunIdentity / ToolCallId `PERFECT` witness 确认。
+5. Fallback 属于 Logical Run，按 SelectedAgent/PeerAgent 永久 A/A/B/B 循环；成功不重置，第四次后不判死，只有 typed `session.status=retry` 推进。
+6. 插件 Prompt 必须经 PromptDispatcher；发送时 `Model=None`，未知来源 fail-closed。
+7. Git tree 读取失败必须 fail closed。
+8. PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成。
 
 ## 构建与测试
 
@@ -59,7 +60,7 @@ npm run test:compile
 npm run test:next
 npm run test:manager-tools
 node testkit/opencode/tests/gate-testkit.mjs
-npm run test:e2e:p0
+npm run test:e2e:p0:three
 ```
 
 先运行当前改动的最小目标测试；只有该阶段的契约已证明后才运行更广的套件。TestKit 每个 scenario 必须独占 workspace、HOME/XDG、Provider、端口、Journal、spool、进程组、diagnostics 和 expectation store。

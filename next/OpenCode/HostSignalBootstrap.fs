@@ -115,27 +115,28 @@ module HostSignalBootstrap =
                             return true
             }
 
-        let providerErrors =
-            ProviderErrorFallback(
+        let providerContinuation =
+            ProviderFailureContinuation(
                 sessionPort,
                 journal,
                 scope.FallbackFailures,
-                reconciler.RootBindings,
                 ensureAuthorityFromSnapshot,
                 continuationAccepted
             )
 
         let onSignal (signal: HostSignal) =
             match signal with
+            | ProviderFailure failure ->
+                providerContinuation.Observe failure
+                providerContinuation.OnIdle failure.SessionId
             | ProviderRetry retry ->
                 // Provider retry is the only durable fallback writer.
                 RetrySignalHandler.handle journal scope.FallbackFailures reconciler.RootBindings retry
-            | ProviderError error -> providerErrors.Observe error
             | SessionIdle sessionId ->
                 reconciler.Signal(signal)
-                providerErrors.OnIdle sessionId
+                providerContinuation.OnIdle sessionId
             | SessionDeleted sessionId ->
-                providerErrors.Remove sessionId
+                providerContinuation.Remove sessionId
                 scope.DisposeSession(SessionId.value sessionId)
                 reconciler.Signal(signal)
 
@@ -171,7 +172,7 @@ module HostSignalBootstrap =
                     |> Option.bind (fun profile ->
                         profile.CanonicalRole
                         |> PromptAuthority.roleLabel
-                        |> AgentRoleHelpers.roleOfString)
+                        |> AgentRoleIdentity.roleOfString)
 
                 reconciler.BindUserMessage(sid, mid, ?agentRole = agentRole)
                 scope.AbortedSessions.Remove sessionId |> ignore

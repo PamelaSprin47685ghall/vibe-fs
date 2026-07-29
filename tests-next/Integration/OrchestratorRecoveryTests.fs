@@ -38,7 +38,7 @@ module OrchestratorRecoveryTests =
             let rebaseCalls = ref 0
 
             let! verdict, recorded =
-                runRecovery facts (gitPort rebaseCalls "c1") (authority "c1" "target") managerId worktree "prompt"
+                _runRecovery facts (gitPort rebaseCalls "c1") (authority "c1" "target") managerId worktree "prompt"
 
             match verdict with
             | OrchestratorVerdict.Published _ -> ()
@@ -91,7 +91,7 @@ module OrchestratorRecoveryTests =
             let rebaseCalls = ref 0
 
             let! verdict, recorded =
-                runRecovery facts (gitPort rebaseCalls "c1") (authority "c1" "target") managerId worktree "prompt"
+                _runRecovery facts (gitPort rebaseCalls "c1") (authority "c1" "target") managerId worktree "prompt"
 
             match verdict with
             | OrchestratorVerdict.Published _ -> ()
@@ -126,7 +126,7 @@ module OrchestratorRecoveryTests =
                 // Real repo: candidate commit is a proper ancestor of the current
                 // target HEAD. Reconcile must prove containment via git and record
                 // the CANDIDATE sha — not the target HEAD that merely contains it.
-                let repoDir, candidate, targetHead = GitTestRepo.createTwoCommitRepo tempDir
+                let repoDir, candidate, targetHead = _GitTestRepo._createTwoCommitRepo tempDir
                 Assert.False((candidate = targetHead), "candidate and target HEAD must differ")
 
                 let runtimeId = RuntimeId.create "rt-reconcile"

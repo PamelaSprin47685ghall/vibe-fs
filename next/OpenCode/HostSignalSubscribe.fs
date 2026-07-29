@@ -18,36 +18,6 @@ module HostSignalSubscribe =
     [<Emit("console.info($0, $1)")>]
     let private logInfo (prefix: string) (message: string) : unit = jsNative
 
-    let private eventTypeOf (raw: obj) =
-        if isNull raw then
-            ""
-        elif not (isNull raw?``type``) then
-            unbox<string> raw?``type``
-        elif not (isNull raw?payload) && not (isNull raw?payload?``type``) then
-            unbox<string> raw?payload?``type``
-        else
-            ""
-
-    let private isSignalEvent (raw: obj) =
-        match eventTypeOf raw with
-        | "session.status"
-        | "session.error"
-        | "session.deleted" -> true
-        | _ -> false
-
-    let private unwrap (raw: obj) =
-        if isNull raw then
-            raw
-        elif not (isNull raw?payload) then
-            let payload = raw?payload
-
-            if not (isNull raw?directory) && isNull payload?directory then
-                payload?directory <- raw?directory
-
-            payload
-        else
-            raw
-
     let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<IDisposable, string> =
         let listen = events?listen
 
@@ -55,10 +25,7 @@ module HostSignalSubscribe =
             Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen unavailable"
         else
             try
-                let callback =
-                    box (fun rawEvent ->
-                        if isSignalEvent rawEvent then
-                            onSignalEvent (unwrap rawEvent))
+                let callback = box onSignalEvent
 
                 let subscription = listen?call (events, callback)
 
@@ -84,24 +51,12 @@ module HostSignalSubscribe =
                 try
                     let abortCtrl = newAbortController ()
 
-                    let onEvent =
-                        box (fun data ->
-                            let normalized = unwrap data
-
-                            if isSignalEvent normalized then
-                                onSignalEvent normalized)
+                    let onEvent = box onSignalEvent
 
                     let options =
                         createObj
                             [ "signal", abortCtrl?signal
-                              "onSseEvent",
-                              box (fun (evt: obj) ->
-                                  if not (isNull evt) then
-                                      let data = if isNull evt?data then evt else evt?data
-                                      let normalized = unwrap data
-
-                                      if isSignalEvent normalized then
-                                          onSignalEvent normalized) ]
+                              "onSseEvent", box onSignalEvent ]
 
                     emitJsExpr
                         (globalApi, options, onEvent, abortCtrl)
@@ -148,33 +103,13 @@ module HostSignalSubscribe =
 
         let client = if isNull input then null else input?client
 
-        // Host often emits non-retryable provider failures only on global SSE.
-        // Keep idle/retry/deleted single-sourced; allow session.error from global
-        // as a second, filtered subscription when local listen is primary.
-        let onlySessionError (raw: obj) =
-            if eventTypeOf (unwrap raw) = "session.error" then
-                onSignalEvent raw
-
         match listenTarget with
         | Some events ->
             match subscribeListen events onSignalEvent with
             | Error err -> Error err
             | Ok localSub ->
-                match subscribeGlobalEvent client onlySessionError with
-                | Ok globalSub ->
-                    logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen+global.session.error"
-
-                    let composite =
-                        { new IDisposable with
-                            member _.Dispose() =
-                                localSub.Dispose()
-                                globalSub.Dispose() }
-
-                    Ok(Some composite, "events.listen+global.session.error")
-                | Error _ ->
-                    // Global optional: local alone still satisfies idle/retry/deleted.
-                    logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
-                    Ok(Some localSub, "events.listen")
+                logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                Ok(Some localSub, "events.listen")
         | None ->
             match subscribeGlobalEvent client onSignalEvent with
             | Ok sub ->

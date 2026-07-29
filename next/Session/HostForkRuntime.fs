@@ -10,7 +10,7 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
-open Wanxiangshu.Next.Session.AgentRoleHelpers
+open Wanxiangshu.Next.Session.AgentRoleIdentity
 
 /// Bridges real child sessions to the existing completion mailbox.
 /// Fork / Reuse / Pty operations live in extension files (semantic split).

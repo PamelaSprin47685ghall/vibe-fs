@@ -48,7 +48,7 @@ module HostSignalAdapterTests =
         Assert.True(HostSignalAdapter.tryAdapt owned abortErr |> Option.isNone)
 
     [<Fact>]
-    let ``Non_retryable_session_error_is_provider_error_signal`` () =
+    let ``Provider_failure_is_a_non_durable_wakeup`` () =
         let err =
             createObj
                 [ "type", box "session.error"
@@ -71,43 +71,9 @@ module HostSignalAdapterTests =
                   ) ]
 
         match HostSignalAdapter.tryAdapt owned err with
-        | Some(ProviderError signal) ->
-            Assert.equal ("s1", SessionId.value signal.SessionId)
-            Assert.equal ("bad request", signal.Reason)
-            Assert.equal (Some 400, signal.StatusCode)
-            Assert.equal (Some false, signal.IsRetryable)
-        | other -> Assert.True(false, sprintf "unexpected %A" other)
-
-    [<Fact>]
-    let ``Devin_stream_error_without_statusCode_is_provider_error_signal`` () =
-        let err =
-            createObj
-                [ "type", box "session.error"
-                  "properties",
-                  box (
-                      createObj
-                          [ "sessionID", box "s1"
-                            "error",
-                            box (
-                                createObj
-                                    [ "name", box "APIError"
-                                      "message",
-                                      box
-                                          "Devin stream error invalid_argument: an internal error occurred (trace ID: 85c5a621ac1dcff4667eb684fa3e95b1)" ]
-                            ) ]
-                  ) ]
-
-        match HostSignalAdapter.tryAdapt owned err with
-        | Some(ProviderError signal) ->
-            Assert.equal ("s1", SessionId.value signal.SessionId)
-
-            Assert.equal (
-                "Devin stream error invalid_argument: an internal error occurred (trace ID: 85c5a621ac1dcff4667eb684fa3e95b1)",
-                signal.Reason
-            )
-
-            Assert.equal (None, signal.StatusCode)
-            Assert.equal (None, signal.IsRetryable)
+        | Some(ProviderFailure failure) ->
+            Assert.Equal("s1", SessionId.value failure.SessionId)
+            Assert.Equal("bad request", failure.Reason)
         | other -> Assert.True(false, sprintf "unexpected %A" other)
 
     [<Fact>]

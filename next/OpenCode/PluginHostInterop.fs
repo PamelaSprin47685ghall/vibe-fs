@@ -16,7 +16,7 @@ type SpikePluginConfig =
     { Directory: string
       Port: IOpenCodePort option }
 
-module SpikePluginHelpers =
+module PluginHostInterop =
 
     [<Emit("import('@opencode-ai/plugin/tool')")>]
     let importToolModule () : Task<obj> = jsNative
@@ -32,7 +32,6 @@ module SpikePluginHelpers =
         (budgetStore: CompanionBudgetStore)
         : obj =
         let remember = fun sessionId budget -> budgetStore.Remember(sessionId, budget)
-
         emitJsExpr
             (sessionBudgets, sessionOutputLimits, remember)
             """
@@ -41,10 +40,6 @@ module SpikePluginHelpers =
               const lim = input.model.limit;
               if (lim.context > 0) {
                 $0.set(input.sessionID, lim.context);
-                // Y self-rebase budget is the smaller of the observed model
-                // context and WANXIANGSHU_BLOGGER_CONTEXT_LIMIT. Also seed from
-                // the primary's own system transform so we do not depend on the
-                // host populating blogger parentID on every child request.
                 const override = Number(process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || 0);
                 const budget = override > 0 ? Math.min(lim.context, override) : lim.context;
                 if (input.agent === 'blogger' || input.agent === 'fast-blogger' || input.agent === 'deep-blogger') {
@@ -59,17 +54,14 @@ module SpikePluginHelpers =
         """
 
     let projectionSessionIdFromMessages (output: obj) =
-        if isNull output || isNull output?messages then
-            None
+        if isNull output || isNull output?messages then None
         else
             let messages = unbox<obj array> output?messages
-
             messages
             |> Array.tryPick (fun msg ->
                 if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
                     Some(unbox<string> msg?info?sessionID)
-                else
-                    None)
+                else None)
 
     let toolHooks
         (toolModule: obj)
@@ -85,17 +77,7 @@ module SpikePluginHelpers =
         (cancelSignals: (SessionId seq -> unit) option)
         : ToolRegistration =
         ToolRegistry.create
-            toolModule
-            sessionPort
-            journal
-            gitTreePort
-            workspaceDirectory
-            scope.SessionParents
-            scope.SessionRoles
-            currentPhysicalUserMessage
-            scope.VerdictSessions
-            scope.SessionDirectories
-            onRunStarted
-            backgroundBFor
-            snapshot
-            cancelSignals
+            toolModule sessionPort journal gitTreePort workspaceDirectory
+            scope.SessionParents scope.SessionRoles currentPhysicalUserMessage
+            scope.VerdictSessions scope.SessionDirectories onRunStarted
+            backgroundBFor snapshot cancelSignals

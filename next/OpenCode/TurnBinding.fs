@@ -14,7 +14,7 @@ open Wanxiangshu.Next.Kernel
 module TurnBinding =
 
     let private canonicalRoleOf (role: Role) : AgentRole option =
-        Wanxiangshu.Next.Session.AgentRoleHelpers.roleOfString (PromptAuthority.roleLabel role)
+        Wanxiangshu.Next.Session.AgentRoleIdentity.roleOfString (PromptAuthority.roleLabel role)
 
     /// Build an ActiveRunBinding from the journal PromptAuthority projection.
     /// Directory is not a journal fact; it must be supplied by the host when the

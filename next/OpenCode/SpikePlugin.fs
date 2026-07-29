@@ -10,7 +10,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
-open SpikePluginHelpers
+open PluginHostInterop
 
 module SpikePlugin =
 
@@ -52,7 +52,7 @@ module SpikePlugin =
 
                 let bindRunStarted =
                     box (fun (sessionId: string) (role: string) (directory: string) ->
-                        match AgentRoleHelpers.roleOfString role with
+                        match AgentRoleIdentity.roleOfString role with
                         | None -> ()
                         | Some agentRole ->
                             wired.BindActiveRun

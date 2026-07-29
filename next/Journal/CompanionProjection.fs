@@ -33,7 +33,7 @@ module CompanionProjection =
     let checkpoint content current =
         { defaultArg current empty with LatestB = Some content }
 
-    let advance projection content current =
+    let recordBlogAdvance projection content current =
         { defaultArg current empty with
             LastSuccessfulProjection = Some projection
             LatestB = Some content }

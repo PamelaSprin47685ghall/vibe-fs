@@ -6,6 +6,7 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Review
 
 module HostReviewGuard =
 
@@ -172,7 +173,7 @@ module HostReviewGuard =
     /// First PERFECT on this tree is recorded but not yet confirmed (KISS-N07).
     /// This is the ONLY code path that installs confirm-perfect GuardKey; the
     /// accepted confirmation Host message id becomes ConfirmationPhysicalMessageId.
-    let confirmPerfect
+    let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
@@ -180,6 +181,7 @@ module HostReviewGuard =
         messageId
         (onContinuationAccepted: SessionId -> MessageId -> unit)
         =
+        let _barrierFlow = ReviewProgram.confirmPerfect messageId
         sendGuardNudge
             sessionPort
             journal

@@ -3,8 +3,6 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -251,11 +249,7 @@ module PromptDispatcher =
             (logicalRunId: string)
             (authorityRootUserMessageId: string)
             =
-            createObj
-                [ "wanxiangshu_prompt_key", box (PromptKeyRef.value key)
-                  "wanxiangshu_origin", box origin
-                  "wanxiangshu_logical_run", box logicalRunId
-                  "wanxiangshu_authority_root", box authorityRootUserMessageId ]
+            PromptMetadataCodec.create key origin logicalRunId authorityRootUserMessageId
 
         member internal this.SubscribeNoOp (port: ISessionHostPort) (sessionId: SessionId) =
             port.SubscribeTerminal(sessionId, (fun _ _ -> ()))

@@ -9,8 +9,8 @@ open Wanxiangshu.Next.Kernel.Identity
 /// Outputs typed `HostSignal` for the coarse signals:
 ///   - session.status idle
 ///   - session.status retry
-///   - session.error
 ///   - session.deleted
+///   - session.error as a non-durable failure wakeup
 /// All other raw payloads return None.
 module HostEventCodec =
 
@@ -26,6 +26,8 @@ module HostEventCodec =
                 payload?directory <- rawInput?directory
 
             payload
+        elif not (isNull rawInput?data) && not (isNull rawInput?data?``type``) then
+            rawInput?data
         else
             rawInput
 
@@ -64,20 +66,11 @@ module HostEventCodec =
         else
             None
 
-    let isAbortedError (errorObj: obj) : bool =
-        if isNull errorObj then
-            false
-        else
-            let name = errorObj?name
-
-            not (isNull name)
-            && (unbox<string> name = "MessageAbortedError" || unbox<string> name = "AbortError")
-
     let isHostSignalEvent (raw: obj) : bool =
         match eventTypeOf raw with
         | "session.status"
-        | "session.error"
-        | "session.deleted" -> true
+        | "session.deleted"
+        | "session.error" -> true
         | _ -> false
 
     let private retrySignal (sessionId: SessionId) (raw: obj) : RetrySignal option =
@@ -109,55 +102,6 @@ module HostEventCodec =
                   Reason = reason
                   MessageId = tryReadMessageId raw }
 
-    let private providerErrorSignal (sessionId: SessionId) (raw: obj) : ProviderErrorSignal option =
-        let properties = if isNull raw then null else raw?properties
-        let error = if isNull properties then null else properties?error
-
-        if isNull error || isAbortedError error then
-            None
-        else
-            let data = if isNull error?data then null else error?data
-
-            let statusCode =
-                if isNull data || isNull data?statusCode then
-                    None
-                else
-                    Some(unbox<int> data?statusCode)
-
-            let isRetryable =
-                if isNull data || isNull data?isRetryable then
-                    None
-                else
-                    Some(unbox<bool> data?isRetryable)
-
-            let accepted =
-                match isRetryable with
-                | Some true -> false
-                | Some false -> true
-                | None ->
-                    match statusCode with
-                    | Some code when code > 0 && code < 500 -> true
-                    | None -> true
-                    | _ -> false
-
-            if not accepted then
-                None
-            else
-                let reason =
-                    if not (isNull data) && not (isNull data?message) then
-                        unbox<string> data?message
-                    elif not (isNull error?message) then
-                        unbox<string> error?message
-                    else
-                        "provider error"
-
-                Some
-                    { SessionId = sessionId
-                      Reason = reason
-                      StatusCode = statusCode
-                      IsRetryable = isRetryable
-                      MessageId = tryReadMessageId raw }
-
     let tryDecode (rawInput: obj) : HostSignal option =
         let raw = unwrap rawInput
 
@@ -179,12 +123,23 @@ module HostEventCodec =
                         | "idle" -> Some(SessionIdle sessionId)
                         | "retry" -> retrySignal sessionId raw |> Option.map ProviderRetry
                         | _ -> None
-            | "session.error" ->
-                match tryReadSessionId raw with
-                | None -> None
-                | Some sessionId -> providerErrorSignal sessionId raw |> Option.map ProviderError
             | "session.deleted" ->
                 match tryReadSessionId raw with
                 | Some sessionId -> Some(SessionDeleted sessionId)
+                | _ -> None
+            | "session.error" ->
+                match tryReadSessionId raw with
+                | Some sessionId ->
+                    let properties = raw?properties
+                    let error = if isNull properties then null else properties?error
+                    let name = if isNull error || isNull error?name then "" else unbox<string> error?name
+                    if name = "MessageAbortedError" || name = "AbortError" then
+                        None
+                    else
+                        let reason =
+                            if not (isNull error) && not (isNull error?message) then unbox<string> error?message
+                            elif not (isNull error) && not (isNull error?data) && not (isNull error?data?message) then unbox<string> error?data?message
+                            else "provider failure"
+                        Some(ProviderFailure { SessionId = sessionId; Reason = reason; MessageId = tryReadMessageId raw })
                 | _ -> None
             | _ -> None

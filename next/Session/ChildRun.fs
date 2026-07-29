@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Agent
 
 /// Single-assignment completion cell — the one place a child run's final
 /// result is written.  The first successful TrySet wins; subsequent calls are
@@ -11,6 +12,7 @@ open Wanxiangshu.Next.Kernel
 type CompletionCell<'a>() =
     let tcs = TaskCompletionSource<'a>(TaskCreationOptions.RunContinuationsAsynchronously)
     let mutable completed = false
+    let mutable stored: 'a option = None
     let gate = obj ()
 
     member _.TrySet(value: 'a) : bool =
@@ -18,6 +20,9 @@ type CompletionCell<'a>() =
             if completed then
                 false
             else
+                // Fable's Task.Result is not a reliable completed-value API.
+                // Keep the single physical completion value beside its signal.
+                stored <- Some value
                 completed <- true
                 tcs.SetResult(value)
                 true)
@@ -27,8 +32,7 @@ type CompletionCell<'a>() =
     member _.IsCompleted: bool =
         lock gate (fun () -> completed)
 
-    member _.StoredValue: 'a option =
-        lock gate (fun () -> if completed then Some(tcs.Task.Result) else None)
+    member _.StoredValue: 'a option = lock gate (fun () -> stored)
 
 module CompletionCell =
     let create<'a> () : CompletionCell<'a> = CompletionCell<'a>()
@@ -173,6 +177,24 @@ module ChildRunProgram =
         (work: CancellationToken -> Task<AgentCompletionOutcome>)
         : AgentFlow<RunCompletion> =
         agent {
-            let! outcome = fromTask work
-            return ChildRun.makeCompleted run outcome
+            // Validate the managed identity through the canonical AgentProgram
+            // before executing the physical child work.
+            let! identityOk =
+                Flow.lift (fun _ _ ->
+                    task {
+                        let! result =
+                            AgentProgram.runAgentFlow
+                                { SessionId = run.AgentId
+                                  AgentName = run.AgentName }
+                                CancellationToken.None
+                                (AgentProgram.validateSession run.AgentName)
+
+                        return result |> Result.defaultValue false
+                    })
+
+            if not identityOk then
+                return! Flow.fail (AgentError.InvalidFork "Child run identity does not match managed agent")
+            else
+                let! outcome = fromTask work
+                return ChildRun.makeCompleted run outcome
         }

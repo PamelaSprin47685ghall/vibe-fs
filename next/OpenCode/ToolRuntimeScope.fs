@@ -100,8 +100,8 @@ type ToolRuntimeScope
         match PromptAuthority.tryParseRole name with
         | Some role -> Some role
         | None ->
-            AgentRoleHelpers.roleOfString name
-            |> Option.map AgentRoleHelpers.toRole
+            AgentRoleIdentity.roleOfString name
+            |> Option.map AgentRoleIdentity.toRole
 
     member _.Sessions = sessions
     member _.Journal = journal

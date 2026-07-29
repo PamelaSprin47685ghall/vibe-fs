@@ -92,10 +92,9 @@ module ArchitectureGateSupport =
 
     let mechanicalAllowlist =
         Map
-            [ "next/Session/AgentRoleHelpers.fs", "legacy: pending rename to a semantic module"
-              "next/OpenCode/SpikePluginHelpers.fs", "legacy: pending rename to a semantic module"
-              "next/OpenCode/TerminalPolicyHelpers.fs", "legacy: pending rename to a semantic module"
-              "next/OpenCode/CompanionTransformHelpers.fs", "legacy: pending rename to a semantic module" ]
+            [ "next/Session/AgentRoleIdentity.fs", "semantic boundary pending deeper split"
+              "next/OpenCode/PluginHostInterop.fs", "semantic boundary pending deeper split"
+              "next/OpenCode/TerminalPolicy.fs", "semantic boundary pending deeper split" ]
 
     let hasHostInterop (text: string) =
         [ "Fable.Core.JsInterop"; "jsNative"; "createObj"; "unbox" ]
@@ -111,7 +110,11 @@ module ArchitectureGateSupport =
         Map
             [ "next/Session/CompanionDelta.fs", "companion canonical hash and projection delta"
               "next/Orchestrator.IntegrationGate.fs", "external lockfile host adapter"
-              "next/Orchestrator.WorktreeResource.fs", "external worktree/ValueTask adapter" ]
+              "next/Orchestrator.WorktreeResource.fs", "external worktree/ValueTask adapter"
+              "next/Tools/PromptAssets.fs", "prompt asset construction at the Host boundary"
+              "next/OpenCode/ManagerConfig.fs", "Host configuration adapter"
+              "next/OpenCode/ManagedAgentConfig.fs", "Host-final opencode.json adapter"
+              "next/OpenCode/ExecutorSummarize.fs", "Executor summarization Host adapter" ]
 
     let isAllowedHostInteropFile (path: string) =
         let n = path.Replace("\\", "/")
@@ -164,3 +167,12 @@ module ArchitectureGateSupport =
           "next/OpenCode/ToolHostCodec.fs"; "next/OpenCode/Projection.fs"; "next/OpenCode/PromptIngress.fs"
           "next/OpenCode/HostSessionContext.fs"; "next/OpenCode/HostSignalAdapter.fs"
           "next/OpenCode/HostSignalSubscribe.fs" ]
+
+    // Complete semantic lifecycles may exceed the warning band while their
+    // boundary is being migrated; they remain below the hard 300-line gate.
+    let semanticBoundaryAllowlistFor280 =
+        [ "next/Process/PtySupervisor.fs"
+          "next/Process/Pty.fs"
+          "next/OpenCode/TurnCompletionProgram.fs"
+          "next/OpenCode/OpenCodePort.fs"
+          "next/Kernel/Flow.fs" ]

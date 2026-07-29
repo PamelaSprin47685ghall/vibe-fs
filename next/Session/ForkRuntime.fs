@@ -1,7 +1,10 @@
 namespace Wanxiangshu.Next.Session
 
 open System
+open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Next.Agent
+open Wanxiangshu.Next.Kernel
 
 /// Runtime for managing child agent runs and PTY sessions.
 ///
@@ -53,7 +56,7 @@ type ForkRuntime
 
         let runTask () =
             task {
-                let! outcome =
+                let work (ct: CancellationToken) =
                     task {
                         try
                             match workOpt with
@@ -63,15 +66,24 @@ type ForkRuntime
                             return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
 
-                let outcome = AgentCompletion.withRunIdentity agentId runId role outcome
+                let flow = ChildRunProgram.run childRun work
 
-                let completion: RunCompletion =
-                    { RunId = runId
-                      AgentId = agentId
-                      AgentName = agentName
-                      Role = role
-                      Outcome = outcome
-                      CompletedAt = DateTimeOffset.UtcNow }
+                let! result =
+                    AgentProgram.runAgentFlow
+                        { SessionId = agentId
+                          AgentName = agentName }
+                        childRun.Cancellation.Token
+                        flow
+
+                let completion =
+                    match result with
+                    | Ok value -> value
+                    | Error error ->
+                        match error with
+                        | AgentError.ParentCancelled -> ChildRun.makeAborted childRun "parent cancelled"
+                        | AgentError.InvalidFork message
+                        | AgentError.HostFailure message
+                        | AgentError.SessionDead message -> ChildRun.makeFailed childRun message
 
                 // Set the single-assignment completion cell exactly once.
                 childRun.Completion.TrySet(completion) |> ignore
@@ -107,7 +119,7 @@ type ForkRuntime
         let agentName =
             match agent with
             | Some name when not (String.IsNullOrWhiteSpace name) -> name.Trim()
-            | _ -> AgentRoleHelpers.defaultFastManagedName role
+            | _ -> AgentRoleIdentity.defaultFastManagedName role
 
         lock lockObj (fun () ->
             if mailbox.IsCancelled then
@@ -179,7 +191,7 @@ type ForkRuntime
         let agentName =
             match agent with
             | Some name when not (String.IsNullOrWhiteSpace name) -> name.Trim()
-            | _ -> AgentRoleHelpers.defaultFastManagedName role
+            | _ -> AgentRoleIdentity.defaultFastManagedName role
 
         lock lockObj (fun () ->
             if not (Map.containsKey agentId agents) then

@@ -41,7 +41,7 @@ module HostForkBusyNudge =
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
                     let cursor = DurableFallback.currentState childId snapshot
-                    let effectiveAgent = PromptAuthority.effectiveAgentAt profile cursor.Offset
+                    let resolveBusyAgent = PromptAuthority.effectiveAgentAt profile cursor.Offset
                     let rt = PromptDispatcher.forJournal j
 
                     let! sent =
@@ -51,7 +51,7 @@ module HostForkBusyNudge =
                             prompt
                             PromptAuthority.ContinuationKind.BusyAgentNudge
                             profile
-                            effectiveAgent
+                            resolveBusyAgent
                             directory
                             None
 

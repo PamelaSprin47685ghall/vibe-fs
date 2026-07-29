@@ -61,7 +61,7 @@ module Fold =
                 p.SessionId
                 (fun session ->
                     { session with
-                        Companion = Some(CompanionProjection.advance p.Projection p.Content session.Companion) })
+                        Companion = Some(CompanionProjection.recordBlogAdvance p.Projection p.Content session.Companion) })
                 projection
         | AgentFact.CompanionEpochSwitched p ->
             AgentProjection.update

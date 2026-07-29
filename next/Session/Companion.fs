@@ -33,8 +33,10 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         |> Option.map (fun m -> m.PrefixReplacementEnabled || m.ActivePrefixEpoch.IsSome)
         |> Option.defaultValue false
 
+    // Fable Tasks do not expose IsCompleted; this bit belongs to the
+    // single in-flight completion cell and is not a second blogger state.
     let mutable inFlightTask: Task<unit> option = None
-    let mutable inFlightCompleted: bool = true
+    let mutable inFlightCompleted = true
 
     let persistSuccessful (projection: ProjectionSnapshot) (content: BlogText) =
         match durable, sessionId with

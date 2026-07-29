@@ -80,8 +80,8 @@ type PtyPort
                     | Ok text -> AgentCompletion.ofSimpleText agentId id.Value role text
                     | Error err -> AgentCompletion.ofSimpleError agentId id.Value role err
 
-                // AgentName derived from role without AgentRoleHelpers dependency
-                // (Pty.fs is compiled before AgentRoleHelpers.fs).
+                // AgentName derived directly from role; PTY is compiled before the
+                // managed-role identity adapter.
                 let agentName =
                     sprintf
                         "fast-%s"

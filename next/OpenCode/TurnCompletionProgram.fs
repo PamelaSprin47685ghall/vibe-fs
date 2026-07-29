@@ -40,6 +40,31 @@ module TurnCompletionProgram =
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
             |> ignore
 
+    let private continueAfterProviderFailure
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (continuationAccepted: SessionId -> MessageId -> unit)
+        (turn: ReconciledTurn)
+        (error: string)
+        =
+        task {
+            let! continuation =
+                HostSessionNudge.sendContinuationResult
+                    sessionPort
+                    turn.SessionId
+                    "Continue after provider failure."
+                    PromptAuthority.ProviderRetryAttempt
+                    (repairDirectory turn)
+                    journal
+                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+
+            match continuation with
+            | Ok _ -> ()
+            | Error _ -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+        }
+        |> ignore
+
     /// Apply the full terminal completion program for a reconciled turn.
     let applyWithContinuation
         (sessionPort: ISessionHostPort)
@@ -61,14 +86,14 @@ module TurnCompletionProgram =
 
         match turn.AgentRole with
         | Some agent when
-            TerminalPolicyHelpers.isLinkedChild journal sessionKey
+            TerminalPolicy.isLinkedChild journal sessionKey
             || sessionParents.ContainsKey sessionKey
             ->
             HostSessionNudge.ensureAgentOwnerAuthority
                 journal
                 turn.SessionId
                 turn.RootUserMessageId
-                (AgentRoleHelpers.defaultFastManagedName agent)
+                (AgentRoleIdentity.defaultFastManagedName agent)
         | _ -> ()
 
         match turn.Outcome with
@@ -116,10 +141,17 @@ module TurnCompletionProgram =
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
             |> ignore
         | TurnFailed error ->
-            // Provider/transport failures that produced an assistant terminal are
-            // surfaced as a failed completion; only the provider retry status signal may
-            // advance the durable fallback cursor.
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+            // A settled failed turn continues the same Logical Run. The next
+            // typed provider-retry signal, if emitted by the Host, is the only
+            // durable fallback cursor advance; this continuation itself cannot
+            // reset or mutate its A/A/B/B attempt profile.
+            continueAfterProviderFailure
+                sessionPort
+                eventPort
+                journal
+                continuationAccepted
+                turn
+                error
         | TurnCompleted ->
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
@@ -185,7 +217,7 @@ module TurnCompletionProgram =
 
             if wasAborted then
                 ()
-            elif not (TerminalPolicyHelpers.sessionDead journal turn.SessionId) then
+            elif not (TerminalPolicy.sessionDead journal turn.SessionId) then
                 match turn.AgentRole with
                 // A first PERFECT must always enter its causal confirmation
                 // round-trip before the generic "missing verdict" branch.
@@ -194,7 +226,7 @@ module TurnCompletionProgram =
                 | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey ->
                     verdictSessions.Remove sessionKey |> ignore
 
-                    HostReviewGuard.confirmPerfect
+                    HostReviewGuard.requestPerfectConfirmation
                         sessionPort
                         journal
                         nudgeSent
@@ -212,7 +244,7 @@ module TurnCompletionProgram =
                         sessionKey
                         (MessageId.value turn.AssistantMessageId)
                         continuationAccepted
-                | Some AgentRole.Manager when TerminalPolicyHelpers.isTopLevelManager sessionParents journal sessionKey ->
+                | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
                     match HostReviewGuard.missingTree journal gitTreePort sessionKey with
                     | HostReviewGuard.ReviewGuardMissing treeHash ->
                         HostReviewGuard.nudgeManager

@@ -1,8 +1,5 @@
 namespace Wanxiangshu.Next.OpenCode
 
-open System
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -85,10 +82,4 @@ module PromptAuthority =
         let peer = ManagedAgent.peer selected
         Wanxiangshu.Next.Domain.PromptAuthority.effectiveAgentFromManaged selected.Name peer.Name cursor
 
-    [<Import("createHash", "node:crypto")>]
-    let private createHashImport: string -> obj = jsNative
-
-    let sha256Hex (input: string) : string =
-        let hash = createHashImport "sha256"
-        hash?update (box input) |> ignore
-        unbox<string> (hash?digest (box "hex"))
+    let sha256Hex = HostPromptHash.sha256

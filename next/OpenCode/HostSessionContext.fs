@@ -14,7 +14,7 @@ module HostSessionContext =
         if isNull agent || String.IsNullOrWhiteSpace agent then
             None
         else
-            AgentRoleHelpers.roleOfString agent
+            AgentRoleIdentity.roleOfString agent
 
     let canonicalRole (agent: string) =
         roleOf agent |> Option.map (fun role -> role.ToString().ToLowerInvariant())

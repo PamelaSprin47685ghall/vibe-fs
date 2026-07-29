@@ -6,7 +6,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
-open Wanxiangshu.Next.Session.AgentRoleHelpers
+open Wanxiangshu.Next.Session.AgentRoleIdentity
 
 /// Restart recovery for linked children: rebuild unjoined completions from
 /// transcript when possible; otherwise mark Interrupted instead of faking Busy.
@@ -119,12 +119,12 @@ module HostForkRestart =
                 let managedName =
                     linkage.LinkedRoles |> Map.tryFind childId |> Option.defaultValue ""
 
-                let role = AgentRoleHelpers.roleOfString managedName
+                let role = AgentRoleIdentity.roleOfString managedName
 
                 match role with
                 | Some role ->
                     let childSessionId = SessionId.create (ChildId.value childId)
-                    let agent = AgentRoleHelpers.defaultFastManagedName role
+                    let agent = AgentRoleIdentity.defaultFastManagedName role
                     children.[agentId] <- childSessionId
                     recovered.[agentId] <- (childSessionId, role, agent)
                     childCreatedDir agentId childSessionId (directoryOf agentId)

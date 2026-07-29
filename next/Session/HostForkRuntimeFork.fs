@@ -7,7 +7,7 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
-open Wanxiangshu.Next.Session.AgentRoleHelpers
+open Wanxiangshu.Next.Session.AgentRoleIdentity
 
 [<AutoOpen>]
 module HostForkRuntimeFork =

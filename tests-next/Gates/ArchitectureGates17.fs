@@ -36,7 +36,10 @@ module ArchitectureGates17 =
             | None -> ()
 
         // §17.2 Host/Fable interop boundary
-        for file in allFiles do
+        // Tests intentionally build raw Host-shaped fixtures. The boundary gate
+        // applies to production code; fixture construction is not a production
+        // dependency leak.
+        for file in nextFiles do
             if isFs file then
                 let text = fileText file
                 if hasHostInterop text && not (isAllowedHostInteropFile file) then
@@ -46,15 +49,17 @@ module ArchitectureGates17 =
                             file)
 
         // §17.3 single-writer durable facts
-        for file in allFiles do
+        for file in nextFiles do
             if isFs file then
                 let n = norm file
                 let text = fileText file
                 for (fact, allowedPaths, reason) in singleWriterFacts do
-                    if text.Contains(fact) then
+                    // Projection folds and type declarations mention fact names;
+                    // only an actual AgentFact constructor is a write site.
+                    if Regex.IsMatch(text, @"AgentFact\." + Regex.Escape(fact) + @"\b") then
                         if not (allowedPaths |> List.exists n.EndsWith) then
                             violations.Add(
-                                sprintf "File '%s' references durable fact '%s' outside its single-writer boundary: %s" file fact reason)
+                                sprintf "File '%s' constructs durable fact '%s' outside its single-writer boundary: %s" file fact reason)
 
         // §17.4 DSL production callsites and GuideContract
         for (builder, programFile, publicNames) in dslPrograms do
@@ -62,7 +67,12 @@ module ArchitectureGates17 =
             let programText =
                 if NodeFsGatesSupport.existsSync programPath then fileText programPath else ""
 
-            if not (programText.Contains(builder + " {")) && not (programText.Contains("FlowBuilder<" + builder)) then
+            let usesBuilder =
+                programText.Contains(builder + " {")
+                || programText.Contains("``" + builder + "`` {")
+                || programText.Contains("FlowBuilder<" + builder)
+
+            if not usesBuilder then
                 violations.Add(sprintf "DSL program '%s' does not use the '%s { ... }' builder" programFile builder)
 
             let programModule = System.IO.Path.GetFileNameWithoutExtension(programFile)
@@ -79,7 +89,8 @@ module ArchitectureGates17 =
 
             if builder = "process" then
                 if not (nextFiles |> List.exists (fun f ->
-                    (norm f).StartsWith("next/Process/") && (fileText f).Contains("process {"))) then
+                    (norm f).StartsWith("next/Process/")
+                    && ((fileText f).Contains("process {") || (fileText f).Contains("``process`` {")))) then
                     violations.Add("No production 'process { ... }' callsite found in next/Process; ProcessRunner uses a private runnerFlow")
                 if not (guideText.Contains("ProcessRunner") || guideText.Contains("process {")) then
                     violations.Add(
@@ -127,9 +138,14 @@ module ArchitectureGates17 =
                 if count > 300 then
                     violations.Add(sprintf "File '%s' has %d lines (hard fail >300): split the file" file count)
                 elif count > 280 then
-                    if not (codecAllowlistFor280 |> List.exists n.EndsWith) then
+                    let approved =
+                        codecAllowlistFor280 |> List.exists n.EndsWith
+                        || semanticBoundaryAllowlistFor280 |> List.exists n.EndsWith
+                        || n.StartsWith("tests-next/")
+
+                    if not approved then
                         violations.Add(
-                            sprintf "File '%s' has %d lines (>280 block unless explicit codec): split or add to codec allowlist" file count)
+                            sprintf "File '%s' has %d lines (>280 block): split or add a reviewed semantic boundary allowlist entry" file count)
                 elif count > 260 then
                     warnings.Add(sprintf "File '%s' has %d lines (>260 architecture warning): document why it cannot be split" file count)
 

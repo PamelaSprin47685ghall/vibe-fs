@@ -13,7 +13,7 @@ open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 module OrchestratorRecoveryFixtures =
-    module GitTestRepo =
+    module _GitTestRepo =
         [<Import("execFileSync", "node:child_process")>]
         let execFileSync (file: string, args: string[], opts: obj) : string = jsNative
 
@@ -26,7 +26,7 @@ module OrchestratorRecoveryFixtures =
         /// Creates a real git repo with two empty commits on branch `main`.
         /// Returns (firstCommitSha, secondCommitSha); the first is a proper ancestor
         /// of the second.
-        let createTwoCommitRepo (parentDir: string) : string * string * string =
+        let _createTwoCommitRepo (parentDir: string) : string * string * string =
             let dir = pathJoin (parentDir, "repo")
             mkdirSync (dir, {| recursive = true |})
 
@@ -43,7 +43,7 @@ module OrchestratorRecoveryFixtures =
             let targetHead = git [ "rev-parse"; "HEAD" ]
             (dir, candidate, targetHead)
 
-    let makePort (facts: AgentFact list) =
+    let _makePort (facts: AgentFact list) =
         let mutable projection = AgentProjection.empty
 
         for fact in facts do
@@ -95,9 +95,9 @@ module OrchestratorRecoveryFixtures =
           ReadHead = fun _ -> Task.FromResult(Ok reverifyHead)
           GetTargetHead = fun _ -> Task.FromResult(Ok reverifyHead) }
 
-    let runRecovery facts git authorityPort managerId worktree prompt =
+    let _runRecovery facts git authorityPort managerId worktree prompt =
         task {
-            let journal, recorded = makePort facts
+            let journal, recorded = _makePort facts
 
             let manager: ManagerPort =
                 { RunManager = fun _ _ _ -> Task.FromResult(Ok())

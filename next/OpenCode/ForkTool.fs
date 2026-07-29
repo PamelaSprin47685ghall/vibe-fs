@@ -85,7 +85,7 @@ module ForkTool =
                                 managed.Visibility = AgentVisibility.Public
                                 && List.contains managed.Name ManagedAgent.publicForkableNames
                                 ->
-                                let role = AgentRoleHelpers.ofManaged managed
+                                let role = AgentRoleIdentity.ofManaged managed
 
                                 match!
                                     runtime.Fork(
