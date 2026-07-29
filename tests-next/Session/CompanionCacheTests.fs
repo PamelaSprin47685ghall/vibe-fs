@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Xunit
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
@@ -14,6 +15,15 @@ open Wanxiangshu.Next.Tests.JournalTests.JournalTestSupport
 
 /// Provider-prefix cache gates for Companion epoch freeze.
 module CompanionCacheTests =
+    [<Emit("(() => { const calls = []; const original = console.error; console.error = (...args) => calls.push(args.map(String).join(' ')); return { calls, restore: () => { console.error = original; } }; })()")>]
+    let private captureConsoleError () : obj = jsNative
+
+    [<Emit("$0.restore()")>]
+    let private restoreConsoleError (capture: obj) : unit = jsNative
+
+    [<Emit("$0.calls")>]
+    let private capturedConsoleErrors (capture: obj) : string array = jsNative
+
     let private makeHost (nextText: string ref) (condenseText: string) =
         let mutable terminal: (SessionId -> TerminalOutcome -> unit) option = None
         let mutable output = [ "history" ]
@@ -174,6 +184,43 @@ module CompanionCacheTests =
             // Dynamic watermark growth must NOT delete u3..u6 while FrozenB is B1.
             Assert.True(List.contains "u3" ids || epoch.CutoffMessageIndex > 2)
             Assert.Equal("B1", headText t2)
+        }
+
+    /// Missing Authority is an expected fail-closed state for host-internal and
+    /// pre-authority transforms. It must neither create a Blogger nor write to
+    /// the user's terminal, even when legacy caches suggest an eligible role.
+    [<Fact>]
+    let ``Missing authority stays fail closed without terminal pollution`` () =
+        task {
+            let sid = "missing-authority"
+            let nextText = ref "unused"
+            let host = makeHost nextText "unused"
+            let companions = Dictionary<string, CompanionHost>()
+            let sessionRoles = Dictionary<string, string>()
+            sessionRoles.[sid] <- "manager"
+            let inObj = createObj [ "sessionID", box sid; "agent", box "fast-manager" ]
+            let outObj = createObj [ "messages", box [| msg sid "u1" "pending" |] ]
+            let capture = captureConsoleError ()
+
+            try
+                for _ in 1..3 do
+                    CompanionTransform.handleCompanionTransform
+                        companions
+                        (obj ())
+                        host
+                        None
+                        None
+                        (Dictionary<string, int>())
+                        (Dictionary<string, int>())
+                        sessionRoles
+                        None
+                        inObj
+                        outObj
+            finally
+                restoreConsoleError capture
+
+            Assert.Equal(0, companions.Count)
+            Assert.Empty(capturedConsoleErrors capture)
         }
 
     /// Dual-hook safety: second transform with b-head present is a no-op.

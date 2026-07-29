@@ -97,14 +97,9 @@ module CompanionTransform =
             | Some role -> sessionRoles.[sessionId] <- role
             | None ->
                 // No ActiveLogicalRun.Profile.Agent: fail closed for companion.
+                // This is expected for host-internal and pre-authority transforms;
                 // sessionRoles/message agent/transform input are not production sources.
                 ()
-
-            if agentRole.IsNone then
-                // Diagnostic only — do not create Blogger without Authority.
-                System.Console.Error.WriteLine(
-                    sprintf "[MissingAuthorityProfile] session=%s companion eligibility denied" sessionId
-                )
 
             if Companion.shouldCreateForAgent authorityAgent then
                 let companion =
