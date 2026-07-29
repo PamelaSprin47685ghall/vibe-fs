@@ -30,11 +30,18 @@ type ISessionOutputBoundaryPort =
     abstract GetSessionOutputWatermark: sessionId: SessionId -> int
     abstract GetSessionOutputSince: sessionId: SessionId * watermark: int -> string list
 
-type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEventObservationPort) =
+type InjectedSessionPort
+    (
+        underlyingPort: IOpenCodePort option,
+        eventPort: IEventObservationPort,
+        ?familyParent: SessionId -> SessionId option
+    ) =
     let activeListeners = HashSet<SessionId>()
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
+    let childParents = Dictionary<SessionId, SessionId>()
     let sessionOutputs = Dictionary<SessionId, List<string>>()
     let lockObj = obj ()
+    let restoredParent = defaultArg familyParent (fun _ -> None)
 
     let recordOutput (sId: SessionId) (text: string) =
         lock lockObj (fun () ->
@@ -43,21 +50,60 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
 
             sessionOutputs.[sId].Add(text))
 
-    let registerChild (pId: SessionId) (cId: SessionId) =
-        lock lockObj (fun () ->
-            if not (parentChildMap.ContainsKey(pId)) then
-                parentChildMap.[pId] <- HashSet<SessionId>()
+    let familyRoot (sessionId: SessionId) =
+        match lock lockObj (fun () -> childParents.TryGetValue sessionId) with
+        | true, rootId -> rootId
+        | false, _ ->
+            let rec findRoot current =
+                match restoredParent current with
+                | Some parentId when parentId <> current -> findRoot parentId
+                | _ -> current
 
-            parentChildMap.[pId].Add(cId) |> ignore)
+            findRoot sessionId
 
-    let getAndRemoveChildren (pId: SessionId) =
+    let registerChild (parentId: SessionId) (childId: SessionId) =
         lock lockObj (fun () ->
-            if parentChildMap.ContainsKey(pId) then
-                let children = parentChildMap.[pId] |> Seq.toList
-                parentChildMap.Remove(pId) |> ignore
+            let rootId =
+                match childParents.TryGetValue parentId with
+                | true, value -> value
+                | false, _ -> parentId
+
+            match childParents.TryGetValue childId with
+            | true, previousRoot when previousRoot <> rootId && parentChildMap.ContainsKey previousRoot ->
+                parentChildMap.[previousRoot].Remove childId |> ignore
+            | _ -> ()
+
+            if not (parentChildMap.ContainsKey rootId) then
+                parentChildMap.[rootId] <- HashSet<SessionId>()
+
+            parentChildMap.[rootId].Add childId |> ignore
+            childParents.[childId] <- rootId)
+
+    let getAndRemoveChildren (parentId: SessionId) =
+        lock lockObj (fun () ->
+            if parentChildMap.ContainsKey parentId then
+                let children = parentChildMap.[parentId] |> Seq.toList
+                parentChildMap.Remove parentId |> ignore
+
+                for childId in children do
+                    childParents.Remove childId |> ignore
+
                 children
             else
                 [])
+
+    let detachChild (childId: SessionId) =
+        lock lockObj (fun () ->
+            match childParents.TryGetValue childId with
+            | true, rootId ->
+                childParents.Remove childId |> ignore
+
+                if parentChildMap.ContainsKey rootId then
+                    parentChildMap.[rootId].Remove childId |> ignore
+
+                    if parentChildMap.[rootId].Count = 0 then
+                        parentChildMap.Remove rootId |> ignore
+            | false, _ -> ())
 
     let abortChildren (parentId: SessionId) =
         task {
@@ -141,6 +187,7 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
 
         member me.AbortSession(sessionId) =
             task {
+                detachChild sessionId
                 recordOutput sessionId "Aborted"
                 do! abortChildren sessionId
 
@@ -156,18 +203,20 @@ type InjectedSessionPort(underlyingPort: IOpenCodePort option, eventPort: IEvent
 
         member me.CreateChildSession(parentId, options) =
             task {
+                let rootId = familyRoot parentId
+
                 match underlyingPort with
                 | Some port ->
-                    let! res = port.CreateChildSession parentId options
+                    let! res = port.CreateChildSession rootId options
 
                     match res with
                     | Ok childId ->
-                        registerChild parentId childId
+                        registerChild rootId childId
                         return Ok childId
                     | Error err -> return Error err
                 | None ->
                     let childId = SessionId.create (Guid.NewGuid().ToString("N"))
-                    registerChild parentId childId
+                    registerChild rootId childId
                     return Ok childId
             }
 

@@ -93,56 +93,14 @@ module internal AgentFactsReview =
                                 else
                                     existing.RecentProviderRunIds
 
-                            let hasValidProviderRunId = not (String.IsNullOrWhiteSpace p.ProviderRunId)
-
-                            // chat.message can accept the physical ReviewConfirmation before the
-                            // asynchronous send callback records GuardPromptAccepted. Either durable
-                            // proof must authorize the second PERFECT.
-                            let physicalConfirmationMatched =
-                                match p.UserMessageId with
-                                | Some userMsg when not (String.IsNullOrWhiteSpace userMsg) ->
-                                    let acceptedReviewConfirmation =
-                                        Map.tryFind p.ReviewerSessionId proj.Sessions
-                                        |> Option.bind (fun reviewer -> reviewer.PromptAuthority)
-                                        |> Option.bind (fun authority ->
-                                            Map.tryFind (MessageId.create userMsg) authority.AcceptedContinuationIds)
-                                        |> Option.exists ((=) PromptAuthority.ReviewConfirmation)
-
-                                    acceptedReviewConfirmation
-                                    || (existing.ConfirmationPhysicalMessageId
-                                        |> Option.exists (fun confirmMsg ->
-                                            not (String.IsNullOrWhiteSpace confirmMsg) && userMsg = confirmMsg))
-                                | _ -> false
-
-                            let confirmationPending =
-                                match existing.AcceptedGuardKey with
-                                | Some key when key.IndexOf("confirm-perfect", StringComparison.OrdinalIgnoreCase) >= 0 ->
-                                    true
-                                | _ -> existing.ConfirmationPhysicalMessageId.IsSome
-
-                            let markerConfirmationMatched =
-                                match p.UserPromptText with
-                                | Some text when
-                                    not (String.IsNullOrWhiteSpace text)
-                                    && confirmationPending
-                                    && text.IndexOf("PERFECT requires confirmation", StringComparison.Ordinal) >= 0
-                                    ->
-                                    true
-                                | _ -> false
-
-                            // Host tool context may not yet expose the physical confirmation
-                            // message id. When confirm-perfect was accepted, a distinct second
-                            // PERFECT provider run is accepted once while physical id remains
-                            // the preferred proof when present.
-                            let acceptedConfirmSecondPerfect =
-                                confirmationPending && existing.ConsecutivePerfects = 1 && not providerRunUsed
-
                             let secondPerfectConfirmed =
-                                hasValidProviderRunId
-                                && not providerRunUsed
-                                && (physicalConfirmationMatched
-                                    || markerConfirmationMatched
-                                    || acceptedConfirmSecondPerfect)
+                                ReviewConfirmation.isSecondPerfectConfirmed
+                                    proj
+                                    existing
+                                    p.ReviewerSessionId
+                                    p.ProviderRunId
+                                    p.UserPromptText
+                                    p.UserMessageId
 
                             match existing.LastGitTreeHash with
                             | Some lastHash when lastHash = hash ->

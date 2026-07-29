@@ -29,6 +29,7 @@
     <Compile Include="Journal/AgentFacts.Types.fs"/>
     <Compile Include="Journal/AgentFacts.FoldHelpers.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
+    <Compile Include="Journal/ReviewConfirmation.fs"/>
     <Compile Include="Journal/AgentFacts.Review.fs"/>
     <Compile Include="Journal/AgentFacts.Fallback.fs"/>
     <Compile Include="Journal/AgentFacts.Authority.fs"/>

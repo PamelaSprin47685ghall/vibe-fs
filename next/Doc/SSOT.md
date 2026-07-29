@@ -126,7 +126,7 @@ identity = logicalRunId + AuthorityRootUserMessageId + providerAttempt
 ### Interaction Repair / Review witness / Companion
 
 - Interaction Repair：同一 identity 最多一次；第二次仍空 → `MISSING_FINAL_REPORT`
-- Review witness：同时记录 PhysicalUserMessageId（confirmation）与 AuthorityRootUserMessageId；双 PERFECT + tree witness 不变
+- Review witness：首次 PERFECT 返回 `AWAITING_CONFIRMATION` 并要求结束当前 turn；ReviewConfirmation 接受前的过早重复 PERFECT 不写 Journal。第二次有效 PERFECT 同时记录 PhysicalUserMessageId（confirmation）与 AuthorityRootUserMessageId；双 PERFECT + tree witness 不变
 - Companion eligibility **唯一** 读 `ActiveLogicalRun` 的 CanonicalRole / SelectedAgent；缺 ActiveLogicalRun → 不创建 Blogger
 
 ### 删除清单（语义层）
@@ -152,6 +152,18 @@ Fallback 第四次失败仍判死
 Blogger/Executor 名称进入 LLM tool schema
 旧 journal 被猜测性迁移
 ```
+
+## OpenCode Session 家族扁平化 [NORMATIVE]
+
+OpenCode 的物理 Session 关系不允许出现孙级：**儿子的儿子仍是家族根的儿子**。创建 Agent、ManagerJob、one-shot Inspector/Coder、Blogger、Executor summarizer 或任何其他内部 child 时，`parentID` 必须解析为当前 Session 家族最上层 root；重启后必须从 durable linkage 恢复同一 root，不能重新产生嵌套。
+
+这不是 UI 特判。创建、Host 父级、根 Session 取消与资源清理都使用同一扁平家族：
+
+- root abort 收敛全部直接 child；
+- 单个 child abort 只关闭该 child；作用域资源必须按自己的 child ID 精确关闭；
+- `join` completion、Review owner、Prompt Authority 等局部执行所有权仍由创建它的结构化程序持有，不以 Host `parentID` 反推。
+
+验收：`root → child → grandchild` 的两次 Host `CreateChildSession` 均收到同一个 `root` 作为 `parentID`；进程重启后创建 descendant 仍成立。
 
 ## 父/Join 取消语义 [NORMATIVE]
 

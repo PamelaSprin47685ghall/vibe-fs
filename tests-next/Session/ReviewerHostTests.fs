@@ -41,6 +41,22 @@ module ReviewerHostTests =
                     ReviewFinishResult.NeedsReview
                     (host.RecordVerdict("call-1", "tree-a", ReviewGuardVerdict.Perfect, "run-1"))
 
+                expect
+                    ReviewFinishResult.NeedsReview
+                    (host.RecordVerdict(
+                        "call-premature",
+                        "tree-a",
+                        ReviewGuardVerdict.Perfect,
+                        "run-premature",
+                        userMessageId = "root-a"
+                    ))
+
+                let pendingGuard =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions.[manager].ReviewGuard.Value
+
+                Assert.Equal([ "call-1" ], pendingGuard.RecentToolCallIds)
+                Assert.Equal(1, pendingGuard.ConsecutivePerfects)
+
                 // ReviewGuard's confirm-perfect nudge after the first PERFECT installs the
                 // content marker; without the marker text the second PERFECT must
                 // not confirm (fail-closed, KISS-N07).

@@ -29,6 +29,8 @@ Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infi
 - Fixed the reviewer `inspector` callback returning a curried function instead of a Promise, which OpenCode displayed as a red tool error.
 - Fixed `coder`/`inspector` argument schemas leaking Zod internals into provider JSON, which made DevOps requests fail immediately with `invalid_request_error`; all custom tool arguments are now guarded against raw-schema mixing.
 - Fixed ReviewGuard requiring a third `PERFECT` when `chat.message` accepted the confirmation before the asynchronous guard-send callback; the second distinct `PERFECT` now accepts the durable `ReviewConfirmation` identity.
+- Fixed reviewers immediately repeating `PERFECT` inside the unconfirmed physical root: the first call now returns `AWAITING_CONFIRMATION`, requires ending the turn, and premature repeats are not journaled, so the second valid call releases the review.
+- Flattened every OpenCode Session family: agents, one-shot workers, Blogger, Executor, and restored descendants all use the family root as physical `parentID`, making former grandchildren visible as direct children and root cancellation comprehensive.
 
 ### Not in this RC cut
 

@@ -52,7 +52,29 @@ type ReviewerHost
                         |> Option.exists (fun guard -> List.contains toolCallId guard.RecentToolCallIds)
                     | None -> false
 
-                if duplicate then
+                let awaitingConfirmation =
+                    if duplicate || verdict <> ReviewGuardVerdict.Perfect then
+                        false
+                    else
+                        match Map.tryFind managerSessionId current.AgentProjections.Sessions with
+                        | Some session ->
+                            session.ReviewGuard
+                            |> Option.exists (fun existing ->
+                                existing.LastGitTreeHash = Some(GitTreeHash.create treeHash)
+                                && existing.ConsecutivePerfects >= 1
+                                && not existing.IsConfirmed
+                                && not (
+                                    ReviewConfirmation.isSecondPerfectConfirmed
+                                        current.AgentProjections
+                                        existing
+                                        reviewerSessionId
+                                        providerRunId
+                                        promptText
+                                        userMsg
+                                ))
+                        | None -> false
+
+                if duplicate || awaitingConfirmation then
                     Ok(reviewState current treeHash)
                 else
                     let fact =

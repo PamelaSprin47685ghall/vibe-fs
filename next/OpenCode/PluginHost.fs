@@ -86,11 +86,12 @@ module PluginHost =
     let createHost
         (input: obj)
         (portOpt: IOpenCodePort option)
+        (familyParent: (SessionId -> SessionId option) option)
         : Result<IEventObservationPort * ISessionHostPort * ISessionSnapshotPort option, string> =
         // Completion/output port is local and driven by SessionReconciler.
         // Host SSE is only used as a coarse idle/retry/deleted signal source.
         let hostEventPort = Events.HostEventPort()
         let eventPort = hostEventPort :> IEventObservationPort
-        let sessionPort = InjectedSessionPort(portOpt, eventPort) :> ISessionHostPort
+        let sessionPort = InjectedSessionPort(portOpt, eventPort, ?familyParent = familyParent) :> ISessionHostPort
         let snapshotPort = SessionSnapshotPort.create input
         Ok(eventPort, sessionPort, snapshotPort)

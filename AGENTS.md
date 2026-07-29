@@ -337,6 +337,7 @@ Fallback 第四次失败仍判死
 6. Y 自身接近上限时，把旧 B 作为唯一正文输入重投影；Y 新输出 B' 替代旧 B。
 7. Manager 无 read/write/edit/grep/glob 等普通工具；只有 `fork / join / list`。无 PTY、无 executor。
 8. `fork(fast-*|deep-* agent, prompt)` 创建异步子代理；`fork(existingId, prompt)` 是 fire-and-forget nudge/continue。Busy existing agent 不创建新 RunId、不安装新 listener、不创建新 completion；nudge 归属于当前 active Run。**原因**：如果 busy nudge 替换 active RunId，原始 fork 对应的 completion 会被覆盖而永久丢失。nudge 只是 "在当前运行的尾部追加提醒"，其结果属于同一次 completion。Nudge 成功 = Host 已确认接受 prompt。Busy→idle 竞态以 Host AcceptPrompt 返回的 run identity 为归属依据。若 Host 不支持 busy append，返回 BusyNudgeUnsupported。
+8b. **OpenCode Session 家族扁平化**：儿子的儿子仍是家族 root 的儿子。所有 Agent、ManagerJob、one-shot Inspector/Coder、Blogger 与 Executor child 的 Host `parentID` 都解析为最上层 root；重启恢复同一 root。root abort 收敛全部 child，单 child 精确关闭；`join`/Review/Authority 的结构化程序所有权不从 Host `parentID` 反推。
 9. `join()` 等任意一个完成项；不指定对象。每个 RunIdentity 对应 single-assignment completion cell。Terminal/SendFailure/Cancel 竞争 TrySetResult，首个成功者唯一生效。join 消费后永久删除 completed handle。
 10. `list()` 统一显示 Agent 与 PTY，但内部资源实现保持独立。
 11. Inspector 同步调用 Executor Tool；Coder 每次同步 Inspector 调用创建一次性 Inspector Session，并可并行。
@@ -2511,7 +2512,8 @@ Schema：
 规则：
 
 - `REVISE`：第一次调用立即生效。
-- `PERFECT`：第一次仅返回"请再次调用 PERFECT 确认"；第二次连续 PERFECT 才生效。
+- `PERFECT`：第一次返回 `AWAITING_CONFIRMATION`，明确要求结束当前 turn 并等待新的 ReviewConfirmation user message；确认消息到达后的第二次 PERFECT 才生效。
+- ReviewConfirmation 接受前，同一物理 root 中过早重复的 PERFECT 不写 Journal、不占用第二次确认。
 - 第二次 PERFECT 必须来自不同 ProviderRunIdentity，
   且该 Run 的 user 输入必须包含第一次 PERFECT 后由 ReviewGuard 发出的确认请求。
   仅 ToolCallId 不同不足以证明独立确认。
@@ -2536,7 +2538,7 @@ let rec awaitVerdict confirmations reviewedTree =
 
         | VerdictCalled PERFECT when confirmations = 0 ->
             do! returnToolMessage
-                    "PERFECT requires confirmation. Call verdict(PERFECT) again."
+                    "PERFECT requires confirmation. End this turn and wait for ReviewConfirmation."
             return! awaitVerdict 1 reviewedTree
 
         | VerdictCalled PERFECT ->

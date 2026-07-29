@@ -84,6 +84,34 @@ module ForkRuntimeIntegration =
             match j with Ok c -> equal "failed" (AgentCompletion.text c.Outcome) | Error e -> failwithf "Expected Ok, got %A" e
         }
 
+    let ``Nested sessions use the family root as OpenCode parent`` () =
+        task {
+            let state, _, sessionPort = MockOpenCode.createHost ()
+            let rootId = SessionId.create "root-session"
+
+            let options: OpenCodeChildOptions =
+                { Title = None
+                  Agent = None
+                  Directory = None }
+
+            let! childResult = sessionPort.CreateChildSession(rootId, options)
+
+            let childId =
+                match childResult with
+                | Ok value -> value
+                | Error error -> failwith error
+
+            let! grandchildResult = sessionPort.CreateChildSession(childId, options)
+
+            let grandchildId =
+                match grandchildResult with
+                | Ok value -> value
+                | Error error -> failwith error
+
+            equal rootId state.ParentChild.[childId]
+            equal rootId state.ParentChild.[grandchildId]
+        }
+
     /// Cancel a runtime that has a busy agent and pending join waiter.
     let ``Cancel runtime delivers Cancelled to pending joiners`` () =
         task {

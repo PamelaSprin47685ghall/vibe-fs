@@ -206,17 +206,34 @@ module VerdictSurface =
                             | Ok result ->
                                 lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
 
-                                let status =
-                                    match result with
-                                    | ReviewFinishResult.Confirmed -> "CONFIRMED"
-                                    | ReviewFinishResult.NeedsReview -> "NEEDS_REVIEW"
-
                                 let vText =
                                     if verdict = ReviewGuardVerdict.Perfect then
                                         "PERFECT"
                                     else
                                         "REVISE"
 
-                                return box (stringify (createObj [ "verdict", box vText; "status", box status ]))
+                                match result, verdict with
+                                | ReviewFinishResult.Confirmed, _ ->
+                                    return
+                                        box (
+                                            stringify (createObj [ "verdict", box vText; "status", box "CONFIRMED" ])
+                                        )
+                                | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Perfect ->
+                                    return
+                                        box (
+                                            stringify (
+                                                createObj
+                                                    [ "verdict", box vText
+                                                      "status", box "AWAITING_CONFIRMATION"
+                                                      "message",
+                                                      box
+                                                          "PERFECT requires confirmation. End this turn now. Do not call verdict again until a new ReviewConfirmation user message arrives." ]
+                                            )
+                                        )
+                                | ReviewFinishResult.NeedsReview, ReviewGuardVerdict.Revise ->
+                                    return
+                                        box (
+                                            stringify (createObj [ "verdict", box vText; "status", box "NEEDS_REVIEW" ])
+                                        )
                 | Ok _, _, _ -> return box (stringify (createObj [ "error", box "Missing reviewer tool context" ]))
             }

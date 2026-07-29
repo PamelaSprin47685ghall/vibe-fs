@@ -22,20 +22,25 @@ module SpikePlugin =
             let ownedSessions = HashSet<string>()
             let userMessageBindings = Dictionary<string, MessageId>()
             let fallbackFailures = HashSet<string>()
+            let sessionRoles = Dictionary<string, string>()
+            let sessionParents = Dictionary<string, string>()
 
-            match PluginHost.createHost input portOpt with
+            PluginHost.restoreSessionRoles journal sessionRoles
+            PluginHost.restoreSessionParents journal sessionParents
+
+            let familyParent (sessionId: SessionId) =
+                match sessionParents.TryGetValue(SessionId.value sessionId) with
+                | true, parentId -> Some(SessionId.create parentId)
+                | false, _ -> None
+
+            match PluginHost.createHost input portOpt (Some familyParent) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt) ->
                 let companions = Dictionary<string, CompanionHost>()
                 let companionGate = obj ()
-                let sessionRoles = Dictionary<string, string>()
-                let sessionParents = Dictionary<string, string>()
                 let verdictSessions = HashSet<string>()
                 let nudgeSent = HashSet<string>()
                 let managerGuardNudges = HashSet<string>()
-
-                PluginHost.restoreSessionRoles journal sessionRoles
-                PluginHost.restoreSessionParents journal sessionParents
 
                 for KeyValue(childId, parentId) in sessionParents do
                     ownedSessions.Add childId |> ignore

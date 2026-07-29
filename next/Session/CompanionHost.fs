@@ -265,7 +265,11 @@ type CompanionHost
             match taskOpt with
             | Some task ->
                 let! childId = task
-                do! sessions.AbortChildren(primaryId)
+                let! aborted = sessions.AbortSession(childId)
+
+                match aborted with
+                | Ok() -> ()
+                | Error error -> raise (InvalidOperationException error)
 
                 durable
                 |> Option.iter (fun port ->
