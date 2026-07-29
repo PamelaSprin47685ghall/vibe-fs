@@ -114,22 +114,25 @@ const HOST_INTEROP_ALLOWLIST = new Map([
 const PURE_CORE_DIRS = ['next/Kernel/', 'next/Domain/']
 
 // ── single writer ───────────────────────────────────────────────────────────
+//
+// `allowed` must list the fold, the codec and Kernel/Fact.fs alongside the real
+// writer: the check matches `AgentFact.<Name>`, and a fold's match pattern looks
+// exactly like a constructor application. Narrowing it to true construction
+// would need to parse F#, so the allowlist carries the distinction instead.
+//
+// An entry naming a fact that no longer exists is worse than no entry: it can
+// never fire, so it reads as an enforced boundary while enforcing nothing.
 
 const SINGLE_WRITER_FACTS = [
   {
     fact: 'FallbackCursorAdvanced',
-    allowed: ['OpenCode/FallbackDetect.fs', 'Journal/AgentJournal.fs', 'Journal/Fold.fs', 'Kernel/Fact.fs'],
+    allowed: ['Session/FallbackController.fs', 'Journal/AgentJournal.fs', 'Journal/Fold.fs', 'Kernel/Fact.fs'],
     reason: 'only the FallbackController may build the durable fallback cursor fact (FALLBACK-003)',
   },
   {
-    fact: 'ReviewConfirmedIdle',
-    allowed: [
-      'Journal/AgentJournal.fs',
-      'OpenCode/TurnCompletionProgram.fs',
-      'Journal/Fold.fs',
-      'Kernel/Fact.fs',
-    ],
-    reason: 'only TurnCompletionProgram may record a confirmed reviewer idle (REVIEW-006)',
+    fact: 'FallbackExhausted',
+    allowed: ['Session/FallbackController.fs', 'Journal/AgentJournal.fs', 'Journal/Fold.fs', 'Kernel/Fact.fs'],
+    reason: 'the budget verdict belongs to the same writer that advanced the cursor (FALLBACK-005)',
   },
   {
     fact: 'PluginPromptClaimed',
@@ -143,14 +146,26 @@ const SINGLE_WRITER_FACTS = [
     reason: 'only PromptDispatcher may claim a plugin prompt (PROMPT-005)',
   },
   {
-    fact: 'PluginPromptAccepted',
+    fact: 'PluginPromptSubmitted',
     allowed: [
+      'OpenCode/PromptDispatcherSend.fs',
       'OpenCode/PromptDispatcher.fs',
       'Journal/PromptAuthorityLedger.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
     ],
-    reason: 'only PromptDispatcher may accept a plugin prompt (PROMPT-005)',
+    reason: 'a transport receipt is recorded only by the sender that received it (PROMPT-005)',
+  },
+  {
+    fact: 'PluginPromptPhysicalAccepted',
+    allowed: [
+      'OpenCode/PromptDispatcher.fs',
+      'OpenCode/PromptDispatcherSend.fs',
+      'Journal/PromptAuthorityLedger.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'only PromptDispatcher may prove physical acceptance (PROMPT-005)',
   },
   {
     fact: 'PluginPromptAbandoned',

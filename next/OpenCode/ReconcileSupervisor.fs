@@ -24,7 +24,13 @@ module ReconcileSupervisor =
         (
             snapshot: ISessionSnapshotPort,
             binding: TurnBinding.Store,
-            onTurn: ReconciledTurn -> unit,
+            /// Returns a Task so the pass awaits the turn's effects.
+            ///
+            /// `ReconciledTurn -> unit` forced the consumer to discard its own
+            /// task, and FALLBACK-003 put the durable cursor advance inside it —
+            /// so a failed turn's advance raced the next reconcile pass instead of
+            /// preceding it.
+            onTurn: ReconciledTurn -> Task,
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option)
         ) as this =
@@ -47,9 +53,9 @@ module ReconcileSupervisor =
             String.Concat(
                 [| SessionId.value turn.SessionId
                    "|"
-                   MessageId.value turn.UserMessageId
+                   PhysicalUserMessageId.value turn.PhysicalUserMessageId
                    "|"
-                   MessageId.value turn.AssistantMessageId |]
+                   ProviderRunIdentity.value turn.ProviderRun |]
             )
 
         let alreadyConsumed (turn: ReconciledTurn) =
@@ -153,7 +159,7 @@ module ReconcileSupervisor =
                                             true)
 
                                 if publish then
-                                    onTurn turn
+                                    do! onTurn turn
                             | None -> ()
 
                             cont <-
@@ -201,26 +207,31 @@ module ReconcileSupervisor =
                 runLoop sessionId |> ignore
 
         /// Handle a coarse host signal.
+        ///
+        /// FALLBACK-003: every signal is a wake, nothing more. Retry and failure
+        /// carry no decision — the reconciled snapshot is the only source for
+        /// whether the attempt actually failed, and FallbackController is the only
+        /// writer of the cursor advance that follows.
         member _.Signal(signal: HostSignal) : unit =
             match signal with
-            | SessionIdle sessionId -> this.Kick(sessionId)
+            | SessionIdle sessionId
+            | ProviderFailure(sessionId, _) -> this.Kick(sessionId)
+            | ProviderRetry retry -> this.Kick(retry.SessionId)
             | SessionDeleted sessionId -> this.ClearSession(sessionId)
-            | ProviderRetry _
-            | ProviderFailure _ -> ()
 
         /// Bind a new authority root (human or agent owner).
-        member _.BindUserMessage(sessionId: SessionId, messageId: MessageId, ?agentRole: AgentRole) =
-            binding.BindUserMessage(sessionId, messageId, ?agentRole = agentRole)
+        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: AgentRole) =
+            binding.BindUserMessage(sessionId, physical, ?agentRole = agentRole)
 
         /// Bind a continuation physical message to the active logical run.
-        member _.BindContinuationUserMessage(sessionId: SessionId, messageId: MessageId) =
-            binding.BindContinuationUserMessage(sessionId, messageId)
+        member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =
+            binding.BindContinuationUserMessage(sessionId, physical)
 
         /// Register a host-provided active run.
         member _.BindActiveRun(b: ActiveRunBinding) = binding.BindActiveRun(b)
 
         /// Latest physical user message for the active logical run.
-        member _.TryPhysicalUserMessage(sessionId: SessionId) : MessageId option =
+        member _.TryPhysicalUserMessage(sessionId: SessionId) : PhysicalUserMessageId option =
             binding.TryPhysicalUserMessage(sessionId)
 
         /// Root user message bindings used for fallback identity.

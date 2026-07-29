@@ -7,20 +7,23 @@ open Wanxiangshu.Next.Kernel.Identity
 /// payload decoding has exactly one owner: HostEventCodec.
 module HostSignalAdapter =
 
-    let sessionIdOf = function
+    let sessionIdOf =
+        function
         | SessionIdle sessionId
         | SessionDeleted sessionId -> sessionId
         | ProviderRetry retry -> retry.SessionId
-        | ProviderFailure failure -> failure.SessionId
+        | ProviderFailure(sessionId, _) -> sessionId
 
     /// SSOT signals are session.status idle|retry and session.deleted.
     let tryAdapt (isOwned: SessionId -> bool) (rawInput: obj) : HostSignal option =
         HostEventCodec.tryDecode rawInput
         |> Option.bind (fun signal ->
-            if isOwned (sessionIdOf signal)
-               || (match signal with
-                   | ProviderFailure _ -> true
-                   | _ -> false) then
+            if
+                isOwned (sessionIdOf signal)
+                || (match signal with
+                    | ProviderFailure _ -> true
+                    | _ -> false)
+            then
                 Some signal
             else
                 None)

@@ -21,6 +21,25 @@ module AgentRoleIdentity =
 
     let ofManaged (agent: ManagedAgent) : AgentRole = ofRole agent.Role
 
+    /// `AgentRole` and `Role` are the same ten cases spelled twice.
+    ///
+    /// SSOT has one Role (AGENT-001), so this converter exists only while
+    /// `AgentRole` still threads through ForkRuntime, ChildRun and PtyHandle.
+    /// Deleting the duplicate type belongs to packages E/F; until then the
+    /// conversion is explicit rather than implicit, so every crossing is visible.
+    let toRole (role: AgentRole) : Role =
+        match role with
+        | AgentRole.Manager -> Role.Manager
+        | AgentRole.Orchestrator -> Role.Orchestrator
+        | AgentRole.Coder -> Role.Coder
+        | AgentRole.Inspector -> Role.Inspector
+        | AgentRole.Browser -> Role.Browser
+        | AgentRole.Meditator -> Role.Meditator
+        | AgentRole.Reviewer -> Role.Reviewer
+        | AgentRole.DevOps -> Role.DevOps
+        | AgentRole.Executor -> Role.Executor
+        | AgentRole.Blogger -> Role.Blogger
+
     let roleOfString (value: string) =
         if String.IsNullOrWhiteSpace value then
             None

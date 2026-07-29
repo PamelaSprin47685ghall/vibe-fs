@@ -75,10 +75,9 @@ module Events =
             if not (String.IsNullOrWhiteSpace text) then
                 recordOutput sessionId text
 
-        /// Terminal completions are produced by TerminalPolicies via
-        /// NotifyTerminal. Raw host event observation is handled upstream by the
-        /// signal stack (HostSignalAdapter / HostSignalSubscribe), so Observe is
-        /// a no-op.
+        /// Terminal completions arrive through NotifyTerminal from the reconcile
+        /// path. Raw host event observation is handled upstream by the signal stack
+        /// (HostSignalAdapter / HostSignalSubscribe), so Observe is a no-op.
         member _.Observe(_rawEvent: obj) = ()
 
         interface IEventObservationPort with

@@ -66,7 +66,6 @@ type ToolRuntimeScope
             parentWorkRecordFor = (fun parentId -> background (SessionId.value parentId)),
             childWorkRecordFor = (fun childId -> background (SessionId.value childId)),
             ?sessionSnapshot = snapshot,
-            cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor),
             cancelSignals = onCancelSignals
         )
 
@@ -126,8 +125,7 @@ type ToolRuntimeScope
                         SessionId.create ctx.SessionId,
                         sessions,
                         ?journal = None,
-                        onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
-                        cancelFallbackRetries = (fun ids -> ids |> Seq.iter PluginFallbackRetry.cancelPendingFor)
+                        onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId)
                     )
 
                 executorRuntimes.[ctx.SessionId] <- runtime

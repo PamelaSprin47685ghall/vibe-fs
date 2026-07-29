@@ -21,6 +21,16 @@ module FallbackJournalPort =
 /// only advance to the FallbackController.
 module DurableFallback =
 
+    /// The whole durable fallback state for a session.
+    ///
+    /// FALLBACK-001 has the Authority Root create this, so it already holds the
+    /// only correct LogicalRunId and AuthorityRootUserMessageId for the run. The
+    /// controller reads them from here rather than being passed them, because a
+    /// second source for those two values can disagree with this one.
+    let tryCurrentState (sessionId: SessionId) (projection: ProjectionSet) : FallbackProjection option =
+        AgentProjection.tryFind sessionId projection.AgentProjections
+        |> Option.bind (fun session -> session.Fallback)
+
     /// The cursor as the journal has it.
     ///
     /// Returns the projection's cursor directly. The previous version rebuilt one
@@ -34,8 +44,7 @@ module DurableFallback =
     /// accepted; substituting `initial` would make "no proven authority" look like
     /// "a fresh run at Offset 0".
     let tryCurrentCursor (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.FallbackCursor option =
-        AgentProjection.tryFind sessionId projection.AgentProjections
-        |> Option.bind (fun session -> session.Fallback)
+        tryCurrentState sessionId projection
         |> Option.map (fun fallback -> fallback.Cursor)
 
     /// FALLBACK-002: which side the next attempt lands on.

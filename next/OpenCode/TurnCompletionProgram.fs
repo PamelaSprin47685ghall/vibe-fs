@@ -2,15 +2,15 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
 
-/// A single continuous program that sequences terminal-policy decisions with
-/// ports.  It is the only production path that drives side effects
-/// (NotifyTerminal, dispose runtime, nudges).
+/// The one production path that turns a reconciled turn into side effects
+/// (NotifyTerminal, dispose runtime, nudges, fallback advance).
 module TurnCompletionProgram =
 
     let private repairDirectory (turn: ReconciledTurn) =
@@ -19,54 +19,92 @@ module TurnCompletionProgram =
         else
             Some turn.Directory
 
+    /// FALLBACK-008: one repair per unusable terminal.
+    ///
+    /// The task is awaited rather than discarded. `|> ignore` on the task also
+    /// discarded the claim/abandon bookkeeping inside it, so a failed repair left
+    /// a Claimed fact with nothing after it and no terminal for the caller.
     let private sendRepair
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (continuationAccepted: SessionId -> MessageId -> unit)
         (turn: ReconciledTurn)
         (prompt: string)
         (repairKind: string)
-        =
-        let sent =
-            HostSessionNudge.trySendInteractionRepair
-                sessionPort
-                turn.SessionId
-                prompt
-                (repairDirectory turn)
-                journal
-                turn.AssistantMessageId
-                repairKind
-                (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+        : Task =
+        task {
+            let! sent =
+                HostSessionNudge.trySendInteractionRepair
+                    sessionPort
+                    turn.SessionId
+                    prompt
+                    (repairDirectory turn)
+                    journal
+                    turn.ProviderRun
+                    repairKind
+                    None
 
-        if not sent then
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
-            |> ignore
+            match sent with
+            | Ok _ -> ()
+            | Error _ ->
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
+                |> ignore
+        }
+        :> Task
 
+    /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
+    ///
+    /// The reconciled snapshot is what proves the attempt failed (HOST-004), so
+    /// this is where the cursor advances — not in the Host retry event handler,
+    /// which only wakes. `FallbackController` is the single writer.
+    ///
+    /// FALLBACK-004 then decides whether a continuation follows: only when the
+    /// budget still permits one. The continuation itself produces no second
+    /// advance, which is why nothing here writes again.
     let private continueAfterProviderFailure
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (continuationAccepted: SessionId -> MessageId -> unit)
         (turn: ReconciledTurn)
         (error: string)
-        =
+        : Task =
         task {
-            let! continuation =
-                HostSessionNudge.sendContinuationResult
-                    sessionPort
-                    turn.SessionId
-                    "Continue after provider failure."
-                    PromptAuthority.ProviderRetryAttempt
-                    (repairDirectory turn)
-                    journal
-                    (Some(fun messageId -> continuationAccepted turn.SessionId messageId))
+            let fail reason =
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                |> ignore
 
-            match continuation with
-            | Ok _ -> ()
-            | Error _ -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+            match journal with
+            | None -> fail error
+            | Some durable ->
+                match
+                    FallbackController.recordConfirmedFailure
+                        durable
+                        AgentPairCursor.DefaultAutoRecoveryBudget
+                        turn.SessionId
+                        turn.ProviderRun
+                        error
+                with
+                | Error reason -> fail reason
+                | Ok outcome when not (FallbackController.mayContinue outcome) ->
+                    // FALLBACK-005: budget spent, or no proven authority. Either way
+                    // no further automatic physical request may be issued.
+                    fail error
+                | Ok _ ->
+                    let! continuation =
+                        HostSessionNudge.sendContinuationResult
+                            sessionPort
+                            turn.SessionId
+                            "Continue after provider failure."
+                            PromptAuthority.ProviderRetryAttempt
+                            (repairDirectory turn)
+                            journal
+                            None
+
+                    match continuation with
+                    | Ok _ -> ()
+                    | Error _ -> fail error
         }
-        |> ignore
+        :> Task
 
     /// Apply the full terminal completion program for a reconciled turn.
     let applyWithContinuation
@@ -80,111 +118,82 @@ module TurnCompletionProgram =
         (sessionParents: Dictionary<string, string>)
         (disposeExecutorRuntime: string -> unit)
         (abortedSessions: HashSet<string>)
-        (continuationAccepted: SessionId -> MessageId -> unit)
-        (_fallbackFailures: HashSet<string>)
         (turn: ReconciledTurn)
-        =
+        : Task =
         let sessionKey = SessionId.value turn.SessionId
         disposeExecutorRuntime sessionKey
 
-        // SHOCK-UNMIGRATED[EXEC-009]: the managed agent name must come from the
-        // durable `HandleLinked.TargetAgent` of this child's handle, not be rebuilt
-        // from its AgentRole. The old `defaultFastManagedName` invented tier Fast,
-        // so a `deep-coder` child acquired an Authority Root naming `fast-coder`
-        // and FALLBACK-002's A/B pair was wrong for the whole Logical Run.
+        // SHOCK-UNMIGRATED[EXEC-009]: a linked child's Authority Root must name the
+        // managed agent from the durable `HandleLinked.TargetAgent`, not one rebuilt
+        // from its AgentRole — rebuilding invented tier Fast, so a `deep-coder`
+        // child acquired a root naming `fast-coder` and FALLBACK-002's A/B pair was
+        // wrong for the whole Logical Run.
         //
-        // Reaching the record needs the parent session and handle id, which is the
-        // read layer package F builds. `isLinkedChild` above is already dangling on
-        // the same projection change, so both move together.
-        match turn.AgentRole with
-        | Some _ when
+        // Reaching that record needs handle → child session, which `HandleLinked`
+        // does not carry. `TerminalPolicy.isLinkedChild` is dangling on the same
+        // projection change, so both move together in package F.
+        if
             TerminalPolicy.isLinkedChild journal sessionKey
             || sessionParents.ContainsKey sessionKey
-            ->
+        then
             failwith "SHOCK-UNMIGRATED[EXEC-009]: linked-child authority needs the durable handle's TargetAgent"
-        | _ -> ()
 
         let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
-            let roleStr =
-                turn.AgentRole
-                |> Option.map (fun r -> r.ToString().ToLowerInvariant())
-                |> Option.defaultValue "coder"
+            // HOST-005: session-wide A is this turn's text plus reasoning appended
+            // to everything the Session accumulated. An empty intermediate turn
+            // does not wipe prior A.
+            let sessionWide = TerminalSessionA.accumulateTurn eventPort turn
 
-            // Session-wide A: append this turn's text + reasoning/thinking, then
-            // expose the full Session accumulation. Empty intermediate turns do
-            // not wipe prior A.
-            let finalA = TerminalSessionA.accumulateTurn eventPort turn
-            let formalText = CompletedTurnClassifier.partsText turn.Parts
-
-            let finalText =
-                if not (String.IsNullOrWhiteSpace finalA) then
-                    finalA
+            let sessionWideText =
+                if not (String.IsNullOrWhiteSpace sessionWide) then
+                    sessionWide
                 elif forceConfirmedReviewer then
-                    // Dual-PERFECT confirmation often ends on a tool-only frame.
-                    // The durable witness is already Confirmed; expose a minimal
-                    // A so AwaitAgent can resolve without a prose stop frame.
+                    // A confirmed double-PERFECT often ends on a tool-only frame.
+                    // The witness is already Confirmed, so expose a minimal A rather
+                    // than failing a review that actually succeeded.
                     "Review confirmed."
                 else
-                    finalA
+                    sessionWide
 
-            let runResult: AgentRunResult =
-                { SessionId = turn.SessionId
-                  RootUserMessageId = turn.RootUserMessageId
-                  AssistantMessageId = turn.AssistantMessageId
-                  Role = roleStr
-                  Directory = turn.Directory
-                  FinalText = finalText
-                  FormalText = formalText }
+            // SHOCK-UNMIGRATED[REVIEW-006]: `ReviewConfirmedIdle` and
+            // `ReviewGuardProjection.ConfirmationPhysicalMessageId` are both gone.
+            // REVIEW-006 replaces them with a self-contained `ConfirmedReviewWitness`
+            // whose confirmation evidence is the provider input seal (REVIEW-010),
+            // not a physical message id shared with the confirmation prompt.
+            // `ReviewerGuardState.confirmedOwner` still reads the deleted field.
+            if turn.AgentRole = Some AgentRole.Reviewer then
+                failwith "SHOCK-UNMIGRATED[REVIEW-006]: confirmed reviewer idle needs ConfirmedReviewWitness"
 
-            // A first PERFECT is not a child completion. Keep the reviewer's
-            // physical handle live until the confirmation prompt causes a
-            // distinct run that records the second PERFECT; otherwise Manager
-            // `join()` can return before the ReviewWitness is confirmed.
-            let awaitingReviewerConfirmation =
-                turn.AgentRole = Some AgentRole.Reviewer
-                && ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey
-                && not forceConfirmedReviewer
+            // PROMPT-008: the Role comes from the reconciled turn, and there is no
+            // default. Defaulting to Coder — as the previous `"coder"` string did —
+            // reports a completion under a role nobody selected.
+            match turn.AgentRole with
+            | None ->
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
+                |> ignore
+            | Some role ->
+                let runResult: AgentRunResult =
+                    { SessionId = turn.SessionId
+                      AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                      ProviderRun = turn.ProviderRun
+                      Role = AgentRoleIdentity.toRole role
+                      Directory = turn.Directory
+                      SessionWideText = sessionWideText
+                      TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
-            // This path runs only after an idle signal reconciles a terminal
-            // reviewer turn. A first PERFECT remains pending; only the reviewer
-            // that supplied the confirmed double-PERFECT clears prior inputs.
-            match
-                turn.AgentRole,
-                ReviewerGuardState.confirmedOwner sessionParents journal sessionKey (MessageId.value turn.UserMessageId),
-                journal
-            with
-            | Some AgentRole.Reviewer, Some reviewOwner, Some j ->
-                match AgentJournal.recordReviewConfirmedIdle j reviewOwner turn.SessionId turn.AssistantMessageId with
-                | Ok() -> ()
-                | Error err ->
-                    raise (InvalidOperationException(sprintf "Failed to checkpoint confirmed reviewer idle: %s" err))
-            | Some AgentRole.Reviewer, None, Some j when forceConfirmedReviewer ->
-                match ReviewerGuardState.reviewOwner sessionParents journal sessionKey with
-                | Some reviewOwner ->
-                    match
-                        AgentJournal.recordReviewConfirmedIdle j reviewOwner turn.SessionId turn.AssistantMessageId
-                    with
-                    | Ok() -> ()
-                    | Error err ->
-                        raise (
-                            InvalidOperationException(sprintf "Failed to checkpoint confirmed reviewer idle: %s" err)
-                        )
-                | None -> ()
-            | _ -> ()
-
-            if not awaitingReviewerConfirmation then
-                // Gate on session-wide A (text + reasoning). An empty intermediate
-                // turn does not wipe prior A; only a Session with no A fails empty.
-                if String.IsNullOrWhiteSpace runResult.FinalText then
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty final text")
+                // EXEC-006: `IsValid` is the single place that decides whether a
+                // completed run carries session-wide A. Re-testing the text here
+                // would be a second copy of that rule.
+                if runResult.IsValid then
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                     |> ignore
                 else
-                    // Completion fact path only: ReconciledTurn → AgentRunResult → TerminalOutcome.
-                    // FinalText is full Session A (incl. reasoning), not last-turn only.
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                    eventPort.NotifyTerminal
+                        turn.SessionId
+                        (TerminalOutcome.Failed "completed with empty session-wide text")
                     |> ignore
 
             wasAborted
@@ -194,34 +203,35 @@ module TurnCompletionProgram =
             && ReviewerGuardState.isConfirmedReviewer sessionParents journal sessionKey
 
         match turn.Outcome with
-        | TurnUnknown -> ()
+        | TurnUnknown -> Task.CompletedTask
         | TurnInProgress when reviewerAlreadyConfirmed ->
-            // Second PERFECT is frequently a tool-only provider step. Once the
-            // durable witness is Confirmed, finish the physical reviewer run so
-            // OrchestratorHost.reverify / Manager join can observe completion.
+            // A second PERFECT is frequently a tool-only provider step. Once the
+            // witness is Confirmed, finish the physical reviewer run so
+            // OrchestratorHost.reverify and Manager `join` observe completion.
             completeReviewerOrAssistant true |> ignore
+            Task.CompletedTask
         | TurnInProgress ->
-            // Host finished a provider step with tool-calls only. Idle means the
-            // step is settled; interaction repair continues the Logical Run.
-            // This is never durable provider fallback.
+            // The Host settled a provider step with tool calls only. Interaction
+            // repair continues the Logical Run; this is never provider fallback.
             if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                sendRepair sessionPort eventPort journal continuationAccepted turn "\u200B" "zero-width"
-        | TurnNeedsContinuation _ when reviewerAlreadyConfirmed -> completeReviewerOrAssistant true |> ignore
+                sendRepair sessionPort eventPort journal turn "\u200B" "zero-width"
+            else
+                Task.CompletedTask
+        | TurnNeedsContinuation _ when reviewerAlreadyConfirmed ->
+            completeReviewerOrAssistant true |> ignore
+            Task.CompletedTask
         | TurnNeedsContinuation _ ->
-            // Absorb text+reasoning into session-wide A even when this turn is
-            // not yet completable (empty formal text / contains-XML formal text).
+            // Absorb text and reasoning into session-wide A even though this turn is
+            // not completable, then ask for the missing report. Still not fallback.
             TerminalSessionA.accumulateTurn eventPort turn |> ignore
 
-            // No final natural-language report yet or length limit. Do NOT complete
-            // the run. Interaction repair continues the same Logical Run; this is
-            // never a durable fallback advance.
             let repairPrompt =
                 "Your tool work is complete, but no final task report was produced. "
                 + "Return a concise final report containing:\n"
                 + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
                 + "Do not call another tool unless necessary."
 
-            sendRepair sessionPort eventPort journal continuationAccepted turn repairPrompt "missing-final-report"
+            sendRepair sessionPort eventPort journal turn repairPrompt "missing-final-report"
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey
@@ -229,23 +239,20 @@ module TurnCompletionProgram =
 
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
             |> ignore
-        | TurnFailed error ->
-            // A settled failed turn continues the same Logical Run. The next
-            // typed provider-retry signal, if emitted by the Host, is the only
-            // durable fallback cursor advance; this continuation itself cannot
-            // reset or mutate its A/A/B/B attempt profile.
-            continueAfterProviderFailure sessionPort eventPort journal continuationAccepted turn error
+
+            Task.CompletedTask
+        | TurnFailed error -> continueAfterProviderFailure sessionPort eventPort journal turn error
         | TurnCompleted ->
             let wasAborted = completeReviewerOrAssistant reviewerAlreadyConfirmed
 
-            if wasAborted then
-                ()
-            elif not (TerminalPolicy.sessionDead journal turn.SessionId) then
+            if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+                Task.CompletedTask
+            else
                 match turn.AgentRole with
-                // A first PERFECT must always enter its causal confirmation
-                // round-trip before the generic "missing verdict" branch.
-                // `verdictSessions` is only a terminal bookkeeping hint; it
-                // must never suppress the pending confirmation transition.
+                // REVIEW-003: a first PERFECT must enter its causal confirmation
+                // round-trip before the generic missing-verdict branch.
+                // `verdictSessions` is terminal bookkeeping only and must never
+                // suppress the pending confirmation transition.
                 | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation sessionParents journal sessionKey ->
                     verdictSessions.Remove sessionKey |> ignore
 
@@ -253,20 +260,14 @@ module TurnCompletionProgram =
                         sessionPort
                         journal
                         nudgeSent
-                        sessionKey
-                        (MessageId.value turn.AssistantMessageId)
-                        continuationAccepted
+                        turn.SessionId
+                        turn.ProviderRun
+                    :> Task
                 | Some AgentRole.Reviewer when
                     not (verdictSessions.Remove sessionKey)
                     && not (ReviewerGuardState.submitted sessionParents journal sessionKey)
                     ->
-                    HostReviewGuard.nudgeReviewer
-                        sessionPort
-                        journal
-                        nudgeSent
-                        sessionKey
-                        (MessageId.value turn.AssistantMessageId)
-                        continuationAccepted
+                    HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent turn.SessionId turn.ProviderRun :> Task
                 | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
                     match HostReviewGuard.missingTree journal gitTreePort sessionKey with
                     | HostReviewGuard.ReviewGuardMissing treeHash ->
@@ -274,40 +275,20 @@ module TurnCompletionProgram =
                             sessionPort
                             journal
                             managerGuardNudges
-                            sessionKey
-                            (MessageId.value turn.AssistantMessageId)
+                            turn.SessionId
+                            turn.ProviderRun
                             treeHash
-                            continuationAccepted
-                    | HostReviewGuard.ReviewGuardConfirmed -> ()
+                        :> Task
+                    | HostReviewGuard.ReviewGuardConfirmed -> Task.CompletedTask
+                    // ORCH-008 / REVIEW-007 fail closed: an unavailable guard must not
+                    // let a Manager finish unreviewed. Reported as a terminal failure
+                    // rather than raised, because raising here escapes into whichever
+                    // Host callback happens to be on the stack.
                     | HostReviewGuard.ReviewGuardUnavailable reason ->
-                        raise (InvalidOperationException(sprintf "Review guard unavailable: %s" reason))
-                | _ -> ()
+                        eventPort.NotifyTerminal
+                            turn.SessionId
+                            (TerminalOutcome.Failed(sprintf "Review guard unavailable: %s" reason))
+                        |> ignore
 
-    /// Apply without a continuation-accepted callback (tests / simple callers).
-    let apply
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
-        (verdictSessions: HashSet<string>)
-        (nudgeSent: HashSet<string>)
-        (managerGuardNudges: HashSet<string>)
-        (sessionParents: Dictionary<string, string>)
-        (disposeExecutorRuntime: string -> unit)
-        (abortedSessions: HashSet<string>)
-        (turn: ReconciledTurn)
-        =
-        applyWithContinuation
-            sessionPort
-            eventPort
-            journal
-            gitTreePort
-            verdictSessions
-            nudgeSent
-            managerGuardNudges
-            sessionParents
-            disposeExecutorRuntime
-            abortedSessions
-            (fun _ _ -> ())
-            (HashSet<string>())
-            turn
+                        Task.CompletedTask
+                | _ -> Task.CompletedTask

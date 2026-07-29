@@ -41,13 +41,12 @@ module OrchestratorHostReview =
                 | Ok OrchestratorReviewRead.PendingConfirmation
                 | Ok OrchestratorReviewRead.NeedsReview ->
                     // One reviewer assignment covers first PERFECT + HostReviewGuard
-                    // confirmation + second PERFECT. TerminalPolicies withholds the
-                    // first PERFECT completion until confirmation finishes, so this
-                    // await spans the full double-PERFECT barrier.
+                    // confirmation + second PERFECT. The first PERFECT does not
+                    // complete the run until confirmation finishes, so this await
+                    // spans the full double-PERFECT barrier.
                     let prompt =
                         match priorState with
-                        | Ok OrchestratorReviewRead.PendingConfirmation ->
-                            HostReviewGuard.skepticalReevaluationPrompt
+                        | Ok OrchestratorReviewRead.PendingConfirmation -> HostReviewGuard.skepticalReevaluationPrompt
                         | _ -> "Review the current worktree for correctness. Submit your verdict with the verdict tool."
 
                     let! ran = runReviewerOnce managerId worktree prompt
@@ -62,11 +61,7 @@ module OrchestratorHostReview =
                         | Ok OrchestratorReviewRead.Confirmed -> return Ok()
                         | Ok OrchestratorReviewRead.RevisionRequired -> return Error "Reviewer requested revision"
                         | Ok OrchestratorReviewRead.PendingConfirmation ->
-                            let! nudged =
-                                runReviewerOnce
-                                    managerId
-                                    worktree
-                                    HostReviewGuard.skepticalReevaluationPrompt
+                            let! nudged = runReviewerOnce managerId worktree HostReviewGuard.skepticalReevaluationPrompt
 
                             match nudged with
                             | Error err -> return Error err

@@ -56,16 +56,6 @@ module HostEventCodec =
 
     let trySessionId (raw: obj) = tryReadSessionId raw
 
-    let private tryReadMessageId (raw: obj) : MessageId option =
-        let properties = if isNull raw then null else raw?properties
-
-        if not (isNull properties) && not (isNull properties?messageID) then
-            Some(MessageId.create (unbox<string> properties?messageID))
-        elif not (isNull properties) && not (isNull properties?messageId) then
-            Some(MessageId.create (unbox<string> properties?messageId))
-        else
-            None
-
     let isHostSignalEvent (raw: obj) : bool =
         match eventTypeOf raw with
         | "session.status"
@@ -96,11 +86,14 @@ module HostEventCodec =
                 else
                     unbox<string> status?message
 
+            // ARCH-002: the event's `messageID` is deliberately not read. It was
+            // taken as the failed assistant message and written into the fallback
+            // cursor, which derives a domain fact from an event field. The failed
+            // provider run comes from the reconciled snapshot (HOST-004).
             Some
                 { SessionId = sessionId
                   Attempt = attempt
-                  Reason = reason
-                  MessageId = tryReadMessageId raw }
+                  Reason = reason }
 
     let tryDecode (rawInput: obj) : HostSignal option =
         let raw = unwrap rawInput
@@ -132,14 +125,24 @@ module HostEventCodec =
                 | Some sessionId ->
                     let properties = raw?properties
                     let error = if isNull properties then null else properties?error
-                    let name = if isNull error || isNull error?name then "" else unbox<string> error?name
+
+                    let name =
+                        if isNull error || isNull error?name then
+                            ""
+                        else
+                            unbox<string> error?name
+
                     if name = "MessageAbortedError" || name = "AbortError" then
                         None
                     else
                         let reason =
-                            if not (isNull error) && not (isNull error?message) then unbox<string> error?message
-                            elif not (isNull error) && not (isNull error?data) && not (isNull error?data?message) then unbox<string> error?data?message
-                            else "provider failure"
-                        Some(ProviderFailure { SessionId = sessionId; Reason = reason; MessageId = tryReadMessageId raw })
+                            if not (isNull error) && not (isNull error?message) then
+                                unbox<string> error?message
+                            elif not (isNull error) && not (isNull error?data) && not (isNull error?data?message) then
+                                unbox<string> error?data?message
+                            else
+                                "provider failure"
+
+                        Some(ProviderFailure(sessionId, reason))
                 | _ -> None
             | _ -> None

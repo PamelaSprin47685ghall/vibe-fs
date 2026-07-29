@@ -89,10 +89,6 @@ module AgentPairCursor =
         else
             MayContinue cursor
 
-    /// One step of the controller's decision: record the failure, then judge.
-    let failAndJudge (budget: int) (cursor: FallbackCursor) : RecoveryVerdict =
-        recoveryVerdict budget (recordFailure cursor)
-
     let effectiveAgent (authority: AuthorityAgentPair) (cursor: FallbackCursor) : string =
         match side cursor.Offset with
         | SideA -> authority.SelectedAgent

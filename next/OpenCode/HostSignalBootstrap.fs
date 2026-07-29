@@ -50,13 +50,7 @@ module HostSignalBootstrap =
 
         let binding = TurnBinding.Store()
 
-        let mutable reconcilerRef: ReconcileSupervisor.Supervisor option = None
-
-        let continuationAccepted (sessionId: SessionId) (messageId: MessageId) =
-            reconcilerRef
-            |> Option.iter (fun reconciler -> reconciler.BindContinuationUserMessage(sessionId, messageId))
-
-        let onTurn (turn: ReconciledTurn) =
+        let onTurn (turn: ReconciledTurn) : Task =
             // Manager sessions run inside their own worktree, not the plugin's
             // root workspace. The review-guard tree check must resolve that
             // worktree's GitTreePort; otherwise it compares against a
@@ -79,79 +73,25 @@ module HostSignalBootstrap =
                 scope.SessionParents
                 scope.DisposeExecutorRuntime
                 scope.AbortedSessions
-                continuationAccepted
-                scope.FallbackFailures
                 turn
 
         let reconciler =
             ReconcileSupervisor.Supervisor(snapshot, binding, onTurn, ?projection = Some resolveProjection)
 
-        do reconcilerRef <- Some reconciler
-
-        let ensureAuthorityFromSnapshot (sessionId: SessionId) =
-            task {
-                match HostSessionNudge.tryActiveProfile journal sessionId with
-                | Some _ -> return true
-                | None ->
-                    let! messages = snapshot.GetMessages sessionId
-
-                    let root =
-                        match messages with
-                        | Error _ -> None
-                        | Ok values ->
-                            values
-                            |> List.tryPick (fun message ->
-                                match message.Role, message.Agent with
-                                | "user", Some agent ->
-                                    match PromptAuthority.parseAgentName agent with
-                                    | Ok _ -> Some(message.Id, agent)
-                                    | Error _ -> None
-                                | _ -> None)
-
-                    match root, journal with
-                    | None, _ -> return false
-                    // PROMPT-005: accepting an Authority Root is a durable act. With
-                    // nowhere to persist it there is nothing to accept, so this
-                    // reports failure rather than producing a profile that would
-                    // vanish with the process.
-                    | Some _, None -> return false
-                    | Some(messageId, agent), Some durable ->
-                        let runtime = PromptDispatcher.forJournal durable
-
-                        match runtime.AcceptHumanRoot sessionId messageId (Some agent) with
-                        | Error _ -> return false
-                        | Ok _ ->
-                            scope.UserMessageBindings.[SessionId.value sessionId] <- messageId
-                            reconciler.BindUserMessage(sessionId, messageId)
-                            return true
-            }
-
-        let providerContinuation =
-            ProviderFailureContinuation(
-                sessionPort,
-                journal,
-                scope.FallbackFailures,
-                scope.UserMessageBindings,
-                ensureAuthorityFromSnapshot,
-                continuationAccepted
-            )
-
+        /// FALLBACK-003: every Host signal is a wake and nothing else.
+        ///
+        /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
+        /// — a second and third writer of the durable cursor, each deciding from
+        /// event fields whether an attempt had failed. Both are gone: the
+        /// reconciled snapshot decides, and FallbackController performs the advance.
         let onSignal (signal: HostSignal) =
             match signal with
-            | ProviderFailure failure ->
-                // session.error is only a wakeup; wait for the following idle
-                // admission before sending so the Host is no longer busy.
-                providerContinuation.Observe failure
-            | ProviderRetry retry ->
-                // Provider retry is the only durable fallback writer.
-                RetrySignalHandler.handle journal scope.FallbackFailures reconciler.RootBindings retry
-            | SessionIdle sessionId ->
-                reconciler.Signal(signal)
-                providerContinuation.OnIdle sessionId
+            | SessionIdle _
+            | ProviderRetry _
+            | ProviderFailure _ -> reconciler.Signal signal
             | SessionDeleted sessionId ->
-                providerContinuation.Remove sessionId
                 scope.DisposeSession(SessionId.value sessionId)
-                reconciler.Signal(signal)
+                reconciler.Signal signal
 
         let signalRouter = HostSignalRouter(scope.OwnedSessions, onSignal)
 
@@ -177,8 +117,8 @@ module HostSignalBootstrap =
                 && not (String.IsNullOrWhiteSpace messageId)
             then
                 let sid = SessionId.create sessionId
-                let mid = MessageId.create messageId
-                scope.UserMessageBindings.[sessionId] <- mid
+                let physical = PhysicalUserMessageId.create messageId
+                scope.UserMessageBindings.[sessionId] <- physical
 
                 let agentRole =
                     HostSessionNudge.tryActiveProfile journal sid
@@ -187,7 +127,7 @@ module HostSignalBootstrap =
                         |> PromptAuthority.roleLabel
                         |> AgentRoleIdentity.roleOfString)
 
-                reconciler.BindUserMessage(sid, mid, ?agentRole = agentRole)
+                reconciler.BindUserMessage(sid, physical, ?agentRole = agentRole)
                 scope.AbortedSessions.Remove sessionId |> ignore
                 registerOwned sessionId
                 registerSource sessionId LocalPluginEvent
@@ -197,7 +137,10 @@ module HostSignalBootstrap =
                 not (String.IsNullOrWhiteSpace sessionId)
                 && not (String.IsNullOrWhiteSpace messageId)
             then
-                reconciler.BindContinuationUserMessage(SessionId.create sessionId, MessageId.create messageId)
+                reconciler.BindContinuationUserMessage(
+                    SessionId.create sessionId,
+                    PhysicalUserMessageId.create messageId
+                )
 
         let workspaceDir =
             if isNull input || isNull input?directory then
@@ -218,17 +161,19 @@ module HostSignalBootstrap =
             | Some _, None -> registerSource key GlobalForeignDirectoryEvent
             | _ -> registerSource key LocalPluginEvent
 
+            // A host-registered run knows its physical opening message; the
+            // Authority Root is derived from it by PROMPT-002 promotion rather than
+            // read out of a second binding table.
+            let physical =
+                match scope.UserMessageBindings.TryGetValue key with
+                | true, bound -> Some bound
+                | false, _ -> None
+
             reconciler.BindActiveRun
                 { SessionId = sessionId
                   RunId = None
-                  RootUserMessageId =
-                    match scope.UserMessageBindings.TryGetValue(SessionId.value sessionId) with
-                    | true, mid -> Some mid
-                    | false, _ -> None
-                  PhysicalUserMessageId =
-                    match scope.UserMessageBindings.TryGetValue(SessionId.value sessionId) with
-                    | true, mid -> Some mid
-                    | false, _ -> None
+                  AuthorityRootUserMessageId = physical |> Option.map PhysicalUserMessageId.promoteToAuthorityRoot
+                  PhysicalUserMessageId = physical
                   ContinuationMessageIds = Set.empty
                   AgentRole = Some role
                   Directory = defaultArg directory "" }
@@ -250,7 +195,7 @@ module HostSignalBootstrap =
           CurrentPhysicalUserMessage =
             (fun sessionId ->
                 reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
-                |> Option.map MessageId.value)
+                |> Option.map PhysicalUserMessageId.value)
           ChatMessageHook = chatMessageHook
           RegisterSource = registerSource
           ObserveEvent = signalRouter.ObserveLocal }
