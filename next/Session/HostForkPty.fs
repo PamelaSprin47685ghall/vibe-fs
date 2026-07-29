@@ -18,7 +18,11 @@ module HostForkRuntimePty =
                   Command = command
                   StartedAt = DateTimeOffset.UtcNow }
 
-        member this.UntrackPtyRun(id: string) = this.Runtime.UnregisterPty id
+        member this.UntrackPtyRun(id: string) =
+            lock this.Gate (fun () -> this.PtyRuns.Remove id |> ignore)
+            this.Runtime.UnregisterPty id
+
+        member this.OwnsPty(id: PtyId) = lock this.Gate (fun () -> this.PtyRuns.Contains id.Value)
 
         member this.IsPtyCompletion(runId: string) =
             lock this.Gate (fun () -> this.PtyRuns.Contains runId)
@@ -43,14 +47,16 @@ module HostForkRuntimePty =
         member this.TryPty(id: string) =
             let candidate = PtyId.Create id
 
-            if this.PtyPort.Known candidate then
+            if this.OwnsPty candidate && this.PtyPort.Known candidate then
                 Some candidate
             else
                 None
 
         member this.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyRead, string>> =
             task {
-                if not (this.PtyPort.Exists id) then
+                if not (this.OwnsPty id) then
+                    return Error(sprintf "Unknown PTY id: %s" id.Value)
+                elif not (this.PtyPort.Exists id) then
                     return Error(sprintf "Unknown PTY id: %s" id.Value)
                 else
                     match signal with

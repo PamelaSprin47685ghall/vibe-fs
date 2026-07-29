@@ -35,6 +35,7 @@
     <Compile Include="Process/ProcessBoundedTests.fs"/>
     <Compile Include="Process/DeadlineTests.fs"/>
     <Compile Include="Process/PtyTests.fs"/>
+    <Compile Include="Process/PtyOwnershipTests.fs"/>
     <Compile Include="Process/PtyLifecycleTests.fs"/>
     <Compile Include="Agent/ProgramsTests.fs"/>
     <Compile Include="Session/ForkRuntimeTests.fs"/>
@@ -70,6 +71,7 @@
     <Compile Include="OpenCode/ManagerConfigTests.fs"/>
     <Compile Include="OpenCode/ManagedAgentTests.fs"/>
     <Compile Include="OpenCode/ExecutorSummarizeTests.fs"/>
+    <Compile Include="OpenCode/ExecutorMailboxOwnershipTests.fs"/>
     <Compile Include="OpenCode/ToolSurfaceJoinAbortTests.fs"/>
     <Compile Include="OpenCode/ManagerEscCancelE2ETests.fs"/>
     <Compile Include="MockOpenCode/MockOpenCode.fs"/>

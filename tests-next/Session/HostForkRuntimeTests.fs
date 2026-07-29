@@ -138,7 +138,7 @@ module HostForkRuntimeTests =
                     AgentJournal.create tempDir (RuntimeId.create "runtime-restored") 1 DateTimeOffset.UtcNow
 
                 let linkFact =
-                    AgentFact.AgentLinked
+                    AgentFact.AgentForked
                         {| ParentId = parentId
                            ChildId = childId
                            TargetAgent = "agent-restored"

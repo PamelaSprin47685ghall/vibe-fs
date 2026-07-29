@@ -162,6 +162,7 @@ OpenCode 的物理 Session 关系不允许出现孙级：**儿子的儿子仍是
 - root abort 收敛全部直接 child；
 - 单个 child abort 只关闭该 child；作用域资源必须按自己的 child ID 精确关闭；
 - `join` completion、Review owner、Prompt Authority 等局部执行所有权仍由创建它的结构化程序持有，不以 Host `parentID` 反推。
+- durable session association 不等于 join ownership：`AgentLinked` 可关联 Blogger 等系统 child，但不可恢复进任何 ForkRuntime mailbox；只有该 runtime 发出的 `AgentForked` 进入 `ForkedChildren`，才可在重启后恢复并由该 runtime 的 `join()` 消费。PTY completion 同样必须按创建它的 runtime 过滤。
 
 验收：`root → child → grandchild` 的两次 Host `CreateChildSession` 均收到同一个 `root` 作为 `parentID`；进程重启后创建 descendant 仍成立。
 
@@ -170,7 +171,7 @@ OpenCode 的物理 Session 关系不允许出现孙级：**儿子的儿子仍是
 `join` 工具收到 host `abort` 信号时，必须立即同步完成以下动作，然后才返回/继续：
 
 1. 调用 `HostForkRuntime.Cancel()`，后者立即设置 `ForkRuntime.IsCancelled`，使 `runtime.Join()` 返回 `Cancelled` 而不是 `NothingToJoin`。
-2. 计算当前 `HostForkRuntime` 的 parent session 与所有已链接 child session 的 ID 集合。
+2. 计算当前 `HostForkRuntime` 的 parent session 与该 runtime 直接 fork 的 child session 的 ID 集合。Companion 与其他系统关联不得作为 join-owned child 混入此集合。
 3. 调用 `cancelSignals` callback，对 `parentId :: childIds` 调用 `HostSignalRouter.UnregisterOwned`；这样 `HostSignalAdapter` 会丢弃这些 session 后续到达的 `session.status=idle`/`retry` 事件，从来源上阻止新的 `ProviderRetryAttempt` flush 产生。
 4. 调用 `cancelFallbackRetries` callback，移除 `PluginFallbackRetry` 中已经为这些 session 排队的 `ProviderRetryAttempt` flush。
 5. 同步写 `AgentUnlinked` 事实，保证崩溃恢复后这些子 session 不再被当作仍链接。

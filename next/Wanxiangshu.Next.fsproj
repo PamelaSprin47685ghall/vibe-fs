@@ -42,6 +42,7 @@
     <Compile Include="Journal/RuntimePath.fs"/>
     <Compile Include="Session/ForkTypes.fs"/>
     <Compile Include="Session/AgentCompletion.fs"/>
+    <Compile Include="Session/ForkRuntimeOwnership.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
     <Compile Include="Session/ReviewTypes.fs"/>

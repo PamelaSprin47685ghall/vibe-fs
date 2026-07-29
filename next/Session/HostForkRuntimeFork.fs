@@ -65,7 +65,7 @@ module HostForkRuntimeFork =
                             | None -> Ok()
                             | Some journal ->
                                 let fact =
-                                    AgentFact.AgentLinked
+                                    AgentFact.AgentForked
                                         {| ParentId = this.ParentId
                                            ChildId = ChildId.create (SessionId.value childId)
                                            TargetAgent = agentId

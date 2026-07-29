@@ -155,20 +155,21 @@ type ForkRuntime
 
     member _.PublishCompletion(completion: RunCompletion) : unit =
         lock lockObj (fun () ->
-            if waiters.Count > 0 then
-                waiters.Dequeue().SetResult(Ok completion)
-            else
-                mailbox.Enqueue completion
+            if not isCancelled && ForkRuntimeOwnership.ownsPublishedCompletion agents ptys completion then
+                if waiters.Count > 0 then
+                    waiters.Dequeue().SetResult(Ok completion)
+                else
+                    mailbox.Enqueue completion
 
-            match agents.TryGetValue completion.AgentId with
-            | true, rec' when rec'.Status <> AgentStatus.Closed ->
-                agents.[completion.AgentId] <-
-                    { rec' with
-                        Status = AgentStatus.Idle
-                        CurrentRunId = None
-                        LastCompletionStatus = Some(AgentCompletion.status completion.Outcome)
-                        HasPendingCompletion = waiters.Count = 0 && mailbox.Count > 0 }
-            | _ -> ())
+                match agents.TryGetValue completion.AgentId with
+                | true, rec' when rec'.Status <> AgentStatus.Closed ->
+                    agents.[completion.AgentId] <-
+                        { rec' with
+                            Status = AgentStatus.Idle
+                            CurrentRunId = None
+                            LastCompletionStatus = Some(AgentCompletion.status completion.Outcome)
+                            HasPendingCompletion = waiters.Count = 0 && mailbox.Count > 0 }
+                | _ -> ())
 
     member _.RegisterPty(pty: PtyRecord) : unit =
         lock lockObj (fun () -> ptys.[pty.PtyId] <- pty)
