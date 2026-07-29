@@ -102,21 +102,21 @@ module RoleDefinitions =
     let managerPrompt =
         "Manager system prompt SSOT: prompts/manager-system.md\n"
         + "Tools: fork / join / list only.\n"
-        + "Manager thinks and delegates. Coder edits. DevOps executes. Reviewer verifies."
+        + "Manager owns verification. Coder edits then stops. DevOps executes. Reviewer verifies."
 
     /// Full Coder system prompt lives in prompts/coder-system.md and is loaded
     /// into OpenCode AgentConfig.prompt (host system prompt).
     let coderPrompt =
         "Coder system prompt SSOT: prompts/coder-system.md\n"
         + "Tools: read / write / edit / glob / grep / inspector.\n"
-        + "Coder edits; use Inspector only for necessary, narrow investigation. DevOps and Reviewer own routine verification."
+        + "Coder edits then stops. Inspector is only for narrow static facts; never compile, test, diagnose failures, or delegate verification."
 
     /// Full Inspector system prompt lives in prompts/inspector-system.md and is
     /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let inspectorPrompt =
         "Inspector system prompt SSOT: prompts/inspector-system.md\n"
         + "Tools: executor only.\n"
-        + "Read-only investigation. Never mutate files or spawn sub-agents."
+        + "Read-only static queries only. Never mutate, compile, build, typecheck, lint, test, run project code, or spawn sub-agents."
 
     /// Full DevOps system prompt lives in prompts/devops-system.md and is loaded
     /// into OpenCode AgentConfig.prompt (host system prompt).

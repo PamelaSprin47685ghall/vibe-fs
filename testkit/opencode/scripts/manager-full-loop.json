@@ -595,7 +595,7 @@
         "tool": "fork",
         "args": {
           "agent": "fast-coder",
-          "prompt": "Edit src/main.txt to 'patched', report final A and the verification handoff."
+          "prompt": "Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file and implementation decision; do not verify or suggest verification."
         }
       }
     },
@@ -640,7 +640,7 @@
       },
       "respond": {
         "type": "text",
-        "text": "Coder final report: src/main.txt patched; verification handed off."
+        "text": "Coder edit summary: src/main.txt patched. Source edit complete; no verification performed or recommended."
       }
     },
     {
