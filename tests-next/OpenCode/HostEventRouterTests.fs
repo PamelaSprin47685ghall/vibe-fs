@@ -50,6 +50,12 @@ module HostEventRouterTests =
     let private textPart text =
         createObj [ "id", box "p1"; "type", box "text"; "text", box text ]
 
+    let private reasoningPart text =
+        createObj [ "id", box "reasoning-1"; "type", box "reasoning"; "text", box text ]
+
+    let private bookkeepingPart kind =
+        createObj [ "id", box ("bookkeeping-" + kind); "type", box kind ]
+
     let private applyDecide sessionPort journal git verdict nudgeSent managerGuard parents turn =
         let eventPort = Events.HostEventPort()
 
@@ -205,4 +211,80 @@ module HostEventRouterTests =
                       MessageId = None }
 
                 Assert.Equal(1, fallbackFailures journal sessionId)
+            })
+
+    [<Fact>]
+    let ``Deep_meditator_reasoning_only_stop_requests_interaction_repair`` () =
+        withTempDir (fun directory ->
+            task {
+                let sessionId = "deep-meditator-reasoning-only"
+                let prompts = ResizeArray<string * string>()
+                let sessionPort = recordingPort prompts
+
+                use journal =
+                    AgentJournal.create directory (RuntimeId.create "deep-meditator-runtime") 1 DateTimeOffset.UtcNow
+
+                registerAuthorityRoot journal sessionId "deep-meditator"
+
+                let parts =
+                    [| bookkeepingPart "step-start"
+                       reasoningPart "I have completed the analysis but emitted no formal answer."
+                       bookkeepingPart "step-finish" |]
+
+                let assistant =
+                    { Id = MessageId.create "a-reasoning-only"
+                      Role = "assistant"
+                      Agent = Some "deep-meditator"
+                      Finish = Some "stop"
+                      ErrorName = None
+                      Model = None
+                      Parts = parts
+                      Raw = createObj [] }
+
+                let turn =
+                    CompletedTurnClassifier.buildTurn
+                        (SessionId.create sessionId)
+                        (MessageId.create "u1")
+                        (MessageId.create "u1")
+                        assistant
+                        None
+                        "/tmp/ws"
+
+                Assert.Equal(Some AgentRole.Meditator, turn.AgentRole)
+
+                match turn.Outcome with
+                | TurnOutcome.TurnNeedsContinuation _ -> ()
+                | other -> Assert.True(false, sprintf "expected reasoning-only continuation, got %A" other)
+
+                applyDecide
+                    sessionPort
+                    (Some journal)
+                    None
+                    (HashSet())
+                    (HashSet())
+                    (HashSet())
+                    (Dictionary())
+                    turn
+
+                do! drainMicrotasks 16
+                Assert.Single(prompts) |> ignore
+                Assert.Contains("no final task report was produced", snd prompts.[0])
+
+                let authority =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Map.find (SessionId.create sessionId)
+                    |> fun session -> session.PromptAuthority
+
+                match authority with
+                | Some projection ->
+                    Assert.equal (
+                        Some "deep-meditator",
+                        projection.ActiveLogicalRun |> Option.map (fun profile -> profile.SelectedAgent)
+                    )
+
+                    Assert.True(
+                        projection.PendingClaims
+                        |> Map.exists (fun _ claim -> claim.EffectiveAgent = Some "deep-meditator")
+                    )
+                | None -> Assert.True(false, "interaction repair lost deep-meditator authority")
             })

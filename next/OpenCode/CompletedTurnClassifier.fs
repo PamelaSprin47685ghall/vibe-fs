@@ -101,8 +101,11 @@ module CompletedTurnClassifier =
             | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
                 let text = partsText parts
 
-                if String.IsNullOrWhiteSpace text && not (hasToolCallPart parts) then
-                    TurnNeedsContinuation "assistant stop with empty text"
+                // A terminal provider step is not a final answer unless it has
+                // formal text. Reasoning, tool calls, and step bookkeeping may
+                // all be present while the model-visible answer is still empty.
+                if String.IsNullOrWhiteSpace text then
+                    TurnNeedsContinuation "assistant stop without formal text"
                 else
                     TurnCompleted
             | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnInProgress

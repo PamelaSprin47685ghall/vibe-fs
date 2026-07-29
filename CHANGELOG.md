@@ -26,6 +26,7 @@ Phase 0 documentation freeze for the 0.5.0 track. Product law now points at infi
 
 ### Runtime fixes
 
+- Fixed reasoning-only terminal turns (including OpenCode `step-start`/`step-finish` bookkeeping) being mistaken for completed output. Public work agents such as `deep-meditator` now retain the same Authority Root and EffectiveAgent while dispatching one `InteractionRepair` continuation for a formal final report.
 - Removed the repeated `companion eligibility denied` stderr message from pre-authority and host-internal transforms. Missing `ActiveLogicalRun` still fails closed without creating a Blogger, while eligible sessions continue to use the durable authority projection.
 - Fixed the reviewer `inspector` callback returning a curried function instead of a Promise, which OpenCode displayed as a red tool error.
 - Fixed `coder`/`inspector` argument schemas leaking Zod internals into provider JSON, which made DevOps requests fail immediately with `invalid_request_error`; all custom tool arguments are now guarded against raw-schema mixing.
