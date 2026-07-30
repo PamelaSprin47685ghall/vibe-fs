@@ -60,6 +60,9 @@ const [
   TerminalValidity,
   BloggerTomlModule,
   BloggerDeltaModule,
+  CompanionPromptModule,
+  CompanionIdentityModule,
+  CompanionBuilderModule,
   Authority,
   AuthorityRun,
   Witness,
@@ -84,6 +87,9 @@ const [
   prod('Domain/TerminalValidity'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
+  prod('Domain/CompanionPrompt'),
+  prod('Domain/CompanionIdentity'),
+  prod('Domain/CompanionProjectionBuilder'),
   prod('Domain/PromptAuthority'),
   prod('Domain/PromptAuthorityRun'),
   prod('Domain/ReviewWitness'),
@@ -599,6 +605,86 @@ export const bloggerDelta = (() => {
         truncatedFlags: listItems(chunk.Items).map((item) => item.Truncated),
         nextCursor: { turn: chunk.NextCursor.TurnIndex, part: chunk.NextCursor.PartIndex },
         nextCutoff: chunk.NextCoverableTurnCutoffExclusive,
+      }
+    },
+  }
+})()
+
+/** COMPANION-004 / COMPANION-010: the fixed prompt text, with no interpolation. */
+export const companionPrompt = {
+  system: CompanionPromptModule.System,
+  normalInstruction: CompanionPromptModule.NormalInstruction,
+  squashInstruction: CompanionPromptModule.SquashInstruction,
+  memoryPreamble: CompanionPromptModule.CompanionMemoryPreamble,
+  memoryBlock: (frozenB) => CompanionPromptModule.companionMemoryBlock(frozenB),
+}
+
+/**
+ * COMPANION-013: the four synthetic identity formulas.
+ *
+ * `sha256` is injected so a test can supply a visible, deterministic stand-in and
+ * assert on the INPUT the formula composed. Asserting on real hex would only prove
+ * the digest is stable, not that the right fields went into it.
+ */
+export const companionIdentity = {
+  sealRoot: (sha256, { session, epoch, cutoff, prefixDigest, frozenDigest }) =>
+    CompanionIdentityModule.sealRoot(
+      sha256,
+      sessionId(session),
+      prefixEpochId(epoch),
+      cutoff,
+      prefixDigest,
+      blobDigest(frozenDigest),
+    ),
+
+  companionMemoryMessageId: (sha256, seal) => CompanionIdentityModule.companionMemoryMessageId(sha256, seal),
+
+  frameMessageId: (sha256, { blogger, epoch, ordinal, digest }) =>
+    CompanionIdentityModule.frameMessageId(sha256, sessionId(blogger), frameEpochId(epoch), ordinal, blobDigest(digest)),
+
+  instructionMessageId: (sha256, { blogger, epoch, kind }) =>
+    CompanionIdentityModule.instructionMessageId(sha256, sessionId(blogger), frameEpochId(epoch), kind),
+}
+
+/** COMPANION-005 / CTX-012: the Companion's provider-visible message list. */
+export const companionProjection = (() => {
+  const m = bind(CompanionBuilderModule, 'CompanionProjectionBuilder', ['build', 'isFirstTurnShape'])
+  const buildKind = unionCase(CompanionBuilderModule.CompanionRequestKind, 'CompanionRequestKind')
+
+  return {
+    normal: buildKind('Normal', []),
+    squash: (frameCount) => buildKind('Squash', [frameCount]),
+
+    /**
+     * `frames` is `[{ digest, body }]`; `delta` is `{ messageId, toml }` or omitted.
+     *
+     * The tuple lists are converted here: an F# tuple is a JS array, and a `list` of
+     * them still needs `toList` or it folds as empty.
+     */
+    build: (sha256, { blogger, epoch, kind, frames, delta }) => {
+      const plan = m.build(
+        sha256,
+        sessionId(blogger),
+        frameEpochId(epoch),
+        kind,
+        toList(frames.map((f) => [blobDigest(f.digest), f.body])),
+        delta === undefined ? undefined : [delta.messageId, delta.toml],
+      )
+
+      const messages = listItems(plan.Messages).map((msg) => ({
+        id: msg.MessageId,
+        role: msg.Role,
+        text: msg.Text,
+        physical: msg.IsPhysical,
+      }))
+
+      return {
+        system: plan.System,
+        messages,
+        roles: messages.map((msg) => msg.role),
+        texts: messages.map((msg) => msg.text),
+        physicalFlags: messages.map((msg) => msg.physical),
+        isFirstTurnShape: m.isFirstTurnShape(plan),
       }
     },
   }
