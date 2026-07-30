@@ -895,7 +895,7 @@ T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs
 | 项 | 值 |
 |----|----|
 | 条款 | VERIFY-004 VERIFY-002 |
-| 目标模块 | `testkit/opencode/watchdog.js`、`watchdog-constants.js`、`stability-checker.js`、`scripts/run-canary-staggered.mjs`、`tests-next/runner.js` |
+| 目标模块 | `testkit/opencode/watchdog.js`、`watchdog-constants.js`、`stability-checker.js`、`scripts/run-canary-staggered.mjs`、`tests-mjs/runner.mjs`（原写 `tests-next/runner.js`，该目录已随 T-5 删除） |
 | 原理状态 | 保留。没有进展就杀死、watchdog 按语义事件投喂、因果 bark 交错启动，三者是既有设计中最有价值的部分，必须继承发扬 |
 | 实现状态 | 不合格。见下方实测缺陷 |
 | 重建方式 | 第一性原理瀑布流，与包 K 同期。禁止在现有实现上逐点修补 |
@@ -907,11 +907,13 @@ T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs
 
 | 缺陷 | 位置 | 后果 |
 |------|------|------|
-| 声明了断言心跳但未接线 | `tests-next/Assert.fs:13` `resetHeartbeat () : unit = ()` 空实现；`runner.js` 的 `globalThis.__resetAssertionTimeout` 无人调用 | 单测的「断言投喂心跳」根本不存在。1000ms 是纯 wall-clock 超时，读者却以为有因果保护 |
-| 数量常量与清单各自维护 | `run-canary-staggered.mjs`：`CANARY_COUNT = 17`，`CANARY_TESTS` 实际 19 条 | 已经漂移。日志里的 `expected ~17` 是错的 |
-| 静态门禁指向不存在的目录 | `stability-checker.js:32` 判 `e2e/opencode/specs/`，该目录不存在 | `containsTool` 检查恒为通过，伪门禁 |
-| 超时值散落为字面量 | `run-canary-staggered.mjs:120` 就绪窗口 `10000`；`:35` canary 兜底 `90000`；`watchdog.js:84` 诊断竞速 `3000` | 只有 `WATCHDOG_TIMEOUT_MS` 是集中的。其余三个无法统一调整，也无法被门禁检查 |
-| 启动阶段只有 wall-clock 覆盖 | canary 进程拉起到 `[setupScenario] ready` 之间只有 10s 硬窗口 | 存在一段无因果判据的时间窗，违反 VERIFY-004「覆盖必须无缝」 |
+| 一个测试超时导致整个套件停摆 | `tests-mjs/runner.mjs:111` 把 `PER_TEST_TIMEOUT_MS` 交给 `node:test` 的 `run({ timeout })` | 实测：`run({timeout})` 只判决不中止。挂死且持句柄的测试在超时点被判失败，但源流永不发 `end`，唯一终止者是 `SUITE_TIMEOUT_MS = 300000`。同时违反「禁止一个测试超时导致整个套件停摆」与「运行器必须有测试覆盖这一点」，且使 `runner.mjs:9-10` 的注释成为假声明 |
+| watchdog 被墙钟无条件续期 | `canary-driver.mjs:126` 的 `waitFact` 轮询循环 | 每 500ms 切片无条件 `advance({blocking:true})`，与 fact 计数是否推进无关，最长可把一个错误的 watchdog 续到 120s。正是 VERIFY-004「一个反复重连的 SSE 读者能永久续期一个错误的 watchdog」点名的形态。宪章缺陷表原未记录，归入 W6 |
+| 数量常量与清单各自维护 | `run-canary-staggered.mjs:36`：`CANARY_COUNT = 17`，`CANARY_TESTS` 实测 16 条 | 已经漂移两次：宪章原记「实际 19 条」，包 K 删三条 canary 后成 16。唯一用途是 `:203` 的日志，而该行同时打印两侧，字面输出 `Concurrency: 16 / 16 (expected ~17)`。漂移方向都变了，证明它必须派生而非校正 |
+| 静态门禁指向不存在的目录 | `stability-checker.js:30` 判 `e2e/opencode/specs/`，该目录不存在 | `containsTool` 检查在全部 28 个 `runStaticGate([__filename])` 调用点恒不可达，伪门禁。同文件的 `fixed-sleep` 检查（`:43-63`）是活的 |
+| 超时值散落为字面量 | `run-canary-staggered.mjs:35`（90000 兜底）、`:111`（10000 就绪窗口，且同值重复进 `:244-245` 两处用户可见字符串）、`watchdog.js:84`（3000 诊断竞速）、`scenario-parallel.js:162`（3000 host.stop 竞速）、`canary-driver.mjs:127`（120000 waitFact 总窗） | 只有 `WATCHDOG_TIMEOUT_MS` 是集中的。其余无法统一调整，也无法被门禁检查 |
+| 启动阶段只有 wall-clock 覆盖 | canary 进程拉起（`run-canary-staggered.mjs:86`）到 `[setupScenario] ready` 之间只有 `:111` 的 10s 硬窗口 | 存在一段无因果判据的时间窗，违反 VERIFY-004「覆盖必须无缝」。无任何递进就绪证据（端口已绑、插件已载、provider 已起）投喂任何东西 |
+| ~~声明了断言心跳但未接线~~ | ~~`tests-next/Assert.fs:13`~~ | 已随 `tests-next/` 在 T-5（`952be9e3`）整体删除而灭绝。`resetHeartbeat` 与 `__resetAssertionTimeout` 全仓非散文引用为 0。故禁止退化清单第 7 条当前无任何活代码违反，W4 是全新实现而非修复 |
 
 #### 重建顺序
 
@@ -919,13 +921,66 @@ T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs
 W1  集中所有时间常量，建立单一来源；门禁禁止字面量超时
 W2  canary 清单单一事实来源，数量从清单派生
 W3  删除伪门禁，静态检查路径判据与实际目录对齐
-W4  重建单测运行器的因果心跳：断言真实投喂，并有测试证明未接线会红
+W4  重建单测运行器的因果推进门禁：以「距上次判决的静默时长」为主判据，
+    verdict 投喂、stdout/stderr 不续期、静默即 SIGKILL 子进程组并转储诊断。
+    并有测试证明：(a) 未接线或错误接线（噪声续期）会红；(b) 超时测试被遗忘
+    而不污染下一个测试的归因；(c) 干净结束不等满静默窗口
 W5  启动阶段因果判据，消除只有 wall-clock 的时间窗
 W6  watchdog 重写：语义投喂、背景不续期、诊断完整、不持有事件循环
 W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试
 ```
 
 W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没有测试证明能力真实存在。`Assert.fs` 的空 `resetHeartbeat` 能存在这么久，正是因为没有任何测试断言心跳被投喂。
+
+#### 六项裁决（实施前定案）
+
+原 W4 措辞已按第一条改写。六项都不动 SSOT：VERIFY-004 的文字正确，要改的是本总账。
+
+##### 一：W4 不重建断言级心跳，改为判决级
+
+条款是条件句而非强制：「若运行器声称『断言投喂心跳』，则该心跳必须真实连通并有测试证明。」SSOT 从未要求单测运行器必须有断言级心跳。而那个「声明了但未接线」的心跳已随 `tests-next/` 删除而灭绝（见缺陷表末行）。
+
+断言级投喂是语义错误，不只是难实现。条款自带判据「该事件是否证明被测因果链前进了一步」，并排除「任何『有字节在动』的证据」。纯 fold 的因果链是一次函数调用，断言在它返回之后执行，是已完成计算的下游观测，不是未完成调用的中间检查点。更糟：`for (c of cases) assert(f(c)); await neverResolves()` 会续期 300 次，断言写在非终止循环内则永久续期——正是条款点名的「反复重连的 SSE 读者」形态。选它会新增一条退化项，而非清除一条。
+
+正确的因果信号在上一层：每个完成的 verdict 证明套件因果链前进一步，由运行时产生而非作者产生，挂死的测试无法伪造。这也让 `blocking` 区分在单测运行器里第一次有真实工作可做——`test:pass`/`test:fail`/`test:complete` 续期，`test:stdout`/`test:stderr`/`test:diagnostic` 只记录。
+
+实现为两层：子进程保持 `run({ files, timeout, concurrency })` 语义不变（保住「超时即遗忘」与进程内并行），每个事件 `process.send` 一条；父进程复用 `testkit/opencode/watchdog.js` 的 `Watchdog`（不重造），在 spawn 之前武装（顺带覆盖单测侧的启动窗口），静默则转储诊断并 SIGKILL 子进程组。
+
+已否决的三条：进程级隔离（每文件一进程）付 40 次 `build/next` 模块加载与 40 次 spawn 且失去 `concurrency`，换来的抢占一个哨兵进程已经买到——父进程不被子进程的事件循环阻塞，故 CPU 密集挂死也能杀；断言级投喂见上；仅改名不修停摆，把主违反留给「另行修复」。
+
+`PER_TEST_TIMEOUT_MS` 保名保值 1000：固定单测硬界是「每个测试有独立的硬超时」明确要求的，只有 `runner.mjs:9-10` 的注释在说谎，删注释而非改常量。
+
+##### 二：W2 拥有数量单一来源，修订三的 K8 归属被取代
+
+修订三把 `CANARY_COUNT` 漂移的修复派给 K8 的 `data-driven.manifest.toml`。包 K8 已完成且未创建该清单，把此刻新建的文件归属于一个已完结的包是虚构。
+
+两项义务本可分离却被并在一起：修订三想要的是「数据驱动 canary 运行器」，W2 的条款义务只是「数量从清单派生」。故 W2 履行数量义务；数据驱动运行器登记为取消——8 条 stub canary 仍是 8 个 9 行文件，在没有任何需求要求合并它们之前，多一层清单间接不产生收益。
+
+##### 三：`Promise.all` 不违反 ARCH-009，但仍要有界
+
+`run-canary-staggered.mjs:233` 对全部输入集 `Promise.all`。ARCH-009 的适用域是业务层（`next/**`），harness 工具按适配器内部例外不受此限，故不启动例外协议、不改条款。
+
+但该条款的理由归属于 VERIFY-004，而对 16 个 OpenCode 进程的无界扇出恰好制造 VERIFY-004 禁止用「延长窗口」掩盖的资源竞争。故在 W5 落地时以 `CANARY_MAX_PARALLEL` 有界化，并在此记录适用域判断。
+
+##### 四：manager-tool-contract 的三组 `.execute` 断言不随迁移带走
+
+实测该测试当前是红的，红在第 242 行：`reviewerInspector.agent` 为 `undefined`，期望 `'fast-inspector'`。故 1–236 行是真实拥有的覆盖，238–288 行的三组共 31 条断言在当前树里从未通过过。
+
+带走它们只有两种下场，都被禁止：让套件长红（破坏绿基线），或把断言放宽到承认 `undefined` 正确（正是 `design-script-forest.md:630` 判为「比没有验证装置更危险」的假绿）。故迁移只带 1–236 行，三组连同实测失败一并另记待办，与删除原文件同一提交落地。
+
+##### 五：K10 收缩为一条森林级性质加一份在册清点
+
+K10 的四项里三项已实现且已有门禁覆盖：无死边（`scenario-schema.js` `deadEdges`）、索引无冲突（`duplicateDeclarations` + `runtime-key.js` `ambiguousTurn`）、fault 有限（`validateFault` + `conflictingFaults`）。重新实现它们会造出第二事实源——正是 W1 与 W2 要消灭的缺陷。
+
+故 K10 = 设计文档 `:581` 那条真正未实现的森林级性质「同请求序列 → 同内容序列」（跨全部 15 条真实剧本），加一份把其余三项映射到 `file:symbol` 与执行它的门禁用例名的在册清点，任一映射消失即门禁失败。形状仿 `scripts/shock-audit.mjs` 的符号灭绝表，方向取反。
+
+##### 六：K11 第四类变异重新锚定
+
+`loadScripts` 已在 K8c（`d01386dc`）删除，故「重启后本该命中的边消失」不能再对着它写。重新锚定到 `ScenarioRuntime` 的 `bind` + `clearSeals` + `select`：一条静态剧本的边在模拟重启后必须仍然命中——这正是「静态剧本」的定义。
+
+##### 附：reporter 少报只作注释处理
+
+实测同一次运行 `spec` 打印 `ℹ fail 1` 而源流发出 2 次 `test:fail`。`runner.mjs` 自己数源流故退出码正确，但读汇总的人看到错数字。这是上游 bug，不改写也不打补丁 `spec`；由父进程用 IPC 收到的全部 verdict 打印权威汇总，并加注释记录该少报。
 
 ### 包 K：剧本森林重建
 
