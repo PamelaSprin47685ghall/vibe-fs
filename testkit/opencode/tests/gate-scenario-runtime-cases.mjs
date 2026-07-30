@@ -327,7 +327,6 @@ user = "Ship the parser fix."
 
 [[turn]]
 id = "guard"
-lane = "fast-manager"
 internal = true
 user = "Review is required before completion."
 
@@ -360,7 +359,6 @@ user = "Ship the parser fix."
 
 [[turn]]
 id = "guard"
-lane = "fast-manager"
 internal = true
 user = "Review is required before completion."
 

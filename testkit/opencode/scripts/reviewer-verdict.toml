@@ -76,7 +76,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = "Review review_target.txt and submit two PERFECT verdicts."
+user = ["[Original user requirements — authoritative review scope]", "Review review_target.txt and submit two PERFECT verdicts."]
 tools = ["verdict"]
 
   [[turn.step]]
@@ -104,7 +104,6 @@ tools = ["fork", "join", "list"]
 
 [[turn]]
 id = "guard-manager-nudged"
-lane = "guard-manager"
 internal = true
 user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
 tools = ["fork", "join", "list"]
@@ -125,7 +124,6 @@ tools = ["verdict"]
 
 [[turn]]
 id = "reviewer-nudged"
-lane = "reviewer-nudge"
 internal = true
 user = "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
 tools = ["verdict"]

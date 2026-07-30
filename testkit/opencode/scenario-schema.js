@@ -27,6 +27,7 @@
 
 import { parse as parseToml } from 'smol-toml';
 import { retiredFieldProblems } from './legacy-fields.js';
+import { turnFragments } from './runtime-key.js';
 import { validateFault } from './delivery-plan.js';
 
 // ── the TOML root-key trap ──────────────────────────────────────────────────
@@ -112,6 +113,34 @@ export function rootKeyOrderProblems(source) {
 
 // ── compilation ─────────────────────────────────────────────────────────────
 
+/**
+ * `user` is either a prefix or an ordered fragment list.
+ *
+ * The list form exists for one measured reason (`runtime-key.js` documents it): production
+ * WRAPS a forked Reviewer's assignment, so the text a scenario knows sits at the end of the
+ * request. Two fragments is the minimum that can say "starts with the wrapper, and later
+ * contains this".
+ *
+ * A one-element list is rejected because it is a prefix wearing a costume — the reader would
+ * have to compare bracket shapes to see which rule applies.
+ */
+const userTextProblems = (turn, index) => {
+  const user = turn.user;
+
+  if (typeof user === 'string') {
+    return user === '' ? [`turn[${index}] needs user text`] : [];
+  }
+  if (!Array.isArray(user)) return [`turn[${index}] needs user text`];
+
+  if (user.length < 2) {
+    return [`turn[${index}] a one-fragment user list is just a prefix; write the string`];
+  }
+  if (user.some((fragment) => typeof fragment !== 'string' || fragment === '')) {
+    return [`turn[${index}] every user fragment must be non-empty text`];
+  }
+  return [];
+};
+
 /** A step's position within its turn IS its runtime `step` (K2). */
 const compileTurns = (turns) =>
   turns.flatMap((turn, turnIndex) =>
@@ -176,8 +205,13 @@ export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
     (text) => typeof text === 'string',
   );
 
+  // For a fragment declaration the scenario-visible part is the LAST fragment: the earlier
+  // ones are production's wrapper, which no scenario text can carry. Comparing against the
+  // wrapper would make every such turn trivially unreachable.
+  const declaredText = (turn) => turnFragments(turn.user).at(-1);
+
   const reachedBy = (texts, turn) =>
-    texts.some((text) => text.startsWith(turn.user) || turn.user.startsWith(text));
+    texts.some((text) => text.startsWith(declaredText(turn)) || declaredText(turn).startsWith(text));
 
   const reachableTurns = new Set(
     turns.filter((turn) => turn.internal === true || reachedBy(scenarioPrompts, turn)),
@@ -226,9 +260,14 @@ const responseDigest = (respond) => JSON.stringify(respond ?? null);
 const duplicateDeclarations = (entries) => {
   const problems = [];
 
+  // `turn` may be an array, so compare a digest: two distinct arrays with the same contents
+  // are the same declaration and `!==` would not say so.
+  const turnDigest = (entry) => JSON.stringify(turnFragments(entry.turn));
+
   for (const left of entries) {
     for (const right of entries) {
-      if (left.lane !== right.lane || left.step !== right.step || left.turn !== right.turn) continue;
+      if (left.lane !== right.lane || left.step !== right.step) continue;
+      if (turnDigest(left) !== turnDigest(right)) continue;
       if (left.kind !== right.kind) continue;
       if (left.id >= right.id) continue;
 
@@ -416,13 +455,34 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
 
   turns.forEach((turn, index) => {
     if (typeof turn.id !== 'string' || turn.id === '') problems.push(`turn[${index}] needs an id`);
-    if (typeof turn.user !== 'string' || turn.user === '') problems.push(`turn[${index}] needs user text`);
+    problems.push(...userTextProblems(turn, index));
     if (!Array.isArray(turn.step) || turn.step.length === 0) problems.push(`turn[${index}] needs at least one step`);
     if (turn.kind !== undefined && turn.kind !== 'chat' && turn.kind !== 'title') {
       problems.push(`turn[${index}] kind '${turn.kind}' is not chat or title`);
     }
     if (turn.internal !== undefined && turn.internal !== true) {
       problems.push(`turn[${index}] internal must be true when present; omit it otherwise`);
+    }
+    // An internal turn's prompt is composed by production, which decides WHICH session
+    // receives it. Pinning it to one alias claims knowledge the scenario does not have.
+    //
+    // Measured in K9, three times, each looking like an unrelated conversion bug:
+    //
+    //   a Companion prompt is identical across sessions, so a lane-bound blogger turn
+    //   answered one work session out of six (`CompanionHostBlogger.fs:77`)
+    //
+    //   `Submit a structured verdict…` (`HostReviewGuard.fs:164`) arrived at the Reviewer
+    //   the Manager had FORKED, not at the session the scenario created for that purpose
+    //
+    //   `Review is required before completion.` reaches whichever Manager tried to finish
+    //
+    // The turn text is the identity in every case — production composes one exact sentence
+    // per situation. A lane adds nothing and subtracts sessions.
+    if (turn.internal === true && turn.lane !== undefined) {
+      problems.push(
+        `turn[${index}] '${turn.id}' is internal, so it may not declare a lane: ` +
+          'production decides which session receives a prompt it composed',
+      );
     }
   });
 

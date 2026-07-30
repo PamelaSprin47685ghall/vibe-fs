@@ -451,7 +451,6 @@ user = "go"
 
 [[turn]]
 id = "blogger"
-lane = "coder-blogger"
 internal = true
 user = "You are the blogger of a coding agent session."
 

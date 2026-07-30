@@ -248,12 +248,74 @@ export function runtimeKeyOf(body, bindings) {
  * matches nothing — a request with no user message cannot begin with any declared
  * user text, and admitting it would make every scenario match a bare continuation.
  */
+/**
+ * A declaration's fragments, in order. A plain string is a one-fragment declaration.
+ *
+ * ── why more than one fragment exists ───────────────────────────────────────
+ *
+ * Measured in K9 against REVIEW-002. When a Manager forks a Reviewer, production does not
+ * send the Manager's assignment as the prompt — it WRAPS it
+ * (`../next/Session/HostForkRuntimeFork.fs:98`):
+ *
+ *   [Original user requirements — authoritative review scope]
+ *   …verified HumanRoot prompts since the prior review…
+ *
+ *   User prompt 1:
+ *   <the human's actual prompt>
+ *
+ *   [Manager review request — supplementary]
+ *   <the assignment the scenario declared>
+ *
+ * So the text a scenario knows sits at the END. A single prefix cannot reach it, and
+ * declaring only the wrapper is worse than useless: `manager-full-loop` forks a Reviewer
+ * twice (a REVISE round, then a dual-PERFECT round) and both requests share that wrapper
+ * byte for byte. One prefix declaration would make them the same key, and the load-time
+ * duplicate check would rightly refuse to guess which response belongs to which.
+ *
+ * ── why this is not `containsText` coming back ──────────────────────────────
+ *
+ * The retired `containsText` was an UNORDERED BAG of substrings, each free to match
+ * anywhere. Three properties separate this from it:
+ *
+ *   anchored    fragment 0 must be a true prefix of the turn
+ *   ordered     each later fragment must occur after the previous one ends
+ *   additive    the uniqueness weight is total fragment length, so "more declared text"
+ *               still means "more specific" and ties are still author errors
+ *
+ * A bag has none of the three, which is why it needed `specificity` scoring to choose
+ * between overlapping matches. This is the same longest-prefix rule with a hole punched
+ * through the middle at a point the author names explicitly.
+ */
+export const turnFragments = (turn) => (Array.isArray(turn) ? turn : [turn]);
+
+/**
+ * How much declared text matches, or `null` when the declaration does not apply.
+ *
+ * The weight is what replaces the old prefix `.length`, and it must be the SUM rather than
+ * the span: measuring "distance from start of first to end of last" would make a
+ * declaration look more specific for skipping more text it never named.
+ */
+const matchWeight = (turn, declaration) => {
+  const fragments = turnFragments(declaration.turn);
+  if (!turn.startsWith(fragments[0])) return null;
+
+  let cursor = fragments[0].length;
+  for (const fragment of fragments.slice(1)) {
+    const found = turn.indexOf(fragment, cursor);
+    if (found < 0) return null;
+    cursor = found + fragment.length;
+  }
+
+  return fragments.reduce((total, fragment) => total + fragment.length, 0);
+};
+
 const prefixMatches = (turn, declarations) =>
   turn === null
     ? []
     : declarations
-        .filter((declaration) => turn.startsWith(declaration.turn))
-        .sort((left, right) => right.turn.length - left.turn.length);
+        .map((declaration) => ({ declaration, weight: matchWeight(turn, declaration) }))
+        .filter(({ weight }) => weight !== null)
+        .sort((left, right) => right.weight - left.weight);
 
 /**
  * Resolve a request against declared (lane, turn, step) entries.
@@ -284,11 +346,11 @@ export function resolveEntry(body, entries, bindings) {
     return { unmatched: { key, candidates: atKey } };
   }
 
-  const longest = matches[0].turn.length;
-  const tied = matches.filter((entry) => entry.turn.length === longest);
+  const heaviest = matches[0].weight;
+  const tied = matches.filter((match) => match.weight === heaviest);
   if (tied.length > 1) {
-    return { ambiguousTurn: tied, key };
+    return { ambiguousTurn: tied.map((match) => match.declaration), key };
   }
 
-  return { matched: matches[0], key };
+  return { matched: matches[0].declaration, key };
 }

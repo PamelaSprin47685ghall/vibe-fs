@@ -99,7 +99,6 @@ tools = ["fork", "join", "list"]
 
 [[turn]]
 id = "manager-guard"
-lane = "fast-manager"
 internal = true
 user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
 tools = ["fork", "join", "list"]
@@ -121,7 +120,6 @@ tools = ["fork", "join", "list"]
 
 [[turn]]
 id = "conflict-resume"
-lane = "fast-manager"
 internal = true
 user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
 tools = ["fork", "join", "list"]
@@ -144,7 +142,7 @@ tools = ["write"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = "Review the current worktree for correctness"
+user = ["[Original user requirements — authoritative review scope]", "Review the current worktree for correctness"]
 tools = ["verdict"]
 
   [[turn.step]]
@@ -155,7 +153,6 @@ tools = ["verdict"]
 
 [[turn]]
 id = "reviewer-confirm"
-lane = "fast-reviewer"
 internal = true
 user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 tools = ["verdict"]

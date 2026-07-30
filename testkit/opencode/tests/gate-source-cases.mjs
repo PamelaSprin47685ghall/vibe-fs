@@ -442,6 +442,27 @@ user = "go on"
   },
 
   {
+    name: 'VERIFY-003 no internal turn declares a lane',
+    fn: () => {
+      // Now a load-time rejection in `scenario-schema.js`, so this walks the forest only to
+      // prove the rule is actually in force on the real files — a compiler check nothing
+      // exercises is the zero-call-site shape this whole package has been removing.
+      const offenders = walk(SCENARIO_ROOT, ['.toml']).flatMap((file) => {
+        const source = readFileSync(file, 'utf8');
+        const blocks = source.split(/^\[\[turn\]\]$/m).slice(1);
+        return blocks
+          .filter((block) => {
+            const own = block.split(/^\[\[/m)[0];
+            return /^internal = true$/m.test(own) && /^lane = /m.test(own);
+          })
+          .map(() => file);
+      });
+
+      assertEq(offenders.length, 0, `internal turns must not name a lane: ${offenders.join(', ')}`);
+    },
+  },
+
+  {
     name: 'COMPANION-002 a Companion turn declares no lane',
     fn: () => {
       // Measured in K9, and it turned every canary red at once.

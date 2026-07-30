@@ -48,7 +48,6 @@ tools = ["executor"]
 
 [[turn]]
 id = "map"
-lane = "map-0"
 internal = true
 user = "Summarize command output chunk"
 

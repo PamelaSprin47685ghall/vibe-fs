@@ -69,7 +69,6 @@ user = "Prove same-run provider AABB trajectory."
 # scenario whose author cannot tell a covered path from an uncovered one.
 [[turn]]
 id = "continue"
-lane = "med"
 internal = true
 user = "Continue after provider failure."
 

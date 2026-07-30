@@ -36,6 +36,9 @@ const request = (messages, sessionID = SESSION) => ({ sessionID, messages });
 
 const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, turn, step });
 
+/** `HostForkRuntimeFork.fs:98`'s first line — the anchor a reviewer declaration uses. */
+const WRAP = '[Original user requirements — authoritative review scope]';
+
 /** `prompt.ts:235` prepends this as `messages[0]`, then appends the real conversation. */
 const titleRequest = (text) =>
   request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)]);
@@ -253,6 +256,106 @@ export const runtimeKeyCases = [
 
       assertEq(prose, 'fork');
       assertTrue(!call.includes('\u001f') || call !== prose, 'tool call text must be distinguishable');
+    },
+  },
+
+  // ── an ordered fragment declaration ──────────────────────────────────────
+
+  {
+    name: 'REVIEW-002 a fragment declaration reaches text production put at the end',
+    fn: () => {
+      // Measured in K9. When a Manager forks a Reviewer, production WRAPS the assignment
+      // (`../next/Session/HostForkRuntimeFork.fs:98`): the verified HumanRoot requirements
+      // come first, the Manager's request last under a `[Manager review request]` heading.
+      //
+      // So the text a scenario knows is a SUFFIX of what arrives, and a single prefix cannot
+      // reach it. Every reviewer turn in the forest failed to match for exactly this reason.
+      const wrapped = (assignment) =>
+        `${WRAP}\nUser prompt 1:\nShip it.\n\n[Manager review request — supplementary]\n${assignment}`;
+
+      const entries = [
+        entry({ id: 'revise', lane: 'fast-manager', turn: [WRAP, 'Review current worktree'] }),
+        entry({ id: 'perfect', lane: 'fast-manager', turn: [WRAP, 'Re-review the fixed tree'] }),
+      ];
+
+      assertEq(resolveEntry(request([user(wrapped('Review current worktree'))]), entries, BINDINGS).matched.id, 'revise');
+      assertEq(resolveEntry(request([user(wrapped('Re-review the fixed tree'))]), entries, BINDINGS).matched.id, 'perfect');
+    },
+  },
+
+  {
+    name: 'REVIEW-002 fragment 0 is anchored, so a wrapper that is absent does not match',
+    fn: () => {
+      // Anchoring is the first of the three properties that separate this from the retired
+      // `containsText`. Without it a fragment list would be a bag of substrings free to match
+      // anywhere, which is what needed `specificity` scoring to disambiguate.
+      const entries = [entry({ id: 'a', turn: [WRAP, 'Review current worktree'] })];
+
+      const noWrapper = resolveEntry(request([user('Review current worktree now')]), entries, BINDINGS);
+      assertTrue(noWrapper.unmatched !== undefined, 'the anchor must be a true prefix');
+    },
+  },
+
+  {
+    name: 'REVIEW-002 fragments must occur in the declared order',
+    fn: () => {
+      // The second property. A bag would match these in any arrangement; an ordered list
+      // says "after the wrapper", which is what makes the declaration describe a shape rather
+      // than a set of coincidences.
+      const entries = [entry({ id: 'a', turn: ['HEAD', 'middle', 'tail'] })];
+
+      assertEq(resolveEntry(request([user('HEAD then middle then tail')]), entries, BINDINGS).matched.id, 'a');
+
+      const reordered = resolveEntry(request([user('HEAD then tail then middle')]), entries, BINDINGS);
+      assertTrue(reordered.unmatched !== undefined, 'out of order is not a match');
+    },
+  },
+
+  {
+    name: 'REVIEW-002 fragments do not overlap: a later one starts after the previous ends',
+    fn: () => {
+      // `indexOf(fragment, cursor)` where the cursor sits past the previous fragment. Reusing
+      // the same characters twice would let `["abc", "bc"]` match "abc" — a declaration
+      // claiming more text than the request contains.
+      const entries = [entry({ id: 'a', turn: ['abc', 'bc'] })];
+
+      assertTrue(resolveEntry(request([user('abc')]), entries, BINDINGS).unmatched !== undefined);
+      assertEq(resolveEntry(request([user('abcbc')]), entries, BINDINGS).matched.id, 'a');
+    },
+  },
+
+  {
+    name: 'REVIEW-002 total declared length decides, not the span it covers',
+    fn: () => {
+      // The third property, and the one that keeps ties meaningful. Weighing by span — from
+      // the start of the first fragment to the end of the last — would make a declaration
+      // look MORE specific for skipping more text it never named. Summing what is actually
+      // declared keeps "more declared text" equal to "more specific".
+      const entries = [
+        entry({ id: 'span', turn: ['HEAD', 'z'] }),
+        entry({ id: 'declared', turn: ['HEAD', 'middle'] }),
+      ];
+
+      // 'span' covers to the very end of the turn; 'declared' names more characters.
+      assertEq(
+        resolveEntry(request([user('HEAD then middle then z')]), entries, BINDINGS).matched.id,
+        'declared',
+      );
+    },
+  },
+
+  {
+    name: 'REVIEW-003 two fragment declarations of equal weight are an author error',
+    fn: () => {
+      // Same rule as two equal-length prefixes: a tie is not something to break, it means the
+      // scenario does not say what the model does next.
+      const entries = [
+        entry({ id: 'left', turn: ['HEAD', 'xy'] }),
+        entry({ id: 'right', turn: ['HEAD', 'yz'] }),
+      ];
+
+      const resolved = resolveEntry(request([user('HEAD xy yz')]), entries, BINDINGS);
+      assertEq(resolved.ambiguousTurn?.length, 2, JSON.stringify(resolved.matched ?? resolved.unmatched));
     },
   },
 
