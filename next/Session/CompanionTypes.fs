@@ -13,7 +13,18 @@ type CompanionOutcome =
     | Submitted
     | SkippedBusy
 
-type ActivePrefixEpoch =
+/// The frozen companion memory with its body already loaded, ready to inject into
+/// X's projection (COMPANION-010).
+///
+/// Deliberately NOT named `ActivePrefixEpoch`: that name belongs to the durable
+/// projection in `Wanxiangshu.Next.Journal`, which stores a `BlobRef` plus digest
+/// rather than the text. Two types with one name for one concept resolve by `open`
+/// order, so a caller could silently get the other one.
+///
+/// The distinction is real, not cosmetic. The journal records WHERE the body is;
+/// this record is the body itself after a read. Only the second can be handed to
+/// the transform boundary, and only the first can be folded.
+type ResolvedPrefixMemory =
     { EpochId: string
       FrozenB: BlogText
       CutoffMessageIndex: int
@@ -23,7 +34,7 @@ type CompanionMemory =
     {
         LastSuccessfulProjection: ProjectionSnapshot option
         LatestB: BlogText option
-        ActivePrefixEpoch: ActivePrefixEpoch option
+        ActivePrefixEpoch: ResolvedPrefixMemory option
         /// COMPANION-003: the durable companion Blogger Session Y.
         BloggerSessionId: SessionId option
         PrefixReplacementEnabled: bool
@@ -32,7 +43,7 @@ type CompanionMemory =
 type ICompanionDurablePort =
     abstract Load: SessionId -> CompanionMemory option
     abstract AppendSuccessful: SessionId * ProjectionSnapshot * BlogText -> Result<unit, string>
-    abstract AppendEpochSwitched: SessionId * ActivePrefixEpoch -> Result<unit, string>
+    abstract AppendEpochSwitched: SessionId * ResolvedPrefixMemory -> Result<unit, string>
     abstract EnableReplacement: SessionId -> Result<unit, string>
 
     /// COMPANION-003. Takes the Blogger's own SessionId, not a `ChildId` plus a

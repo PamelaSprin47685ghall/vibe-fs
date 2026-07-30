@@ -22,6 +22,7 @@
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
+    <Compile Include="Domain/TerminalValidity.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
@@ -32,6 +33,8 @@
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/CompanionProjection.fs"/>
+    <Compile Include="Journal/BlogProjection.fs"/>
+    <Compile Include="Journal/PrefixEpochProjection.fs"/>
     <Compile Include="Journal/FallbackProjection.fs"/>
     <Compile Include="Journal/LinkageProjection.fs"/>
     <Compile Include="Journal/OrchestratorProjection.fs"/>

@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open System.Text.RegularExpressions
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
@@ -9,16 +9,6 @@ open Wanxiangshu.Next.Session
 /// Empty formal text or formal text that contains XML markup (including broken
 /// tags) is interaction repair (continuation), never durable fallback.
 module CompletedTurnClassifier =
-
-    // Containment, not well-formedness: broken/partial tags still count.
-    let private xmlMarkup =
-        Regex(
-            "<(?:/?\\s*(?:tool_call|use_tool|call|function_call|invoke)\\b[^>]*>?)|</(?:tool_call|use_tool|call|function_call|invoke)\\s*>",
-            RegexOptions.Compiled ||| RegexOptions.IgnoreCase
-        )
-
-    let private containsXmlMarkup (text: string) =
-        not (String.IsNullOrWhiteSpace text) && xmlMarkup.IsMatch text
 
     let private supportsInteractionRepair =
         function
@@ -92,20 +82,16 @@ module CompletedTurnClassifier =
                 else
                     TurnFailed(defaultArg errorName "assistant finish=error")
             | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
-                let text = partsText parts
-
-                // A terminal provider step is not a final answer unless it has
-                // formal natural-language text. Reasoning/tool bookkeeping may
-                // be present while the model-visible answer is still empty.
-                // Formal text that contains XML markup (including broken tags)
-                // is also not a final report; it is interaction repair, not
-                // durable provider fallback.
-                if String.IsNullOrWhiteSpace text then
-                    TurnNeedsContinuation "assistant stop without formal text"
-                elif containsXmlMarkup text then
-                    TurnNeedsContinuation "assistant stop with XML markup"
-                else
-                    TurnCompleted
+                // CTX-004: a terminal provider step is not a final answer unless
+                // it carries usable formal text. `TerminalValidity` is the single
+                // owner of that predicate — reasoning and tool bookkeeping may be
+                // present while the model-visible answer is still empty or is
+                // tool-call markup, and both cases earn interaction repair rather
+                // than durable provider fallback.
+                match TerminalValidity.check (partsText parts) with
+                | Ok() -> TurnCompleted
+                | Error rejection ->
+                    TurnNeedsContinuation(sprintf "assistant stop with %s" (TerminalValidity.describe rejection))
             | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnInProgress
             | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
                 TurnNeedsContinuation "assistant finish=length"

@@ -25,7 +25,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     let mutable latestB: BlogText option =
         restoredMemory |> Option.bind (fun m -> m.LatestB)
 
-    let mutable activePrefixEpoch: ActivePrefixEpoch option =
+    let mutable activePrefixEpoch: ResolvedPrefixMemory option =
         restoredMemory |> Option.bind (fun m -> m.ActivePrefixEpoch)
 
     let mutable prefixReplacementEnabled =
@@ -55,7 +55,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             | Error error -> raise (InvalidOperationException error)
         | _ -> ()
 
-    let persistEpochSwitched (epoch: ActivePrefixEpoch) =
+    let persistEpochSwitched (epoch: ResolvedPrefixMemory) =
         match durable, sessionId with
         | Some port, Some sid ->
             match port.AppendEpochSwitched(sid, epoch) with
@@ -84,7 +84,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         | Some _ when not inFlightCompleted -> true
         | _ -> false
 
-    let makeEpoch (cutoff: int) (digest: string) (frozenB: BlogText) : ActivePrefixEpoch =
+    let makeEpoch (cutoff: int) (digest: string) (frozenB: BlogText) : ResolvedPrefixMemory =
         let sessionStr = sessionId |> Option.map SessionId.value |> Option.defaultValue ""
 
         { EpochId = sprintf "%s|%d|%s" sessionStr cutoff digest

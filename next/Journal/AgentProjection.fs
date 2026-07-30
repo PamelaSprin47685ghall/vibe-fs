@@ -3,20 +3,31 @@ namespace Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
-/// The seven bounded projections one session owns (PERSIST-008).
+/// The nine bounded projections one session owns (PERSIST-008).
 ///
 /// Each is `option` because a session acquires state only when a fact concerning
 /// it arrives. "No fact yet" and "an empty projection" are different claims and
 /// must stay distinguishable — collapsing them is how a missing fact starts
 /// looking like a satisfied precondition.
 type SessionAgentProjection =
-    { Companion: CompanionProjection option
-      Handles: AgentLinkageProjection option
-      ReviewGuard: ReviewGuardProjection option
-      ReviewRequirements: ReviewRequirementProjection option
-      Fallback: FallbackProjection option
-      PromptAuthority: PromptAuthority.PromptAuthorityProjection option
-      Effects: DurableEffectProjection option }
+    {
+        Companion: CompanionProjection option
+        /// SSOT/12: the Companion frame sequence and what it covers. Separate from
+        /// `Companion` because that record is the runtime cache's durable mirror,
+        /// while this one is the frame history CTX-011 builds probe candidates from.
+        Blog: BlogProjectionState option
+        /// COMPANION-009: which X prefix generation is in force. Not folded into
+        /// `Blog`: a squash advances the frame epoch without touching the prefix, and
+        /// a reanchor retires the prefix without touching frames, so one record for
+        /// both would make each change look like it moved the other.
+        PrefixEpoch: ActivePrefixEpoch option
+        Handles: AgentLinkageProjection option
+        ReviewGuard: ReviewGuardProjection option
+        ReviewRequirements: ReviewRequirementProjection option
+        Fallback: FallbackProjection option
+        PromptAuthority: PromptAuthority.PromptAuthorityProjection option
+        Effects: DurableEffectProjection option
+    }
 
 type AgentProjectionSet =
     { Sessions: Map<SessionId, SessionAgentProjection>
@@ -27,6 +38,8 @@ module AgentProjection =
 
     let emptySession =
         { Companion = None
+          Blog = None
+          PrefixEpoch = None
           Handles = None
           ReviewGuard = None
           ReviewRequirements = None

@@ -108,6 +108,29 @@ module Identity =
     /// evidence that a second PERFECT actually consumed the first challenge.
     type SealDigest = private SealDigest of string
 
+    // ── blob storage (PERSIST-007) ──────────────────────────────────────────
+
+    /// Where a large body lives outside the NDJSON line. PERSIST-007 keeps the
+    /// journal line small: the blob is written first, the event references it.
+    type BlobRef = private BlobRef of string
+
+    /// Content digest of a blob body. Separate from `BlobRef` because the two
+    /// answer different questions — "where is it" versus "is it the bytes I
+    /// meant" — and a single string type would let a caller pass either.
+    type BlobDigest = private BlobDigest of string
+
+    /// Which generation of the Companion frame sequence is in force
+    /// (COMPANION-006). Advances only when a squash commits.
+    type FrameEpochId = private FrameEpochId of int64
+
+    /// Which generation of the X provider-visible prefix is in force
+    /// (COMPANION-009). Advances when a probe is promoted or a reanchor retires
+    /// the snapshot.
+    ///
+    /// Distinct from `FrameEpochId`: the two move independently, and sharing one
+    /// type would let a fold validate an X rebase against a Y squash's number.
+    type PrefixEpochId = private PrefixEpochId of int64
+
     // ── execution handles (SSOT/09) ─────────────────────────────────────────
 
     /// A forked agent child, persisted across restart (EXEC-009).
@@ -235,6 +258,26 @@ module Identity =
     module SealDigest =
         let create (value: string) = SealDigest value
         let value (SealDigest v) = v
+
+    module BlobRef =
+        let create (value: string) = BlobRef value
+        let value (BlobRef v) = v
+
+    module BlobDigest =
+        let create (value: string) = BlobDigest value
+        let value (BlobDigest v) = v
+
+    module FrameEpochId =
+        let create (value: int64) = FrameEpochId value
+        let value (FrameEpochId v) = v
+        let initial = FrameEpochId 0L
+        let next (FrameEpochId v) = FrameEpochId(v + 1L)
+
+    module PrefixEpochId =
+        let create (value: int64) = PrefixEpochId value
+        let value (PrefixEpochId v) = v
+        let initial = PrefixEpochId 0L
+        let next (PrefixEpochId v) = PrefixEpochId(v + 1L)
 
     module AgentHandleId =
         let create (value: string) = AgentHandleId value

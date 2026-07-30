@@ -57,6 +57,55 @@ module Fold =
         | Error UnknownHandle -> reject factName "handle completion or retirement for a handle that was never linked"
         | Error NotCompleted -> reject factName "join retired a handle that had no completion (EXEC-004)"
 
+    /// PERSIST-010: every Companion frame refusal describes a line a correct
+    /// writer could not have produced, so none of them is absorbed.
+    ///
+    /// A stale frame epoch is the one that looks benign and is not. It means the
+    /// line was written against a frame sequence that a squash has already
+    /// replaced, so applying it would append an entry describing frames that no
+    /// longer exist — and skipping it would lose an entry whose delta was already
+    /// consumed. Neither is recoverable, so the fold refuses the journal.
+    let private blogOutcome factName result =
+        match result with
+        | Ok updated -> Ok updated
+        | Error(BlogFoldRejection.StaleFrameEpoch(expected, actual)) ->
+            reject
+                factName
+                (sprintf
+                    "frame epoch %d is in force but the line was written against %d (PERSIST-010)"
+                    (FrameEpochId.value expected)
+                    (FrameEpochId.value actual))
+        | Error BlogFoldRejection.NonSequentialFrameEpoch ->
+            reject factName "squash frame epoch is not the successor of the previous one (PERSIST-010)"
+        | Error BlogFoldRejection.IngestCursorNotAdvanced ->
+            reject factName "committed entry consumed nothing, so the same delta could be blogged forever (CTX-011)"
+        | Error BlogFoldRejection.IngestCursorMismatch ->
+            reject factName "entry's previous ingest cursor disagrees with the projection (PERSIST-010)"
+        | Error BlogFoldRejection.CoverageRetreated ->
+            reject factName "coverage moved backwards within one numbering (CTX-011)"
+        | Error(BlogFoldRejection.CoveredFrameCountOutOfRange(claimed, available)) ->
+            reject factName (sprintf "squash claimed %d of %d available frames (CTX-012)" claimed available)
+
+    /// PERSIST-010 prefix-epoch refusals.
+    ///
+    /// `StalePrefixEpoch` is absorbed here, unlike its frame counterpart. Every
+    /// epoch-advancing line carries the epoch it expected, so a replayed rebase or
+    /// reanchor — the crash-recovery path in CTX-012 deliberately re-attempts both
+    /// — arrives stale and means "already applied". That is what makes recovery
+    /// idempotent without a second dedupe mechanism.
+    ///
+    /// `CandidateNotNew` is absorbed for the same reason: CTX-011 already refuses
+    /// to build such a probe, so a line carrying one is a replay.
+    let private prefixOutcome factName projection result =
+        match result with
+        | Ok updated -> Ok updated
+        | Error(PrefixFoldRejection.StalePrefixEpoch _)
+        | Error PrefixFoldRejection.CandidateNotNew -> Ok projection
+        | Error PrefixFoldRejection.NonSequentialPrefixEpoch ->
+            reject factName "prefix epoch is not the successor of the previous one (PERSIST-010)"
+        | Error(PrefixFoldRejection.CutoffRetreated(committed, proposed)) ->
+            reject factName (sprintf "promoted cutoff %d is earlier than the committed %d (CTX-011)" proposed committed)
+
     // ── session-scoped helpers ──────────────────────────────────────────────
 
     let private updateSession sessionId apply projection =
@@ -68,6 +117,26 @@ module Fold =
             (fun session ->
                 { session with
                     Companion = Some(apply (Option.defaultValue CompanionProjection.empty session.Companion)) })
+            projection
+
+    /// SSOT/12 frame facts. `tryUpdate` rather than `update`: every one of them can
+    /// be refused, and PERSIST-010 requires the refusal to reach the caller.
+    let private tryUpdateBlog sessionId apply projection =
+        AgentProjection.tryUpdate
+            sessionId
+            (fun session ->
+                apply (Option.defaultValue BlogProjection.empty session.Blog)
+                |> Result.map (fun updated -> { session with Blog = Some updated }))
+            projection
+
+    let private tryUpdatePrefix sessionId apply projection =
+        AgentProjection.tryUpdate
+            sessionId
+            (fun session ->
+                apply (Option.defaultValue PrefixEpochProjection.empty session.PrefixEpoch)
+                |> Result.map (fun updated ->
+                    { session with
+                        PrefixEpoch = Some updated }))
             projection
 
     let private updateReviewGuard sessionId apply projection =
@@ -475,6 +544,78 @@ module Fold =
 
         | AgentFact.CompanionBloggerClosed payload ->
             Ok(updateCompanion payload.SessionId CompanionProjection.closeBlogger projection)
+
+        // ── failure-driven context recovery (SSOT/12) ───────────────────────
+
+        | AgentFact.BlogEntryCommitted payload ->
+            tryUpdateBlog
+                payload.SessionId
+                (BlogProjection.applyEntry
+                    payload.FrameEpochId
+                    { TurnIndex = payload.PreviousIngestTurn
+                      PartIndex = payload.PreviousIngestPart }
+                    { TurnIndex = payload.NextIngestTurn
+                      PartIndex = payload.NextIngestPart }
+                    payload.PreviousCoverableTurnCutoffExclusive
+                    payload.NextCoverableTurnCutoffExclusive
+                    payload.NextCoveredPrefixDigest
+                    { Kind = BlogFrameKind.Entry
+                      Digest = payload.TextDigest
+                      TextRef = payload.TextRef })
+                projection
+            |> blogOutcome "BlogEntryCommitted"
+
+        | AgentFact.BlogSquashCommitted payload ->
+            tryUpdateBlog
+                payload.SessionId
+                (BlogProjection.applySquash
+                    payload.PreviousFrameEpochId
+                    payload.NextFrameEpochId
+                    payload.CoveredFrameCount
+                    { Kind = BlogFrameKind.Squash
+                      Digest = payload.TextDigest
+                      TextRef = payload.TextRef })
+                projection
+            |> blogOutcome "BlogSquashCommitted"
+
+        | AgentFact.PrefixRebaseCommitted payload ->
+            tryUpdatePrefix
+                payload.SessionId
+                (PrefixEpochProjection.applyRebase
+                    payload.PreviousEpochId
+                    payload.NextEpochId
+                    { FrozenBRef = payload.FrozenBRef
+                      FrozenBDigest = payload.FrozenBDigest
+                      CutoffExclusive = payload.CutoffExclusive
+                      CoveredPrefixDigest = payload.CoveredPrefixDigest
+                      SealRoot = payload.SealRoot
+                      SyntheticMessageId = payload.SyntheticMessageId })
+                projection
+            |> prefixOutcome "PrefixRebaseCommitted" projection
+
+        | AgentFact.ContextReanchored payload ->
+            // HOST-006: one physical event, two projections. The prefix retires and
+            // the Companion's coverage returns to the origin, and both must land or
+            // neither — a retired prefix beside a coverage claim in the voided
+            // numbering is the state the single fact exists to prevent.
+            //
+            // Hence one session-level update rather than two chained ones: the
+            // atomicity is structural, not something a reader has to verify by
+            // tracing whether the second step was reached.
+            //
+            // Frames survive. Only coverage is zeroed (BlogProjection.applyReanchor).
+            AgentProjection.tryUpdate
+                payload.SessionId
+                (fun session ->
+                    session.PrefixEpoch
+                    |> Option.defaultValue PrefixEpochProjection.empty
+                    |> PrefixEpochProjection.applyReanchor payload.PreviousEpochId payload.NextEpochId
+                    |> Result.map (fun retired ->
+                        { session with
+                            PrefixEpoch = Some retired
+                            Blog = session.Blog |> Option.map BlogProjection.applyReanchor }))
+                projection
+            |> prefixOutcome "ContextReanchored" projection
 
         // ── durable effects ─────────────────────────────────────────────────
 

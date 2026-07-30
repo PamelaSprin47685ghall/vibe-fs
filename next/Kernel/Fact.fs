@@ -337,6 +337,79 @@ module Fact =
         /// fresh one rather than reviving this session.
         | CompanionBloggerClosed of {| SessionId: SessionId |}
 
+        // ── failure-driven context recovery (SSOT/12) ───────────────────────
+
+        /// COMPANION-008: one Blogger entry landed, and the coverage it proves
+        /// advanced. ONE fact, not two: the clause makes frame append and
+        /// coverage advance the same domain commit, so a shape that could record
+        /// either alone would make the forbidden intermediate states expressible.
+        ///
+        /// Both cursors are recorded so the fold can verify monotonicity without
+        /// trusting the writer (PERSIST-010).
+        | BlogEntryCommitted of
+            {| SessionId: SessionId
+               BloggerSessionId: SessionId
+               FrameEpochId: FrameEpochId
+               PreviousIngestTurn: int
+               PreviousIngestPart: int
+               NextIngestTurn: int
+               NextIngestPart: int
+               PreviousCoverableTurnCutoffExclusive: int
+               NextCoverableTurnCutoffExclusive: int
+               NextCoveredPrefixDigest: string
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity |}
+
+        /// CTX-012: a valid squash rewrote the oldest frames. Permanent once
+        /// committed, even if the same slot's main request then fails.
+        ///
+        /// Carries no coverage fields: a squash changes how B is REPRESENTED, not
+        /// which X turns it covers. Including them would let a writer silently
+        /// move coverage under cover of a compression.
+        | BlogSquashCommitted of
+            {| SessionId: SessionId
+               BloggerSessionId: SessionId
+               PreviousFrameEpochId: FrameEpochId
+               NextFrameEpochId: FrameEpochId
+               CoveredFrameCount: int
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity |}
+
+        /// CTX-012: a probe attempt produced a valid terminal, so its candidate
+        /// prefix is promoted to the committed epoch.
+        ///
+        /// There is deliberately no counterpart for a failed probe. CTX-010 makes
+        /// the candidate attempt-local, so a discarded one never became a fact and
+        /// has nothing to roll back.
+        | PrefixRebaseCommitted of
+            {| SessionId: SessionId
+               PreviousEpochId: PrefixEpochId
+               NextEpochId: PrefixEpochId
+               FrozenBRef: BlobRef
+               FrozenBDigest: BlobDigest
+               CutoffExclusive: int
+               CoveredPrefixDigest: string
+               SealRoot: string
+               SyntheticMessageId: string
+               ProbeId: string
+               SolvingProviderRun: ProviderRunIdentity |}
+
+        /// HOST-006 containment: a Host compaction was observed, so the prefix
+        /// epoch is retired and Companion coverage is zeroed.
+        ///
+        /// `ObservedCompactionRun` is which message PROVES it happened — a
+        /// physical fact. There is no reason or source field: CTX-005 forbids
+        /// classifying, and a user's `/compact` and an unexpected Host compaction
+        /// get identical handling, so a discriminator would only grow a branch
+        /// that never executes.
+        | ContextReanchored of
+            {| SessionId: SessionId
+               PreviousEpochId: PrefixEpochId
+               NextEpochId: PrefixEpochId
+               ObservedCompactionRun: ProviderRunIdentity |}
+
         /// COMPANION-009: an epoch switch creates a new SealRoot and is the one
         /// sanctioned prefix-cache cold boundary.
         | CompanionEpochSwitched of

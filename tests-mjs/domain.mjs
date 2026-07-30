@@ -50,11 +50,14 @@ const [
   EnvelopeModule,
   FoldModule,
   FactCodec,
+  BlogProj,
+  PrefixProj,
   FallbackProj,
   ReviewProj,
   LinkageProj,
   OrchestratorProj,
   Cursor,
+  TerminalValidity,
   Authority,
   AuthorityRun,
   Witness,
@@ -69,11 +72,14 @@ const [
   prod('Journal/Envelope'),
   prod('Journal/Fold'),
   prod('Journal/FactCodec'),
+  prod('Journal/BlogProjection'),
+  prod('Journal/PrefixEpochProjection'),
   prod('Journal/FallbackProjection'),
   prod('Journal/ReviewProjection'),
   prod('Journal/LinkageProjection'),
   prod('Journal/OrchestratorProjection'),
   prod('Domain/AgentPairCursor'),
+  prod('Domain/TerminalValidity'),
   prod('Domain/PromptAuthority'),
   prod('Domain/PromptAuthorityRun'),
   prod('Domain/ReviewWitness'),
@@ -282,6 +288,8 @@ const Ids = {
   worktreePath: idModule('WorktreePath'),
   targetRef: idModule('TargetRef'),
   commit: idModule('CommitHash'),
+  blobRef: idModule('BlobRef'),
+  blobDigest: idModule('BlobDigest'),
 }
 
 export const runtimeId = (v) => Ids.runtime.create(v)
@@ -307,6 +315,14 @@ export const worktreeIdentity = (v) => Ids.worktreeIdentity.create(v)
 export const worktreePath = (v) => Ids.worktreePath.create(v)
 export const targetRef = (v) => Ids.targetRef.create(v)
 export const commitHash = (v) => Ids.commit.create(v)
+export const blobRef = (v) => Ids.blobRef.create(v)
+export const blobDigest = (v) => Ids.blobDigest.create(v)
+
+// Epoch ids wrap int64, so Fable represents them as BigInt. Taking a JS number
+// here and converting once keeps `1` out of every call site — passing a plain
+// number where F# expects int64 does not throw, it silently compares unequal.
+export const frameEpochId = (value) => Identity.FrameEpochIdModule_create(BigInt(value))
+export const prefixEpochId = (value) => Identity.PrefixEpochIdModule_create(BigInt(value))
 
 export const localSeq = (value) => Identity.LocalSeqModule_create(BigInt(value))
 
@@ -314,6 +330,8 @@ export const idValue = Object.fromEntries(
   Object.entries(Ids).map(([name, module]) => [name, module.value]),
 )
 idValue.localSeq = (id) => Identity.LocalSeqModule_value(id)
+idValue.frameEpoch = (id) => Identity.FrameEpochIdModule_value(id)
+idValue.prefixEpoch = (id) => Identity.PrefixEpochIdModule_value(id)
 
 /** PROMPT-002: one-way promotion. There is deliberately no inverse. */
 export const promoteToAuthorityRoot = (physical) => Identity.PhysicalUserMessageIdModule_promoteToAuthorityRoot(physical)
@@ -485,6 +503,119 @@ export const fallbackProjection = (() => {
     applyAdvance: (identity, prevOffset, nextOffset, count, current) =>
       resultOf(m.applyAdvance(identity, prevOffset, nextOffset, count, current)),
     mayContinue: (budget, current) => m.mayContinue(budget, current),
+  }
+})()
+
+// ── failure-driven context recovery (SSOT/12) ────────────────────────────────
+
+/** CTX-004: the one content-level validity check. */
+export const terminalValidity = {
+  isValid: (text) => TerminalValidity.isValid(text),
+
+  /**
+   * `{ ok: true }` or `{ ok: false, error: 'Empty' | 'XmlOnly' }`.
+   *
+   * The success case carries no value on purpose: F# returns `Result<unit, _>`, and
+   * Fable erases `unit` to `undefined`. Exposing it would invite assertions on a
+   * meaningless payload that happens to compare equal to a missing field.
+   */
+  check: (text) => {
+    const result = resultOf(TerminalValidity.check(text))
+    return result.ok ? { ok: true } : { ok: false, error: caseOf(result.error) }
+  },
+
+  describe: (rejectionName) => TerminalValidity.describe(unionCase(TerminalValidity.Rejection, 'Rejection')(rejectionName, [])),
+}
+
+/**
+ * COMPANION-005 / CTX-011: the Companion frame sequence and its coverage.
+ *
+ * `frame()` builds a `BlogFrame` by kind NAME, never by tag ordinal — inserting a
+ * case ahead of `Squash` would otherwise silently turn every squash frame into an
+ * entry, and no assertion would notice.
+ */
+export const blogProjection = (() => {
+  const m = bind(BlogProj, 'BlogProjection', [
+    'empty',
+    'withSeed',
+    'frameCount',
+    'squashWidth',
+    'applyEntry',
+    'applySquash',
+    'applyReanchor',
+    'hasCoverage',
+  ])
+  const buildKind = unionCase(BlogProj.BlogFrameKind, 'BlogFrameKind')
+
+  return {
+    empty: m.empty,
+    withSeed: (seed, state) => m.withSeed(seed, state),
+    frameCount: (state) => m.frameCount(state),
+    squashWidth: (state) => m.squashWidth(state),
+    hasCoverage: (state) => m.hasCoverage(state),
+    frameEpochOf: (state) => idValue.frameEpoch(state.FrameEpochId),
+
+    frame: ({ kind, digest, ref }) => ({
+      Kind: buildKind(kind, []),
+      Digest: blobDigest(digest),
+      TextRef: blobRef(ref),
+    }),
+
+    frameKinds: (state) => listItems(state.Frames).map((f) => caseOf(f.Kind)),
+
+    cursor: (turn, part) => ({ TurnIndex: turn, PartIndex: part }),
+
+    coverage: (state) => ({
+      ingestTurn: state.Coverage.IngestCursor.TurnIndex,
+      ingestPart: state.Coverage.IngestCursor.PartIndex,
+      cutoff: state.Coverage.CoverableTurnCutoffExclusive,
+      digest: state.Coverage.CoveredPrefixDigest,
+    }),
+
+    /** Rejections carry payloads; the name alone is what a test asserts on. */
+    applyEntry: ({ epoch, previous, next, previousCutoff, nextCutoff, digest, frame }, state) => {
+      const result = resultOf(
+        m.applyEntry(frameEpochId(epoch), previous, next, previousCutoff, nextCutoff, digest, frame, state),
+      )
+      return result.ok ? result : { ok: false, error: caseOf(result.error) }
+    },
+
+    applySquash: ({ previousEpoch, nextEpoch, count, frame }, state) => {
+      const result = resultOf(m.applySquash(frameEpochId(previousEpoch), frameEpochId(nextEpoch), count, frame, state))
+      return result.ok ? result : { ok: false, error: caseOf(result.error) }
+    },
+
+    applyReanchor: (state) => m.applyReanchor(state),
+  }
+})()
+
+/** COMPANION-009 / CTX-012: which X prefix generation is in force. */
+export const prefixEpochProjection = (() => {
+  const m = bind(PrefixProj, 'PrefixEpochProjection', ['empty', 'applyRebase', 'applyReanchor', 'hasSnapshot'])
+
+  return {
+    empty: m.empty,
+    hasSnapshot: (state) => m.hasSnapshot(state),
+    epochOf: (state) => idValue.prefixEpoch(state.EpochId),
+
+    snapshot: ({ ref, digest, cutoff, prefixDigest, sealRoot, syntheticId }) => ({
+      FrozenBRef: blobRef(ref),
+      FrozenBDigest: blobDigest(digest),
+      CutoffExclusive: cutoff,
+      CoveredPrefixDigest: prefixDigest,
+      SealRoot: sealRoot,
+      SyntheticMessageId: syntheticId,
+    }),
+
+    applyRebase: ({ previousEpoch, nextEpoch, candidate }, state) => {
+      const result = resultOf(m.applyRebase(prefixEpochId(previousEpoch), prefixEpochId(nextEpoch), candidate, state))
+      return result.ok ? result : { ok: false, error: caseOf(result.error) }
+    },
+
+    applyReanchor: ({ previousEpoch, nextEpoch }, state) => {
+      const result = resultOf(m.applyReanchor(prefixEpochId(previousEpoch), prefixEpochId(nextEpoch), state))
+      return result.ok ? result : { ok: false, error: caseOf(result.error) }
+    },
   }
 })()
 
