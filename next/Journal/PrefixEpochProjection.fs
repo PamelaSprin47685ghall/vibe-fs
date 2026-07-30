@@ -15,8 +15,26 @@ open Wanxiangshu.Next.Kernel.Identity
 /// A separate copy here would let the profile's snapshot and the committed snapshot
 /// differ in shape, and CTX-012 requires them to be byte-identical.
 type ActivePrefixEpoch =
-    { EpochId: PrefixEpochId
-      Snapshot: PrefixSnapshot option }
+    {
+        EpochId: PrefixEpochId
+        Snapshot: PrefixSnapshot option
+        /// HOST-006: which compaction pseudo-runs have already been reanchored.
+        ///
+        /// Durable, because a compaction message stays in the Host transcript forever.
+        /// Every later reconcile observes the same run again, and the epoch check alone
+        /// does NOT stop that: by then the epoch has moved on, so a freshly decided
+        /// reanchor for that old compaction carries a `PreviousEpochId` that MATCHES the
+        /// current one and would be accepted — advancing the epoch again and zeroing
+        /// coverage the session had legitimately rebuilt.
+        ///
+        /// The epoch check and this set therefore guard different failures. The epoch
+        /// check catches a replayed LINE (a crash between append and fold). This set
+        /// catches a repeated DECISION (the same observation acted on twice). Neither
+        /// subsumes the other.
+        ///
+        /// Bounded by the number of compactions in one session, not by turns.
+        ReanchoredRuns: Set<ProviderRunIdentity>
+    }
 
 /// Why a prefix-epoch line was refused. One case per PERSIST-010 rule.
 [<RequireQualifiedAccess>]
@@ -30,17 +48,20 @@ type PrefixFoldRejection =
     /// CTX-011: the candidate is indistinguishable from what is already committed,
     /// so promoting it would burn an epoch and a cold boundary for no change.
     | CandidateNotNew
-
-// A duplicate reanchor needs no case of its own. Every reanchor advances the
-// epoch, so a replayed line carries a `PreviousEpochId` the projection has already
-// left behind and lands on `StalePrefixEpoch`. Idempotency is a consequence of the
-// epoch check rather than a second mechanism that could disagree with it.
+    /// HOST-006: this compaction pseudo-run was already reanchored.
+    ///
+    /// Separate from `StalePrefixEpoch` because it is reachable with a perfectly
+    /// current epoch — see `ReanchoredRuns`. Collapsing the two would make the fold
+    /// accept a second reanchor for one compaction whenever any other epoch change
+    /// happened in between.
+    | CompactionAlreadyReanchored of run: ProviderRunIdentity
 
 module PrefixEpochProjection =
 
     let empty =
         { EpochId = PrefixEpochId.initial
-          Snapshot = None }
+          Snapshot = None
+          ReanchoredRuns = Set.empty }
 
     /// CTX-011 snapshot identity: cutoff, prefix digest, FrozenB digest.
     ///
@@ -76,8 +97,9 @@ module PrefixEpochProjection =
             | Some committed when sameCandidate candidate committed -> Error PrefixFoldRejection.CandidateNotNew
             | _ ->
                 Ok
-                    { EpochId = nextEpoch
-                      Snapshot = Some candidate }
+                    { state with
+                        EpochId = nextEpoch
+                        Snapshot = Some candidate }
 
     /// PERSIST-010 `ContextReanchored`: HOST-006 containment.
     ///
@@ -90,17 +112,37 @@ module PrefixEpochProjection =
     /// prefix changed and the seal barrier broke — and COMPANION-009's byte-stability
     /// guarantee is scoped to one epoch, so staying on the same number would state
     /// something false.
+    ///
+    /// `observedRun` is recorded so the same compaction cannot be reanchored twice.
+    /// That check has to be here and not only at the decision site: the compaction
+    /// message stays in the transcript forever, so once the epoch has moved on for any
+    /// other reason, a freshly decided reanchor for that old run would carry a matching
+    /// `PreviousEpochId` and be accepted — advancing the epoch again and zeroing
+    /// coverage the session had legitimately rebuilt.
     let applyReanchor
         (previousEpoch: PrefixEpochId)
         (nextEpoch: PrefixEpochId)
+        (observedRun: ProviderRunIdentity)
         (state: ActivePrefixEpoch)
         : Result<ActivePrefixEpoch, PrefixFoldRejection> =
-        if previousEpoch <> state.EpochId then
+        if Set.contains observedRun state.ReanchoredRuns then
+            Error(PrefixFoldRejection.CompactionAlreadyReanchored observedRun)
+        elif previousEpoch <> state.EpochId then
             Error(PrefixFoldRejection.StalePrefixEpoch(state.EpochId, previousEpoch))
         elif nextEpoch <> PrefixEpochId.next previousEpoch then
             Error PrefixFoldRejection.NonSequentialPrefixEpoch
         else
-            Ok { EpochId = nextEpoch; Snapshot = None }
+            Ok
+                { EpochId = nextEpoch
+                  Snapshot = None
+                  ReanchoredRuns = Set.add observedRun state.ReanchoredRuns }
+
+    /// HOST-006: has this compaction pseudo-run already been reanchored.
+    ///
+    /// The predicate `HostCompactionPolicy.nextReanchor` consumes. Exposed as a query
+    /// so the adapter reads it from the projection rather than keeping a runtime set
+    /// that a restart would lose.
+    let isReanchored (run: ProviderRunIdentity) (state: ActivePrefixEpoch) = Set.contains run state.ReanchoredRuns
 
     /// COMPANION-009: is a companion-memory prefix in force for this session.
     let hasSnapshot (state: ActivePrefixEpoch) = Option.isSome state.Snapshot

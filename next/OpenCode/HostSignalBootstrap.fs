@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -77,8 +78,63 @@ module HostSignalBootstrap =
                 scope.AbortedSessions
                 turn
 
+        /// HOST-006 containment: observe every reconciled snapshot for compaction
+        /// pseudo-runs and reanchor at most one per pass.
+        ///
+        /// Wired here rather than inside `onTurn` because a compaction pseudo-run
+        /// belongs to no Logical Run of ours — a manual `/compact` produces one with no
+        /// active root at all — so a turn-shaped callback would never see it.
+        ///
+        /// No journal means no durable epoch and nothing to reanchor. Silent rather
+        /// than an error: a journal-less run has no PrefixEpoch to retire, so there is
+        /// no state that could drift.
+        let onSnapshot (sessionId: SessionId) (messages: SessionMessage list) : Task =
+            // HOST-006 prevention layer's second half: the runtime probe.
+            //
+            // Judged before containment, and once per plugin instance. If the Host
+            // compacts outside the configuration the plugin can reach, the correct
+            // response is to refuse to run — not to reanchor and carry on, which would
+            // hide the condition behind behaviour that looks correct.
+            if scope.CompactionProbePending then
+                match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
+                | None -> () // Not a completed first turn yet; the probe stays armed.
+                | Some verdict ->
+                    if scope.TryClaimStartupProbe() then
+                        match verdict with
+                        | CompactionGateVerdict.Satisfied -> ()
+                        | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
+
+            match journal with
+            | None -> Task.CompletedTask
+            | Some durable ->
+                let observed =
+                    messages
+                    |> List.filter (fun message -> HostCompactionPolicy.isContainableCompaction message.IsCompaction)
+                    |> List.map (fun message -> ProviderRunIdentity.create message.Id)
+
+                if List.isEmpty observed then
+                    Task.CompletedTask
+                else
+                    match HostCompactionGate.reanchorObserved durable sessionId observed with
+                    | Ok None
+                    | Ok(Some _) -> Task.CompletedTask
+                    // A failed append here is not fatal to the turn that just
+                    // completed. PERSIST-003's fail-closed path already owns a poisoned
+                    // journal; what this must not do is throw inside the reconcile loop
+                    // and leave `Running` set, which would stop every later pass for
+                    // this session.
+                    | Error reason ->
+                        HostCompactionGate.logReanchorFailure sessionId reason
+                        Task.CompletedTask
+
         let reconciler =
-            ReconcileSupervisor.Supervisor(snapshot, binding, onTurn, ?projection = Some resolveProjection)
+            ReconcileSupervisor.Supervisor(
+                snapshot,
+                binding,
+                onTurn,
+                ?projection = Some resolveProjection,
+                ?onSnapshot = Some onSnapshot
+            )
 
         /// FALLBACK-003: every Host signal is a wake and nothing else.
         ///

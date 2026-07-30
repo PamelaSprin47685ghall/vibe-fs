@@ -32,7 +32,19 @@ module ReconcileSupervisor =
             /// preceding it.
             onTurn: ReconciledTurn -> Task,
             ?onDeleted: SessionId -> unit,
-            ?projection: (SessionId -> AgentProjectionSet option)
+            ?projection: (SessionId -> AgentProjectionSet option),
+            /// HOST-006 containment: the full message list this pass read.
+            ///
+            /// A separate observer from `onTurn` because it answers a different
+            /// question. `onTurn` is about the active Logical Run's outcome; this is
+            /// about what appeared in the transcript regardless of any run — and a Host
+            /// compaction pseudo-run belongs to no Logical Run of ours, so it would
+            /// never reach a turn-shaped callback.
+            ///
+            /// Invoked at most once per pass, with the last snapshot actually read. The
+            /// attempt loop may read up to three times; observing each read would ask
+            /// the same question of three nearly identical snapshots.
+            ?onSnapshot: SessionId -> SessionMessage list -> Task
         ) as this =
 
         let gate = obj ()
@@ -40,6 +52,8 @@ module ReconcileSupervisor =
         let consumed = Dictionary<string, string>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
+
+        let observeSnapshot = defaultArg onSnapshot (fun _ _ -> Task.CompletedTask)
 
         let stateOf key =
             match states.TryGetValue(key) with
@@ -101,8 +115,27 @@ module ReconcileSupervisor =
 
                             let mutable turnFound: ReconciledTurn option = None
 
+                            // HOST-006: the last snapshot this pass actually read.
+                            //
+                            // Captured rather than re-fetched, so observing costs no extra
+                            // I/O. The attempt loop may read up to three times; the last
+                            // one is the freshest view and the only one worth observing.
+                            let mutable lastSnapshot: SessionMessage list option = None
+
                             match active with
-                            | None -> () // Unknown origin: no decision.
+                            | None ->
+                                // Unknown origin: no turn decision (PROMPT-004 fails
+                                // closed). But a Host compaction pseudo-run belongs to no
+                                // Logical Run of ours, so it can appear precisely here —
+                                // a manual `/compact` on a session the plugin has not
+                                // bound a root for. Skipping the read would make that
+                                // compaction invisible until some unrelated turn happened
+                                // to wake this loop.
+                                let! snapshotResult = snapshot.GetMessages sessionId
+
+                                match snapshotResult with
+                                | Error _ -> ()
+                                | Ok messages -> lastSnapshot <- Some messages
                             | Some activeRun ->
                                 let mutable continuationCandidate: ReconciledTurn option = None
                                 let mutable attempt = 0
@@ -118,6 +151,8 @@ module ReconcileSupervisor =
                                         match snapshotResult with
                                         | Error _ -> ()
                                         | Ok messages ->
+                                            lastSnapshot <- Some messages
+
                                             match TurnReconcile.reconcile messages activeRun with
                                             | None -> ()
                                             | Some turn ->
@@ -160,6 +195,18 @@ module ReconcileSupervisor =
 
                                 if publish then
                                     do! onTurn turn
+                            | None -> ()
+
+                            // HOST-006 containment, after the turn.
+                            //
+                            // Order matters. The turn's own effects — FALLBACK-003's
+                            // cursor advance, a Companion commit — belong to the epoch
+                            // that was in force when the request was made. A reanchor
+                            // retires that epoch, so running it first would make those
+                            // effects land against a prefix generation the request never
+                            // used.
+                            match lastSnapshot with
+                            | Some messages -> do! observeSnapshot sessionId messages
                             | None -> ()
 
                             cont <-

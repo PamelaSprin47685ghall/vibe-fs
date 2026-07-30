@@ -1004,7 +1004,13 @@ export const blogProjection = (() => {
 
 /** COMPANION-009 / CTX-012: which X prefix generation is in force. */
 export const prefixEpochProjection = (() => {
-  const m = bind(PrefixProj, 'PrefixEpochProjection', ['empty', 'applyRebase', 'applyReanchor', 'hasSnapshot'])
+  const m = bind(PrefixProj, 'PrefixEpochProjection', [
+    'empty',
+    'applyRebase',
+    'applyReanchor',
+    'hasSnapshot',
+    'isReanchored',
+  ])
 
   return {
     empty: m.empty,
@@ -1025,10 +1031,23 @@ export const prefixEpochProjection = (() => {
       return result.ok ? result : { ok: false, error: caseOf(result.error) }
     },
 
-    applyReanchor: ({ previousEpoch, nextEpoch }, state) => {
-      const result = resultOf(m.applyReanchor(prefixEpochId(previousEpoch), prefixEpochId(nextEpoch), state))
+    /**
+     * `observedRun` is the compaction pseudo-run being reanchored (HOST-006).
+     *
+     * Required, not optional: the projection records it so the same compaction cannot
+     * be reanchored twice, and a facade default would let a test skip the argument and
+     * silently exercise a shape production cannot produce.
+     */
+    applyReanchor: ({ previousEpoch, nextEpoch, observedRun }, state) => {
+      const result = resultOf(
+        m.applyReanchor(prefixEpochId(previousEpoch), prefixEpochId(nextEpoch), providerRun(observedRun), state),
+      )
       return result.ok ? result : { ok: false, error: caseOf(result.error) }
     },
+
+    isReanchored: (run, state) => m.isReanchored(providerRun(run), state),
+
+    reanchoredRuns: (state) => [...state.ReanchoredRuns].map(idValue.providerRun).sort(),
   }
 })()
 

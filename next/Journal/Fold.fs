@@ -113,7 +113,11 @@ module Fold =
         match result with
         | Ok updated -> Ok updated
         | Error(PrefixFoldRejection.StalePrefixEpoch _)
-        | Error PrefixFoldRejection.CandidateNotNew -> Ok projection
+        | Error PrefixFoldRejection.CandidateNotNew
+        // HOST-006: the same compaction observed twice. Absorbed rather than fatal —
+        // the observation repeats on every reconcile because the compaction message
+        // stays in the transcript, so this is the expected steady state, not corruption.
+        | Error(PrefixFoldRejection.CompactionAlreadyReanchored _) -> Ok projection
         | Error PrefixFoldRejection.NonSequentialPrefixEpoch ->
             reject factName "prefix epoch is not the successor of the previous one (PERSIST-010)"
         | Error(PrefixFoldRejection.CutoffRetreated(committed, proposed)) ->
@@ -646,7 +650,10 @@ module Fold =
                 (fun session ->
                     session.PrefixEpoch
                     |> Option.defaultValue PrefixEpochProjection.empty
-                    |> PrefixEpochProjection.applyReanchor payload.PreviousEpochId payload.NextEpochId
+                    |> PrefixEpochProjection.applyReanchor
+                        payload.PreviousEpochId
+                        payload.NextEpochId
+                        payload.ObservedCompactionRun
                     |> Result.map (fun retired ->
                         { session with
                             PrefixEpoch = Some retired

@@ -145,7 +145,35 @@ module SpikePlugin =
                           box (
                               systemTransformHook scope.SessionBudgets scope.SessionOutputLimits scope.CompanionBudgets
                           )
-                          "config", box (fun (config: obj) -> ManagerConfig.configureManager config) ]
+                          // HOST-006 prevention layer. The config hook is the only
+                          // place the plugin can reach the compaction settings: the
+                          // Host hands over the live instance-state object and runs
+                          // this before other services (`bootstrap.ts:36`), so a write
+                          // here is in force before anything reads it.
+                          //
+                          // `enforceSettings` reports the first key it could not
+                          // establish. That is carried to the startup probe rather than
+                          // thrown here: HOST-006's verdict needs both halves — the
+                          // settings AND the first turn — and failing at config time
+                          // would report the symptom without the observation.
+                          "config",
+                          box (fun (config: obj) ->
+                              ManagerConfig.configureManager config
+                              scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config))
+                          // HOST-006: this hook cannot refuse a compaction — its output
+                          // has no cancel field (`plugin/index.ts:305`) and
+                          // `plugin.trigger` discards the return value. Registered
+                          // anyway so the containment layer has a same-turn signal, and
+                          // so the absence of a veto is documented at the boundary
+                          // rather than inferred from silence.
+                          "experimental.session.compacting",
+                          box (uncurriedExecute (box HostCompactionGate.onSessionCompacting))
+                          // HOST-006: always `enabled = false`. `compaction.auto=false`
+                          // already makes the replay branch unreachable, but this is the
+                          // one vetoable synthetic-turn injection point, and leaving it
+                          // unanswered relies on an upstream default staying harmless.
+                          "experimental.compaction.autocontinue",
+                          box (uncurriedExecute (box HostCompactionGate.onCompactionAutoContinue)) ]
 
                 hooks?event <- box wired.ObserveEvent
 

@@ -131,14 +131,13 @@ test('CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
   // behind is byte-identical to the one before it.
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 4 }).value
 
-  assert.deepEqual(Object.keys(prefix).sort(), [
-    'applyReanchor',
-    'applyRebase',
-    'empty',
-    'epochOf',
-    'hasSnapshot',
-    'snapshot',
-  ])
+  // The claim is the absence of a CATEGORY of operation, so it is asserted as a
+  // pattern rather than by enumerating every key. An enumeration breaks whenever an
+  // unrelated accessor is added — it did, when `isReanchored` arrived — and each such
+  // break teaches the reader to update the list rather than to think about the rule.
+  const rollbackShaped = Object.keys(prefix).filter((key) => /rollback|revert|undo|restore|clear|discard/i.test(key))
+
+  assert.deepEqual(rollbackShaped, [], 'CTX-010 forbids a rollback: a failed probe was never committed')
 
   // The next slot after a discarded probe reads the same committed epoch.
   assert.equal(prefix.epochOf(committed), 1n)
@@ -147,10 +146,13 @@ test('CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
 
 // ── reanchor: retire, do not replace ───────────────────────────────────────
 
+const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
+  prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
+
 test('HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value
 
-  const result = prefix.applyReanchor({ previousEpoch: 1, nextEpoch: 2 }, committed)
+  const result = reanchor(committed, { previousEpoch: 1, nextEpoch: 2 })
   assert.equal(result.ok, true, result.ok ? '' : result.error)
 
   // Retirement, not replacement: the projection cannot repoint the cutoff at a
@@ -164,13 +166,17 @@ test('HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
   // prefix changed and the seal barrier broke — and COMPANION-009's byte-stability
   // guarantee is scoped to one epoch, so staying put would state something false.
   assert.equal(prefix.epochOf(result.value), 2n)
+
+  // The compaction that caused it is recorded, so the same observation cannot act
+  // twice.
+  assert.deepEqual(prefix.reanchoredRuns(result.value), ['msg_compaction'])
 })
 
 test('HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => {
   // A manual /compact on a session with no committed snapshot. Nothing to retire,
   // but the cold boundary is just as real, and the epoch is what the frame
   // projection's coverage reset is paired with under one fact.
-  const result = prefix.applyReanchor({ previousEpoch: 0, nextEpoch: 1 }, prefix.empty)
+  const result = reanchor(prefix.empty, { previousEpoch: 0, nextEpoch: 1 })
 
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   assert.equal(prefix.epochOf(result.value), 1n)
@@ -180,22 +186,44 @@ test('HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => 
 test('PERSIST_010_reanchor_epoch_must_be_the_successor', () => {
   for (const nextEpoch of [0, 3, 9]) {
     assert.deepEqual(
-      prefix.applyReanchor({ previousEpoch: 0, nextEpoch }, prefix.empty),
+      reanchor(prefix.empty, { previousEpoch: 0, nextEpoch }),
       { ok: false, error: 'NonSequentialPrefixEpoch' },
       `nextEpoch ${nextEpoch} must be refused after epoch 0`,
     )
   }
 })
 
-test('HOST_006_a_replayed_reanchor_is_reported_as_stale', () => {
-  // Two observations of one compaction pseudo-run must produce one retirement.
-  // The epoch check is what makes that true; there is no separate seen-set.
-  const once = prefix.applyReanchor({ previousEpoch: 0, nextEpoch: 1 }, prefix.empty).value
+test('HOST_006_the_same_compaction_is_never_reanchored_twice', () => {
+  // Two observations of one pseudo-run must produce one retirement.
+  const once = reanchor(prefix.empty, { previousEpoch: 0, nextEpoch: 1 }).value
 
-  const replay = prefix.applyReanchor({ previousEpoch: 0, nextEpoch: 1 }, once)
-  assert.deepEqual(replay, { ok: false, error: 'StalePrefixEpoch' })
+  const replay = reanchor(once, { previousEpoch: 0, nextEpoch: 1 })
+  assert.deepEqual(replay, { ok: false, error: 'CompactionAlreadyReanchored' })
 
   assert.equal(prefix.epochOf(once), 1n, 'the epoch did not move twice')
+})
+
+test('HOST_006_a_recorded_compaction_stays_refused_after_the_epoch_moves_on', () => {
+  // The failure the recorded-run set exists for, and the reason the epoch check alone
+  // is not enough.
+  //
+  // A compaction message stays in the Host transcript forever, so every later
+  // reconcile observes it again. Once the epoch has advanced for an UNRELATED reason —
+  // a promoted probe here — a freshly decided reanchor for that old compaction would
+  // carry a `PreviousEpochId` that matches the current epoch. The epoch check would
+  // accept it, the epoch would advance again, and the coverage the session had
+  // legitimately rebuilt would be zeroed.
+  const reanchored = reanchor(prefix.empty, { previousEpoch: 0, nextEpoch: 1, observedRun: 'msg_c1' }).value
+  const promoted = rebase(reanchored, { previousEpoch: 1, nextEpoch: 2, cutoff: 4 }).value
+
+  assert.equal(prefix.epochOf(promoted), 2n)
+
+  // A well-formed line for the OLD compaction, correct against the current epoch.
+  const stale = reanchor(promoted, { previousEpoch: 2, nextEpoch: 3, observedRun: 'msg_c1' })
+
+  assert.deepEqual(stale, { ok: false, error: 'CompactionAlreadyReanchored' })
+  assert.equal(prefix.epochOf(promoted), 2n, 'the promoted prefix survives')
+  assert.equal(prefix.hasSnapshot(promoted), true)
 })
 
 test('CTX_012_probe_capability_returns_after_a_reanchor', () => {
@@ -203,22 +231,31 @@ test('CTX_012_probe_capability_returns_after_a_reanchor', () => {
   // coverage in the new numbering, a probe promotes normally — from cutoff 1,
   // because the retired snapshot no longer imposes a floor.
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 20 }).value
-  const retired = prefix.applyReanchor({ previousEpoch: 1, nextEpoch: 2 }, committed).value
+  const retired = reanchor(committed, { previousEpoch: 1, nextEpoch: 2 }).value
 
   const rebuilt = rebase(retired, { previousEpoch: 2, nextEpoch: 3, cutoff: 1, seal: 'seal-new' })
 
   assert.equal(rebuilt.ok, true, rebuilt.ok ? '' : rebuilt.error)
   assert.equal(prefix.epochOf(rebuilt.value), 3n)
   assert.deepEqual(rebuilt.value.Snapshot, candidate({ cutoff: 1, seal: 'seal-new' }))
+
+  // A rebase does not disturb the recorded compactions.
+  assert.deepEqual(prefix.reanchoredRuns(rebuilt.value), ['msg_compaction'])
 })
 
-test('HOST_006_reanchor_after_reanchor_needs_the_current_epoch', () => {
-  // A second, genuinely new compaction on an already-reanchored session. It must
-  // carry the epoch now in force; using the original one would be indistinguishable
-  // from a replay of the first.
-  const first = prefix.applyReanchor({ previousEpoch: 0, nextEpoch: 1 }, prefix.empty).value
+test('HOST_006_a_genuinely_new_compaction_reanchors_again', () => {
+  // A second, different pseudo-run on an already-reanchored session. It must be
+  // accepted, or a second manual /compact would leave the session pointing at a
+  // numbering the transcript no longer has.
+  const first = reanchor(prefix.empty, { previousEpoch: 0, nextEpoch: 1, observedRun: 'msg_c1' }).value
 
-  const second = prefix.applyReanchor({ previousEpoch: 1, nextEpoch: 2 }, first)
+  const second = reanchor(first, { previousEpoch: 1, nextEpoch: 2, observedRun: 'msg_c2' })
   assert.equal(second.ok, true, second.ok ? '' : second.error)
   assert.equal(prefix.epochOf(second.value), 2n)
+
+  // Both compactions are now recorded, so neither can act again.
+  assert.deepEqual(prefix.reanchoredRuns(second.value), ['msg_c1', 'msg_c2'])
+  assert.equal(prefix.isReanchored('msg_c1', second.value), true)
+  assert.equal(prefix.isReanchored('msg_c2', second.value), true)
+  assert.equal(prefix.isReanchored('msg_c3', second.value), false)
 })
