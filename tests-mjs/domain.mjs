@@ -58,6 +58,8 @@ const [
   OrchestratorProj,
   Cursor,
   TerminalValidity,
+  PrefixCandidateModule,
+  RecoverySlotModule,
   BloggerTomlModule,
   BloggerDeltaModule,
   CompanionPromptModule,
@@ -85,6 +87,8 @@ const [
   prod('Journal/OrchestratorProjection'),
   prod('Domain/AgentPairCursor'),
   prod('Domain/TerminalValidity'),
+  prod('Domain/PrefixCandidate'),
+  prod('Domain/RecoverySlot'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
   prod('Domain/CompanionPrompt'),
@@ -498,6 +502,9 @@ export const cursor = {
   effectiveAgent: (pair, value) => Cursor.effectiveAgent(pair, value),
   isValidAdvance: (prevOffset, nextOffset, prevCount, nextCount) =>
     Cursor.isValidAdvance(prevOffset, nextOffset, prevCount, nextCount),
+
+  /** CTX-006: is this one of the primed slots (A′ / B′). */
+  isRecoverySlot: (offset) => Cursor.isRecoverySlot(offset),
   attemptIdentity: (session, run, root, providerRunId) => Cursor.attemptIdentity(session, run, root, providerRunId),
 
   /** FALLBACK-005: `MayContinue` | `Exhausted`, with the cursor as payload. */
@@ -687,6 +694,99 @@ export const companionProjection = (() => {
         isFirstTurnShape: m.isFirstTurnShape(plan),
       }
     },
+  }
+})()
+
+/**
+ * PROMPT-008: which physical request this is, and the two questions it answers.
+ *
+ * The kinds are built by case NAME. All four are payload-free, so an ordinal-based
+ * construction would compile, run, and answer `clearsFailureCountOnSuccess` for the
+ * wrong kind — the exact class of silent failure this facade exists to prevent.
+ */
+export const requestKind = (() => {
+  const build = unionCase(PrefixCandidateModule.ProviderRequestKind, 'ProviderRequestKind')
+  const m = bind(PrefixCandidateModule, 'ProviderRequestKind', [
+    'label',
+    'clearsFailureCountOnSuccess',
+    'mayCarryProbe',
+  ])
+
+  const of = (name) => build(name, [])
+
+  return {
+    workMain: of('WorkMain'),
+    bloggerMain: of('BloggerMain'),
+    bloggerSquash: of('BloggerSquash'),
+    interactionRepair: of('InteractionRepair'),
+    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair'].map(of),
+
+    nameOf: (kind) => caseOf(kind),
+    label: (kind) => m.label(kind),
+    clearsFailureCountOnSuccess: (kind) => m.clearsFailureCountOnSuccess(kind),
+    mayCarryProbe: (kind) => m.mayCarryProbe(kind),
+  }
+})()
+
+/**
+ * FALLBACK-012 / CTX-006 / CTX-007: the recovery slot's control flow.
+ *
+ * `arming` is exposed only through the three named constructors. There is
+ * deliberately no `armingOf(offset)` here, mirroring the production module: the
+ * question "is offset N armed" has no answer, and offering one would let a test
+ * assert the parked-cursor bug as correct behaviour.
+ */
+export const recoverySlot = (() => {
+  const m = bind(RecoverySlotModule, 'RecoverySlot', [
+    'beginSequence',
+    'afterFailureAdvance',
+    'afterRestart',
+    'isArmed',
+    'mayRecover',
+    'onSquashOutcome',
+    'onMainOutcome',
+    'advancesCursor',
+    'nextArming',
+  ])
+  const buildOutcome = unionCase(RecoverySlotModule.AttemptOutcome, 'AttemptOutcome')
+
+  /**
+   * Wrap a decision so its name is readable AND the value stays usable.
+   *
+   * The value is carried through rather than rebuilt from the name: reconstructing a
+   * `SlotDecision` from a string would mean re-supplying `CommitMain`'s payload here,
+   * so the facade would be guessing what production returned instead of reporting it.
+   *
+   * `nextArming` is the union VALUE and `nextArmingName` is the string. Both exist
+   * because they serve opposite needs: a trace threads the value into the next
+   * `mayRecover` call, while an assertion reads the name. Exposing only the name
+   * makes the accessor lossy — the caller cannot feed it back — and exposing only the
+   * value makes every assertion write `caseOf` itself.
+   */
+  const decisionOf = (decision) => ({
+    name: caseOf(decision),
+    clearsFailureCount: caseOf(decision) === 'CommitMain' ? payloadOf(decision) : undefined,
+    advancesCursor: m.advancesCursor(decision),
+    nextArming: m.nextArming(decision),
+    nextArmingName: caseOf(m.nextArming(decision)),
+  })
+
+  return {
+    beginSequence: m.beginSequence,
+    afterFailureAdvance: m.afterFailureAdvance,
+    afterRestart: m.afterRestart,
+
+    armingName: (arming) => caseOf(arming),
+    isArmed: (arming) => m.isArmed(arming),
+
+    /** CTX-006: arming AND an odd (primed) offset AND material to work with. */
+    mayRecover: (arming, offset, hasMaterial) => m.mayRecover(arming, offset, hasMaterial),
+
+    /** `{ name, clearsFailureCount, advancesCursor, nextArming }`. */
+    onSquash: (outcome) => decisionOf(m.onSquashOutcome(buildOutcome(outcome, []))),
+
+    onMain: ({ kind, repairSpent = false, outcome }) =>
+      decisionOf(m.onMainOutcome(kind, repairSpent, buildOutcome(outcome, []))),
   }
 })()
 

@@ -70,6 +70,18 @@ module AgentPairCursor =
 
     let advance (offset: byte) : byte = byte ((int offset + 1) % 4)
 
+    /// CTX-006: is this offset one of the primed slots (A′ / B′).
+    ///
+    /// The A/A′/B/B′ shape: offsets 1 and 3 are the SECOND attempt on each side, and
+    /// those are the slots a recovery action may run in. Offsets 0 and 2 are the first
+    /// attempt on their side and always send an ordinary request.
+    ///
+    /// Necessary but not sufficient on its own. FALLBACK-012 forbids arming from
+    /// parity alone — a success does not reset Offset, so a parked odd cursor would
+    /// otherwise arm the first slot of every later sequence. `RecoverySlot.mayRecover`
+    /// combines this with the control-flow arming fact.
+    let isRecoverySlot (offset: byte) : bool = offset % 2uy = 1uy
+
     /// FALLBACK-004 on failure: Offset advances, budget is consumed by one.
     let recordFailure (cursor: FallbackCursor) : FallbackCursor =
         { Offset = advance cursor.Offset
