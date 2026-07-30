@@ -248,12 +248,19 @@ const DUPLICATE_ALGORITHM_OWNERS = [
 /// F# record construction is structural, so there is no type name to grep for.
 /// The `fields` below exist on no other type in the codebase, so a file that
 /// assigns all of them IS building one — a real signal, not a heuristic.
+///
+/// `builder` checks the opposite failure. A constructor with zero call sites
+/// satisfies "nobody bypasses me" trivially, because there is nothing to bypass —
+/// and that is the state PROMPT-008 was actually in for the whole of packages 0d
+/// through X7: the function existed, the gate was green, and every provider request
+/// still assembled its own fields from `ActiveLogicalRun`.
 const SINGLE_CONSTRUCTOR_TYPES = [
   {
     type: 'AttemptExecutionProfile',
     clause: 'PROMPT-008',
     owner: 'next/Domain/PromptAuthority.fs',
     fields: ['SystemPromptId =', 'ToolCapabilitySet ='],
+    builder: 'buildAttemptExecutionProfile',
   },
 ]
 
@@ -581,17 +588,31 @@ for (const { symbol, owners } of DUPLICATE_ALGORITHM_OWNERS) {
 
 // ── gate: one constructor per restricted type ───────────────────────────────
 
-for (const { type, clause, owner, fields } of SINGLE_CONSTRUCTOR_TYPES) {
-  const builders = productionFiles.filter((file) => {
+for (const { type, clause, owner, fields, builder } of SINGLE_CONSTRUCTOR_TYPES) {
+  const assemblers = productionFiles.filter((file) => {
     if (!isFs(file) || norm(file) === owner) return false
     const text = read(file)
     return fields.every((field) => text.includes(field))
   })
 
-  for (const builder of builders) {
+  for (const assembler of assemblers) {
     fail(
       'single-constructor',
-      `${builder}: assembles ${type} field by field; ${clause} requires construction through ${owner}`,
+      `${assembler}: assembles ${type} field by field; ${clause} requires construction through ${owner}`,
+    )
+  }
+
+  if (!builder) continue
+
+  const callers = productionFiles.filter(
+    (file) => isFs(file) && norm(file) !== owner && read(file).includes(builder),
+  )
+
+  if (callers.length === 0) {
+    fail(
+      'single-constructor',
+      `${owner}: ${builder} has no call site; ${clause} means every provider request is built from it, ` +
+        `so an unused constructor means every request is still assembled elsewhere`,
     )
   }
 }

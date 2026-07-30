@@ -41,10 +41,16 @@ const fableLibraryDir = (() => {
 const lib = (name) => import(join(fableLibraryDir, name))
 const prod = (name) => import(join(BUILD_ROOT, `${name}.js`))
 
-const [DateOffset, FsMap, FsList] = await Promise.all([lib('DateOffset.js'), lib('Map.js'), lib('List.js')])
+const [DateOffset, FsMap, FsList, FsResult] = await Promise.all([
+  lib('DateOffset.js'),
+  lib('Map.js'),
+  lib('List.js'),
+  lib('Result.js'),
+])
 
 const [
   Identity,
+  RolesModule,
   FactModule,
   Outcome,
   EnvelopeModule,
@@ -68,6 +74,8 @@ const [
   CompanionIdentityModule,
   CompanionBuilderModule,
   ProbeSelectionModule,
+  XPrefixModule,
+  AttemptPlannerModule,
   Authority,
   AuthorityRun,
   Witness,
@@ -77,6 +85,7 @@ const [
   ProcessRequest,
 ] = await Promise.all([
   prod('Kernel/Identity'),
+  prod('Kernel/Roles'),
   prod('Kernel/Fact'),
   prod('Kernel/Outcome'),
   prod('Journal/Envelope'),
@@ -100,6 +109,8 @@ const [
   prod('Domain/CompanionIdentity'),
   prod('Domain/CompanionProjectionBuilder'),
   prod('Domain/PrefixProbeSelection'),
+  prod('Domain/XPrefixProjection'),
+  prod('Domain/AttemptPlanner'),
   prod('Domain/PromptAuthority'),
   prod('Domain/PromptAuthorityRun'),
   prod('Domain/ReviewWitness'),
@@ -232,6 +243,17 @@ export const isSome = (value) => !isNone(value)
 /** F# `Result` → { ok, value } | { ok: false, error }. */
 export const resultOf = (value) =>
   caseOf(value) === 'Ok' ? { ok: true, value: payloadOf(value) } : { ok: false, error: payloadOf(value) }
+
+/**
+ * Build an F# `Result`, for a test that must HAND one to production.
+ *
+ * A deferred selector (`AttemptPlanner.plan`'s `selectProbe`) returns a `Result`, so a
+ * test has to construct one. Writing `{ tag: 0, fields: [x] }` by hand is the ordinal
+ * construction this facade exists to forbid: `Ok` and `Error` are positional, so the
+ * two are one typo apart and swapping them yields a plan that looks plausible.
+ */
+export const okResult = (value) => new FsResult.FSharpResult$2(0, [value])
+export const errorResult = (value) => new FsResult.FSharpResult$2(1, [value])
 
 // ── case-name resolution ─────────────────────────────────────────────────────
 // A union's tag ordinal is positional and silently shifts when a case is added
@@ -984,6 +1006,166 @@ export const probeSelection = (() => {
         sealRoot: probe.Candidate.SealRoot,
         syntheticId: probe.Candidate.SyntheticMessageId,
       }
+    },
+  }
+})()
+
+/** AGENT-001: the ten canonical roles and two tiers, by case name. */
+export const roles = (() => {
+  const buildRole = unionCase(RolesModule.Role, 'Role')
+  const buildTier = unionCase(RolesModule.AgentTier, 'AgentTier')
+
+  return {
+    of: (name) => buildRole(name, []),
+    tier: (name) => buildTier(name, []),
+    nameOf: (role) => caseOf(role),
+    permissions: (role) => [...RolesModule.Roles_permissions(role)].map(caseOf).sort(),
+  }
+})()
+
+/**
+ * COMPANION-009 / CTX-010: which prefix X sends, as a plan over message positions.
+ *
+ * `frozenBBody` is supplied by the caller because the snapshot carries a `BlobRef`,
+ * never the body (PERSIST-007). Passing it here is the same split `ResolvedPrefixMemory`
+ * makes in production: the journal records where the body is, and only a resolved copy
+ * reaches the transform boundary.
+ */
+export const xPrefix = (() => {
+  const m = bind(XPrefixModule, 'XPrefixProjection', ['forSnapshot', 'forChoice', 'requiredBlob', 'replacesPrefix'])
+
+  const planOf = (plan) => {
+    const memory = unwrapOption(plan.CompanionMemory)
+
+    return {
+      dropLeading: plan.DropLeading,
+      replacesPrefix: m.replacesPrefix(plan),
+      memoryId: isNone(memory) ? undefined : memory[0],
+      memoryText: isNone(memory) ? undefined : memory[1],
+    }
+  }
+
+  return {
+    forSnapshot: (snapshot, frozenBBody = '') => planOf(m.forSnapshot(snapshot, frozenBBody)),
+    forChoice: (choice, committed, frozenBBody = '') => planOf(m.forChoice(choice, committed, frozenBBody)),
+
+    /** `undefined` when the plan needs no blob read. */
+    requiredBlob: (choice, committed) => {
+      const ref = unwrapOption(m.requiredBlob(choice, committed))
+      return isNone(ref) ? undefined : idValue.blobRef(ref)
+    },
+  }
+})()
+
+/** CTX-010: the two prefix choices, built by case name. */
+export const projectionChoice = (() => {
+  const build = unionCase(PrefixCandidateModule.XProjectionChoice, 'XProjectionChoice')
+
+  return {
+    committed: build('UseCommittedEpoch', []),
+    probe: (value) => build('UsePrefixProbe', [value]),
+    nameOf: (choice) => caseOf(choice),
+  }
+})()
+
+/**
+ * CTX-010: a `PrefixProbe`, for a test that must hand one to production.
+ *
+ * Built here rather than as an object literal at each call site so the field names live
+ * in one place. A misspelled field on an F# record reaching JS reads as `undefined`
+ * rather than failing — the same silent class as the three hazards this facade exists
+ * to close.
+ */
+export const prefixProbe = ({ id = 'probe-1', basedOnEpoch = 0, candidate }) => ({
+  ProbeId: id,
+  BasedOnEpochId: prefixEpochId(basedOnEpoch),
+  Candidate: candidate,
+})
+
+/** CTX-011: a `NoCandidateReason`, by case name. Payload-carrying cases take fields. */
+export const noCandidateReason = (() => {
+  const build = unionCase(ProbeSelectionModule.NoCandidateReason, 'NoCandidateReason')
+  return (name, ...fields) => build(name, fields)
+})()
+
+/**
+ * PROMPT-008: the one call site of `buildAttemptExecutionProfile`.
+ *
+ * `mayRecover` is passed in rather than derived from a cursor, mirroring production:
+ * arming is a control-flow fact of the caller's recovery sequence (FALLBACK-012), and a
+ * planner that decided it from an offset would be the parked-cursor bug.
+ */
+export const attemptPlanner = (() => {
+  const m = bind(AttemptPlannerModule, 'AttemptPlanner', ['plan', 'probeOf', 'promotableProbe'])
+  const buildOutcome = unionCase(RecoverySlotModule.AttemptOutcome, 'AttemptOutcome')
+
+  /** A complete AuthorityExecutionProfile. Every field is required — PROMPT-002 fixes them all. */
+  const authority = ({
+    session = 'ses_x',
+    run = 'run-1',
+    root = 'msg_root',
+    kind = rootKind.human,
+    selected = 'fast-coder',
+    peer = 'deep-coder',
+    role = 'Coder',
+    tier = 'Fast',
+  } = {}) => ({
+    SessionId: sessionId(session),
+    LogicalRunId: logicalRunId(run),
+    AuthorityRootUserMessageId: authorityRoot(root),
+    AuthorityKind: kind,
+    SelectedAgent: selected,
+    PeerAgent: peer,
+    CanonicalRole: roles.of(role),
+    SelectedTier: roles.tier(tier),
+  })
+
+  return {
+    authority,
+
+    plan: ({
+      authorityProfile = authority(),
+      cursor: cursorValue = cursor.initial,
+      physical = 'msg_user',
+      run = 'msg_assistant',
+      origin = promptOrigin.authorityRoot(rootKind.human),
+      kind,
+      mayRecover = false,
+      selectProbe = () => {
+        throw new Error('selectProbe must not be called when the slot may not recover')
+      },
+    }) => {
+      const plan = m.plan(
+        authorityProfile,
+        cursorValue,
+        physicalUser(physical),
+        providerRun(run),
+        origin,
+        kind,
+        mayRecover,
+        selectProbe,
+      )
+
+      const noProbeReason = unwrapOption(plan.NoProbeReason)
+      const probe = unwrapOption(m.probeOf(plan))
+
+      return {
+        value: plan,
+        requestKind: caseOf(plan.Profile.RequestKind),
+        choice: caseOf(plan.Profile.ProjectionChoice),
+        effectiveAgent: plan.Profile.EffectiveAgent,
+        canonicalRole: caseOf(plan.Profile.Authority.CanonicalRole),
+        toolCapabilities: [...plan.Profile.ToolCapabilitySet].map(caseOf).sort(),
+        systemPromptId: idValue.systemPrompt(plan.Profile.SystemPromptId),
+        noProbeReason: isNone(noProbeReason) ? undefined : caseOf(noProbeReason),
+        probeId: isNone(probe) ? undefined : probe.ProbeId,
+      }
+    },
+
+    /** CTX-012: `undefined` unless this attempt carried a probe AND produced a usable terminal. */
+    promotableProbeId: (plan, outcome) => {
+      const probe = unwrapOption(m.promotableProbe(plan.value, buildOutcome(outcome, [])))
+      return isNone(probe) ? undefined : probe.ProbeId
     },
   }
 })()

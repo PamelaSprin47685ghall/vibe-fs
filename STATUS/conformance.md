@@ -26,7 +26,7 @@
 | PROMPT-005: 四阶段协议 | UNVERIFIED | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 包 A：四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生 |
 | PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定 |
 | PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
-| PROMPT-008: 原子 AttemptExecutionProfile | CONTRADICTS | `Domain/PromptAuthority.buildAttemptExecutionProfile` | 唯一构造函数存在且已补 `RequestKind` / `ProjectionChoice`（包 X5），但全仓零调用点 —— 见下方「零调用点的唯一构造函数」 |
+| PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.plan` | 唯一构造函数现有唯一调用点；`single-constructor` 门禁同时检查「无人绕过」与「有人调用」两侧 |
 | PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
 | PROMPT-011: 未决发送恢复 | PARTIAL | `Domain/PromptAuthority.derivePromptKey` | 包 A：PromptKey 已按条款派生并写入 Host metadata，`ClaimSequence` 由 fold 推进。仍缺启动期 tail window 查找与 `RecoveryAttemptBudget = 3`（属清场期） |
 
@@ -124,30 +124,22 @@
 | PERSIST-008: Projection 查询 | PARTIAL | `Journal/Fold.fs` | 多数 projection 是 O(1) 积分；`Fold.reviewOwner` 用 `Map.tryPick` 扫描全部 session |
 | PERSIST-009: Durable Effect 协议 | PARTIAL | `EffectProjection.fs` | 事实存在；未覆盖 Prompt 发送与 Git publish |
 
-## 零调用点的唯一构造函数（PROMPT-008）
+## 零调用点的唯一构造函数（PROMPT-008，已解决）
 
-`buildAttemptExecutionProfile` 存在、被 `single-constructor` 门禁保护、字段完整，
-且在包 X5 补齐了 `RequestKind` 与 `ProjectionChoice`。全仓调用点为 0。
+包 X5 补 `RequestKind` / `ProjectionChoice` 时发现 `buildAttemptExecutionProfile`
+全仓调用点为 0。包 X8 落地 `Domain/AttemptPlanner.plan` 作为唯一调用点后解决。
 
-```text
-grep -rn "buildAttemptExecutionProfile" next/ | grep -v Domain/PromptAuthority.fs
-→ 无输出
-```
+值得留档的是这个缺陷为何能存在这么久。包 0d 的记录写「profile 本身尚未作为参数
+贯通全链（各处仍分别读 `ActiveLogicalRun`）」，措辞把它说成覆盖不足；实际是
+没有任何一次 provider request 从这个 profile 出发构造，而那正是 PROMPT-008
+禁止的状态。措辞的温和程度掩盖了状态的严重程度。
 
-包 0d 的记录写的是「profile 本身尚未作为参数贯通全链（各处仍分别读
-`ActiveLogicalRun`）」，措辞把它说成覆盖不足。实际状态更严重：没有任何一次
-provider request 是从这个 profile 出发构造的。 每个发送路径仍各自读
-`ActiveLogicalRun` 拼出自己需要的字段，而 PROMPT-008 禁止的正是这件事。
+门禁也没抓住它，因为它只问「谁在手工构造这个类型」。答案是没有人——包括本该
+构造它的那个函数的调用方。一个零调用点的构造函数通过所有「不得绕过」检查，
+因为无路可绕。
 
-因此状态从 `PARTIAL` 改为 `CONTRADICTS`。前者暗示部分路径已合规，而事实是零条。
-
-门禁没有抓住这一点，因为它检查的是「谁在手工构造这个类型」，答案是没有人——
-包括本该构造它的那个函数的调用方。一个零调用点的构造函数通过所有「不得绕过」
-类型的检查，因为无路可绕。
-
-贯通归包 X8：probe 候选必须进入 profile（CTX-010 要求候选只对一次 attempt 有效），
-而那正是第一个真正需要完整 profile 的调用点。在此之前先补一条第 0 层门禁：
-`buildAttemptExecutionProfile` 调用点数为 0 时报错。
+`single-constructor` 门禁现在检查两侧：无人手工拼装，且至少有一个调用点。
+两条都红过一次以确认门禁真的会响。
 
 ## 未列入本表的条款
 
