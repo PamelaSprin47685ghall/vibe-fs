@@ -947,6 +947,102 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 
 包 X 新增四条剧本（X-A 至 X-D，见下），一并纳入 K8 的手工重写范围。
 
+#### 包 K 清点与拆解修订（退火二后实测）
+
+设计文档第十二节的 K1–K10 写于封炉期。退火二后逐项实测，四处需要偏离：三处比原计划更彻底，一处原计划缺失。
+
+现状实测：
+
+```text
+剧本      22 文件 / 7583 行 / 258 条边
+testkit   65 个 .js/.mjs
+canary    19 条（run-canary-staggered 的 CANARY_TESTS）
+           其中 8 条是 9 行 stub，除文件名外逐字节相同
+           其中 4 条是内联轨迹（228/230/406/86 行，共 26 处 expect*）
+```
+
+##### 修订一：K1 从「两侧对拍」改为「删除 testkit 那一侧」
+
+设计文档要求 testkit 的规范化函数与生产 VERIFY-007 同一定义并两侧对拍。实测生产侧已具备完整出口：
+
+```text
+build/next/Domain/ProviderProjection.js
+  toSemantic  renderSemantic  fixtureKey  semanticallyEqual
+  sealDigest  toolResultDigest(s)  isAppendOnlyPrefix  CanonicalVersion
+```
+
+而 `testkit/opencode/tests/manager-tool-contract.mjs:7` 已经直接 `import ... from '../../../build/next/OpenCode/SpikePlugin.js'`——testkit 引用生产产物是既有模式，不是本包引入的新风险。
+
+因此 `sealProviderVisible` / `isProviderVisiblePrefix` 整体删除，testkit 改为 import 生产投影。对拍使漂移可被发现，单一来源使漂移不可能发生；后者是严格更强的形态，且顺带把 VERIFY-007 从 `PARTIAL` 推到底——该条现存的差距措辞正是「testkit 侧仍是单一 `sealProviderVisible` 同时承担两种相等性」。
+
+保留一处 testkit 私有：`estimatePromptTokens`。它给 mock 的 usage 字段编造 token 数，而 mock 扮演的是 provider，provider 报告 token 用量是真实行为。CTX-001 禁止的是插件观察上下文容量，不是 provider 报告它。此处登记为必须守住的边界：该函数不得出现在 `next/` 任何路径上（当前实测 0 处）。
+
+##### 修订二：删除 `loadScripts` 顺带消灭三个文件，不是「合并」
+
+设计文档说 22 个文件合并后预计降至 19。实测这三个文件的存在理由只有一个——作为 `loadScripts` 的运行期换入目标：
+
+```text
+host-restart-after.json                              3 边   无任何 canary 引用
+orchestrator-restart-publish-recovery.json           5 边   无任何 canary 引用
+orchestrator-restart-publish-conflict-recovery.json  0 边   {"scenario":..., "scripts": []}
+```
+
+第三个是空文件。它唯一的作用是在 flow 中途把匹配空间换成空集，即「重启后什么都不该再命中」——而这正是设计文档第八节判定为错误的那件事：重启不改变剧本，重启后的对话步本来就该写在同一个文件里。
+
+所以这不是把三个文件的内容并进主文件，而是删掉一个不表达任何内容的文件、把另两个的 8 条边接回它们本来的对话位置。22 → 19 由此达成，且 `loadScripts` 在剧本侧的 3 处引用同时归零。
+
+##### 修订三：8 条 stub canary 合并为清单驱动，`CANARY_COUNT` 漂移随之消失
+
+实测这 8 个文件（agent-dsl / executor / process-stress / pty-stress / orchestrator / orchestrator-publish / inspector-oneshot / manager-full-loop）除剧本文件名与错误消息外逐字节相同，每个 9 行：静态门禁 + `runCanary('X.json')`。
+
+它们不承载任何信息。8 个文件 72 行仪式表达的是「有 8 个纯数据驱动的 scenario」——那是清单，不是代码。改为单一清单驱动后：
+
+```text
+testkit/opencode/tests/data-driven.manifest.toml   8 行声明
+testkit/opencode/tests/run-data-driven.mjs         一个入口
+```
+
+包 W 的实测缺陷之一「`CANARY_COUNT = 17` 而 `CANARY_TESTS` 实际 19 条，日志里的 `expected ~17` 是错的」在此顺带解决：清单成为唯一来源，数量由它派生，不再有第二处可漂移。这条跨包收益是把 K 与 W 排在同期的理由之一。
+
+余下 4 条内联 canary（companion / companion-cache / companion-replacement / manager-companion）不合并。它们是第 3 层轨迹：`expect*` 之外还有真实断言、文件读写、`execFileSync`。K8 对它们只做一件事——把内容声明搬进 TOML，把轨迹与断言留在 `.mjs`。
+
+##### 修订四：新增 K11 —— 森林的反向自检
+
+设计文档第十四节的结论是「一个能对错误实现给出绿灯的验证装置，比没有验证装置更危险」，并列出四种既有的绿灯误判（`epochCold` / `specificity` / `requestRoleOf` / `loadScripts`）。但 K1–K10 里没有任何一步验证这件事本身。
+
+K10 的森林自检查的是纯函数性、索引无冲突、fault 有限、无死边——全部是「森林自身结构正确」。结构正确不蕴含「错误实现会被拒绝」：`epochCold` 那条豁免在结构上完全合法，它的问题是放过了不该发生的 epoch 切换。
+
+因此新增：
+
+```text
+K11  变异自检：对每条关键 canary，注入一个确定的错误响应序列，断言森林拒绝
+     覆盖至少四类，对应第十四节的四种历史误判：
+       前缀在未声明处断裂          → 必须 fail closed，不得靠 tools+system 相同放行
+       同长度冲突前缀              → 载入期拒绝，不得打分取一
+       角色与 AttemptExecutionProfile 不一致 → 必须由 profile 决定，不得由 wire 反推
+       重启后本该命中的边消失      → 必须仍然命中（静态剧本的定义）
+```
+
+这是唯一能证明门禁在起作用的测试类别，与包 T-5b 对 `architecture-gate` 做的负向验证（移走 `guide-contract.test.mjs` 与 `runner.mjs` 各报 2 项违规）同一方法论：门禁必须红过一次才算存在。
+
+##### 修订后的执行顺序
+
+```text
+K1   删除 sealProviderVisible / isProviderVisiblePrefix，testkit import 生产投影
+K2   运行时键提取：(lane, turn, step) 三个纯函数 + 最长前缀唯一命中
+K3   delivery 与 fault 计划求值（纯函数）
+K4   epoch 冷边界显式声明与前缀封印验证
+K5   TOML schema + 载入期编译器 + 六项载入期校验 + 根键顺序硬检查
+K6   TOML formatter（幂等）
+K7   旧字段拒绝器：turn 编号 / reusable / pathless / blocking / loadScripts / specificity
+K8   19 个 scenario 手工重写为 TOML（含 X-A–X-D 四条新增），4 条内联轨迹只搬内容
+K9   删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径
+K10  森林结构自检：纯函数性、索引无冲突、fault 有限、无死边
+K11  森林变异自检：四类错误响应必须被拒绝（新增）
+```
+
+K1 提前到第一步的理由：它决定 K2 的前缀比较用哪个投影。先做 K2 会写出一个基于 testkit 私有规范化的前缀索引，K1 完成后整体重写。
+
 ### 包 X：失败驱动上下文恢复
 
 | 项 | 值 |
