@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../index.js';
 import { runCanary } from '../canary-driver.mjs';
+import { FORK_COMPLETION_WINDOW_MS, FORK_RECONCILE_SLICE_MS } from '../time-budget.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -34,7 +35,7 @@ async function proveNudgeForkCompleted(scenario, ctx) {
   const parentId = ctx.sessionId;
   assert.ok(parentId, 'parent session required');
   // Reconcile from API (not message.updated): exact tool completion proof.
-  const deadline = Date.now() + 10000;
+  const deadline = Date.now() + FORK_COMPLETION_WINDOW_MS;
   let completed = 0;
   while (Date.now() < deadline) {
     const res = await scenario.client.request('GET', `/session/${parentId}/message`);
@@ -59,7 +60,7 @@ async function proveNudgeForkCompleted(scenario, ctx) {
     }
     await scenario.events.awaitEvent(
       (e) => e.sessionID === parentId && (e.type === 'session.status' || e.type === 'session.idle'),
-      2000,
+      FORK_RECONCILE_SLICE_MS,
     ).catch(() => {});
   }
   assert.ok(completed >= 1, `expected completed fork tool after nudge, got ${completed}`);

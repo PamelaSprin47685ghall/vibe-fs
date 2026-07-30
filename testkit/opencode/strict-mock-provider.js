@@ -41,7 +41,7 @@ import {
 import { checkSatisfied } from './strict-mock-satisfy.js';
 import { faultBody } from './delivery-plan.js';
 import { StrictMockSignals } from './strict-mock-signals.js';
-import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
+import { WATCHDOG_TIMEOUT_MS } from './time-budget.js';
 import { respond } from './strict-mock-responses.js';
 import {
   createState,

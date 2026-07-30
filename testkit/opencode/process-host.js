@@ -15,6 +15,12 @@ import http from 'node:http';
 import { createIsolatedEnv } from './isolated-env.js';
 import {
   SIGTERM_GRACE_MS,
+  SIGKILL_GRACE_MS,
+  SOCKET_CHECK_TIMEOUT_MS,
+  PROCESS_TREE_TIMEOUT_MS,
+  HOST_START_TIMEOUT_MS,
+} from './time-budget.js';
+import {
   READY_POLL_INTERVAL_MS,
   READY_POLL_MAX_TRIES,
   parseListenPort,
@@ -32,9 +38,6 @@ const READY_SENTINEL = 'opencode server listening on http://';
 const LISTEN_POLL_INTERVAL_MS = 50;
 const LISTEN_POLL_INITIAL_DELAY_MS = 100;
 const STDOUT_RING_MAX = 100;
-const SIGKILL_GRACE_MS = 1000;
-const SOCKET_CHECK_TIMEOUT_MS = 2000;
-const PROCESS_TREE_TIMEOUT_MS = 2000;
 
 export class ProcessHost {
   constructor() {
@@ -74,7 +77,7 @@ export class ProcessHost {
       onStderrChunk: this._onStderr.bind(this),
       onExit: this._onChildExit.bind(this),
     });
-    const startTimeout = opts.startTimeoutMs || 5000;
+    const startTimeout = opts.startTimeoutMs || HOST_START_TIMEOUT_MS;
     const listenLine = await this._waitForListening(startTimeout);
     const ht1 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
@@ -92,7 +95,7 @@ export class ProcessHost {
     this._port = parseListenPort(listenLine);
     this._baseUrl = `http://127.0.0.1:${this._port}`;
     opts.onProgress?.('listening');
-    await this._waitForHealth(5000);
+    await this._waitForHealth(HOST_START_TIMEOUT_MS);
     const ht2 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
       console.log(`[host.start] _waitForHealth took ${ht2 - ht1}ms`);
@@ -100,7 +103,7 @@ export class ProcessHost {
     opts.onProgress?.('healthy');
   }
 
-  async _waitForHealth(timeoutMs = 5000) {
+  async _waitForHealth(timeoutMs = HOST_START_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       try {

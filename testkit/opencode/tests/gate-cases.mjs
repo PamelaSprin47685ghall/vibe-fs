@@ -22,7 +22,11 @@ import { createIsolatedEnv } from '../isolated-env.js';
 import { gatherDiagnostics } from '../diagnostics.js';
 import { createScenarioTurn } from '../scenario-turn.js';
 import { runStabilityGate } from '../stability-checker.js';
-import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
+import {
+  DEFAULT_AWAIT_TIMEOUT_MS,
+  GATE_PROBE_TIMEOUT_MS,
+  GATE_HOST_START_TIMEOUT_MS,
+} from '../time-budget.js';
 import { laneCases } from './gate-lane-cases.mjs';
 
 async function runIsolationHardening() {
@@ -56,7 +60,7 @@ async function runProcessHostEnvIsolation() {
     await host.start({
       scenarioDir,
       providerUrl: `${providerUrl}/v1`,
-      startTimeoutMs: 1000,
+      startTimeoutMs: GATE_HOST_START_TIMEOUT_MS,
       extraEnv: {
         HOME: '/evil',
         XDG_CONFIG_HOME: '/evil',
@@ -126,8 +130,16 @@ function runSessionCreatedIsNotWatchdogHeartbeat() {
 }
 
 function runWatchdogTimeoutIsCentralized() {
-  assertEq(WATCHDOG_TIMEOUT_MS, 2000, 'scenario watchdog timeout must be the centralized 2s value');
+  // The VALUE is pinned in gate-budget-cases.mjs, against the whole budget table at once. What
+  // remains here is narrower and not derivable from that pin: scenario setup must take its
+  // silence window FROM the table. `budget-gate`'s anti-drift rule proves the constant is
+  // referenced somewhere in scope; this proves it is referenced at the one call site that
+  // decides how long a canary may go quiet.
   const scenarioCode = fs.readFileSync(new URL('../scenario-parallel.js', import.meta.url), 'utf8');
+  assertTrue(
+    scenarioCode.includes("from './time-budget.js'"),
+    'scenario setup must import its budgets from the single source',
+  );
   assertTrue(
     scenarioCode.includes('WATCHDOG_TIMEOUT_MS'),
     'scenario setup must consume the centralized watchdog timeout',
@@ -140,7 +152,7 @@ async function runEventProbeReconnectAndStatus() {
   ]);
   const probe = new EventProbe(server1.url, '/tmp');
   await probe.connect();
-  const busy = await probe.awaitEvent((e) => e.type === 'session.status', 3000);
+  const busy = await probe.awaitEvent((e) => e.type === 'session.status', GATE_PROBE_TIMEOUT_MS);
   assertEq(busy.status, 'busy', 'status object must be normalised to string');
   assertEq(busy.sessionID, 's1', 'sessionID extracted');
   await probe.close();
@@ -150,7 +162,7 @@ async function runEventProbeReconnectAndStatus() {
   ]);
   probe._baseUrl = server2.url;
   await probe.connect();
-  const idle = await probe.awaitEvent((e) => e.type === 'session.idle', 3000);
+  const idle = await probe.awaitEvent((e) => e.type === 'session.idle', GATE_PROBE_TIMEOUT_MS);
   assertEq(idle.type, 'session.idle', 'reconnect should receive events');
   assertEq(idle.sessionID, 's1', 'sessionID preserved after reconnect');
   await probe.close();
@@ -193,7 +205,7 @@ async function runTerminalIdleWithObjectStatus() {
   await turn.awaitTerminal({
     requireActivity: false,
     requireAssistantTerminal: false,
-    timeoutMs: 3000,
+    timeoutMs: GATE_PROBE_TIMEOUT_MS,
   });
 
   await probe.close();
@@ -204,7 +216,7 @@ async function runNoFixedSleepCriticalAssertion() {
   const probe = new EventProbe('http://127.0.0.1:1', '/tmp');
   probe._events.push({ seq: 1, type: 'message.updated', finishReason: 'stop' });
   const start = Date.now();
-  await probe.awaitEvent((e) => e.type === 'message.updated', 1000);
+  await probe.awaitEvent((e) => e.type === 'message.updated', DEFAULT_AWAIT_TIMEOUT_MS);
   const elapsed = Date.now() - start;
   assertTrue(elapsed < 20, `awaitEvent on existing event should be immediate, took ${elapsed}ms`);
 }
@@ -320,7 +332,7 @@ export const cases = [
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },
   { name: 'title classification uses current user turn', fn: runTitleHistoryIsolation },
   { name: 'session.created noise does not renew watchdog', fn: runSessionCreatedIsNotWatchdogHeartbeat },
-  { name: 'watchdog timeout is centralized at 2s', fn: runWatchdogTimeoutIsCentralized },
+  { name: 'watchdog timeout comes from the budget module', fn: runWatchdogTimeoutIsCentralized },
   { name: 'EventProbe reconnect and status normalisation', fn: runEventProbeReconnectAndStatus },
   { name: 'EventProbe session and tool normalisation', fn: runEventProbeSessionAndToolNormalisation },
   { name: 'terminal idle with object status', fn: runTerminalIdleWithObjectStatus },

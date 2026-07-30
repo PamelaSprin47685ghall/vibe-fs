@@ -7,8 +7,6 @@
 import http from 'node:http';
 import { sendJSON } from './strict-mock-sse.js';
 
-const READY_TIMEOUT_MS = 1000;
-
 export function startHttpServer(handler) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => handler(req, res));
@@ -93,5 +91,3 @@ export function readRequestBody(req) {
     req.on('error', reject);
   });
 }
-
-export { READY_TIMEOUT_MS };

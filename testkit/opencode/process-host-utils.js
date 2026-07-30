@@ -12,17 +12,15 @@ import path from "node:path";
 import { getDescendantPids } from "./process-host-checks.js";
 import { terminateTree } from "../process-lifecycle.js";
 import { recordSpawn, recordExit } from "../spawn-ledger.js";
+import { SIGTERM_GRACE_MS, SIGKILL_GRACE_MS } from "./time-budget.js";
 
 export const OPENCODE_BIN = process.env.OPENCODE_BIN || "opencode";
 
 const STDOUT_RING_MAX = 100;
 const activeChildPids = new Set();
 
-export const SIGTERM_GRACE_MS = 5000;
-export const SIGKILL_GRACE_MS = 1000;
 export const READY_POLL_INTERVAL_MS = 100;
 export const READY_POLL_MAX_TRIES = 50;
-export const PROCESS_TREE_TIMEOUT_MS = 2000;
 
 function cleanupAllActiveChildren() {
   for (const pid of activeChildPids) {
@@ -76,7 +74,7 @@ export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = 
   } catch {}
 
   try {
-    await terminateTree(child, { termGraceMs: termMs || 500, killGraceMs: killMs || 1000 });
+    await terminateTree(child, { termGraceMs: termMs, killGraceMs: killMs });
   } catch (err) {
     console.error(`[ProcessHost] terminateTree error: ${err.message}`);
   }

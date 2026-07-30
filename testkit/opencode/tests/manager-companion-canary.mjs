@@ -6,7 +6,7 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
-import { WATCHDOG_TIMEOUT_MS } from '../watchdog-constants.js';
+import { WATCHDOG_TIMEOUT_MS } from '../time-budget.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);

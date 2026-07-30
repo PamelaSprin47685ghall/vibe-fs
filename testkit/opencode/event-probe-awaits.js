@@ -5,8 +5,8 @@
  * stay within the 60-line function budget.
  */
 
-const DEFAULT_AWAIT_TIMEOUT_MS = 1000;
-const DEFAULT_NEVER_TIMEOUT_MS = 5000;
+import { DEFAULT_AWAIT_TIMEOUT_MS, DEFAULT_NEVER_TIMEOUT_MS } from './time-budget.js';
+
 const TIMED_OUT_SENTINEL = 'timed out';
 
 function removeCallback(probe, callback) {

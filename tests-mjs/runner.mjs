@@ -20,14 +20,7 @@ import { relative } from 'node:path'
 import { run } from 'node:test'
 import { spec } from 'node:test/reporters'
 import { walk } from '../scripts/repo-scan.mjs'
-
-// A pure fold or a fake-port trajectory has no reason to take a second. Layer 3
-// Host trajectories use a fake clock, so they do not need wall-clock headroom
-// either. Raising this is how a race gets papered over (VERIFY-002).
-const PER_TEST_TIMEOUT_MS = 1000
-
-// Whole-suite ceiling, so a runaway file cannot hold CI forever.
-const SUITE_TIMEOUT_MS = 300000
+import { PER_TEST_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '../testkit/opencode/time-budget.js'
 
 const TESTS_ROOT = 'tests-mjs'
 const PRODUCTION_ROOT = 'next'

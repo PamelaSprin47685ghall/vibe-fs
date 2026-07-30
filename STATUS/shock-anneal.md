@@ -895,7 +895,7 @@ T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs
 | 项 | 值 |
 |----|----|
 | 条款 | VERIFY-004 VERIFY-002 |
-| 目标模块 | `testkit/opencode/watchdog.js`、`watchdog-constants.js`、`stability-checker.js`、`scripts/run-canary-staggered.mjs`、`tests-mjs/runner.mjs`（原写 `tests-next/runner.js`，该目录已随 T-5 删除） |
+| 目标模块 | `testkit/opencode/watchdog.js`、`time-budget.js`（W1 建立，取代已删的 `watchdog-constants.js`）、`stability-checker.js`、`scripts/run-canary-staggered.mjs`、`scripts/budget-gate.mjs`（W1 建立）、`tests-mjs/runner.mjs`（原写 `tests-next/runner.js`，该目录已随 T-5 删除） |
 | 原理状态 | 保留。没有进展就杀死、watchdog 按语义事件投喂、因果 bark 交错启动，三者是既有设计中最有价值的部分，必须继承发扬 |
 | 实现状态 | 不合格。见下方实测缺陷 |
 | 重建方式 | 第一性原理瀑布流，与包 K 同期。禁止在现有实现上逐点修补 |
@@ -911,14 +911,14 @@ T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs
 | watchdog 被墙钟无条件续期 | `canary-driver.mjs:126` 的 `waitFact` 轮询循环 | 每 500ms 切片无条件 `advance({blocking:true})`，与 fact 计数是否推进无关，最长可把一个错误的 watchdog 续到 120s。正是 VERIFY-004「一个反复重连的 SSE 读者能永久续期一个错误的 watchdog」点名的形态。宪章缺陷表原未记录，归入 W6 |
 | 数量常量与清单各自维护 | `run-canary-staggered.mjs:36`：`CANARY_COUNT = 17`，`CANARY_TESTS` 实测 16 条 | 已经漂移两次：宪章原记「实际 19 条」，包 K 删三条 canary 后成 16。唯一用途是 `:203` 的日志，而该行同时打印两侧，字面输出 `Concurrency: 16 / 16 (expected ~17)`。漂移方向都变了，证明它必须派生而非校正 |
 | 静态门禁指向不存在的目录 | `stability-checker.js:30` 判 `e2e/opencode/specs/`，该目录不存在 | `containsTool` 检查在全部 28 个 `runStaticGate([__filename])` 调用点恒不可达，伪门禁。同文件的 `fixed-sleep` 检查（`:43-63`）是活的 |
-| 超时值散落为字面量 | `run-canary-staggered.mjs:35`（90000 兜底）、`:111`（10000 就绪窗口，且同值重复进 `:244-245` 两处用户可见字符串）、`watchdog.js:84`（3000 诊断竞速）、`scenario-parallel.js:162`（3000 host.stop 竞速）、`canary-driver.mjs:127`（120000 waitFact 总窗） | 只有 `WATCHDOG_TIMEOUT_MS` 是集中的。其余无法统一调整，也无法被门禁检查 |
+| ~~超时值散落为字面量~~ | ~~`run-canary-staggered.mjs:35`（90000 兜底）、`:111`（10000 就绪窗口，且同值重复进 `:244-245` 两处用户可见字符串）、`watchdog.js:84`（3000 诊断竞速）、`scenario-parallel.js:162`（3000 host.stop 竞速）、`canary-driver.mjs:127`（120000 waitFact 总窗）~~ | W1 已闭合。`budget-gate` 对未迁移树报 54 行，即宪章记的 6 处加 15 处同类（`process-host*` 五处、`scenario-http` 三处、`scenario-runner` 三处、`stability-checker` 三处、`event-probe-awaits` 两处、`spawn-ledger` 的 `30 * 60 * 1000` 等），另有 26 个常量当时无调用点。全部值逐字节移入 `time-budget.js`，`SUITE_TIMEOUT_MS` 与 `PER_TEST_TIMEOUT_MS` 保名保值待 W4 |
 | 启动阶段只有 wall-clock 覆盖 | canary 进程拉起（`run-canary-staggered.mjs:86`）到 `[setupScenario] ready` 之间只有 `:111` 的 10s 硬窗口 | 存在一段无因果判据的时间窗，违反 VERIFY-004「覆盖必须无缝」。无任何递进就绪证据（端口已绑、插件已载、provider 已起）投喂任何东西 |
 | ~~声明了断言心跳但未接线~~ | ~~`tests-next/Assert.fs:13`~~ | 已随 `tests-next/` 在 T-5（`952be9e3`）整体删除而灭绝。`resetHeartbeat` 与 `__resetAssertionTimeout` 全仓非散文引用为 0。故禁止退化清单第 7 条当前无任何活代码违反，W4 是全新实现而非修复 |
 
 #### 重建顺序
 
 ```text
-W1  集中所有时间常量，建立单一来源；门禁禁止字面量超时
+W1  集中所有时间常量，建立单一来源；门禁禁止字面量超时                       已完成
 W2  canary 清单单一事实来源，数量从清单派生
 W3  删除伪门禁，静态检查路径判据与实际目录对齐
 W4  重建单测运行器的因果推进门禁：以「距上次判决的静默时长」为主判据，
@@ -929,6 +929,29 @@ W5  启动阶段因果判据，消除只有 wall-clock 的时间窗
 W6  watchdog 重写：语义投喂、背景不续期、诊断完整、不持有事件循环
 W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试
 ```
+
+W1 落地记要。26 个常量进 `testkit/opencode/time-budget.js`，`scripts/budget-gate.mjs`
+四条规则进 `gate:static`（现 5 条门禁），`gate-budget-cases.mjs` 14 条自检进 `test:harness`
+（183 → 197）。门禁先红后绿：对未迁移树报 54 行，逐字转录在会话记事本。
+
+判据取「量级即语义线」：轮询切片必须比它所受的界更快（`canary-driver` 500ms 在 2000ms
+静默预算下、监听轮询 50ms、socket 重试 30ms），故合法切片按构造 < 1000ms；≥ 1000ms 者
+本身即预算，必须进表。这避开了「该字面量是否受某个导入界约束」这类无法静态判定的问题。
+门禁不设豁免注释——本包要替换的四个伪门禁都是从豁免通道腐烂的。
+
+宪章第 4 条原设想的字符串反重复判据（表值或表值除以 1000 的数字串）在真实树上产出 935
+条命中：1000/1000 = 1，而 harness 里几乎每个字符串都含孤立的 `1`（`'http://127.0.0.1:9999/v1'`、
+`'$1'`、`'2025-01-01'`）。改为要求带单位（`10s` / `3000ms` / `5 minutes`）；残留缺口
+（无单位裸整数重述）写在门禁头部注释里，不隐藏。
+
+顺带发现并修正 `architecture-gate.mjs` 的 test-runner 判据是 `/\b\d{3,5}\b/`——「文件里有
+3-5 位数字」。集中化之后它会在正确的树上变红，而在任何提到 1024 的文件上放行：它匹配的是
+数字存在，不是界存在。改为要求 runner 命名 `PER_TEST_TIMEOUT_MS`。这是本仓库第五个
+「判据与意图不符」的实例。
+
+`SUITE_TIMEOUT_MS` 与 `PER_TEST_TIMEOUT_MS` 保名保值。W4 改变前者含义时才改名——此刻改名
+等于宣称一个尚未发生的修复。值钉断言诚实标注为 DETECTION 而非 PREVENTION：调大数字永远是
+合法代码，静态不可阻止；能安排的只是「调大必然可见」。
 
 W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没有测试证明能力真实存在。`Assert.fs` 的空 `resetHeartbeat` 能存在这么久，正是因为没有任何测试断言心跳被投喂。
 

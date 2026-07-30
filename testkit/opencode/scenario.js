@@ -18,6 +18,7 @@ import path from 'node:path';
 import { FsOracle, HttpClient, getSessionId } from './scenario-http.js';
 import { runScenarioTests } from './scenario-runner.js';
 import { setupScenarioParallel, Scenario } from './scenario-parallel.js';
+import { TEARDOWN_IDLE_MS } from './time-budget.js';
 
 function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'oc-e2e-'));
@@ -62,7 +63,7 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
   // 5. 等待 session idle / terminated
   for (const sid of scenario.sessionIds) {
     try {
-      await scenario.client.waitForSessionIdle(sid, 2000);
+      await scenario.client.waitForSessionIdle(sid, TEARDOWN_IDLE_MS);
     } catch {}
   }
 

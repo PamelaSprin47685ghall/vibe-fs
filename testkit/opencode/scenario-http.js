@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { DEFAULT_AWAIT_TIMEOUT_MS } from './time-budget.js';
 
 export class FsOracle {
   constructor(workDir) { this._workDir = workDir; }
@@ -82,7 +83,7 @@ export class HttpClient {
     }
     return res;
   }
-  async prompt(sessionID, text, model, timeoutMs = 1000) {
+  async prompt(sessionID, text, model, timeoutMs = DEFAULT_AWAIT_TIMEOUT_MS) {
     const ac = new AbortController();
     const promptModel = model || { providerID: 'test', modelID: 'test-model' };
     const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -101,7 +102,7 @@ export class HttpClient {
   }
   async messages(sessionID) { return this.request('GET', `/session/${sessionID}/message`); }
   async sessionStatus(sessionID) { return this.request('GET', `/session/${sessionID}`); }
-  async runCommand(sessionID, command, args = '', timeoutMs = 1000) {
+  async runCommand(sessionID, command, args = '', timeoutMs = DEFAULT_AWAIT_TIMEOUT_MS) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
@@ -111,7 +112,7 @@ export class HttpClient {
   }
   async abort(sessionID) { return this.request('POST', `/session/${sessionID}/abort`, { body: {} }); }
 
-  async waitForSessionIdle(sessionID, timeoutMs = 1000) {
+  async waitForSessionIdle(sessionID, timeoutMs = DEFAULT_AWAIT_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
     let sawNonIdle = false;
     while (Date.now() < deadline) {

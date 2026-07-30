@@ -10,7 +10,7 @@
  * 100% Event-driven; ZERO polling loops.
  */
 
-import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
+import { WATCHDOG_TIMEOUT_MS } from './time-budget.js';
 
 function isIdleEvent(e) {
   // Quiescence signal only (transport-level), not the product-correctness oracle.

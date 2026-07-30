@@ -31,7 +31,7 @@ import {
   teardownScenario,
   getSessionId,
 } from './index.js';
-import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
+import { WATCHDOG_TIMEOUT_MS, WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { bindLaneSession } from './tests/lane.mjs';
 import { requestKindOf } from './strict-mock-matches.js';
 import { compileScenario } from './scenario-schema.js';
@@ -118,7 +118,7 @@ async function runFlow(scenario, doc, ctx) {
         : (n) => n >= need;
       // Overall span may exceed WATCHDOG_TIMEOUT_MS under parallel host load;
       // silence budget stays 2s via advance (not a raised expectation timeout).
-      const overallMs = step.timeoutMs || 120000;
+      const overallMs = step.timeoutMs || WAIT_FACT_WINDOW_MS;
       const deadline = Date.now() + overallMs;
       let ok = cmp(countFact(scenario.host.workDir, name));
       while (!ok && Date.now() < deadline) {

@@ -10,6 +10,12 @@
 
 import { execSync } from "node:child_process";
 import fs from "node:fs";
+import { SIGKILL_GRACE_MS } from "./opencode/time-budget.js";
+
+// Sub-threshold and therefore not a budget: SIGTERM is a request, and this is only how long a
+// well-behaved process gets to honour it before SIGKILL. It stays local because it bounds this
+// function's own escalation rather than any test's progress.
+const TERM_GRACE_MS = 500;
 
 function procStat(pid) {
   try {
@@ -73,7 +79,7 @@ function waitFor(cond, timeoutMs, intervalMs = 20) {
  * Resolves when the leader is dead AND the group is empty.
  * Throws (loud, never silent) listing survivors if anything escapes.
  */
-export async function terminateTree(child, { termGraceMs = 500, killGraceMs = 1000 } = {}) {
+export async function terminateTree(child, { termGraceMs = TERM_GRACE_MS, killGraceMs = SIGKILL_GRACE_MS } = {}) {
   const pid = typeof child === "number" ? child : child?.pid;
   if (!pid) return;
 

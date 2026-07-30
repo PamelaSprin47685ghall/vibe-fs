@@ -14,13 +14,14 @@
 
 import { dumpDiagnostics } from './diagnostics.js';
 import { teardownScenario } from './scenario.js';
+import { DEFAULT_AWAIT_TIMEOUT_MS, SCENARIO_SUITE_WINDOW_MS } from './time-budget.js';
 
 export async function runScenarioTests(opts, tests, setupScenario) {
   let passed = 0;
   let failed = 0;
   const failures = [];
-  const defaultTimeoutMs = opts.timeoutMs || 1000;
-  const globalTimeoutMs = opts.globalTimeoutMs || 500000; // 500s default to prevent 600s overall timeout
+  const defaultTimeoutMs = opts.timeoutMs || DEFAULT_AWAIT_TIMEOUT_MS;
+  const globalTimeoutMs = opts.globalTimeoutMs || SCENARIO_SUITE_WINDOW_MS;
   const suiteStart = Date.now();
 
   if (opts.reuseHost) {
@@ -63,7 +64,7 @@ async function runReusedHost(opts, tests, setupScenario, defaultTimeoutMs) {
   const failures = [];
   let scenario;
   const suiteStart = Date.now();
-  const globalTimeoutMs = opts.globalTimeoutMs || 500000;
+  const globalTimeoutMs = opts.globalTimeoutMs || SCENARIO_SUITE_WINDOW_MS;
   try {
     scenario = await setupScenario(opts);
     console.log(`  [reuseHost] scenario ready (${Date.now() - suiteStart}ms)`);

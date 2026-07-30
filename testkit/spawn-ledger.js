@@ -9,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { procStartTime } from "./process-lifecycle.js";
+import { LEDGER_ENTRY_TTL_MS } from "./opencode/time-budget.js";
 
 const SAFE_ID_RE = /^[A-Za-z0-9_.-]+$/;
 function sanitizeRunId(raw) {
@@ -38,7 +39,7 @@ try {
   fs.writeFileSync(path.join(LEDGER_DIR, `${RUN_ID}.run`), JSON.stringify(marker) + "\n", { flag: "wx" });
 } catch {}
 
-export function recordSpawn(pid, cmd, ttlMs = 30 * 60 * 1000) {
+export function recordSpawn(pid, cmd, ttlMs = LEDGER_ENTRY_TTL_MS) {
   if (!pid) return;
   ensureDir();
   const entry = {

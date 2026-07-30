@@ -6,10 +6,11 @@
 
 import net from 'node:net';
 import { pidIsAlive } from '../process-lifecycle.js';
+import { PROCESS_TREE_TIMEOUT_MS, SOCKET_CHECK_TIMEOUT_MS } from './time-budget.js';
 
 export const isPidAlive = pidIsAlive;
 
-export async function checkSocketClosed(port, timeoutMs = 2000) {
+export async function checkSocketClosed(port, timeoutMs = SOCKET_CHECK_TIMEOUT_MS) {
   if (!port) return true;
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

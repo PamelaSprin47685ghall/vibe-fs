@@ -677,15 +677,27 @@ for (const { type, clause, owner, fields, builder } of SINGLE_CONSTRUCTOR_TYPES)
 }
 
 // ── gate: the test runner enforces a hard per-test timeout ──────────────────
+//
+// The criterion used to be "the file contains a 3-to-5-digit number", which was the best
+// available test while the bound was a literal in the runner. Package W1 moved every timing
+// budget into `testkit/opencode/time-budget.js`, and that check would now FAIL on the correct
+// tree while passing on any file that happened to mention 1024 — it was matching the presence
+// of digits, not the presence of a bound. Naming the constant is the stronger criterion: it
+// cannot be satisfied by a coincidence, and `budget-gate` separately forbids re-inlining it.
 
 const runnerPath = RUNNER_CANDIDATES.find((candidate) => existsSync(candidate))
+const PER_TEST_BUDGET = 'PER_TEST_TIMEOUT_MS'
 
 if (!runnerPath) {
   fail('test-runner', `no test runner found; expected one of ${RUNNER_CANDIDATES.join(', ')}`)
 } else {
   const runner = read(runnerPath)
-  if (!/\b\d{3,5}\b/.test(runner)) {
-    fail('test-runner', `${runnerPath}: must declare an explicit per-test timeout in milliseconds`)
+  if (!runner.includes(PER_TEST_BUDGET)) {
+    fail(
+      'test-runner',
+      `${runnerPath}: must declare an explicit per-test timeout by consuming ${PER_TEST_BUDGET} ` +
+        `from testkit/opencode/time-budget.js (VERIFY-004: 兜底值必须集中定义)`,
+    )
   }
   if (!runner.includes('Promise.race') && !runner.includes('AbortSignal.timeout')) {
     fail('test-runner', `${runnerPath}: must enforce the timeout in-process (Promise.race or AbortSignal.timeout)`)

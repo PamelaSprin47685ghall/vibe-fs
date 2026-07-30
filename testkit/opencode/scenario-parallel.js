@@ -8,7 +8,7 @@ import { resolvePluginPath } from './scenario-paths.js';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
-import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
+import { WATCHDOG_TIMEOUT_MS, DIAGNOSTIC_RACE_MS } from './time-budget.js';
 
 export class Scenario {
   constructor(ctx) {
@@ -159,7 +159,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
         try {
           await Promise.race([
             host.stop({ assert: false }),
-            new Promise((r) => setTimeout(r, 3000)),
+            new Promise((r) => setTimeout(r, DIAGNOSTIC_RACE_MS)),
           ]);
         } catch (e) {
           console.error(`[Watchdog Cleanup Error] host.stop failed: ${e.message}`);

@@ -238,7 +238,7 @@ assistant message 在 transform 之前已经创建并持久化。
 命令：
 
 ```bash
-npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs + toml
+npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs + toml + budget
 npm run gate:shock             # 第 0 层：旧符号灭绝 + 单一写入口（休克期专用）
 
 dotnet build next/Wanxiangshu.Next.fsproj    # 生产 .NET
@@ -254,6 +254,11 @@ npm run test:release           # gate:static → build → unit → harness → 
 `test:unit` 现在只是 `test:mjs` 的别名（包 T-5 删掉 `tests-next/` 后残余 F# 套件归零）。
 `gate:toml`（`scripts/toml-format.mjs`）是包 K 新增的第 0 层门禁：剧本 TOML 必须与
 formatter 输出逐字节一致。
+`gate:budget`（`scripts/budget-gate.mjs`）是包 W1 新增的第 0 层门禁：`testkit/**`、
+`scripts/**`、`tests-mjs/runner.mjs` 里不得出现 ≥1000 的计时字面量，值必须来自
+`testkit/opencode/time-budget.js`。判据是量级即语义线——轮询切片必须比它所受的界更快，
+故合法切片按构造 < 1000ms；≥1000ms 者本身即预算。门禁无豁免通道，字符串也不得把预算
+重述成带单位的时长。
 
 `test:mjs` 拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
 
@@ -336,7 +341,9 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 | `cold-boundary.js` | 只认显式声明的冷边界 |
 | `scenario-schema.js` | TOML 编译器，8 个根键 + 24 个 flow 动词白名单 + 载入期校验 |
 | `legacy-fields.js` | 20 个退役字段，出现即拒绝载入 |
+| `time-budget.js` | 全部 wall-clock 兜底的单一来源，逐条带理由（VERIFY-004） |
 | `scripts/toml-format.mjs` | 行式 formatter，`gate:toml` 强制逐字节一致 |
+| `scripts/budget-gate.mjs` | `gate:budget`，禁止 ≥1000 的计时字面量散落，无豁免通道 |
 
 内容层（VERIFY-003）：
 

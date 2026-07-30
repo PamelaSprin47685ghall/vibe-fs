@@ -14,6 +14,8 @@
  * exits naturally — the watchdog only fires while something (a hung
  * SSE reader, a leaked server) still keeps the event loop alive.
  */
+import { DIAGNOSTIC_RACE_MS } from './time-budget.js';
+
 export class Watchdog {
   constructor({ timeoutMs, label, onTimeout }) {
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -81,7 +83,10 @@ export class Watchdog {
     }
     try {
       if (this._onTimeout) {
-        await Promise.race([this._onTimeout(), new Promise((resolve) => setTimeout(resolve, 3000))]);
+        await Promise.race([
+          this._onTimeout(),
+          new Promise((resolve) => setTimeout(resolve, DIAGNOSTIC_RACE_MS)),
+        ]);
       }
     } catch {}
     process.exit(1);

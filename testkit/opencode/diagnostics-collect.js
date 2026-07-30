@@ -7,12 +7,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { PROCESS_TREE_TIMEOUT_MS } from './time-budget.js';
 
 const TAIL_EVENT_LIMIT = 100;
 const TAIL_NDJSON_LINES = 30;
 const STDERR_TAIL = 3000;
 const STDOUT_TAIL = 2000;
-const PROC_TREE_TIMEOUT_MS = 2000;
 const WORKSPACE_FIND_MAXDEPTH = 3;
 const MAX_UNEXPECTED_PREVIEW = 8;
 const MAX_WORKSPACE_FILES = 30;
@@ -150,7 +150,7 @@ function collectProcessTree(diag, scenario) {
       : process.platform === 'darwin'
         ? `pgrep -P ${pid} 2>/dev/null || true`
         : `ps -o pid=,ppid=,command= -p ${pid} 2>/dev/null || true`;
-    diag.processTree = execSync(cmd, { timeout: PROC_TREE_TIMEOUT_MS }).toString().trim();
+    diag.processTree = execSync(cmd, { timeout: PROCESS_TREE_TIMEOUT_MS }).toString().trim();
   } catch {}
 }
 
@@ -160,7 +160,7 @@ function collectWorkspaceFiles(diag, scenario) {
   try {
     const files = execSync(
       `find ${workDir} -maxdepth ${WORKSPACE_FIND_MAXDEPTH} -not -path '*/.git/*' -not -path '*/node_modules/*' -not -name '.git' 2>/dev/null || true`,
-      { timeout: PROC_TREE_TIMEOUT_MS },
+      { timeout: PROCESS_TREE_TIMEOUT_MS },
     ).toString().trim();
     diag.workspaceFiles = files.split('\n').filter(Boolean);
   } catch {}
@@ -171,7 +171,6 @@ export const DIAG_CONSTANTS = {
   TAIL_NDJSON_LINES,
   STDERR_TAIL,
   STDOUT_TAIL,
-  PROC_TREE_TIMEOUT_MS,
   MAX_UNEXPECTED_PREVIEW,
   MAX_WORKSPACE_FILES,
 };

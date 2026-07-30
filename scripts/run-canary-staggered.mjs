@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { terminateTree } from "../testkit/process-lifecycle.js";
 import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
+import { CANARY_TIMEOUT_MS, CANARY_READY_MS } from "../testkit/opencode/time-budget.js";
 
 function parsePositiveInt(value, fallback, name) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -30,9 +31,11 @@ function shuffle(array) {
   return arr;
 }
 
-// Dual-script restart canaries (e.g. orchestrator-restart-publish) need ~45s solo;
-// leave headroom for parallel host load. Override with CANARY_TIMEOUT_MS if needed.
-const CANARY_TIMEOUT_MS = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, 90000, "CANARY_TIMEOUT_MS");
+// The wall-clock fallback; the scenario-local watchdog is the real hang criterion. The env
+// override stays here rather than in the budget module so that module reads no process state.
+// Named distinctly from the imported default because the two are different facts: one is the
+// budget, one is what this run resolved it to.
+const canaryProcessTimeoutMs = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, CANARY_TIMEOUT_MS, "CANARY_TIMEOUT_MS");
 const CANARY_COUNT = 17;
 const CANARY_TESTS = [
   "testkit/opencode/tests/agent-dsl-canary.mjs",
@@ -114,7 +117,7 @@ function runCanary(file, onBarkSignal) {
         readyGateFailures.add(file);
         emitBark(true);
       }
-    }, 10000);
+    }, CANARY_READY_MS);
 
     const timer = setTimeout(async () => {
       if (settled) return;
@@ -124,7 +127,7 @@ function runCanary(file, onBarkSignal) {
       const hadBark = barked;
       if (!hadBark) emitBark(true);
       try {
-        await terminateTree(child, { termGraceMs: 500, killGraceMs: 1000 });
+        await terminateTree(child);
         recordExit(child.pid);
       } catch (err) {
         console.error("  ⚠ canary " + name + " cleanup: " + err.message);
@@ -136,13 +139,13 @@ function runCanary(file, onBarkSignal) {
         code: -1,
         signal: "TIMEOUT",
         stdout,
-        stderr: stderr + "\n[CANARY TIMEOUT] Process exceeded " + CANARY_TIMEOUT_MS + "ms limit",
+        stderr: stderr + "\n[CANARY TIMEOUT] Process exceeded " + canaryProcessTimeoutMs + "ms limit",
         barked: hadBark,
         barkTimeout: !hadBark,
         processTimeout: true,
         exitedBeforeBark: !hadBark,
       });
-    }, CANARY_TIMEOUT_MS);
+    }, canaryProcessTimeoutMs);
 
     const checkBark = (chunk) => {
       const str = chunk.toString();
@@ -239,10 +242,10 @@ async function main() {
       } else {
         failed = true;
         let failReason = `code ${r.code}, signal ${r.signal}`;
-        if (r.processTimeout) failReason = `process timeout (>${CANARY_TIMEOUT_MS}ms)` + (r.barked ? " after ready" : " before ready");
+        if (r.processTimeout) failReason = `process timeout (>${canaryProcessTimeoutMs}ms)` + (r.barked ? " after ready" : " before ready");
         else if (r.exitedBeforeBark) failReason = "exited before [setupScenario] ready";
-        else if (readyGateFailures.has(r.file)) failReason = "ready timeout (failed to emit exact [setupScenario] ready within 10s)";
-        else if (r.barkTimeout) failReason = "ready timeout (failed to emit [setupScenario] ready within 10s)";
+        else if (readyGateFailures.has(r.file)) failReason = `ready timeout (failed to emit exact [setupScenario] ready within ${CANARY_READY_MS}ms)`;
+        else if (r.barkTimeout) failReason = `ready timeout (failed to emit [setupScenario] ready within ${CANARY_READY_MS}ms)`;
         console.error("  ✗ " + r.name + " FAILED (" + failReason + ")");
         if (r.stdout) console.error("── stdout ──\n" + r.stdout);
         if (r.stderr) console.error("── stderr ──\n" + r.stderr);

@@ -11,6 +11,11 @@
 import fs from 'node:fs';
 import { gatherDiagnostics } from './diagnostics-collect.js';
 import { setupScenario, teardownScenario } from './scenario.js';
+import {
+  STABILITY_SCENARIO_TIMEOUT_MS,
+  STABILITY_GATE_WINDOW_MS,
+  STABILITY_MIN_RUN_MS,
+} from './time-budget.js';
 
 /**
  * Checks files for containsTool and fixed sleep violations.
@@ -83,7 +88,7 @@ async function runOneTest(name, fn, opts = {}) {
   }
 
   let testErr = null;
-  const timeoutMs = opts.timeoutMs || 30000;
+  const timeoutMs = opts.timeoutMs || STABILITY_SCENARIO_TIMEOUT_MS;
   let timer;
 
   try {
@@ -149,7 +154,7 @@ export async function runStabilityGate(opts = {}) {
     throw new Error(`Stability repeat must be an integer from 1 through 3, got ${repeat}`);
   }
 
-  const globalTimeoutMs = opts.globalTimeoutMs || 300000; // 5 minutes default
+  const globalTimeoutMs = opts.globalTimeoutMs || STABILITY_GATE_WINDOW_MS;
   const startTime = Date.now();
 
   console.log(`Running stability gate for "${test.name}" (repeating ${repeat} times)...`);
@@ -163,11 +168,11 @@ export async function runStabilityGate(opts = {}) {
       break;
     }
     const remainingTime = globalTimeoutMs - elapsed;
-    if (remainingTime < 5000) {
+    if (remainingTime < STABILITY_MIN_RUN_MS) {
       console.warn(`[StabilityGate] Insufficient time remaining (${remainingTime}ms). Stopping after ${i - 1} runs.`);
       break;
     }
-    const testTimeout = Math.min(scenarioOpts.timeoutMs || 30000, remainingTime);
+    const testTimeout = Math.min(scenarioOpts.timeoutMs || STABILITY_SCENARIO_TIMEOUT_MS, remainingTime);
     const runOpts = { ...scenarioOpts, timeoutMs: testTimeout };
 
     const runName = `${test.name} (run ${i}/${repeat})`;

@@ -16,6 +16,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { LEDGER_DIR, RUN_ID } from "./spawn-ledger.js";
 import { pidIsAlive, procStartTime } from "./process-lifecycle.js";
+import { ORPHAN_MIN_AGE_MS } from "./opencode/time-budget.js";
 
 function parsePositiveInt(value, fallback, name) {
   const n = Number(value);
@@ -29,7 +30,7 @@ function parsePositiveInt(value, fallback, name) {
 const FORCE = process.argv.includes("--force");
 const MIN_FREE_MB = parsePositiveInt(process.env.REAPER_MIN_FREE_MB, 2048, "REAPER_MIN_FREE_MB");
 // 只兜底"没继承到 WANXIANG_RUN_ID 的裸进程"；归属判断才是主逻辑，年龄无需长。
-const ORPHAN_MIN_AGE_MS = parsePositiveInt(process.env.REAPER_ORPHAN_MIN_AGE_MS, 5000, "REAPER_ORPHAN_MIN_AGE_MS");
+const orphanMinAgeMs = parsePositiveInt(process.env.REAPER_ORPHAN_MIN_AGE_MS, ORPHAN_MIN_AGE_MS, "REAPER_ORPHAN_MIN_AGE_MS");
 const ORPHAN_MARKERS = ["oc-e2e-", "tests-mjs/", "wanxiang-ledger", ".wanxiangshu-next"];
 
 let reaped = 0;
@@ -124,8 +125,8 @@ function sweepOrphans() {
       killGroupVerified(pid, procStartTime(pid)); // 属主已死：替它收尸
       continue;
     }
-    // 无 env 的裸进程：年龄兜底（5s，仅覆盖 spawn 后未及登记的窗口）
-    if (Number(etimesStr) * 1000 < ORPHAN_MIN_AGE_MS) continue;
+    // 无 env 的裸进程：年龄兜底（仅覆盖 spawn 后未及登记的窗口，值见 time-budget.js）
+    if (Number(etimesStr) * 1000 < orphanMinAgeMs) continue;
     killGroupVerified(pid, procStartTime(pid));
   }
 }
