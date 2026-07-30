@@ -44,7 +44,7 @@ import {
   toSemantic,
   toolResultDigests,
 } from '../../build/next/Domain/ProviderProjection.js';
-import { ofArray } from '../../build/next/fable_modules/fable-library-js.5.13.0/List.js';
+import { ofArray, toArray as listToArray } from '../../build/next/fable_modules/fable-library-js.5.13.0/List.js';
 
 // ── union construction by case NAME ─────────────────────────────────────────
 // Positional construction would silently relabel prose as reasoning: `WireText`
@@ -175,7 +175,44 @@ export function wireOf(body) {
 export const semanticOf = (body) => toSemantic(wireOf(body));
 
 /** VERIFY-007: the fixture-matching key. Semantic, so it survives a second run. */
-export const fixtureKeyOf = (body) => fixtureKey(semanticOf(body));
+export const fixtureKeyOf = (body) => fixtureKey(semanticOf(body))
+
+const SEMANTIC_PART_CASES = ['SemanticText', 'SemanticReasoning', 'SemanticToolCall', 'SemanticToolResult', 'SemanticMedia']
+
+const UNIT = '\u001f'
+const RECORD = '\u001e'
+
+/**
+ * One semantic part as text a PREFIX comparison can work on.
+ *
+ * NOT `renderSemantic`: its closed JSON envelope puts `}]}]}` after the text, so no
+ * shorter utterance is ever a string prefix of a longer one and VERIFY-003's
+ * longest-prefix rule silently degrades to whole-string equality.
+ *
+ * Prose verbatim; every other kind tagged with `\u001f`, which prose cannot contain.
+ */
+const partText = (part) => {
+  const kind = SEMANTIC_PART_CASES[part.tag]
+  const fields = part.fields ?? []
+
+  switch (kind) {
+    case 'SemanticText':
+      return fields[0]
+    case 'SemanticReasoning':
+      return `${UNIT}reasoning${UNIT}${fields[0]}`
+    case 'SemanticToolCall':
+      return `${UNIT}tool-call${UNIT}${fields[0]}${UNIT}${fields[1]}`
+    case 'SemanticToolResult':
+      return `${UNIT}tool-result${UNIT}${fields[0]}`
+    case 'SemanticMedia':
+      return `${UNIT}media${UNIT}${fields[0] ?? ''}${UNIT}${fields[1]}`
+    default:
+      throw new Error(`unknown SemanticPart case at tag ${part.tag}`)
+  }
+}
+
+/** One message's semantic content, prefix-comparable. Role excluded: the caller selected by it. */
+export const messageText = (message) => listToArray(message.Parts).map(partText).join(RECORD);
 
 // ── the production questions, re-exported ───────────────────────────────────
 //

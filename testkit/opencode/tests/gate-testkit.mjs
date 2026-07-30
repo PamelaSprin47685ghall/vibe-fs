@@ -10,6 +10,7 @@
 import { cases } from './gate-cases.mjs';
 import { pluginDependencyCase } from './gate-plugin-dependency-case.mjs';
 import { projectionCases } from './gate-projection-cases.mjs';
+import { runtimeKeyCases } from './gate-runtime-key-cases.mjs';
 import { timeoutCases } from './gate-timeout-cases.mjs';
 
 let passed = 0;
@@ -29,7 +30,7 @@ async function runCase({ name, fn }) {
 
 console.log('Running testkit/opencode gate tests...\n');
 
-for (const c of [...cases, pluginDependencyCase, ...projectionCases, ...timeoutCases]) {
+for (const c of [...cases, pluginDependencyCase, ...projectionCases, ...runtimeKeyCases, ...timeoutCases]) {
   await runCase(c);
 }
 
