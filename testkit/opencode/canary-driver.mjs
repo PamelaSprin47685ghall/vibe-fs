@@ -40,6 +40,15 @@ import { ScenarioRuntime } from './scenario-runtime.js';
 const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'scripts');
 
 /**
+ * Poll slice of the `waitFact` barrier. Below LITERAL_BUDGET_THRESHOLD_MS by construction and
+ * therefore a slice rather than a budget: it must re-read the journal several times inside one
+ * silence window, or a stalled chain and a coarse poll become indistinguishable.
+ */
+const FACT_POLL_SLICE_MS = 500;
+
+const pollSlice = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * Compile the named scenario, or fail with every problem at once.
  *
  * A scenario that half-loads is a scenario whose author believes something is covered and
@@ -55,22 +64,35 @@ function loadScenario(name) {
   return result.scenario;
 }
 
-function countFact(workDir, factName) {
+/**
+ * Read the runtime journal once: how many lines name this fact, and how many facts exist at all.
+ *
+ * Both numbers come from one pass because the barrier below needs them together and reading the
+ * directory twice would let them disagree about the same moment.
+ */
+function readJournal(workDir, factName) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
   const runtimeDir = path.join(
     path.isAbsolute(common) ? common : path.resolve(workDir, common),
     'wanxiangshu-next',
     'runtimes',
   );
-  if (!fs.existsSync(runtimeDir)) return 0;
-  let count = 0;
+  if (!fs.existsSync(runtimeDir)) return { named: 0, total: 0 };
+  let named = 0;
+  let total = 0;
   for (const file of fs.readdirSync(runtimeDir)) {
     if (!file.endsWith('.ndjson')) continue;
     for (const line of fs.readFileSync(path.join(runtimeDir, file), 'utf8').split('\n')) {
-      if (line.includes(factName)) count += 1;
+      if (line.trim() === '') continue;
+      total += 1;
+      if (line.includes(factName)) named += 1;
     }
   }
-  return count;
+  return { named, total };
+}
+
+function countFact(workDir, factName) {
+  return readJournal(workDir, factName).named;
 }
 
 async function sendPrompt(scenario, sessionId, prompt) {
@@ -92,6 +114,78 @@ async function sendPrompt(scenario, sessionId, prompt) {
   return response;
 }
 
+/**
+ * Await a durable journal fact, renewing the silence budget only on an observation.
+ *
+ * ── the defect this replaced ────────────────────────────────────────────────
+ *
+ * The previous loop called `advance({ blocking: true })` at the top of every iteration and then
+ * waited on the event probe with a predicate that accepted EVERY host event, for 500ms. So the
+ * silence budget was renewed every slice whether or not the fact moved, and the thing being
+ * awaited was 「有字节在动」 rather than a step of the causal chain. VERIFY-004 names this exact
+ * shape: 「一个反复重连的 SSE 读者能永久续期一个错误的 watchdog」. Measured with a fake event source
+ * that answers every slice and a fact that never appears, the loop survived past two silence
+ * windows and would have run to the full 120000ms fallback.
+ *
+ * ── the causal signal, and why it is not just the awaited count ─────────────
+ *
+ * The awaited count alone is too strict to be the only signal. This barrier spans a host-side
+ * publish / fast-forward / join chain that legitimately takes longer than one silence window,
+ * and it emits many journal facts on the way to the one being awaited — so a watchdog fed only
+ * by the final count would kill a run that is visibly progressing.
+ *
+ * So renewal follows either observation, and both are semantic:
+ *
+ *   the awaited count increased      the barrier's own subject moved
+ *   any journal fact was appended    production code committed a durable domain fact
+ *
+ * The second is not transport motion. A journal line is written by the production reducer
+ * reaching a decision (PERSIST-002 admits only committed appends), which is why a reconnecting
+ * SSE reader cannot manufacture one — the failure mode the clause forbids. A slice that observes
+ * neither renews nothing, and two such slices in a row end the run.
+ *
+ * ── why the overall window stays, and why it is 兜底 rather than the criterion ─
+ *
+ * WAIT_FACT_WINDOW_MS remains as the loop bound. It is reachable only by a run that keeps
+ * appending journal facts for two minutes without ever producing the awaited one — a genuinely
+ * progressing chain that is nonetheless not converging, which no silence criterion can detect
+ * because there is no silence. The clause permits precisely this (「wall-clock 上限可以作为兜底
+ * 存在，但不得是唯一或首要的判据」): the primary criterion is now the silence budget, which fires
+ * first in every case where nothing is happening, and this bound only catches livelock.
+ */
+export async function awaitFactBarrier(scenario, step) {
+  const name = step.waitFact.name;
+  const need = step.waitFact.eq !== undefined ? step.waitFact.eq : step.waitFact.gte !== undefined ? step.waitFact.gte : 1;
+  const cmp = step.waitFact.eq !== undefined
+    ? (n) => n === need
+    : (n) => n >= need;
+  const lane = step.lane || `fact:${name}`;
+  const deadline = Date.now() + (step.timeoutMs || WAIT_FACT_WINDOW_MS);
+
+  let observed = readJournal(scenario.host.workDir, name);
+  while (!cmp(observed.named) && Date.now() < deadline) {
+    const remaining = Math.max(1, deadline - Date.now());
+    // The observable is a file on disk, so the wait is a poll rather than an event await. Kept
+    // well under the silence budget for one reason only: a slice longer than the budget could
+    // not tell a stalled chain from a coarse poll, since the watchdog would fire mid-slice.
+    await pollSlice(Math.min(remaining, FACT_POLL_SLICE_MS));
+
+    const next = readJournal(scenario.host.workDir, name);
+    if (next.named > observed.named) {
+      scenario.watchdog?.advance({ reason: `fact-count:${name}=${next.named}`, lane });
+    } else if (next.total > observed.total) {
+      scenario.watchdog?.advance({ reason: `journal-append-while-awaiting:${name}`, lane });
+    }
+    observed = next;
+  }
+
+  assert.ok(
+    cmp(observed.named),
+    `waitFact ${name} not satisfied (need ${step.waitFact.eq !== undefined ? 'eq' : 'gte'} ${need}, got ${observed.named})`,
+  );
+  scenario.watchdog?.advance({ reason: `fact-ready:${name}`, lane });
+}
+
 async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
   for (const step of flow) {
@@ -107,44 +201,7 @@ async function runFlow(scenario, doc, ctx) {
       continue;
     }
     if (step.waitFact) {
-      // Intermediate causal barrier on durable journal facts (e.g. OrchestratorPublished)
-      // between LLM turns. Do NOT raise the single wait timeout: re-arm the 2s
-      // scenario-local watchdog on every host event / poll slice so a multi-second
-      // publish/ff chain is covered by intermediate progress, not a larger timeoutMs.
-      const name = step.waitFact.name;
-      const need = step.waitFact.eq !== undefined ? step.waitFact.eq : step.waitFact.gte !== undefined ? step.waitFact.gte : 1;
-      const cmp = step.waitFact.eq !== undefined
-        ? (n) => n === need
-        : (n) => n >= need;
-      // Overall span may exceed WATCHDOG_TIMEOUT_MS under parallel host load;
-      // silence budget stays 2s via advance (not a raised expectation timeout).
-      const overallMs = step.timeoutMs || WAIT_FACT_WINDOW_MS;
-      const deadline = Date.now() + overallMs;
-      let ok = cmp(countFact(scenario.host.workDir, name));
-      while (!ok && Date.now() < deadline) {
-        scenario.watchdog?.advance({
-          reason: `wait-fact:${name}`,
-          lane: step.lane || `fact:${name}`,
-          blocking: true,
-        });
-        const remaining = Math.max(1, deadline - Date.now());
-        // Slice well under the 2s silence budget so advance never races the watchdog.
-        const slice = Math.min(remaining, 500);
-        try {
-          // Any host event re-enters the loop; fact may appear without a matching
-          // provider request (ff / join completion is host-side).
-          await scenario.events.awaitEvent(() => true, slice);
-        } catch {
-          // slice elapsed without events — re-check fact below
-        }
-        ok = cmp(countFact(scenario.host.workDir, name));
-      }
-      assert.ok(ok, `waitFact ${name} not satisfied (need ${step.waitFact.eq !== undefined ? 'eq' : 'gte'} ${need}, got ${countFact(scenario.host.workDir, name)})`);
-      scenario.watchdog?.advance({
-        reason: `fact-ready:${name}`,
-        lane: step.lane || `fact:${name}`,
-        blocking: true,
-      });
+      await awaitFactBarrier(scenario, step);
       continue;
     }
     if (step.prompt) {
