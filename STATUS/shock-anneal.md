@@ -1376,7 +1376,7 @@ N0  规范先行（M0）：ARCH-010 进 SSOT/01；CTX-013 修订；PROMPT-001 �
 N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一处；            已完成
     多行定为 ''' + 零加工内容 + closing 独占一行；含 ''' 或裸控制字符者
     回退单行 basic string。裁决与实测见下方 N1 记要
-N2  surface inventory（M1）：列出全部最终进入 LLM 的文本生产点并四分类
+N2  surface inventory（M1）：列出全部最终进入 LLM 的文本生产点并四分类            已完成
     NativeSystemPrompt / HumanRaw / ModelNative / RuntimeSyntheticToml。
     该分类只用于实现审计，不构成新的运行时 envelope。门禁固定该清单
 N3  fork/child-instruction surface 迁到 ARCH-010 形态；fork 信封条件包裹在此定案
@@ -1502,6 +1502,75 @@ body 内注入 '''          THROWS  each key-value declaration...
 
 一条测试从「回退」翻为「保持字面量」：结尾单引号的正文现在 closing 独占一行，不再需要退到转义形式。保留该用例并写明它是 delimiter 位移唯一改变的行为，否则将来「恢复结尾引号保护」会静默把这些正文推回转义分支。
 
+##### N1 收口：抽出 `SyntheticToml`
+
+`de08822d`。`test:mjs` 406 → 418、gate-testkit 258/0、gate:static 六门绿、`build/next/OpenCode/Plugin.js` 可 import。
+
+上面那句「本来就只有一处 owner」是当时的事实，但它是巧合而非结构：`BloggerToml` 恰好是唯一生产者，故规则私藏其内也不违反条款。N3 与 N5 会让第二个 surface 渲染 value，那一刻「只有一个 owner」要么成为结构，要么第二个 surface 复制逻辑、条款禁止的局部方言就地诞生。
+
+故按条款自己的两条边界切分：
+
+```text
+SyntheticToml   字符串规则 + 文档布局      「字符串写法只有一个 owner」
+BloggerToml     part 种类 + 固定键序 + marker  「不引入统一 envelope」
+```
+
+`SyntheticToml` 的三个新成员承载此前无处安放的规则：
+
+```text
+comment   多行 instruction 按行拆成多条 comment。裸 \n 会终止注释并把余下内容以
+          语法形式留在顶层——这正是 instruction 变成畸形文档（或字段）的路径。
+          空行渲染为裸 # 以保持 header 为单一连续块；真空行会终止 header，令其后
+          一切成为第二个非法 header
+field     name = 已渲染值，值必须先经 renderString
+document  instruction header → 恰好一个空行 → data body。三种合法形态由参数为空
+          自然得到；「data body 不输出 comment」变为不可表达，因为 body 块只能来自
+          field 与表构造器
+```
+
+`BloggerToml` 相应收缩，新增 `renderWith` 承接可选 instruction header，`render` 成为 `renderWith []` 的别名。facade 拆为两个命名空间，且 `bloggerToml` 不再导出 `renderString` / `byteCount` / `normalizeNewlines`——留着它们能工作会告诉下一个读者 Blogger 拥有字符串渲染，即条款禁止的那件事。
+
+测试按同一边界重分：`synthetic-toml.test.mjs` 20 条（字符串形态、comment 拆行与空行、三种文档形态、data body 无顶层 comment、19 输入往返 parse、字节计数与平台编码器一致），`blogger-toml.test.mjs` 缩为 13 条只剩 schema。原文件八条字符串形态测试是删除而非复制：第二份断言同一规则就是局部方言上移一层。
+
+并补三条此前不存在的 CTX-013 断言：data-only delta 不得出现任何 comment（原绝对规则恰好在此存活，且「data-only chunk 必须人为添加 instruction」被明确禁止）；instruction header 在 supply 时位于最前且与 body 隔一个空行；header bytes 计入渲染总量而 data-only 不付额外开销——后者是 chunker 200 KiB 限额测试所依赖的算术。
+
+#### N2 落地记要
+
+`19a9a976`。`gate:surface` 进 `gate:static`（现 6 条门禁）。
+
+动议 M1 要求列出全部最终进入 LLM 的文本生产点并四分类。手写一份「构造 prompt 文本的地方」的清单正是本包 W1 与 W2 已经删过两次的缺陷形态：一份没人更新的镜像。而生产者无法机械枚举——任何 `sprintf` 都是候选。
+
+故 ground truth 取 sink 侧。PROMPT-005 使这个闭集为真：插件发出的每条 user-shaped prompt 都经 `PromptDispatcher`，故其三个 send 成员加 `sendFirstPrompt` 是插件文本到达 `SendPrompt` 进而到达 provider 的唯一通路。扫描其调用点得到 surface，注册表说明每个 surface 承载什么。
+
+实测 8 个 surface，全部 `RuntimeSyntheticToml`：
+
+```text
+OneShotAgentTool           one-shot agent 指派
+CompanionHostBlogger       Blogger delta（正常 + 重启后 re-anchor）
+HostForkRunLifecycle       fork 子会话首 prompt（lifecycle 路径）
+HostForkAgentOwner         fork 子会话首 prompt（共享助手）
+HostForkRuntimeFork        fork 子会话信封   ← N3 目标，当前红灯同一根因
+HostSessionNudge × 2       continuation nudge / interaction repair
+HostForkBusyNudge          busy-agent fire-and-forget nudge（EXEC-002）
+```
+
+`composer` 字段记录文本实际构造处，因为 N3 与 N5 迁移的是 composer 而非 sink；多个站点共享同一 sink 只在 composer 上不同，故键取 `file#sink` 对而非 sink。
+
+两项排除做成结构性而非声明式：
+
+```text
+NativeSystemPrompt   send 站点文件不得在代码里引用 prompt asset。system prompt 只能
+                     经 Host agent config 到达模型，不能成为会话级合成消息
+HumanRaw             send 行不得携带 HumanRoot。人类原文只入不出：AcceptHumanRoot
+                     记录 Host 已投递的 root，不存在 SendHumanRoot
+ModelNative          此处无需检查：assistant 文本重入 payload 时是 Blogger delta item
+                     的 value，BloggerToml 按构造渲染为 data
+```
+
+五条红证逐条实测：删一条注册表条目 → 该 send 站点未登记；加一条不存在的站点 → 条目陈旧；sink 名改错致扫描为空 → fail closed（否则后续检查全部空转为绿）；send 站点文件代码引用 asset → 判红并指出行号；send 行携带 `HumanRoot` → 判红。
+
+第四条的第一版按整文件 `includes` 判，会把「本处刻意不走 PromptAssets」这类解释性注释判红——那会训练下一个读者删掉解释而不是保留它。改为跳过注释行并报告行号，并补 4b 反向验证：同一标记只出现在注释里必须仍绿。
+
 #### 测试要求（动议 §15）
 
 ```text
@@ -1532,22 +1601,43 @@ transport   tool call/result linkage 不变、message role 不变、provider met
 [x] PROMPT-001 已增加「文本形态不是 authority 证据」交叉引用
 [x] CTX-013 已删除绝对「不输出注释」
 [x] CTX-013 已允许最前方 instruction comment header
-[ ] Blogger data body 禁止 comments
+[x] Blogger data body 禁止 comments
 [x] Blogger 多行排版改为 closing 独占一行、内容零加工
 [x] 所有多行 data 使用 canonical ''' 排版，且渲染结果可被 parser 读回
-[ ] 已建立 runtime textual surface inventory
-[ ] 所有纳入范围的 instruction 使用最前方 comments
-[ ] 所有纳入范围的 data 使用 fields/tables/values
-[ ] data body 开始后不存在顶层 comment
-[ ] human raw message 未被包装
-[ ] model-native transcript 未被重写
-[ ] system/developer prompt 未被本包迁移
-[ ] provider tool binding 未变化
-[ ] 不存在统一 envelope
-[ ] 不存在 TOML 反向 parser
-[ ] fixtures、golden tests 和 canary 已更新    ← 与退火三共用验收
-[ ] 完整 release gate 通过                      ← 与退火三共用验收
+[x] 已建立 runtime textual surface inventory
+[ ] 所有纳入范围的 instruction 使用最前方 comments      ← N3 + N5
+[ ] 所有纳入范围的 data 使用 fields/tables/values       ← N3 + N5
+[ ] data body 开始后不存在顶层 comment                  ← 渲染器已保证，待全部 surface 经它
+[x] human raw message 未被包装
+[ ] model-native transcript 未被重写                    ← 与权限/transport 回归共同验收
+[x] system/developer prompt 未被本包迁移
+[ ] provider tool binding 未变化                        ← 与权限/transport 回归共同验收
+[x] 不存在统一 envelope
+[x] 不存在 TOML 反向 parser
+[ ] fixtures、golden tests 和 canary 已更新             ← 与退火三共用验收
+[ ] 完整 release gate 通过                              ← 与退火三共用验收
 ```
+
+勾验依据，逐项可复核：
+
+```text
+Blogger data body 禁止 comments     CTX_013_a_data_only_delta_emits_no_comment_at_all，
+                                    且 document 使 body 内 comment 不可表达（body 块只能
+                                    来自 field 与表构造器）
+已建立 surface inventory            scripts/surface-inventory.mjs + gate:surface，8 个 surface
+                                    双向检查，五条红证
+human raw 未被包装                  N2 结构性判据：send 行不得携带 HumanRoot。已红过
+system/developer prompt 未被迁移     N2 结构性判据：send 站点文件不得在代码里引用 prompt
+                                    asset。已红过
+不存在统一 envelope                  SyntheticToml.document 签名只有 instructions 与 body，
+                                    无 envelope 参数；两个渲染器均无 schema/kind/origin/
+                                    authority/content_type/message_id 字段
+不存在 TOML 反向 parser              next/ 全仓零 TOML parser。smol-toml 的消费者只有
+                                    scenario-schema.js（harness 读测试 fixture，非合成
+                                    payload）与三个测试文件
+```
+
+余下 6 项分三组：N3 与 N5 迁移 surface 后可勾 3 项；权限与 transport 回归勾 2 项；退火三勾 2 项（其中 fixtures/canary 一项与退火三共用）。
 
 #### 编号说明与遗留裁决
 
