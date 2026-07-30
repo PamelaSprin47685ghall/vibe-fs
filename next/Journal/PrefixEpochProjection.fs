@@ -1,21 +1,7 @@
 namespace Wanxiangshu.Next.Journal
 
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
-
-/// COMPANION-009: the frozen companion memory that replaces X's raw prefix, and
-/// the proof it may.
-///
-/// `CutoffExclusive` is an index into X's provider-visible messages, so it is only
-/// meaningful under the numbering that produced `CoveredPrefixDigest`. Both travel
-/// together for that reason — a snapshot carrying one without the other could not
-/// be re-verified before use (COMPANION-011).
-type PrefixSnapshot =
-    { FrozenBRef: BlobRef
-      FrozenBDigest: BlobDigest
-      CutoffExclusive: int
-      CoveredPrefixDigest: string
-      SealRoot: string
-      SyntheticMessageId: string }
 
 /// COMPANION-009: which prefix generation is in force.
 ///
@@ -23,6 +9,11 @@ type PrefixSnapshot =
 /// call for identical behaviour: nothing has been promoted yet, and a Host
 /// compaction retired what had been promoted (HOST-006). Both mean "send raw
 /// history", so they are one state, not two.
+///
+/// `PrefixSnapshot` comes from `Domain.PrefixCandidate`: the attempt profile carries
+/// one (PROMPT-008), the selector builds one (CTX-011), and this fold validates one.
+/// A separate copy here would let the profile's snapshot and the committed snapshot
+/// differ in shape, and CTX-012 requires them to be byte-identical.
 type ActivePrefixEpoch =
     { EpochId: PrefixEpochId
       Snapshot: PrefixSnapshot option }

@@ -820,6 +820,33 @@ X10 Canary 验收（X-A 至 X-D，随包 K 一并落地）
 
 X7 必须早于 X8：两套压缩系统同时活着时，无法判断 PrefixEpoch 的变化来自 probe 还是 Host。
 
+#### X8 必须落地的门禁：零调用点的唯一构造函数
+
+包 X5 补 `RequestKind` / `ProjectionChoice` 时发现 `buildAttemptExecutionProfile`
+全仓调用点为 0。 包 0d 记录的措辞是「profile 尚未作为参数贯通全链（各处仍分别读
+`ActiveLogicalRun`）」，听起来像覆盖不足；实际是没有任何一次 provider request
+从这个 profile 出发构造。`conformance.md` 的 PROMPT-008 已从 `PARTIAL` 降为
+`CONTRADICTS`。
+
+`single-constructor` 门禁没抓住它，因为它问的是「谁在手工构造这个类型」，
+而答案是没有人——包括本该构造它的那个函数的调用方。一个零调用点的构造函数
+通过所有「不得绕过」检查，因为无路可绕。
+
+门禁要加的三处改动，X8 落地时一并合入：
+
+```text
+SINGLE_CONSTRUCTOR_TYPES 每项增加 builder: 'buildAttemptExecutionProfile'
+门禁在 owner 之外统计该标识符出现的生产文件数，为 0 则 fail
+实测：加上后 architecture-gate 报 1 violation，指名该函数无调用点
+```
+
+已在本地写出并验证会红，然后回滚。现在不合入，因为门禁一旦为红就会阻塞 X6/X7
+的每次提交，而它要求的贯通正是 X8 的第一个真实调用点（CTX-010 要求候选只对一次
+attempt 有效，那是第一个真正需要完整 profile 的位置）。X8 完成时同时合入门禁与
+调用点，一次转绿。
+
+X6 与 X7 期间该函数保持零调用点是已知且已登记的状态，不是遗忘。
+
 #### X2 的实测状态与一处未列入表的残留
 
 灭绝表 13 行中的 17 个符号在包 A–H 完成时已全部为 0，无需再删：

@@ -23,6 +23,7 @@
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
     <Compile Include="Domain/TerminalValidity.fs"/>
+    <Compile Include="Domain/PrefixCandidate.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>

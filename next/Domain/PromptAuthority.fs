@@ -77,6 +77,19 @@ module PromptAuthority =
             /// unauthorised tool into the schema while the gate still refused it,
             /// or worse, the reverse.
             ToolCapabilitySet: Set<ToolPermission>
+            /// PROMPT-008: which physical request this is.
+            ///
+            /// Real request semantics, not a flow stage (ARCH-001). It decides which
+            /// projection is built, which instruction is sent, and — through CTX-007
+            /// — what a success does to the fallback cursor.
+            RequestKind: ProviderRequestKind
+            /// CTX-010: which prefix this attempt sends.
+            ///
+            /// Part of the immutable profile because the candidate must be valid for
+            /// exactly one attempt. Held in mutable session state instead, a probe
+            /// would outlive the request that justified it, and CTX-012's "a failed
+            /// probe never became a fact" would stop being structurally true.
+            ProjectionChoice: XProjectionChoice
         }
 
         /// Convenience projections. Reading through the authority profile keeps
@@ -497,12 +510,19 @@ module PromptAuthority =
     /// mutable session cache, the last user message, a Role map and the fallback
     /// projection — four sources that can disagree, and did (the B-side request
     /// occasionally carried the wrong tool set).
+    ///
+    /// `requestKind` and `choice` cannot be derived and so must be supplied. The
+    /// probe is validated against the kind rather than trusted: CTX-010 permits one
+    /// only on a work main request, and enforcing that here means a Companion
+    /// request carrying a probe is not expressible rather than merely discouraged.
     let buildAttemptExecutionProfile
         (authority: AuthorityExecutionProfile)
         (cursor: AgentPairCursor.FallbackCursor)
         (physicalUserMessageId: PhysicalUserMessageId)
         (providerRun: ProviderRunIdentity)
         (origin: PromptOrigin)
+        (requestKind: ProviderRequestKind)
+        (choice: XProjectionChoice)
         : AttemptExecutionProfile =
         { Authority = authority
           PhysicalUserMessageId = physicalUserMessageId
@@ -510,7 +530,13 @@ module PromptAuthority =
           Origin = origin
           EffectiveAgent = effectiveAgentFor authority cursor
           SystemPromptId = systemPromptIdFor authority.CanonicalRole
-          ToolCapabilitySet = Roles.permissions authority.CanonicalRole }
+          ToolCapabilitySet = Roles.permissions authority.CanonicalRole
+          RequestKind = requestKind
+          ProjectionChoice =
+            if ProviderRequestKind.mayCarryProbe requestKind then
+                choice
+            else
+                XProjectionChoice.UseCommittedEpoch }
 
     /// COMPANION-001/002: Companion eligibility reads the CanonicalRole of the
     /// active Logical Run and nothing else.
