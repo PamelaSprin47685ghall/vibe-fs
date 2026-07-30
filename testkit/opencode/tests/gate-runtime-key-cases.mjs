@@ -15,7 +15,7 @@
  */
 
 import { assertEq, assertTrue } from './gate-lib.mjs';
-import { kindOf, laneOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../runtime-key.js';
+import { kindOf, lanesOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../runtime-key.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([
@@ -39,6 +39,9 @@ const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, tu
 /** `prompt.ts:235` prepends this as `messages[0]`, then appends the real conversation. */
 const titleRequest = (text) =>
   request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)]);
+
+const titleRequestOn = (text, sessionID) =>
+  request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)], sessionID);
 
 export const runtimeKeyCases = [
   // ── kind: the fourth component, and why turn alone cannot carry it ────────
@@ -238,19 +241,65 @@ export const runtimeKeyCases = [
   {
     name: 'HOST-008 lane resolves through the session binding',
     fn: () => {
-      assertEq(laneOf(request([user('go')]), BINDINGS), 'fast-manager');
-      assertEq(laneOf(request([user('go')], 'ses_real_2'), BINDINGS), 'coder-after');
+      assertEq([...lanesOf(request([user('go')]), BINDINGS)].join(), 'fast-manager');
+      assertEq([...lanesOf(request([user('go')], 'ses_real_2'), BINDINGS)].join(), 'coder-after');
     },
   },
 
   {
-    name: 'HOST-008 an unbound session is null, not a guess',
+    name: 'HOST-008 an unbound session yields no lane, not a guess',
     fn: () => {
       // The mock cannot know which alias an unbound session belongs to. Inventing
       // one would answer a question only the durable association can answer.
-      assertEq(laneOf(request([user('go')], 'ses_unknown'), BINDINGS), null);
-      assertEq(laneOf({ messages: [] }, BINDINGS), null);
-      assertEq(laneOf(request([user('go')]), undefined), null);
+      assertEq(lanesOf(request([user('go')], 'ses_unknown'), BINDINGS).size, 0);
+      assertEq(lanesOf({ messages: [] }, BINDINGS).size, 0);
+      assertEq(lanesOf(request([user('go')]), undefined).size, 0);
+    },
+  },
+
+  {
+    name: 'HOST-008 one session with two aliases yields both, not the first',
+    fn: () => {
+      // Measured in K9, and it was an impurity hiding inside the function that names the
+      // key. Every converted scenario binds two aliases to its primary session — the Host
+      // titles a session on the same id it chats on, so
+      // `bind = ["inspector-title", "fast-inspector"]` is the norm rather than an edge case.
+      //
+      // A reverse lookup returning the FIRST match made the answer depend on Map insertion
+      // order: same request, same bindings, different lane depending on which alias the
+      // driver happened to register first. `process-stress` failed to resolve its title
+      // request for exactly this reason.
+      const shared = 'ses_shared';
+      const titleFirst = new Map([['inspector-title', shared], ['fast-inspector', shared]]);
+      const chatFirst = new Map([['fast-inspector', shared], ['inspector-title', shared]]);
+      const body = request([user('go')], shared);
+
+      assertEq([...lanesOf(body, titleFirst)].sort().join('|'), 'fast-inspector|inspector-title');
+      assertEq(
+        [...lanesOf(body, chatFirst)].sort().join('|'),
+        [...lanesOf(body, titleFirst)].sort().join('|'),
+        'insertion order may not change the answer',
+      );
+    },
+  },
+
+  {
+    name: 'HOST-008 kind separates the title entry from the chat entry on one session',
+    fn: () => {
+      // The consequence of the above: both entries are at the same session and the same
+      // step, so `kind` is what tells them apart. That is what it was added to the key for.
+      const shared = 'ses_shared';
+      const bindings = new Map([['t', shared], ['c', shared]]);
+      const entries = [
+        { id: 'chat.0', lane: 'c', kind: 'chat', turn: 'Ship it.', step: 0 },
+        { id: 'title.0', lane: 't', kind: 'title', turn: 'Ship it.', step: 0 },
+      ];
+
+      assertEq(resolveEntry(request([user('Ship it.')], shared), entries, bindings).matched.id, 'chat.0');
+      assertEq(
+        resolveEntry(titleRequestOn('Ship it.', shared), entries, bindings).matched.id,
+        'title.0',
+      );
     },
   },
 

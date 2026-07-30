@@ -11,6 +11,7 @@ import { cases } from './gate-cases.mjs';
 import { coldBoundaryCases } from './gate-cold-boundary-cases.mjs';
 import { deliveryCases } from './gate-delivery-cases.mjs';
 import { pluginDependencyCase } from './gate-plugin-dependency-case.mjs';
+import { scenarioRuntimeCases } from './gate-scenario-runtime-cases.mjs';
 import { schemaCases } from './gate-schema-cases.mjs';
 import { sourceCases } from './gate-source-cases.mjs';
 import { projectionCases } from './gate-projection-cases.mjs';
@@ -34,7 +35,7 @@ async function runCase({ name, fn }) {
 
 console.log('Running testkit/opencode gate tests...\n');
 
-for (const c of [...cases, pluginDependencyCase, ...projectionCases, ...runtimeKeyCases, ...deliveryCases, ...coldBoundaryCases, ...schemaCases, ...sourceCases, ...timeoutCases]) {
+for (const c of [...cases, pluginDependencyCase, ...projectionCases, ...runtimeKeyCases, ...deliveryCases, ...coldBoundaryCases, ...schemaCases, ...scenarioRuntimeCases, ...sourceCases, ...timeoutCases]) {
   await runCase(c);
 }
 

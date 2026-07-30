@@ -37,23 +37,35 @@ import { toArray as listToArray } from '../../build/next/fable_modules/fable-lib
 // ── lane ────────────────────────────────────────────────────────────────────
 
 /**
- * Which conversation thread this request belongs to.
+ * Which lanes this request could belong to — a SET, not one name.
  *
- * A lane is addressed by the session the Host issued. Aliases exist because a
- * scenario names sessions before they exist (`fast-manager`, `coder-after`), and
- * the binding is established when the Host mints the real id.
+ * A lane is addressed by the session the Host issued, and aliases exist because a
+ * scenario names sessions before they exist (`fast-manager`, `coder-after`). The
+ * binding is established when the Host mints the real id; HOST-008 makes the
+ * association durable and the mock is told it rather than inferring it.
  *
- * Returns `null` for an unbound session rather than guessing. HOST-008 makes the
- * association durable; a mock inventing one would answer a question it cannot know.
+ * ── why a set ───────────────────────────────────────────────────────────────
+ *
+ * Measured: every converted scenario binds TWO aliases to its primary session, e.g.
+ * `bind = ["inspector-title", "fast-inspector"]`, because the Host titles a session
+ * on the same id it chats on. A reverse lookup returning the first match is then
+ * decided by Map insertion order, not by the request — the exact impurity this
+ * module exists to remove, hidden inside the function that names the key.
+ *
+ * So membership is the question the request can actually answer: "is this entry's
+ * lane one of the aliases bound to this session?" `kind` then separates the title
+ * entry from the chat entry, which is what it was added for. Two entries that still
+ * tie after that are an author error `resolveEntry` reports rather than resolves.
  */
-export function laneOf(body, bindings) {
+export function lanesOf(body, bindings) {
   const sessionId = sessionIdOf(body);
-  if (sessionId === null) return null;
+  if (sessionId === null) return new Set();
 
+  const lanes = new Set();
   for (const [alias, bound] of bindings ?? []) {
-    if (bound === sessionId) return alias;
+    if (bound === sessionId) lanes.add(alias);
   }
-  return null;
+  return lanes;
 }
 
 /**
@@ -154,9 +166,22 @@ export function stepOf(body) {
   return step;
 }
 
-/** The whole key. */
+/**
+ * The whole key.
+ *
+ * `lanes` is plural for the reason `lanesOf` explains. The diagnostic field `lane` is
+ * the sorted join, so an unmatched-request report names every alias the session holds
+ * instead of one arbitrarily chosen member.
+ */
 export function runtimeKeyOf(body, bindings) {
-  return { lane: laneOf(body, bindings), kind: kindOf(body), turn: turnOf(body), step: stepOf(body) };
+  const lanes = lanesOf(body, bindings);
+  return {
+    lanes,
+    lane: lanes.size === 0 ? null : [...lanes].sort().join('|'),
+    kind: kindOf(body),
+    turn: turnOf(body),
+    step: stepOf(body),
+  };
 }
 
 // ── longest-prefix lookup ───────────────────────────────────────────────────
@@ -194,7 +219,7 @@ export function resolveEntry(body, entries, bindings) {
 
   const atKey = entries.filter(
     (entry) =>
-      (entry.lane === undefined || entry.lane === key.lane) &&
+      (entry.lane === undefined || key.lanes.has(entry.lane)) &&
       (entry.kind ?? 'chat') === key.kind &&
       entry.step === key.step,
   );
