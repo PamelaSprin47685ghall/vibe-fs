@@ -15,6 +15,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
 import { bloggerDelta as delta, bloggerToml as toml } from '../domain.mjs'
 
 const origin = delta.cursor(0, 0)
@@ -237,6 +238,17 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   assert.equal(chunk.bytes <= limit, true)
   assert.equal(chunk.toml.includes('\uFFFD'), false, 'no replacement character from a split sequence')
   assert.equal(chunk.toml.includes(toml.truncationMarker), true)
+
+  // The claim in this test's name, actually exercised. Byte-level checks cannot see a
+  // document that is malformed, and the truncation path is where malformation is most
+  // likely: the cut lands at an arbitrary offset inside a `'''` body and the marker plus
+  // the closing delimiter are appended after it. ARCH-010 put that delimiter on its own
+  // line, which moved the arithmetic by one byte — precisely the kind of change a
+  // `bytes <= limit` assertion passes through silently.
+  const parsed = parseToml(chunk.toml)
+  assert.equal(parsed.item.length, 1)
+  assert.equal(parsed.item[0].truncated, true)
+  assert.equal(parsed.item[0].text.includes(toml.truncationMarker), true, 'the marker survives parsing as data')
 
   // Every retained CJK character is whole: the count of them is an integer number
   // of 3-byte sequences, which a byte-level cut could not guarantee.
