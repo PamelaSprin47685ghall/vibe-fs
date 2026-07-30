@@ -1461,8 +1461,13 @@ export const authority = {
   agentPair: (profile) => Authority.agentPair(profile),
   effectiveAgentAt: (profile, offset) => Authority.effectiveAgentAt(profile, offset),
   effectiveAgentFor: (profile, value) => Authority.effectiveAgentFor(profile, value),
-  claimScopeDigest: (sha256, session, runId, origin, payloadDigest) =>
-    Authority.claimScopeDigest(sha256, session, runId, origin, payloadDigest),
+  /**
+   * PROMPT-011 claim scope. NOT hashed — it is a `\u001f`-joined string, so a test
+   * can read the four components it names. Takes no `sha256`; only `derivePromptKey`
+   * hashes.
+   */
+  claimScopeDigest: (session, runId, origin, payloadDigest) =>
+    Authority.claimScopeDigest(session, runId, origin, payloadDigest),
   nextClaimSequence: (scope, projection) => Authority.nextClaimSequence(scope, projection),
   derivePromptKey: (...args) => Authority.derivePromptKey(...args),
   repairPayloadDigest: (run, kind) => Authority.repairPayloadDigest(run, kind),
