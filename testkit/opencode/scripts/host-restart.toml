@@ -1,0 +1,161 @@
+# HOST-004/EXEC-009: a Host restart mid-run must reconcile from the journal, and a
+# restored child must still carry the tools its agent declares. The proof is that after
+# the restart the Manager can nudge the SAME coder child and get a reply.
+#
+# ── two files became one ────────────────────────────────────────────────────
+#
+# The JSON form kept the post-restart edges in `host-restart-after.json` and swapped them
+# in mid-run with `loadScripts`. §8 retires that: a scenario is one static file, and a
+# restart does not change what the model would say. The old split also hid the real
+# claim — that the restored session answers edges declared BEFORE the restart, which is
+# only meaningful if they were all declared up front.
+#
+# The `after` file also carried a second scenario name ("host-restart") with no setup,
+# session or flow — a fragment that could not load on its own and had no way to say so.
+
+scenario = "host-restart"
+description = "HOST-004 restart reconcile; a restored child retains its coder tools and answers a nudge"
+pass = "Host restart reconcile canary passed: restored child retained coder tools across restart."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "host restart canary\n" } } }
+session = { agent = "fast-manager", bind = ["parent-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews." }
+
+must = ["manager.5", "reviewer-confirm", "manager-after-restart.1", "child-a2"]
+
+flow = [
+  { afterExpectation = { id = "manager.5", restart = true } },
+
+  { wait = "manager.0" },
+  { wait = "child-a1" },
+  { wait = "manager.2" },
+  { wait = "manager.3" },
+  { wait = "reviewer" },
+  { wait = "reviewer-confirm" },
+  { wait = "manager.5" },
+
+  { awaitRestart = true },
+
+  # The nudge is a fresh user message, so it opens a new turn in the same lane. Nothing
+  # is loaded here — the turn below was declared before the Host ever started.
+  { prompt = { agent = "fast-manager", text = "Nudge the coder child for child-a2." } },
+  { wait = "manager-after-restart.0", timeoutMs = 15000 },
+  { wait = "child-a2", timeoutMs = 15000 },
+  { wait = "manager-after-restart.1", timeoutMs = 15000 },
+
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+# Six provider steps, ONE user message. The JSON form wrote these as six edges at
+# `lane.turn = 1..6` — a hand-maintained ordinal whose only distinguishing `match` was
+# `requiredTools`, identical on all six. Each tool call and its result append assistant
+# messages, so `step` counts them and the numbering becomes a property of the request.
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write host_restart_proof.txt with OK." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder joined." }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review and PERFECT twice." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  # The restart fires after this step (`afterExpectation` above), so everything below is
+  # answered by a reconciled Host reading the journal rather than in-memory state.
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewed." }
+
+# REVIEW-003: two PERFECT verdicts from two different ProviderRunIdentity, the second
+# proving it saw the first's challenge. The JSON form expressed this with `aliases` plus
+# `reusable` on one edge — one declaration pretending to be two runs. They are two turns,
+# because the challenge production sends is a new user message.
+
+[[turn]]
+id = "reviewer"
+lane = "fast-reviewer"
+user = "Review and PERFECT twice."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  # Step 1 is the same turn after the verdict tool result comes back. The retired
+  # `afterToolResult` predicate said exactly this, one layer less directly: a tool result
+  # is already part of the semantic prefix, so the step count says it.
+  [[turn.step]]
+  respond = { type = "text", text = "First PERFECT submitted; awaiting confirmation prompt." }
+
+# The challenge text is composed by production (`next/Domain/ReviewChallenge.fs:22`), so
+# no scenario text reaches this turn — the fourth measured `internal` site.
+
+[[turn]]
+id = "reviewer-confirm"
+lane = "fast-reviewer"
+internal = true
+user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+[[turn]]
+id = "child-a1"
+lane = "fast-coder"
+user = "Write host_restart_proof.txt with OK."
+
+  [[turn.step]]
+  respond = { type = "text", text = "child-a1 done." }
+
+# The claim of the whole scenario: this turn is answered AFTER the restart, by a child the
+# reconcile restored, and it still has coder tools. Declared here, before the Host starts.
+
+[[turn]]
+id = "manager-after-restart"
+lane = "fast-manager"
+user = "Nudge the coder child for child-a2."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Report child-a2." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Finished after restart." }
+
+[[turn]]
+id = "child-a2"
+lane = "coder-after"
+user = "Report child-a2."
+
+  [[turn.step]]
+  respond = { type = "text", text = "child-a2 done." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "title"
+lane = "parent-title"
+kind = "title"
+user = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

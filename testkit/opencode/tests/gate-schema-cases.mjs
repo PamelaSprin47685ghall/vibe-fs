@@ -681,6 +681,18 @@ user = "Ship the parser fix."
   },
 
   {
+    name: 'VERIFY-003 a scenario with no turns is rejected',
+    fn: () => {
+      // The shape `loadScripts` needed. `host-restart-after.json` was
+      // `{ "scenario": "host-restart" }` plus three edges: a fragment that named a
+      // scenario it was not, could not run alone, and had no way to say so. It loaded
+      // clean, which is how the dynamic-loading damage stayed invisible.
+      rejects('scenario = "host-restart"\n', 'a scenario declares at least one turn');
+      rejects('scenario = "p"\nflow = [ { prompt = { text = "go" } } ]\n', 'at least one turn');
+    },
+  },
+
+  {
     name: 'VERIFY-003 malformed TOML is reported as a parse failure, not a schema problem',
     fn: () => {
       // The two are different author actions: fix the syntax, versus fix the meaning.

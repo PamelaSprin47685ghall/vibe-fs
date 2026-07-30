@@ -404,6 +404,16 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
   if (typeof raw.scenario !== 'string' || raw.scenario === '') problems.push('scenario name is required');
 
   const turns = raw.turn ?? [];
+
+  // A scenario with no turns describes no provider behaviour at all. It loaded clean
+  // until now, and that is precisely the shape `loadScripts` needed:
+  // `host-restart-after.json` was `{ "scenario": "host-restart" }` plus three edges — a
+  // fragment that named a scenario it was not, could not run alone, and had no way to
+  // say so. With one static file per scenario there is no such thing as a fragment.
+  if (turns.length === 0) {
+    problems.push('a scenario declares at least one turn; a file with none describes no provider behaviour');
+  }
+
   turns.forEach((turn, index) => {
     if (typeof turn.id !== 'string' || turn.id === '') problems.push(`turn[${index}] needs an id`);
     if (typeof turn.user !== 'string' || turn.user === '') problems.push(`turn[${index}] needs user text`);
