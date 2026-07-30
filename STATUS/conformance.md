@@ -110,11 +110,29 @@ REVIEW-010 「transform 侧封装与因果校验属包 D」→ 同上
 |------|------|-------------|------|
 | ORCH-001: `fork-manager` 命名 | CONFORMANT | `ForkTool.fs` | — |
 | ORCH-002: Clean Gate | CONFORMANT | `OrchestratorGit.fs` | — |
-| ORCH-003: 一个 Job 一个 worktree 一个 Manager | PARTIAL | `Journal/OrchestratorProjection.fs` `OrchestratorHost.runManager` | 包 0c 持久化 `ManagerAgent`；包 B 删除了未命中时回落 `fast-manager` 的分支（改报错）。冲突路径复用同一 Manager 属包 G |
-| ORCH-005: 短 CAS Integration Gate | CONTRADICTS | `Orchestrator.IntegrationGate.fs` | 锁持有跨 review 期间 |
-| ORCH-006: 持久事实 | CONTRADICTS | `Kernel/Fact.fs:111-151` | 事实集是 stage-like（`CandidateRegistered` / `Rebased` / `Pre-` `PostRebaseReviewConfirmed`）；缺 `ManagerAgent`、`WorktreeIdentity`、`TargetBranchFrozen`、witness ID |
-| ORCH-007: 恢复逻辑 | PARTIAL | `Orchestrator.Recovery.fs` | `PublishClaimed` 恢复无三分支固定顺序判断 |
-| ORCH-008: target ref 安全 | CONFORMANT | `OrchestratorGit.fs` | `GetTargetHead` 失败 fail closed 已验证 |
+| ORCH-003: 一个 Job 一个 worktree 一个 Manager | CONFORMANT | `Journal/OrchestratorProjection.fs` | `ManagerAgent` 持久化为精确 agent 名（非裸角色）；创建后只有 `Progress` 会变；未知 job 的进展是 no-op 而非新建条目；第二次 create 不改 Manager 与 worktree。第 1 层测试 |
+| ORCH-004: 并行 Job | CONFORMANT | `OrchestratorProjection.activeJobs` | 多 job 同时 active，终态 job 退出 active 集合但留在 map 中。第 1 层测试 |
+| ORCH-005: 短 CAS Integration Gate | CONFORMANT | `OrchestratorProgram.publishUnderGate` | gate 只包住 `claimAndFf`，不再跨 rebase 与 LLM review；gate 内二次读 head 即 CAS 的 compare；`claimAndFf` 包在 try 内以免泄漏 publish 锁。第 3 层轨迹属退火三 |
+| ORCH-006: 持久事实 | CONFORMANT | `Journal/OrchestratorProjection.fs` `Kernel/Fact.fs` | `JobProgress` 是单值而非五个独立可选字段，故 ORCH-007 是一次 match 而非排序；`ManagerAgent` / `WorktreeIdentity` / `TargetBranchFrozen` / 两个 review barrier id 全部就位；终态 job 留在 map 中使重放的 `Published` 被识别为重复。第 1 层测试 |
+| ORCH-007: 恢复逻辑 | CONFORMANT | `OrchestratorProjection.recoveryAction` | 八个 progress 分支各产出恰好一个动作（第 1 层测试以表格断言全覆盖）；`PublishClaimed` 三分支按条款固定顺序——已发布优先于未变，反序会重试一次已成功的 ff |
+| ORCH-008: target ref 安全 | CONFORMANT | `OrchestratorGit.fs` `OrchestratorProjection.recoveryAction` | `GetTargetHead` 失败时两个依赖 head 的分支均 `FailClosed`，理由文字点明禁止回落 HEAD |
+
+### ORCH-006 的一处实测缺陷：`createJob` 无条件覆盖（包 T-4 修正）
+
+`createJob` 原先无条件 `Map.add`，于是重放 `ManagerJobCreated` 会把 `Progress` 重置为
+`ManagerStarted`。
+
+这不是理论问题：PERSIST-009 的 durable-effect 协议在 `CommitUnknown` 后重试，所以一份
+journal 合法地可能带两条同一 `ManagerJobCreated`；重启恢复也会从头重读。一个已经
+`Published` 的 job 因此会以「刚创建」的样子交给 ORCH-007，recovery 于是为已经落到
+target ref 的工作再拉起一个 Manager。
+
+修正是已存在则原样返回。与 `recordProgress` 同一规则：worktree 与 Manager 在 job 整个
+生命周期内固定，所以第二次 create 没有新信息可说——包括它与首次不一致时。
+
+`recordProgress` 早就有终态保护（`isTerminal` 分支），所以缺口只在 create 一侧。两个
+函数之中只有一个做了幂等，这正是同一份不变量分两处表达时的典型失败。
+
 
 ## Agent
 
@@ -136,11 +154,43 @@ REVIEW-010 「transform 侧封装与因果校验属包 D」→ 同上
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| EXEC-004: Join 语义 | PARTIAL | `JoinTool.fs` `CompletionMailbox.fs` | single-assignment cell 已实现；join 后不写 `HandleRetired` tombstone |
-| EXEC-005: List 语义 | PARTIAL | `ListTool.fs` | 无 CompletedAwaitingJoin 状态 |
-| EXEC-009: Handle 持久化 + tombstone | PARTIAL | `Journal/LinkageProjection.fs` | 包 0b/0c：三事实与三态投影已就位。读侧全部悬空——`HandleLinked` 不含 child SessionId，8 处消费者无法由 handle 找到 child。包 B 已删占位 `ChildDispatch.tryCancel`；其余属包 F，含一处 SSOT 例外决策 |
-| EXEC-011: Process Deadline | PARTIAL | `Process/Deadline.fs` | 3× estimate 已实现；无管理员 hard limit |
+| EXEC-004: Join 语义 | CONFORMANT | `Journal/LinkageProjection.fs` `HandleController.retire` `HostForkRuntime.Join` | single-assignment cell：首个完成者唯一生效，后到者报 `AlreadyCompleted` 而非覆盖；`Join()` 消费后写 `HandleRetired`，且退休失败时不交出 completion（否则调用方以为已消费而 journal 仍在提供）。第 1 层测试覆盖三种 completion kind 与四种拒绝理由 |
+| EXEC-005: List 语义 | CONTRADICTS | `OpenCode/ListTool.fs` | 投影侧齐备（`listable` 含 `CompletedAwaitingJoin`、排除 `Retired`），但 `list` 工具不读它——它编码 `AgentRecord.Status`（`Idle`/`Busy`/`Interrupted`/`Closed`）加一个 `hasPendingCompletion` 布尔。「已完成待 join」因此报成 `idle` + `true`，而 `Retired` 无从排除。见下方零消费者一节 |
+| EXEC-009: Handle 持久化 + tombstone | PARTIAL | `Journal/LinkageProjection.fs` `Session/HandleController.fs` | 三事实、三态投影、typed handle（agent/pty/manager-job 为三个独立键）、tombstone 永久性、`HandleLinked.ChildSessionId` 全部就位并有第 1 层测试。读侧仍有两处悬空：`isRetired` 与三个派生视图全仓零调用点 |
+| EXEC-011: Process Deadline | CONFORMANT | `Process/ProcessRequest.fs` `Process/Deadline.fs` | `min(3 × estimate, hardLimit)`，`DefaultHardLimit = 1h` 有限；估算为 0/负/NaN/∞ 时回落到硬上限而非「无 deadline」；deadline 存为时刻故 `remaining` 每次由时钟派生、不递减；`nextWaitMs` 钳到 `2^31-1`（JS 定时器超过即立刻触发，会把长 deadline 变成忙循环）。第 1 层测试 |
 | EXEC-015: PTY 行为 | CONFORMANT | `Process/Pty*.fs` | onExit-only completion 已验证 |
+
+### 零调用点的读侧：`isRetired` 与三个派生视图（包 T-4 发现）
+
+写第 1 层测试时逐个确认消费者，发现四个函数全仓生产调用点为 0：
+
+```text
+HandleProjection.listable        0   EXEC-005 的 list 视图
+HandleProjection.joinable        0   EXEC-004 的 join 候选
+HandleProjection.activeHandles   0   EXEC-009 的父取消逐项清单
+HandleProjection.isRetired       0   EXEC-009 的 fork 前置检查
+                                     （`Kernel/Identity.fs:308` 只是注释提及）
+```
+
+这与包 X8 之前的 `buildAttemptExecutionProfile` 是同一形态：函数正确、有测试、
+且没有任何生产路径走它。差别在于那一个是唯一写入口（门禁能问「谁在绕过」），
+这四个是唯一读入口——而「没有人读」不构成任何现有门禁的违规。
+
+后果按条款分两类。 `listable` 无人读是 EXEC-005 的直接违反：`list` 报的是运行期
+`AgentStatus`，`CompletedAwaitingJoin` 塌成 `idle` + `hasPendingCompletion=true`，
+`Retired` 则完全无从排除——而三态可区分正是这个投影替换双 map 的理由。
+`joinable` 与 `activeHandles` 无人读目前不产生错误行为：join 走运行期 mailbox，
+父取消走 `HostForkChildDispatch` 的 owned 列表，两者当前答案与投影一致。但它们是
+两套并行的真相来源，重启后运行期那套要靠 `HostForkRestart` 重建，投影这套是权威。
+
+`isRetired` 无人读是最需要记账的一处。 EXEC-009 明确要求「Retired ID 永远返回
+`RetiredHandle`，不得退回到把输入当成 Agent 名称重新 fork」，而 fork 路径当前不问
+这个问题。tombstone 因此是写下了但没人查的——投影正确地永久保留它，测试也证明
+`isRetired` 答对，但没有任何生产分支因此改变行为。
+
+三项均登记为退火三之前的接线工作，不在包 T 内（包 T 只换验证层语言，不改
+`next/`）。写成 `CONTRADICTS` 与 `PARTIAL` 而非 `CONFORMANT`，正是因为「纯函数对
++ 测试绿」不等于条款成立——条款约束的是系统行为，而没有调用点的正确函数不产生行为。
 
 ## Host 集成
 

@@ -151,6 +151,18 @@ module OrchestratorProjection =
         |> List.map snd
         |> List.filter (fun job -> not (isTerminal job.Progress))
 
+    /// ORCH-003: create a job, once.
+    ///
+    /// Idempotent for a job that already exists. PERSIST-009's durable-effect
+    /// protocol retries after `CommitUnknown`, so one journal can legitimately
+    /// carry the same `ManagerJobCreated` twice — and an unconditional overwrite
+    /// would reset `Progress` to `ManagerStarted`. A replay of a PUBLISHED job
+    /// would then hand ORCH-007 a job that looks freshly created, and recovery
+    /// would resume a Manager for work that already landed.
+    ///
+    /// Keeping the existing entry rather than merging fields is the same rule
+    /// `recordProgress` follows: the worktree and the Manager are fixed for the
+    /// job's whole life, so a second create has nothing new to say.
     let createJob
         (job:
             {| ManagerJobId: ManagerJobId
@@ -162,19 +174,22 @@ module OrchestratorProjection =
                TargetBranchFrozen: string |})
         (projection: OrchestratorProjection)
         =
-        { projection with
-            Jobs =
-                Map.add
-                    job.ManagerJobId
-                    { ManagerJobId = job.ManagerJobId
-                      ManagerSessionId = job.ManagerSessionId
-                      ManagerAgent = job.ManagerAgent
-                      WorktreeIdentity = job.WorktreeIdentity
-                      WorktreePath = job.WorktreePath
-                      TargetRef = job.TargetRef
-                      TargetBranchFrozen = job.TargetBranchFrozen
-                      Progress = JobProgress.ManagerStarted }
-                    projection.Jobs }
+        if Map.containsKey job.ManagerJobId projection.Jobs then
+            projection
+        else
+            { projection with
+                Jobs =
+                    Map.add
+                        job.ManagerJobId
+                        { ManagerJobId = job.ManagerJobId
+                          ManagerSessionId = job.ManagerSessionId
+                          ManagerAgent = job.ManagerAgent
+                          WorktreeIdentity = job.WorktreeIdentity
+                          WorktreePath = job.WorktreePath
+                          TargetRef = job.TargetRef
+                          TargetBranchFrozen = job.TargetBranchFrozen
+                          Progress = JobProgress.ManagerStarted }
+                        projection.Jobs }
 
     /// Record a job's latest progress.
     ///

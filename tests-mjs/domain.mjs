@@ -1696,11 +1696,24 @@ export const handleProjection = (() => {
     'linkedChildren',
   ])
 
+  /**
+   * Rejections carry no payload, so the case name is the whole answer.
+   *
+   * `resultOf` alone would hand back the union object, and `payloadOf` of a
+   * fieldless case is `[]`. `JSON.stringify` makes that LOOK like a string —
+   * Fable's union `toJSON` emits the case name — so a `deepEqual` against
+   * `{ ok: false, error: 'AlreadyCompleted' }` fails while the log reads correct.
+   */
+  const decided = (result) => {
+    const value = resultOf(result)
+    return value.ok ? value : { ok: false, error: caseOf(value.error) }
+  }
+
   return {
     empty: m.empty,
-    link: (handle, child, targetAgent, role, current) => resultOf(m.link(handle, child, targetAgent, role, current)),
-    complete: (handle, kind, current) => resultOf(m.complete(handle, kind, current)),
-    retire: (handle, current) => resultOf(m.retire(handle, current)),
+    link: (handle, child, targetAgent, role, current) => decided(m.link(handle, child, targetAgent, role, current)),
+    complete: (handle, kind, current) => decided(m.complete(handle, kind, current)),
+    retire: (handle, current) => decided(m.retire(handle, current)),
     tryFind: (handle, current) => unwrapOption(m.tryFind(handle, current)),
     isRetired: (handle, current) => m.isRetired(handle, current),
     listable: (current) => listItems(m.listable(current)),
@@ -1709,6 +1722,18 @@ export const handleProjection = (() => {
     tryFindByChildSession: (child, current) => unwrapOption(m.tryFindByChildSession(child, current)),
     linkedChildren: (current) => listItems(m.linkedChildren(current)),
     lifecycleOf: (record) => caseOf(record.Lifecycle),
+
+    /** One handle record as comparable text. */
+    read: (record) => ({
+      handle: handleId.describe(record.Handle),
+      child: idValue.session(record.ChildSessionId),
+      targetAgent: record.TargetAgent,
+      role: caseOf(record.CanonicalRole),
+      lifecycle: caseOf(record.Lifecycle),
+      // EXEC-005: `list` must distinguish which completion landed, so the kind is
+      // part of the state rather than a flag beside it.
+      completion: caseOf(record.Lifecycle) === 'CompletedAwaitingJoin' ? caseOf(payloadOf(record.Lifecycle)) : undefined,
+    }),
   }
 })()
 
