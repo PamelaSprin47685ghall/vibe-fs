@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Journal
@@ -53,7 +54,8 @@ module ReconcileSupervisor =
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
 
-        let observeSnapshot = defaultArg onSnapshot (fun _ _ -> Task.CompletedTask)
+        let observeSnapshot =
+            defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
 
         let stateOf key =
             match states.TryGetValue(key) with

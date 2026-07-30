@@ -201,23 +201,23 @@ module TurnCompletionProgram =
             && ReviewerGuardState.isConfirmedReviewer journal sessionKey
 
         match turn.Outcome with
-        | TurnUnknown -> Task.CompletedTask
+        | TurnUnknown -> AsyncSupport.completedTask ()
         | TurnInProgress when reviewerAlreadyConfirmed ->
             // A second PERFECT is frequently a tool-only provider step. Once the
             // witness is Confirmed, finish the physical reviewer run so
             // OrchestratorHost.reverify and Manager `join` observe completion.
             completeReviewerOrAssistant true |> ignore
-            Task.CompletedTask
+            AsyncSupport.completedTask ()
         | TurnInProgress ->
             // The Host settled a provider step with tool calls only. Interaction
             // repair continues the Logical Run; this is never provider fallback.
             if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
                 sendRepair sessionPort eventPort journal turn "\u200B" "zero-width"
             else
-                Task.CompletedTask
+                AsyncSupport.completedTask ()
         | TurnNeedsContinuation _ when reviewerAlreadyConfirmed ->
             completeReviewerOrAssistant true |> ignore
-            Task.CompletedTask
+            AsyncSupport.completedTask ()
         | TurnNeedsContinuation _ ->
             // Absorb text and reasoning into session-wide A even though this turn is
             // not completable, then ask for the missing report. Still not fallback.
@@ -238,13 +238,13 @@ module TurnCompletionProgram =
             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
             |> ignore
 
-            Task.CompletedTask
+            AsyncSupport.completedTask ()
         | TurnFailed error -> continueAfterProviderFailure sessionPort eventPort journal turn error
         | TurnCompleted ->
             let wasAborted = completeReviewerOrAssistant reviewerAlreadyConfirmed
 
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
-                Task.CompletedTask
+                AsyncSupport.completedTask ()
             else
                 match turn.AgentRole with
                 // REVIEW-003: a first PERFECT must enter its causal confirmation
@@ -277,7 +277,7 @@ module TurnCompletionProgram =
                             turn.ProviderRun
                             treeHash
                         :> Task
-                    | HostReviewGuard.ReviewGuardConfirmed -> Task.CompletedTask
+                    | HostReviewGuard.ReviewGuardConfirmed -> AsyncSupport.completedTask ()
                     // ORCH-008 / REVIEW-007 fail closed: an unavailable guard must not
                     // let a Manager finish unreviewed. Reported as a terminal failure
                     // rather than raised, because raising here escapes into whichever
@@ -288,5 +288,5 @@ module TurnCompletionProgram =
                             (TerminalOutcome.Failed(sprintf "Review guard unavailable: %s" reason))
                         |> ignore
 
-                        Task.CompletedTask
-                | _ -> Task.CompletedTask
+                        AsyncSupport.completedTask ()
+                | _ -> AsyncSupport.completedTask ()

@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Journal
@@ -105,7 +106,7 @@ module HostSignalBootstrap =
                         | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
 
             match journal with
-            | None -> Task.CompletedTask
+            | None -> AsyncSupport.completedTask ()
             | Some durable ->
                 let observed =
                     messages
@@ -113,11 +114,11 @@ module HostSignalBootstrap =
                     |> List.map (fun message -> ProviderRunIdentity.create message.Id)
 
                 if List.isEmpty observed then
-                    Task.CompletedTask
+                    AsyncSupport.completedTask ()
                 else
                     match HostCompactionGate.reanchorObserved durable sessionId observed with
                     | Ok None
-                    | Ok(Some _) -> Task.CompletedTask
+                    | Ok(Some _) -> AsyncSupport.completedTask ()
                     // A failed append here is not fatal to the turn that just
                     // completed. PERSIST-003's fail-closed path already owns a poisoned
                     // journal; what this must not do is throw inside the reconcile loop
@@ -125,7 +126,7 @@ module HostSignalBootstrap =
                     // this session.
                     | Error reason ->
                         HostCompactionGate.logReanchorFailure sessionId reason
-                        Task.CompletedTask
+                        AsyncSupport.completedTask ()
 
         let reconciler =
             ReconcileSupervisor.Supervisor(
