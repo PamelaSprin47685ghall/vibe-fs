@@ -78,9 +78,12 @@ assistant message 在 transform 之前已经创建并持久化。
 这个文件现在只讲一种语义吗？
 这条修改是在实现条款，还是在维护过渡态？
 这个字段是物理世界真实存在的事物，还是程序接下来去哪的信息？
+这个字段真的载过数据吗——去量，不要读代码推理？
 ```
 
 第三问来自 ARCH-001。后者一律删除。
+
+第四问是本仓库反复吃亏的地方，量法见 §4 末尾。
 
 ### 规范与状态的唯一位置
 
@@ -92,6 +95,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | `STATUS/design-script-forest.md` | canary 剧本森林重建设计定稿 |
 | `STATUS/design-context-recovery.md` | 失败驱动上下文恢复设计定稿归档（含设计演化与代价推理） |
 | `STATUS/blocker-HOST-006.md` | SSOT 例外 1 定案：手工 compaction 不可阻断的逻辑矛盾与两层解法 |
+| `SSOT/01.md` 的 `ARCH-009` | SSOT 例外 2：有界并发与共享原语契约，为 `mapBounded` 补的条款 |
 | `STATUS/evidence/` | 机器输出与 Host 行为证据，绑定 commit |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
@@ -127,10 +131,13 @@ assistant message 在 transform 之前已经创建并持久化。
 
 删除旧机制会留下功能空洞，这些空洞本身合规，但要记账，不要当成 bug 去"修好"：
 
-- X 前缀替换当前不生效。`CompanionHost.TransformRaw` 只做 COMPANION-005 累积并原样
-  返回 `messages`。新链路（探针提交 → `XPrefixProjection` → 注入）尚未接进 transform
-- `CompanionDelta.jsonDelta` 仍在 `Companion.Submit` 路径上。包 X3 的 TOML delta
-  与三级 chunker 已实现但未接线，属包 X4 后半
+- `CompanionDelta.jsonDelta` 仍在 `Companion.Submit` 路径上（`Companion.fs:104`、
+  `CompanionProgram.fs:27`）。包 X3 的 TOML delta 与三级 chunker 已实现但未接线
+- `CompanionHost.TransformRaw`（`CompanionHost.fs:148`）只做 COMPANION-005 累积并原样
+  返回 `messages`。这不是缺口而是 CTX-002 的正确形态：transform 看不到 attempt 结局，
+  恢复决策只能在 `AttemptPlanner.plan` 里做
+
+包 X9 已删除全部上下文估算层（见 §3 第四条的形态表），勿重新引入。
 
 ---
 
@@ -193,6 +200,26 @@ assistant message 在 transform 之前已经创建并持久化。
 `buildAttemptExecutionProfile` 就这样在 `PROMPT-008` 标着 `CONTRADICTS` 的情况下
 存活到包 X8 才拿到第一个真实调用点（`AttemptPlanner.plan`）。
 
+### 判死代码要量，不要读
+
+删字段之前先证明它载过数据。读代码只能证明「有人写了它」，量运行时才能证明
+「它到达过判断」。三种已实证的死法，各自要不同的量法：
+
+| 死法 | 症状 | 量法 |
+|------|------|------|
+| 零调用点 | 唯一入口无人调用 | `architecture-gate` 双向检查 |
+| 有写入无读取 | 字段被赋值，读侧分支从不进入 | 在读点插桩计数，跑全部剧本 |
+| 有读取无数据 | 读到的永远是 `undefined`，比较短路 | 在比较点打印两侧实际值 |
+
+第三种最隐蔽，因为代码读起来完全合理。`parentSession` 是标本：16 个剧本声明它、
+`matchesExpectation` 认真比较它，但唯一数据源是 provider 从不接收的
+`__testkitHeaders`，而比较又经 `sessionBindings` 解析一个从未绑定的别名——
+两条链各自都断。插桩五分钟得到的结论，读代码读不出来。
+
+推论：发现一处死代码后，先量清它死了几重，再决定替代物。只修好其中一重会造出
+更精巧的死代码。`parentSession` 的第一版修法是给可达性加不动点边，那条边在实测中
+遍历的是空图。
+
 ---
 
 ## 5. 验证阶梯
@@ -211,19 +238,22 @@ assistant message 在 transform 之前已经创建并持久化。
 命令：
 
 ```bash
-npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs
+npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs + toml
 npm run gate:shock             # 第 0 层：旧符号灭绝 + 单一写入口（休克期专用）
 
 dotnet build next/Wanxiangshu.Next.fsproj    # 生产 .NET
 npm run build                                # 生产 Fable → build/next
 
 npm run test:mjs               # 第 1–3 层（mjs，无编译步骤）
-npm run test:unit              # test:mjs + 残余 F# 套件（包 T 完成后收缩为 test:mjs）
 npm run test:harness           # gate-testkit：mock 森林与隔离自检
 npm run test:e2e:p0            # 单轮 canary
 npm run test:e2e:p0:three      # P0 三轮
 npm run test:release           # gate:static → build → unit → harness → P0×3
 ```
+
+`test:unit` 现在只是 `test:mjs` 的别名（包 T-5 删掉 `tests-next/` 后残余 F# 套件归零）。
+`gate:toml`（`scripts/toml-format.mjs`）是包 K 新增的第 0 层门禁：剧本 TOML 必须与
+formatter 输出逐字节一致。
 
 `test:mjs` 拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
 
@@ -275,25 +305,65 @@ tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
 测试名直接引用条款：`FALLBACK_003_duplicate_signal_advances_once`。
 粒度原则：入口粗，覆盖细。一个测试只验证一条因果链。
 
+### dotnet build 绿不代表 JS 能加载
+
+Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证击穿过生产入口：
+
+`Task.CompletedTask` 编译成对 `get_CompletedTask` 的引用，而 Fable 不导出该 getter，
+于是 `build/next/OpenCode/Plugin.js` 在 import 时就抛错——整个插件根本加载不了，
+而 F# 侧毫无警告。用 `next/Kernel/AsyncSupport.fs` 的 `completedTask()` 代替。
+
+`[<Emit>]` 模板必须匹配 Fable 实际生成的元数。多参函数在 Fable 输出里可能是柯里化链
+也可能是单个多元箭头，模板押错一边就在每次 Host 调用时抛异常。三个 Host hook
+（`experimental.chat.messages.transform`、`experimental.session.compacting`、
+`experimental.compaction.autocontinue`）曾同时踩中，现由 `PluginHostInterop.fs` 的
+`curriedHook` / `pairedHook` 两个 emit 助手分开表达。
+
+推论：改动任何 `[<Emit>]` 或 `Plugin.fs` 导出面之后，必须真的 `import` 一次发布产物。
+`tests-mjs/Plugin/host-hooks.test.mjs` 以 fixture 完备性门禁锁住 hook 面，
+新增 hook 未登记会失败。
+
 ## 7. Canary 剧本与 fixture
 
-设计定稿 `STATUS/design-script-forest.md`。当前实现严重偏离，由工作包 K 整体重建；改剧本前必读该文档。
+设计定稿 `STATUS/design-script-forest.md`。工作包 K 正在整体重建；改剧本前必读该文档。
+
+已落地的构件（`testkit/opencode/`）：
+
+| 文件 | 职责 |
+|------|------|
+| `runtime-key.js` | `(lane, turn, step, kind)` 纯函数 + 最长前缀唯一查找 |
+| `delivery-plan.js` | 故障与内容正交，物理投递计数 |
+| `cold-boundary.js` | 只认显式声明的冷边界 |
+| `scenario-schema.js` | TOML 编译器，8 个根键 + 24 个 flow 动词白名单 + 载入期校验 |
+| `legacy-fields.js` | 20 个退役字段，出现即拒绝载入 |
+| `scripts/toml-format.mjs` | 行式 formatter，`gate:toml` 强制逐字节一致 |
 
 内容层（VERIFY-003）：
 
 - 剧本是 mock 的压缩表示法。压掉重复的对话前缀，不压掉语义
 - 一个 scenario 恰好一个 TOML 文件，Host 启动前一次性静态加载。禁止运行期换剧本
-- 运行时键 `(lane, turn, step)` 三者皆为请求的纯函数。`step` = 该 user 消息之后的
-  assistant 消息条数，客观存在于请求里，不需要 mock 记账
+- 运行时键四个分量皆为请求的纯函数。`step` = 该 user 消息之后的 assistant 消息条数，
+  客观存在于请求里，不需要 mock 记账；`kind` 区分 chat 与 title
 - 最长前缀唯一命中；命中 0 条 fail closed；同长度冲突在载入期拒绝
 - 禁止用 specificity 打分、子串长度、路径下标消歧
 - 书写形式是对话（TOML），前缀索引是编译产物。作者不写前缀数组
 
+死边检查与 `internal`：
+
+- 载入期计算可达性，不动点而非单遍——fork 链是真实的（Manager → Coder → 其子会话），
+  可达边是已达 turn 的 `respond.args.prompt`
+- prompt 由生产内部合成的 lane 用 `internal = true` opt out。它们不在可达性的论域内，
+  不是「需要更聪明的可达性」。当前两例：Blogger（`CompanionHostBlogger.fs:72,77,118`）、
+  Executor map 子会话（`ExecutorSummarize.fs:95`）
+- `internal = false` 被拒绝。它读起来像「已检查且可达」，是该字段含义的反面
+- title turn 不需要特例：title 请求携带被标题的对话，普通前缀规则即可覆盖
+
 故障层：
 
 - provider 失败、SSE 中断、超时属于传输层，与内容正交。允许计数，因为物理投递次数
-  真实可数
+  真实可数。`attempts` 一基，因为它数的是投递而非数组下标
 - 禁止用「破坏内容幂等」表达失败（例如对 error 删除 seal 缓存）
+- 重试必须重选同一条内容边——这是「内容是请求的纯函数」为真而非口号的判据
 
 冷边界：
 
@@ -307,6 +377,10 @@ tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
 - 禁止从 tools 形状猜 CanonicalRole、从 prompt 正文猜 Agent/tier、嗅探自定义 header
 - 禁止在生产 prompt 里埋测试专用标记
 - 角色由 `AttemptExecutionProfile` 唯一决定（PROMPT-008）
+- harness 记账是单向的：`__testkitHeaders` 已退役，剧本只能匹配 provider 真正收到的东西。
+  `parentSession` 同批退役（实测双重死代码，见 §4 末尾）
+- fixture 缓存键必须用语义投影，不能用 wire 投影。用 wire 会把同一语义对话的不同
+  ID 当成不同 fixture，缓存永不命中而看起来仍然工作
 
 投影分工（VERIFY-007）：
 
@@ -331,6 +405,9 @@ tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
 - Projection 查询不扫描完整历史，必须 O(1) 积分状态（PERSIST-008）
 - Pre-0.5.0 journal 不猜测迁移，启动发现旧 schema 直接失败（PERSIST-005）
 - 外部副作用走 `DurableEffectRequested → 幂等执行 → DurableEffectAccepted`（PERSIST-009）
+- 序列化时间戳必须归一化到 UTC offset（PERSIST-001）。否则同一事实在不同时区产出不同
+  字节，快照指纹与跨机重放全部失效。`test:mjs` 跑三个时区正是为了逼出这一类
+- Projection 的 create 类操作必须幂等（`createJob` 曾无条件覆盖，恢复重放会抹掉进度）
 
 ---
 
