@@ -14,7 +14,9 @@
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
 | 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）。完成指删除与领域实现，不含接线；X10 被接线空洞阻断，见「包 K8f 摸底」 |
 | 6 | 休克三 + 退火二：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5e；386 测试三时区全绿，证据 `evidence/post-anneal2/`） |
-| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
+| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 完成（K1–K11；15 剧本 TOML，`script-loader.js` 与 18 个 JSON 删，driver 改接 `ScenarioRuntime`）。K8f 阻断：X 恢复链零生产调用点，见「包 K8f 摸底」 |
+| 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W6 完成（254 门禁用例、404 mjs 测试全绿）；W7 进行中 |
+| 6.7 | 运行时合成文本 TOML 记法（包 N，SSOT/13 → ARCH-010） | gate:static + canary | 未开始。排序裁决见「包 N」：N 拆两段，fork surface 段（N3）必须先于 canary 修红 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
 
 阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在写测试前定稿。
@@ -919,15 +921,15 @@ T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs
 
 ```text
 W1  集中所有时间常量，建立单一来源；门禁禁止字面量超时                       已完成
-W2  canary 清单单一事实来源，数量从清单派生
-W3  删除伪门禁，静态检查路径判据与实际目录对齐
+W2  canary 清单单一事实来源，数量从清单派生                                   已完成
+W3  删除伪门禁，静态检查路径判据与实际目录对齐                               已完成
 W4  重建单测运行器的因果推进门禁：以「距上次判决的静默时长」为主判据，
     verdict 投喂、stdout/stderr 不续期、静默即 SIGKILL 子进程组并转储诊断。
     并有测试证明：(a) 未接线或错误接线（噪声续期）会红；(b) 超时测试被遗忘
-    而不污染下一个测试的归因；(c) 干净结束不等满静默窗口
-W5  启动阶段因果判据，消除只有 wall-clock 的时间窗
-W6  watchdog 重写：语义投喂、背景不续期、诊断完整、不持有事件循环
-W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试
+    而不污染下一个测试的归因；(c) 干净结束不等满静默窗口                     已完成
+W5  启动阶段因果判据，消除只有 wall-clock 的时间窗                           已完成
+W6  watchdog 重写：语义投喂、背景不续期、诊断完整、不持有事件循环           已完成
+W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试         进行中
 ```
 
 W1 落地记要。26 个常量进 `testkit/opencode/time-budget.js`，`scripts/budget-gate.mjs`
@@ -952,6 +954,27 @@ W1 落地记要。26 个常量进 `testkit/opencode/time-budget.js`，`scripts/b
 `SUITE_TIMEOUT_MS` 与 `PER_TEST_TIMEOUT_MS` 保名保值。W4 改变前者含义时才改名——此刻改名
 等于宣称一个尚未发生的修复。值钉断言诚实标注为 DETECTION 而非 PREVENTION：调大数字永远是
 合法代码，静态不可阻止；能安排的只是「调大必然可见」。
+
+W5 落地记要。启动窗口拆成 6 级因果阶梯（`testkit/opencode/readiness.js`），每级独立预算，
+到达即重新计时；总启动时长因此无界，被界住的是静默。`CANARY_READY_MS` 保留为总兜底，即
+条款允许 wall-clock 值承担的角色。阶梯读子进程本来就在打的计时行，不新增门禁专用证据。
+
+两处实测缺陷，各有红证：
+
+```text
+阶段顺序押反    第一版按「先备工作区、再起 provider」的自然读法排，而
+                scenario-parallel.js 实际是 provider.start@88 先于 prepareWorkspace@94。
+                observe 只在下一个期待标记上前进，押反即停在 1/6，每条 canary 都在
+                阶段预算上失败而宿主完好。门禁因此从两个源文件数出各标记的打印行号
+                再比顺序，不拿顺序与自身副本对拍。倒置实测 3 红
+喂 chunk 而非   管道读边界落在哪里由缓冲区决定，被切断的标记在两次读里都不出现，
+累积缓冲        症状同样是健康启动耗尽阶段预算。observe 单调，重放整段缓冲无代价。
+                断开实测 1 红
+```
+
+`CANARY_MAX_PARALLEL` 从 `time-budget.js` 迁至 `canary-manifest.js`：它是并发计数不是时长。
+W5 先放进了预算表，被预算表自己的整表钉死判红——契约为「全部 wall-clock 兜底的单一来源」
+的表若能装并发计数，该契约就退化成「W5 需要的常量」。
 
 W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没有测试证明能力真实存在。`Assert.fs` 的空 `resetHeartbeat` 能存在这么久，正是因为没有任何测试断言心跳被投喂。
 
@@ -1317,6 +1340,64 @@ K11  森林变异自检：四类错误响应必须被拒绝（新增）
 ```
 
 K1 提前到第一步的理由：它决定 K2 的前缀比较用哪个投影。先做 K2 会写出一个基于 testkit 私有规范化的前缀索引，K1 完成后整体重写。
+
+### 包 N：运行时合成文本的 TOML Instruction/Data 记法（SSOT/13 → ARCH-010）
+
+| 项 | 值 |
+|----|----|
+| 条款 | 新增 ARCH-010；连带修订 CTX-013、PROMPT-001 交叉引用、SSOT/99 术语 |
+| 动议 | `PENDING/13-Toml方案.md`（已通过审阅；合入前不是规范，不得据以改生产字节） |
+| 核心原则 | instruction 用 comment，data 用 field；instruction 永远在前 |
+| 范围 | 运行时构造、包装或注入并作为文本进入 LLM 会话上下文的合成消息、工具返回文本及其他合成 payload |
+| 明确排除 | system prompt、developer prompt、角色 prompt assets、人类原始消息、模型原始输出、provider 原生结构 |
+| 生产 | 将改动（prompt 组合面） |
+
+本包与包 K 的关系决定它的排期。包 K 把 canary 剧本的 TOML 声明写定；包 N 改写这些声明所匹配的
+生产合成文本字节。两者触碰同一批 scenario 声明，故顺序是：
+
+```text
+N 的 fork surface 段（N0–N4）  先于 canary 修红
+canary 11 红 → 16/16           随后
+N 的其余 surface 段（N5–N6）   canary 全绿之后
+```
+
+若先修红再迁 surface，同一批 turn 声明要按旧字节写一遍、再按新字节重写一遍。而当前多数红灯的
+同一根因——`HostForkRuntimeFork.fs:196` 的条件信封两形态无公共前缀——正是 N3 要迁的
+fork/child-instruction surface：ARCH-010 的 instruction-first 保证恰给条件信封一个它现在没有的
+稳定前缀（`# instruction` 恒在最前，有无 parent work record 都命中）。先修红等于先做一个会被 N3
+重写的修法。
+
+N0 规范先行是硬前置（动议 M0）：任何生产 prompt 字节不得在 ARCH-010 进 SSOT/01 之前改动。
+
+#### 子步骤
+
+```text
+N0  规范先行：ARCH-010 写入 SSOT/01.md；CTX-013 改「data body 不输出 comment，
+    可选 instruction 只能位于最前」并删 Blogger 本地 ''' 多行；PROMPT-001 加
+    「文本形态非 authority 证据」交叉引用；SSOT/99 五术语
+N1  确认 canonical TOML 字符串 writer 唯一 owner，收敛多处 delimiter/缩进/转义
+N2  建立 runtime textual surface inventory，四分类
+    NativeSystemPrompt / HumanRaw / ModelNative / RuntimeSyntheticToml，门禁固定该清单
+N3  fork/child-instruction surface 迁到 ARCH-010 形态；fork 信封条件包裹在此定案
+N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得为顶层 comment、
+    instruction-first、data 开始后无顶层 comment、无 '''
+─── canary 修红（11 → 16/16）与退火三在此之后 ───
+N5  其余 synthetic surface 迁移：Blogger delta 优先，再 continuation / repair / guard /
+    nudge / review challenge / conflict / companion memory / executor / tool result / summary input
+N6  更新依赖最终字节的 fixture / golden / payload digest / byte-limit 测试
+```
+
+#### 编号冲突（合入 14/15 时裁决，不在本包）
+
+`PENDING/13-Toml方案.md` 自称「SSOT/13 修正动议」，正文却要求把主规范落为 SSOT/01 的
+ARCH-010，不新建 SSOT/13 文件。`PENDING/14-Predict方案.md` 引用的「SSOT/13 — Projection
+Algebra」在 PENDING 中不存在。故本包不占用 SSOT/13 编号；14（STRENGTH-）与 15（ENFORCER-）
+合入时须先裁决 Projection Algebra 是否独立成 SSOT/13、还是同样落为 SSOT/01 条款。
+
+#### 完成定义
+
+动议第 18 节的 20 项清单。其中「fixtures / golden / canary 已更新」与「完整 release gate 通过」
+两项与退火三共用验收，不重复设立。
 
 ### 包 X：失败驱动上下文恢复
 
