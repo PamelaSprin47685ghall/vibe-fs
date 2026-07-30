@@ -973,9 +973,52 @@ build/next/Domain/ProviderProjection.js
 
 而 `testkit/opencode/tests/manager-tool-contract.mjs:7` 已经直接 `import ... from '../../../build/next/OpenCode/SpikePlugin.js'`——testkit 引用生产产物是既有模式，不是本包引入的新风险。
 
-因此 `sealProviderVisible` / `isProviderVisiblePrefix` 整体删除，testkit 改为 import 生产投影。对拍使漂移可被发现，单一来源使漂移不可能发生；后者是严格更强的形态，且顺带把 VERIFY-007 从 `PARTIAL` 推到底——该条现存的差距措辞正是「testkit 侧仍是单一 `sealProviderVisible` 同时承担两种相等性」。
-
 保留一处 testkit 私有：`estimatePromptTokens`。它给 mock 的 usage 字段编造 token 数，而 mock 扮演的是 provider，provider 报告 token 用量是真实行为。CTX-001 禁止的是插件观察上下文容量，不是 provider 报告它。此处登记为必须守住的边界：该函数不得出现在 `next/` 任何路径上（当前实测 0 处）。
+
+###### 修订一的修订：直接复用会让门禁变成恒真（实测）
+
+上面那段推理漏了一件事，实测才发现。把 OpenAI wire body 喂给生产的 `Projection.decodeRequest`：
+
+```text
+两条完全不同的 user 内容           渲染结果相同
+renderWire 输出                    messages 全部 "parts":[]
+semanticallyEqual(A, B)            true
+```
+
+原因是两种 wire 格式不同，而生产解码器只认其中一种：
+
+```text
+Host raw（生产 transform 边界）   parts: [{ type: "text", text: "..." }]
+OpenAI HTTP（mock 收到的）        content: "...", tool_calls: [{ id, function }]
+```
+
+`decodePart` 按 `type` 字段分派（`text` / `reasoning` / `tool-call` / `tool-result` / `file`）。OpenAI 消息没有 `parts` 数组，于是每条消息解出零个 part，只剩 `Role`。角色序列相同的任意两个请求因此语义相等。
+
+如果 K1 按原计划落地，剧本匹配与前缀封印会同时变成恒真：每条边命中每个角色序列相同的请求。这正是设计文档第十四节判定为最坏结果的那件事——「一个能对错误实现给出绿灯的验证装置，比没有验证装置更危险」。而它不会以失败的形式出现，canary 会全绿。
+
+正确的切分是第三种，两个原方案都不对：
+
+```text
+原设计     两套完整规范化 + 对拍          比较逻辑可漂移
+修订一     删掉 testkit 那套，直接复用     格式不同，门禁恒真
+修订一'    testkit 只保留 wire 解码器，
+           所有提问复用生产投影            ← 采用
+```
+
+即：`OpenAI wire body → ProviderWireProjection` 是一个 adapter，属 VERIFY-005 明确允许 testkit 拥有的那类代码（外来 wire 格式的解码）；而 `toSemantic` / `renderSemantic` / `semanticallyEqual` / `isAppendOnlyPrefix` / `sealDigest` 一律来自生产。类型与提问单一来源，解码器按 wire 格式各有一个——因为它们解码的确实是两种不同的字节格式。
+
+`WirePart` 的五个构造子（`WireText` / `WireReasoning` / `WireToolCall` / `WireToolResult` / `WireMedia`）可从 mjs 按 case 名构造，与 `tests-mjs/domain.mjs` 的 `unionCase` 同一手法，所以 adapter 不需要生产侧新增任何出口。
+
+K1 因此追加一项验收，且这一项是本步的主要判据：
+
+```text
+K1-a  testkit adapter：OpenAI wire body → ProviderWireProjection
+K1-b  删除 sealProviderVisible / isProviderVisiblePrefix，改用生产投影提问
+K1-c  反恒真测试：两条不同 user 内容必须语义不等；两条相同必须相等
+      并覆盖 tool_calls / tool 结果 / 多模态，各自内容不同则不等
+```
+
+K1-c 不是补充测试，是 K1 存在的理由。 没有它，K1 的「成功」与「把门禁变成恒真」在所有现有反馈下不可区分。这也修正了修订四（K11 变异自检）的排期判断：变异自检不能全部推到最后，涉及投影替换的那一类必须与替换同一步落地。
 
 ##### 修订二：删除 `loadScripts` 顺带消灭三个文件，不是「合并」
 
