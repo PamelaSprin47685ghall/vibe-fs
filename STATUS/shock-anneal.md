@@ -12,7 +12,7 @@
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（`SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)） |
 | 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
-| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）；X10 随包 K |
+| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）。完成指删除与领域实现，不含接线；X10 被接线空洞阻断，见「包 K8f 摸底」 |
 | 6 | 休克三 + 退火二：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5e；386 测试三时区全绿，证据 `evidence/post-anneal2/`） |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
@@ -1303,6 +1303,44 @@ X 前缀替换不生效。`Domain/XPrefixProjection.fs` 与 `Domain/AttemptPlann
 的探针时，X 看到原始历史（SSOT/12「无 snapshot → 原始历史」）。
 
 接线点属 X10 之前的一步，需要 attempt 结局能到达 transform 边界。
+
+##### 包 K8f 摸底：X10 被这个空洞阻断（实测）
+
+包 K8f 计划写 X-A 至 X-D 四条 canary 验收剧本。摸底测量后判定不可写，原因不是剧本
+难写，而是没有可观察的生产行为：
+
+```text
+模块 / 事实                生产调用点或写入方    第 1 层 mjs 测试
+XPrefixProjection          0                     有
+AttemptPlanner             0                     有
+PrefixProbeSelection       0                     有
+PrefixProbeSubmitted       0                     有
+PrefixProbePromoted        0                     有
+BlogSquashCommitted        0                     有
+```
+
+三个模块无任何 `open` 或限定名引用（注释除外），三个事实无 `AgentFact.<Name>` 构造点。
+`RecoverySlot` 唯一的引用来自 `AttemptPlanner.fs` 自身，而它本身零调用点——整条链是
+一个自洽但悬空的岛。
+
+canary 是第 4 层：驱动真实 Host 并断言生产行为。链条未接线时，X-A–X-D 只有两种下场：
+立刻红（什么都不发生），或者写成不断言任何东西——即包 K8d 刚淘汰的 `companion-cache`
+同类物。在淘汰它的下一个包里重造一个，是本次迁移最该避免的事。
+
+因此 K8f 的前置不是剧本，而是接线，属包 X 而非包 K：
+
+```text
+X4 后半   Submit 链路换币 ProjectionSnapshot = string → SemanticMessage list
+          （否则 Y 收不到 TOML delta，jsonDelta 无法删）
+X-wire    attempt 结局到达恢复决策点：失败 attempt → AttemptPlanner.plan
+          → 探针提交（PrefixProbeSubmitted）→ Host 接受后提升（PrefixProbePromoted）
+          → 恢复槽内 squash（BlogSquashCommitted）
+```
+
+在此之前 K8f 保持 pending 并标注阻断原因，不以「写了四条剧本」充作完成。包 K 的其余
+部分（K9–K11、manager-tool-contract）不依赖这条链，先行。
+
+这也修正了总表第 5 行的措辞：X0–X9 完成指的是删除与领域实现完成，不含接线。
 
 #### X8 必须落地的门禁：零调用点的唯一构造函数
 
