@@ -10,8 +10,13 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { terminateTree } from "../testkit/process-lifecycle.js";
 import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
-import { CANARY_TIMEOUT_MS, CANARY_READY_MS } from "../testkit/opencode/time-budget.js";
-import { CANARY_TESTS, CANARY_SUFFIX } from "../testkit/opencode/canary-manifest.js";
+import {
+  CANARY_READY_MS,
+  CANARY_TIMEOUT_MS,
+  READINESS_STAGE_MS,
+} from "../testkit/opencode/time-budget.js";
+import { ReadinessLadder, READINESS_STAGES } from "../testkit/opencode/readiness.js";
+import { CANARY_TESTS, CANARY_SUFFIX, CANARY_MAX_PARALLEL } from "../testkit/opencode/canary-manifest.js";
 
 function parsePositiveInt(value, fallback, name) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -41,9 +46,14 @@ const canaryProcessTimeoutMs = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, C
 // Full-suite parallel isolation: all canaries share one pool. Launch order is
 // shuffled each iteration. Canary N starts only after canary N-1 emits
 // `[setupScenario] ready` (event-driven bark). No index-based fixed sleep.
+// Bounded, not the whole suite. `Promise.all` over every canary is not an ARCH-009 violation — that
+// clause scopes to the business layer and this is harness tooling — but the clause's reason is
+// attributed to VERIFY-004, and an unbounded fan-out over fifteen OpenCode processes manufactures
+// exactly the resource contention that makes 「慢」 indistinguishable from 「死」. The startup
+// ladder's per-stage budgets only mean something under a bound.
 const MAX_PARALLEL = parsePositiveInt(
   process.env.MAX_PARALLEL_CANARIES,
-  CANARY_TESTS.length,
+  Math.min(CANARY_MAX_PARALLEL, CANARY_TESTS.length),
   "MAX_PARALLEL_CANARIES",
 );
 const activeCanaryPids = new Set();
@@ -93,12 +103,33 @@ function runCanary(file, onBarkSignal) {
       }
     };
 
-    const readyTimer = setTimeout(() => {
-      if (!settled && !barked) {
+    // The startup ladder. Each stage the child reports re-arms this; silence inside a stage is what
+    // fails, not total startup time (W5). `CANARY_READY_MS` survives below as the total 兜底, which
+    // is what the clause permits a wall-clock value to be.
+    const ladder = new ReadinessLadder();
+    let readyTimer;
+    let stageStall = null;
+
+    const armStage = () => {
+      clearTimeout(readyTimer);
+      readyTimer = setTimeout(() => {
+        if (settled || barked) return;
+        stageStall = ladder.describe();
         barkTimeout = true;
         readyGateFailures.add(file);
         emitBark(true);
-      }
+      }, READINESS_STAGE_MS);
+    };
+    armStage();
+
+    // Total ceiling for the climb, so a child that trickles one stage per budget forever is still
+    // bounded. Distinct from the per-stage criterion and never the primary one.
+    const readyCeiling = setTimeout(() => {
+      if (settled || barked) return;
+      stageStall = `${ladder.describe()} (total startup ceiling)`;
+      barkTimeout = true;
+      readyGateFailures.add(file);
+      emitBark(true);
     }, CANARY_READY_MS);
 
     const timer = setTimeout(async () => {
@@ -129,21 +160,27 @@ function runCanary(file, onBarkSignal) {
       });
     }, canaryProcessTimeoutMs);
 
-    const checkBark = (chunk) => {
-      const str = chunk.toString();
-      if (!barked && /(?:^|\r?\n)\[setupScenario\] ready(?:\r?\n|$)/.test(str)) {
+    // Fed the ACCUMULATED buffer, not the chunk. Chunk boundaries fall wherever the pipe buffer
+    // happens to break, so a marker split across two reads appears in neither one — and the symptom
+    // is the stage budget expiring on a healthy startup, which reads as a hang. `observe` is
+    // monotonic and re-reading a marker it already consumed advances nothing, so replaying the whole
+    // buffer each time is free and removes the boundary as a variable.
+    const checkBark = (accumulated) => {
+      if (!barked && ladder.observe(accumulated).length > 0) armStage();
+
+      if (!barked && /(?:^|\r?\n)\[setupScenario\] ready(?:\r?\n|$)/.test(accumulated)) {
         emitBark(false);
       }
     };
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
-      checkBark(chunk);
+      checkBark(stdout);
     });
 
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
-      checkBark(chunk);
+      checkBark(stderr);
     });
 
     child.on("exit", (code, signal) => {
@@ -153,6 +190,7 @@ function runCanary(file, onBarkSignal) {
       settled = true;
       clearTimeout(timer);
       clearTimeout(readyTimer);
+      clearTimeout(readyCeiling);
       if (child.pid) {
         recordExit(child.pid);
         activeCanaryPids.delete(child.pid);
@@ -168,6 +206,7 @@ function runCanary(file, onBarkSignal) {
         barkTimeout,
         processTimeout: false,
         exitedBeforeBark,
+        stageStall,
       });
     });
   });
@@ -234,8 +273,12 @@ async function main() {
         let failReason = `code ${r.code}, signal ${r.signal}`;
         if (r.processTimeout) failReason = `process timeout (>${canaryProcessTimeoutMs}ms)` + (r.barked ? " after ready" : " before ready");
         else if (r.exitedBeforeBark) failReason = "exited before [setupScenario] ready";
-        else if (readyGateFailures.has(r.file)) failReason = `ready timeout (failed to emit exact [setupScenario] ready within ${CANARY_READY_MS}ms)`;
-        else if (r.barkTimeout) failReason = `ready timeout (failed to emit [setupScenario] ready within ${CANARY_READY_MS}ms)`;
+        // Names the stage, not just the outcome. 「诊断必须包含「最后一次进展是什么」」 — the old
+        // message said only that ready never arrived, which is true of every startup failure and
+        // therefore points at none of them.
+        else if (readyGateFailures.has(r.file) || r.barkTimeout) {
+          failReason = `startup stalled (${r.stageStall ?? `no stage reached, ${READINESS_STAGES.length} expected`})`;
+        }
         console.error("  ✗ " + r.name + " FAILED (" + failReason + ")");
         if (r.stdout) console.error("── stdout ──\n" + r.stdout);
         if (r.stderr) console.error("── stderr ──\n" + r.stderr);

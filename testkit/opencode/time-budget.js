@@ -64,6 +64,20 @@ export const DIAGNOSTIC_RACE_MS = 3000;
 export const CANARY_READY_MS = 10000;
 
 /**
+ * How long one startup STAGE may be silent before the canary is declared stuck (W5).
+ *
+ * Replaces `CANARY_READY_MS` as the startup criterion; that constant survives as the total 兜底.
+ * The clause forbids a window with no causal criterion inside it, and a flat ten seconds from spawn
+ * to ready was exactly that: a canary that bound its port and then wedged was indistinguishable
+ * from one still compiling.
+ *
+ * Per stage rather than per startup, so total startup time is unbounded in the same way a healthy
+ * canary's runtime is — what is bounded is silence. Four seconds because the slowest observed stage
+ * is `host.start`'s health wait, and it must survive fifteen canaries competing for one machine.
+ */
+export const READINESS_STAGE_MS = 4000;
+
+/**
  * Fallback ceiling for one canary process: the 兜底 VERIFY-004 permits so long as it is not the
  * primary criterion, which the watchdog is. Dual-script restart canaries need roughly 45s solo,
  * doubled for parallel host load. Still overridable through the CANARY_TIMEOUT_MS environment

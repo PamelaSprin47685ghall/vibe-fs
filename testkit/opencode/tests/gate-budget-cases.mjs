@@ -273,6 +273,7 @@ export const budgetCases = [
         WATCHDOG_TIMEOUT_MS: 2000,
         DIAGNOSTIC_RACE_MS: 3000,
         CANARY_READY_MS: 10000,
+        READINESS_STAGE_MS: 4000,
         CANARY_TIMEOUT_MS: 90000,
         WAIT_FACT_WINDOW_MS: 120000,
         FORK_COMPLETION_WINDOW_MS: 10000,
@@ -346,6 +347,13 @@ export const budgetCases = [
       assertTrue(
         budget.LITERAL_BUDGET_THRESHOLD_MS <= budget.WATCHDOG_TIMEOUT_MS,
         'the gate threshold must not exceed the tightest budget, or that budget itself would read as a poll slice',
+      );
+      // W5's ordering. `CANARY_READY_MS` was the startup criterion and is now the total 兜底; a
+      // per-stage budget at or above it would restore the flat window the clause forbids, since one
+      // stage could then consume the whole startup and nothing inside it would be a criterion.
+      assertTrue(
+        budget.READINESS_STAGE_MS < budget.CANARY_READY_MS,
+        'a stage budget at or above the total startup 兜底 makes the ladder decorative (VERIFY-004)',
       );
     },
   },

@@ -96,3 +96,21 @@ export function nonConformingCanaryNames(dir = CANARY_DIR) {
 
 /** The suite. `CANARY_TESTS.length` is the only cardinality; there is no second one to disagree. */
 export const CANARY_TESTS = readCanaryTests();
+
+/**
+ * How many canaries may be in flight at once (ARCH-009 by analogy).
+ *
+ * ARCH-009 scopes to the business layer, so `Promise.all` over the whole suite in a harness script
+ * is not a violation of it — recorded as such in `STATUS/shock-anneal.md`. But the clause's REASON is
+ * attributed to VERIFY-004, and an unbounded fan-out over fifteen OpenCode processes manufactures
+ * precisely the resource contention VERIFY-004 forbids masking with longer windows: failure then
+ * depends on machine load rather than on logic, and 「慢」 becomes indistinguishable from 「死」.
+ *
+ * Bounding it is what makes the startup ladder's per-stage budgets mean anything.
+ * `MAX_PARALLEL_CANARIES` still overrides for a machine that can take more.
+ *
+ * It lives here and not in `time-budget.js` because it is not a duration. W5 put it there and the
+ * budget gate's own pin refused it: a table contracted as 「全部 wall-clock 兜底的单一来源」 cannot
+ * hold a concurrency count without that contract decaying into 「W5 需要的常量」.
+ */
+export const CANARY_MAX_PARALLEL = 8;
