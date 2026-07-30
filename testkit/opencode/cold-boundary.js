@@ -33,25 +33,26 @@ export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side'];
 // ── declaration lookup ──────────────────────────────────────────────────────
 
 /**
- * Which boundary is declared AT this key, or `null`.
+ * Which boundary is declared AT this ENTRY, or `null`.
  *
  * A declaration names the point the break is expected at, so it is consumed by the
- * request that breaks the seal — not by the one before it. Keyed exactly like a
- * fault: prefix matching here would let one declaration excuse every later turn that
- * happens to start with the same words.
+ * request that breaks the seal — not by the one before it.
+ *
+ * Keyed by entry id for the reason `faultFor` documents: this compared the DECLARED turn
+ * text against the REQUEST text, and a declaration is a prefix, so the two matched only
+ * when the author wrote the utterance out in full. Every cold boundary in every real
+ * scenario was inert. `resolveEntry` has already chosen the declaration; asking again
+ * with a weaker comparison could only disagree with it.
  */
-export function boundaryFor(boundaries, key) {
-  const matches = (boundaries ?? []).filter(
-    (boundary) =>
-      (boundary.lane === undefined || boundary.lane === key.lane) &&
-      boundary.turn === key.turn &&
-      boundary.step === key.step,
-  );
+export function boundaryFor(boundaries, entry) {
+  if (entry === null || entry === undefined) return null;
+
+  const matches = (boundaries ?? []).filter((boundary) => boundary.entryId === entry.id);
 
   if (matches.length === 0) return null;
   if (matches.length > 1) {
     throw new Error(
-      `two cold boundaries declared for the same (lane, turn, step): ${matches.map((b) => b.kind).join(', ')}`,
+      `two cold boundaries declared for the same step '${entry.id}': ${matches.map((b) => b.kind).join(', ')}`,
     );
   }
   return matches[0];

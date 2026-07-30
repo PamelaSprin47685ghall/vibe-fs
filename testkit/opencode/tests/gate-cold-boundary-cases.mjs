@@ -40,7 +40,19 @@ const EPOCH_REBASED = body('test-model', [SYSTEM, user('[companion memory]'), us
 const decide = (previous, next, boundary = null) =>
   sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
 
+/** A SOURCE boundary, as an author writes it and `validateBoundary` checks it. */
 const at = (kind) => ({ kind, lane: 'fast-coder', turn: 'Round 2', step: 0 });
+
+/**
+ * A COMPILED boundary, as `boundaryFor` consumes it: it names the entry it governs.
+ *
+ * Deliberately a different shape from `at`. Sharing one fixture across both layers is what
+ * let the lookup cases assert against author-shaped input the runtime never sees — and hid
+ * that the lookup compared DECLARED text to REQUEST text, so every real boundary was inert.
+ */
+const compiledAt = (kind, entryId = 'round2') => ({ kind, lane: 'fast-coder', entryId });
+
+const entry = (id) => ({ id, lane: 'fast-coder' });
 
 export const coldBoundaryCases = [
   // ── the ordinary case ─────────────────────────────────────────────────────
@@ -161,41 +173,46 @@ export const coldBoundaryCases = [
   // ── declaration lookup is keyed, never inferred ──────────────────────────
 
   {
-    name: 'VERIFY-003 a boundary applies only to its own lane, turn and step',
+    name: 'VERIFY-003 a boundary governs exactly the step it names',
     fn: () => {
-      const boundaries = [at('epoch-switch')];
-      const lookup = (key) => boundaryFor(boundaries, key);
+      const boundaries = [compiledAt('epoch-switch')];
 
-      assertTrue(lookup({ lane: 'fast-coder', turn: 'Round 2', step: 0 }) !== null, 'exact key');
-      assertTrue(lookup({ lane: 'fast-coder', turn: 'Round 2', step: 1 }) === null, 'another step');
-      assertTrue(lookup({ lane: 'other', turn: 'Round 2', step: 0 }) === null, 'another lane');
-      assertTrue(lookup({ lane: 'fast-coder', turn: 'Round 3', step: 0 }) === null, 'another turn');
+      assertTrue(boundaryFor(boundaries, entry('round2')) !== null, 'the named step');
+      assertTrue(boundaryFor(boundaries, entry('round2step1')) === null, 'another step');
+      assertTrue(boundaryFor(boundaries, entry('round3')) === null, 'another turn');
+      assertTrue(boundaryFor(boundaries, undefined) === null, 'an unresolved request has no boundary');
     },
   },
 
   {
-    name: 'VERIFY-003 the turn is matched exactly, not by prefix',
+    name: 'VERIFY-003 a boundary cannot spread to a declaration sharing its prefix',
     fn: () => {
-      // A prefix-matched boundary would excuse every later turn that happens to start
-      // with the same words — one declaration silently covering a whole conversation.
-      const boundaries = [{ kind: 'epoch-switch', turn: 'Round', step: 0 }];
+      // A prefix-matched boundary would excuse every later turn that happens to start with
+      // the same words — one declaration silently covering a whole conversation.
+      //
+      // This used to be asserted by comparing text with `===`, and that was the defect: the
+      // lookup compared its DECLARED turn against the REQUEST turn, and a declaration is a
+      // prefix, so they matched only when the author wrote the utterance out in full. Every
+      // cold boundary in every real scenario was inert, and this case passed because its
+      // fixtures did exactly that.
+      //
+      // Naming the entry makes it structural: `resolveEntry` picks one declaration, and the
+      // boundary either names it or does not.
+      const boundaries = [compiledAt('epoch-switch', 'round')];
 
-      assertTrue(boundaryFor(boundaries, { turn: 'Round', step: 0 }) !== null);
-      assertTrue(
-        boundaryFor(boundaries, { turn: 'Round 2', step: 0 }) === null,
-        'a boundary must not spread by prefix',
-      );
+      assertTrue(boundaryFor(boundaries, entry('round')) !== null);
+      assertTrue(boundaryFor(boundaries, entry('round2')) === null, 'a boundary must not spread by prefix');
     },
   },
 
   {
     name: 'VERIFY-003 two boundaries for one key is an error, not a precedence question',
     fn: () => {
-      const boundaries = [at('epoch-switch'), at('fallback-side')];
+      const boundaries = [compiledAt('epoch-switch'), compiledAt('fallback-side')];
 
       let threw = null;
       try {
-        boundaryFor(boundaries, { lane: 'fast-coder', turn: 'Round 2', step: 0 });
+        boundaryFor(boundaries, entry('round2'));
       } catch (error) {
         threw = error.message;
       }

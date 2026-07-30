@@ -38,19 +38,33 @@
  */
 export const FAULT_KINDS = ['provider-error', 'disconnect', 'context-overflow'];
 
-/** Which declared fault governs this key, or `null`. */
-export function faultFor(faults, key) {
-  const matches = (faults ?? []).filter(
-    (fault) =>
-      (fault.lane === undefined || fault.lane === key.lane) &&
-      fault.turn === key.turn &&
-      fault.step === key.step,
-  );
+/**
+ * Which declared fault governs this ENTRY, or `null`.
+ *
+ * ── measured: keying by text never fired ────────────────────────────────────
+ *
+ * This compared `fault.turn === key.turn`, i.e. the DECLARED text against the REQUEST
+ * text. A declaration is a prefix — that is the whole point of the lookup — so the two
+ * are equal only when the author happened to write the utterance out in full. Every
+ * fault in every real scenario was therefore inert.
+ *
+ * The gate cases did not catch it because their fixtures declare a turn and then send
+ * exactly that string, making prefix and equality indistinguishable. Same failure mode
+ * as `sessionIdOf` and `kindOf` in K9: a fixture built in the shape the code expects.
+ *
+ * `resolveEntry` has already decided WHICH declaration answers this request, so the
+ * fault belongs to that entry's identity. Comparing ids removes the second matching
+ * decision entirely — there is now exactly one place that says which entry a request is.
+ */
+export function faultFor(faults, entry) {
+  if (entry === null || entry === undefined) return null;
+
+  const matches = (faults ?? []).filter((fault) => fault.entryId === entry.id);
 
   if (matches.length === 0) return null;
   if (matches.length > 1) {
     throw new Error(
-      `two faults declared for the same (lane, turn, step): ${matches.map((f) => f.kind).join(', ')}`,
+      `two faults declared for the same step '${entry.id}': ${matches.map((f) => f.kind).join(', ')}`,
     );
   }
   return matches[0];
@@ -134,8 +148,14 @@ export function faultBody(fault) {
 // only quantity in the forest that a request cannot report about itself: the
 // request looks identical on attempt 1 and attempt 3.
 
-/** Key text for the counter map. `\u001f` cannot occur in a lane or turn. */
-const counterKey = (key) => `${key.lane ?? ''}\u001f${key.turn ?? ''}\u001f${key.step}`;
+/**
+ * Key text for the counter map.
+ *
+ * Keyed by the resolved ENTRY, not by the request text, for the same reason `faultFor` is:
+ * two deliveries of one declaration must land on one counter, and a request that differs
+ * from the declaration by a suffix is still that declaration's delivery.
+ */
+const counterKey = (entry) => `${entry.lane ?? ''}\u001f${entry.id}`;
 
 export const emptyDeliveries = () => new Map();
 
@@ -145,15 +165,15 @@ export const emptyDeliveries = () => new Map();
  * Called on every arrival, fault or not. Counting only the successes would make
  * `attempts = [1, 2]` unreachable — the second delivery would still be attempt 1.
  */
-export function recordDelivery(deliveries, key) {
-  const text = counterKey(key);
+export function recordDelivery(deliveries, entry) {
+  const text = counterKey(entry);
   const attempt = (deliveries.get(text) ?? 0) + 1;
   deliveries.set(text, attempt);
   return attempt;
 }
 
-/** How many deliveries this key has seen, without recording one. */
-export const deliveriesOf = (deliveries, key) => deliveries.get(counterKey(key)) ?? 0;
+/** How many deliveries this entry has seen, without recording one. */
+export const deliveriesOf = (deliveries, entry) => deliveries.get(counterKey(entry)) ?? 0;
 
 // ── load-time validation ────────────────────────────────────────────────────
 

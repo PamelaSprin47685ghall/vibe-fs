@@ -104,11 +104,11 @@ export class ScenarioRuntime {
 
     const { key, matched } = resolved;
 
-    const seal = this.#sealFor(body, key);
+    const seal = this.#sealFor(body, key, matched);
     if (seal.broken !== undefined) return { sealBroken: { reason: seal.broken, key, kind: seal.kind } };
 
-    const attempt = recordDelivery(this.deliveries, key);
-    const outcome = deliveryOutcome(faultFor(this.scenario.faults, key), attempt);
+    const attempt = recordDelivery(this.deliveries, matched);
+    const outcome = deliveryOutcome(faultFor(this.scenario.faults, matched), attempt);
 
     return outcome.deliver === true
       ? { entry: matched, key, attempt, resealed: seal.resealed }
@@ -163,7 +163,7 @@ export class ScenarioRuntime {
     return typeof id === 'string' && id !== '' ? id : null;
   }
 
-  #sealFor(body, key) {
+  #sealFor(body, key, entry) {
     if (key.kind !== 'chat') return { held: true };
 
     const sessionId = this.#sessionIdOf(body);
@@ -172,7 +172,7 @@ export class ScenarioRuntime {
     return sealDecision({
       previousWire: this.seals.get(sessionId) ?? null,
       body,
-      boundary: boundaryFor(this.scenario.boundaries, key),
+      boundary: boundaryFor(this.scenario.boundaries, entry),
     });
   }
 }

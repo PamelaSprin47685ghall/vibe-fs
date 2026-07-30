@@ -469,13 +469,19 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
   };
 }
 
-/** A fault's `turn`/`step` names become the integer key `faultFor` looks up. */
+/**
+ * A fault's `turn`/`step` names resolve to the ENTRY it governs.
+ *
+ * `entryId` rather than a (lane, turn, step) copy: the entry is what `resolveEntry`
+ * already chose for a request, so an id comparison cannot disagree with it. The copied
+ * triple could and did — `faultFor` compared the declared turn text against the request
+ * text, so every fault in every real scenario was inert (measured in K9).
+ */
 const compileFault = (entries, fault) => {
   const { entry } = resolveReference(entries, fault);
   return {
+    entryId: entry.id,
     lane: entry.lane,
-    turn: entry.turn,
-    step: entry.step,
     attempts: fault.attempts,
     kind: fault.delivery ?? fault.kind,
     status: fault.status,
@@ -486,9 +492,8 @@ const compileFault = (entries, fault) => {
 const compileBoundary = (entries, boundary) => {
   const { entry } = resolveReference(entries, boundary);
   return {
+    entryId: entry.id,
     lane: entry.lane,
-    turn: entry.turn,
-    step: entry.step,
     kind: boundary.reason ?? boundary.kind,
   };
 };

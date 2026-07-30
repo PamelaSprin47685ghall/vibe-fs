@@ -113,8 +113,11 @@ export const schemaCases = [
       const scenario = accepts(HEALTHY);
 
       assertEq(scenario.faults.length, 1);
-      assertEq(scenario.faults[0].step, 0);
-      assertEq(scenario.faults[0].turn, 'Ship the parser fix.');
+      // The author wrote `turn = "mgr"`, `step = 0`; the compiler resolved that pair to the
+      // one entry it names. `entryId` rather than a copied (lane, turn, step) triple, because
+      // the entry is what `resolveEntry` already chose for a request — an id comparison
+      // cannot disagree with it, and the copied triple did (measured: every real fault inert).
+      assertEq(scenario.faults[0].entryId, 'mgr.0');
       assertEq(scenario.faults[0].kind, 'provider-error');
       assertEq(scenario.faults[0].lane, 'fast-manager');
     },
@@ -126,7 +129,7 @@ export const schemaCases = [
       const scenario = accepts(HEALTHY);
 
       assertEq(scenario.boundaries.length, 1);
-      assertEq(scenario.boundaries[0].step, 1);
+      assertEq(scenario.boundaries[0].entryId, 'mgr.1');
       assertEq(scenario.boundaries[0].kind, 'epoch-switch');
     },
   },

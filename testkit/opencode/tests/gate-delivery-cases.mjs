@@ -31,11 +31,40 @@ const user = (text) => ({ role: 'user', content: text });
 const request = (text, sessionID = SESSION) => ({ sessionID, messages: [user(text)] });
 
 const TURN = 'Round 1 fallback attempt.';
-const ENTRIES = [{ id: 'round1', lane: 'fast-coder', turn: TURN, step: 0, respond: { text: 'done' } }];
+const OTHER_TURN = 'Round 2 fallback attempt.';
 
+// Two declarations, and `round1x` deliberately shares a prefix with `round1`. That overlap
+// is what the "no spreading" cases below need: under text keying a fault on the shorter
+// declaration silently covered the longer one.
+const ENTRIES = [
+  { id: 'round1', lane: 'fast-coder', turn: TURN, step: 0, respond: { text: 'done' } },
+  { id: 'round1x', lane: 'fast-coder', turn: `${TURN} Extended.`, step: 0, respond: { text: 'extended' } },
+  { id: 'round2', lane: 'fast-coder', turn: OTHER_TURN, step: 0, respond: { text: 'done 2' } },
+  { id: 'round1step1', lane: 'fast-coder', turn: TURN, step: 1, respond: { text: 'after' } },
+];
+
+const entryOf = (id) => ENTRIES.find((entry) => entry.id === id);
+
+/**
+ * A COMPILED fault, as `faultFor` consumes it: it names the entry it governs.
+ *
+ * Deliberately a different shape from `sourceFault` below. The author writes turn and step
+ * NAMES; the compiler resolves them to one entry. Sharing a fixture between the two layers
+ * is what let the old cases assert `faultFor` against author-shaped input, which is a shape
+ * the runtime never sees.
+ */
 const fault = (overrides = {}) => ({
+  entryId: 'round1',
   lane: 'fast-coder',
-  turn: TURN,
+  attempts: [1, 2],
+  kind: 'provider-error',
+  status: 500,
+  ...overrides,
+});
+
+/** A SOURCE fault, as an author writes it and `validateFault` checks it. */
+const sourceFault = (overrides = {}) => ({
+  turn: 'round1',
   step: 0,
   attempts: [1, 2],
   kind: 'provider-error',
@@ -43,11 +72,25 @@ const fault = (overrides = {}) => ({
   ...overrides,
 });
 
-/** One arrival: count the delivery, then ask the plan what to do with it. */
+/**
+ * One arrival, in the order the provider path uses: resolve WHICH declaration answers
+ * this request, then count that declaration's delivery, then ask the plan.
+ *
+ * The old helper keyed the counter and the fault lookup on `runtimeKeyOf(body)` — the
+ * REQUEST text. That is what made every real fault inert: a declaration is a prefix, so
+ * the declared text equals the request text only when the author wrote the utterance out
+ * in full, which every fixture here happened to do.
+ */
 const arrive = (deliveries, faults, body) => {
-  const key = runtimeKeyOf(body, BINDINGS);
-  const attempt = recordDelivery(deliveries, key);
-  return { key, attempt, outcome: deliveryOutcome(faultFor(faults, key), attempt), entry: resolveEntry(body, ENTRIES, BINDINGS) };
+  const resolved = resolveEntry(body, ENTRIES, BINDINGS);
+  const entry = resolved.matched;
+  const attempt = entry === undefined ? 0 : recordDelivery(deliveries, entry);
+  return {
+    key: resolved.key,
+    entry: resolved,
+    attempt,
+    outcome: deliveryOutcome(faultFor(faults, entry), attempt),
+  };
 };
 
 export const deliveryCases = [
@@ -135,15 +178,14 @@ export const deliveryCases = [
   {
     name: 'VERIFY-003 the counter is per key, not global',
     fn: () => {
-      // Two different turns each start at attempt 1. A global counter would make the
+      // Two different declarations each start at attempt 1. A global counter would make the
       // second turn's first delivery look like a retry of the first turn.
       const deliveries = emptyDeliveries();
-      const other = 'Round 2 fallback attempt.';
 
       assertEq(arrive(deliveries, [], request(TURN)).attempt, 1);
-      assertEq(arrive(deliveries, [], request(other)).attempt, 1, 'a different turn starts fresh');
+      assertEq(arrive(deliveries, [], request(OTHER_TURN)).attempt, 1, 'a different turn starts fresh');
       assertEq(arrive(deliveries, [], request(TURN)).attempt, 2);
-      assertEq(arrive(deliveries, [], request(other)).attempt, 2);
+      assertEq(arrive(deliveries, [], request(OTHER_TURN)).attempt, 2);
     },
   },
 
@@ -153,44 +195,58 @@ export const deliveryCases = [
       // `deliveriesOf` reads without recording. A diagnostic that had to record in
       // order to report would change the thing it was reporting.
       const deliveries = emptyDeliveries();
-      const key = runtimeKeyOf(request(TURN), BINDINGS);
+      const entry = entryOf('round1');
 
-      assertEq(deliveriesOf(deliveries, key), 0);
-      recordDelivery(deliveries, key);
-      assertEq(deliveriesOf(deliveries, key), 1);
-      assertEq(deliveriesOf(deliveries, key), 1, 'reading must not count');
+      assertEq(deliveriesOf(deliveries, entry), 0);
+      recordDelivery(deliveries, entry);
+      assertEq(deliveriesOf(deliveries, entry), 1);
+      assertEq(deliveriesOf(deliveries, entry), 1, 'reading must not count');
     },
   },
 
   // ── fault selection is keyed, not scored ────────────────────────────────
 
   {
-    name: 'VERIFY-003 a fault applies only to its own lane, turn and step',
+    name: 'VERIFY-003 a fault governs exactly the step it names',
     fn: () => {
       const faults = [fault()];
 
-      const at = (key) => faultFor(faults, key);
-
-      assertTrue(at({ lane: 'fast-coder', turn: TURN, step: 0 }) !== null, 'exact key matches');
-      assertTrue(at({ lane: 'fast-coder', turn: TURN, step: 1 }) === null, 'another step is another point');
-      assertTrue(at({ lane: 'other', turn: TURN, step: 0 }) === null, 'another lane is another conversation');
-      assertTrue(at({ lane: 'fast-coder', turn: 'Something else', step: 0 }) === null, 'another turn');
+      assertTrue(faultFor(faults, entryOf('round1')) !== null, 'the named step');
+      assertTrue(faultFor(faults, entryOf('round1step1')) === null, 'another step is another point');
+      assertTrue(faultFor(faults, entryOf('round2')) === null, 'another turn');
+      assertTrue(faultFor(faults, undefined) === null, 'an unresolved request has no fault');
     },
   },
 
   {
-    name: 'VERIFY-003 the turn is matched exactly, not by prefix',
+    name: 'VERIFY-003 a fault cannot spread to a declaration that shares its prefix',
     fn: () => {
-      // Content uses longest-prefix so a scenario can declare a short distinctive
-      // fragment. A fault must not: a prefix-matched fault would silently cover
-      // every later turn that happens to start with the same words.
-      const faults = [fault({ turn: 'Round 1' })];
+      // Content uses longest-prefix so a scenario can declare a short distinctive fragment.
+      // A fault must not spread that way — one declaration would silently cover every later
+      // turn starting with the same words.
+      //
+      // This used to be enforced by comparing text with `===`, which is where it went wrong:
+      // the fault compared its DECLARED text against the REQUEST text, and since a
+      // declaration is a prefix the two matched only when the author wrote the utterance out
+      // in full. Real faults were inert; this case passed because its fixtures did exactly
+      // that.
+      //
+      // Naming the entry makes the property structural rather than asserted: `resolveEntry`
+      // has already picked one declaration, and the fault either names it or does not.
+      const faults = [fault({ entryId: 'round1' })];
 
-      assertTrue(faultFor(faults, { lane: 'fast-coder', turn: 'Round 1', step: 0 }) !== null);
+      assertTrue(faultFor(faults, entryOf('round1')) !== null);
       assertTrue(
-        faultFor(faults, { lane: 'fast-coder', turn: 'Round 1 fallback attempt.', step: 0 }) === null,
-        'a fault must not spread by prefix',
+        faultFor(faults, entryOf('round1x')) === null,
+        'the longer declaration is a different step, so the fault does not reach it',
       );
+
+      // And end to end: a request matching the longer declaration is delivered, not faulted.
+      const deliveries = emptyDeliveries();
+      const extended = arrive(deliveries, faults, request(`${TURN} Extended.`));
+
+      assertEq(extended.entry.matched.id, 'round1x');
+      assertEq(extended.outcome.deliver, true);
     },
   },
 
@@ -204,7 +260,7 @@ export const deliveryCases = [
 
       let threw = null;
       try {
-        faultFor(faults, { lane: 'fast-coder', turn: TURN, step: 0 });
+        faultFor(faults, entryOf('round1'));
       } catch (error) {
         threw = error.message;
       }
@@ -231,7 +287,7 @@ export const deliveryCases = [
     fn: () => {
       // A fault that never fires is a step the author believes is covered and is
       // not. Silently accepting it is how a scenario stops testing what it claims.
-      const problems = validateFault(fault({ attempts: [] }));
+      const problems = validateFault(sourceFault({ attempts: [] }));
 
       assertEq(problems.length, 1);
       assertTrue(problems[0].includes('never fires'), problems[0]);
@@ -241,10 +297,10 @@ export const deliveryCases = [
   {
     name: 'VERIFY-003 attempt numbers are one-based and distinct',
     fn: () => {
-      assertTrue(validateFault(fault({ attempts: [0, 1] })).some((p) => p.includes('one-based')), 'zero rejected');
-      assertTrue(validateFault(fault({ attempts: [-1] })).some((p) => p.includes('one-based')), 'negative rejected');
-      assertTrue(validateFault(fault({ attempts: [1, 1] })).some((p) => p.includes('distinct')), 'duplicate rejected');
-      assertEq(validateFault(fault({ attempts: [1, 3] })).length, 0, 'gaps are legitimate');
+      assertTrue(validateFault(sourceFault({ attempts: [0, 1] })).some((p) => p.includes('one-based')), 'zero rejected');
+      assertTrue(validateFault(sourceFault({ attempts: [-1] })).some((p) => p.includes('one-based')), 'negative rejected');
+      assertTrue(validateFault(sourceFault({ attempts: [1, 1] })).some((p) => p.includes('distinct')), 'duplicate rejected');
+      assertEq(validateFault(sourceFault({ attempts: [1, 3] })).length, 0, 'gaps are legitimate');
     },
   },
 
@@ -253,11 +309,11 @@ export const deliveryCases = [
     fn: () => {
       // A typo'd kind must not become a silently inert declaration. The three kinds
       // are transport facts: a provider error, a dropped stream, a refused request.
-      assertEq(validateFault(fault()).length, 0);
-      assertEq(validateFault(fault({ kind: 'disconnect' })).length, 0);
-      assertEq(validateFault(fault({ kind: 'context-overflow' })).length, 0);
+      assertEq(validateFault(sourceFault()).length, 0);
+      assertEq(validateFault(sourceFault({ kind: 'disconnect' })).length, 0);
+      assertEq(validateFault(sourceFault({ kind: 'context-overflow' })).length, 0);
 
-      const problems = validateFault(fault({ kind: 'provider_error' }));
+      const problems = validateFault(sourceFault({ kind: 'provider_error' }));
       assertEq(problems.length, 1);
       assertTrue(problems[0].includes('unknown fault kind'), problems[0]);
     },
@@ -268,10 +324,10 @@ export const deliveryCases = [
     fn: () => {
       // Without both it is not a point in a conversation, and it would apply to
       // whatever happened to match — the "spreads by accident" failure again.
-      assertTrue(validateFault(fault({ turn: '' })).some((p) => p.includes('name the turn')));
-      assertTrue(validateFault(fault({ turn: undefined })).some((p) => p.includes('name the turn')));
-      assertTrue(validateFault(fault({ step: -1 })).some((p) => p.includes('non-negative')));
-      assertTrue(validateFault(fault({ step: 1.5 })).some((p) => p.includes('non-negative')));
+      assertTrue(validateFault(sourceFault({ turn: '' })).some((p) => p.includes('name the turn')));
+      assertTrue(validateFault(sourceFault({ turn: undefined })).some((p) => p.includes('name the turn')));
+      assertTrue(validateFault(sourceFault({ step: -1 })).some((p) => p.includes('non-negative')));
+      assertTrue(validateFault(sourceFault({ step: 1.5 })).some((p) => p.includes('non-negative')));
     },
   },
 
@@ -285,7 +341,7 @@ export const deliveryCases = [
 
       for (const kind of contentish) {
         assertTrue(
-          validateFault(fault({ kind })).some((p) => p.includes('unknown fault kind')),
+          validateFault(sourceFault({ kind })).some((p) => p.includes('unknown fault kind')),
           `'${kind}' is content and must not be a fault kind`,
         );
       }
