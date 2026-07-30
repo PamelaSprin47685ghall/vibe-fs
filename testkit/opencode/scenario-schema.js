@@ -118,7 +118,7 @@ const compileTurns = (turns) =>
       turnId: turn.id,
       turnIndex,
       lane: turn.lane,
-      parentLane: turn.parentSession,
+      internal: turn.internal === true,
       kind: turn.kind ?? 'chat',
       turn: turn.user,
       step: stepIndex,
@@ -158,27 +158,39 @@ const resolveReference = (entries, reference) => {
  * likely to be too strict; package K8 converts the real scenarios and will say.
  */
 export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
-  const prompts = [
-    // The scenario's opening prompt is a root key, not a flow step: 15 of the 19 JSON
-    // scenarios send exactly one prompt and never mention it in `flow`. Reading only
-    // `flow[].prompt` made every one of their first turns a dead edge.
-    prompt?.text,
-    ...(flow ?? []).map((flowStep) => flowStep.prompt?.text),
-    ...entries.map((entry) => entry.respond?.args?.prompt),
-  ].filter((text) => typeof text === 'string');
-
-  return new Set(
-    turns
-      .filter(
-        (turn) =>
-          // A title request is issued by the Host after a real turn
-          // (`prompt.ts:235`), never by a flow prompt, so it is reachable by
-          // construction — the conversation it titles is what a flow reaches.
-          turn.kind === 'title' ||
-          prompts.some((prompt) => prompt.startsWith(turn.user) || turn.user.startsWith(prompt)),
-      )
-      .map((turn) => turn.id),
+  // Reached by a scenario prompt, or by a reachable step's tool-call prompt. Fixpoint,
+  // not one pass, because forks chain: Manager → Coder → the Coder's own children.
+  //
+  // `internal = true` opts a lane out. Production composes those prompts itself
+  // (`CompanionHostBlogger.fs:72,77,118`, `ExecutorSummarize.fs:95`), so no scenario
+  // text can reach them and the check would have no evidence either way.
+  const scenarioPrompts = [prompt?.text, ...(flow ?? []).map((flowStep) => flowStep.prompt?.text)].filter(
+    (text) => typeof text === 'string',
   );
+
+  const reachedBy = (texts, turn) =>
+    texts.some((text) => text.startsWith(turn.user) || turn.user.startsWith(text));
+
+  const reachableTurns = new Set(
+    turns.filter((turn) => turn.internal === true || reachedBy(scenarioPrompts, turn)),
+  );
+
+  for (;;) {
+    const before = reachableTurns.size;
+
+    const toolPrompts = entries
+      .filter((entry) => [...reachableTurns].some((turn) => turn.id === entry.turnId))
+      .map((entry) => entry.respond?.args?.prompt)
+      .filter((text) => typeof text === 'string');
+
+    for (const turn of turns) {
+      if (!reachableTurns.has(turn) && reachedBy(toolPrompts, turn)) reachableTurns.add(turn);
+    }
+
+    if (reachableTurns.size === before) break;
+  }
+
+  return new Set([...reachableTurns].map((turn) => turn.id));
 }
 
 // ── the load-time validations ───────────────────────────────────────────────
@@ -303,6 +315,9 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     if (!Array.isArray(turn.step) || turn.step.length === 0) problems.push(`turn[${index}] needs at least one step`);
     if (turn.kind !== undefined && turn.kind !== 'chat' && turn.kind !== 'title') {
       problems.push(`turn[${index}] kind '${turn.kind}' is not chat or title`);
+    }
+    if (turn.internal !== undefined && turn.internal !== true) {
+      problems.push(`turn[${index}] internal must be true when present; omit it otherwise`);
     }
   });
 

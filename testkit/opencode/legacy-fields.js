@@ -34,6 +34,14 @@ export const RETIRED_FIELDS = {
   // §6: out-of-band identity leaking into content matching
   __testkitHeaders: 'harness bookkeeping is one-way; a scenario matches only what the provider received',
 
+  // Measured dead twice over. Its only source was `__testkitHeaders['x-parent-session-id']`
+  // (retired above), and `matchesExpectation` looked the value up in `sessionBindings` —
+  // where all 16 scenarios that declared a parent had never bound it, so the comparison
+  // short-circuited and never ran. Use `internal = true` to say a lane is production-
+  // composed; nothing needs to name the parent.
+  parentSession:
+    'a parent session id is out-of-band and was never bound; mark the lane internal = true instead',
+
   // §7: flag explosion
   reusable: 'content is a pure function of the request, so every step is inherently reusable',
   pathless: 'there is no cursor to be exempt from',

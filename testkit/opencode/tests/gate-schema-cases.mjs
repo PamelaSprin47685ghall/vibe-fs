@@ -428,6 +428,112 @@ user = "nobody ever sends this"
   },
 
   {
+    name: 'VERIFY-003 a production-composed lane opts out with internal',
+    fn: () => {
+      // The Blogger and the Executor map child cannot be reached by any scenario text:
+      // production composes their prompts itself
+      // (`../next/Session/CompanionHostBlogger.fs:72,77,118`,
+      // `../next/OpenCode/ExecutorSummarize.fs:95`). Without an opt-out the dead-edge
+      // check has no evidence either way and rejects a correct scenario.
+      accepts(`scenario = "p"
+prompt = { text = "go" }
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+
+[[turn]]
+id = "blogger"
+lane = "coder-blogger"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "blog" }
+`);
+    },
+  },
+
+  {
+    name: 'VERIFY-003 internal must be true when present',
+    fn: () => {
+      // `internal = false` would read as "checked and reachable", which is the opposite
+      // of what the field means. Omitting it is the way to say that.
+      rejects(
+        `scenario = "p"
+prompt = { text = "go" }
+
+[[turn]]
+id = "a"
+internal = false
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+`,
+        'internal must be true when present',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 parentSession is retired, not a reachability input',
+    fn: () => {
+      // Measured dead twice over. Its only source was
+      // `__testkitHeaders['x-parent-session-id']` — harness bookkeeping the provider
+      // never sees — and `matchesExpectation` resolved it through `sessionBindings`,
+      // where all 16 scenarios declaring a parent had never bound it. So the comparison
+      // short-circuited and never ran, in every scenario, for its whole life.
+      rejects(
+        `scenario = "p"
+prompt = { text = "go" }
+
+[[turn]]
+id = "a"
+parentSession = "manager"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+`,
+        'mark the lane internal = true instead',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 a title turn is reachable through the turn it titles',
+    fn: () => {
+      // No special case needed: a title request carries the conversation being titled,
+      // so its declared text prefix-matches the real turn's. Special-casing `kind` here
+      // would have exempted title turns from the dead-edge check for nothing.
+      const scenario = accepts(`scenario = "p"
+prompt = { text = "Ship the parser fix now." }
+
+[[turn]]
+id = "a"
+user = "Ship the parser fix now."
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+
+[[turn]]
+id = "title"
+kind = "title"
+user = "Ship the parser fix"
+
+  [[turn.step]]
+  respond = { type = "title", text = "Parser fix" }
+`);
+
+      assertEq(scenario.entries.length, 2);
+    },
+  },
+
+  {
     name: 'VERIFY-003 reachability is prefix-based in both directions',
     fn: () => {
       // A flow prompt may be longer than the declared fragment (the scenario declares

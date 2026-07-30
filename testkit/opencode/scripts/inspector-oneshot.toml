@@ -1,0 +1,68 @@
+# AGENT-007: Coder may reach a fact through the opaque `inspector` tool, and its
+# schema contains no `executor`. The forbidden half used to be a `forbiddenTools`
+# predicate here; it is now a production gate assertion, because a mock cannot prove
+# a tool is absent from a schema it never sees.
+
+scenario = "inspector-oneshot"
+description = "AGENT-007 Coder investigates through inspector and stops"
+pass = "Inspector oneshot canary passed: coder invoked inspector for a narrow investigation."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "Inspector oneshot canary\n" } } }
+session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
+prompt = { agent = "fast-coder", text = "Use inspector once to investigate a precise workspace fact needed for the edit. Then stop with a short summary." }
+
+# COMPANION-005: the Blogger is not part of what this scenario asserts, so it is
+# absent from `must`. The JSON form said the same thing with `blocking = false` — a
+# matching flag that also changed how the edge was selected. `must` separates the two
+# questions: what may arrive, and what has to.
+must = ["coder.0", "coder.1"]
+
+flow = [
+  { wait = "title" },
+  { wait = "blogger.0", lane = "coder-blogger" },
+  { wait = "coder.0" },
+  { wait = "coder.1" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = "Use inspector once to investigate a precise workspace fact needed for the edit. Then stop with a short summary."
+tools = ["inspector"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "inspector", args = { prompt = "Inspect the workspace and return factual findings relevant to the requested edit." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Inspector investigation complete." }
+
+# One declaration answers every Blogger request, and `neverEnd` is gone.
+#
+# Each Companion submit appends a fresh delta as a new user message in the Blogger
+# session, so every Blogger request has that delta as its LAST user message and no
+# assistant after it — step 0, every time. The three production prompts
+# (../next/Session/CompanionHostBlogger.fs:72,77,118) all begin with the sentence
+# below, so one prefix at step 0 covers appends, squashes and re-anchors alike.
+#
+# That is what `neverEnd = true` was for. It falls out of prefix matching instead of
+# needing a flag, which is why K7 retires it.
+
+[[turn]]
+id = "blogger"
+lane = "coder-blogger"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "coder blog" }
+
+[[turn]]
+id = "title"
+lane = "coder-title"
+kind = "title"
+user = "Use inspector once to investigate a precise workspace fact needed for the edit."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

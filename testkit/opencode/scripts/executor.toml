@@ -1,0 +1,65 @@
+# EXEC-012: output larger than the estimate is map/reduced in 200KB chunks, and the
+# map children are real Executor sessions (../next/OpenCode/ExecutorSummarize.fs:95).
+#
+# The command writes 10000 bytes against a 2000-byte estimate, so exactly one map
+# chunk is produced — enough to prove the path without making the fixture depend on
+# a chunk count.
+
+scenario = "executor"
+description = "EXEC-012 large output is summarised through a real map child"
+pass = "Executor canary passed."
+
+setup = { strict = true }
+session = { agent = "fast-inspector", bind = ["inspector-title", "fast-inspector"] }
+prompt = { agent = "fast-inspector", text = "Run a large command via executor and summarize." }
+
+must = ["inspector.0", "inspector.1", "map.0"]
+
+flow = [
+  { wait = "title" },
+  { wait = "inspector.0" },
+  { wait = "map.0" },
+  { wait = "inspector.1" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+# Two provider steps of ONE user message. The JSON form numbered them `lane.turn = 1`
+# and `lane.turn = 2`; between them the Host appended the executor tool result, which
+# is what `step` counts.
+
+[[turn]]
+id = "inspector"
+lane = "fast-inspector"
+user = "Run a large command via executor and summarize."
+tools = ["executor"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "node -e \"process.stdout.write('x'.repeat(10000))\"", estimated_running_secs = 10, estimated_output_bytes = 2000, estimated_mem_usage = "medium" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Executor completed with reduced output." }
+
+# The map child. `ExecutorSummarize.fs:95` formats its prompt as
+# "Summarize command output chunk %d. Preserve errors, decisions, paths…", so the
+# declared text is a genuine PREFIX of what arrives — the chunk index and the raw
+# output follow it. The JSON form matched the same words with `containsText`, a
+# substring predicate that would also have matched the phrase quoted anywhere.
+
+[[turn]]
+id = "map"
+lane = "map-0"
+internal = true
+user = "Summarize command output chunk"
+
+  [[turn.step]]
+  respond = { type = "text", text = "chunk-0" }
+
+[[turn]]
+id = "title"
+lane = "inspector-title"
+kind = "title"
+user = "Run a large command via executor and summarize."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
