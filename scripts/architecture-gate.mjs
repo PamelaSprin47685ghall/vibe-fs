@@ -275,9 +275,20 @@ const SINGLE_CONSTRUCTOR_TYPES = [
   },
 ]
 
-// The active test runner. VERIFY-008 replaced the Fable runner with a plain mjs
-// one; it must still enforce a hard per-test timeout.
-const RUNNER_CANDIDATES = ['tests-mjs/runner.mjs']
+// The active test runner, now two tiers (W4). VERIFY-008 replaced the Fable runner with a plain
+// mjs one; VERIFY-004 then split it, because node:test's per-test timeout is a verdict line rather
+// than an abort line and a hung test holding a handle parks the whole suite.
+//
+// Each tier gets the criterion that belongs to it — see the gate below for why one criterion over
+// both files would now be satisfiable by the wrong file.
+const RUNNER_TIERS = [
+  { path: 'tests-mjs/runner.mjs', budget: 'UNIT_VERDICT_SILENCE_MS', enforcement: ['Watchdog'] },
+  {
+    path: 'tests-mjs/run-inner.mjs',
+    budget: 'PER_TEST_TIMEOUT_MS',
+    enforcement: ['AbortSignal.timeout', 'timeout:'],
+  },
+]
 
 // ── bounded concurrency (ARCH-009) ──────────────────────────────────────────
 //
@@ -676,31 +687,48 @@ for (const { type, clause, owner, fields, builder } of SINGLE_CONSTRUCTOR_TYPES)
   }
 }
 
-// ── gate: the test runner enforces a hard per-test timeout ──────────────────
+// ── gate: each test-runner tier enforces the bound that belongs to it ───────
 //
-// The criterion used to be "the file contains a 3-to-5-digit number", which was the best
-// available test while the bound was a literal in the runner. Package W1 moved every timing
-// budget into `testkit/opencode/time-budget.js`, and that check would now FAIL on the correct
-// tree while passing on any file that happened to mention 1024 — it was matching the presence
-// of digits, not the presence of a bound. Naming the constant is the stronger criterion: it
-// cannot be satisfied by a coincidence, and `budget-gate` separately forbids re-inlining it.
+// This criterion has now been wrong twice, in two different ways, and the second is the more
+// instructive.
+//
+// First it was "the file contains a 3-to-5-digit number" — the best available test while the bound
+// was a literal. Package W1 centralized every budget, so that check would have FAILED on the
+// correct tree while passing on any file that happened to mention 1024: it matched the presence of
+// digits, not the presence of a bound.
+//
+// Then it was "`tests-mjs/runner.mjs` names `PER_TEST_TIMEOUT_MS`". W4 split the runner in two and
+// the per-test bound moved to the tier that can enforce it; the parent now enforces a
+// verdict-silence window, which is the PRIMARY criterion VERIFY-004 demands. The gate failed it for
+// not carrying a bound that is no longer its job — the criterion had quietly become a claim about
+// file layout rather than about enforcement.
+//
+// So the criterion is per tier, and each names both its budget and the mechanism that applies it.
+// One criterion spanning both files would be satisfiable by either alone, which is how a gate stops
+// distinguishing a two-tier design from a one-tier design that merely mentions the right words.
 
-const runnerPath = RUNNER_CANDIDATES.find((candidate) => existsSync(candidate))
-const PER_TEST_BUDGET = 'PER_TEST_TIMEOUT_MS'
+for (const { path, budget, enforcement } of RUNNER_TIERS) {
+  if (!existsSync(path)) {
+    fail('test-runner', `${path}: missing; VERIFY-004's unit-runner gate needs both tiers`)
+    continue
+  }
 
-if (!runnerPath) {
-  fail('test-runner', `no test runner found; expected one of ${RUNNER_CANDIDATES.join(', ')}`)
-} else {
-  const runner = read(runnerPath)
-  if (!runner.includes(PER_TEST_BUDGET)) {
+  const source = read(path)
+
+  if (!source.includes(budget)) {
     fail(
       'test-runner',
-      `${runnerPath}: must declare an explicit per-test timeout by consuming ${PER_TEST_BUDGET} ` +
-        `from testkit/opencode/time-budget.js (VERIFY-004: 兜底值必须集中定义)`,
+      `${path}: must consume ${budget} from testkit/opencode/time-budget.js ` +
+        `(VERIFY-004: 兜底值必须集中定义)`,
     )
   }
-  if (!runner.includes('Promise.race') && !runner.includes('AbortSignal.timeout')) {
-    fail('test-runner', `${runnerPath}: must enforce the timeout in-process (Promise.race or AbortSignal.timeout)`)
+
+  if (!enforcement.some((token) => source.includes(token))) {
+    fail(
+      'test-runner',
+      `${path}: names ${budget} but applies nothing; expected one of ${enforcement.join(' / ')}. ` +
+        `A budget with no enforcement is the shape VERIFY-004 calls 声明了但未接线`,
+    )
   }
 }
 

@@ -105,12 +105,28 @@ export const FORK_RECONCILE_SLICE_MS = 2000;
 export const PER_TEST_TIMEOUT_MS = 1000;
 
 /**
- * Whole-suite abort ceiling. Measured in package W: a test that hangs while holding a handle is
- * terminated by THIS, not by the per-test bound — so today it is the real hang criterion, which
- * VERIFY-004 forbids. W4 owns that repair and will rename this constant when it changes its
- * meaning; renaming it now would claim a fix that has not happened.
+ * Whole-suite ceiling, now a 兜底 rather than the hang criterion.
+ *
+ * Before W4 this WAS the real criterion: a test that hangs while holding a handle prevents
+ * node:test from emitting `end`, so nothing else terminated the run. VERIFY-004 forbids that
+ * (「以套件总时长作为唯一挂死判据」) and W4 removed it — `UNIT_VERDICT_SILENCE_MS` below is the
+ * primary criterion, and this survives only for a child that outlives its supervisor.
+ *
+ * The clause permits exactly this: 「wall-clock 上限可以作为兜底存在，但不得是唯一或首要的判据」.
  */
-export const SUITE_TIMEOUT_MS = 300000;
+export const SUITE_BACKSTOP_MS = 300000;
+
+/**
+ * How long the unit suite may go without a test VERDICT before it is declared hung.
+ *
+ * The primary hang criterion for `tests-mjs`, fed by `test:pass` / `test:fail` / `test:complete`.
+ * Not `PER_TEST_TIMEOUT_MS`, because a verdict arrives only after a test finishes: node:test's
+ * timeout is a verdict line rather than an abort line (measured), so an overrunning test keeps
+ * running and the gap between two verdicts can legitimately exceed the per-test bound. Three times
+ * that bound covers the overrun plus scheduling jitter under `concurrency: true` while still ending
+ * a genuinely hung run two orders of magnitude sooner than the backstop.
+ */
+export const UNIT_VERDICT_SILENCE_MS = 3000;
 
 // ── waiting for one semantic event ──────────────────────────────────────────
 

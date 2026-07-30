@@ -56,7 +56,7 @@ const THRESHOLD_MS = budget.LITERAL_BUDGET_THRESHOLD_MS
  * A name ending this way announces itself as a bound, so what it is assigned is a budget.
  *
  * The word suffixes are case-insensitive because this tree spells them three ways
- * (`SUITE_TIMEOUT_MS`, `startTimeoutMs`, a bare `timeout` key). The millisecond suffix is not:
+ * (`SUITE_BACKSTOP_MS`, `startTimeoutMs`, a bare `timeout` key). The millisecond suffix is not:
  * `_MS` and `killGraceMs` are units, while a lowercase `ms` ending is usually an English plural
  * (`items`, `params`) and matching it would flag arithmetic as a budget.
  */

@@ -278,7 +278,8 @@ export const budgetCases = [
         FORK_COMPLETION_WINDOW_MS: 10000,
         FORK_RECONCILE_SLICE_MS: 2000,
         PER_TEST_TIMEOUT_MS: 1000,
-        SUITE_TIMEOUT_MS: 300000,
+        SUITE_BACKSTOP_MS: 300000,
+        UNIT_VERDICT_SILENCE_MS: 3000,
         DEFAULT_AWAIT_TIMEOUT_MS: 1000,
         DEFAULT_NEVER_TIMEOUT_MS: 5000,
         GATE_PROBE_TIMEOUT_MS: 3000,
@@ -327,8 +328,20 @@ export const budgetCases = [
         'same for the waitFact window: it is a fallback, the watchdog is the criterion',
       );
       assertTrue(
-        budget.PER_TEST_TIMEOUT_MS < budget.SUITE_TIMEOUT_MS,
+        budget.PER_TEST_TIMEOUT_MS < budget.SUITE_BACKSTOP_MS,
         'a per-test bound at or above the suite ceiling would make the suite ceiling the only hang criterion',
+      );
+      // W4's ordering, and the reason the silence window is not simply the per-test bound: a verdict
+      // arrives only after a test finishes, and node:test's timeout is a verdict line rather than an
+      // abort line, so an overrunning test keeps running. A window at or below the per-test bound
+      // would declare that legitimate overrun a hang.
+      assertTrue(
+        budget.UNIT_VERDICT_SILENCE_MS > budget.PER_TEST_TIMEOUT_MS,
+        'the verdict-silence window must cover one whole test plus jitter, or an overrun reads as a hang',
+      );
+      assertTrue(
+        budget.UNIT_VERDICT_SILENCE_MS < budget.SUITE_BACKSTOP_MS,
+        'the silence window is the primary criterion; the suite ceiling is only 兜底 (VERIFY-004)',
       );
       assertTrue(
         budget.LITERAL_BUDGET_THRESHOLD_MS <= budget.WATCHDOG_TIMEOUT_MS,
