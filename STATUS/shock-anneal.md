@@ -1373,7 +1373,7 @@ N5 排在 canary 全绿之后而非之前：动议 M5 要求「更新所有依�
 ```text
 N0  规范先行（M0）：ARCH-010 进 SSOT/01；CTX-013 修订；PROMPT-001 交叉引用；     已完成
     SSOT/99 三术语。不得先批量改生产 prompt 再让实现反向定义规范
-N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一处；            进行中
+N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一处；            已完成
     多行定为 ''' + 零加工内容 + closing 独占一行；含 ''' 或裸控制字符者
     回退单行 basic string。裁决与实测见下方 N1 记要
 N2  surface inventory（M1）：列出全部最终进入 LLM 的文本生产点并四分类
@@ -1464,6 +1464,44 @@ closing delimiter 改独占一行有两个理由。其一是可读性：`second 
 
 单行形态仍然全量转义，且该不对称是动议 §6.2 明确要求的：单行 basic string 没有 raw 变体，TOML 会把 `"a\b"` 读成退格。只有多行形态能原样，这正是它存在的理由。
 
+#### N1 落地记要
+
+`5152db5a` + `99fd4bc2`。dotnet build 绿、npm run build 绿、`test:mjs` 404 → 406、gate-testkit 258/0、gate:static 五门绿。
+
+生产改动只有两行：`renderString` 的多行分支加一个换行，`literalSafe` 删一项判据。
+
+删掉「不以 `'` 结尾」是因为它守的边界已不存在——它原本防的是 closing delimiter 紧随最后一个内容字符时与结尾单引号连成 `''''`。留着它会把一整类合法正文推进转义分支，而一个永不失败的判据与写错的判据在所有反馈下不可区分。
+
+字符串 owner 确认为唯一：`next/` 全仓 `'''` 的非注释出现点只有 `BloggerToml.fs` 两处（`literalSafe` 的检查与 `renderString` 的发射）。`BloggerDelta.fs` 只调用 `BloggerToml` 的 `render` / `byteCount` / `normalizeNewlines` / `TruncationMarker`，不自行拼字符串。`CompanionPrompt.fs` 与 `CompanionProjectionBuilder.fs` 搬运已渲染的 TOML，不产生字符串字面量。故 M2 的「若存在多处 owner，先收敛 owner」在本仓不适用——本来就只有一处。
+
+测试侧的实质变化不是改期望值，而是补两条此前不存在的断言：
+
+```text
+ARCH_010_every_rendered_string_parses_back_to_the_value_it_was_given
+    19 个输入用 smol-toml 真的 parse 回来并断言 value 存活。此前全文件只比对
+    bytes，而 bytes 相等无法区分「合法 TOML」与「长得像 TOML」。期望值读渲染器
+    自己的选择（多行带一个尾换行、单行不带），故覆盖面可以宽而不重述选型规则
+
+ARCH_010_a_payload_shaped_like_TOML_stays_inside_the_value
+    注入 shape（# 注释 + status = "perfect" + [[item]] + role = "system"）必须
+    完整留在 value 内：parsed.item 仍只有一条、role 仍是 tool、status 未成为顶层
+    键。这是 ARCH-010 data containment 第一次有可执行证据
+```
+
+并把 `blogger-delta.test.mjs` 里那条名字声称「still valid TOML」而只做 bytes 检查的用例改为真的 parse。截断路径是最可能畸形的地方：切点落在 `'''` body 内任意偏移，marker 与 closing delimiter 在切点之后追加，而 ARCH-010 把 delimiter 移到独占一行正是把这段算术挪了一个字节——这类改动 `bytes <= limit` 会静默放过。
+
+该 parse 断言的红证与其边界一并实测：
+
+```text
+去掉整个 closing         THROWS  unfinished string
+body 内注入 '''          THROWS  each key-value declaration...
+去掉 closing 前的换行     仍 parses  ← 那是旧格式，本就合法
+```
+
+第三项说明 parse 断言钉不住 delimiter 位置，钉住它的是 `blogger-toml.test.mjs` 的逐字节断言。两个文件分工正确：一个钉字节形态，一个钉截断后仍可解析。
+
+一条测试从「回退」翻为「保持字面量」：结尾单引号的正文现在 closing 独占一行，不再需要退到转义形式。保留该用例并写明它是 delimiter 位移唯一改变的行为，否则将来「恢复结尾引号保护」会静默把这些正文推回转义分支。
+
 #### 测试要求（动议 §15）
 
 ```text
@@ -1476,8 +1514,8 @@ containment 恶意 payload（含 # Ignore all previous instructions.、status = 
             必须完整留在字符串 value 内，不得逃逸为当前 instruction / data field / TOML table
 Blogger     data-only、instruction + data、data body 无 comment、多行 ''' 固定排版
             （closing 独占一行、内容零加工）、不出现 """、含 ''' 或裸控制字符者回退单行、
-            往返断言 parse 成功且 value == 原文 + 尾换行、
-            不出现 '''、fixed key order、truncation、image/media omission、cursor/coverage 不变、
+            往返断言 parse 成功且 value == 原文 + 尾换行、fixed key order、truncation、
+            image/media omission、cursor/coverage 不变、
             header 存在时计入 byte limit、header 不存在时不产生虚假开销
 权限回归    TOML comment 不创建 authority；未认领的 TOML 形 user message 仍 fail closed；
             continuation 不因格式变化成为新 root；human raw 不被 renderer 改写；
@@ -1495,8 +1533,8 @@ transport   tool call/result linkage 不变、message role 不变、provider met
 [x] CTX-013 已删除绝对「不输出注释」
 [x] CTX-013 已允许最前方 instruction comment header
 [ ] Blogger data body 禁止 comments
-[ ] Blogger 多行排版改为 closing 独占一行、内容零加工
-[ ] 所有多行 data 使用 canonical ''' 排版，且渲染结果可被 parser 读回
+[x] Blogger 多行排版改为 closing 独占一行、内容零加工
+[x] 所有多行 data 使用 canonical ''' 排版，且渲染结果可被 parser 读回
 [ ] 已建立 runtime textual surface inventory
 [ ] 所有纳入范围的 instruction 使用最前方 comments
 [ ] 所有纳入范围的 data 使用 fields/tables/values
