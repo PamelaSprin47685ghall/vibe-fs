@@ -13,6 +13,10 @@ import { coldBoundaryCases } from './gate-cold-boundary-cases.mjs';
 import { deliveryCases } from './gate-delivery-cases.mjs';
 import { pluginDependencyCase } from './gate-plugin-dependency-case.mjs';
 import { forestLibCases } from './gate-forest-lib-cases.mjs';
+import { forestCases } from './gate-forest-cases.mjs';
+import { mutationCases } from './gate-mutation-cases.mjs';
+import { readinessCases } from './gate-readiness-cases.mjs';
+import { unitRunnerCases } from './gate-unit-runner-cases.mjs';
 import { scenarioRuntimeCases } from './gate-scenario-runtime-cases.mjs';
 import { schemaCases } from './gate-schema-cases.mjs';
 import { sourceCases } from './gate-source-cases.mjs';
@@ -39,7 +43,7 @@ async function runCase({ name, fn }) {
 
 console.log('Running testkit/opencode gate tests...\n');
 
-for (const c of [...cases, pluginDependencyCase, ...projectionCases, ...runtimeKeyCases, ...deliveryCases, ...coldBoundaryCases, ...schemaCases, ...scenarioRuntimeCases, ...forestLibCases, ...sourceCases, ...pathCriterionCases, ...singleSourceCases, ...timeoutCases, ...budgetCases]) {
+for (const c of [...cases, pluginDependencyCase, ...projectionCases, ...runtimeKeyCases, ...deliveryCases, ...coldBoundaryCases, ...schemaCases, ...scenarioRuntimeCases, ...forestLibCases, ...sourceCases, ...pathCriterionCases, ...singleSourceCases, ...timeoutCases, ...budgetCases, ...readinessCases, ...unitRunnerCases, ...forestCases, ...mutationCases]) {
   await runCase(c);
 }
 
