@@ -105,7 +105,6 @@ tools = ["fork-pty", "join", "list", "executor", "read", "glob", "grep", "inspec
 
 [[turn]]
 id = "blogger"
-lane = "session-blogger"
 internal = true
 user = "You are the blogger of a coding agent session. Write one dense paragraph"
 

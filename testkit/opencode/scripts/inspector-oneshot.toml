@@ -19,7 +19,7 @@ must = ["coder.0", "coder.1"]
 
 flow = [
   { wait = "title" },
-  { wait = "blogger.0", lane = "coder-blogger" },
+  { wait = "blogger.0" },
   { wait = "coder.0" },
   { wait = "coder.1" },
   { awaitTerminal = true, requireAssistantTerminal = true },
@@ -51,7 +51,6 @@ tools = ["inspector"]
 
 [[turn]]
 id = "blogger"
-lane = "coder-blogger"
 internal = true
 user = "You are the blogger of a coding agent session."
 

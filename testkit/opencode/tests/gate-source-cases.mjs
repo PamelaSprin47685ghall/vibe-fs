@@ -442,6 +442,43 @@ user = "go on"
   },
 
   {
+    name: 'COMPANION-002 a Companion turn declares no lane',
+    fn: () => {
+      // Measured in K9, and it turned every canary red at once.
+      //
+      // COMPANION-002 gives EVERY Managed Work Session exactly one Companion. A lane-bound
+      // blogger turn answers only the single session that alias is bound to, so
+      // `manager-full-loop` — six work sessions — had five Companion requests with no
+      // declaration to answer them. The failure surfaced as `no-prefix-matched` on a blogger
+      // request, which reads like a conversion slip in one file and was a rule violation in
+      // eleven.
+      //
+      // The honest declaration omits the lane. A Companion prompt is IDENTICAL across
+      // sessions because production composes it from the delta alone
+      // (`../next/Session/CompanionHostBlogger.fs:77`): nothing in the request distinguishes
+      // one Blogger from another, and inventing a distinction would be the mock re-deriving
+      // identity that §5 forbids. An omitted lane says exactly that — this content is a pure
+      // function of the prompt and claims nothing about who asked.
+      //
+      // The retired `neverEnd` flag was standing in for this. K7 was right to remove it (it
+      // also made one edge answer at every step, which is what `step` is for), but the thing
+      // it approximated is real.
+      const offenders = walk(SCENARIO_ROOT, ['.toml']).flatMap((file) =>
+        readFileSync(file, 'utf8')
+          .split('\n')
+          .map((line, index) => ({ file, line: index + 1, text: line.trim() }))
+          .filter(({ text }) => /^lane = ".*blogger.*"$/.test(text)),
+      );
+
+      assertEq(
+        offenders.length,
+        0,
+        offenders.map(({ file, line, text }) => `${file}:${line} ${text}`).join(', '),
+      );
+    },
+  },
+
+  {
     name: 'VERIFY-003 every scenario is already formatted',
     fn: () => {
       // `gate:toml` enforces this in CI, but that is a separate npm script: a scenario could

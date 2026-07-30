@@ -152,7 +152,6 @@ user = "Report child-a2."
 
 [[turn]]
 id = "blogger"
-lane = "session-blogger"
 internal = true
 user = "You are the blogger of a coding agent session. Write one dense paragraph"
 
