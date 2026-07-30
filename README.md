@@ -51,8 +51,7 @@ Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git �
 
 ```bash
 npm run build
-npm run test:compile
-npm run test:next
+npm run test:mjs
 npm run test:manager-tools
 node testkit/opencode/tests/gate-testkit.mjs
 npm run test:e2e:p0:three
@@ -75,7 +74,7 @@ wanxiangshu
 
 ```text
 next/                 生产 Agent DSL
-tests-next/           Fable contract/Port tests
+tests-mjs/            第 1–3 层测试（mjs，import build/next）
 testkit/opencode/     独立 OpenCode harness
 SSOT/                 产品语义（唯一规范，条款 ID 寻址）
 STATUS/               实现状态、合规表、迁移总账

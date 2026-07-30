@@ -22,8 +22,14 @@ import { basename, extname } from 'node:path'
 import { walk } from './repo-scan.mjs'
 
 const PRODUCTION_ROOT = 'next'
-const TESTS_ROOT = 'tests-next'
+const TESTS_ROOT = 'tests-mjs'
 const SOURCE_EXTENSIONS = ['.fs', '.fsproj']
+
+// VERIFY-008: layers 1-3 are `.mjs` importing `build/next`. The test tree is
+// scanned with its own extensions rather than the production ones, so that
+// deleting `tests-next/` does not silently empty the test-side scan — an empty
+// scan makes every gate over it vacuously pass.
+const TEST_EXTENSIONS = ['.mjs']
 
 // ── forbidden vocabulary ────────────────────────────────────────────────────
 
@@ -192,7 +198,12 @@ const DSL_PROGRAMS = [
   { builder: 'process', file: 'Process/ProcessRunner.fs', names: ['run', 'runWithHost'] },
 ]
 
-const GUIDE_CONTRACT_PATH = 'tests-next/GuideContract/Signatures.fs'
+// VERIFY-008: the mjs contract that replaced `tests-next/GuideContract/Signatures.fs`.
+//
+// The F# version asserted types exist at COMPILE time; this one asserts each
+// entrypoint is a callable export in `build/next` at RUN time. Weaker about
+// signatures, stronger about reachability — a function the build drops now fails.
+const GUIDE_CONTRACT_PATH = 'tests-mjs/guide-contract.test.mjs'
 
 // ── layering ────────────────────────────────────────────────────────────────
 
@@ -264,9 +275,9 @@ const SINGLE_CONSTRUCTOR_TYPES = [
   },
 ]
 
-// The active test runner. VERIFY-008 replaces the Fable runner with a plain
-// mjs one; whichever exists must still enforce a hard per-test timeout.
-const RUNNER_CANDIDATES = ['tests-mjs/runner.mjs', 'tests-next/runner.js']
+// The active test runner. VERIFY-008 replaced the Fable runner with a plain mjs
+// one; it must still enforce a hard per-test timeout.
+const RUNNER_CANDIDATES = ['tests-mjs/runner.mjs']
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -306,7 +317,7 @@ for (const root of [PRODUCTION_ROOT, TESTS_ROOT]) {
 }
 
 const productionFiles = walk(PRODUCTION_ROOT, SOURCE_EXTENSIONS)
-const testFiles = walk(TESTS_ROOT, SOURCE_EXTENSIONS)
+const testFiles = walk(TESTS_ROOT, TEST_EXTENSIONS)
 const allFiles = [...productionFiles, ...testFiles]
 
 // ── gate: legacy vocabulary and src imports ─────────────────────────────────
@@ -346,19 +357,11 @@ for (const file of productionFiles) {
   }
 }
 
-for (const file of testFiles.filter((path) => path.endsWith('.fsproj'))) {
-  const text = read(file)
-  if (!text.includes('ProjectReference')) continue
-
-  const referencesProduction =
-    text.includes('../next/Wanxiangshu.Next.fsproj') || text.includes('..\\next\\Wanxiangshu.Next.fsproj')
-  const referencesLegacy = text.includes('wanxiangshu.fsproj') && !text.includes('Wanxiangshu.Next.fsproj')
-  const referencesSrc = text.includes('../src') || text.includes('..\\src') || text.includes('\\src')
-
-  if (referencesLegacy || referencesSrc || !referencesProduction) {
-    fail('project-reference', `${file}: test project may only reference next/Wanxiangshu.Next.fsproj`)
-  }
-}
+// No test-project reference gate. The test tree has no `.fsproj` to reference
+// anything with (VERIFY-008), so that violation class is unrepresentable rather
+// than unchecked. The general form still applies: `referencesLegacySrc` runs over
+// `allFiles`, which includes every `.mjs` test, so a test importing `../src`
+// still fails above.
 
 // ── gate: fragment SSE events must not reach the business layer ─────────────
 
@@ -437,14 +440,11 @@ const declaredCompileItems = (fsprojPath, root) => {
   return [...text.matchAll(/Include="([^"]+\.fs)"/g)].map((match) => `${root}/${norm(match[1])}`)
 }
 
-const fsprojDrift = [
-  { project: PRODUCTION_FSPROJ, root: PRODUCTION_ROOT, files: productionFiles },
-  {
-    project: `${TESTS_ROOT}/Wanxiangshu.Next.Tests.fsproj`,
-    root: TESTS_ROOT,
-    files: testFiles,
-  },
-]
+// Only the production project. The test tree is `.mjs` with no project file, so
+// `node:test` owns registration and there is no declaration to drift from — which
+// is the point: `fsproj-drift` existed because five test files were dropped from
+// the tests `.fsproj` at `c3c35756` and kept passing as dead code for months.
+const fsprojDrift = [{ project: PRODUCTION_FSPROJ, root: PRODUCTION_ROOT, files: productionFiles }]
 
 for (const { project, root, files } of fsprojDrift) {
   if (!existsSync(project)) continue
@@ -643,12 +643,28 @@ const SCANNER_WITNESSES = [
   'next/Tools/StaticTools.fs',
 ]
 
+// The test side needs its own witnesses now that it is scanned with a different
+// extension list. `TEST_EXTENSIONS` drifting to `.fs`, or the tree moving, would
+// otherwise yield an empty `testFiles` — and every gate over `allFiles` would
+// silently stop covering tests while still reporting OK.
+const TEST_SCANNER_WITNESSES = ['tests-mjs/runner.mjs', 'tests-mjs/domain.mjs', GUIDE_CONTRACT_PATH]
+
 if (productionFiles.length < 10) {
   fail('scanner', `recursive scan returned only ${productionFiles.length} production files`)
 }
 
 for (const witness of SCANNER_WITNESSES) {
   if (!productionFiles.some((file) => norm(file) === witness)) {
+    fail('scanner', `recursive scan missed ${witness}`)
+  }
+}
+
+if (testFiles.length < 5) {
+  fail('scanner', `recursive scan returned only ${testFiles.length} test files under ${TESTS_ROOT}`)
+}
+
+for (const witness of TEST_SCANNER_WITNESSES) {
+  if (!testFiles.some((file) => norm(file) === witness)) {
     fail('scanner', `recursive scan missed ${witness}`)
   }
 }

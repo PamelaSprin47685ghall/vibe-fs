@@ -30,7 +30,7 @@ const FORCE = process.argv.includes("--force");
 const MIN_FREE_MB = parsePositiveInt(process.env.REAPER_MIN_FREE_MB, 2048, "REAPER_MIN_FREE_MB");
 // 只兜底"没继承到 WANXIANG_RUN_ID 的裸进程"；归属判断才是主逻辑，年龄无需长。
 const ORPHAN_MIN_AGE_MS = parsePositiveInt(process.env.REAPER_ORPHAN_MIN_AGE_MS, 5000, "REAPER_ORPHAN_MIN_AGE_MS");
-const ORPHAN_MARKERS = ["oc-e2e-", "tests-next/worker.js", "wanxiang-ledger", ".wanxiangshu-next"];
+const ORPHAN_MARKERS = ["oc-e2e-", "tests-mjs/", "wanxiang-ledger", ".wanxiangshu-next"];
 
 let reaped = 0;
 

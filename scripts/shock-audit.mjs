@@ -9,7 +9,10 @@ import { walk, countLiteral, readLines } from './repo-scan.mjs'
 
 const SCOPES = {
   next: { root: 'next', extensions: ['.fs'] },
-  tests: { root: 'tests-next', extensions: ['.fs'] },
+  // VERIFY-008: layers 1-3 are `.mjs`. Left pointing at the deleted `tests-next`
+  // this scope would return 0 for every symbol, which reads as "extinct" — the
+  // most dangerous possible failure for an extinction audit.
+  tests: { root: 'tests-mjs', extensions: ['.mjs'] },
   testkit: { root: 'testkit', extensions: ['.mjs', '.js'] },
   scripts: { root: 'testkit/opencode/scripts', extensions: ['.json', '.toml'] },
 }
@@ -21,18 +24,23 @@ const SCOPES = {
 // then be a gate that can never reach zero, which eventually forces a wrong
 // deletion. The scope IS the violation.
 
-// The one file where an extinct fact NAME must survive as a string literal.
+// The files where an extinct fact NAME must survive as a string literal.
 //
-// PERSIST-004 requires a pre-0.5.0 journal to stop startup with a precise
+// PERSIST-004/005 require a pre-0.5.0 journal to stop startup with a precise
 // diagnosis, and the only way to recognise one is by the case names it contains.
 // Counting those literals as residue makes every migrated fact permanently
 // non-zero, so the gate would eventually force deleting the very check that
 // tells an operator to archive the old file.
 //
-// The tradeoff is that a genuine violation inside this file goes unseen here.
-// That is acceptable because the file holds nothing but the codec and this
-// rejection list; the architecture and ssot gates still read it.
-const LEGACY_NAME_SENTINEL = 'next/Journal/FactCodec.fs'
+// Two entries, for the same reason on both sides of the boundary: the codec holds
+// the rejection list, and the layer 1 test asserts each name still produces the
+// migration message rather than an opaque union error. Exempting only the codec
+// would make writing that test impossible — the assertion IS the literal.
+//
+// The tradeoff is that a genuine violation inside these two files goes unseen
+// here. Acceptable because each holds nothing but the codec and its rejection
+// list, or the test over it; the architecture and ssot gates still read both.
+const LEGACY_NAME_SENTINELS = ['next/Journal/FactCodec.fs', 'tests-mjs/Journal/envelope.test.mjs']
 
 const EXTINCTION = [
   { symbol: 'PostPromptFireAndForget', clause: 'PROMPT-007' },
@@ -220,7 +228,7 @@ const pad = (value, width) => String(value).padEnd(width)
 
 /** Restrict a scope's file list to the paths where the symbol is a violation. */
 const filesFor = (entry, scope) => {
-  const all = files[scope].filter((file) => file.replace(/\\/g, '/') !== LEGACY_NAME_SENTINEL)
+  const all = files[scope].filter((file) => !LEGACY_NAME_SENTINELS.includes(file.replace(/\\/g, '/')))
   if (!entry.scopedTo) return all
   return all.filter((file) => entry.scopedTo.some((fragment) => file.replace(/\\/g, '/').includes(fragment)))
 }

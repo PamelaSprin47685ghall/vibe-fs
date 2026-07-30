@@ -208,12 +208,32 @@ HandleProjection.isRetired       0   EXEC-009 的 fork 前置检查
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| VERIFY-001: 测试金字塔 | PARTIAL | `tests-next/` `testkit/` | 第 0 层已建（`ssot-lint` / `shock-audit`）；`architecture-gate.mjs` 未建，Gates 仍是测试 |
+| VERIFY-001: 测试金字塔 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0 层齐备（`ssot-lint` / `shock-audit` / `architecture-gate`，均为 `scripts/` 下静态检查器）；第 1–2 层在 `tests-mjs/`（374 测试）。第 3 层 Fake Host 轨迹与第 4–5 层 canary/发布门禁待包 K/W 与退火三 |
 | VERIFY-003: Canary Mock 剧本 | CONTRADICTS | `strict-mock-forest.js` `strict-mock-matches.js` | 六项违规：`specificity` 打分消歧、`pathCursor` 游标、失败时删 seal 缓存、`requestRoleOf` 反推角色、`loadScripts` 运行期换剧本、`epochCold` / `modelSideCold` 嗅探式冷边界豁免。分析见 `design-script-forest.md` |
-| VERIFY-004: Stability Gate | CONFORMANT | `run-canary-staggered.mjs` `stability-checker.js` | 三轮 + leak check 已实现 |
-| VERIFY-005: Architecture Gates | PARTIAL | `tests-next/Gates/` | 行数门禁已删除；单一写入口门禁未实现（FALLBACK-003 双写未被拦住）；Gates 仍实现为测试而非静态检查器 |
-| VERIFY-007: 两种 Provider Projection | NOT_IMPLEMENTED | `strict-mock-matches.js` 的 `sealProviderVisible` | 只有一个投影，同时承担字节相等与语义相等 |
-| VERIFY-008: 测试语言边界 | NOT_IMPLEMENTED | `tests-next/**/*.fs` | 测试仍是 `.fs` + Fable 编译 + 手写 Assert shim |
+| VERIFY-004: Stability Gate | CONFORMANT | `run-canary-staggered.mjs` `stability-checker.js` | 三轮 + leak check 已实现。原理与实现的偏差（含「断言心跳从未接线」）记于 `shock-anneal.md` 包 W |
+| VERIFY-005: Architecture Gates | CONFORMANT | `scripts/architecture-gate.mjs` | 已是静态检查器而非测试，故不需先编译即可运行；单一写入口门禁实现为 `SINGLE_WRITER_FACTS`，八个事实实测 ok (1)；`single-constructor` 双向检查（无人绕过 + 有人调用）。行数门禁按条款保持删除 |
+| VERIFY-007: 两种 Provider Projection | PARTIAL | `Domain/ProviderProjection.fs` | 生产侧两投影已分离：`ProviderWireProjection`（含 ID、字节相等）与 `ProviderSemanticProjection`（去 ID、语义相等），`toSemantic` 单向降级。testkit 侧仍是单一 `sealProviderVisible` 同时承担两种相等性，属包 K |
+| VERIFY-008: 测试语言边界 | CONFORMANT | `tests-mjs/` `scripts/architecture-gate.mjs` | 生产 `.fs`、第 1–3 层全 `.mjs` 直接 import `build/next`；`tests-next/` 已删（75 文件 / 11654 行 / 234 断言）；Fable 约定仅存于 `domain.mjs`，由 `domain.meta.test.mjs` 的四个陷阱锁 + 全量 undefined 扫描守住；门禁 `TESTS_ROOT`/`TEST_EXTENSIONS` 指向 `tests-mjs`+`.mjs`，并新增测试侧 scanner witness 防止扫描静默变空 |
+
+### VERIFY 段此前四行失效（包 T-5 更正）
+
+与 Fallback / Review 两段同一成因。四行里三行仍指向已删除的 `tests-next/`：
+
+```text
+VERIFY-001 「architecture-gate.mjs 未建，Gates 仍是测试」
+           → 门禁早已在 scripts/ 下，本次更正前就是第 0 层
+VERIFY-005 「单一写入口门禁未实现（FALLBACK-003 双写未被拦住）」
+           → SINGLE_WRITER_FACTS 已实现，FALLBACK-003 实测 ok (1)
+VERIFY-008 「测试仍是 .fs + Fable 编译 + 手写 Assert shim」
+           → 本包删完 tests-next，test:unit 收缩为 test:mjs
+VERIFY-007 「只有一个投影」
+           → 生产侧已拆两个类型；未完成的是 testkit 侧，归包 K
+```
+
+VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未实现」，而门禁不仅实现了、
+还在包 X8 抓出了 `buildAttemptExecutionProfile` 零调用点。一个标着「未实现」的门禁
+没人会去看它的输出——状态表往乐观方向偏移会让人跳过检查，往悲观方向偏移会让人
+忽略已有的保护。两个方向都在削弱同一份判据。
 
 ## 持久化
 

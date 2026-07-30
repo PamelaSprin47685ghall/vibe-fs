@@ -6,10 +6,7 @@
   "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
   "main": "../build/next/OpenCode/Plugin.js",
   "scripts": {
-    "build": "dotnet fable precompile Wanxiangshu.Next.fsproj -o ../build/next",
-    "test:compile": "dotnet fable ../tests-next/Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next",
-    "test:next": "node --test ../tests-next/runner.test.mjs && node ../tests-next/runner.js --build-dir ../build/tests-next",
-    "build-and-test": "npm run build && npm run test:compile && npm run test:next"
+    "build": "dotnet fable precompile Wanxiangshu.Next.fsproj -o ../build/next"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",

@@ -29,9 +29,7 @@
     "postbuild": "node scripts/postbuild.mjs",
 
     "test:mjs": "node tests-mjs/runner.mjs",
-    "test:compile": "node scripts/clean-fable-output.mjs build/tests-next && cd tests-next && dotnet fable Wanxiangshu.Next.Tests.fsproj --outDir ../build/tests-next --precompiledLib ../build/next",
-    "test:next": "node --test tests-next/runner.test.mjs && node tests-next/runner.js --build-dir build/tests-next",
-    "test:unit": "npm run test:mjs && npm run test:compile && npm run test:next",
+    "test:unit": "npm run test:mjs",
 
     "test:manager-tools": "node --test testkit/opencode/tests/manager-tool-contract.mjs",
     "test:harness": "node testkit/opencode/tests/gate-testkit.mjs",

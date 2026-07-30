@@ -13,7 +13,7 @@
 | 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
 | 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）；X10 随包 K |
-| 6 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 未开始 |
+| 6 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5；374 测试，三时区全绿） |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
 
@@ -769,6 +769,126 @@ session id、Git tree hash 与 prompt payload 摘要。
 facade 出口 `journalStore()` 独占一个临时目录并负责清理（VERIFY-004）。`writeRaw` 是
 表达「损坏 journal」的唯一手段——损坏 fixture 必须只在测试意图的那一点上与健康文件
 不同，所以其余部分仍由生产的 `Envelope.serialize` 生成。
+
+#### 包 T-5 前置：`tests-next` 清点与一处不可直迁的覆盖
+
+删除前逐项清点。`tests-next` 现状：75 个 `.fs`、11654 行、234 个 `[<Fact>]`/`[<Theory>]`，
+且自 X9 起已无法编译（`test:compile` 报 200 个 error，Fable 编译失败）。它已经不产生
+任何反馈，所以「删除」不损失现有判据——但其中一部分覆盖尚未在 mjs 侧重建。
+
+按目录清点：
+
+| 目录 | 文件 | 测试 | 处置 |
+|------|------|------|------|
+| `Flow/` | 2 | 21 | 部分不可直迁，见下 |
+| `Domain/` | 1 | 3 | 已由 `Fallback/cursor.test.mjs` 覆盖 |
+| `Journal/` | 10 | 37 | 已由 `Journal/{envelope,boot}.test.mjs` 覆盖 |
+| `Process/` | 5 | 26 | Deadline 已覆盖；PTY 生命周期属第 3 层，归退火三 |
+| `Session/` | 16 | 56 | Companion/Fallback/Handle 已覆盖；fork runtime 属第 3 层 |
+| `OpenCode/` | 26 | 82 | 全部依赖 Host 替身，属第 3 层，归包 K/W 与退火三 |
+| `MockOpenCode/` | 7 | 1 | Host 替身工装，由包 K 的剧本森林替换 |
+| `Integration/` | 5 | 7 | 第 3–4 层，归退火三 |
+| `GuideContract/` | 1 | 1 | 已由 `tests-mjs/guide-contract.test.mjs` 替换 |
+
+`Flow/` 的 21 个测试是唯一需要单独裁决的一组。 实测生产四个 flow 程序的控制流用量：
+
+```text
+let! / do!   18 处    ← 主体
+use!          1 处    OrchestratorProgram.fs:372（worktree 释放）
+while         0 处
+for           2 处    ProcessRunner，且只遍历 8KiB 定长分块
+try           0 处    （11 处命中全是注释文字）
+```
+
+由此分三类：
+
+`mapBounded` 的 3 个测试必须重建，且可以重建。 它是生产在用的并发原语，
+`Parallel_mapBounded` 是普通导出，从 mjs 可直接调用。`guide-contract.test.mjs` 已断言
+它存在且不存在无界的 `Parallel.map*` 兄弟；行为测试（保序、异常传播、空输入）待补。
+
+`use!` 的 4 个 disposal 测试必须重建。 它们锁的是「body 失败且 dispose 也失败时，
+body 的异常胜出」，而唯一的 `use!` 调用点是 publish 路径上的 worktree 释放——泄漏一个
+worktree 会阻塞整个仓库。这是真实载荷，不是 builder 能力展示。
+
+其余约 14 个测试（`TryFinally`、`TryWith`、`While` 短路、10000 步栈安全）覆盖的是
+生产 flow 从不使用的 builder 能力。 `while` 在四个程序里零处，`for` 只遍历定长分块，
+故「10000 步不栈溢出」描述的是生产到不了的场景。这些不重建，理由记档而非静默丢弃。
+
+不可直迁的原因：builder 方法名带 Fable 签名哈希。
+
+```text
+FlowBuilder$2__Bind_Z40B88B2D    FlowBuilder$2__Using_Z25CD278
+FlowBuilder$2__TryFinally_74403B28   FlowBuilder$2__While_31AC1067
+```
+
+后缀由签名派生，正是 VERIFY-008 要求关在 `domain.mjs` 里的那种 Fable 约定。但把它们
+关进 facade 也换不来什么：`use!` 的语义由编译器把 `companion { use! x = ... }` desugar
+成 `Using(...)` 得到，而从 mjs 只能手工串 `Using` 调用——那样断言的是我拼的链，不是
+编译器的 desugaring。测试会绿，而真正要保护的翻译过程未被覆盖。
+
+因此 disposal 契约的重建路径不是第 1 层 mjs，而是让生产的 `use!` 调用点在第 3 层轨迹里
+真的走一遍失败释放。登记为退火三的必须项，与 `OpenCode/` 那 82 个测试同批。
+
+包 T-5 的执行顺序（下一步）：
+
+```text
+T-5a  本节（清点与裁决）                                    完成
+T-5b  architecture-gate: TESTS_ROOT → tests-mjs；删 fsproj-drift 的测试项；
+      GUIDE_CONTRACT_PATH → tests-mjs/guide-contract.test.mjs；
+      RUNNER_CANDIDATES 去掉 tests-next/runner.js
+T-5c  git rm tests-next 全部；package.json 删 test:compile / test:next，
+      test:unit 收缩为 test:mjs；清理 build/tests-next
+T-5d  shock-audit: tests 根 tests-next → tests-mjs（否则旧符号计数永远为 0，
+      看起来像已灭绝）
+T-5e  mapBounded 三个行为测试补进 tests-mjs
+```
+
+T-5b 必须先于 T-5c：门禁当前对 `tests-next/GuideContract/Signatures.fs` 的缺失是 fail，
+先删文件会让门禁红着，而红门禁下无法验证删除本身是否干净。
+
+#### 包 T-5 实测结果
+
+`tests-next/` 已删：81 个文件、11654 行、234 个断言。`test:unit` 收缩为 `test:mjs`。
+`test:mjs` 374 测试，在 UTC / Asia-Shanghai / America-New_York 三个时区下全绿；
+`gate:static` 全绿（174 生产 + 23 测试文件）。
+
+门禁侧的四处改动，每处都有一个「删完之后会静默失效」的理由：
+
+`TESTS_ROOT` → `tests-mjs`，并新增 `TEST_EXTENSIONS = ['.mjs']`。 测试树与生产树
+现在用不同的扩展名列表扫描。沿用 `SOURCE_EXTENSIONS`（`.fs`/`.fsproj`）会让
+`testFiles` 变成空数组，而所有跨 `allFiles` 的门禁（禁用词汇、`src` 引用、依赖方向）
+都会继续报 OK——扫描面静默缩小，门禁不会说任何话。
+
+新增测试侧 scanner witness。 原有 witness 只覆盖生产四个文件。补上
+`tests-mjs/{runner.mjs,domain.mjs,guide-contract.test.mjs}` 与 `testFiles.length < 5`
+下限，是因为上一条的失效模式恰恰是「扫描返回空」。负向验证：临时移走
+`guide-contract.test.mjs` 与 `runner.mjs`，门禁各报 2 项违规（`dsl-program` /
+`test-runner` 加 `scanner`）。
+
+`fsproj-drift` 去掉测试项。 测试树没有项目文件，所以「声明与磁盘不一致」这个违规类
+变成不可表达而非未检查。留着空跑的检查项会让人以为它还在保护什么——而它当初存在的
+理由（`c3c35756` 把五个测试文件从 `.fsproj` 移除、它们作为死代码继续「通过」了数月）
+在 mjs 侧由 `node:test` 的文件发现天然消解。
+
+测试项目引用门禁整体删除。 同上：没有 `.fsproj` 可以引用任何东西。通用形态仍在——
+`referencesLegacySrc` 跑在 `allFiles` 上，含每个 `.mjs` 测试，所以测试 import `../src`
+照样红。
+
+`shock-audit` 的 tests 作用域改指 `tests-mjs` + `.mjs`。 这是本包最危险的一处：
+留在已删除的 `tests-next` 上，该列会对每个符号返回 0——对一张灭绝审计表来说，
+「查不到」和「已灭绝」显示成同一个值是最坏的失效方向。
+
+连带发现一处豁免名单需要扩容。 改指之后十个旧事实名在 tests 列报出残留，全部来自
+`tests-mjs/Journal/envelope.test.mjs`——那是 PERSIST-005 的测试，断言每个退役事实名
+仍产生迁移提示而非晦涩的 union 错误。断言本身就是那个字符串字面量，所以
+`LEGACY_NAME_SENTINEL` 从单个文件扩为 `LEGACY_NAME_SENTINELS` 两项（codec 与它的
+测试）。只豁免 codec 会让这个测试无法存在。
+
+其余跨仓引用一并清理：`README.md` 布局与构建段、`SSOT/10.md` 的 VERIFY-004 实现清单、
+`testkit/reaper.mjs` 的孤儿进程标记、`next/package.json` 的三个脚本、`build/tests-next`
+产物目录（1.4M，git 已忽略）。
+
+`conformance.md` VERIFY 段四行同步更正，成因与 Fallback / Review 两段相同。
 
 ### 包 W：因果推进门禁重建
 
