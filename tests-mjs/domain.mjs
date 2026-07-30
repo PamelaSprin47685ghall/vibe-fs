@@ -61,6 +61,7 @@ const [
   TerminalValidity,
   PrefixCandidateModule,
   RecoverySlotModule,
+  CompactionPolicyModule,
   BloggerTomlModule,
   BloggerDeltaModule,
   CompanionPromptModule,
@@ -91,6 +92,7 @@ const [
   prod('Domain/TerminalValidity'),
   prod('Domain/PrefixCandidate'),
   prod('Domain/RecoverySlot'),
+  prod('Domain/HostCompactionPolicy'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
   prod('Domain/CompanionPrompt'),
@@ -852,6 +854,70 @@ export const sessionAssociation = (() => {
     },
 
     unlink: (main, current) => m.unlink(sessionId(main), current),
+  }
+})()
+
+/**
+ * HOST-006: the prevention layer's required settings and the containment decision.
+ *
+ * The verdicts carry payloads, so `verdictOf` reports the case name alongside the
+ * rendered message — a test asserting only the name would pass while the operator
+ * message said nothing useful, and asserting only the message would break on wording.
+ */
+export const hostCompaction = (() => {
+  const m = bind(CompactionPolicyModule, 'HostCompactionPolicy', [
+    'requiredSettings',
+    'autoContinueEnabled',
+    'isContainableCompaction',
+    'nextReanchor',
+    'judgeFirstTurn',
+    'describeVerdict',
+  ])
+
+  const settings = listItems(m.requiredSettings).map((setting) => ({
+    path: listItems(setting.Path).join('.'),
+    required: setting.Required,
+    clause: setting.Clause,
+    reason: setting.Reason,
+    value: setting,
+  }))
+
+  const verdictOf = (verdict) => ({
+    name: caseOf(verdict),
+    message: m.describeVerdict(verdict),
+  })
+
+  return {
+    settings,
+    settingPaths: settings.map((s) => s.path),
+    autoContinueEnabled: m.autoContinueEnabled,
+
+    isContainableCompaction: (isCompaction) => m.isContainableCompaction(isCompaction),
+
+    /**
+     * `undefined` when every observed compaction has already been reanchored.
+     *
+     * `alreadyReanchored` is a list of id strings here and becomes the predicate the
+     * production signature takes. Production asks a keyed question because the caller
+     * holds an indexed projection (PERSIST-008); a test has a handful of ids, so the
+     * conversion belongs at this boundary rather than in every test.
+     */
+    nextReanchor: (observed, alreadyReanchored = []) => {
+      const handled = new Set(alreadyReanchored)
+      const next = unwrapOption(
+        m.nextReanchor(toList(observed.map(providerRun)), (run) => handled.has(idValue.providerRun(run))),
+      )
+      return isNone(next) ? undefined : idValue.providerRun(next)
+    },
+
+    judgeFirstTurn: ({ unavailable, session, pseudoRuns }) =>
+      verdictOf(
+        m.judgeFirstTurn(
+          unavailable === undefined ? undefined : settings.find((s) => s.path === unavailable).value,
+          sessionId(session),
+          pseudoRuns,
+        ),
+      ),
   }
 })()
 
