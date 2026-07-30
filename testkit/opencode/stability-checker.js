@@ -2,7 +2,7 @@
  * stability-checker.js — Stability gate and static analysis logic.
  *
  * Implements:
- *   - Static analysis: checks for standalone fixed sleeps and containsTool.
+ *   - Static analysis: checks for standalone fixed sleeps.
  *   - Stability repetition: repeats a selected E2E test function N times.
  *   - Random order and isolation check.
  *   - Scenario-local failure diagnostics.
@@ -18,8 +18,21 @@ import {
 } from './time-budget.js';
 
 /**
- * Checks files for containsTool and fixed sleep violations.
+ * Checks files for fixed sleep violations.
  * Returns { passed: boolean, violations: Array<{ file, line, type, message }> }
+ *
+ * A `containsTool` check used to sit beside this one, gated on the path prefix
+ * `e2e/opencode/specs/`. Package W3 measured it dead twice over: that directory has never
+ * existed in this repository, so the branch was unreachable at all 19 call sites, AND
+ * `containsTool` occurs nowhere in `testkit/`, `scripts/`, or `tests-mjs/` — `git log -S` puts
+ * its last three appearances in the 0.4 tree. Realigning the path would have bought a reachable
+ * check with nothing to ever do, which is the same defect one layer over.
+ *
+ * Its responsibility is already discharged by something strictly stronger. Package K7 retired
+ * the whole `contains*` predicate family at LOAD time: `legacy-fields.js:20` refuses
+ * `containsText` with 'declare the turn text as a prefix', and `tests/gate-source-cases.mjs`
+ * asserts that refusal. A scenario carrying the vocabulary does not load, so there is no later
+ * source scan left to perform.
  */
 export function runStaticGate(filePaths = []) {
   const violations = [];
@@ -32,18 +45,7 @@ export function runStaticGate(filePaths = []) {
     lines.forEach((line, idx) => {
       const lineNum = idx + 1;
 
-      // 1. Check containsTool
-      // E2E spec files under e2e/opencode/specs/ must not use containsTool.
-      if (filePath.includes('e2e/opencode/specs/') && line.includes('containsTool')) {
-        violations.push({
-          file: filePath,
-          line: lineNum,
-          type: 'containsTool',
-          message: 'containsTool assertion is forbidden in E2E spec files. Use filesystem or message-content assertions instead.',
-        });
-      }
-
-      // 2. Check fixed sleep
+      // Check fixed sleep
       // Matches sleep(...) or Promise.sleep(...) or setTimeout(..., number)
       const sleepMatch = line.match(/\b(sleep|Promise\.sleep|setTimeout)\s*\(\s*(\d+)/);
       if (sleepMatch) {
