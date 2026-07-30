@@ -1,18 +1,15 @@
-// tests-mjs/Kernel/parallel.test.mjs — VERIFY-004, plus unclaused primitive contract.
+// tests-mjs/Kernel/parallel.test.mjs — ARCH-009.
 //
-// `Parallel.mapBounded` is the only concurrency primitive production uses, and
-// `guide-contract.test.mjs` asserts no unbounded `Parallel.map*` sibling exists
-// beside it. This file covers what that one function must actually do.
+// `Parallel.mapBounded` is the only concurrency primitive the business layer may
+// use, and `guide-contract.test.mjs` asserts no unbounded `Parallel.map*` sibling
+// exists beside it. ARCH-009 is what those two facts come from.
 //
-// NO CLAUSE GOVERNS THIS FUNCTION. Tests whose property follows from a clause are
-// named for it — the concurrency ceiling and cancellation are VERIFY-004, because
-// unbounded fan-out is what makes a hang indistinguishable from slowness. The rest
-// (result ordering, empty input, refusing a non-positive bound) are contract
-// properties of a shared primitive that SSOT does not currently address, so they
-// carry a `mapBounded_` prefix rather than a borrowed clause id. Inventing one
-// would put a claim in a test name that `SSOT/` does not back — and `ssot-lint`
-// only reads `SSOT/`, so nothing would catch it. Gap recorded in
-// `STATUS/conformance.md`.
+// The clause was written BECAUSE of this file. Writing these tests surfaced a
+// shared primitive with a real behavioural contract and no clause backing any of
+// it, so the tests briefly carried a `mapBounded_` prefix — a name asserting
+// nothing, since `ssot-lint` only reads `SSOT/` and would never catch a fabricated
+// clause id in a test name. Rather than leave that gap, ARCH-009 now states the
+// contract and every test here names it (supersedes record #2).
 //
 // Why it matters beyond correctness: unbounded fan-out makes a canary fail on
 // machine load rather than on logic, and VERIFY-002 forbids papering over a race
@@ -47,7 +44,7 @@ const withConcurrencyProbe = (action) => {
 
 // ── results are positional, never completion-ordered ────────────────────────
 
-test('mapBounded_results_follow_input_order_not_completion_order', async () => {
+test('ARCH_009_results_follow_input_order_not_completion_order', async () => {
   // The property a caller depends on: `results[i]` is the result for `items[i]`.
   // Here the FIRST item is the SLOWEST, so a implementation that appended on
   // completion would return the exact reverse.
@@ -60,7 +57,7 @@ test('mapBounded_results_follow_input_order_not_completion_order', async () => {
   assert.deepEqual(await parallel.mapBounded(6, reverseDelays, items), [10, 20, 30, 40, 50, 60])
 })
 
-test('mapBounded_order_holds_when_the_bound_forces_several_waves', async () => {
+test('ARCH_009_order_holds_when_the_bound_forces_several_waves', async () => {
   // With max=2 over 6 items the work runs in three waves, so ordering has to
   // survive being reassembled across them rather than within one batch.
   const items = [1, 2, 3, 4, 5, 6]
@@ -72,7 +69,7 @@ test('mapBounded_order_holds_when_the_bound_forces_several_waves', async () => {
   assert.deepEqual(await parallel.mapBounded(2, jittered, items), ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'])
 })
 
-test('mapBounded_a_synchronous_action_still_yields_a_result_list', async () => {
+test('ARCH_009_a_synchronous_action_still_yields_a_result_list', async () => {
   // Not every action awaits. An implementation keying results off a resolved
   // promise's callback ordering would degrade here without failing loudly.
   assert.deepEqual(await parallel.mapBounded(3, async (item) => item + 1, [1, 2, 3]), [2, 3, 4])
@@ -80,7 +77,7 @@ test('mapBounded_a_synchronous_action_still_yields_a_result_list', async () => {
 
 // ── the bound actually binds ─────────────────────────────────────────────────
 
-test('VERIFY_004_concurrency_never_exceeds_the_declared_maximum', async () => {
+test('ARCH_009_concurrency_never_exceeds_the_declared_maximum', async () => {
   const { probed, state } = withConcurrencyProbe(async (item) => {
     await sleep(15)
     return item
@@ -94,7 +91,7 @@ test('VERIFY_004_concurrency_never_exceeds_the_declared_maximum', async () => {
   assert.equal(state.inFlight, 0, 'every permit must be released')
 })
 
-test('VERIFY_004_a_maximum_of_one_serialises_the_work', async () => {
+test('ARCH_009_a_maximum_of_one_serialises_the_work', async () => {
   // The degenerate bound is worth pinning separately: it is what a caller reaches
   // for when an action is not safe to run concurrently at all.
   const completions = []
@@ -110,7 +107,7 @@ test('VERIFY_004_a_maximum_of_one_serialises_the_work', async () => {
   assert.deepEqual(completions, [1, 2, 3, 4], 'serialised work completes in submission order')
 })
 
-test('mapBounded_a_bound_above_the_item_count_is_not_an_error', async () => {
+test('ARCH_009_a_bound_above_the_item_count_is_not_an_error', async () => {
   const { probed, state } = withConcurrencyProbe(async (item) => {
     await sleep(8)
     return item
@@ -120,7 +117,7 @@ test('mapBounded_a_bound_above_the_item_count_is_not_an_error', async () => {
   assert.equal(state.peak, 2, 'peak is bounded by the work available, not by the permit count')
 })
 
-test('mapBounded_a_rejection_returns_early_while_siblings_keep_running', async () => {
+test('ARCH_009_a_rejection_returns_early_while_siblings_keep_running', async () => {
   // `Promise.all` semantics, pinned because it is easy to assume otherwise: the
   // call rejects as soon as ONE action throws, but the actions already admitted
   // are not cancelled — they run to completion in the background.
@@ -161,7 +158,7 @@ test('mapBounded_a_rejection_returns_early_while_siblings_keep_running', async (
 
 // ── rejecting a nonsensical bound ────────────────────────────────────────────
 
-test('mapBounded_a_non_positive_maximum_is_refused_rather_than_defaulted', async () => {
+test('ARCH_009_a_non_positive_maximum_is_refused_rather_than_defaulted', async () => {
   // Zero cannot mean "unbounded" and cannot mean "one". Both readings are a guess
   // at the caller's intent, and one of them silently removes the bound.
   for (const invalid of [0, -1, -100]) {
@@ -173,7 +170,7 @@ test('mapBounded_a_non_positive_maximum_is_refused_rather_than_defaulted', async
   }
 })
 
-test('mapBounded_an_empty_input_short_circuits_before_the_bound_is_checked', async () => {
+test('ARCH_009_an_empty_input_short_circuits_before_the_bound_is_checked', async () => {
   // Empty input returns before any permit is taken. Worth pinning because it is
   // the one path where the action is never called at all.
   let calls = 0
@@ -188,11 +185,11 @@ test('mapBounded_an_empty_input_short_circuits_before_the_bound_is_checked', asy
 
 // ── cancellation is observed at the permit, not inside the action ────────────
 
-test('VERIFY_004_a_live_token_lets_the_work_run', async () => {
+test('ARCH_009_a_live_token_lets_the_work_run', async () => {
   assert.deepEqual(await parallel.mapBounded(2, async (item) => item * 3, [1, 2, 3], liveToken()), [3, 6, 9])
 })
 
-test('VERIFY_004_an_already_cancelled_token_stops_the_work_before_it_starts', async () => {
+test('ARCH_009_an_already_cancelled_token_stops_the_work_before_it_starts', async () => {
   // `WaitAsync` throws on a cancelled token before the action is invoked. That
   // ordering is the point: cancellation must not depend on the action choosing to
   // check, because a long-running action would then ignore it entirely.
@@ -210,7 +207,7 @@ test('VERIFY_004_an_already_cancelled_token_stops_the_work_before_it_starts', as
   assert.equal(calls, 0, 'no action may run under an already-cancelled token')
 })
 
-test('VERIFY_004_the_cancellation_token_reaches_the_action', async () => {
+test('ARCH_009_the_cancellation_token_reaches_the_action', async () => {
   // The action receives the token as its second argument, so a nested call can
   // propagate it. Losing it here is how an inner fan-out becomes uncancellable.
   const token = liveToken()

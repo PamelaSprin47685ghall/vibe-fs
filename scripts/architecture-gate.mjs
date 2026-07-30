@@ -279,6 +279,23 @@ const SINGLE_CONSTRUCTOR_TYPES = [
 // one; it must still enforce a hard per-test timeout.
 const RUNNER_CANDIDATES = ['tests-mjs/runner.mjs']
 
+// ── bounded concurrency (ARCH-009) ──────────────────────────────────────────
+//
+// The business layer gets one fan-out primitive: `Parallel.mapBounded`. Direct
+// unbounded fan-out makes failure depend on machine load rather than logic, so
+// "slow" and "hung" stop being distinguishable — the exact signal VERIFY-004's
+// causal-progress gate exists to preserve.
+//
+// The owner is allowed to use `Promise.all` because that is HOW a bounded
+// primitive is built: the semaphore admits `maxConcurrency` at a time and
+// `Promise.all` awaits the already-bounded set. Without naming the owner this gate
+// would flag the implementation of the very thing it mandates.
+const UNBOUNDED_FANOUT = {
+  clause: 'ARCH-009',
+  owner: 'next/Kernel/Flow.fs',
+  patterns: ['Promise.all', 'Task.WhenAll', 'Task.WaitAll'],
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 const violations = []
@@ -468,6 +485,34 @@ for (const { fact, allowed, reason } of SINGLE_WRITER_FACTS) {
     // Folds and type declarations name facts; only a constructor is a write.
     if (constructor.test(read(file)) && !endsWithAny(file, allowed)) {
       fail('single-writer', `${file}: constructs '${fact}' outside its writer boundary — ${reason}`)
+    }
+  }
+}
+
+// ── gate: bounded concurrency only (ARCH-009) ───────────────────────────────
+
+{
+  const { clause, owner, patterns } = UNBOUNDED_FANOUT
+  const ownerText = existsSync(owner) ? read(owner) : null
+
+  if (ownerText === null) {
+    fail('bounded-concurrency', `${owner} is missing: ARCH-009's bounded primitive has no owner`)
+  } else if (!ownerText.includes('mapBounded')) {
+    // Without this the gate would still pass after the primitive was deleted:
+    // every file would be clean because nobody fans out at all.
+    fail('bounded-concurrency', `${owner}: must define the bounded primitive ARCH-009 mandates (mapBounded)`)
+  }
+
+  for (const file of productionFiles.filter(isFs)) {
+    if (norm(file) === owner) continue
+    const text = read(file)
+    for (const pattern of patterns) {
+      if (text.includes(pattern)) {
+        fail(
+          'bounded-concurrency',
+          `${file}: unbounded fan-out '${pattern}'; ${clause} admits only Parallel.mapBounded outside ${owner}`,
+        )
+      }
     }
   }
 }

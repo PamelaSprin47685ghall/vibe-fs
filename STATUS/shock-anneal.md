@@ -1406,19 +1406,29 @@ FallbackExhausted        FALLBACK-005   absent (fact not defined yet)
 
 禁止一边改代码一边悄悄降低条款。
 
-已触发次数：1。
+已触发次数：2。
 
 ### supersedes 记录
 
 | # | 条款 | 日期 | commit | blocker | 变更 |
 |---|------|------|--------|---------|------|
 | 1 | HOST-006 | 2026-07-30 | `cd1f8f09` | `STATUS/blocker-HOST-006.md` | 单层「全部禁止」改为预防层 + 收容层；manual `/compact` 成为官方支持用法，效果 best effort；新增 `compaction prune` 到必须关闭清单；启动门禁从静态配置读取升级为运行时探测；新增持久事实 `ContextReanchored`（PERSIST-010） |
+| 2 | ARCH-009（新增） | 2026-07-30 | 本次 | 无（不是矛盾，是规范缺失） | 新增条款：业务层并发只允许有界 map；`maxConcurrency` 必须为正且拒绝非正值；结果按输入位置排列；取消在获取许可处观察且 token 传达到 action；拒绝不取消 siblings，许可必须在失败时归还 |
 
 例外 1 的判据是逻辑矛盾，不是实现困难。 manual compaction 的完整路径（`groups/session.ts:303` → `handlers/session.ts:282` → `prompt.ts:1149` → `compaction.ts:513`）全程无 hook、无配置查询；唯一的 `experimental.session.compacting` 输出类型是 `{ context; prompt? }`，无否决字段，且 `plugin.trigger` 的返回值在调用点被丢弃。冻结版同时要求「必须关闭 manual」与「无法满足则启动失败」，两句连读要求插件在所有受支持版本上无条件启动失败。
 
 修订未降低保护强度，三处提高了：一是 `compaction.prune` 此前未被点名，而它绕过投影边界直接删持久消息行；二是启动门禁从「读配置」改为「运行时探测首个 session 的 compaction pseudo-run 数为 0」，因为 `packages/core/src/session/runner/llm.ts:215` 存在第二个 compaction 实现，其配置来源与插件可写的那份不同，静态读取无法证明它没在跑；三是新增收容层，任何仍然出现的 compaction 都触发一次重锚，而冻结版对「万一还是发生了」没有任何规定。
 
 收容层是主要防线，预防层是次要的。 预防层依赖 Host 的配置键名、hook 名与 `isOverflow` 短路位置，全部会随上游版本漂移；收容层只依赖「compaction pseudo-run 在 transcript 里可识别」，而 ARCH-003 禁止修改 Host、也无法钉住 Host 版本，因此耐用的那一层才该承重。
+
+例外 2 是反向缺口：不是条款不可实现，是条款不存在。 包 T-5e 写 `Parallel.mapBounded` 的第 1 层测试时发现，这个跨领域共享原语的行为契约真实存在（并发上限、结果保序、取消传播、许可归还、拒绝后 siblings 的命运），而 `SSOT/` 没有任何条款管它。
+
+例外协议第 3 步「证明是 Host 能力或逻辑矛盾」在此不适用，因为没有要修改的既有条款。走协议的理由是第 6 步：新增条款同样需要重新冻结，且不得由实现反向定义。因此 ARCH-009 的文字先于测试改名写定，而不是把已有测试的行为抄成条款。
+
+一处需要明确的判断：`Promise.all` 的「拒绝不取消 siblings」写进条款，不是把实现细节升级成规范。判据是这条行为决定调用方的正确写法——把 reject 读作「全部工作已停止」会写出错误的清理逻辑，而语言语义不会阻止他。规范必须表达它，否则它只被一个测试锁住，而测试不是规范（见 AGENTS.md 第 1 节）。
+
+反过来，`Promise.all` 用于实现有界原语本身不受 ARCH-009 约束——条款禁止的是业务层直接无界扇出，适配器内部为构造有界语义而使用它是实现自由。这条边界写在条款正文里，否则下一次读者会把整个 `Kernel/Flow.fs` 判成违规。
+
 
 ## 封炉期已完成
 
