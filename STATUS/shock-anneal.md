@@ -807,8 +807,10 @@ X5  Y squash + armed-by-advance 控制流 + 三结局分派（CTX-007）
     + 第 3 层轨迹（squash 成功/失败、级联、预算耗尽）
 X6  ManagedSessionKind + SessionAssociation（HOST-008）；全部工作角色懒创建 Y；
     Y 不递归；重启复用；X 删除时 Y 收敛
-X7  全局关闭 Host compaction（HOST-006）：配置、Hook 拒绝、autocontinue false、
-    启动能力门禁。此步未完成前不启用新 PrefixEpoch 逻辑
+X7  Host compaction 预防层 + 收容层（HOST-006）：
+    预防 = 关 auto/overflow/autocontinue/prune + 运行时启动探测
+    收容 = 观察 pseudo-run → ContextReanchored 重锚（永远武装）
+    此步未完成前不启用新 PrefixEpoch 逻辑
 X8  X probe：候选选择（CTX-011）、cutoff proof、FrozenB blob、attempt profile、
     probe projection、promote/discard（CTX-012）、崩溃恢复
 X9  删除旧实现：主动 PrefixEpoch 更新、Host compaction rebase、角色 eligibility、
@@ -829,7 +831,7 @@ LatestBBytes OverflowPatterns OverflowDetected CompressionThreshold
 SquashReason PrefixProbeRolledBack RestoreOldEpoch
 ```
 
-但角色白名单本身仍在，以另一个名字： `Domain.PromptAuthority.hasCompanion`（`next/Domain/PromptAuthority.fs:528`）按 `CanonicalRole` 返回 bool，六个角色 true、四个 false。这正是 COMPANION-001 删除的东西——它没有进灭绝表，因为表是按旧符号名列的，而这个函数是包 B 期间新写的，当时的 COMPANION-001 还是白名单语义。
+但角色白名单本身仍在，以另一个名字：`Domain.PromptAuthority.hasCompanion`（`next/Domain/PromptAuthority.fs:528`）按 `CanonicalRole` 返回 bool，六个角色 true、四个 false。这正是 COMPANION-001 删除的东西——它没有进灭绝表，因为表是按旧符号名列的，而这个函数是包 B 期间新写的，当时的 COMPANION-001 还是白名单语义。
 
 唯一消费者：`next/OpenCode/CompanionTransform.fs:104`。
 
@@ -844,24 +846,32 @@ Kernel/Roles.fs:96-100 的 RoleDefinition 注释   （现在指向 hasCompanion 
 
 `Session/CompanionDelta.fs` 的 `jsonDelta` 归 X3（TOML 发射器就位）与 X9（删除旧路径），不归 X2：先删会让 Companion 链路无 delta 可发。
 
-#### X0：Host 源码确认清单
+#### X0：Host 源码确认清单（已完成）
 
-按 ARCH-003 与 `AGENTS.md` 第 0 节，以下判断必须先读 `../opencode` 实际源码，不得只看 `.d.ts`，也不得只做黑盒实验：
+结论全文：`STATUS/evidence/host-context-recovery.md`。绑定 Host `1.18.9`、本仓库 `cd1f8f09`。
 
-| # | 待确认 | 影响 |
-|---|-------|------|
-| 1 | `experimental.chat.messages.transform` 是否允许输出与物理 transcript 不同的消息集（含删除历史） | 整个 frame 投影可行性 |
-| 2 | transform 是否允许输出连续 user 消息 | COMPANION-005 投影形状 |
-| 3 | synthetic user ID 如何影响 assistant `parentID`；wire 上是否有 Host 侧校验冲突 | COMPANION-013 身份公式 |
-| 4 | transform 输出末条消息 id 是否必须等于物理末条 user 消息 id | delta 必须最后（COMPANION-005） |
-| 5 | transform 输入能否读取 Prompt metadata 或 request kind | squash 请求的直通方式 |
-| 6 | automatic compaction 的真实关闭位置 | HOST-006 |
-| 7 | overflow compaction 是否全部经过可拒绝 Hook | HOST-006 |
-| 8 | manual compaction 是否能被全局阻断 | HOST-006 |
-| 9 | autocontinue 的真实调用路径与条件 | HOST-006 |
-| 10 | Y 物理 transcript 中被投影删除的历史是否仍影响 Host 内部行为 | PERSIST-010 fold 唯一权威性 |
+| # | 待确认 | 结论 | 影响 |
+|---|-------|------|------|
+| 1 | transform 是否允许输出与物理 transcript 不同的消息集 | 可以，但只能就地修改数组 | frame 投影可行，有约定陷阱 |
+| 2 | transform 是否允许输出连续 user 消息 | 允许，Host 侧无校验 | COMPANION-005 投影形状成立 |
+| 3 | synthetic user ID 如何影响 assistant `parentID` | 完全无影响，且无 id 存在性校验 | COMPANION-013 公式安全 |
+| 4 | 输出末条消息 id 是否必须等于物理末条 | 不必须 | 「delta 最后」的理由需改写 |
+| 5 | transform 输入能否读 prompt metadata / request kind | 不能，输入是空对象 | `RequestKind` 由插件自己回答 |
+| 6 | automatic compaction 的真实关闭位置 | `compaction.auto = false`，实例级 | 可关闭 |
+| 7 | overflow compaction 是否经可拒绝 Hook | 无 hook，但 `auto=false` 转为终局错误 | 与 CTX-002 对齐 |
+| 8 | manual compaction 是否能被全局阻断 | 不能 | 触发 SSOT 例外 1 |
+| 9 | autocontinue 的真实调用路径与条件 | hook 可否决；`auto=false` 下 replay 分支不可达 | 可关闭 |
+| 10 | 被投影省略的历史是否仍影响 Host 内部 | 触发阈值不受影响；`prune` 受影响 | `prune` 进必须关闭清单 |
 
-不满足时调整投影方式或 fail closed。 不得修改 OpenCode 本体，不得要求上游加 Hook。第 6–9 项任一无法可靠关闭，则启动失败（HOST-006），不得静默运行两套压缩系统。
+第 8 项触发 SSOT 例外协议第 1 次，见 `STATUS/blocker-HOST-006.md`。HOST-006 由单层「全部禁止」改为预防层 + 收容层，manual `/compact` 成为官方支持用法。
+
+X0 发现的两条实现约束，写代码前必读。
+
+第一条会静默失效。 `experimental.chat.messages.transform` 的返回值在调用点被丢弃（`packages/opencode/src/plugin/index.ts:284-293`），Host 随后读的是原数组绑定（`prompt.ts:1262`）。因此 frame 投影只能就地修改数组（`splice` / `push` / `length = 0`）；写成 `output.messages = frames` 不报错、不抛异常，只是 provider 收到未修改的原始 transcript，而所有断言都会通过。这与 `tests-mjs/domain.mjs` 封死的三个陷阱同类，X4 必须有一个第 3 层轨迹专门证明「替换数组引用不生效」。Host 仓库内无该 hook 的测试或文档，因此不能假定它在未来版本保持不变。
+
+第二条改变了一处设计理由。 COMPANION-005 的「delta 必须最后」原本的理由是「更容易保持 HOST-010 零例外绑定」，源码显示这不成立：`parentID` 与传给 processor 的 `user` 都来自 transform 之前算出的 `lastUser`（`prompt.ts:1096`、`1188`、`1273`），与输出顺序无关。该顺序仍应保留，但理由改为「让物理 delta 同时是 provider 看到的最后一条，避免 Host 与 provider 对本轮新内容产生两种答案」。
+
+未解决项两条，登记在 evidence 文件末尾：`packages/core/src/session/runner/llm.ts:215` 的第二个 compaction 实现是否可达（处置：X7 的启动探测必须是运行时的，不能只读源码结论）；非 Anthropic provider adapter 是否合并相邻同角色消息（处置：包 K 待确认）。
 
 #### 测试矩阵
 
@@ -905,8 +915,12 @@ Y  纯图片 turn → image_omitted → 正常推进 coverage
 
 Session      全部工作角色创建 Y；Y 不递归；重启复用同一 Y；
              fallback Agent 改变不创建新 Y；X 删除时 Y 正确收敛
-Compaction   X auto/manual 被拒；Y overflow 被拒；autocontinue 恒 false；
-             compaction 不推进 cursor
+Compaction   预防：auto/overflow/autocontinue/prune 关闭后不再自行触发；
+             启动探测在首轮出现 pseudo-run 时报 HostContractUnsupported
+             收容：手动 /compact → 一次 ContextReanchored，epoch 退役、
+             coverage 归零、Frames 全保留；同一 pseudo-run 重复观察幂等；
+             重锚后新轮次重新累积 coverage，probe 能力恢复；
+             compaction pseudo-run 不推进 cursor、不成为 Authority Root
 ```
 
 第 4 层 canary（四条，随包 K 写成 TOML）：
@@ -956,7 +970,7 @@ turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squa
 [x] SSOT 不再定义 Companion eligibility
 [x] SSOT 明确所有 Work Session 有 Companion
 [x] SSOT 明确 Companion 不递归
-[x] SSOT 明确 Host compaction 全局关闭
+[x] SSOT 明确 Host compaction 预防层四项 + 收容层重锚
 [x] SSOT 明确 X probe 成功后才 promote
 [x] SSOT 明确 Y squash 有效后立即提交
 [x] SSOT 明确图片内容不进入 Companion
@@ -970,6 +984,9 @@ turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squa
 [ ] Y delta TOML 不超过 200 KiB         [ ] A′ 失败后 B 使用旧 epoch
 [ ] B′ 可独立重试等价候选               [ ] squash 成功 + main 失败后 squash 仍存在
 [ ] Host compaction 不产生任何领域事实  [ ] 全部工作角色均创建 Y
+[ ] 手动 /compact 触发一次重锚而非静默失效
+[ ] 重锚后 coverage 重新累积，probe 能力恢复
+[ ] compaction.prune 关闭已断言
 [ ] Y 不创建 Y                          [ ] 图片二进制/URL/hash 不进入 TOML
 [ ] Prompt 全部经 PromptDispatcher      [ ] Fallback cursor 只有一个写入口
 ```
@@ -1046,7 +1063,7 @@ turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squa
 | `CompressionThreshold` / `SquashReason` | 无 | CTX-005 | 0 |
 | X 侧摘要/压缩请求 | Companion 工作日志本地替换 | CTX-009 | 0 |
 | `PrefixProbeRolledBack` / `PrefixProbeCleared` / `RestoreOldEpoch` | 无（失败 probe 非事实） | CTX-010 | 0 |
-| Host compaction → PrefixEpoch rebase 路径 | 全局关闭 | HOST-006 | 0 |
+| Host compaction → PrefixEpoch rebase 路径 | 收容层重锚（ContextReanchored） | HOST-006 | 0 |
 | JSON 形态的 Blogger delta | 确定性 TOML | CTX-013 | 0 |
 | 物理 Y transcript 作为投影历史来源 | Journal fold 派生 Frames | PERSIST-010 | 0 |
 
@@ -1122,7 +1139,19 @@ FallbackExhausted        FALLBACK-005   absent (fact not defined yet)
 
 禁止一边改代码一边悄悄降低条款。
 
-已触发次数：0。
+已触发次数：1。
+
+### supersedes 记录
+
+| # | 条款 | 日期 | commit | blocker | 变更 |
+|---|------|------|--------|---------|------|
+| 1 | HOST-006 | 2026-07-30 | `cd1f8f09` | `STATUS/blocker-HOST-006.md` | 单层「全部禁止」改为预防层 + 收容层；manual `/compact` 成为官方支持用法，效果 best effort；新增 `compaction prune` 到必须关闭清单；启动门禁从静态配置读取升级为运行时探测；新增持久事实 `ContextReanchored`（PERSIST-010） |
+
+例外 1 的判据是逻辑矛盾，不是实现困难。 manual compaction 的完整路径（`groups/session.ts:303` → `handlers/session.ts:282` → `prompt.ts:1149` → `compaction.ts:513`）全程无 hook、无配置查询；唯一的 `experimental.session.compacting` 输出类型是 `{ context; prompt? }`，无否决字段，且 `plugin.trigger` 的返回值在调用点被丢弃。冻结版同时要求「必须关闭 manual」与「无法满足则启动失败」，两句连读要求插件在所有受支持版本上无条件启动失败。
+
+修订未降低保护强度，三处提高了：一是 `compaction.prune` 此前未被点名，而它绕过投影边界直接删持久消息行；二是启动门禁从「读配置」改为「运行时探测首个 session 的 compaction pseudo-run 数为 0」，因为 `packages/core/src/session/runner/llm.ts:215` 存在第二个 compaction 实现，其配置来源与插件可写的那份不同，静态读取无法证明它没在跑；三是新增收容层，任何仍然出现的 compaction 都触发一次重锚，而冻结版对「万一还是发生了」没有任何规定。
+
+收容层是主要防线，预防层是次要的。 预防层依赖 Host 的配置键名、hook 名与 `isOverflow` 短路位置，全部会随上游版本漂移；收容层只依赖「compaction pseudo-run 在 transcript 里可识别」，而 ARCH-003 禁止修改 Host、也无法钉住 Host 版本，因此耐用的那一层才该承重。
 
 ## 封炉期已完成
 
