@@ -27,6 +27,7 @@
 
 import { parse as parseToml } from 'smol-toml';
 import { retiredFieldProblems } from './legacy-fields.js';
+import { validateFault } from './delivery-plan.js';
 
 // ── the TOML root-key trap ──────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ const FLOW_VERBS = new Set([
   'assertActiveRequests',
   'assertWorktreeClean',
   'assertPtyEcho',
+  'assertModelTrajectory',
   'afterExpectation',
   'custom',
 ]);
@@ -161,9 +163,15 @@ export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
   // Reached by a scenario prompt, or by a reachable step's tool-call prompt. Fixpoint,
   // not one pass, because forks chain: Manager → Coder → the Coder's own children.
   //
-  // `internal = true` opts a lane out. Production composes those prompts itself
-  // (`CompanionHostBlogger.fs:72,77,118`, `ExecutorSummarize.fs:95`), so no scenario
-  // text can reach them and the check would have no evidence either way.
+  // `internal = true` opts a turn out. Production composes those prompts itself, so no
+  // scenario text can reach them and the check would have no evidence either way. Three
+  // measured sites, and the third is not a child session at all:
+  //
+  //   `CompanionHostBlogger.fs:72,77,118`  Blogger child, prompt built from the delta
+  //   `ExecutorSummarize.fs:95`            map child, prompt built per output chunk
+  //   `TurnCompletionProgram.fs:92`        continuation, SAME lane, new user message
+  //
+  // That last one is why this is a per-TURN flag rather than a per-lane one.
   const scenarioPrompts = [prompt?.text, ...(flow ?? []).map((flowStep) => flowStep.prompt?.text)].filter(
     (text) => typeof text === 'string',
   );
@@ -235,6 +243,93 @@ const duplicateDeclarations = (entries) => {
 
   return problems;
 };
+
+/**
+ * A fault declaration that is malformed rather than merely misplaced.
+ *
+ * `validateFault` had eight callers in the gate and none here, so until now a real
+ * scenario could declare `attempts = []` — a fault that never fires — and load clean.
+ * Exactly the zero-call-site shape `architecture-gate`'s `single-constructor` check
+ * exists to catch one layer down.
+ */
+const malformedFaults = (scenario) =>
+  (scenario.fault ?? []).flatMap((fault, index) =>
+    validateFault({ ...fault, kind: fault.delivery ?? fault.kind }).map(
+      (problem) => `fault[${index}]: ${problem}`,
+    ),
+  );
+
+/**
+ * A `provider-error` fault must say whether the Host should retry it.
+ *
+ * This is the load-bearing bit of a fallback scenario and it is invisible in the
+ * response body: a retryable 500 means the HOST drives the retries, a non-retryable 400
+ * means the Host gives up and the plugin must send a continuation (FALLBACK-009). Get it
+ * wrong and the scenario still runs, just proving a different clause than its author
+ * believes. So it is required rather than defaulted.
+ */
+const providerErrorProblems = (scenario) =>
+  (scenario.fault ?? []).flatMap((fault, index) => {
+    if ((fault.delivery ?? fault.kind) !== 'provider-error') return [];
+
+    const problems = [];
+    if (!Number.isInteger(fault.status)) {
+      problems.push(`fault[${index}]: a provider-error must declare the HTTP status it returns`);
+    }
+    if (typeof fault.retryable !== 'boolean') {
+      problems.push(
+        `fault[${index}]: a provider-error must declare retryable; ` +
+          'it decides whether the Host retries or the plugin continues the Logical Run (FALLBACK-009)',
+      );
+    }
+    return problems;
+  });
+
+/**
+ * Two faults governing one (lane, turn, step).
+ *
+ * `faultFor` already throws on this, but it throws at DELIVERY — so the author finds out
+ * mid-run, in whichever scenario reached that step first, with the Host already up. The
+ * static whole is available at load time; there is no reason to wait.
+ */
+const conflictingFaults = (entries, scenario) => {
+  const seen = new Map();
+  const problems = [];
+
+  (scenario.fault ?? []).forEach((fault, index) => {
+    const { entry } = resolveReference(entries, fault);
+    if (entry === undefined) return;
+
+    const key = `${entry.lane ?? ''}\u001f${entry.turn}\u001f${entry.step}`;
+    const earlier = seen.get(key);
+
+    if (earlier === undefined) seen.set(key, index);
+    else {
+      problems.push(
+        `fault[${earlier}] and fault[${index}]: two faults declared for the same ` +
+          `(lane, turn, step); one delivery cannot fail two ways`,
+      );
+    }
+  });
+
+  return problems;
+};
+
+/** An `assertModelTrajectory` naming a lane no turn declares. */
+const trajectoryProblems = (entries, scenario) =>
+  (scenario.flow ?? []).flatMap((flowStep, index) => {
+    const claim = flowStep.assertModelTrajectory;
+    if (claim === undefined) return [];
+
+    const problems = [];
+    if (!entries.some((entry) => entry.lane === claim.lane)) {
+      problems.push(`flow[${index}] assertModelTrajectory references lane '${claim.lane}', which no turn declares`);
+    }
+    if (!Array.isArray(claim.models) || claim.models.length === 0) {
+      problems.push(`flow[${index}] assertModelTrajectory needs the exact expected model sequence`);
+    }
+    return problems;
+  });
 
 /** 3-5. A fault, cold boundary or `must` naming something that does not exist. */
 const danglingReferences = (entries, scenario) => {
@@ -329,6 +424,10 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
 
   const validationProblems = [
     ...unknownFlowVerbs(raw.flow),
+    ...malformedFaults(raw),
+    ...providerErrorProblems(raw),
+    ...conflictingFaults(entries, raw),
+    ...trajectoryProblems(entries, raw),
     ...duplicateDeclarations(entries),
     ...danglingReferences(entries, raw),
     ...deadEdges(turns, entries, raw),
@@ -362,6 +461,7 @@ const compileFault = (entries, fault) => {
     attempts: fault.attempts,
     kind: fault.delivery ?? fault.kind,
     status: fault.status,
+    retryable: fault.retryable,
   };
 };
 

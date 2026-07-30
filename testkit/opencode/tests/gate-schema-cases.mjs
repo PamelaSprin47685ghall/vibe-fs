@@ -65,6 +65,7 @@ step = 0
 attempts = [1]
 delivery = "provider-error"
 status = 500
+retryable = true
 
 [[epoch]]
 turn = "mgr"
@@ -554,6 +555,120 @@ user = "Ship the parser fix"
   },
 
   // ── structural requirements ──────────────────────────────────────────────
+
+  {
+    name: 'VERIFY-003 a malformed fault is rejected by the real compiler, not only the unit',
+    fn: () => {
+      // `validateFault` had eight callers in this gate and none in the compiler, so a
+      // real scenario could declare `attempts = []` — a fault that never fires — and
+      // load clean. Same zero-call-site shape `single-constructor` catches one layer
+      // down: a checker nothing calls is a checker that is not in force.
+      rejects(
+        `${HEALTHY}
+[[fault]]
+turn = "mgr"
+step = 1
+delivery = "provider-error"
+status = 500
+retryable = true
+attempts = []
+`,
+        'an empty list is a fault that never fires',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 a provider-error must declare status and retryable',
+    fn: () => {
+      // FALLBACK-009. `retryable` decides WHO drives the retry: a retryable 500 means
+      // the Host does it and no continuation is ever sent; a non-retryable 400 means the
+      // Host gives up and the plugin must carry the Logical Run forward. Both run
+      // silently, proving different clauses — so neither may be defaulted.
+      rejects(
+        `${HEALTHY}
+[[fault]]
+turn = "mgr"
+step = 1
+delivery = "provider-error"
+status = 500
+attempts = [1]
+`,
+        'must declare retryable',
+      );
+
+      rejects(
+        `${HEALTHY}
+[[fault]]
+turn = "mgr"
+step = 1
+delivery = "provider-error"
+retryable = false
+attempts = [1]
+`,
+        'must declare the HTTP status',
+      );
+
+      // A disconnect has no status to declare, so the requirement is scoped to the one
+      // fault kind that carries one.
+      accepts(`${HEALTHY}
+[[fault]]
+turn = "mgr"
+step = 1
+delivery = "disconnect"
+attempts = [1]
+`);
+    },
+  },
+
+  {
+    name: 'VERIFY-003 two faults on one key are rejected at load, not at delivery',
+    fn: () => {
+      // `faultFor` throws on this, which means the author finds out mid-run — after the
+      // Host is up, in whichever scenario happened to reach that step first. The whole
+      // point of a load-time check is that the static whole is available before then.
+      rejects(
+        `${HEALTHY}
+[[fault]]
+turn = "mgr"
+step = 0
+delivery = "disconnect"
+attempts = [2]
+`,
+        'two faults declared for the same (lane, turn, step)',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 assertModelTrajectory must name a declared lane and an exact sequence',
+    fn: () => {
+      // The effective model is a CONCLUSION of the run (PROMPT-008 makes
+      // `AttemptExecutionProfile` its only source), so a scenario asserts it and never
+      // matches on it. The old `fallback-aabb-trace` matched `model` per edge, which let
+      // the scenario silently agree with whatever the cursor happened to do.
+      const claiming = (claim) => `scenario = "probe"
+
+flow = [
+  { prompt = { agent = "fast-manager", text = "Ship the parser fix." } },
+  { wait = "mgr.0" },
+  { assertModelTrajectory = ${claim} },
+]
+
+[[turn]]
+id = "mgr"
+lane = "fast-manager"
+user = "Ship the parser fix."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Done." }
+`;
+
+      rejects(claiming('{ lane = "nonexistent", models = ["test-model"] }'), "references lane 'nonexistent'");
+      rejects(claiming('{ lane = "fast-manager", models = [] }'), 'needs the exact expected model sequence');
+      accepts(claiming('{ lane = "fast-manager", models = ["test-model", "test-model-b"] }'));
+    },
+  },
 
   {
     name: 'VERIFY-003 a scenario needs a name, and a turn needs user text and a step',

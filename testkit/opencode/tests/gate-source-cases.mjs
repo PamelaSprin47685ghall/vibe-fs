@@ -373,6 +373,45 @@ user = "go"
   },
 
   {
+    name: 'VERIFY-003 a comment introducing a turn stays attached to it',
+    fn: () => {
+      // The blank line before a top-level header exists so turns read as blocks. But a
+      // comment already carries the header's indent from pass 2, so inserting a blank
+      // between them detaches the clause reference from the turn it explains — which is
+      // the entire reason §10 chose TOML over JSON.
+      //
+      // Measured on the third real conversion: `# Attempt 1, at Offset 0 → SideA.` was
+      // pushed one blank line away from the `[[turn]]` it introduces.
+      const formatted = formatToml(`scenario = "p"
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text" }
+# FALLBACK-002: attempt 2 is the same key, delivered again
+[[turn]]
+id = "b"
+user = "go on"
+
+  [[turn.step]]
+  respond = { type = "text" }
+`);
+
+      assertTrue(
+        formatted.includes('# FALLBACK-002: attempt 2 is the same key, delivered again\n[[turn]]'),
+        `comment must stay adjacent to its turn:\n${formatted}`,
+      );
+      assertTrue(
+        formatted.includes('respond = { type = "text" }\n\n# FALLBACK-002'),
+        'the block separation moves to before the comment, not after it',
+      );
+      assertEq(formatToml(formatted), formatted);
+    },
+  },
+
+  {
     name: 'VERIFY-003 blank runs collapse and turns read as blocks',
     fn: () => {
       const formatted = formatToml(`scenario = "p"

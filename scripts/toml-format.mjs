@@ -130,6 +130,22 @@ export function formatToml(source) {
     if (!literal[index] && lines[index].startsWith('#')) indents[index] = nextContent
   }
 
+  // Third pass: where a block begins.
+  //
+  // A top-level header starts one — but comments sitting directly above it INTRODUCE it,
+  // and pass 2 already gave them its indent. So the blank line belongs before the first
+  // of those comments, not between the comment and the header it explains. Caught on the
+  // third real conversion, where `# Attempt 1, at Offset 0 → SideA.` was pushed one
+  // blank line away from its `[[turn]]`.
+  const blockStart = lines.map(() => false)
+  lines.forEach((text, index) => {
+    if (literal[index] || !isHeader(text) || headerDepth(text) !== 0) return
+
+    let start = index
+    while (start > 0 && !literal[start - 1] && lines[start - 1].startsWith('#')) start -= 1
+    blockStart[start] = true
+  })
+
   const out = []
   lines.forEach((text, index) => {
     if (literal[index]) {
@@ -143,11 +159,8 @@ export function formatToml(source) {
       return
     }
 
-    // One blank line before a top-level header, so turns read as blocks. Nested
-    // headers stay attached to their parent.
-    if (isHeader(text) && headerDepth(text) === 0 && out.length > 0 && out[out.length - 1] !== '') {
-      out.push('')
-    }
+    // One blank line before each turn, so they read as blocks.
+    if (blockStart[index] && out.length > 0 && out[out.length - 1] !== '') out.push('')
 
     out.push(`${INDENT.repeat(indents[index] ?? 0)}${text}`)
   })

@@ -1,0 +1,104 @@
+# FALLBACK-002/009: the same-run provider-visible A→A→B→B trajectory. This is the
+# repository's central No-Go evidence — Offset cycles `(n+1) mod 4` so sides go A, A, B,
+# B, and every one of those four attempts is the SAME Logical Run under the same
+# Authority Root (no new completion, no cursor reset).
+#
+# The provider refuses with a non-retryable 400, so the Host stops retrying and the
+# plugin must carry the run forward with a `ProviderRetryAttempt` continuation
+# (`next/OpenCode/TurnCompletionProgram.fs:92`). That is what makes four attempts
+# observable at the wire at all.
+#
+# ── why five edges became two turns ─────────────────────────────────────────
+#
+# The JSON form had `req-a2`, `req-b1`, `req-b2` as three separate edges whose `user`
+# text was character-identical ("Continue after provider failure."). They were told
+# apart by `lane.turn = 2|3|4` — a hand-maintained ordinal — and by `match.model`.
+#
+# Both of those are retired, and correctly so: under (lane, turn, step) the three
+# requests ARE one key. Each continuation appends a fresh user message with no assistant
+# after it, so each is step 0 of the same turn text. Three deliveries of one key is
+# exactly `attempts = [1, 2, 3]`.
+#
+# The model ids that used to do the disambiguating are now asserted instead of matched.
+# §5 forbids a mock from re-deriving domain concepts from the wire, and the effective
+# model is decided by `AttemptExecutionProfile` (PROMPT-008) — so it is a CONCLUSION of
+# the run, never an input to edge selection. Matching on it let the scenario silently
+# agree with whatever the cursor did.
+
+scenario = "fallback-aabb-trace"
+description = "FALLBACK-002 provider-visible same-run A/A/B/B; no fifth attempt in the Logical Run"
+pass = "Provider-visible same-run A→A→B→B request trajectory proven; no fifth chat request."
+
+setup = { strict = true }
+session = { agent = "fast-meditator", bind = ["title", "med"] }
+prompt = { agent = "fast-meditator", text = "Prove same-run provider AABB trajectory." }
+
+must = ["prove", "continue"]
+
+flow = [
+  { wait = "prove" },
+  { wait = "continue" },
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
+  { awaitEvent = { type = "session.idle", reason = "aabb-dead-idle" } },
+
+  # The trajectory assertion. Exact list, so it proves the cycle AND that there was no
+  # fifth attempt — the old canary hard-coded a `rawModels.length === 5 → slice(1)`
+  # normalization to tolerate a duplicate first attempt, which is assertion weakening
+  # of the kind VERIFY-002 forbids. If the Host ever does deliver that duplicate, this
+  # must fail and be explained, not absorbed.
+  { assertModelTrajectory = { lane = "med", models = ["test-model", "test-model", "test-model-b", "test-model-b"] } },
+
+  { expectSatisfied = true },
+]
+
+# Attempt 1, at Offset 0 → SideA.
+[[turn]]
+id = "prove"
+lane = "med"
+user = "Prove same-run provider AABB trajectory."
+
+  [[turn.step]]
+  respond = { type = "text", text = "unreachable: every delivery of this step is refused" }
+
+# Attempts 2, 3 and 4 — Offset 1 (SideA), 2 (SideB), 3 (SideB). One key, three
+# deliveries. The `respond` text is unreachable here too, and saying so in the text is
+# deliberate: a scenario that silently declares content no delivery can return is a
+# scenario whose author cannot tell a covered path from an uncovered one.
+[[turn]]
+id = "continue"
+lane = "med"
+internal = true
+user = "Continue after provider failure."
+
+  [[turn.step]]
+  respond = { type = "text", text = "unreachable: every delivery of this step is refused" }
+
+# `retryable = false` is the load-bearing half. A 400 the Host considers retryable would
+# make the Host drive the retries and no continuation would ever be sent, so the
+# trajectory above would collapse to one user message and the scenario would prove
+# nothing about FALLBACK-009.
+
+[[fault]]
+turn = "prove"
+step = 0
+delivery = "provider-error"
+status = 400
+retryable = false
+attempts = [1]
+
+[[fault]]
+turn = "continue"
+step = 0
+delivery = "provider-error"
+status = 400
+retryable = false
+attempts = [1, 2, 3]
+
+[[turn]]
+id = "title"
+lane = "title"
+kind = "title"
+user = "Prove same-run provider AABB trajectory."
+
+  [[turn.step]]
+  respond = { type = "title", text = "AABB Trace" }

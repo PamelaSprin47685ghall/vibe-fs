@@ -1,0 +1,131 @@
+# FALLBACK-003/004: a failed provider attempt advances the cursor exactly once, and a
+# SUCCESS clears ConsecutiveFailureCount without moving Offset. That second half is why
+# there is more than one round here — round 2 advances the cursor to 2 even though
+# round 1 ended in success, which is the observable form of "成功不重置 Offset".
+#
+# What this scenario does NOT prove: the A/A/B/B side cycle. Every round below is
+# delivered at `test-model` — measured on all eight JSON edges, round 3 and 4 included,
+# despite `omitModel`. The provider-visible trajectory lives in `fallback-aabb-trace`,
+# and the exhaustion budget in `fallback-exhaustion`.
+#
+# The JSON form wrote each round as TWO edges (`round1-failure`, `round1-retry`) whose
+# `match` predicates were character-identical. One conversation step delivered twice is
+# one turn and one fault; see `delivery-plan.js`.
+
+scenario = "fallback"
+description = "FALLBACK-003/004 a failure advances the cursor once; success does not reset Offset; omit-model inherits BaseModel on a restarted Authority Root"
+pass = "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root."
+
+setup = { strict = true }
+session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
+prompt = { agent = "fast-coder", text = "Round 1 fallback attempt." }
+
+must = ["round1", "round2", "round3"]
+
+flow = [
+  { wait = "round1" },
+  { awaitEvent = { type = "session.status", statusType = "retry", reason = "fallback-retry" } },
+  { awaitEvent = { type = "session.idle", reason = "fallback-idle" } },
+  { awaitTerminal = true, requireAssistantTerminal = false },
+  { assertFacts = { name = "FallbackCursorAdvanced", eq = 1 } },
+
+  { prompt = { agent = "fast-coder", text = "Round 2 fallback attempt." } },
+  { wait = "round2" },
+  { awaitEvent = { type = "session.status", statusType = "retry", reason = "fallback-retry" } },
+  { awaitEvent = { type = "session.idle", reason = "fallback-idle" } },
+  { awaitTerminal = true, requireAssistantTerminal = false },
+  { assertFacts = { name = "FallbackCursorAdvanced", eq = 2 } },
+
+  # The restart is the point of round 3: the cursor must be read back from the journal,
+  # and `omitModel` must inherit BaseModel on the Authority Root the restart established
+  # rather than fail closed for want of an explicit model.
+  { restart = true },
+  { prompt = { agent = "fast-coder", text = "Round 3 fallback attempt.", omitModel = true } },
+  { wait = "round3" },
+  { awaitEvent = { type = "session.status", statusType = "retry", reason = "fallback-retry" } },
+  { awaitEvent = { type = "session.idle", reason = "fallback-idle" } },
+  { awaitTerminal = true, requireAssistantTerminal = false },
+  { assertFacts = { name = "FallbackCursorAdvanced", eq = 3 } },
+
+  { expectSatisfied = true },
+]
+
+# Each round is ONE conversation step. Its first physical delivery is refused with a
+# retryable 500, so the Host retries on its own (FALLBACK-004: no continuation when the
+# Host still retries) and the second delivery gets the text below. A retry re-selects
+# this same step — which is the property `retryReselectsSameContent` asserts.
+
+[[turn]]
+id = "round1"
+lane = "fast-coder"
+user = "Round 1 fallback attempt."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "round1 retry completed." }
+
+[[turn]]
+id = "round2"
+lane = "fast-coder"
+user = "Round 2 fallback attempt."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "round2 retry completed." }
+
+[[turn]]
+id = "round3"
+lane = "fast-coder"
+user = "Round 3 fallback attempt."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "round3 retry completed." }
+
+[[fault]]
+turn = "round1"
+step = 0
+delivery = "provider-error"
+status = 500
+retryable = true
+attempts = [1]
+
+[[fault]]
+turn = "round2"
+step = 0
+delivery = "provider-error"
+status = 500
+retryable = true
+attempts = [1]
+
+[[fault]]
+turn = "round3"
+step = 0
+delivery = "provider-error"
+status = 500
+retryable = true
+attempts = [1]
+
+# Production composes the Blogger prompt itself (`CompanionHostBlogger.fs:72,77,118`),
+# so no scenario text reaches this lane — hence `internal`. Every Blogger request is at
+# step 0: each Companion submit appends the new delta as a fresh user message with no
+# assistant after it, so one declaration answers append, squash and re-anchor alike.
+# That is what the retired `neverEnd` flag was reaching for.
+
+[[turn]]
+id = "blogger"
+lane = "coder-blogger"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder background." }
+
+[[turn]]
+id = "title"
+lane = "coder-title"
+kind = "title"
+user = "Round 1 fallback attempt."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
