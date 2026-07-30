@@ -15,7 +15,7 @@
  */
 
 import { assertEq, assertTrue } from './gate-lib.mjs';
-import { laneOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../runtime-key.js';
+import { kindOf, laneOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../runtime-key.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([
@@ -36,7 +36,84 @@ const request = (messages, sessionID = SESSION) => ({ sessionID, messages });
 
 const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, turn, step });
 
+/** `prompt.ts:235` prepends this as `messages[0]`, then appends the real conversation. */
+const titleRequest = (text) =>
+  request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)]);
+
 export const runtimeKeyCases = [
+  // ── kind: the fourth component, and why turn alone cannot carry it ────────
+
+  {
+    name: 'VERIFY-003 a title request and its chat turn share turn and step',
+    fn: () => {
+      // The measurement that forced `kind` into the key. The Host prepends its title
+      // marker at `messages[0]` and appends the whole conversation after it
+      // (`../opencode/packages/opencode/src/session/prompt.ts:235`), while `turnOf`
+      // reads the LAST user message — so both requests report the same turn.
+      //
+      // Without a fourth component a title edge and a chat edge for one turn collide,
+      // and the load-time duplicate check would reject a legitimate scenario.
+      const title = titleRequest('Ship the parser fix.');
+      const chat = request([user('Ship the parser fix.')]);
+
+      assertEq(turnOf(title), turnOf(chat), 'turn cannot tell them apart');
+      assertEq(stepOf(title), stepOf(chat), 'nor can step');
+      assertEq(kindOf(title), 'title');
+      assertEq(kindOf(chat), 'chat');
+    },
+  },
+
+  {
+    name: 'VERIFY-003 kind is read from position, not from prose matching',
+    fn: () => {
+      // The marker must be `messages[0]`. A user quoting the phrase mid-conversation is
+      // having an ordinary chat turn, and treating it as a title request would answer
+      // it with a title.
+      assertEq(kindOf(request([user('Generate a title for this conversation: no really')])), 'title');
+      assertEq(
+        kindOf(request([user('hello'), user('Generate a title for this conversation:')])),
+        'chat',
+        'the marker only counts at position 0',
+      );
+      assertEq(kindOf(request([{ role: 'system', content: 'Generate a title for this conversation:' }])), 'chat');
+      assertEq(kindOf(request([])), 'chat');
+    },
+  },
+
+  {
+    name: 'VERIFY-003 there is no synthetic kind',
+    fn: () => {
+      // The old classifier had one, decided by `NUDGE_MARKERS` — production prompt
+      // sentences copied into the mock, which the extinction list condemns as a
+      // cross-product dead heuristic. It is unnecessary: a nudge's LAST user message IS
+      // the nudge sentence, so `turnOf` already distinguishes it.
+      const nudge = request([
+        user('Ship it.'),
+        assistant('r1'),
+        user('There are still incomplete todos. Continue working through the remaining items.'),
+      ]);
+
+      assertEq(kindOf(nudge), 'chat', 'a nudge is an ordinary chat request');
+      assertEq(turnOf(nudge), 'There are still incomplete todos. Continue working through the remaining items.');
+    },
+  },
+
+  {
+    name: 'VERIFY-003 kind partitions declarations, and defaults to chat',
+    fn: () => {
+      const entries = [
+        { id: 'chat', lane: 'fast-manager', turn: 'Ship it.', step: 0 },
+        { id: 'title', lane: 'fast-manager', kind: 'title', turn: 'Ship it.', step: 0 },
+      ];
+
+      assertEq(resolveEntry(request([user('Ship it.')]), entries, BINDINGS).matched?.id, 'chat');
+      assertEq(resolveEntry(titleRequest('Ship it.'), entries, BINDINGS).matched?.id, 'title');
+
+      // An undeclared kind means chat, so single-lane scenarios need not say so.
+      assertEq(runtimeKeyOf(request([user('Ship it.')]), BINDINGS).kind, 'chat');
+    },
+  },
+
   // ── step is a property of the request ─────────────────────────────────────
 
   {

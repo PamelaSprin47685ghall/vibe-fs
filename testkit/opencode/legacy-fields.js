@@ -30,6 +30,7 @@ export const RETIRED_FIELDS = {
   role: 'the role comes from AttemptExecutionProfile (PROMPT-008); a mock may not infer it from the wire',
   requestRoleOf: 'same as role: PROMPT-008 makes the profile the only source',
 
+
   // §6: out-of-band identity leaking into content matching
   __testkitHeaders: 'harness bookkeeping is one-way; a scenario matches only what the provider received',
 

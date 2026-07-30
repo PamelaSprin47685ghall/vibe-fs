@@ -68,6 +68,40 @@ export function sessionIdOf(body) {
   return typeof id === 'string' && id !== '' ? id : null;
 }
 
+// ── kind ────────────────────────────────────────────────────────────────────
+
+/**
+ * The Host's own title marker, prepended as the FIRST message.
+ *
+ * `../opencode/packages/opencode/src/session/prompt.ts:235`
+ *   messages: [{ role: "user", content: "Generate a title for this conversation:\n" }, ...msgs]
+ *
+ * So a title request carries the whole conversation after the marker, and `turnOf`
+ * reads the LAST user message — which is the same text the ordinary chat request for
+ * that turn carries. Measured: the two produce an identical `turn` and an identical
+ * `step`, so without a fourth component a title edge and a chat edge collide.
+ */
+const TITLE_MARKER = 'Generate a title for this conversation:';
+
+/**
+ * `title` or `chat`. Read from position, not from prose matching.
+ *
+ * There is deliberately no `synthetic`. The old classifier had one, decided by
+ * `NUDGE_MARKERS` — a table of production prompt sentences copied into the mock, which
+ * the extinction list condemns as a cross-product dead heuristic. It is unnecessary
+ * anyway: a nudge's LAST user message IS the nudge sentence, so `turnOf` already tells
+ * it apart from any real turn. Only the title case needs help, because its marker sits
+ * at `messages[0]` while `turnOf` looks at the end.
+ */
+export function kindOf(body) {
+  const first = Array.isArray(body?.messages) ? body.messages[0] : undefined;
+  if (first?.role !== 'user') return 'chat';
+
+  const content = first.content;
+  const text = typeof content === 'string' ? content : '';
+  return text.startsWith(TITLE_MARKER) ? 'title' : 'chat';
+}
+
 // ── turn ────────────────────────────────────────────────────────────────────
 
 const isUser = (message) => message?.role === 'user';
@@ -120,9 +154,9 @@ export function stepOf(body) {
   return step;
 }
 
-/** The whole key, for a caller that wants all three at once. */
+/** The whole key. */
 export function runtimeKeyOf(body, bindings) {
-  return { lane: laneOf(body, bindings), turn: turnOf(body), step: stepOf(body) };
+  return { lane: laneOf(body, bindings), kind: kindOf(body), turn: turnOf(body), step: stepOf(body) };
 }
 
 // ── longest-prefix lookup ───────────────────────────────────────────────────
@@ -158,13 +192,16 @@ const prefixMatches = (turn, declarations) =>
 export function resolveEntry(body, entries, bindings) {
   const key = runtimeKeyOf(body, bindings);
 
-  const atLaneAndStep = entries.filter(
-    (entry) => (entry.lane === undefined || entry.lane === key.lane) && entry.step === key.step,
+  const atKey = entries.filter(
+    (entry) =>
+      (entry.lane === undefined || entry.lane === key.lane) &&
+      (entry.kind ?? 'chat') === key.kind &&
+      entry.step === key.step,
   );
 
-  const matches = prefixMatches(key.turn, atLaneAndStep);
+  const matches = prefixMatches(key.turn, atKey);
   if (matches.length === 0) {
-    return { unmatched: { key, candidates: atLaneAndStep } };
+    return { unmatched: { key, candidates: atKey } };
   }
 
   const longest = matches[0].turn.length;

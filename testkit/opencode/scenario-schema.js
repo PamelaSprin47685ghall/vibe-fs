@@ -30,7 +30,50 @@ import { retiredFieldProblems } from './legacy-fields.js';
 
 // ── the TOML root-key trap ──────────────────────────────────────────────────
 
-const ROOT_KEYS = ['scenario', 'description', 'must', 'flow'];
+const ROOT_KEYS = ['scenario', 'description', 'must', 'flow', 'setup', 'session', 'pass', 'prompt'];
+
+/**
+ * Flow verbs, measured from the 19 JSON scenarios rather than invented.
+ *
+ * A whitelist because `wait`'s dangling reference is checked but its NAME was not: a
+ * typo'd `awaitTerminl` is silently ignored, and the author believes a barrier is in
+ * force. Same protection as the retired-field rejector, one layer up.
+ *
+ * `loadScripts` is deliberately absent — the retired-field rejector owns it (§8).
+ */
+const FLOW_VERBS = new Set([
+  'wait',
+  'waitFact',
+  'prompt',
+  'session',
+  'lane',
+  'timeoutMs',
+  'awaitTerminal',
+  'requireAssistantTerminal',
+  'awaitEvent',
+  'awaitRestart',
+  'restart',
+  'abort',
+  'bindChild',
+  'createChild',
+  'createSession',
+  'expectSatisfied',
+  'requireIdleAfterActivity',
+  'assertFacts',
+  'assertFile',
+  'assertActiveRequests',
+  'assertWorktreeClean',
+  'assertPtyEcho',
+  'afterExpectation',
+  'custom',
+]);
+
+const unknownFlowVerbs = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) =>
+    Object.keys(flowStep ?? {})
+      .filter((verb) => !FLOW_VERBS.has(verb))
+      .map((verb) => `flow[${index}]: unknown verb '${verb}'; a misspelled verb is silently ignored`),
+  );
 
 /**
  * TOML assigns a root-level key to the LAST table header above it, silently.
@@ -75,6 +118,8 @@ const compileTurns = (turns) =>
       turnId: turn.id,
       turnIndex,
       lane: turn.lane,
+      parentLane: turn.parentSession,
+      kind: turn.kind ?? 'chat',
       turn: turn.user,
       step: stepIndex,
       tools: turn.tools ?? [],
@@ -120,7 +165,14 @@ export function reachableTurnIds(turns, entries, flow) {
 
   return new Set(
     turns
-      .filter((turn) => prompts.some((prompt) => prompt.startsWith(turn.user) || turn.user.startsWith(prompt)))
+      .filter(
+        (turn) =>
+          // A title request is issued by the Host after a real turn
+          // (`prompt.ts:235`), never by a flow prompt, so it is reachable by
+          // construction — the conversation it titles is what a flow reaches.
+          turn.kind === 'title' ||
+          prompts.some((prompt) => prompt.startsWith(turn.user) || turn.user.startsWith(prompt)),
+      )
       .map((turn) => turn.id),
   );
 }
@@ -153,6 +205,7 @@ const duplicateDeclarations = (entries) => {
   for (const left of entries) {
     for (const right of entries) {
       if (left.lane !== right.lane || left.step !== right.step || left.turn !== right.turn) continue;
+      if (left.kind !== right.kind) continue;
       if (left.id >= right.id) continue;
 
       problems.push(
@@ -244,6 +297,9 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     if (typeof turn.id !== 'string' || turn.id === '') problems.push(`turn[${index}] needs an id`);
     if (typeof turn.user !== 'string' || turn.user === '') problems.push(`turn[${index}] needs user text`);
     if (!Array.isArray(turn.step) || turn.step.length === 0) problems.push(`turn[${index}] needs at least one step`);
+    if (turn.kind !== undefined && turn.kind !== 'chat' && turn.kind !== 'title') {
+      problems.push(`turn[${index}] kind '${turn.kind}' is not chat or title`);
+    }
   });
 
   if (problems.length > 0) {
@@ -253,6 +309,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
   const entries = compileTurns(turns);
 
   const validationProblems = [
+    ...unknownFlowVerbs(raw.flow),
     ...duplicateDeclarations(entries),
     ...danglingReferences(entries, raw),
     ...deadEdges(turns, entries, raw.flow),
