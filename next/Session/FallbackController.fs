@@ -80,7 +80,14 @@ module FallbackController =
             with
             | Error FallbackAdvanceRejection.AlreadyObserved
             | Error FallbackAdvanceRejection.AlreadyExhausted -> Ok(AlreadyRecorded current.Cursor)
-            | Error FallbackAdvanceRejection.DifferentRun -> Ok NoActiveRun
+            // Both say "there is no run this advance belongs to", which is exactly
+            // what `NoActiveRun` means. `NoCursor` cannot arise here — reaching this
+            // point required `tryCurrentState` to return a cursor — but it is the
+            // fold's answer for the same shape, and inventing a distinct outcome for
+            // an unreachable case would put a state in `AdvanceOutcome` that no
+            // caller can ever observe.
+            | Error FallbackAdvanceRejection.DifferentRun
+            | Error FallbackAdvanceRejection.NoCursor -> Ok NoActiveRun
             | Error FallbackAdvanceRejection.InvalidTransition ->
                 Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
             | Ok _ ->

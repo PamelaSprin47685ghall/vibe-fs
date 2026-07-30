@@ -30,6 +30,13 @@ type FallbackAdvanceRejection =
     | AlreadyExhausted
     /// The line belongs to a different Logical Run or Authority Root.
     | DifferentRun
+    /// FALLBACK-001: the session has no cursor, so no Authority Root was ever
+    /// accepted for it — the root fact is missing from the journal.
+    ///
+    /// Separate from `InvalidTransition` because the offsets on such a line are
+    /// usually perfectly valid; the damage is the absent root. Reporting it as a
+    /// successor violation sends an operator to inspect numbers that are correct.
+    | NoCursor
     /// FALLBACK-007 fold validation: NextOffset must be the modulo-4 successor
     /// and the count must advance by exactly one. A line failing this is corrupt
     /// or forged and is refused rather than absorbed.

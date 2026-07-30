@@ -675,15 +675,48 @@ export const cursor = {
   recoveryVerdict: (budget, value) => caseOf(Cursor.recoveryVerdict(budget, value)),
 
   defaultBudget: Cursor.DefaultAutoRecoveryBudget,
+
+  /**
+   * The cursor's two quantities as a plain object.
+   *
+   * `assert.deepEqual` compares prototypes, and every cursor coming out of the
+   * domain is an F# record instance — so comparing one against `{ Offset, ... }`
+   * fails on the class, not on the values, and the diff blames the wrong thing.
+   */
+  read: (value) => ({ offset: value.Offset, failures: value.ConsecutiveFailureCount }),
 }
 
 export const fallbackProjection = (() => {
-  const m = bind(FallbackProj, 'FallbackProjection', ['forAuthority', 'applyAdvance', 'mayContinue'])
+  const m = bind(FallbackProj, 'FallbackProjection', [
+    'forAuthority',
+    'applyAdvance',
+    'applyExhausted',
+    'recordSuccess',
+    'mayContinue',
+  ])
   return {
+    /** FALLBACK-001. There is deliberately no `empty`: a run and a root are required. */
     forAuthority: (runId, root) => m.forAuthority(runId, root),
-    applyAdvance: (identity, prevOffset, nextOffset, count, current) =>
-      resultOf(m.applyAdvance(identity, prevOffset, nextOffset, count, current)),
+
+    /** Rejections carry no payload, so the case name is the whole answer. */
+    applyAdvance: (identity, prevOffset, nextOffset, count, current) => {
+      const result = resultOf(m.applyAdvance(identity, prevOffset, nextOffset, count, current))
+      return result.ok ? result : { ok: false, error: caseOf(result.error) }
+    },
+
+    applyExhausted: (current) => m.applyExhausted(current),
+    recordSuccess: (current) => m.recordSuccess(current),
     mayContinue: (budget, current) => m.mayContinue(budget, current),
+
+    /** The durable state as plain JS, so a renamed field cannot read `undefined`. */
+    read: (current) => ({
+      logicalRun: idValue.logicalRun(current.LogicalRunId),
+      authorityRoot: idValue.authorityRoot(current.AuthorityRootUserMessageId),
+      offset: current.Cursor.Offset,
+      failures: current.Cursor.ConsecutiveFailureCount,
+      dedupeKeys: listItems(current.RecentFailureKeys).length,
+      exhausted: current.Exhausted,
+    }),
   }
 })()
 

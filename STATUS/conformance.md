@@ -34,13 +34,43 @@
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| FALLBACK-002: Modulo-4 Cursor 与 ConsecutiveFailureCount | PARTIAL | `AgentPairCursor.fs` | Offset 正确；`FallbackCursor` 无 `ConsecutiveFailureCount` 字段（当前是 `LastProviderAttempt`） |
-| FALLBACK-003: 统一 FallbackController | CONTRADICTS | `ProviderFailureWakeup.fs:50` + `RetrySignalHandler.fs:84` | 两个 writer 经 `recordFallbackFailure` 写同一事实。`shock-audit` 实测 3 writers |
-| FALLBACK-004: 不变量 | PARTIAL | `FallbackProjection.fs` | Authority profile 不变已实现；成功清零 count 未实现（无 count） |
-| FALLBACK-005: 有限 Circuit Breaker | NOT_IMPLEMENTED | — | 无 `AutoRecoveryBudget`；无 `FallbackExhausted` journal 事实（`Kernel/Outcome.fs:44` 同名 case 是无关的 terminal outcome） |
-| FALLBACK-007: 持久事实 | PARTIAL | `Kernel/Fact.fs:74` | 缺 `PreviousOffset` / `NextOffset` / `ConsecutiveFailureCount` 字段；无 Fold 验证 |
-| FALLBACK-008: 空/XML-only terminal | UNVERIFIED | `HostSessionNudge.trySendInteractionRepair` | 包 A：预算改由 `ClaimSequences` 派生（PROMPT-005 `Claimed` 已写），不再依赖无事实支撑的 `RepairClaims` |
-| FALLBACK-010: Host Attempt ≠ ConsecutiveFailureCount | UNVERIFIED | `HostSignal.fs` | 当前无 count 概念，故无从混淆；建立 count 后需门禁 |
+| FALLBACK-001: Fallback 属于 Logical Run | CONFORMANT | `FallbackProjection.forAuthority` `Fold.fs:229` | cursor 由 `AuthorityRootAccepted` 创建，无 `empty` 构造函数；无 cursor 的 advance 以 `NoCursor` 拒绝并停止 replay。第 1 层测试 |
+| FALLBACK-002: Modulo-4 Cursor 与 ConsecutiveFailureCount | CONFORMANT | `Domain/AgentPairCursor.fs` | 两个量已分离为独立字段；Offset 模 4 无终态，count 为有界预算；offset 越界 `invalidOp` 而非默认 SideA。第 1 层测试 |
+| FALLBACK-003: 统一 FallbackController | CONFORMANT | `Session/FallbackController.fs` | `shock-audit` 实测 ok (1)。两个旧 writer（`ProviderFailureWakeup` / `RetrySignalHandler` 经 `recordFallbackFailure`）已删；去重按 `FallbackAttemptIdentity` 四元组，窗口上限 32（PERSIST-008） |
+| FALLBACK-004: 不变量 | CONFORMANT | `AgentPairCursor.recordSuccess` | 成功清零 count 且不动 Offset，并清空去重窗口；失败推进 Offset 且消耗一格预算。第 1 层测试含「成功后停放在奇数 Offset」这一 FALLBACK-012 前提 |
+| FALLBACK-005: 有限 Circuit Breaker | CONFORMANT | `AgentPairCursor.recoveryVerdict` `Kernel/Fact.fs:127` | `DefaultAutoRecoveryBudget = 12`（非 `[<Literal>]`，故第 1 层可断言）；`FallbackExhausted` 事实存在；判决在失败记录之后，第 12 次立即终局，无自动第 13 次；`Exhausted` 为持久状态而非由 count 重新派生 |
+| FALLBACK-006: 完整序列示例 | CONFORMANT | `AgentPairCursor.sideSequence` | 表以函数表达且无上界。第 1 层测试断言 100 项 |
+| FALLBACK-007: 持久事实 | CONFORMANT | `Kernel/Fact.fs:115` `FallbackProjection.applyAdvance` | 六个字段齐备；Fold 验证 modulo-4 后继与 count 恰好 +1；四种拒绝理由可区分（`AlreadyObserved` / `AlreadyExhausted` / `DifferentRun` / `NoCursor` / `InvalidTransition`），前三者吸收、后两者停止 replay。成功不写任何事实 |
+| FALLBACK-008: 空/XML-only terminal | CONFORMANT | `Domain/TerminalValidity.fs` `PromptAuthority.repairAlreadyClaimed` | 唯一内容级校验；预算由 `ClaimSequences` 派生故重启后仍在，abandon 不解锁。第 1 层测试 |
+| FALLBACK-010: Host Attempt ≠ ConsecutiveFailureCount | CONFORMANT | `Domain/AgentPairCursor.fs` | 结构性保证：`recordFailure` 只接受 cursor 一个入参，Host `Attempt` 无路可入；推进按 `ProviderRunIdentity` 去重，故一次 provider run 的多次 Host 重试只消耗一格预算 |
+| FALLBACK-011: 一个槽可含维护子请求 | CONFORMANT | `Domain/RecoverySlot.fs` | 见 Companion 段；第 1 层测试在 `Context/recovery-slot.test.mjs` |
+| FALLBACK-012: armed 需要紧邻失败推进与 primed 槽位 | CONFORMANT | `RecoverySlot.mayRecover` | 两条件合取；facade 不提供由 Offset 奇偶单独派生 arming 的出口。第 1 层测试 |
+
+### Fallback 段此前的记录全部失效（包 T-3 更正）
+
+本段在包 T-3 之前的内容描述的是迁移前状态，七行里没有一行仍然成立：
+
+```text
+FALLBACK-002 「无 ConsecutiveFailureCount 字段（当前是 LastProviderAttempt）」
+             → 字段自包 0b 起就存在，LastProviderAttempt 已不在仓库中
+FALLBACK-003 「两个 writer 经 recordFallbackFailure 写同一事实，实测 3 writers」
+             → 包 C 已合一，recordFallbackFailure 全仓 0 处，shock-audit ok (1)
+FALLBACK-004 「成功清零 count 未实现（无 count）」            → 已实现
+FALLBACK-005 「无 AutoRecoveryBudget；无 FallbackExhausted 事实」→ 两者都有
+FALLBACK-007 「缺三个字段；无 Fold 验证」                     → 六字段齐备，Fold 验证在
+FALLBACK-010 「当前无 count 概念，故无从混淆」                 → 有 count，且已有结构性保证
+```
+
+失效的原因值得记档。 这些行是包 C 完成时该更新而没更新的。休克期关闭了测试反馈，而
+`conformance.md` 的更新一直依赖手工，于是「代码前进、状态表留在原地」这个方向的偏移没有
+任何机器会发现——`ssot-lint` 只检查条款 ID 与实现状态词的分离，不检查状态词是否真实。
+
+这正是 AGENTS.md 第 1 节警告的第二种失败形态的镜像：那条讲的是「写完才看文档」，这里是
+「改完没回写状态」。两者的共同后果一样——`conformance.md` 与代码的偏离多一处，而且偏在
+乐观方向时更危险：一个标着 `CONTRADICTS` 的合规项只是噪音，一个标着 `CONFORMANT` 的
+违规项会让人跳过检查。
+
+本次更正后 Fallback 段的每一行都绑定到一个第 1 层测试或一次 `shock-audit` 实测输出。
 
 ## Review
 

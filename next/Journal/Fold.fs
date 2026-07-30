@@ -37,6 +37,8 @@ module Fold =
         | Error AlreadyObserved
         | Error AlreadyExhausted
         | Error DifferentRun -> Ok projection
+        | Error NoCursor ->
+            reject factName "cursor advance has no cursor to advance: FALLBACK-001 requires an accepted Authority Root"
         | Error InvalidTransition ->
             reject factName "cursor advance violates FALLBACK-007 (offset or count is not the successor)"
 
@@ -280,7 +282,7 @@ module Fold =
                     // FALLBACK-001 says the cursor is created by the Authority
                     // Root, so its absence means the root fact is missing.
                     match session.Fallback with
-                    | None -> Error InvalidTransition
+                    | None -> Error NoCursor
                     | Some current ->
                         FallbackProjection.applyAdvance
                             identity
