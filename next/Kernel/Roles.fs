@@ -93,11 +93,10 @@ module Roles =
 
 
 /// RoleDefinition: combines tool permissions with system prompts for each agent role.
-/// No `Companion` flag. COMPANION-001's eligible set is answered by
-/// `PromptAuthority.hasCompanion` from the Logical Run's CanonicalRole, and a
-/// flag here was a second source that disagreed with it: Reviewer, DevOps and
-/// Meditator were marked as having no Companion, so three of the six eligible
-/// roles silently never got one.
+/// No `Companion` flag, and no role-keyed Companion predicate anywhere. COMPANION-001
+/// gives every managed work session a Y regardless of role, so a role is not an input
+/// to that decision — `SessionAssociationProjection.isCompanion` answers it from the
+/// durable Session kind (HOST-008) instead.
 type RoleDefinition =
     { Role: Role
       Prompt: string

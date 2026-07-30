@@ -226,7 +226,11 @@ const DUPLICATE_ALGORITHM_OWNERS = [
   { symbol: 'buildAttemptExecutionProfile', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-008
   { symbol: 'derivePromptKey', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-011
   { symbol: 'claimScopeDigest', owners: ['Domain/PromptAuthority.fs'] }, // PROMPT-011
-  { symbol: 'hasCompanion', owners: ['Domain/PromptAuthority.fs'] }, // COMPANION-002
+  // COMPANION-001/002: "is this a Companion" is a Session-kind fact, not a role
+  // predicate. The registry names the association projection because a role-keyed
+  // `hasCompanion` is exactly what the clause deleted — a whitelist cannot answer a
+  // question role is not an input to.
+  { symbol: 'isCompanion', owners: ['Journal/SessionAssociation.fs'] }, // COMPANION-002
   { symbol: 'systemPromptIdFor', owners: ['Domain/PromptAuthority.fs'] }, // AGENT-001
   { symbol: 'toSemantic', owners: ['Domain/ProviderProjection.fs'] }, // VERIFY-007
   { symbol: 'sealDigest', owners: ['Domain/ProviderProjection.fs'] }, // REVIEW-010

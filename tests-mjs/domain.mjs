@@ -56,6 +56,7 @@ const [
   ReviewProj,
   LinkageProj,
   OrchestratorProj,
+  AssociationProj,
   Cursor,
   TerminalValidity,
   PrefixCandidateModule,
@@ -85,6 +86,7 @@ const [
   prod('Journal/ReviewProjection'),
   prod('Journal/LinkageProjection'),
   prod('Journal/OrchestratorProjection'),
+  prod('Journal/SessionAssociation'),
   prod('Domain/AgentPairCursor'),
   prod('Domain/TerminalValidity'),
   prod('Domain/PrefixCandidate'),
@@ -790,6 +792,69 @@ export const recoverySlot = (() => {
   }
 })()
 
+/**
+ * HOST-008 / COMPANION-002: the Work ↔ Companion relation.
+ *
+ * This is what replaced Companion eligibility. There is no `hasCompanion(role)` here
+ * and there must never be one: the question is "is this session itself a Companion",
+ * not "does this role deserve one".
+ */
+export const sessionAssociation = (() => {
+  const m = bind(AssociationProj, 'SessionAssociationProjection', [
+    'empty',
+    'tryFind',
+    'isCompanion',
+    'tryMainSessionOf',
+    'tryBloggerOf',
+    'link',
+    'unlink',
+    'describe',
+  ])
+
+  return {
+    empty: m.empty,
+
+    isCompanion: (id, current) => m.isCompanion(sessionId(id), current),
+
+    mainSessionOf: (id, current) => {
+      const main = unwrapOption(m.tryMainSessionOf(sessionId(id), current))
+      return isNone(main) ? undefined : idValue.session(main)
+    },
+
+    bloggerOf: (id, current) => {
+      const blogger = unwrapOption(m.tryBloggerOf(sessionId(id), current))
+      return isNone(blogger) ? undefined : idValue.session(blogger)
+    },
+
+    /** `{ kind, blogger, parent }`, or undefined when there is no record. */
+    entry: (id, current) => {
+      const found = unwrapOption(m.tryFind(sessionId(id), current))
+      if (isNone(found)) return undefined
+
+      const kind = caseOf(found.Kind)
+
+      return {
+        kind,
+        mainSessionId: kind === 'CompanionSession' ? idValue.session(payloadOf(found.Kind)) : undefined,
+        blogger: isNone(found.BloggerSessionId) ? undefined : idValue.session(found.BloggerSessionId),
+        parent: isNone(found.ParentSessionId) ? undefined : idValue.session(found.ParentSessionId),
+      }
+    },
+
+    /** All session ids in the map, sorted, so a test can assert the whole shape. */
+    ids: (current) => mapEntries(current).map(([id]) => idValue.session(id)).sort(),
+
+    link: ({ main, blogger, parent }, current) => {
+      const result = resultOf(
+        m.link(sessionId(main), sessionId(blogger), parent === undefined ? undefined : sessionId(parent), current),
+      )
+      return result.ok ? result : { ok: false, error: caseOf(result.error), message: m.describe(result.error) }
+    },
+
+    unlink: (main, current) => m.unlink(sessionId(main), current),
+  }
+})()
+
 /** CTX-004: the one content-level validity check. */
 export const terminalValidity = {
   isValid: (text) => TerminalValidity.isValid(text),
@@ -1066,8 +1131,6 @@ export const authority = {
   systemPromptIdFor: (role) => Authority.systemPromptIdFor(role),
   buildAttemptExecutionProfile: (...args) => Authority.buildAttemptExecutionProfile(...args),
 
-  /** COMPANION-001/002: eligibility from the Logical Run's CanonicalRole alone. */
-  hasCompanion: (profile) => Authority.hasCompanion(profile),
   allowsTool: (permission, profile) => Authority.allowsTool(permission, profile),
 
   /** PROMPT-011 bounds. */

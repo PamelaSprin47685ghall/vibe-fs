@@ -30,8 +30,17 @@ type SessionAgentProjection =
     }
 
 type AgentProjectionSet =
-    { Sessions: Map<SessionId, SessionAgentProjection>
-      Orchestrator: OrchestratorProjection }
+    {
+        Sessions: Map<SessionId, SessionAgentProjection>
+        /// HOST-008: the Work ↔ Companion relation.
+        ///
+        /// Workspace-scoped rather than per-session, because the relation spans two
+        /// sessions and both directions must be answerable from one keyed lookup
+        /// (PERSIST-008). Held per-session, "is this id somebody's Y" would require
+        /// scanning every session.
+        Associations: Map<SessionId, SessionAssociation>
+        Orchestrator: OrchestratorProjection
+    }
 
 /// Composition of bounded session projections. Fact routing lives in Fold.fs.
 module AgentProjection =
@@ -49,6 +58,7 @@ module AgentProjection =
 
     let empty =
         { Sessions = Map.empty
+          Associations = SessionAssociationProjection.empty
           Orchestrator = OrchestratorProjection.empty }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =

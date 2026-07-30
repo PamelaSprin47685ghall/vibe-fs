@@ -538,33 +538,6 @@ module PromptAuthority =
             else
                 XProjectionChoice.UseCommittedEpoch }
 
-    /// COMPANION-001/002: Companion eligibility reads the CanonicalRole of the
-    /// active Logical Run and nothing else.
-    ///
-    /// Takes the AUTHORITY profile, not an attempt profile. Eligibility is fixed by
-    /// the Authority Root for the whole Logical Run, so per-attempt state cannot
-    /// change it — and the `messages.transform` boundary that asks this question
-    /// holds `ActiveLogicalRun`, which is exactly this type. Requiring an attempt
-    /// profile there would force a caller to assemble one, which PROMPT-008 forbids.
-    ///
-    /// The role set is spelled here rather than read from a `RoleDefinition` flag.
-    /// That flag was a second source and it disagreed: it marked Reviewer, DevOps
-    /// and Meditator as having no Companion, so three of COMPANION-001's six
-    /// eligible roles silently never got one.
-    let hasCompanion (profile: AuthorityExecutionProfile) : bool =
-        match profile.CanonicalRole with
-        | Role.Orchestrator
-        | Role.Manager
-        | Role.Coder
-        | Role.Meditator
-        | Role.DevOps
-        | Role.Reviewer -> true
-        // AGENT-008: internal agents never recursively create a Companion.
-        | Role.Inspector
-        | Role.Browser
-        | Role.Blogger
-        | Role.Executor -> false
-
     /// AGENT-007 layer two: the runtime execution gate reads the same set the
     /// Host-visible schema was built from.
     let allowsTool (permission: ToolPermission) (profile: AttemptExecutionProfile) : bool =

@@ -80,30 +80,29 @@ module CompanionTransform =
             && not (String.IsNullOrWhiteSpace sessionId)
             && not (isNull rawOutObj?messages)
         then
-            // COMPANION-002 eligibility source of truth: ActiveLogicalRun only.
-            // Neither the message's `agent` field nor the transform input is a
-            // production source — both describe what the Host is about to send,
-            // not what an Authority Root fixed.
+            // COMPANION-001 / COMPANION-002: every managed work session has a Y, and
+            // the only thing that must not have one is a Y itself. So the question
+            // here is "is this session a Companion", answered from the durable
+            // association (HOST-008) by one keyed lookup.
             //
-            // The profile is passed whole to `hasCompanion`. The previous version
-            // extracted `SelectedAgent` and re-parsed a Role out of that string,
-            // which reintroduced exactly the agent-string inference the clause
-            // forbids — one field away from the durable CanonicalRole it needed.
+            // What this replaced was `PromptAuthority.hasCompanion`, a whitelist over
+            // ten CanonicalRoles. That shape could not be fixed by editing the list:
+            // COMPANION-001 grants a Y regardless of role, so any role-keyed predicate
+            // is answering a question the clause does not ask. It had also silently
+            // excluded Inspector, Browser and Executor.
             //
-            // Fully qualified: the OpenCode `PromptAuthority` facade shadows the
-            // Domain module here, and adding a re-export there would be a second
-            // definition of this decision.
-            let eligible =
+            // No journal means no association and no durable Companion state. Failing
+            // closed here rather than defaulting to "not a Companion" keeps a Y from
+            // being handed a Y of its own during a journal-less run.
+            let isCompanionSession =
                 match journal with
-                | None -> false
+                | None -> true
                 | Some j ->
-                    (AgentJournal.snapshot j).AgentProjections.Sessions
-                    |> Map.tryFind (SessionId.create sessionId)
-                    |> Option.bind (fun s -> s.PromptAuthority)
-                    |> Option.bind (fun auth -> auth.ActiveLogicalRun)
-                    |> Option.exists Wanxiangshu.Next.Domain.PromptAuthority.hasCompanion
+                    SessionAssociationProjection.isCompanion
+                        (SessionId.create sessionId)
+                        (AgentJournal.snapshot j).AgentProjections.Associations
 
-            if eligible then
+            if not isCompanionSession then
                 let companion =
                     lock gate (fun () ->
                         match companions.TryGetValue sessionId with

@@ -75,11 +75,11 @@
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| COMPANION-001: 服务角色 | PARTIAL | `MessageTransform.shouldCreateCompanion` | 仍从 Agent 字符串解析角色；改读 profile 属包 E |
-| COMPANION-002: Eligibility 唯一来源 | PARTIAL | `CompanionTransform.fs` | 判定已只读 `ActiveLogicalRun.SelectedAgent`（包 A/B），且包 B 删除了回写 `sessionRoles` 缓存的两处。六角色判据本体属包 E |
-| COMPANION-008: 忙时跳过 | PARTIAL | `CompanionHost.fs` | 存在「三次 busy skip」计数，规范只要求不推进 BlogBase |
-| COMPANION-009: PrefixEpoch | PARTIAL | `CompanionProjection.fs` | FrozenB/LatestB 分离已实现；epoch 切换未创建新 SealRoot |
-| COMPANION-013: Synthetic 稳定身份 | UNVERIFIED | `CompanionProjection.fs` | 需门禁证明无 GUID / random / 当前时间 |
+| COMPANION-001: 每个 Work Session 都有 Companion | CONFORMANT | `Journal/SessionAssociation.fs` | 角色白名单已删除。关联 API 不接受 role 参数，因此 role 无法影响它不是输入的决定 |
+| COMPANION-002: Companion 是叶子 | CONFORMANT | `SessionAssociationProjection.link` | 一次 `link` 写双向条目，`isCompanion` O(1)；递归、重复 Y、抢占 Y、自链四种非法态由 fold fail closed |
+| COMPANION-008: 忙时跳过 | PARTIAL | `CompanionHost.fs` | 存在「三次 busy skip」计数，规范只要求不推进 coverage。计数删除属包 X9 |
+| COMPANION-009: PrefixEpoch | PARTIAL | `Journal/PrefixEpochProjection.fs` | 新投影已实现 epoch 递增与 snapshot 退役；旧 `CompanionProjection.switchEpoch` 双轨仍在，删除属包 X9 |
+| COMPANION-013: Synthetic 稳定身份 | PARTIAL | `Domain/CompanionIdentity.fs` | 四个公式已实现且有第 1 层测试（可见 sha256 断言字段组合）；旧 `CompanionDelta.bHeadDigest` 仍被 `CompanionHost` 使用，双轨删除属包 X9。仍缺门禁证明无 GUID / random / 当前时间 |
 
 ## Execution
 

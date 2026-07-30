@@ -45,6 +45,7 @@
     <Compile Include="Journal/FallbackProjection.fs"/>
     <Compile Include="Journal/LinkageProjection.fs"/>
     <Compile Include="Journal/OrchestratorProjection.fs"/>
+    <Compile Include="Journal/SessionAssociation.fs"/>
     <Compile Include="Journal/EffectProjection.fs"/>
     <Compile Include="Journal/ReviewProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>

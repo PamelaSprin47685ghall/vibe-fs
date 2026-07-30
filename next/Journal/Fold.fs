@@ -47,6 +47,19 @@ module Fold =
         | Error NotDistinctAttempt ->
             reject factName "confirmed witness violates REVIEW-003 (same provider run or same tool call)"
 
+    /// HOST-008 / COMPANION-002 association refusals.
+    ///
+    /// Every case is fatal. Unlike a stale prefix epoch, none of these can come from a
+    /// replay: `link` is idempotent for the same pair, which is exactly what restart
+    /// recovery re-attempts. A rejection therefore means two different Companions were
+    /// claimed for one work session, or a Companion was about to be given one of its
+    /// own — states no correct writer produces and neither of which can be repaired by
+    /// picking a side.
+    let private associationOutcome factName result =
+        match result with
+        | Ok updated -> Ok updated
+        | Error rejection -> reject factName (SessionAssociationProjection.describe rejection)
+
     let private handleOutcome factName projection result =
         match result with
         | Ok updated -> Ok updated
@@ -540,10 +553,34 @@ module Fold =
             Ok(updateCompanion payload.SessionId (CompanionProjection.setReplacement payload.Active) projection)
 
         | AgentFact.CompanionBloggerLinked payload ->
-            Ok(updateCompanion payload.SessionId (CompanionProjection.linkBlogger payload.BloggerSessionId) projection)
+            // HOST-008 / COMPANION-002: one fact, two projections.
+            //
+            // The Companion cache records "my Y is this session"; the association
+            // records both directions of the relation, which is what makes "is this
+            // session itself a Companion" answerable without a scan (PERSIST-008).
+            //
+            // Both or neither. A cache entry without the association would leave the
+            // Y looking like an ordinary work session, and the next transform on it
+            // would give it a Y of its own — the recursion COMPANION-002 forbids.
+            SessionAssociationProjection.link payload.SessionId payload.BloggerSessionId None projection.Associations
+            |> Result.map (fun associations ->
+                updateCompanion
+                    payload.SessionId
+                    (CompanionProjection.linkBlogger payload.BloggerSessionId)
+                    { projection with
+                        Associations = associations })
+            |> associationOutcome "CompanionBloggerLinked"
 
         | AgentFact.CompanionBloggerClosed payload ->
-            Ok(updateCompanion payload.SessionId CompanionProjection.closeBlogger projection)
+            // `unlink` is total: an unknown session or one with no Y is already in the
+            // state this fact describes, so replaying it changes nothing.
+            Ok(
+                updateCompanion
+                    payload.SessionId
+                    CompanionProjection.closeBlogger
+                    { projection with
+                        Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
+            )
 
         // ── failure-driven context recovery (SSOT/12) ───────────────────────
 
