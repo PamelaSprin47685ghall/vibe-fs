@@ -18,11 +18,19 @@ module ProviderProjection =
     // ── Wire: exactly what goes out ─────────────────────────────────────────
 
     /// A wire part, IDs included.
+    ///
+    /// `WireMedia` carries the content DIGEST rather than the bytes. Equality is
+    /// unaffected — two different images digest differently, so every question this
+    /// projection answers still gets the same answer — and the projection stays a
+    /// value small enough to hold per request instead of megabytes of base64. The
+    /// digest is computed at the Host codec boundary, exactly as `argsCanonical`
+    /// already is.
     type WirePart =
         | WireText of text: string
         | WireReasoning of text: string
         | WireToolCall of callId: ToolCallId * name: string * argsCanonical: string
         | WireToolResult of callId: ToolCallId * resultCanonical: string
+        | WireMedia of mediaType: string option * contentDigest: string
 
     type WireMessage = { Role: string; Parts: WirePart list }
 
@@ -48,11 +56,17 @@ module ProviderProjection =
 
     /// A semantic part. No call IDs: those differ on every run, so keeping them
     /// would make a fixture unmatchable on its second execution.
+    ///
+    /// `SemanticMedia` keeps the media's stable identity (COMPANION-012). The digest
+    /// is what makes two canonical prefixes containing different images compare
+    /// unequal, which CTX-011's cutoff proof depends on. It is never sent to the
+    /// Companion — CTX-013 replaces the whole part with an omission marker.
     type SemanticPart =
         | SemanticText of text: string
         | SemanticReasoning of text: string
         | SemanticToolCall of name: string * argsCanonical: string
         | SemanticToolResult of resultCanonical: string
+        | SemanticMedia of mediaType: string option * contentDigest: string
 
     type SemanticMessage =
         { Role: string
@@ -84,6 +98,7 @@ module ProviderProjection =
         | WireReasoning text -> SemanticReasoning text
         | WireToolCall(_callId, name, args) -> SemanticToolCall(name, args)
         | WireToolResult(_callId, result) -> SemanticToolResult result
+        | WireMedia(mediaType, digest) -> SemanticMedia(mediaType, digest)
 
     let private semanticMessage (message: WireMessage) : SemanticMessage =
         { Role = message.Role
@@ -143,6 +158,11 @@ module ProviderProjection =
                 [ field "kind" (quote "tool-result")
                   field "callId" (quote (ToolCallId.value callId))
                   field "result" (quote result) ]
+        | WireMedia(mediaType, digest) ->
+            jsonObject
+                [ field "kind" (quote "media")
+                  field "mediaType" (optional mediaType)
+                  field "contentDigest" (quote digest) ]
 
     let private semanticPartJson (part: SemanticPart) =
         match part with
@@ -154,6 +174,11 @@ module ProviderProjection =
                   field "name" (quote name)
                   field "args" (quote args) ]
         | SemanticToolResult result -> jsonObject [ field "kind" (quote "tool-result"); field "result" (quote result) ]
+        | SemanticMedia(mediaType, digest) ->
+            jsonObject
+                [ field "kind" (quote "media")
+                  field "mediaType" (optional mediaType)
+                  field "contentDigest" (quote digest) ]
 
     /// Byte-exact rendering of what was sent.
     let renderWire (wire: ProviderWireProjection) : string =
@@ -245,6 +270,7 @@ module ProviderProjection =
             | WireToolResult(_callId, result) -> Some(toolResultDigest sha256 result)
             | WireText _
             | WireReasoning _
+            | WireMedia _
             | WireToolCall _ -> None)
 
     /// VERIFY-003: the fixture key. Semantic by construction, so a fixture

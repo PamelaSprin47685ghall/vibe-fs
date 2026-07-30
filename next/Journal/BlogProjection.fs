@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Journal
 
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
 /// COMPANION-005: what a frame is. Entry and Squash are interchangeable inputs to
@@ -20,16 +21,15 @@ type BlogFrame =
       Digest: BlobDigest
       TextRef: BlobRef }
 
-/// CTX-011: where the Companion has consumed to. A message index alone is not
-/// enough — one large message may span several 200 KiB chunks, so a chunk
-/// boundary can fall inside a turn.
-type SemanticCursor = { TurnIndex: int; PartIndex: int }
-
 /// CTX-011: the two positions plus the proof that ties the second one to X.
 ///
 /// `IngestCursor` may sit mid-turn; `CoverableTurnCutoffExclusive` never does.
 /// A probe may only use the latter (COMPANION-011), which is why they are separate
 /// fields rather than one "progress" number.
+///
+/// `SemanticCursor` comes from `Domain.BloggerDelta`: the chunker produces the
+/// value this projection folds, and one type keeps the producer and the validator
+/// talking about the same position.
 type BlogCoverage =
     { IngestCursor: SemanticCursor
       CoverableTurnCutoffExclusive: int

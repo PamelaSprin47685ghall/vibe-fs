@@ -58,6 +58,8 @@ const [
   OrchestratorProj,
   Cursor,
   TerminalValidity,
+  BloggerTomlModule,
+  BloggerDeltaModule,
   Authority,
   AuthorityRun,
   Witness,
@@ -80,6 +82,8 @@ const [
   prod('Journal/OrchestratorProjection'),
   prod('Domain/AgentPairCursor'),
   prod('Domain/TerminalValidity'),
+  prod('Domain/BloggerToml'),
+  prod('Domain/BloggerDelta'),
   prod('Domain/PromptAuthority'),
   prod('Domain/PromptAuthorityRun'),
   prod('Domain/ReviewWitness'),
@@ -507,6 +511,98 @@ export const fallbackProjection = (() => {
 })()
 
 // ── failure-driven context recovery (SSOT/12) ────────────────────────────────
+
+/**
+ * CTX-013: the deterministic TOML wire form of a Blogger delta.
+ *
+ * `part()` builds a `BloggerDeltaPart` by case NAME. The union has six cases whose
+ * payloads are structurally similar (`TextPart` and `ReasoningPart` are both one
+ * string), so constructing by ordinal would silently relabel prose as reasoning and
+ * every rendered document would still be valid TOML.
+ */
+export const bloggerToml = (() => {
+  const m = bind(BloggerTomlModule, 'BloggerToml', [
+    'TruncationMarker',
+    'normalizeNewlines',
+    'renderString',
+    'renderItem',
+    'render',
+    'byteCount',
+  ])
+  const buildPart = unionCase(BloggerTomlModule.BloggerDeltaPart, 'BloggerDeltaPart')
+
+  const part = (kind, ...fields) => buildPart(kind, fields)
+
+  return {
+    truncationMarker: m.TruncationMarker,
+    normalizeNewlines: (text) => m.normalizeNewlines(text),
+    renderString: (text) => m.renderString(text),
+    renderItem: (item) => m.renderItem(item),
+    render: (items) => m.render(toList(items)),
+    byteCount: (text) => m.byteCount(text),
+
+    text: (value) => part('TextPart', value),
+    reasoning: (value) => part('ReasoningPart', value),
+    toolCall: (tool, args) => part('ToolCallPart', tool, args),
+    toolResult: (tool, value) => part('ToolResultPart', tool, value),
+    imageOmitted: (mediaType) => part('ImageOmitted', mediaType),
+    mediaOmitted: (mediaType) => part('MediaOmitted', mediaType),
+
+    item: ({ turn, role, part: p, truncated = false }) => ({
+      Turn: turn,
+      Role: role,
+      Part: p,
+      Truncated: truncated,
+    }),
+
+    kindOf: (item) => caseOf(item.Part),
+  }
+})()
+
+/**
+ * CTX-003 / CTX-011 / CTX-013: the three-level chunker.
+ *
+ * `messages` takes plain JS objects and converts the nested lists once. A raw array
+ * where F# expects a `list` reports itself EMPTY rather than throwing, so a test
+ * that skipped this would chunk nothing and assert successfully.
+ */
+export const bloggerDelta = (() => {
+  const m = bind(BloggerDeltaModule, 'BloggerDelta', ['DeltaLimitBytes', 'nextChunk'])
+  const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
+
+  const part = (kind, ...fields) => semanticPart(kind, fields)
+
+  return {
+    limitBytes: m.DeltaLimitBytes,
+
+    text: (value) => part('SemanticText', value),
+    reasoning: (value) => part('SemanticReasoning', value),
+    toolCall: (name, args) => part('SemanticToolCall', name, args),
+    toolResult: (value) => part('SemanticToolResult', value),
+    media: (mediaType, digest) => part('SemanticMedia', mediaType, digest),
+
+    /** `[{ role, parts: [...] }]` → the F# list-of-lists shape. */
+    messages: (turns) => toList(turns.map((turn) => ({ Role: turn.role, Parts: toList(turn.parts) }))),
+
+    cursor: (turn, part) => ({ TurnIndex: turn, PartIndex: part }),
+
+    /** `undefined` when nothing is left to consume. */
+    nextChunk: ({ limit, cursor, previousCutoff = 0, messages }) => {
+      const chunk = unwrapOption(m.nextChunk(limit, cursor, previousCutoff, messages))
+      if (isNone(chunk)) return undefined
+
+      return {
+        toml: chunk.Toml,
+        bytes: bloggerToml.byteCount(chunk.Toml),
+        itemCount: listItems(chunk.Items).length,
+        kinds: listItems(chunk.Items).map((item) => caseOf(item.Part)),
+        truncatedFlags: listItems(chunk.Items).map((item) => item.Truncated),
+        nextCursor: { turn: chunk.NextCursor.TurnIndex, part: chunk.NextCursor.PartIndex },
+        nextCutoff: chunk.NextCoverableTurnCutoffExclusive,
+      }
+    },
+  }
+})()
 
 /** CTX-004: the one content-level validity check. */
 export const terminalValidity = {

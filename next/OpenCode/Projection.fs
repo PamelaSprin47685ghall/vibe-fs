@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Domain.ProviderProjection
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel.Identity
 
 /// Host raw object → `ProviderWireProjection` (VERIFY-005 adapter boundary).
@@ -105,6 +106,25 @@ module Projection =
                 firstString partObj [ "callID"; "callId"; "id" ]
                 |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
 
+            // A Host `FilePart` (`{ type: "file", mime, url, filename? }`). The model
+            // genuinely saw it, so ARCH-004's prefix check and COMPANION-011's cutoff
+            // proof must both account for it.
+            //
+            // The DIGEST goes into the projection, not the bytes. Two different
+            // images digest differently, so every question either projection answers
+            // gets the same answer as it would from the bytes — while the projection
+            // stays a value small enough to hold per request instead of megabytes of
+            // base64.
+            //
+            // `url` is the identity: for an inline image it is the data URL, and for
+            // a referenced one it is the location. A file whose url is missing is
+            // dropped rather than digested as empty, which would make every such
+            // part compare equal to every other.
+            | "file" ->
+                firstString partObj [ "url" ]
+                |> Option.map (fun url ->
+                    WireMedia(firstString partObj [ "mime"; "mediaType" ], HostDigest.sha256Hex url))
+
             | _ -> None
 
     let decodeMessage (rawObj: obj) : WireMessage option =
@@ -198,5 +218,9 @@ module Projection =
                 | WireText text -> Some text
                 | WireReasoning _
                 | WireToolCall _
-                | WireToolResult _ -> None)
+                | WireToolResult _
+                // COMPANION-005: B is prose. Media contributes no formal text, and
+                // CTX-013 forbids inventing any — a caption here would become a
+                // claim about image content that nothing verified.
+                | WireMedia _ -> None)
             |> String.concat ""
