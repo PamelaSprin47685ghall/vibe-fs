@@ -11,6 +11,7 @@ import path from "node:path";
 import { terminateTree } from "../testkit/process-lifecycle.js";
 import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
 import { CANARY_TIMEOUT_MS, CANARY_READY_MS } from "../testkit/opencode/time-budget.js";
+import { CANARY_TESTS, CANARY_SUFFIX } from "../testkit/opencode/canary-manifest.js";
 
 function parsePositiveInt(value, fallback, name) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -36,25 +37,6 @@ function shuffle(array) {
 // Named distinctly from the imported default because the two are different facts: one is the
 // budget, one is what this run resolved it to.
 const canaryProcessTimeoutMs = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, CANARY_TIMEOUT_MS, "CANARY_TIMEOUT_MS");
-const CANARY_COUNT = 17;
-const CANARY_TESTS = [
-  "testkit/opencode/tests/agent-dsl-canary.mjs",
-  "testkit/opencode/tests/manager-full-loop-canary.mjs",
-  "testkit/opencode/tests/manager-companion-canary.mjs",
-  "testkit/opencode/tests/companion-canary.mjs",
-  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
-  "testkit/opencode/tests/executor-canary.mjs",
-  "testkit/opencode/tests/process-stress-canary.mjs",
-  "testkit/opencode/tests/host-nudge-canary.mjs",
-  "testkit/opencode/tests/host-restart-canary.mjs",
-  "testkit/opencode/tests/fallback-canary.mjs",
-  "testkit/opencode/tests/fallback-aabb-trace-canary.mjs",
-  "testkit/opencode/tests/orchestrator-publish-canary.mjs",
-  "testkit/opencode/tests/orchestrator-restart-publish-canary.mjs",
-  "testkit/opencode/tests/pty-stress-canary.mjs",
-  "testkit/opencode/tests/reviewer-restart-canary.mjs",
-  "testkit/opencode/tests/inspector-oneshot-canary.mjs",
-];
 
 // Full-suite parallel isolation: all canaries share one pool. Launch order is
 // shuffled each iteration. Canary N starts only after canary N-1 emits
@@ -203,7 +185,15 @@ async function main() {
 
   for (let rep = 1; rep <= repeats; rep++) {
     if (repeats > 1) console.log("--- Canary Iteration " + rep + "/" + repeats + " ---");
-    console.log("\nConcurrency: " + MAX_PARALLEL + " / " + CANARY_TESTS.length + " (expected ~" + CANARY_COUNT + ")\n");
+    // One number for the suite size, and it is the manifest's length. The line this replaces
+    // printed the SAME fact twice — once derived, once from a hand-maintained `CANARY_COUNT = 17` —
+    // so the live output read `Concurrency: 16 / 16 (expected ~17)`: the degradation announcing
+    // itself in the log it was meant to annotate. `MAX_PARALLEL` stays because it is a different
+    // fact, what `MAX_PARALLEL_CANARIES` resolved to, and it is labelled as one.
+    console.log(
+      "\nSuite: " + CANARY_TESTS.length + " canaries (every " + CANARY_SUFFIX + " under the manifest directory)" +
+        ", MAX_PARALLEL_CANARIES=" + MAX_PARALLEL + "\n",
+    );
 
     const testsToRun = shuffle(CANARY_TESTS);
     const canaryPromises = [];
