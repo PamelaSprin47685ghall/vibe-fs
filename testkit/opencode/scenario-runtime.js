@@ -32,7 +32,7 @@
 
 import { boundaryFor, sealDecision } from './cold-boundary.js';
 import { deliveryOutcome, emptyDeliveries, faultFor, recordDelivery } from './delivery-plan.js';
-import { resolveEntry, runtimeKeyOf } from './runtime-key.js';
+import { resolveEntry, runtimeKeyOf, sessionIdOf } from './runtime-key.js';
 import { wireOf } from './provider-wire.js';
 
 export class ScenarioRuntime {
@@ -41,6 +41,11 @@ export class ScenarioRuntime {
     this.scenario = scenario;
     this.bindings = new Map();
     this.deliveries = emptyDeliveries();
+    // Keyed by the session id `runtime-key.js` resolves, not by a private copy of that
+    // question. K11 measured what a copy costs: the body-only version that stood here
+    // returned null for every real request, because OpenCode sends the session id as a
+    // header (`../opencode/packages/opencode/src/session/llm/request.ts:197`), so no seal
+    // was ever stored and ARCH-004's barrier was inert on this whole path.
     this.seals = new Map();
     /** Which entry ids have been answered at least once — for `expectSatisfied` only. */
     this.answered = new Set();
@@ -133,7 +138,7 @@ export class ScenarioRuntime {
   consume(body, selection) {
     if (selection.entry !== undefined) this.answered.add(selection.entry.id);
 
-    const sessionId = this.#sessionIdOf(body);
+    const sessionId = sessionIdOf(body);
     if (sessionId !== null && runtimeKeyOf(body, this.bindings).kind === 'chat') {
       this.seals.set(sessionId, wireOf(body));
     }
@@ -158,15 +163,10 @@ export class ScenarioRuntime {
     );
   }
 
-  #sessionIdOf(body) {
-    const id = body?.sessionId ?? body?.sessionID ?? null;
-    return typeof id === 'string' && id !== '' ? id : null;
-  }
-
   #sealFor(body, key, entry) {
     if (key.kind !== 'chat') return { held: true };
 
-    const sessionId = this.#sessionIdOf(body);
+    const sessionId = sessionIdOf(body);
     if (sessionId === null) return { held: true };
 
     return sealDecision({
