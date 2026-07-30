@@ -10,19 +10,22 @@
 | 1 | 休克一：领域内核与持久事实（包 0） | 关闭 | 完成（包 0a–0e） |
 | 2 | 休克二：生产代码全部调用链（包 A–H） | 关闭 | 完成 |
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（`SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)） |
-| 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 进行中 |
-| 4 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 | 未开始 |
-| 5 | 退火一：恢复生产编译 | dotnet build → npm run build | 进行中（1a 约 70 个编译错误） |
-| 6 | 退火二：恢复 mjs 单元套件 | test:mjs | 未开始 |
-| 6.3 | 失败驱动上下文恢复（包 X） | 编译 + 第 0–3 层 | 未开始 |
+| 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
+| 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
+| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | 进行中（facade 修复后立即开始） |
+| 6 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 未开始 |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
 
-阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在包 T 写测试前定稿，否则测试会锁定旧语义。
+阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在写测试前定稿。
 
-包 X 排在退火二之后：它新增大量类型与 fold 校验，在无编译反馈下写等于盲改。它必须早于包 K，因为 X-A 至 X-D 四条剧本要与包 K 的 22 条一起手工写成 TOML。
+包 X 先于包 T，这是顺序上最关键的一条。 原计划把包 X 排在包 T 之后，那是错的：包 T 要为 COMPANION-001…013 与 PROMPT-008 写第 1–3 层测试，而这些条款的实现正是包 X 的产出。先写测试就只能对着旧语义写——旧的角色白名单 eligibility、旧的 JSON delta、旧的主动 PrefixEpoch 更新——然后包 X 落地时同一批测试要整体重写一遍。两次编写之间没有任何信息增益，只有一次把旧语义固化成断言的机会。
 
-包 K 排在退火二之后、退火三之前：剧本的 lane 划分与 step 序列反映迁移后的生产行为，先重写会锁定旧语义；而它必须早于任何 canary 运行，因为旧剧本无法匹配新语义的请求。
+包 X 依赖退火一而非退火二：它新增大量类型与 fold 校验，需要编译反馈，但不需要既有 mjs 套件先全绿。`domain.mjs` facade 必须先能加载（它是所有 mjs 测试的唯一入口），这就是 facade 修复排在包 X 之前的原因。
+
+包 X 的第 1–3 层测试随各子步骤同时写，不推迟到包 T。 包 T 因此收缩为「CTX/COMPANION 以外的条款测试 + 删除 `tests-next`」。
+
+包 K 排在包 T 之后、退火三之前：剧本的 lane 划分与 step 序列反映迁移后的生产行为，先重写会锁定旧语义；而它必须早于任何 canary 运行，因为旧剧本无法匹配新语义的请求。X-A 至 X-D 四条与包 K 的 22 条一起手工写成 TOML。
 
 休克期只允许第 0 层反馈：`ssot-lint.mjs`、`shock-audit.mjs`、`architecture-gate.mjs`、`git diff --check`、`git status --short`、`rg`。
 
@@ -642,19 +645,19 @@ HandleRetired
 
 #### 包 G-1 清点结果
 
-包 0b 已删除全部九个旧 `Orchestrator*` 事实，包 0c 已把投影换成 `JobProgress` 判别联合并写好 `recoveryAction`。因此新协议的**读侧已完备，写侧全部悬空**——`Orchestrator/OrchestratorProgram.fs` 与 `Orchestrator.fs` 仍在构造九个已不存在的事实。
+包 0b 已删除全部九个旧 `Orchestrator*` 事实，包 0c 已把投影换成 `JobProgress` 判别联合并写好 `recoveryAction`。因此新协议的读侧已完备，写侧全部悬空——`Orchestrator/OrchestratorProgram.fs` 与 `Orchestrator.fs` 仍在构造九个已不存在的事实。
 
 五处结构性偏离，按迁移顺序：
 
-1. **Integration Gate 跨 review 持有**（ORCH-005 熔断项）。`OrchestratorProgram.program:246` 在进入 `publishLoop` 前 `use! _gate = IntegrationGate.acquire`，而 `publishLoop` 内含 `rebase` 与 `postReview`——即 LLM review 与冲突修复全程持锁。条款要求 lock 只保护 ref mutation，多个 Job 可并行 rebase 与 review。锁必须下移到 `publish` 内部、`FfMerge` 前后。
+1. Integration Gate 跨 review 持有（ORCH-005 熔断项）。`OrchestratorProgram.program:246` 在进入 `publishLoop` 前 `use! _gate = IntegrationGate.acquire`，而 `publishLoop` 内含 `rebase` 与 `postReview`——即 LLM review 与冲突修复全程持锁。条款要求 lock 只保护 ref mutation，多个 Job 可并行 rebase 与 review。锁必须下移到 `publish` 内部、`FfMerge` 前后。
 
-2. **`OrchestratorRecovery.currentJob` 是 stage-like 重建**。它在投影缺失时用 `Option.defaultValue` 造一个五字段全 `None` 的记录，`preReview` / `postReview` / `rebase` / `publish` 再按「哪个字段被设过」推断该做什么。这正是 ORCH-006 禁止的形状，且 0c 之后该记录类型已不存在。整个 `Orchestrator.Recovery.fs`（29 行，两个函数）应删除——`recoveryAction` 已经用一次匹配代替了对五个字段排优先级。
+2. `OrchestratorRecovery.currentJob` 是 stage-like 重建。它在投影缺失时用 `Option.defaultValue` 造一个五字段全 `None` 的记录，`preReview` / `postReview` / `rebase` / `publish` 再按「哪个字段被设过」推断该做什么。这正是 ORCH-006 禁止的形状，且 0c 之后该记录类型已不存在。整个 `Orchestrator.Recovery.fs`（29 行，两个函数）应删除——`recoveryAction` 已经用一次匹配代替了对五个字段排优先级。
 
-3. **`CandidateId` 已灭绝但九处仍在构造它**。旧事实用 `candidate-<managerId>` 合成 id 作为 barrier 身份；ORCH-006 改为 barrier 事实携带 `ReviewBarrierId` 并指向已持久化的 `ConfirmedReviewWitness`。`OrchestratorRecovery.candidateId` 一并删除。
+3. `CandidateId` 已灭绝但九处仍在构造它。旧事实用 `candidate-<managerId>` 合成 id 作为 barrier 身份；ORCH-006 改为 barrier 事实携带 `ReviewBarrierId` 并指向已持久化的 `ConfirmedReviewWitness`。`OrchestratorRecovery.candidateId` 一并删除。
 
-4. **`ManagerId: string` vs `ManagerJobId`**。运行期全链路（`ManagerJob.ManagerId`、`OrchestratorHandle`、`ManagerPort` 三个函数、`VerdictMailbox`、`OrchestratorVerdict` 五个 case）用裸 string，而新事实要求 `ManagerJobId` + `ManagerSessionId` + `WorktreeIdentity` 三个 typed 身份。`OrchestratorHost.runReviewerOnce` 已经在用 `sprintf "%s-reviewer" managerId` 从 manager id 派生 reviewer 的 agent id，这是把 id 当字符串拼装的既有入口。
+4. `ManagerId: string` vs `ManagerJobId`。运行期全链路（`ManagerJob.ManagerId`、`OrchestratorHandle`、`ManagerPort` 三个函数、`VerdictMailbox`、`OrchestratorVerdict` 五个 case）用裸 string，而新事实要求 `ManagerJobId` + `ManagerSessionId` + `WorktreeIdentity` 三个 typed 身份。`OrchestratorHost.runReviewerOnce` 已经在用 `sprintf "%s-reviewer" managerId` 从 manager id 派生 reviewer 的 agent id，这是把 id 当字符串拼装的既有入口。
 
-5. **`ManagerJobCreated` 六字段无处可取**。`Orchestrator.forkManagerCore` 目前只有 `managerId` / `worktreePath` / `branch` / `prompt`；新事实需要 `ManagerSessionId`（Host 签发，需从 fork 结果取）、`ManagerAgent`（PROMPT-008，不可从 role 重建）、`WorktreeIdentity`（稳定身份，非可变路径）、`TargetBranchFrozen`（ORCH-008 的 `symbolic-ref` 冻结值）。`GitPort` 无 symbolic-ref 冻结动作，需新增。
+5. `ManagerJobCreated` 六字段无处可取。`Orchestrator.forkManagerCore` 目前只有 `managerId` / `worktreePath` / `branch` / `prompt`；新事实需要 `ManagerSessionId`（Host 签发，需从 fork 结果取）、`ManagerAgent`（PROMPT-008，不可从 role 重建）、`WorktreeIdentity`（稳定身份，非可变路径）、`TargetBranchFrozen`（ORCH-008 的 `symbolic-ref` 冻结值）。`GitPort` 无 symbolic-ref 冻结动作，需新增。
 
 同时确认的 REVIEW-008 次序矛盾（包 D 遗留的两处 `SHOCK-UNMIGRATED`）：`emitReviewBarrier` 在 `runReviewerOnce` fork reviewer 之前调用，此时 reviewer session 尚不存在。本包按「barrier 从 reviewer fork 路径发出」解决——一个 barrier 对应一次 reviewer fork，新 reviewer session 的 guard 起始为空，REVIEW-008 的「全新双 PERFECT」因此自动成立。
 

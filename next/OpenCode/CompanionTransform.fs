@@ -174,14 +174,13 @@ module CompanionTransform =
                         match memory.LatestB with
                         | None -> ()
                         | Some latestB ->
-                            let current = CompanionDelta.jsonOfMessages Projection.canonicalJson rawMessages
+                            let current = CompanionDelta.jsonOfMessages CanonicalJson.canonicalJson rawMessages
 
                             let coverageCutoff =
                                 match memory.LastSuccessfulProjection with
                                 | Some previous ->
                                     CompanionDelta.prefixLength
-                                        Projection.messageId
-                                        Projection.sameCanonicalMessage
+                                        CanonicalJson.equal
                                         previous
                                         current
                                         (List.length rawMessages)
@@ -191,7 +190,7 @@ module CompanionTransform =
                                 if coverageCutoff <= 0 || coverageCutoff > List.length rawMessages then
                                     ""
                                 else
-                                    CompanionDelta.prefixDigest Projection.canonicalJson rawMessages coverageCutoff
+                                    CompanionDelta.prefixDigest CanonicalJson.canonicalJson rawMessages coverageCutoff
 
                             match memory.ActivePrefixEpoch with
                             | None ->

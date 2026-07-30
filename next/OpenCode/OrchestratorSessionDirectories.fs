@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System.Collections.Generic
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
@@ -32,8 +33,12 @@ module OrchestratorSessionDirectories =
                             // CanonicalRole is the durable role the fork selected.
                             // The previous version consulted a separate `LinkedRoles`
                             // map, which could disagree with the handle it described.
+                            // Typed comparison, not a case-insensitive string match:
+                            // the role is a `Role`, so a spelling drift is a compile
+                            // error rather than a reviewer tree that silently stops
+                            // being registered.
                             match record.CanonicalRole with
-                            | Some role when role.Equals("reviewer", System.StringComparison.OrdinalIgnoreCase) ->
+                            | Role.Reviewer ->
                                 registerReviewerTree (SessionId.value record.ChildSessionId) (GitTree.create path)
                             | _ -> ()
                         | false, _ -> ()

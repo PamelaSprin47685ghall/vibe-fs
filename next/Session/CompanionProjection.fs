@@ -20,7 +20,8 @@ type CompanionBudgetStore() =
             | _ -> 32000
 
     member _.Remember(primarySessionId: string, budget: int) =
-        if budget > 0 then byPrimary.[primarySessionId] <- budget
+        if budget > 0 then
+            byPrimary.[primarySessionId] <- budget
 
     member _.TryFind(primarySessionId: string) =
         match byPrimary.TryGetValue primarySessionId with
@@ -61,7 +62,7 @@ module CompanionProjection =
         max 0 ((bytes + 2) / 3)
 
     let estimateTokens (messages: obj list) =
-        let json = Projection.canonicalJson (List.toArray messages)
+        let json = CanonicalJson.canonicalJson (List.toArray messages)
         estimateTokensUtf8 json
 
     let minReservedOutputTokens = 2048

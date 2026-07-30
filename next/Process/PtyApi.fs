@@ -3,30 +3,19 @@ namespace Wanxiangshu.Next.Process
 open System
 open System.Collections.Generic
 open System.Text
-open Wanxiangshu.Next.Session
 
-/// Public API over PtyPort: fork/send/complete/list helpers and the
-/// cross-runtime parent-abort registry. Kept in its own file so Pty.fs stays
-/// focused on the typed port boundary (architecture gate: files <= 300 lines).
+/// PTY id minting, byte encoding and the cross-runtime parent-abort registry.
+///
+/// The per-operation wrappers (`forkPty`, `send`, `complete`, `list`, `close`) are
+/// gone: `HostForkPty` calls `PtyPort` directly, so each wrapper was a second
+/// spelling of one member with no caller. `forkPtyWith` in particular still passed
+/// an optional `AgentRole`, which is the signature EXEC-015 replaced with a
+/// required `ManagedAgent` — keeping it would preserve a way to open a PTY without
+/// a managed identity.
 module Pty =
     [<Literal>]
     let AgentName = "pty"
 
-    let forkPty (port: PtyPort) (command: string) : PtyId = port.Fork command
-
-    let forkPtyWith
-        (port: PtyPort)
-        (command: string)
-        (agentId: string option)
-        (role: AgentRole option)
-        (ptyId: PtyId option)
-        : PtyId =
-        port.Fork(command, ?agentId = agentId, ?role = role, ?ptyId = ptyId)
-
-    let send (port: PtyPort) (id: PtyId) (command: PtyCommand) = port.Send(id, command)
-    let complete (port: PtyPort) (id: PtyId) (outcome: Result<string, string>) = port.Complete(id, outcome = outcome)
-    let list (port: PtyPort) = port.List()
-    let close (port: PtyPort) (id: PtyId) = port.Close id
     let bytes (text: string) = Encoding.UTF8.GetBytes text
 
     let newId () =

@@ -4,6 +4,13 @@ open Wanxiangshu.Next.Kernel.Identity
 
 /// What actually happened to a ManagerJob, most recent fact only.
 ///
+/// `RequireQualifiedAccess` is not style. `Published`, `Failed` and `Abandoned`
+/// also name cases of `TerminalOutcome`, and an unqualified `Failed reason` in a
+/// session-completion path resolved to THIS union — the compiler reported
+/// "expected TerminalOutcome but here has JobProgress" in three unrelated files.
+/// A bare case name meaning two things across two domains is the double model
+/// ARCH-001 forbids, and qualification is how the reader tells them apart.
+///
 /// ORCH-006 forbids a shape where the recovery action is ambiguous. The old
 /// projection held five independent optional fields (PreRebaseReviewCommit,
 /// RebasedCommit, ConflictFiles, PostRebaseReviewCommit, PublishClaimHead), so
@@ -16,6 +23,7 @@ open Wanxiangshu.Next.Kernel.Identity
 /// barrier, a set of conflicted files. None of them says where the program
 /// should go next; ORCH-007 derives that, and it derives it by matching one
 /// value instead of ranking five.
+[<RequireQualifiedAccess>]
 type JobProgress =
     /// ManagerJobCreated. Worktree exists, Manager has produced nothing yet.
     | ManagerStarted
@@ -126,14 +134,14 @@ module OrchestratorProjection =
 
     let private isTerminal (progress: JobProgress) =
         match progress with
-        | Published _
-        | Failed _
-        | Abandoned -> true
-        | ManagerStarted
-        | CandidateReady _
-        | ConflictPending _
-        | RebasedCandidateReady _
-        | PublishClaimed _ -> false
+        | JobProgress.Published _
+        | JobProgress.Failed _
+        | JobProgress.Abandoned -> true
+        | JobProgress.ManagerStarted
+        | JobProgress.CandidateReady _
+        | JobProgress.ConflictPending _
+        | JobProgress.RebasedCandidateReady _
+        | JobProgress.PublishClaimed _ -> false
 
     /// ORCH-004: jobs still owed work. Multiple jobs may rebase and review in
     /// parallel; only the ref mutation serialises.
@@ -165,7 +173,7 @@ module OrchestratorProjection =
                       WorktreePath = job.WorktreePath
                       TargetRef = job.TargetRef
                       TargetBranchFrozen = job.TargetBranchFrozen
-                      Progress = ManagerStarted }
+                      Progress = JobProgress.ManagerStarted }
                     projection.Jobs }
 
     /// Record a job's latest progress.
@@ -176,7 +184,7 @@ module OrchestratorProjection =
     ///
     /// ORCH-003 fixes the worktree and the Manager for the job's whole life, so
     /// only `Progress` is ever replaced. A terminal job accepts nothing further,
-    /// which makes a replayed Published idempotent instead of reopening the job.
+    /// which makes a replayed `Published` idempotent instead of reopening the job.
     let recordProgress (jobId: ManagerJobId) (progress: JobProgress) (projection: OrchestratorProjection) =
         match Map.tryFind jobId projection.Jobs with
         | None -> projection
@@ -187,22 +195,22 @@ module OrchestratorProjection =
 
     /// ORCH-007. `currentHead` is None when GetTargetHead failed.
     ///
-    /// The three PublishClaimed branches are evaluated in the clause's fixed
+    /// The three `PublishClaimed` branches are evaluated in the clause's fixed
     /// order: already-published first, then unchanged target, then everything
     /// else. Order matters — checking "unchanged" first would re-attempt an ff
     /// that already succeeded.
     let recoveryAction (currentHead: CommitHash option) (job: ManagerJobProjection) : JobRecoveryAction =
         match job.Progress with
-        | ManagerStarted -> ResumeManager
+        | JobProgress.ManagerStarted -> ResumeManager
 
-        | CandidateReady candidate -> RebaseReviewPublish candidate.CandidateCommit
+        | JobProgress.CandidateReady candidate -> RebaseReviewPublish candidate.CandidateCommit
 
-        | ConflictPending conflict ->
+        | JobProgress.ConflictPending conflict ->
             ResumeConflictResolution
                 {| CandidateCommit = conflict.CandidateCommit
                    ConflictFiles = conflict.ConflictFiles |}
 
-        | RebasedCandidateReady rebased ->
+        | JobProgress.RebasedCandidateReady rebased ->
             match currentHead with
             | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
             | Some head when head = rebased.TargetHeadSnapshot ->
@@ -214,7 +222,7 @@ module OrchestratorProjection =
             // base (REVIEW-008), so it must not be reused.
             | Some _ -> RebaseAndReviewAgain
 
-        | PublishClaimed claim ->
+        | JobProgress.PublishClaimed claim ->
             match currentHead with
             | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
             | Some head when head = claim.RebasedCommit ->
@@ -227,6 +235,6 @@ module OrchestratorProjection =
                        ExpectedHead = claim.ExpectedHead |}
             | Some _ -> RebaseAndReviewAgain
 
-        | Published _
-        | Failed _
-        | Abandoned -> CleanUp
+        | JobProgress.Published _
+        | JobProgress.Failed _
+        | JobProgress.Abandoned -> CleanUp

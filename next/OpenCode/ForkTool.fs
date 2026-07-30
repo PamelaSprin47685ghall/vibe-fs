@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open Thoth.Json
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 /// Manager fork/nudge and Orchestrator manager-job creation. Each public tool
@@ -110,11 +111,12 @@ module ForkTool =
             else
                 match ManagedAgent.tryParse request.Agent with
                 | Some managed when managed.Role = Role.Manager && managed.Visibility = AgentVisibility.Public ->
-                    let managerId = ToolHostCodec.newHandleId ()
+                    let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
                     let host = scope.OrchestratorHostFor context.SessionId
 
                     match! host.ForkManagerJob(managerId, managed.Name, request.Prompt) with
-                    | Ok worktree -> return forkPayload managerId managed [ "worktree", Encode.string worktree ]
+                    | Ok worktree ->
+                        return forkPayload (ManagerJobId.value managerId) managed [ "worktree", Encode.string worktree ]
                     | Error forkError -> return error forkError
                 | Some _ -> return error "Orchestrator may only fork fast-manager or deep-manager"
                 | None -> return error (unknownAgentError request.Agent)

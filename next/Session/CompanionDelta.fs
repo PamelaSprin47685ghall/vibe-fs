@@ -196,21 +196,17 @@ module CompanionDelta =
         let hash = HostDigest.sha256Hex input
         sprintf "companion-b-head-%s" (hash.Substring(0, 16))
 
-    let prefixLength
-        (messageId: obj -> string option)
-        (sameCanonicalMessage: obj -> obj -> bool)
-        (previous: string)
-        (current: string)
-        (maximum: int)
-        : int =
+    /// ARCH-004: how many leading messages are unchanged between two canonical
+    /// views.
+    ///
+    /// `sameMessage` is the ONE comparison. The previous signature also took a
+    /// `messageId` reader and short-circuited on differing ids, which was dead: an
+    /// id is part of a message's canonical JSON, so equal canonical text already
+    /// implies equal ids.
+    let prefixLength (sameMessage: obj -> obj -> bool) (previous: string) (current: string) (maximum: int) : int =
         try
             let oldMessages = Fable.Core.JS.JSON.parse previous
             let newMessages = Fable.Core.JS.JSON.parse current
-
-            let sameMessage oldValue newValue =
-                match messageId oldValue, messageId newValue with
-                | Some oldId, Some newId when oldId <> newId -> false
-                | _ -> sameCanonicalMessage oldValue newValue
 
             let mutable index = 0
             let mutable stopped = false

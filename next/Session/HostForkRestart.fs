@@ -43,7 +43,7 @@ module HostForkRestart =
         : Task<unit> =
         task {
             runtime.Restore(agentId, role, agent)
-            runtime.BindChildSession(agentId, SessionId.value childSessionId)
+            runtime.BindChildSession(agentId, childSessionId)
 
             match snapshot with
             | None -> runtime.MarkInterrupted(agentId, "host restart: no session snapshot")
@@ -65,11 +65,11 @@ module HostForkRestart =
                             let payload =
                                 AgentCompletion.completed
                                     agentId
-                                    (SessionId.value childSessionId)
+                                    childSessionId
                                     ("run-restored-" + agentId)
                                     role
-                                    user.Id
-                                    assistant.Id
+                                    (AuthorityRootUserMessageId.create user.Id)
+                                    (ProviderRunIdentity.create assistant.Id)
                                     (textOfParts assistant.Parts)
                                     None
                                     None
@@ -134,15 +134,9 @@ module HostForkRestart =
                     // The role is the durable CanonicalRole. `TargetAgent` carries the
                     // managed agent name the fork selected, so neither is rebuilt from
                     // the other — PROMPT-008's pair stays exactly as recorded.
-                    let role =
-                        record.CanonicalRole
-                        |> Option.bind PromptAuthority.tryParseRole
-                        |> Option.map AgentRoleIdentity.ofRole
+                    let role = AgentRoleIdentity.ofRole record.CanonicalRole
 
-                    match role with
-                    | None -> ()
-                    | Some role ->
-                        children.[agentId] <- record.ChildSessionId
-                        childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
-                        do! recoverChild runtime snapshot agentId record.ChildSessionId role record.TargetAgent
+                    children.[agentId] <- record.ChildSessionId
+                    childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
+                    do! recoverChild runtime snapshot agentId record.ChildSessionId role record.TargetAgent
         }

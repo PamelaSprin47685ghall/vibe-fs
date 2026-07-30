@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Agent
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Identity
 
 /// Runtime for managing child agent runs and PTY sessions.
 ///
@@ -201,7 +202,7 @@ type ForkRuntime
     member _.MarkInterrupted(agentId: string, reason: string) : unit =
         lock lockObj (fun () -> agents <- ForkRecovery.markInterrupted agentId reason agents)
 
-    member _.BindChildSession(agentId: string, childSessionId: string) : unit =
+    member _.BindChildSession(agentId: string, childSessionId: SessionId) : unit =
         lock lockObj (fun () -> agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
 
     /// Internal targeted completion handle. Model-visible join remains join-any.

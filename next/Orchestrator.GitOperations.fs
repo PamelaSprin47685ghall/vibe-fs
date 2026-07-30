@@ -87,7 +87,7 @@ module GitOperations =
     /// the gate, so there is no legitimate "publish without an expectation" — and
     /// making it optional is what allowed a lost update.
     let private ffMerge
-        runner
+        (runner: Command -> Task<int * string * string>)
         repoPath
         (worktree: WorktreePath)
         (target: TargetRef)

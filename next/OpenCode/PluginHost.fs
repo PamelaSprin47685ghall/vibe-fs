@@ -20,12 +20,23 @@ module PluginHost =
             let d = unbox<string> input?directory
             if String.IsNullOrWhiteSpace d then None else Some d
 
-    let createJournal (input: obj) : AgentJournal option =
+    /// PERSIST-004/005: a rejected boot is a startup failure, not an absent journal.
+    ///
+    /// `None` means "no workspace, so no runtime directory to own" — a legitimate
+    /// state. A `FoldRejection` means the on-disk history could not be folded
+    /// (mid-file corruption, pre-0.5.0 schema), and PERSIST-005 forbids guessing:
+    /// swallowing it into `None` would start the plugin with an empty projection and
+    /// then append new facts on top of a history it never read.
+    let createJournal (input: obj) : Result<AgentJournal option, string> =
         match workspaceDirectory input with
-        | None -> None
+        | None -> Ok None
         | Some workspace ->
             let dir = RuntimePath.forWorkspace workspace
-            Some(SharedAgentJournal.acquire dir processId DateTimeOffset.UtcNow)
+
+            match SharedAgentJournal.acquire dir processId DateTimeOffset.UtcNow with
+            | Ok journal -> Ok(Some journal)
+            | Error rejection ->
+                Error(sprintf "journal boot rejected at %s: %s (%s)" dir rejection.Reason rejection.Fact)
 
 
     let restoreSessionParents (journal: AgentJournal option) (sessionParents: Dictionary<string, string>) =

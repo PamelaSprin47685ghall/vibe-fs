@@ -123,7 +123,7 @@ type HostForkRuntime
         let run =
             HostForkRunLifecycle.installRun gate pendingRuns sessions childWorkRecordOf agentId childId role
 
-        runtime.BindChildSession(agentId, SessionId.value childId)
+        runtime.BindChildSession(agentId, childId)
         runStarted childId role (directoryOf agentId)
         run
 

@@ -86,7 +86,7 @@ module internal CompanionHostBlogger =
 
                 match outcome with
                 | Completed result ->
-                    let text = result.FormalText
+                    let text = result.TurnFormalText
 
                     if String.IsNullOrWhiteSpace text then
                         return failBlog "Blogger returned no formal assistant text"
@@ -127,7 +127,7 @@ module internal CompanionHostBlogger =
 
                 match outcome with
                 | Completed result ->
-                    let text = result.FormalText
+                    let text = result.TurnFormalText
 
                     if String.IsNullOrWhiteSpace text then
                         return failBlog "Blogger returned no formal assistant text"

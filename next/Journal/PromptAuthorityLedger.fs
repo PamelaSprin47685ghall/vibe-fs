@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Journal
 
 open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 
 /// Prompt Authority folds (SSOT/03).
@@ -99,7 +100,12 @@ module PromptAuthorityLedger =
                   LogicalRunId = fact.LogicalRunId
                   AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
                   EffectiveAgent = fact.EffectiveAgent
-                  PayloadDigest = fact.PayloadDigest }
+                  PayloadDigest = fact.PayloadDigest
+                  // PROMPT-005: `Claimed` precedes the Host call, so no transport
+                  // receipt can exist yet. `foldPromptSubmitted` attaches it.
+                  Receipt = None
+                  // PROMPT-011: counted by folding `RuntimeStarted`, never by a writer.
+                  RecoveryAttempts = 0 }
 
             PromptAuthorityRun.registerClaim claim projection
 
@@ -137,11 +143,17 @@ module PromptAuthorityLedger =
         PromptAuthorityRun.acceptClaim fact.PromptKey fact.PhysicalUserMessageId projection
 
     /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
+    ///
+    /// `Reason` is part of the fact's shape, so it appears here even though the
+    /// projection does not branch on it: PROMPT-005 keeps the reason on the one
+    /// `Abandoned` fact instead of splitting it into a fifth fact name, and an
+    /// anonymous record that omitted the field would not accept the payload.
     let foldPromptAbandoned
         (projection: PromptAuthority.PromptAuthorityProjection)
         (fact:
             {| PromptKey: PromptKey
-               SessionId: SessionId |})
+               SessionId: SessionId
+               Reason: PromptAbandonReason |})
         =
         PromptAuthorityRun.abandonClaim fact.PromptKey projection
 

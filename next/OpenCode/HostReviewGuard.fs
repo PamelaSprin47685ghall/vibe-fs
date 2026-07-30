@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity

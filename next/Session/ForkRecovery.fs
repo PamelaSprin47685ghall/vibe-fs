@@ -49,7 +49,7 @@ module ForkRecovery =
             interrupted.Completion.TrySet(completion) |> ignore
             Map.add agentId interrupted agents
 
-    let bindChildSession agentId childSessionId agents =
+    let bindChildSession agentId (childSessionId: SessionId) agents =
         match Map.tryFind agentId agents with
         | Some run -> ChildRun.bindSession run childSessionId
         | None -> ()

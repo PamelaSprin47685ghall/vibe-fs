@@ -33,6 +33,15 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         |> Option.map (fun m -> m.PrefixReplacementEnabled || m.ActivePrefixEpoch.IsSome)
         |> Option.defaultValue false
 
+    /// COMPANION-002: the companion Blogger Session Y for this X.
+    ///
+    /// A runtime mirror of the durable link, not a second writer: `CompanionHost`
+    /// owns the create/abort decision and writes the fact through
+    /// `ICompanionDurablePort`, then tells this cache. Restored on construction so a
+    /// restart reuses the same Y instead of creating a second one.
+    let mutable bloggerSessionId: SessionId option =
+        restoredMemory |> Option.bind (fun m -> m.BloggerSessionId)
+
     // Fable Tasks do not expose IsCompleted; this bit belongs to the
     // single in-flight completion cell and is not a second blogger state.
     let mutable inFlightTask: Task<unit> option = None
@@ -88,7 +97,17 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             { LastSuccessfulProjection = lastSuccessfulProjection
               LatestB = latestB
               ActivePrefixEpoch = activePrefixEpoch
+              BloggerSessionId = bloggerSessionId
               PrefixReplacementEnabled = prefixReplacementEnabled })
+
+    /// Mirror a durable Blogger link that `CompanionHost` already recorded.
+    member _.RecordBloggerLinked(bloggerId: SessionId) : unit =
+        lock lockObj (fun () -> bloggerSessionId <- Some bloggerId)
+
+    /// Mirror a durable Blogger unlink. `None` again, so the next transform creates
+    /// a fresh Y rather than prompting an aborted session forever.
+    member _.RecordBloggerClosed() : unit =
+        lock lockObj (fun () -> bloggerSessionId <- None)
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory
@@ -102,8 +121,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         | Some t -> t :> Task
         | None -> Task.FromResult(()) :> Task
 
-    member _.ReplacementActive =
-        lock lockObj (fun () -> prefixReplacementEnabled)
+    member _.ReplacementActive = lock lockObj (fun () -> prefixReplacementEnabled)
 
     member _.TryEnableReplacement() : bool =
         lock lockObj (fun () ->

@@ -20,7 +20,7 @@
 
 保留原因：这些推理解释了「为什么条款长这样」。条款本身只说应该如何，不说为什么排除了别的做法。删掉它们，未来任何人想动这套机制都会重新踩一遍同样的坑。
 
-原文逐字保留，未作术语同步。 阅读时注意：`AXIOM-CTX-001` 现为 `CTX-001`，`ProviderAttemptIdentity` 现为 `ProviderRunIdentity`，`BlogBase` 已拆为 `CoverableB` / `LatestB` / `FrozenB`，§26 的 SSOT 修订清单已全部执行完毕。
+正文逐字保留，未作术语同步。 唯一的机械改动是 `strip-doc-bold` 按仓库文档风格去掉了 17 处粗体标记，文字本身未变。阅读时注意：`AXIOM-CTX-001` 现为 `CTX-001`，`ProviderAttemptIdentity` 现为 `ProviderRunIdentity`，`BlogBase` 已拆为 `CoverableB` / `LatestB` / `FrozenB`，§26 的 SSOT 修订清单已全部执行完毕，§27 实现顺序与 §28 测试矩阵已重组为 `shock-anneal.md` 的包 X。
 
 原始审阅状态：批准实施。变更性质：架构级替换。
 
@@ -52,16 +52,16 @@
 
 本方案经历了多轮设计讨论，关键决策点如下：
 
-1. **delta 瞬态化** — Y 不再保留历史 delta，只保留工作日志 frame。上下文增长从 Σ(delta)+Σ(response) 降为 Σ(response)（D5）。
-2. **纯错误驱动** — 不主动估算上下文容量（AXIOM-CTX-001/002）。所有正常请求先直接执行，只有真实 provider 失败才触发恢复。失败快速结束且不计费（D6）。
-3. **无条件提交 squash** — squash 输出有效即永久提交，不依赖同槽主请求成败。这是有损压缩的正确语义，不需要"标记清理"（D1）。
-4. **200 KiB delta 硬限 + 三级切块** — delta 按消息→part→硬截断切块，单 part 超限截断后丢弃尾部（D3）。
-5. **连续 user 消息投影** — 历史 frame 以 user 角色连续投影，各家 provider 均允许（D4）。
-6. **删除错误分类器** — 不维护 OverflowPatterns 表。系统对所有 Failed/Aborted attempt 执行同一恢复协议，不判断、证明或记录失败根因。
-7. **armed-by-advance** — 武装不是持久 Offset 属性，而是序列内失败推进的控制流事实，防止停放光标导致每轮压缩（§4.0）。
-8. **统一 Companion** — 所有工作角色都有 Y，不依赖 CanonicalRole（AXIOM-COMPANION-001）。
-9. **全局关闭 Host compaction** — X 和 Y 均禁用自动、overflow、manual compaction（AXIOM-HOST-001）。
-10. **X probe 为先提交后提升** — probe 是 attempt-local 候选项，成功后才升为永久 PrefixEpoch（AXIOM-X-002）。
+1. delta 瞬态化 — Y 不再保留历史 delta，只保留工作日志 frame。上下文增长从 Σ(delta)+Σ(response) 降为 Σ(response)（D5）。
+2. 纯错误驱动 — 不主动估算上下文容量（AXIOM-CTX-001/002）。所有正常请求先直接执行，只有真实 provider 失败才触发恢复。失败快速结束且不计费（D6）。
+3. 无条件提交 squash — squash 输出有效即永久提交，不依赖同槽主请求成败。这是有损压缩的正确语义，不需要"标记清理"（D1）。
+4. 200 KiB delta 硬限 + 三级切块 — delta 按消息→part→硬截断切块，单 part 超限截断后丢弃尾部（D3）。
+5. 连续 user 消息投影 — 历史 frame 以 user 角色连续投影，各家 provider 均允许（D4）。
+6. 删除错误分类器 — 不维护 OverflowPatterns 表。系统对所有 Failed/Aborted attempt 执行同一恢复协议，不判断、证明或记录失败根因。
+7. armed-by-advance — 武装不是持久 Offset 属性，而是序列内失败推进的控制流事实，防止停放光标导致每轮压缩（§4.0）。
+8. 统一 Companion — 所有工作角色都有 Y，不依赖 CanonicalRole（AXIOM-COMPANION-001）。
+9. 全局关闭 Host compaction — X 和 Y 均禁用自动、overflow、manual compaction（AXIOM-HOST-001）。
+10. X probe 为先提交后提升 — probe 是 attempt-local 候选项，成功后才升为永久 PrefixEpoch（AXIOM-X-002）。
 
 这些决策共同构成了本方案的完整技术基础。
 
@@ -567,7 +567,7 @@ armedByFailure: bool
 
 ## 4.0 停放光标陷阱（为何必须 armed-by-advance）
 
-不能只靠 Offset 的奇偶性判断是否武装。FALLBACK-004 明确规定**成功时 Offset 不变**（不重置回 0），因此若一个 A′ 成功，cursor 停放在 Offset = 1。
+不能只靠 Offset 的奇偶性判断是否武装。FALLBACK-004 明确规定成功时 Offset 不变（不重置回 0），因此若一个 A′ 成功，cursor 停放在 Offset = 1。
 
 若不引入 armed-by-advance，后果是：
 
@@ -577,13 +577,13 @@ armedByFailure: bool
 > 帧被反复碾压到输出预算地板
 > 保真度持续崩溃，且永不恢复
 
-**修法极简且不加持久状态：**
+修法极简且不加持久状态：
 
 > 武装不是槽位的持久属性，而是当前 attempt 序列内因失败推进而落入奇数槽这一控制流事实。
 
-每次 blog chunk 从停放 Offset **未武装**起步。只有序列内发生失败、推进后落入奇数槽，下一次 attempt 才先 squash。崩溃后该标志自然丢失，恢复后即未武装，安全。
+每次 blog chunk 从停放 Offset 未武装起步。只有序列内发生失败、推进后落入奇数槽，下一次 attempt 才先 squash。崩溃后该标志自然丢失，恢复后即未武装，安全。
 
-**核心不变量：任意两次 squash 之间必然隔着至少一次失败。**
+核心不变量：任意两次 squash 之间必然隔着至少一次失败。
 
 这正是 AA'BB' 的本意——压缩是恢复的副产品，不是例行公事。
 
@@ -717,7 +717,7 @@ main request
 不是 XML-only terminal
 ```
 
-该谓词是唯一的内容级校验，属主唯一。它检查的是**成功产物的有效性**，不是 provider 错误，与 LLM 供应商无关。
+该谓词是唯一的内容级校验，属主唯一。它检查的是成功产物的有效性，不是 provider 错误，与 LLM 供应商无关。
 
 > “溢出”只是一种可能的诊断解释。系统对所有 Failed/Aborted attempt 执行同一恢复协议，不判断、证明或记录失败根因。
 
@@ -1385,7 +1385,7 @@ let produceBlogChunk
 
 禁止把 `armedByFailure` 写入领域状态或 Journal。
 
-**Single-flight 覆盖整条 attempt 序列：** `produceBlogChunk` 的一次调用覆盖该 chunk 的整条 attempt 序列（含 squash 子请求与主请求）。blogger 忙期间 X 的新内容只累积不插队（COMPANION-008 busy skip）。崩溃恢复时：boot fold 重建 `BlogProjectionState`；Dispatcher 未决 claim 走既有 PROMPT-011 协议；Requested-not-Accepted 的 entry/squash 在 reconcile 后从完整 Host snapshot 验证并幂等补提交（按 §25.4-§25.5 恢复协议）。
+Single-flight 覆盖整条 attempt 序列：`produceBlogChunk` 的一次调用覆盖该 chunk 的整条 attempt 序列（含 squash 子请求与主请求）。blogger 忙期间 X 的新内容只累积不插队（COMPANION-008 busy skip）。崩溃恢复时：boot fold 重建 `BlogProjectionState`；Dispatcher 未决 claim 走既有 PROMPT-011 协议；Requested-not-Accepted 的 entry/squash 在 reconcile 后从完整 Host snapshot 验证并幂等补提交（按 §25.4-§25.5 恢复协议）。
 
 ---
 
@@ -2778,7 +2778,7 @@ turn 6：从 Offset=1 起步，未武装
 → slot3(deep) armed-by-advance → squash [S1,R3] 为 S2（Epoch=2，Frames=[S2,R4,R5,R6]）→ 级联成立
 ```
 
-此 trace 的关键不变量：**每一轮 blog chunk 从停放 Offset 未武装起步，只有序列内失败推进后才激活 squash。**
+此 trace 的关键不变量：每一轮 blog chunk 从停放 Offset 未武装起步，只有序列内失败推进后才激活 squash。
 
 ---
 

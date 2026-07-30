@@ -17,7 +17,12 @@ module SpikePlugin =
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
             let portOpt = OpenCodePort.create input
-            let journal = PluginHost.createJournal input
+
+            let journal =
+                match PluginHost.createJournal input with
+                | Ok value -> value
+                | Error err -> raise (InvalidOperationException err)
+
             let scope = new PluginRuntimeScope(journal)
 
             PluginHost.restoreSessionParents journal scope.SessionParents

@@ -30,6 +30,9 @@ const {
   payloadOf,
   cursor,
   sessionId,
+  logicalRunId,
+  authorityRoot,
+  providerRun,
   idValue,
   agentFactCaseNames,
 } = domain
@@ -111,18 +114,19 @@ test('fold.apply converts arrays instead of silently folding nothing', () => {
     stream: stream.session(session),
     fact: fact('AuthorityRootAccepted', {
       SessionId: session,
-      LogicalRunId: 'run-meta',
-      HostMessageId: 'msg_root',
+      LogicalRunId: logicalRunId('run-meta'),
+      AuthorityRootUserMessageId: authorityRoot('msg_root'),
       AuthorityKind: 'HumanRoot',
       SelectedAgent: 'fast-coder',
       PeerAgent: 'deep-coder',
-      CanonicalRole: 'Coder',
-      SelectedTier: 'Fast',
+      CanonicalRole: 'coder',
+      SelectedTier: 'fast',
     }),
   })
 
   const projection = fold.apply(fold.empty, [accepted])
-  assert.deepEqual(Object.keys(fold.sessions(projection)), ['ses_meta'])
+  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
+  assert.deepEqual(Object.keys(fold.sessions(projection.value)), ['ses_meta'])
 })
 
 test('fold.apply rejects a single envelope passed where a sequence was meant', () => {
@@ -178,17 +182,39 @@ test('stream cases resolve by name', () => {
 
 test('an envelope survives NDJSON round trip and still folds', () => {
   const session = sessionId('ses_rt')
+
+  // FALLBACK-001: the cursor is created by the Authority Root, so an advance with
+  // no root is rejected. The round trip therefore needs both envelopes.
+  const root = envelope({
+    seq: 6,
+    observedAt: '2026-03-04T05:06:06Z',
+    stream: stream.session(session),
+    fact: fact('AuthorityRootAccepted', {
+      SessionId: session,
+      LogicalRunId: logicalRunId('run-rt'),
+      AuthorityRootUserMessageId: authorityRoot('msg_root'),
+      AuthorityKind: 'HumanRoot',
+      SelectedAgent: 'fast-coder',
+      PeerAgent: 'deep-coder',
+      CanonicalRole: 'coder',
+      SelectedTier: 'fast',
+    }),
+  })
+
   const advanced = envelope({
     seq: 7,
     observedAt: '2026-03-04T05:06:07Z',
     stream: stream.session(session),
+    run: 'msg_a1',
     fact: fact('FallbackCursorAdvanced', {
       SessionId: session,
-      LogicalRunId: 'run-rt',
-      AuthorityRootUserMessageId: 'msg_root',
+      LogicalRunId: logicalRunId('run-rt'),
+      AuthorityRootUserMessageId: authorityRoot('msg_root'),
+      ProviderRun: providerRun('msg_a1'),
+      PreviousOffset: 0,
+      NextOffset: 1,
+      ConsecutiveFailureCount: 1,
       Reason: 'provider_error',
-      AssistantMessageId: 'msg_a1',
-      ProviderAttempt: '1',
     }),
   })
 
@@ -197,13 +223,21 @@ test('an envelope survives NDJSON round trip and still folds', () => {
 
   const decoded = journal.deserialize(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : String(decoded.error))
-  assert.equal(idValue.session(decoded.value.Fact.fields[0].fields[0].SessionId), 'ses_rt')
+  assert.equal(idValue.session(payloadOf(payloadOf(decoded.value.Fact)).SessionId), 'ses_rt')
   assert.equal(idValue.localSeq(decoded.value.LocalSeq), 7n)
 
-  const projection = fold.replay([advanced])
-  const sessions = fold.sessions(projection)
+  const projection = fold.replay([root, advanced])
+  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
+
+  const sessions = fold.sessions(projection.value)
   assert.deepEqual(Object.keys(sessions), ['ses_rt'])
-  assert.equal(sessions.ses_rt.Fallback.Offset, 1)
+
+  // FALLBACK-007: the advance is validated, not absorbed — offset and count both
+  // move, and asserting the whole cursor means a dropped field cannot pass.
+  assert.deepEqual(
+    { Offset: sessions.ses_rt.Fallback.Cursor.Offset, ConsecutiveFailureCount: sessions.ses_rt.Fallback.Cursor.ConsecutiveFailureCount },
+    { Offset: 1, ConsecutiveFailureCount: 1 },
+  )
 })
 
 test('journal.deserialize reports a decode failure as data, not an exception', () => {
@@ -247,13 +281,16 @@ test('a current-schema journal line is not mistaken for a legacy one', () => {
     envelope({
       seq: 1,
       stream: stream.session(session),
+      run: 'msg_a1',
       fact: fact('FallbackCursorAdvanced', {
         SessionId: session,
-        LogicalRunId: 'run-current',
-        AuthorityRootUserMessageId: 'msg_root',
+        LogicalRunId: logicalRunId('run-current'),
+        AuthorityRootUserMessageId: authorityRoot('msg_root'),
+        ProviderRun: providerRun('msg_a1'),
+        PreviousOffset: 0,
+        NextOffset: 1,
+        ConsecutiveFailureCount: 1,
         Reason: 'provider_error',
-        AssistantMessageId: 'msg_a1',
-        ProviderAttempt: '1',
       }),
     }),
   )

@@ -87,7 +87,7 @@ module HostForkRunLifecycle =
             |> Option.iter (fun subscription -> subscription.Dispose())
 
             let runId = "run-" + run.AgentId
-            let childId = SessionId.value run.ChildId
+            let childId = run.ChildId
 
             match outcome with
             | Completed result ->
@@ -111,10 +111,10 @@ module HostForkRunLifecycle =
                             childId
                             runId
                             run.Role
-                            (AuthorityRootUserMessageId.value result.AuthorityRootUserMessageId)
+                            result.AuthorityRootUserMessageId
                             // HOST-010/HOST-011: the terminal provider run IS the
                             // assistant message, so there is no separate id to pass.
-                            (ProviderRunIdentity.value result.ProviderRun)
+                            result.ProviderRun
                             result.SessionWideText
                             (completedWorkRecord result)
                             result.Directory

@@ -102,7 +102,7 @@ module ReviewSeal =
 
                         match AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact durable with
                         | Ok _ -> return Ok providerRun
-                        | Error failure -> return Error(SnapshotUnavailable(sprintf "%A" failure.Failure))
+                        | Error failure -> return Error(SnapshotUnavailable(JournalAppendFailure.describe failure))
         }
 
     /// Seal at the `messages.transform` boundary.

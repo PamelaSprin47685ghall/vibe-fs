@@ -11,7 +11,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
     let append (sessionId: SessionId) (fact: AgentFact) =
         match AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
         | Ok _ -> Ok()
-        | Error failure -> Error(sprintf "%A" failure.Failure)
+        | Error failure -> Error(JournalAppendFailure.describe failure)
 
     interface ICompanionDurablePort with
         member _.Load(sessionId: SessionId) : CompanionMemory option =

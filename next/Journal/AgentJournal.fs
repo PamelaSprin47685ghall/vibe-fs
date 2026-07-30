@@ -17,6 +17,33 @@ type JournalAppendFailure =
     /// left to fail on the next boot.
     | FactRejected of EventId * FoldRejection
 
+module JournalAppendFailure =
+
+    /// Diagnostic rendering (HOST-007). The ONE place a failed append becomes a
+    /// string.
+    ///
+    /// Nine call sites wrote `sprintf "%A" failure.Failure` — a field that does not
+    /// exist on this union. Each was independently wrong in the same way, which is
+    /// what a missing function looks like. `%A` is also reflection-based: under Fable
+    /// it renders whatever the emitted shape happens to be, so the operator-facing
+    /// text would drift with the compiler rather than with the domain.
+    ///
+    /// The two cases read differently on purpose. `WriteUnknown` means the runtime
+    /// must reconcile (PERSIST-002/003); `FactRejected` means a writer produced a
+    /// fact the domain forbids and the journal is now poisoned.
+    let describe (failure: JournalAppendFailure) : string =
+        match failure with
+        | WriteUnknown(eventId, WriteFailed reason) ->
+            sprintf "append outcome unknown for %s: write failed: %s" (EventId.value eventId) reason
+        | WriteUnknown(eventId, FlushFailed reason) ->
+            sprintf "append outcome unknown for %s: flush failed: %s" (EventId.value eventId) reason
+        | FactRejected(eventId, rejection) ->
+            sprintf
+                "journal poisoned at %s: fact '%s' rejected: %s"
+                (EventId.value eventId)
+                rejection.Fact
+                rejection.Reason
+
 /// The single durable journal for one runtime.
 ///
 /// PERSIST-008: `Snapshot` is integrated state, never a replay. Appending folds

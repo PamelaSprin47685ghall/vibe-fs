@@ -45,7 +45,7 @@ module OrchestratorHostReview =
 
             match AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
             | Ok _ -> Ok()
-            | Error failure -> Error(sprintf "%A" failure.Failure)
+            | Error failure -> Error(JournalAppendFailure.describe failure)
 
     /// Fork a reviewer, open its barrier, and wait for a confirmed dual PERFECT.
     ///

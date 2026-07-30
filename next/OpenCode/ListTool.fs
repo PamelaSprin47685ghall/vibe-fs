@@ -2,18 +2,20 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open Thoth.Json
+open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 /// list() is a pure projection of the owning ForkRuntime's agent and PTY maps.
 module ListTool =
 
-    let private optionalString value = value |> Option.map Encode.string |> Option.defaultValue Encode.nil
+    let private optionalString value =
+        value |> Option.map Encode.string |> Option.defaultValue Encode.nil
 
     let private agentEntry (record: AgentRecord) =
         let baseFields =
             [ "kind", Encode.string "agent"
               "agentId", Encode.string record.AgentId
-              "childSessionId", optionalString record.ChildSessionId
+              "childSessionId", optionalString (record.ChildSessionId |> Option.map SessionId.value)
               "status", Encode.string (record.Status.ToString().ToLowerInvariant())
               "currentRunId", optionalString record.CurrentRunId
               "hasPendingCompletion", Encode.bool record.HasPendingCompletion
@@ -43,8 +45,7 @@ module ListTool =
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
         task {
             match scope.RuntimeFor context with
-            | Error runtimeError ->
-                return ToolHostCodec.jsonObject [ "error", Encode.string runtimeError ]
+            | Error runtimeError -> return ToolHostCodec.jsonObject [ "error", Encode.string runtimeError ]
             | Ok runtime ->
                 let agents, ptys = runtime.List()
 

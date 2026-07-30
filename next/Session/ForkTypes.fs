@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Next.Session
 
 open System
+open Wanxiangshu.Next.Kernel.Identity
 
 [<RequireQualifiedAccess>]
 type AgentRole =
@@ -58,5 +59,5 @@ type AgentRecord =
         CurrentRunId: string option
         LastCompletionStatus: string option
         HasPendingCompletion: bool
-        ChildSessionId: string option
+        ChildSessionId: SessionId option
     }

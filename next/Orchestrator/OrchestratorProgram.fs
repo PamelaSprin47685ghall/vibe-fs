@@ -355,7 +355,7 @@ module OrchestratorProgram =
             | None -> return None
             | Some value ->
                 match value.Progress with
-                | ManagerStarted -> return None
+                | JobProgress.ManagerStarted -> return None
                 | _ ->
                     let! head = deps.Git.GetTargetHead job.TargetRef
 

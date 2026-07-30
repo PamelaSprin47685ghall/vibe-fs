@@ -25,7 +25,6 @@ module PromptAuthority =
     let ReviewConfirmation = ContinuationKind.ReviewConfirmation
     let BusyAgentNudge = ContinuationKind.BusyAgentNudge
     let ProviderRetryAttempt = ContinuationKind.ProviderRetryAttempt
-    let HostCompactionContinue = ContinuationKind.HostCompactionContinue
     let UnknownOrigin = PromptOrigin.UnknownOrigin
     let HostInternal = PromptOrigin.HostInternal
 
@@ -77,10 +76,3 @@ module PromptAuthority =
 
     let effectiveAgentAt (profile: AuthorityExecutionProfile) (offset: byte) =
         Wanxiangshu.Next.Domain.PromptAuthority.effectiveAgentAt profile offset
-
-    let selectedEffectiveAgent (profile: AuthorityExecutionProfile) =
-        Wanxiangshu.Next.Domain.PromptAuthority.selectedEffectiveAgent profile
-
-    let effectiveAgentFromManaged (selected: ManagedAgent) (cursor: AgentPairCursor.FallbackCursor) : string =
-        let peer = ManagedAgent.peer selected
-        Wanxiangshu.Next.Domain.PromptAuthority.effectiveAgentFromManaged selected.Name peer.Name cursor

@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open Thoth.Json
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
 /// join() waits for the owning runtime's next physical completion. Orchestrator
@@ -49,10 +50,11 @@ module JoinTool =
                     [ "kind", Encode.string "agent"
                       "status", Encode.string "completed"
                       "agentId", Encode.string payload.AgentId
-                      "childSessionId", Encode.string payload.ChildSessionId
+                      "childSessionId", optionalString (payload.ChildSessionId |> Option.map SessionId.value)
                       "runId", Encode.string payload.RunId
-                      "rootUserMessageId", Encode.string payload.RootUserMessageId
-                      "assistantMessageId", Encode.string payload.AssistantMessageId
+                      "authorityRoot",
+                      optionalString (payload.AuthorityRoot |> Option.map AuthorityRootUserMessageId.value)
+                      "providerRun", optionalString (payload.ProviderRun |> Option.map ProviderRunIdentity.value)
                       "finalText", Encode.string payload.FinalText
                       "workRecord", workRecord payload.WorkRecord
                       "directory", optionalString payload.Directory ]
@@ -94,7 +96,7 @@ module JoinTool =
                     [ "kind", Encode.string "agent"
                       "status", Encode.string status
                       "agentId", Encode.string payload.AgentId
-                      "childSessionId", optionalString payload.ChildSessionId
+                      "childSessionId", optionalString (payload.ChildSessionId |> Option.map SessionId.value)
                       "runId", Encode.string payload.RunId
                       "role",
                       payload.Role

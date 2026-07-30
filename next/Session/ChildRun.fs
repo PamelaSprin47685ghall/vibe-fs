@@ -4,13 +4,16 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Agent
 
 /// Single-assignment completion cell — the one place a child run's final
 /// result is written.  The first successful TrySet wins; subsequent calls are
 /// idempotent no-ops.
 type CompletionCell<'a>() =
-    let tcs = TaskCompletionSource<'a>(TaskCreationOptions.RunContinuationsAsynchronously)
+    let tcs =
+        TaskCompletionSource<'a>(TaskCreationOptions.RunContinuationsAsynchronously)
+
     let mutable completed = false
     let mutable stored: 'a option = None
     let gate = obj ()
@@ -29,8 +32,7 @@ type CompletionCell<'a>() =
 
     member _.Await: Task<'a> = tcs.Task
 
-    member _.IsCompleted: bool =
-        lock gate (fun () -> completed)
+    member _.IsCompleted: bool = lock gate (fun () -> completed)
 
     member _.StoredValue: 'a option = lock gate (fun () -> stored)
 
@@ -41,43 +43,39 @@ module CompletionCell =
 /// cancellation lifetime.  The run is created for each fork/new-owner attempt;
 /// a busy nudge does not create a new run.
 type ChildRun =
-    { /// Runtime identity used to key the agent in the ForkRuntime map.
-      AgentId: string
+    {
+        /// Runtime identity used to key the agent in the ForkRuntime map.
+        AgentId: string
 
-      /// Unique identity for this run attempt (e.g. "run-a1b2c3d4").
-      RunId: string
+        /// Unique identity for this run attempt (e.g. "run-a1b2c3d4").
+        RunId: string
 
-      /// The managed agent name (e.g. "fast-coder", "deep-reviewer").
-      AgentName: string
+        /// The managed agent name (e.g. "fast-coder", "deep-reviewer").
+        AgentName: string
 
-      /// Canonical role of the agent.
-      Role: AgentRole
+        /// Canonical role of the agent.
+        Role: AgentRole
 
-      /// The prompt text sent to the agent.
-      Prompt: string
+        /// The prompt text sent to the agent.
+        Prompt: string
 
-      /// The Host SessionId of the child session, once created or recovered.
-      mutable ChildSessionId: string option
+        /// The Host SessionId of the child session, once created or recovered.
+        mutable ChildSessionId: SessionId option
 
-      /// Single-assignment completion: set exactly once when the run finishes.
-      Completion: CompletionCell<RunCompletion>
+        /// Single-assignment completion: set exactly once when the run finishes.
+        Completion: CompletionCell<RunCompletion>
 
-      /// Cancellation handle for the run. Cancelled on parent Cancel or abort.
-      Cancellation: CancellationTokenSource
+        /// Cancellation handle for the run. Cancelled on parent Cancel or abort.
+        Cancellation: CancellationTokenSource
 
-      /// When this run was created.
-      CreatedAt: DateTimeOffset }
+        /// When this run was created.
+        CreatedAt: DateTimeOffset
+    }
 
 module ChildRun =
 
     /// Create a new ChildRun with the given identity and agent metadata.
-    let create
-        (agentId: string)
-        (runId: string)
-        (agentName: string)
-        (role: AgentRole)
-        (prompt: string)
-        : ChildRun =
+    let create (agentId: string) (runId: string) (agentName: string) (role: AgentRole) (prompt: string) : ChildRun =
         { AgentId = agentId
           RunId = runId
           AgentName = agentName
@@ -89,11 +87,9 @@ module ChildRun =
           CreatedAt = DateTimeOffset.UtcNow }
 
     let isActive (run: ChildRun) : bool =
-        not run.Cancellation.IsCancellationRequested
-        && not (run.Completion.IsCompleted)
+        not run.Cancellation.IsCancellationRequested && not (run.Completion.IsCompleted)
 
-    let isCompleted (run: ChildRun) : bool =
-        run.Completion.IsCompleted
+    let isCompleted (run: ChildRun) : bool = run.Completion.IsCompleted
 
     let isCancelled (run: ChildRun) : bool =
         run.Cancellation.IsCancellationRequested
@@ -102,8 +98,7 @@ module ChildRun =
         if not run.Cancellation.IsCancellationRequested then
             run.Cancellation.Cancel()
 
-    let bindSession (run: ChildRun) (sessionId: string) : unit =
-        run.ChildSessionId <- Some sessionId
+    let bindSession (run: ChildRun) (sessionId: SessionId) : unit = run.ChildSessionId <- Some sessionId
 
     let makeCompleted (run: ChildRun) (outcome: AgentCompletionOutcome) : RunCompletion =
         { RunId = run.RunId
@@ -118,14 +113,7 @@ module ChildRun =
           AgentId = run.AgentId
           AgentName = run.AgentName
           Role = run.Role
-          Outcome =
-            AgentCompletion.failed
-                run.AgentId
-                run.RunId
-                (Some run.Role)
-                run.ChildSessionId
-                "ERROR"
-                message
+          Outcome = AgentCompletion.failed run.AgentId run.RunId (Some run.Role) run.ChildSessionId "ERROR" message
           CompletedAt = DateTimeOffset.UtcNow }
 
     let makeAborted (run: ChildRun) (reason: string) : RunCompletion =
@@ -133,20 +121,12 @@ module ChildRun =
           AgentId = run.AgentId
           AgentName = run.AgentName
           Role = run.Role
-          Outcome =
-            AgentCompletion.aborted
-                run.AgentId
-                run.RunId
-                (Some run.Role)
-                run.ChildSessionId
-                "CANCELLED"
-                reason
+          Outcome = AgentCompletion.aborted run.AgentId run.RunId (Some run.Role) run.ChildSessionId "CANCELLED" reason
           CompletedAt = DateTimeOffset.UtcNow }
 
     /// Try to complete this run with the given RunCompletion.  Returns true
     /// if this is the first (and only) write.  Idempotent no-op after first set.
-    let tryComplete (run: ChildRun) (completion: RunCompletion) : bool =
-        run.Completion.TrySet(completion)
+    let tryComplete (run: ChildRun) (completion: RunCompletion) : bool = run.Completion.TrySet(completion)
 
 /// The canonical agent program for running a child to its single completion.
 /// This is where `agent {}` is actually invoked by the child/fork production
@@ -163,19 +143,14 @@ module ChildRunProgram =
                         let! outcome = f ct
                         return Ok outcome
                     with
-                    | :? OperationCanceledException ->
-                        return Error AgentError.ParentCancelled
-                    | ex ->
-                        return Error(AgentError.HostFailure ex.Message)
+                    | :? OperationCanceledException -> return Error AgentError.ParentCancelled
+                    | ex -> return Error(AgentError.HostFailure ex.Message)
             })
 
     /// Build the AgentFlow that runs `work` and returns the resulting
     /// RunCompletion.  Cancellation and exceptions are mapped into a
     /// single-assignment RunCompletion value by the caller (ForkRuntime).
-    let run
-        (run: ChildRun)
-        (work: CancellationToken -> Task<AgentCompletionOutcome>)
-        : AgentFlow<RunCompletion> =
+    let run (run: ChildRun) (work: CancellationToken -> Task<AgentCompletionOutcome>) : AgentFlow<RunCompletion> =
         agent {
             // Validate the managed identity through the canonical AgentProgram
             // before executing the physical child work.

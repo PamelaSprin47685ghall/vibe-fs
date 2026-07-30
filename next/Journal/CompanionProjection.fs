@@ -25,6 +25,11 @@ type CompanionProjection =
     member this.PrefixReplacementEnabled = this.ReplacementActive
 
 /// Durable Companion cache facts. In-flight Blogger work remains runtime-only.
+///
+/// Every function takes an already-resolved `CompanionProjection`, not an option:
+/// `Fold.updateCompanion` is the single caller and it defaults the absent case to
+/// `empty` before applying. A second `defaultArg` here would let a caller pass
+/// `None` and silently discard the session's existing companion state.
 module CompanionProjection =
 
     let empty =
@@ -34,21 +39,19 @@ module CompanionProjection =
           BloggerSessionId = None
           ReplacementActive = false }
 
-    let baseline projection current =
-        { defaultArg current empty with
+    let baseline projection (current: CompanionProjection) =
+        { current with
             LastSuccessfulProjection = Some projection }
 
-    let checkpoint content current =
-        { defaultArg current empty with
-            LatestB = Some content }
+    let checkpoint content (current: CompanionProjection) = { current with LatestB = Some content }
 
-    let recordBlogAdvance projection content current =
-        { defaultArg current empty with
+    let recordBlogAdvance projection content (current: CompanionProjection) =
+        { current with
             LastSuccessfulProjection = Some projection
             LatestB = Some content }
 
-    let switchEpoch epochId frozenB cutoff digest current =
-        { defaultArg current empty with
+    let switchEpoch epochId frozenB cutoff digest (current: CompanionProjection) =
+        { current with
             ActivePrefixEpoch =
                 Some
                     { EpochId = epochId
@@ -57,16 +60,15 @@ module CompanionProjection =
                       CoveredPrefixDigest = digest }
             ReplacementActive = true }
 
-    let setReplacement active current =
-        { defaultArg current empty with
+    let setReplacement active (current: CompanionProjection) =
+        { current with
             ReplacementActive = active }
 
-    let linkBlogger (bloggerSessionId: SessionId) current =
-        { defaultArg current empty with
+    let linkBlogger (bloggerSessionId: SessionId) (current: CompanionProjection) =
+        { current with
             BloggerSessionId = Some bloggerSessionId }
 
     /// The Blogger was aborted. `None` again, so the next transform creates a
     /// fresh Y rather than prompting an aborted session forever.
-    let closeBlogger current =
-        { defaultArg current empty with
-            BloggerSessionId = None }
+    let closeBlogger (current: CompanionProjection) =
+        { current with BloggerSessionId = None }

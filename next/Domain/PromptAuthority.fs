@@ -13,6 +13,10 @@ module PromptAuthority =
 
     /// PROMPT-003. Every one of these extends an existing Logical Run and may
     /// not change the execution profile.
+    ///
+    /// There is deliberately no compaction continuation: HOST-006 closes Host
+    /// compaction globally, so a compaction-driven continuation has no origin
+    /// that could produce it.
     type ContinuationKind =
         | InteractionRepair
         | ManagerGuard
@@ -20,7 +24,6 @@ module PromptAuthority =
         | ReviewConfirmation
         | BusyAgentNudge
         | ProviderRetryAttempt
-        | HostCompactionContinue
 
     type PromptOrigin =
         | AuthorityRoot of RootAuthorityKind
@@ -166,7 +169,6 @@ module PromptAuthority =
         | Continuation ReviewConfirmation -> "ReviewConfirmation"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
-        | Continuation HostCompactionContinue -> "HostCompactionContinue"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -178,7 +180,6 @@ module PromptAuthority =
         | "ReviewConfirmation" -> Some ReviewConfirmation
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
-        | "HostCompactionContinue" -> Some HostCompactionContinue
         | _ -> None
 
     let roleLabel (role: Role) =

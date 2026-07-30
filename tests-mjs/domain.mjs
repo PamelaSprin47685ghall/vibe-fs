@@ -85,27 +85,37 @@ const [
 
 // ── the one Fable naming convention ──────────────────────────────────────────
 //
-// Fable suffixes a module's members with `<Name>Module_` exactly when the module
-// shares its name with a type declared in the same file (`FallbackProjection` is
-// both a record and a module, so its members emit as
-// `FallbackProjectionModule_forAuthority`). With no collision the members emit
-// under their plain name.
+// Fable renders a module member's exported name from two independent facts:
 //
-// `member()` absorbs that one rule and THROWS when neither spelling exists. It is
+//   1. A module below the file's root is prefixed with its own name:
+//      `ReviewProjection.empty` emits as `ReviewProjection_empty`.
+//   2. That prefix additionally gains a `Module` suffix when a TYPE of the same
+//      name is declared in the same file, because the type already owns the plain
+//      name: `ReviewRequirementProjection` is both a record and a module, so its
+//      members emit as `ReviewRequirementProjectionModule_empty`.
+//
+// So one file can carry both spellings at once — `ReviewProjection.fs` exports
+// `ReviewProjection_empty` and `ReviewRequirementProjectionModule_empty` side by
+// side. The prefix is what disambiguates them, which is why `moduleName` is
+// always passed explicitly and the unprefixed spelling is tried last.
+//
+// `member()` absorbs that rule and THROWS when no spelling exists. It is
 // deliberately not a `A ?? B` fallback at each call site: a silent alternative
 // would let a renamed or deleted production function read as `undefined` and take
 // the other branch, which is the class of failure this facade exists to prevent.
 
 const member = (mod, moduleName, name) => {
-  const suffixed = `${moduleName}Module_${name}`
-  const fn = mod[suffixed] ?? mod[name]
-  if (fn === undefined) {
+  const spellings = [`${moduleName}Module_${name}`, `${moduleName}_${name}`, name]
+  const found = spellings.find((spelling) => mod[spelling] !== undefined)
+  if (found === undefined) {
     const available = Object.keys(mod)
-      .filter((key) => key.includes(name) || key.startsWith(`${moduleName}Module_`))
+      .filter((key) => key.includes(name) || key.startsWith(moduleName))
       .join(', ')
-    throw new Error(`${moduleName} exports neither '${suffixed}' nor '${name}'. Near matches: ${available || '(none)'}`)
+    throw new Error(
+      `${moduleName} exports none of ${spellings.map((s) => `'${s}'`).join(', ')}. Near matches: ${available || '(none)'}`,
+    )
   }
-  return fn
+  return mod[found]
 }
 
 /** Bind a module's members by name, resolved once at load time. */
@@ -403,23 +413,30 @@ export const envelope = ({
   Fact: envelopeFact,
 })
 
+// `Envelope` and `Fold` each collide with a type in their own file, but only
+// `Envelope` gained the `Module` infix — `Fold`'s members emit as `Fold_*`.
+// Resolving both through `bind` means the facade never hard-codes which of the
+// two spellings a given file happened to produce.
+const Envelopes = bind(EnvelopeModule, 'Envelope', ['serialize', 'deserialize', 'compareSortKey'])
+const Folds = bind(FoldModule, 'Fold', ['empty', 'apply', 'foldEnvelope', 'foldAgentFact'])
+
 export const journal = {
-  serialize: (env) => EnvelopeModule.EnvelopeModule_serialize(env),
-  deserialize: (line) => resultOf(EnvelopeModule.EnvelopeModule_deserialize(line)),
+  serialize: (env) => Envelopes.serialize(env),
+  deserialize: (line) => resultOf(Envelopes.deserialize(line)),
   serializeFact: (value) => FactCodec.serializeFact(value),
   deserializeFact: (json) => resultOf(FactCodec.deserializeFact(json)),
   containsLegacyFallbackFields: (json) => FactCodec.containsLegacyFallbackFields(json),
   pre050MigrationMessage: FactCodec.pre050MigrationMessage,
-  compareSortKey: (a, b) => EnvelopeModule.EnvelopeModule_compareSortKey(a, b),
+  compareSortKey: (a, b) => Envelopes.compareSortKey(a, b),
 }
 
 export const fold = {
-  empty: FoldModule.empty,
+  empty: Folds.empty,
 
   /** `envelopes` may be a JS array; it is converted to an FSharpList here. */
-  apply: (projection, envelopes) => resultOf(FoldModule.apply(projection, requireList(toList(envelopes), 'fold.apply'))),
+  apply: (projection, envelopes) => resultOf(Folds.apply(projection, requireList(toList(envelopes), 'fold.apply'))),
 
-  one: (projection, env) => resultOf(FoldModule.foldEnvelope(projection, env)),
+  one: (projection, env) => resultOf(Folds.foldEnvelope(projection, env)),
 
   /** Round-trip through NDJSON, then fold. Proves the persisted shape folds. */
   replay: (envelopes) => {
@@ -428,7 +445,7 @@ export const fold = {
       if (!result.ok) throw new Error(`envelope did not survive a round trip: ${result.error}`)
       return result.value
     })
-    return resultOf(FoldModule.apply(FoldModule.empty, toList(decoded)))
+    return resultOf(Folds.apply(Folds.empty, toList(decoded)))
   },
 
   /** Sessions map of a folded projection, keyed by session id string. */

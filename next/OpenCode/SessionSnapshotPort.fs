@@ -40,6 +40,10 @@ type SessionMessage =
         /// assistant message, so the binding cannot succeed there and must fail
         /// closed instead of guessing.
         IsCompaction: bool
+        /// PROMPT-011 anchor: the `PromptKey` the Dispatcher wrote into Host metadata,
+        /// when this message carries one. It is the only way an unresolved claim can be
+        /// matched to a physical message after a restart.
+        PromptKey: string option
         Parts: MessagePart array
     }
 

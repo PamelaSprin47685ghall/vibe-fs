@@ -96,7 +96,7 @@ module FallbackController =
                            Reason = reason |}
 
                 match AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal with
-                | Error failure -> Error(sprintf "%A" failure.Failure)
+                | Error failure -> Error(JournalAppendFailure.describe failure)
                 | Ok _ ->
                     // FALLBACK-005: judgement happens after the failure is
                     // recorded, so the 12th consecutive failure is immediately
@@ -115,7 +115,7 @@ module FallbackController =
                         match
                             AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
                         with
-                        | Error failure -> Error(sprintf "%A" failure.Failure)
+                        | Error failure -> Error(JournalAppendFailure.describe failure)
                         | Ok _ -> Ok(Exhausted cursor)
 
     /// FALLBACK-004: whether a continuation may be sent for this outcome.

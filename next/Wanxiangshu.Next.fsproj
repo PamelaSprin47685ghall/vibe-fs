@@ -104,10 +104,10 @@
     <Compile Include="OpenCode/HostSignalAdapter.fs"/>
     <Compile Include="OpenCode/HostSignalSubscribe.fs"/>
     <Compile Include="OpenCode/ReconciledTurn.fs"/>
+    <Compile Include="OpenCode/PromptMetadataCodec.fs"/>
     <Compile Include="OpenCode/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Sessions.fs"/>
-    <Compile Include="OpenCode/PromptMetadataCodec.fs"/>
     <Compile Include="OpenCode/PromptDispatcher.fs"/>
     <Compile Include="OpenCode/PromptDispatcherSend.fs"/>
     <Compile Include="OpenCode/PromptIngressCodec.fs"/>

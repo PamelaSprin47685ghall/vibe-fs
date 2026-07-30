@@ -36,6 +36,16 @@ module CanonicalJson =
     let canonicalJson (value: obj) : string =
         Fable.Core.JS.JSON.stringify (normalizeJson value)
 
+    /// Are two values the same once canonicalised.
+    ///
+    /// One function, because "same message" has one meaning. The Companion prefix
+    /// walk used to take a `messageId` reader AND an equality function and check the
+    /// ids first — but a message's id is part of its canonical JSON, so equal
+    /// canonical text already implies equal ids. That first check could never
+    /// change an answer.
+    let equal (left: obj) (right: obj) : bool =
+        canonicalJson left = canonicalJson right
+
     let withoutKeys (keys: string array) (value: obj) : obj =
         emitJsExpr
             (value, keys)

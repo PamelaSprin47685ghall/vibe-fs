@@ -25,7 +25,7 @@ module HandleController =
     let private append (journal: AgentJournal) (parentId: SessionId) fact =
         match AgentJournal.appendAgent (StreamId.Session parentId) None fact journal with
         | Ok _ -> Ok()
-        | Error failure -> Error(sprintf "%A" failure.Failure)
+        | Error failure -> Error(JournalAppendFailure.describe failure)
 
     /// EXEC-009: a fork bound a handle to a Host child session.
     ///
@@ -51,7 +51,7 @@ module HandleController =
                        ChildSessionId = childSessionId
                        Handle = agentHandle agentId
                        TargetAgent = targetAgent
-                       CanonicalRole = Some(AgentRoleIdentity.roleName role) |})
+                       CanonicalRole = AgentRoleIdentity.toRole role |})
 
     /// EXEC-004: claim the single-assignment completion cell.
     ///

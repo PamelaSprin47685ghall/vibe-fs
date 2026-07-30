@@ -42,7 +42,7 @@ module PromptDispatcher =
             : Result<unit, string> =
             AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal
             |> Result.map (fun _ -> ())
-            |> Result.mapError (fun failure -> sprintf "%A" failure.Failure)
+            |> Result.mapError (fun failure -> JournalAppendFailure.describe failure)
 
         /// PROMPT-004: an Authority Root takes effect.
         ///

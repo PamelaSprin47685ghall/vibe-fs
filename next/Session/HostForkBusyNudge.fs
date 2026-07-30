@@ -6,14 +6,19 @@ open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
-/// Busy-agent nudge via PromptDispatcher (KISS-N12 Continuation).
+/// EXEC-002 busy-agent nudge, as a PROMPT-003 Continuation.
 module HostForkBusyNudge =
 
     /// Continuation of the child's active Logical Run. Never creates a new
     /// Authority Root / RunId / completion.
+    ///
+    /// No journal means no Dispatcher, and PROMPT-005 admits no second sender: this
+    /// used to fall through to `sessions.SendChildPromptFireAndForget`, which is a
+    /// direct `prompt_async` with no claim, no PromptKey and no recovery anchor —
+    /// the exact bypass package A removed elsewhere. It fails closed instead.
     let send
         (sessions: ISessionHostPort)
-        (parentId: SessionId)
+        (_parentId: SessionId)
         (journal: AgentJournal option)
         (childId: SessionId)
         (_role: AgentRole)
@@ -24,24 +29,16 @@ module HostForkBusyNudge =
         task {
             match journal with
             | None ->
-                return!
-                    sessions.SendChildPromptFireAndForget(
-                        parentId,
-                        childId,
-                        prompt,
-                        { Model = None
-                          Agent = None
-                          Directory = directory
-                          Metadata = None }
-                    )
+                return Error "Busy nudge requires an AgentJournal: PROMPT-005 admits no sender outside the Dispatcher"
             | Some j ->
                 let snapshot = AgentJournal.snapshot j
 
                 match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
-                    let cursor = DurableFallback.currentState childId snapshot
-                    let resolveBusyAgent = PromptAuthority.effectiveAgentAt profile cursor.Offset
+                    let busyAgent =
+                        DurableFallback.effectiveAgentForActiveCursor childId snapshot profile
+
                     let rt = PromptDispatcher.forJournal j
 
                     let! sent =
@@ -51,7 +48,7 @@ module HostForkBusyNudge =
                             prompt
                             PromptAuthority.ContinuationKind.BusyAgentNudge
                             profile
-                            resolveBusyAgent
+                            busyAgent
                             directory
                             None
 

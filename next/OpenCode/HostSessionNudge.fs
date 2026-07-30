@@ -35,8 +35,8 @@ module HostSessionNudge =
         (profile: PromptAuthority.AuthorityExecutionProfile)
         =
         journal
-        |> Option.bind (fun j -> DurableFallback.tryCurrentCursor sessionId (AgentJournal.snapshot j))
-        |> Option.map (PromptAuthority.effectiveAgentFor profile)
+        |> Option.map (fun j ->
+            DurableFallback.effectiveAgentForActiveCursor sessionId (AgentJournal.snapshot j) profile)
         |> Option.defaultValue profile.SelectedAgent
 
     /// Reconciled linked children have a host-proven root user message even when

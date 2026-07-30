@@ -108,7 +108,7 @@ module OrchestratorJournalPort =
             fun stream fact ->
                 match AgentJournal.appendAgent stream None fact journal with
                 | Ok projection -> Ok projection
-                | Error failure -> Error(sprintf "%A" failure.Failure)
+                | Error failure -> Error(JournalAppendFailure.describe failure)
           Snapshot = fun () -> AgentJournal.snapshot journal }
 
 type OrchestratorProgramDeps =

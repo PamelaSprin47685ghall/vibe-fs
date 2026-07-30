@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.Journal
 
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 
@@ -56,19 +57,11 @@ module HandleProjection =
 
     let empty = { Handles = Map.empty }
 
-    let private normalizedRole role =
-        role
-        |> Option.bind (fun value ->
-            if System.String.IsNullOrWhiteSpace value then
-                None
-            else
-                Some value)
-
     let link
         (handle: HandleId)
         (childSessionId: SessionId)
         (targetAgent: string)
-        (role: string option)
+        (role: Role)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         match Map.tryFind handle current.Handles with
@@ -82,7 +75,7 @@ module HandleProjection =
                             { Handle = handle
                               ChildSessionId = childSessionId
                               TargetAgent = targetAgent
-                              CanonicalRole = normalizedRole role
+                              CanonicalRole = role
                               Lifecycle = Active }
                             current.Handles }
 

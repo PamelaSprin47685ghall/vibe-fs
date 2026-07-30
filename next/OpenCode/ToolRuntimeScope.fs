@@ -75,7 +75,7 @@ type ToolRuntimeScope
     /// names the "allow inspector while the role is unresolved" exemption the old
     /// code had as the thing to delete. A read-only tool executed under an
     /// unknown role is still an unauthorised execution.
-    let private roleFor (ctx: HostToolContext) =
+    let roleFor (ctx: HostToolContext) =
         match journal with
         | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
             PromptAuthorityLedger.activeProfile
@@ -90,7 +90,7 @@ type ToolRuntimeScope
     /// PROMPT-002 fixes SelectedAgent for its whole duration, whereas FALLBACK-002
     /// moves EffectiveAgent per attempt. A PTY labelled with whichever side the
     /// cursor happened to be on would change identity mid-run.
-    let private managedAgentFor (ctx: HostToolContext) =
+    let managedAgentFor (ctx: HostToolContext) =
         match journal with
         | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
             PromptAuthorityLedger.activeProfile

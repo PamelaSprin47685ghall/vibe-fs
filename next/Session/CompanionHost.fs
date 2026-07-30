@@ -94,6 +94,8 @@ type CompanionHost
                                     |> Option.iter (fun port ->
                                         port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) |> ignore)
 
+                                    companion.RecordBloggerLinked id
+
                                     return id
                                 | Error error -> return raise (InvalidOperationException error)
                             with ex ->
@@ -166,20 +168,14 @@ type CompanionHost
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
 
     member this.TransformRaw(messages: obj list) : obj list =
-        let current = CompanionDelta.jsonOfMessages Projection.canonicalJson messages
+        let current = CompanionDelta.jsonOfMessages CanonicalJson.canonicalJson messages
         let before = companion.Memory
 
         // Watermark is only for Blogger baseline / first-freeze cutoff capture.
         // Once an epoch exists, deletion range is epoch.CutoffMessageIndex only.
         let watermark =
             match before.LastSuccessfulProjection with
-            | Some previous ->
-                CompanionDelta.prefixLength
-                    Projection.messageId
-                    Projection.sameCanonicalMessage
-                    previous
-                    current
-                    (List.length messages)
+            | Some previous -> CompanionDelta.prefixLength CanonicalJson.equal previous current (List.length messages)
             | None -> 0
 
         let deps = this.BloggerDeps
@@ -212,14 +208,16 @@ type CompanionHost
                 messages
             else
                 let currentDigest =
-                    CompanionDelta.prefixDigest Projection.canonicalJson messages epoch.CutoffMessageIndex
+                    CompanionDelta.prefixDigest CanonicalJson.canonicalJson messages epoch.CutoffMessageIndex
 
                 if currentDigest <> epoch.CoveredPrefixDigest then
                     messages
                 else
                     inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
         | true, None when watermark > 0 && before.LatestB.IsSome ->
-            let digest = CompanionDelta.prefixDigest Projection.canonicalJson messages watermark
+            let digest =
+                CompanionDelta.prefixDigest CanonicalJson.canonicalJson messages watermark
+
             companion.FreezeEpoch(watermark, digest) |> ignore
 
             match companion.Memory.ActivePrefixEpoch with
@@ -255,6 +253,7 @@ type CompanionHost
                 | Error error -> raise (InvalidOperationException error)
 
                 durable |> Option.iter (fun port -> port.CloseBlogger primaryId |> ignore)
+                companion.RecordBloggerClosed()
             | None -> ()
         }
 

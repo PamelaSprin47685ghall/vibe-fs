@@ -52,6 +52,23 @@ module DurableFallback =
         tryCurrentCursor sessionId projection
         |> Option.map (fun cursor -> AgentPairCursor.side cursor.Offset)
 
+    /// The EffectiveAgent a continuation must physically use (PROMPT-003).
+    ///
+    /// No cursor means no accepted Authority Root (FALLBACK-001), so there is no
+    /// fallback state to consult and SelectedAgent is the only defensible answer.
+    ///
+    /// The single source for this question: both the busy nudge and the guard nudge
+    /// asked it, and a second copy could answer with the other side of the pair for
+    /// the same cursor.
+    let effectiveAgentForActiveCursor
+        (sessionId: SessionId)
+        (projection: ProjectionSet)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : string =
+        tryCurrentCursor sessionId projection
+        |> Option.map (PromptAuthority.effectiveAgentFor profile)
+        |> Option.defaultValue profile.SelectedAgent
+
     /// FALLBACK-005: whether the automatic recovery budget still permits an
     /// attempt.
     ///

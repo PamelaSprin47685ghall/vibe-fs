@@ -79,7 +79,7 @@ module ReviewController =
     let private append (sessionId: SessionId) (providerRun: ProviderRunIdentity) fact journal =
         match AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal with
         | Ok updated -> Ok updated
-        | Error failure -> Error(sprintf "%A" failure.Failure)
+        | Error failure -> Error(JournalAppendFailure.describe failure)
 
     let private verdictFact (submission: VerdictSubmission) =
         AgentFact.ReviewVerdictRecorded

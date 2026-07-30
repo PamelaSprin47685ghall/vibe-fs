@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.Kernel.Identity
 
 /// Companion work log snapshot (session-wide B / LatestB), not a single turn.
 type WorkRecordSnapshot =
@@ -11,21 +12,37 @@ type WorkRecordSnapshot =
       CoveredThrough: string option }
 
 type AgentFailurePayload =
-    { AgentId: string
-      ChildSessionId: string option
-      RunId: string
-      Role: AgentRole option
-      Code: string
-      Message: string }
+    {
+        AgentId: string
+        /// Typed, matching the completed payload. It was `string option` beside a
+        /// `SessionId option`, so the same concept had two types across two cases of
+        /// one union.
+        ChildSessionId: SessionId option
+        RunId: string
+        Role: AgentRole option
+        Code: string
+        Message: string
+    }
 
+/// One finished child run, as `join` reports it (EXEC-004).
+///
+/// The four identities are `option` because a PTY run genuinely has none of them:
+/// it owns no Host child session, no Authority Root, no provider run, no worktree.
+/// They used to be `string` filled with `""`, which made "absent" and "the empty
+/// string" the same value — the sentinel PROMPT-001 exists to remove — and forced
+/// every reader to re-test for blankness to find out which it had.
+///
+/// Typed, not `string option`: HOST-010 makes the terminal provider run the
+/// assistant message id, and PROMPT-002 makes the root a promoted physical
+/// message. `AssistantMessageId` was a second name for the former.
 type AgentCompletionPayload =
     {
         AgentId: string
-        ChildSessionId: string
+        ChildSessionId: SessionId option
         RunId: string
         Role: AgentRole
-        RootUserMessageId: string
-        AssistantMessageId: string
+        AuthorityRoot: AuthorityRootUserMessageId option
+        ProviderRun: ProviderRunIdentity option
         /// Session-wide A for the child Session: formal text + reasoning/thinking.
         FinalText: string
         /// Session-wide companion work log (B / LatestB) when available.
@@ -59,27 +76,34 @@ module AgentCompletion =
 
     let completed
         (agentId: string)
-        (childSessionId: string)
+        (childSessionId: SessionId)
         (runId: string)
         (role: AgentRole)
-        (rootUserMessageId: string)
-        (assistantMessageId: string)
+        (authorityRoot: AuthorityRootUserMessageId)
+        (providerRun: ProviderRunIdentity)
         (finalText: string)
         (workRecord: WorkRecordSnapshot option)
         (directory: string option)
         =
         AgentCompleted
             { AgentId = agentId
-              ChildSessionId = childSessionId
+              ChildSessionId = Some childSessionId
               RunId = runId
               Role = role
-              RootUserMessageId = rootUserMessageId
-              AssistantMessageId = assistantMessageId
+              AuthorityRoot = Some authorityRoot
+              ProviderRun = Some providerRun
               FinalText = finalText
               WorkRecord = workRecord
               Directory = directory }
 
-    let failed (agentId: string) (runId: string) (role: AgentRole option) (childSessionId: string option) code message =
+    let failed
+        (agentId: string)
+        (runId: string)
+        (role: AgentRole option)
+        (childSessionId: SessionId option)
+        code
+        message
+        =
         AgentFailed
             { AgentId = agentId
               ChildSessionId = childSessionId
@@ -92,7 +116,7 @@ module AgentCompletion =
         (agentId: string)
         (runId: string)
         (role: AgentRole option)
-        (childSessionId: string option)
+        (childSessionId: SessionId option)
         code
         message
         =
@@ -104,8 +128,23 @@ module AgentCompletion =
               Code = code
               Message = message }
 
+    /// A PTY or local run that has no Host child session and no Authority Root.
+    ///
+    /// The four identity arguments are absent rather than blank. `completed` used to
+    /// be called here with `"" "" ""` for ChildSessionId, root and directory, which
+    /// made "this run has no child session" and "its session id is the empty string"
+    /// the same value — the sentinel pattern PROMPT-001 exists to remove.
     let ofSimpleText (agentId: string) (runId: string) (role: AgentRole) (text: string) =
-        completed agentId "" runId role "" "" text None ""
+        AgentCompleted
+            { AgentId = agentId
+              ChildSessionId = None
+              RunId = runId
+              Role = role
+              AuthorityRoot = None
+              ProviderRun = None
+              FinalText = text
+              WorkRecord = None
+              Directory = None }
 
     let ofSimpleError (agentId: string) (runId: string) (role: AgentRole) (message: string) =
         failed agentId runId (Some role) None "ERROR" message
