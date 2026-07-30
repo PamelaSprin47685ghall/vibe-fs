@@ -63,7 +63,14 @@ export function lanesOf(body, bindings) {
 
   const lanes = new Set();
   for (const [alias, bound] of bindings ?? []) {
-    if (bound === sessionId) lanes.add(alias);
+    // A binding is alias → SET of sessions. `fast-reviewer` is not one thread, it is "any
+    // reviewer thread": `orchestrator-publish` forks a Reviewer before the rebase and
+    // another after it, and both belong to that lane. Their `turn` and `step` tell them
+    // apart because each has its own conversation.
+    //
+    // A plain string is accepted too, so a unit fixture can write `new Map([['a', 'ses']])`.
+    const matches = bound instanceof Set ? bound.has(sessionId) : bound === sessionId;
+    if (matches) lanes.add(alias);
   }
   return lanes;
 }

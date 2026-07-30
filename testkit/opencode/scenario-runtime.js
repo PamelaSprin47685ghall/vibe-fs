@@ -46,13 +46,24 @@ export class ScenarioRuntime {
     this.answered = new Set();
   }
 
-  /** HOST-008: the harness is TOLD the association when the Host mints the id. */
+  /**
+   * HOST-008: the harness is TOLD the association when the Host mints the id.
+   *
+   * One alias may hold SEVERAL sessions. A scenario names lanes by role
+   * (`fast-reviewer`), and production forks as many children of that role as the work
+   * needs — `orchestrator-publish` reviews twice, before and after the rebase. Treating
+   * the second child as a rebind would either throw or silently orphan the first.
+   */
   bind(alias, sessionId) {
-    this.bindings.set(alias, sessionId);
+    const bound = this.bindings.get(alias) ?? new Set();
+    bound.add(sessionId);
+    this.bindings.set(alias, bound);
   }
 
+  /** The most recently bound session for an alias, for assertions that need one. */
   sessionFor(alias) {
-    return this.bindings.get(alias);
+    const bound = this.bindings.get(alias);
+    return bound === undefined ? undefined : [...bound].at(-1);
   }
 
   /**

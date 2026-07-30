@@ -152,13 +152,31 @@ export class StrictMockProvider {
     resetState(this._state);
     this._afterExpectation.clear();
   }
+  /**
+   * Associate a scenario alias with a real session id (HOST-008).
+   *
+   * The scenario is told FIRST, and the legacy single-binding rule below only applies to the
+   * `expect*` path. That ordering is load-bearing: a scenario alias names a ROLE, and
+   * production forks as many children of a role as the work needs — `orchestrator-publish`
+   * reviews before and after the rebase, so `fast-reviewer` legitimately holds two sessions.
+   *
+   * Measured in K9: `scenario-parallel.js:136` auto-binds on every `session.created` inside a
+   * `try {} catch {}`, so the throw below silently dropped every child after the first. The
+   * swallowed exception is why the old forest needed `reusable` aliases to answer a second
+   * Reviewer at all.
+   */
   bindSession(alias, sessionID) {
     if (typeof alias !== 'string' || alias.trim() === '') throw new Error('StrictMock session alias must be non-empty');
     if (typeof sessionID !== 'string' || sessionID.trim() === '') throw new Error('StrictMock session ID must be non-empty');
-    const bound = this._state.sessionBindings.get(alias);
-    if (bound && bound !== sessionID) throw new Error(`StrictMock session alias ${alias} is already bound`);
-    this._state.sessionBindings.set(alias, sessionID);
+
     this._scenario?.bind(alias, sessionID);
+
+    const bound = this._state.sessionBindings.get(alias);
+    if (bound && bound !== sessionID) {
+      if (this._scenario !== null) return;
+      throw new Error(`StrictMock session alias ${alias} is already bound`);
+    }
+    this._state.sessionBindings.set(alias, sessionID);
   }
 
   /** Host restart / new process: old provider-visible seals are not comparable. */
