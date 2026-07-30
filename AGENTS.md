@@ -97,6 +97,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | `STATUS/blocker-HOST-006.md` | SSOT 例外 1 定案：手工 compaction 不可阻断的逻辑矛盾与两层解法 |
 | `SSOT/01.md` 的 `ARCH-009` | SSOT 例外 2：有界并发与共享原语契约，为 `mapBounded` 补的条款 |
 | `STATUS/evidence/` | 机器输出与 Host 行为证据，绑定 commit |
+| `PENDING/` | 已审阅通过但未合并的 SSOT 修正动议。合并前不是规范，不得据以改代码 |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
@@ -136,6 +137,12 @@ assistant message 在 transform 之前已经创建并持久化。
 - `CompanionHost.TransformRaw`（`CompanionHost.fs:148`）只做 COMPANION-005 累积并原样
   返回 `messages`。这不是缺口而是 CTX-002 的正确形态：transform 看不到 attempt 结局，
   恢复决策只能在 `AttemptPlanner.plan` 里做
+- X 恢复链零生产调用点（`XPrefixProjection`、`AttemptPlanner`、`PrefixProbeSelection`
+  及其三个事实皆无 writer）。第 1 层测试已存在，接线属于包 X10；包 K8f 的 X-A–X-D 剧本
+  因此阻断——没有调用点的剧本只能证明 mock 自己
+- `HostForkRuntimeFork.fs:196` 的 fork 信封是条件包裹：有 parent work record 时前置
+  `[Parent work record …]`，否则裸发 assignment。两种形态无公共前缀，单一 turn 声明
+  无法同时命中，这是当前多数 canary 红灯的同一根因
 
 包 X9 已删除全部上下文估算层（见 §3 第四条的形态表），勿重新引入。
 
@@ -262,10 +269,44 @@ formatter 输出逐字节一致。
 
 `test:mjs` 拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
 
+### 时间界的四条实测语义（VERIFY-004）
+
+- `node:test` 的 `timeout` 是判据线，不是中止线。超时测试继续跑，判据迟到到达。
+  故静默窗口必须严格大于单测超时（`UNIT_VERDICT_SILENCE_MS > PER_TEST_TIMEOUT_MS`），
+  且严格小于兜底（`< SUITE_BACKSTOP_MS`）。倒置即恢复 VERIFY-004 首条禁止项
+- 续期只能由测试判据事件驱动（`test:pass` / `test:fail` / `test:complete`）。
+  `test:stdout` / `test:stderr` / `diagnostic` 属背景流量，接成续期源等价于
+  「让原始 SSE 或 provider 流量续期 watchdog」——一个不停打印的挂死测试将永不被判死
+- watchdog 计时器必须 `unref`。否则干净结束也要等满整个窗口（实测 2000ms 窗口 → 2004ms）
+- 「全部判据绿但子进程不肯退出」是失败，不是通过。旧父层 `await stream.on('end')`
+  在泄漏 interval 的套件上正常收到 `end` 并 exit 0。判据全绿与进程能够离开是两个断言，
+  开发者说的绿只指后者
+
+命名随语义走：总超时改名 `SUITE_BACKSTOP_MS`，因为它在正确接线后只剩兜底职责；
+叫 `SUITE_TIMEOUT_MS` 会让下一个人把它当主判据。
+
+启动阶段（`spawn` → ready）同样不许只有兜底覆盖。`testkit/opencode/readiness.js` 把它
+拆成 6 级因果阶梯，每级独立预算，到达即重新计时；总启动时长因此无界，被界住的是静默。
+阶梯只前进不回退——重试的健康检查若能重置，重试循环会永久续期启动预算。匹配子进程
+已有的计时行本身，不新增为门禁而生的证据：必须为门禁额外发射的证据，门禁无法信任。
+
 先跑当前改动的最小目标测试；该阶段契约证明后才扩大范围。
 
 禁止的捷径：加 sleep、延长 timeout 掩盖竞态、放宽断言、删除 flaky 测试、
 repeat-until-pass 宣称成功、在测试中手工写 projection 终态。
+
+### 门禁必须红过一次才算存在
+
+写完门禁先把它守的性质破坏掉，确认它真的红。没红过的门禁与注释等价。
+
+实证：W4 的行为用例写完后，把 `classifyVerdict` 改成恒返回 `null`（心跳完全断线），
+五条用例里四条仍然全绿——它们各自都在一个静默窗口内跑完，于是「spawn 时装一次、之后
+从不续期」的 watchdog 与正确接线得出同一结论。对的结果，错的原因，零覆盖机制。
+区分性输入必须是合法地比窗口更慢的工作（5 × 800ms vs 3000ms 窗口）。
+
+同源陷阱：预先注册、留空数组的门禁用例文件。在门禁输出里「零用例」与「全部通过」逐字
+相同。空文件只能由完备性门禁判红——W7 按 VERIFY-004 的禁止降级清单逐项要求命名用例，
+而不是靠人记得回来填。
 
 ## 6. 测试语言边界（VERIFY-008）
 
@@ -277,7 +318,10 @@ repeat-until-pass 宣称成功、在测试中手工写 projection 终态。
 布局：
 
 ```text
-tests-mjs/runner.mjs              入口。陈旧产物 fail closed + 每测试 1000ms 硬超时
+tests-mjs/runner.mjs              父层。陈旧产物 fail closed + 判据静默窗口监督
+tests-mjs/run-inner.mjs           子层。node:test 实际执行（files/timeout/concurrency）
+tests-mjs/verdict-feed.mjs        判据分类：哪些事件允许续期 watchdog
+tests-mjs/fixtures/*.fixture.mjs  门禁驱动的故意病态套件，对真实套件不可见
 tests-mjs/domain.mjs              唯一允许知道 Fable 输出形状的文件
 tests-mjs/domain.meta.test.mjs    facade 自身的契约（锁住三个静默陷阱）
 tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
@@ -337,10 +381,14 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 | 文件 | 职责 |
 |------|------|
 | `runtime-key.js` | `(lane, turn, step, kind)` 纯函数 + 最长前缀唯一查找 |
+| `scenario-runtime.js` | 单剧本运行时（前缀索引、seal 屏障、`clearSeals`），取代已删的 `script-loader.js` |
 | `delivery-plan.js` | 故障与内容正交，物理投递计数 |
 | `cold-boundary.js` | 只认显式声明的冷边界 |
 | `scenario-schema.js` | TOML 编译器，8 个根键 + 24 个 flow 动词白名单 + 载入期校验 |
 | `legacy-fields.js` | 20 个退役字段，出现即拒绝载入 |
+| `canary-manifest.js` | canary 清单由文件系统派生，计数漂移在结构上不可能发生 |
+| `readiness.js` | 启动 6 级就绪阶梯，单调前进 |
+| `watchdog.js` | `advance({blocking})` 判据续期，`unref`，触发时 dump 最后进展 |
 | `time-budget.js` | 全部 wall-clock 兜底的单一来源，逐条带理由（VERIFY-004） |
 | `scripts/toml-format.mjs` | 行式 formatter，`gate:toml` 强制逐字节一致 |
 | `scripts/budget-gate.mjs` | `gate:budget`，禁止 ≥1000 的计时字面量散落，无豁免通道 |
@@ -354,6 +402,10 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 - 最长前缀唯一命中；命中 0 条 fail closed；同长度冲突在载入期拒绝
 - 禁止用 specificity 打分、子串长度、路径下标消歧
 - 书写形式是对话（TOML），前缀索引是编译产物。作者不写前缀数组
+- 生产侧包裹过的 prompt 用有序片段声明 `user = ["包裹前缀", "assignment"]`：片段按序出现
+  即命中，允许片段之间存在声明未覆盖的可变文本。这是 REVIEW-002 一类「生产合成外壳 +
+  作者只知内容」的唯一正确表达，不要改成整段字面量
+- `internal = true` 的 turn 禁止带 lane：其 prompt 由生产内部合成，不属任何声明车道
 
 死边检查与 `internal`：
 
@@ -388,6 +440,19 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
   `parentSession` 同批退役（实测双重死代码，见 §4 末尾）
 - fixture 缓存键必须用语义投影，不能用 wire 投影。用 wire 会把同一语义对话的不同
   ID 当成不同 fixture，缓存永不命中而看起来仍然工作
+
+wire 上真实存在什么——四条实测纠正，每条都曾让整类断言静默失效：
+
+- session 身份在 `x-session-affinity` header，不在 body。按 body 取 id 恒得
+  `undefined`，ARCH-004 的 seal 屏障因此在 `ScenarioRuntime` 路径上完全不通电
+- 别名到 session 是一对多。`lanesOf` 原按一对一建表，K9 实测第二个子会话被
+  `try/catch` 静默吞掉；映射必须是别名 → session 集合
+- `kind` 必须扫描全部前置消息，不能只看 `[0]`。title agent 的 system prompt 正在 `[0]`
+- 故障与冷边界必须按 `entryId` 索引，不能按文本。按文本索引会让每一条真实故障声明
+  失效——文本一经生产侧改写即失配，而失配的表现是「没有故障」，恰好是绿灯
+
+被删的伪门禁：`containsTool`（其检查的工具词汇已灭绝，恒真）、`selfRebaseBlog`（零调用点）。
+判据存在性本身要被门禁守住，否则一个恒真检查会长期冒充覆盖。
 
 投影分工（VERIFY-007）：
 
