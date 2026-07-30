@@ -16,7 +16,12 @@
 import { assertEq, assertTrue } from './gate-lib.mjs';
 import { RETIRED_FIELDS, retiredFieldProblems } from '../legacy-fields.js';
 import { compileScenario } from '../scenario-schema.js';
+import { readFileSync } from 'node:fs';
 import { formatToml } from '../../../scripts/toml-format.mjs';
+import { walk } from '../../../scripts/repo-scan.mjs';
+
+/** The forest itself, so a scenario added later is covered without being registered. */
+const SCENARIO_ROOT = 'testkit/opencode/scripts';
 
 const compile = (source) => compileScenario(source, { name: 'p.toml' });
 
@@ -408,6 +413,46 @@ user = "go on"
         'the block separation moves to before the comment, not after it',
       );
       assertEq(formatToml(formatted), formatted);
+    },
+  },
+
+  {
+    name: 'VERIFY-003 every scenario in the forest compiles',
+    fn: () => {
+      // Until now nothing checked this. Each conversion was verified with a throwaway
+      // `node -e` that compiled the one file just written — the one-off probe AGENTS.md
+      // forbids as verification, because it proves the file loaded on the author's machine
+      // at that moment and nothing afterwards.
+      //
+      // Walking the directory rather than listing names is the point: a scenario added
+      // later is covered without anyone remembering to register it here.
+      const files = walk(SCENARIO_ROOT, ['.toml']);
+      assertTrue(files.length > 0, `no scenarios found under ${SCENARIO_ROOT}`);
+
+      const broken = files
+        .map((file) => ({ file, result: compileScenario(readFileSync(file, 'utf8'), { name: file }) }))
+        .filter(({ result }) => !result.ok);
+
+      assertEq(
+        broken.length,
+        0,
+        broken.map(({ result }) => result.problems.join('\n    ')).join('\n  '),
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 every scenario is already formatted',
+    fn: () => {
+      // `gate:toml` enforces this in CI, but that is a separate npm script: a scenario could
+      // be committed unformatted and `test:harness` would stay green. The gate that reads
+      // the forest should be the gate that says the forest is well-formed.
+      const drifted = walk(SCENARIO_ROOT, ['.toml']).filter((file) => {
+        const source = readFileSync(file, 'utf8');
+        return formatToml(source) !== source;
+      });
+
+      assertEq(drifted.length, 0, `run node scripts/toml-format.mjs --write: ${drifted.join(', ')}`);
     },
   },
 

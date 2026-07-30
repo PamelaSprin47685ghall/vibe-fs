@@ -1,0 +1,194 @@
+# ORCH-005/ORCH-008: the Host dies while an in-progress rebase is CONFLICTED. On restart the
+# job must resume the same rebase — not restart the original task — and still publish
+# exactly once.
+#
+# ── the recovery file this one loaded was empty ──────────────────────────────
+#
+# `orchestrator-restart-publish-conflict-recovery.json` was `{"scenario":
+# "orch-restart-publish", "scripts": []}` — zero edges. So the `loadScripts` step in the old
+# flow swapped in nothing at all, and the post-restart requests were answered by edges the
+# main file had already declared.
+#
+# That is worth stating plainly: a `loadScripts` naming a file with no edges is
+# indistinguishable, at runtime, from one that matters. The reader sees dynamic loading and
+# assumes the recovery behaviour depends on it. Nothing did.
+
+scenario = "orchestrator-restart-publish-conflict"
+description = "ORCH-005 crash during a conflicted rebase resumes the same rebase and publishes exactly once"
+pass = "Orchestrator restart publish canary passed: crash-during-rebase-conflict recovers to exactly-once publish."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator restart publish canary (rebase-conflict)\n", "README.md" = "# orchestrator-restart-publish project (rebase-conflict)\n" } } }
+session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
+prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
+
+must = ["conflict-resume.0", "orch-continue.1"]
+
+flow = [
+  { afterExpectation = { id = "manager.0", gitConflictProof = true } },
+  { afterExpectation = { id = "conflict-resume.0", restart = true } },
+
+  { wait = "orch.0" },
+  { wait = "manager.0" },
+  { wait = "coder.0" },
+  { wait = "manager-guard.2" },
+  { wait = "reviewer.0" },
+  { wait = "reviewer.1" },
+  { wait = "reviewer-confirm.0" },
+  { waitFact = { name = "OrchestratorPreRebaseReviewConfirmed", eq = 1 } },
+  { wait = "conflict-resume.0" },
+
+  { awaitRestart = true },
+
+  { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
+
+  # The SAME key, delivered a second time. The JSON form declared this as
+  # `manager-conflict-resume-2` at `lane.turn = 5` with `"Resolved rebase resolution."`
+  # against the first edge's `"Resuming rebase resolution."` — two different responses for
+  # one key, which content-as-a-pure-function forbids. The two texts existed only so the old
+  # flow could `wait` on distinct ids; nothing asserted which one arrived.
+  { wait = "conflict-resume.0", timeoutMs = 20000 },
+  { wait = "reviewer.0", timeoutMs = 20000 },
+  { wait = "reviewer-confirm.0", timeoutMs = 20000 },
+  { wait = "orch-continue.0", timeoutMs = 20000 },
+  { wait = "orch-continue.1", timeoutMs = 20000 },
+
+  { awaitTerminal = true, requireAssistantTerminal = false, timeoutMs = 20000 },
+  { assertFacts = { name = "OrchestratorPublished", eq = 1 } },
+  { assertWorktreeClean = true },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "orch"
+lane = "fast-orchestrator"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-manager", args = { agent = "fast-manager", prompt = "Ship publish_proof.txt to the target branch." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+[[turn]]
+id = "orch-continue"
+lane = "fast-orchestrator"
+user = "Continue the publish job and join its result."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Publish completed." }
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write publish_proof.txt." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished." }
+
+[[turn]]
+id = "manager-guard"
+lane = "fast-manager"
+internal = true
+user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review the current worktree for correctness" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished." }
+
+# `next/Orchestrator.Prompts.fs:23`. The prompt embeds the conflicted file list, so the
+# declaration is a prefix of it — and production composes the whole thing, hence `internal`.
+#
+# The clause it carries is the load-bearing part: "You are RESUMING an in-progress rebase in
+# this same session — do NOT restart the original task."
+
+[[turn]]
+id = "conflict-resume"
+lane = "fast-manager"
+internal = true
+user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Resuming rebase resolution." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = "Write publish_proof.txt."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder finished." }
+
+[[turn]]
+id = "reviewer"
+lane = "fast-reviewer"
+user = "Review the current worktree for correctness"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer intermediate text after verdict tool." }
+
+[[turn]]
+id = "reviewer-confirm"
+lane = "fast-reviewer"
+internal = true
+user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "blogger-reanchor"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. This session resumed after a restart"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session reanchor background." }
+
+[[turn]]
+id = "title"
+lane = "title"
+kind = "title"
+user = "Ship publish_proof.txt to the target branch."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

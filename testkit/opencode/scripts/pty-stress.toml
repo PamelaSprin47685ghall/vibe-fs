@@ -1,0 +1,122 @@
+# EXEC-011/EXEC-015: DevOps owns `fork-pty`, and a PTY closes only on the real `onExit`. Two
+# PTYs: the first exits on TERM, the second traps TERM and needs KILL. The claim is that the
+# completion waits for the actual exit in both cases rather than reporting closed when the
+# signal was sent.
+#
+# Eleven provider steps, ONE user message. The JSON form numbered them `lane.turn = 1..11`
+# and every edge carried the same nine-tool `requiredTools` list plus the same
+# `forbiddenTools` list — so the tool predicates distinguished nothing and the ordinal did
+# all the work. `tools` is declared once on the turn, which is where request identity lives.
+
+scenario = "pty-stress"
+description = "EXEC-015 a PTY completes on the real onExit; TERM closes the first, KILL is needed for the trapping second"
+pass = "PTY stress canary passed: DevOps owns fork-pty; cwd, write/read echo, TERM->Closed, KILL forces exit, no leak."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "PTY stress canary\n" } } }
+session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Fork DevOps to exercise the structured PTY DSL only (not executor): create, write, read, TERM, then a trapping PTY that needs KILL." }
+
+must = ["devops.10", "manager.2"]
+
+flow = [
+  { wait = "manager.0" },
+  { bindChild = { agent = "fast-devops", bind = ["fast-devops"] } },
+  { wait = "devops.0" },
+  { wait = "devops.1" },
+  { wait = "devops.2" },
+  { wait = "devops.3" },
+  { wait = "devops.4" },
+  { wait = "devops.5" },
+  { wait = "devops.6" },
+  { wait = "devops.7" },
+  { wait = "devops.8" },
+  { wait = "devops.9" },
+  { wait = "devops.10" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { assertPtyEcho = true },
+  { expectSatisfied = true },
+]
+
+# EXEC-013: the Manager may not touch a PTY itself. It delegates and joins, and its declared
+# tool set has no `fork-pty` — which under (lane, turn, step) is a different request identity
+# from the DevOps turn below, not a filter applied to the same one.
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Fork DevOps to exercise the structured PTY DSL only (not executor): create, write, read, TERM, then a trapping PTY that needs KILL."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-devops", prompt = "Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished: DevOps completed PTY stress." }
+
+[[turn]]
+id = "devops"
+lane = "fast-devops"
+user = "Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat"
+tools = ["fork-pty", "join", "list", "executor", "read", "glob", "grep", "inspector", "coder"]
+
+  # First PTY: `cat` holds the session open so the write/read echo is observable.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { agent = "pty", prompt = "echo CWD=$(pwd); exec cat" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { prompt = "ECHO_TEST" } }
+
+  # An empty prompt is a READ of pending output, not a write of nothing. That distinction is
+  # in the DSL rather than in a flag, which is why the same tool name appears at every step.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { prompt = "" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { signal = "TERM" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  # Second PTY traps TERM, so the TERM at step 6 must NOT complete it — EXEC-015's whole
+  # point. Only the KILL at step 7 produces a real `onExit`.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { agent = "pty", prompt = "trap \"\" TERM; echo TRAPPED; exec tail -f /dev/null" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { signal = "TERM" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-pty", args = { signal = "KILL" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  # `list` proves the absence of a leak: both PTYs must be gone from the handle set.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "list" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "DevOps report: both PTYs closed; ECHO_TEST echoed; no leak." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "title"
+lane = "manager-title"
+kind = "title"
+user = "Fork DevOps to exercise the structured PTY DSL only (not executor): create, write, read, TERM, then a trapping PTY that needs KILL."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

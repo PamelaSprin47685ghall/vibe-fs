@@ -1,0 +1,193 @@
+# ORCH-005/PERSIST-009: the Host dies after a publish candidate exists but before the
+# publish is durably accepted. On restart the job must resume and publish EXACTLY ONCE —
+# `OrchestratorPublished eq 1` is the whole point, and a second publish would also show up
+# as a dirty worktree.
+#
+# ── the recovery file was the same five keys ────────────────────────────────
+#
+# `orchestrator-restart-publish-recovery.json` held five edges swapped in mid-run by
+# `loadScripts`. Measured against the main file's edges, all five had the SAME lane, the
+# same `match` predicate and (for three of them) a byte-identical `respond`. The two that
+# differed differed only in text — `"Manager recovered."` against `"Manager finished."` —
+# and that difference existed solely so the old flow could `wait` on a distinct id.
+#
+# Under (lane, turn, step) they ARE one key: after the restart the Orchestrator forks a new
+# Manager child with the same prompt, so it is a fresh conversation whose step counter
+# starts at 0 again. Content is a pure function of the request, so one declaration answers
+# both deliveries and the flow simply waits on the same id twice.
+#
+# What actually proves the recovery is therefore not a differently-worded reply — it is the
+# fact assertions and the file assertion at the end of the flow. The old text pair looked
+# like evidence and was decoration.
+
+scenario = "orchestrator-restart-publish"
+description = "ORCH-005 crash after the publish candidate exists recovers to an exactly-once publish"
+pass = "Orchestrator restart publish canary passed: crash-after-candidate recovers to exactly-once publish."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator restart publish canary (after-candidate)\n", "README.md" = "# orchestrator-restart-publish project (after-candidate)\n" } } }
+session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
+prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
+
+must = ["orch-continue.1", "reviewer-confirm.0"]
+
+flow = [
+  { afterExpectation = { id = "reviewer-confirm.0", restart = true } },
+
+  { wait = "orch.0" },
+  { wait = "manager.0" },
+  { wait = "coder.0" },
+  { wait = "manager-guard.2" },
+  { wait = "reviewer.0" },
+  { wait = "reviewer-confirm.0" },
+
+  { awaitRestart = true },
+
+  # No `loadScripts`. Every turn the recovered run needs is declared below and was declared
+  # before the Host ever started — which is what makes "the restored job resumes" a claim
+  # about production rather than about what the harness swapped in.
+  { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
+  { wait = "manager.0", timeoutMs = 20000 },
+  { wait = "coder.0", timeoutMs = 20000 },
+  { wait = "coder.1", timeoutMs = 20000 },
+  { wait = "manager.1", timeoutMs = 20000 },
+  { wait = "manager.2", timeoutMs = 20000 },
+  { wait = "reviewer.0", timeoutMs = 20000 },
+  { wait = "reviewer-confirm.0", timeoutMs = 20000 },
+  { wait = "orch-continue.0", timeoutMs = 20000 },
+  { wait = "orch-continue.1", timeoutMs = 20000 },
+
+  { awaitTerminal = true, requireAssistantTerminal = false, timeoutMs = 20000 },
+  { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
+  { assertFacts = { name = "OrchestratorPublished", eq = 1 } },
+  { assertWorktreeClean = true },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "orch"
+lane = "fast-orchestrator"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-manager", args = { agent = "fast-manager", prompt = "Ship publish_proof.txt to the target branch." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+# The post-restart continuation is a new user message from the scenario, so it is its own
+# turn rather than another step of the one above.
+
+[[turn]]
+id = "orch-continue"
+lane = "fast-orchestrator"
+user = "Continue the publish job and join its result."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Publish completed." }
+
+# Three steps, answering both the pre-restart Manager and the recovered one. Step 2 is the
+# one the JSON form spelled twice as `manager-terminal` and `manager-recovery-terminal`.
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write publish_proof.txt." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished." }
+
+[[turn]]
+id = "manager-guard"
+lane = "fast-manager"
+internal = true
+user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review the current worktree for correctness" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = "Write publish_proof.txt."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder finished." }
+
+[[turn]]
+id = "reviewer"
+lane = "fast-reviewer"
+user = "Review the current worktree for correctness"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer intermediate text after verdict tool." }
+
+[[turn]]
+id = "reviewer-confirm"
+lane = "fast-reviewer"
+internal = true
+user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree." }
+
+# Both Blogger shapes. The re-anchor frame (`CompanionHostBlogger.fs:72`) is reachable here
+# because this scenario genuinely restarts — unlike `agent-dsl`, where the same edge was
+# declared with no restart in the flow and could never be delivered.
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "blogger-reanchor"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. This session resumed after a restart"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session reanchor background." }
+
+[[turn]]
+id = "title"
+lane = "title"
+kind = "title"
+user = "Ship publish_proof.txt to the target branch."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

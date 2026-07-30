@@ -1,0 +1,250 @@
+# EXEC-004/EXEC-009 + REVIEW-003/005: the whole Manager loop in one conversation. Three
+# parallel read-only children, then a Coder edit, then a REVISE round-trip, then dual
+# PERFECT. The longest scenario in the forest and the one that most needed the ordinal gone:
+# the JSON form numbered the Manager's edges `lane.turn = 1..15` by hand.
+#
+# All fifteen are ONE user message. Every `fork`/`join` appends assistant messages and their
+# tool results, so `step` counts them and the sequence is a property of the request.
+
+scenario = "manager-full-loop"
+description = "EXEC-004 fork three read-only children then a Coder, and drive a REVISE round-trip to dual PERFECT"
+pass = "Manager full loop canary passed."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "manager full loop canary\n", "src/main.txt" = "target\n" } } }
+session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork a coder, review, and finish." }
+
+must = ["manager.14", "review-perfect.0", "reviewer-confirm.0"]
+
+flow = [
+  { wait = "manager.0" },
+  { wait = "blogger" },
+  { bindChild = { agent = "fast-inspector", bind = ["fast-inspector"] } },
+  { wait = "inspector.0" },
+  { wait = "inspector.1" },
+  { wait = "manager.3" },
+
+  { wait = "manager.1" },
+  { bindChild = { agent = "fast-browser", bind = ["fast-browser"] } },
+  { wait = "browser.0" },
+  { wait = "browser.1" },
+  { wait = "manager.4" },
+
+  { wait = "manager.2" },
+  { bindChild = { agent = "fast-meditator", bind = ["fast-meditator"] } },
+  { wait = "meditator.0" },
+  { wait = "meditator.1" },
+  { wait = "manager.5" },
+
+  { wait = "manager.6" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  { wait = "coder-edit.0" },
+  { wait = "coder-edit.1" },
+  { wait = "manager.7" },
+
+  # REVIEW-005: a REVISE is a real verdict and must round-trip through the Coder before any
+  # PERFECT can be asked for.
+  { wait = "manager.8" },
+  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
+  { wait = "review-revise.0" },
+  { wait = "review-revise.1" },
+  { wait = "manager.9" },
+
+  { wait = "manager.10" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  { wait = "coder-fix.0" },
+  { wait = "coder-fix.1" },
+  { wait = "manager.11" },
+
+  { wait = "manager.12" },
+  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
+  { wait = "review-perfect.0" },
+  { wait = "review-perfect.1" },
+  { wait = "reviewer-confirm.0" },
+  { wait = "reviewer-confirm.1" },
+  { wait = "manager.13" },
+  { wait = "manager.14" },
+
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { assertFacts = { name = "ReviewVerdictRecorded", gte = 3 } },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork a coder, review, and finish."
+tools = ["fork", "join", "list"]
+
+  # Three forks before any join — EXEC-004's mailbox is what makes that safe: a completion
+  # waits to be consumed rather than needing the parent to be listening.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-inspector", prompt = "Run executor investigation and return a formal report." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-browser", prompt = "Read AGENTS.md and report architecture constraints." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-meditator", prompt = "Propose a plan without changing the worktree." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file summary." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review current worktree and submit structured verdicts." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Apply reviewer REVISE: write CHANGELOG.md with fixed." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Re-review the fixed tree and submit dual PERFECT." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished: joined inspector/browser/meditator reports, coder edit, and reviewer verdicts." }
+
+# The three read-only children. Each has a different declared tool set, which is what the
+# retired `forbiddenTools` list was approximating: a tool set that must be absent is a
+# different request identity, so it is a different turn — not a filter on this one.
+
+[[turn]]
+id = "inspector"
+lane = "fast-inspector"
+user = "Run executor investigation and return a formal report."
+tools = ["executor"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "pwd && printf 'inspector-evidence\n'", estimated_output_bytes = 256, estimated_running_secs = 5, estimated_mem_usage = "low" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Inspector formal report: evidence collected via executor." }
+
+[[turn]]
+id = "browser"
+lane = "fast-browser"
+user = "Read AGENTS.md and report architecture constraints."
+tools = ["read"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "AGENTS.md" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Browser formal report: architecture constraints summarized." }
+
+[[turn]]
+id = "meditator"
+lane = "fast-meditator"
+user = "Propose a plan without changing the worktree."
+tools = ["read"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "src/main.txt" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Meditator formal plan: keep worktree clean, then patch." }
+
+# Two Coder turns, two forks, one lane. The JSON form numbered them `lane.turn = 1..4`
+# continuously across both child sessions; `step` restarts at 0 per user message, so the
+# boundary between the edit and the fix is now in the request rather than in the numbering.
+
+[[turn]]
+id = "coder-edit"
+lane = "fast-coder"
+user = "Edit src/main.txt to 'patched'."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "src/main.txt", content = "patched\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder edit summary: src/main.txt patched. Stopped after the edit." }
+
+[[turn]]
+id = "coder-fix"
+lane = "fast-coder"
+user = "Apply reviewer REVISE: write CHANGELOG.md with fixed."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "CHANGELOG.md", content = "fixed\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder fix report: CHANGELOG.md written for the reviewer REVISE." }
+
+[[turn]]
+id = "review-revise"
+lane = "fast-reviewer"
+user = "Review current worktree and submit structured verdicts."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "REVISE" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer REVISE report: add CHANGELOG note before PERFECT." }
+
+[[turn]]
+id = "review-perfect"
+lane = "fast-reviewer"
+user = "Re-review the fixed tree and submit dual PERFECT."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "First PERFECT submitted; await confirmation." }
+
+# The nudge shape of the challenge (`HostReviewGuard.fs:189`): the old edge paired the
+# challenge regex with `afterToolResult: false`, i.e. a new user message.
+
+[[turn]]
+id = "reviewer-confirm"
+lane = "fast-reviewer"
+internal = true
+user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer formal report: current tree accepted." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "title"
+lane = "manager-title"
+kind = "title"
+user = "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork a coder, review, and finish."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

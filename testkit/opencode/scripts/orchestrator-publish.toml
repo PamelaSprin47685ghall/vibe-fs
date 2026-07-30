@@ -1,0 +1,169 @@
+# ORCH-005/REVIEW-003: the full publish chain. Orchestrator forks a Manager, the Manager
+# gets work done and is forced through review by the guard, the Orchestrator publishes
+# exactly once.
+#
+# ── two scenarios merged into one ───────────────────────────────────────────
+#
+# `orchestrator.json` and `orchestrator-publish.json` were isomorphic: same flow verb
+# sequence, same 22 edges, same lanes, same review structure. The only differences were the
+# proof file name (`role_surface_proof.txt` vs `publish_proof.txt`) and the id spelling
+# (`orchestrator-*` vs `orch-*`).
+#
+# `orchestrator.json` called itself the "tool-surface canary", and its extra content was
+# `forbiddenTools` lists. Those are retired: a tool set is part of the request identity, so
+# `tools` on the turn declares it, and a DIFFERENT tool set is a different turn rather than
+# a filter. The role surface itself is asserted by `manager-tool-contract`, which reads the
+# schemas directly instead of inferring them from what a mock refused to match.
+#
+# It was also broken. Its final edge matched `user = "Ship publish_proof.txt…"` — copied
+# from the publish scenario — while its own prompt said `role_surface_proof.txt`. So that
+# edge could never match, and the canary failed with `no-prefix-matched` before this
+# package touched anything. Two near-identical files is exactly how that survives: the
+# reader assumes the difference is deliberate.
+
+scenario = "orchestrator-publish"
+description = "ORCH-005 fork-manager to publish exactly once, with pre- and post-rebase review confirmation"
+pass = "Orchestrator publish canary passed."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator publish canary\n", "README.md" = "# orchestrator-publish project\n" } } }
+session = { agent = "fast-orchestrator", bind = ["orch-title", "fast-orchestrator"] }
+prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
+
+must = ["orch.2", "reviewer-confirm.0"]
+
+flow = [
+  { wait = "orch.0" },
+  { wait = "manager.0" },
+  { wait = "coder.0" },
+  { wait = "coder.1" },
+  { wait = "manager.2" },
+
+  # Pre-rebase review: the guard nudges the Manager, which forks a Reviewer.
+  { wait = "reviewer.0" },
+  { wait = "reviewer-confirm.0" },
+  { waitFact = { name = "OrchestratorPreRebaseReviewConfirmed", eq = 1 } },
+
+  # Post-rebase review: a second fork, so a second child session bound to the same lane.
+  # Its step counter restarts at 0 because it is a fresh conversation — which is why the
+  # eight `reviewer-perfect-N` edges of the JSON form are one declaration here.
+  { waitFact = { name = "OrchestratorPostRebaseReviewConfirmed", eq = 1 } },
+  { waitFact = { name = "OrchestratorPublished", eq = 1 } },
+
+  { wait = "orch.2" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
+  { assertWorktreeClean = true },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "orch"
+lane = "fast-orchestrator"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-manager", args = { agent = "fast-manager", prompt = "Ship publish_proof.txt to the target branch." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Publish completed." }
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write publish_proof.txt." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  # REVIEW-007 fires here: a Manager reporting finished on an unreviewed tree is nudged
+  # rather than allowed to complete.
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished." }
+
+# `HostReviewGuard.fs:147`. Production composes it, so `internal`.
+
+[[turn]]
+id = "manager-guard"
+lane = "fast-manager"
+internal = true
+user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review the current worktree for correctness" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finished." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = "Write publish_proof.txt."
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder finished." }
+
+# Here the challenge takes the NUDGE shape, not the tool-result shape — the JSON edge had
+# `afterToolResult: false` together with the challenge regex, meaning a new user message.
+# That is the opposite of `reviewer-verdict`, where the same clause is satisfied through
+# `VerdictTool.fs:64`. Both paths are real (`HostReviewGuard.fs:189` is this one); the
+# retired substring predicate could not tell them apart, and these two scenarios together
+# now pin one each.
+
+[[turn]]
+id = "reviewer"
+lane = "fast-reviewer"
+user = "Review the current worktree for correctness"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer intermediate text after verdict tool." }
+
+[[turn]]
+id = "reviewer-confirm"
+lane = "fast-reviewer"
+internal = true
+user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "title"
+lane = "orch-title"
+kind = "title"
+user = "Ship publish_proof.txt to the target branch."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
