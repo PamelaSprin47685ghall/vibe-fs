@@ -21,9 +21,8 @@ import {
   requestRoleOf,
   requestSessionOf,
   requestParentSessionOf,
-  sealProviderVisible,
-  isProviderVisiblePrefix,
 } from './strict-mock-matches.js';
+import { sealHolds, wireOf } from './provider-wire.js';
 import {
   consumeExpectation,
   edgeLabel,
@@ -122,7 +121,6 @@ export class StrictMockProvider {
   /** Host restart / new process: old provider-visible seals are not comparable. */
   clearPrefixSeals() {
     this._state.sealedBySession.clear();
-    this._state.lastModelBySession?.clear?.();
   }
   /// Read-only: which session (if any) currently owns an alias. Lets a scenario
   /// route a second session to a distinct alias instead of throwing on rebind.
@@ -247,50 +245,23 @@ export class StrictMockProvider {
       console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} chars=${JSON.stringify(parsed.messages || []).length} lastUser=${lastUser}`);
     }
 
-    // Prefix-cache invariant: for a given session, each chat request must keep
-    // the previous provider-visible tools+messages as a byte-prefix. Otherwise
-    // the production projection broke the sealed prefix (e.g. mutating B head).
-    // One allowed cold boundary: epoch freeze injects companion-b-head* at the
-    // front (SSOT epoch switch). That reseals; any other mutation is fatal.
+    // ARCH-004 / COMPANION-009: no sniffed cold-boundary exemptions.
+    //
+    // `epochCold` (tools + system unchanged) and `modelSideCold` (model id changed)
+    // used to reseal here. Both admitted a rewritten body — most of what a wrong
+    // prefix replacement looks like — so they passed exactly the mutations they
+    // existed to catch. `modelSideCold` was also obsolete: no prompt asset
+    // interpolates a model id any more (measured 0 occurrences).
+    //
+    // A legitimate cold boundary belongs in the scenario as an explicit `[[epoch]]`
+    // declaration (VERIFY-003, package K4).
     const sessionID = requestSessionOf(parsed);
     const kind = requestKindOf(parsed);
     if (sessionID && kind === 'chat') {
       const sealed = s.sealedBySession.get(sessionID);
-      if (sealed && !isProviderVisiblePrefix(sealed, parsed)) {
-        // Provider requests may strip synthetic ids. Allowed cold boundary:
-        // tools + leading system text unchanged, but body is not append-only
-        // (epoch B-head replacement). Tools/system mutation is always fatal.
-        let prev;
-        try { prev = JSON.parse(sealed); } catch { prev = null; }
-        const next = JSON.parse(sealProviderVisible(parsed));
-        const toolsSame = prev && JSON.stringify(prev.tools) === JSON.stringify(next.tools);
-        const prev0 = prev?.messages?.[0];
-        const next0 = next?.messages?.[0];
-        const systemSame = prev0 && next0
-          && prev0.role === 'system'
-          && next0.role === 'system'
-          && JSON.stringify(prev0.content) === JSON.stringify(next0.content);
-        // Epoch B-head: tools+system stable, body not append-only.
-        const epochCold = toolsSame && systemSame;
-        // Fallback A→B: host system prompt embeds model id. Allow reseal only when
-        // the provider model id actually changed vs last sealed chat for session
-        // (not for arbitrary system mutations — those stay fail-closed).
-        const prevModel = s.lastModelBySession?.get(sessionID);
-        const nextModel = parsed?.model?.modelID || parsed?.model?.id || parsed?.model || null;
-        const modelChanged = prevModel != null && nextModel != null && String(prevModel) !== String(nextModel);
-        const modelSideCold = toolsSame
-          && modelChanged
-          && prev0?.role === 'system'
-          && next0?.role === 'system'
-          && !systemSame;
-        if (epochCold || modelSideCold) {
-          const why = epochCold ? 'epoch/B-head' : 'fallback-model-side';
-          console.error(`[MOCK-PREFIX-RESEAL] session=${sessionID} tools stable; resealing after ${why} cold boundary`);
-          s.sealedBySession.set(sessionID, sealProviderVisible(parsed));
-        } else {
-          this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', []);
-          return;
-        }
+      if (!sealHolds(sealed, parsed)) {
+        this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', []);
+        return;
       }
     }
 
@@ -319,10 +290,7 @@ export class StrictMockProvider {
     s.requests.push(parsed);
     // Seal only chat turns (title/synthetic may reshuffle without product cache).
     if (sessionID && requestKindOf(parsed) === 'chat') {
-      s.sealedBySession.set(sessionID, sealProviderVisible(parsed));
-      if (!s.lastModelBySession) s.lastModelBySession = new Map();
-      const mid = parsed?.model?.modelID || parsed?.model?.id || parsed?.model || null;
-      if (mid != null) s.lastModelBySession.set(sessionID, mid);
+      s.sealedBySession.set(sessionID, wireOf(parsed));
     }
     this.onExpectationConsumed?.({
       id: exp.id,

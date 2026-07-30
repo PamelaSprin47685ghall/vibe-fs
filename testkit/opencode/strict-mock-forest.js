@@ -14,8 +14,8 @@
 import {
   matchesExpectation,
   requestRoleOf,
-  sealProviderVisible,
 } from './strict-mock-matches.js';
+import { fixtureKeyOf } from './provider-wire.js';
 
 export function edgeWaitIds(edge) {
   const ids = [edge.id];
@@ -148,10 +148,15 @@ function pathIndex(state, edge) {
 }
 
 /**
- * Select edge for body. Seal hit is pure idempotent cache.
+ * Select edge for body. Cache hit is a pure idempotent replay.
+ *
+ * VERIFY-007 assigns fixture matching to the SEMANTIC projection, and the cache key
+ * is a fixture key. The wire projection was used here, which carries tool call ids —
+ * so the same conversation replayed on a second run produced a different key and
+ * never hit the cache (measured). Wire equality belongs to the seal barrier only.
  */
 export function selectExpectation(state, body) {
-  const seal = sealProviderVisible(body);
+  const seal = fixtureKeyOf(body);
   const cached = state.sealToEdgeId?.get(seal);
   if (cached) {
     const edge = allEdges(state).find((e) => e.id === cached);

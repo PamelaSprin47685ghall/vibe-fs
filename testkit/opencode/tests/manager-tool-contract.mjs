@@ -226,7 +226,7 @@ test('manager permission denies global executor tool and executes mailbox path',
     assert.equal(config.agent['fast-orchestrator'].permission.list, 'deny');
 
     const transformed = { messages: [{ role: 'user', text: 'hello' }] };
-    hooks['chat.transform']({}, transformed);
+    hooks['experimental.chat.messages.transform']({}, transformed);
     const markerRe = /\[(CAPS|REVIEW|HINT):/;
     const allText = transformed.messages.flatMap((m) => [
       m.text ?? '',

@@ -1020,6 +1020,89 @@ K1-c  反恒真测试：两条不同 user 内容必须语义不等；两条相�
 
 K1-c 不是补充测试，是 K1 存在的理由。 没有它，K1 的「成功」与「把门禁变成恒真」在所有现有反馈下不可区分。这也修正了修订四（K11 变异自检）的排期判断：变异自检不能全部推到最后，涉及投影替换的那一类必须与替换同一步落地。
 
+##### K1 实测结果与两处连带缺陷
+
+`gate-testkit` 29 → 45 项全绿；`test:mjs` 386 → 389；三时区全绿。
+
+删除：`sealProviderVisible`、`isProviderVisiblePrefix`、`normalizeVisibleContent`（83 行），
+以及只为 `modelSideCold` 存在的 `lastModelBySession`。新增 `testkit/opencode/provider-wire.js`
+（OpenAI wire → `ProviderWireProjection` 的 adapter，全部提问 re-export 生产函数）。
+
+两个嗅探式冷边界豁免整体删除而非移植：
+
+```text
+epochCold      tools + 首条 system 未变 → 无论 body 怎么改都重新封印
+modelSideCold  tools 未变且 model id 变了 → 同上
+```
+
+`epochCold` 放行的正是它要抓的那类变异——错误的前缀替换绝大多数就长成「tools 与
+system 不变、body 被改写」。`modelSideCold` 则已过期：它存在的前提是 Host system
+prompt 内嵌 model id，而生产早已不这么做（PROMPT-006 发送时 `Model = None`，
+prompt 资产内插 model id 实测 0 处）。
+
+连带修正一处 fixture 键错误。 `selectExpectation` 用 wire 投影当缓存键，而 wire 含
+tool call id——同一段对话第二次运行 id 不同，键因此不同，缓存永不命中（实测）。
+VERIFY-007 把剧本匹配指派给语义投影，缓存键改为 `fixtureKey`。wire 相等只服务封印。
+
+###### 连带发现：三个 Host hook 在真实调用形态下抛异常
+
+修 `manager-tool-contract` 的 hook 名之后露出的。按 Host 的调用方式
+（`../opencode/packages/opencode/src/plugin/index.ts:290` 的 `fn(input, output)`）
+逐个调用五个 hook：
+
+```text
+chat.message                           ok
+chat.params                            ok
+experimental.chat.messages.transform   Cannot read properties of undefined (reading 'messages')
+experimental.session.compacting        (intermediate value)(...) is not a function
+experimental.compaction.autocontinue   Cannot set properties of undefined (setting 'enabled')
+```
+
+根因在 emit 模板与 Fable 发射元数不匹配：
+
+```fsharp
+[<Emit("(args, context) => $0(args)(context)")>]   // 假设内层是柯里链
+```
+
+Fable 对 `obj` 类型记录字段与偏应用保留柯里链，对普通双参 `let` 发射二参箭头。
+柯里模板作用于二参箭头时只传一个参数，函数体于是拿到 `output = undefined`。
+
+`prompt.ts:1255` 每个 provider step 都触发 transform，所以插件在真实 Host 上每一轮
+都抛。`dotnet build` 看不见 emit 模板内部，`domain.mjs` 又从不 import `OpenCode/*`
+——两侧都没有理由调用一个 hook。
+
+修法是两个具名 emit（`curriedHook` / `pairedHook`），调用点显式选择，不做运行时
+`fn.length` 嗅探——那种「双保险」只会把下一次不匹配藏起来而不是让它失败。
+
+新增 `tests-mjs/Plugin/host-hooks.test.mjs`（4 测试）关掉这个缺口。它的形态值得留档：
+每个 hook 一份 fixture，外加一条完整性门禁断言「注册的 hook 集合 == fixture 的键集合」。
+最初写成单一最小输入遍历所有 hook，实测两个问题——太空的输入无法触发丢参数那条路径，
+而 `chat.message` 会真的去创建子会话并把异步工作泄漏到测试结束之后。共同分母输入比
+没有测试更糟。
+
+###### `manager-tool-contract` 的定位错误（登记，不在 K1 修）
+
+清点它的依赖面：`initSpikePlugin` + `mkdtemp` + `git init`，无 `setupScenario`、
+无 HTTP、无 mock provider。`events: { listen: () => () => {} }` 是三行假端口而非
+harness。它是第 2 层资源契约测试，与 `tests-mjs/Journal/boot.test.mjs` 同类，
+在 `testkit/` 里的唯一理由是写它时 `tests-mjs` 还不存在。
+
+它当前是红的，且早于本轮：包 H（`af384b77`）把双 transform 注册收敛为单注册后，
+测试仍调 `hooks['chat.transform']`。改对 hook 名后露出下一层——184 个断言里 6 个走
+`.execute`，而工具执行需要一个已受理的 Authority Root（AGENT-007 双层 fail-closed），
+测试从未建立。其余 178 个断言（registry 形状、schema 键、config prompt、journal 落位）
+都是第 2 层，本来就该在 `tests-mjs`。
+
+处置分两步，均不在 K1：
+
+```text
+178 个第 2 层断言   迁入 tests-mjs/Plugin/，与 host-hooks.test.mjs 同目录
+6 个 .execute 断言  需要 Authority Root fixture，属第 3 层，归退火三
+package.json        test:manager-tools 随迁移删除；test/test:release 各去掉一处引用
+```
+
+`test:release` 单列 `test:manager-tools` 这一行本不该存在——它是同一段历史的残留。
+
 ##### 修订二：删除 `loadScripts` 顺带消灭三个文件，不是「合并」
 
 设计文档说 22 个文件合并后预计降至 19。实测这三个文件的存在理由只有一个——作为 `loadScripts` 的运行期换入目标：

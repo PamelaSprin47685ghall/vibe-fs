@@ -319,12 +319,26 @@ const read = (path) => {
   return sources.get(path)
 }
 
-const referencesLegacySrc = (text) =>
-  text.includes('../src') ||
-  text.includes('..\\src') ||
-  text.includes('/src/') ||
-  text.includes('\\src\\') ||
-  (text.includes('open Wanxiangshu.') && !text.includes('open Wanxiangshu.Next'))
+// The violation is a reference to THIS repo's pre-0.5.0 `src/` tree, which is gone.
+//
+// Host source paths are not that. AGENTS.md §0 and the SSOT exception protocol both
+// REQUIRE citing `../opencode/packages/**/src/**` with line numbers before claiming a
+// Host capability gap — and a bare `/src/` substring test forbids exactly that. It
+// fired on a comment citing `packages/opencode/src/plugin/index.ts:290`, i.e. on the
+// evidence the discipline demands.
+const HOST_SOURCE_PATH = /(?:\.\.\/opencode|packages)\/[\w.-]+(?:\/[\w.-]+)*\/src\//
+
+const referencesLegacySrc = (text) => {
+  if (text.includes('open Wanxiangshu.') && !text.includes('open Wanxiangshu.Next')) return true
+
+  const withoutHostCitations = text.replace(new RegExp(HOST_SOURCE_PATH.source, 'g'), '')
+  return (
+    withoutHostCitations.includes('../src') ||
+    withoutHostCitations.includes('..\\src') ||
+    withoutHostCitations.includes('/src/') ||
+    withoutHostCitations.includes('\\src\\')
+  )
+}
 
 for (const root of [PRODUCTION_ROOT, TESTS_ROOT]) {
   if (!existsSync(root)) {

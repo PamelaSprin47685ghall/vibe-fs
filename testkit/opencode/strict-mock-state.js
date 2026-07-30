@@ -23,7 +23,6 @@ export function createState() {
     fatal: null,
     sealedBySession: new Map(),
     /** @type {Map<string, string>} last provider model id per session (fallback reseal) */
-    lastModelBySession: new Map(),
     stopped: false,
   };
 }
@@ -108,5 +107,4 @@ export function resetState(state) {
   state.stopped = false;
   state.fatal = null;
   state.sealedBySession.clear();
-  state.lastModelBySession.clear();
 }

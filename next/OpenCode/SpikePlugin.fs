@@ -122,10 +122,10 @@ module SpikePlugin =
                 // directly through `build/next`.
                 let hooks =
                     createObj
-                        [ "chat.message", box (uncurriedExecute wired.ChatMessageHook)
+                        [ "chat.message", box (curriedHook wired.ChatMessageHook)
                           // Host built-in retry reuses the same user message;
                           // 0.5.0 relies on Agent bindings — chat.params is a no-op.
-                          "chat.params", box (uncurriedExecute chatParams)
+                          "chat.params", box (curriedHook chatParams)
                           // ONE transform registration.
                           //
                           // Both `chat.transform` and this key used to point at the
@@ -137,7 +137,7 @@ module SpikePlugin =
                           // registration of one hook, and every provider step ran the
                           // Companion rewrite and the REVIEW-010 seal twice over the
                           // same message array.
-                          "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
+                          "experimental.chat.messages.transform", box (pairedHook (box transform))
                           // HOST-006 prevention layer. The config hook is the only
                           // place the plugin can reach the compaction settings: the
                           // Host hands over the live instance-state object and runs
@@ -160,13 +160,13 @@ module SpikePlugin =
                           // so the absence of a veto is documented at the boundary
                           // rather than inferred from silence.
                           "experimental.session.compacting",
-                          box (uncurriedExecute (box HostCompactionGate.onSessionCompacting))
+                          box (pairedHook (box HostCompactionGate.onSessionCompacting))
                           // HOST-006: always `enabled = false`. `compaction.auto=false`
                           // already makes the replay branch unreachable, but this is the
                           // one vetoable synthetic-turn injection point, and leaving it
                           // unanswered relies on an upstream default staying harmless.
                           "experimental.compaction.autocontinue",
-                          box (uncurriedExecute (box HostCompactionGate.onCompactionAutoContinue)) ]
+                          box (pairedHook (box HostCompactionGate.onCompactionAutoContinue)) ]
 
                 hooks?event <- box wired.ObserveEvent
 
