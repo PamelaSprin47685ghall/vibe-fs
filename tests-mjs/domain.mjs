@@ -42,12 +42,13 @@ const fableLibraryDir = (() => {
 const lib = (name) => import(join(fableLibraryDir, name))
 const prod = (name) => import(join(BUILD_ROOT, `${name}.js`))
 
-const [DateOffset, FsMap, FsList, FsResult, FsSet] = await Promise.all([
+const [DateOffset, FsMap, FsList, FsResult, FsSet, AsyncBuilder] = await Promise.all([
   lib('DateOffset.js'),
   lib('Map.js'),
   lib('List.js'),
   lib('Result.js'),
   lib('Set.js'),
+  lib('AsyncBuilder.js'),
 ])
 
 const [
@@ -87,6 +88,7 @@ const [
   ProviderProj,
   DeadlineModule,
   ProcessRequest,
+  FlowModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -124,6 +126,7 @@ const [
   prod('Domain/ProviderProjection'),
   prod('Process/Deadline'),
   prod('Process/ProcessRequest'),
+  prod('Kernel/Flow'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -1881,6 +1884,27 @@ export const processEstimate = (() => {
     outputThreshold: (bytes) => m.outputThreshold(outputBytesOf('OutputBytes', [BigInt(bytes)])),
   }
 })()
+
+// ── bounded parallelism (ARCH-008, VERIFY-004) ───────────────────────────────
+
+/**
+ * `Parallel.mapBounded`, the ONE concurrency primitive production uses.
+ *
+ * `action` is passed as an UNCURRIED `(item, ct) => Promise`. Fable compiled the
+ * two-parameter F# function to a two-argument JS one, so the curried spelling
+ * `(item) => (ct) => ...` fails with `computation(...).finally is not a function`
+ * — the builder receives a function where it expects a task. That error surfaces
+ * only at await time, which is why the shape is fixed here rather than at each
+ * call site.
+ */
+export const parallel = {
+  mapBounded: async (maxConcurrency, action, items, cancellation = liveToken()) =>
+    listItems(await FlowModule.Parallel_mapBounded(maxConcurrency, cancellation, action, items)),
+}
+
+/** A `CancellationToken`. `cancelled()` is already-cancelled at construction. */
+export const liveToken = () => new AsyncBuilder.CancellationToken(false)
+export const cancelledToken = () => new AsyncBuilder.CancellationToken(true)
 
 // ── outcomes ─────────────────────────────────────────────────────────────────
 
