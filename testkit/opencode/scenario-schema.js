@@ -26,6 +26,7 @@
  */
 
 import { parse as parseToml } from 'smol-toml';
+import { retiredFieldProblems } from './legacy-fields.js';
 
 // ── the TOML root-key trap ──────────────────────────────────────────────────
 
@@ -228,6 +229,11 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     raw = parseToml(source);
   } catch (error) {
     return { ok: false, problems: [`${name}: TOML parse failed: ${error.message}`] };
+  }
+
+  const retired = retiredFieldProblems(raw);
+  if (retired.length > 0) {
+    return { ok: false, problems: retired.map((problem) => `${name}: ${problem}`) };
   }
 
   const problems = [];

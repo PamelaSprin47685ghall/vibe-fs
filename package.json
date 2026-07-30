@@ -23,7 +23,8 @@
     "gate:architecture": "node scripts/architecture-gate.mjs",
     "gate:shock": "node scripts/shock-audit.mjs",
     "gate:docs": "node scripts/strip-doc-bold.mjs",
-    "gate:static": "npm run gate:ssot && npm run gate:architecture && npm run gate:docs",
+    "gate:toml": "node scripts/toml-format.mjs",
+    "gate:static": "npm run gate:ssot && npm run gate:architecture && npm run gate:docs && npm run gate:toml",
 
     "build": "node scripts/clean-fable-output.mjs build/next && dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next",
     "postbuild": "node scripts/postbuild.mjs",
