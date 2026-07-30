@@ -324,3 +324,52 @@ test('the AgentFact union is non-empty, so case resolution is meaningful', () =>
   assert.ok(names.length > 0)
   assert.equal(new Set(names).size, names.length, 'case names must be unique')
 })
+
+// ── hazard 4: Fable escapes a reserved emitted name with `$` ─────────────────
+//
+// `ReviewChallenge.Text` emits as `Text$`, so reading `.Text` off the module gave
+// `undefined`. Nothing threw: the facade exported `reviewChallenge.text ===
+// undefined`, and a test asserting the challenge sentence would have compared
+// undefined to undefined and passed.
+//
+// `member()` now tries the `$` spelling too. This sweep is what found it and is
+// what keeps the next one from shipping — it needs no knowledge of which members
+// exist, so a newly bound member is covered the moment it is added.
+
+test('no facade member is undefined', () => {
+  const undefinedMembers = []
+
+  for (const [name, value] of Object.entries(domain)) {
+    if (value === undefined) {
+      undefinedMembers.push(name)
+      continue
+    }
+
+    // Namespace objects only. A function's own properties are not contract
+    // surface, and `introspect` is the facade describing itself.
+    const isNamespace = value !== null && typeof value === 'object' && !Array.isArray(value)
+    if (!isNamespace) continue
+
+    for (const [key, member] of Object.entries(value)) {
+      if (member === undefined) undefinedMembers.push(`${name}.${key}`)
+    }
+  }
+
+  assert.deepEqual(
+    undefinedMembers,
+    [],
+    'an undefined facade member reads as undefined in every test that uses it, and comparing undefined to undefined passes',
+  )
+})
+
+test('member resolution prefers a real export over the escaped spelling', () => {
+  // The `$` spellings are tried LAST. If they were tried first, a module
+  // exporting both `foo` and `foo$` — Fable does this when a value and a type
+  // share a name — would bind the wrong one.
+  assert.equal(domain.reviewChallenge.textVersion, 1)
+  assert.match(domain.reviewChallenge.text, /^Nope, let's re-evaluate: /)
+
+  // And the digest is derived from that same text, not spelled separately.
+  const digest = idValue.sealDigest(domain.reviewChallenge.contentDigest((input) => `H(${input})`))
+  assert.equal(digest, `H(${domain.reviewChallenge.text})`)
+})

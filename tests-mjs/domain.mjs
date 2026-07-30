@@ -42,11 +42,12 @@ const fableLibraryDir = (() => {
 const lib = (name) => import(join(fableLibraryDir, name))
 const prod = (name) => import(join(BUILD_ROOT, `${name}.js`))
 
-const [DateOffset, FsMap, FsList, FsResult] = await Promise.all([
+const [DateOffset, FsMap, FsList, FsResult, FsSet] = await Promise.all([
   lib('DateOffset.js'),
   lib('Map.js'),
   lib('List.js'),
   lib('Result.js'),
+  lib('Set.js'),
 ])
 
 const [
@@ -145,9 +146,24 @@ const [
 // deliberately not a `A ?? B` fallback at each call site: a silent alternative
 // would let a renamed or deleted production function read as `undefined` and take
 // the other branch, which is the class of failure this facade exists to prevent.
+//
+// A third rule, discovered by `domain.meta.test.mjs` sweeping the facade for
+// undefined members: Fable appends `$` to an emitted name that would collide with
+// a JS built-in or reserved word. `ReviewChallenge.Text` emits as `Text$`, and
+// reading `.Text` off the module gave `undefined` — a bound clause constant that
+// silently became nothing. Trying the `$` spelling here is what makes that a
+// resolution rule instead of a per-call-site accident.
 
 const member = (mod, moduleName, name) => {
-  const spellings = [`${moduleName}Module_${name}`, `${moduleName}_${name}`, name]
+  const spellings = [
+    `${moduleName}Module_${name}`,
+    `${moduleName}_${name}`,
+    name,
+    // Fable's reserved-name escape. Last, so a real member always wins.
+    `${moduleName}Module_${name}$`,
+    `${moduleName}_${name}$`,
+    `${name}$`,
+  ]
   const found = spellings.find((spelling) => mod[spelling] !== undefined)
   if (found === undefined) {
     const available = Object.keys(mod)
@@ -218,6 +234,26 @@ export const mapTryFind = (key, map) => unwrapOption(FsMap.tryFind(key, map))
 
 /** FSharpList → array. */
 export const listItems = (list) => FsList.toArray(list)
+
+// F# `Set<string>` needs a comparer object; Fable does not infer one from the
+// element type. `REVIEW-010`'s `IncludedToolResultDigests` is such a set, and it
+// is the causal evidence a confirmation rests on — so a test that built it wrong
+// would be proving the wrong thing about the most load-bearing check in SSOT/05.
+const ordinalComparer = { Compare: (left, right) => (left < right ? -1 : left > right ? 1 : 0) }
+
+/**
+ * array → `FSharpSet<string>`.
+ *
+ * Passing a JS array where F# expects a Set does not throw: `Set.contains` walks
+ * a tree structure the array does not have and answers `false` for everything. A
+ * seal built that way would refuse every confirmation while looking exactly like
+ * correct fail-closed behaviour.
+ */
+export const stringSet = (items) => FsSet.ofArray(items, ordinalComparer)
+
+export const setItems = (value) => Array.from(value)
+export const setCount = (value) => FsSet.count(value)
+export const setContains = (item, value) => FsSet.contains(item, value)
 
 /**
  * array → FSharpList.
@@ -1476,6 +1512,21 @@ export const prefixEpochProjection = (() => {
 
 // ── review (SSOT/05) ─────────────────────────────────────────────────────────
 
+/**
+ * REVIEW-006: one witnessed PERFECT verdict.
+ *
+ * Deliberately no `authorityRoot` parameter. REVIEW-003 forbids confirming on a
+ * shared authority root and REVIEW-006's field list has no such field, so the
+ * facade cannot offer one either — once a test can set it, comparing it is one
+ * line away.
+ */
+export const verdictWitness = ({ run, call, tree, reviewer }) => ({
+  ProviderRun: providerRun(run),
+  ToolCallId: toolCallId(call),
+  GitTreeHash: gitTreeHash(tree),
+  ReviewerSessionId: sessionId(reviewer),
+})
+
 export const reviewWitness = {
   isConfirmed: (value) => Witness.ReviewWitnessModule_isConfirmed(value),
   isPerfectPending: (value) => Witness.ReviewWitnessModule_isPerfectPending(value),
@@ -1488,14 +1539,80 @@ export const reviewWitness = {
   confirm: (barrier, challengeDigest, secondInputDigest, first, second) =>
     unwrapOption(Witness.ReviewWitnessModule_confirm(barrier, challengeDigest, secondInputDigest, first, second)),
   noReview: Witness.ReviewWitness.NoReview,
+
+  /** The whole witness as comparable text, so a renamed field cannot read `undefined`. */
+  read: (value) => {
+    const readOne = (one) => ({
+      run: idValue.providerRun(one.ProviderRun),
+      call: idValue.toolCall(one.ToolCallId),
+      tree: idValue.gitTree(one.GitTreeHash),
+      reviewer: idValue.session(one.ReviewerSessionId),
+    })
+    const payload = payloadOf(value)
+
+    switch (caseOf(value)) {
+      case 'NoReview':
+        return { state: 'NoReview' }
+      case 'RevisionWitness':
+        return { state: 'RevisionWitness', tree: idValue.gitTree(payload.GitTreeHash) }
+      case 'PerfectPending':
+        return { state: 'PerfectPending', first: readOne(payload) }
+      case 'Confirmed':
+        return {
+          state: 'Confirmed',
+          barrier: idValue.reviewBarrier(payload.BarrierId),
+          tree: idValue.gitTree(payload.GitTreeHash),
+          first: readOne(payload.First),
+          second: readOne(payload.Second),
+          challengeResultDigest: idValue.sealDigest(payload.ChallengeResultDigest),
+          secondProviderInputDigest: idValue.sealDigest(payload.SecondProviderInputDigest),
+        }
+      default:
+        throw new Error(`unknown ReviewWitness case '${caseOf(value)}'`)
+    }
+  },
 }
 
 /** REVIEW-003: the fixed challenge, its version, and its digest. */
-export const reviewChallenge = {
-  text: Challenge.Text,
-  textVersion: Challenge.TextVersion,
-  contentDigest: (sha256) => Challenge.contentDigest(sha256),
-}
+export const reviewChallenge = (() => {
+  // Resolved through `bind` rather than read off the module directly. `Text`
+  // emits as `Text$` (Fable escapes a reserved name), so `Challenge.Text` was
+  // `undefined` — a clause constant that silently became nothing.
+  const m = bind(Challenge, 'ReviewChallenge', ['Text', 'TextVersion', 'contentDigest'])
+
+  return {
+    text: m.Text,
+    textVersion: m.TextVersion,
+    contentDigest: (sha256) => m.contentDigest(sha256),
+
+    /** The `PerfectChallengeIssued` payload a first PERFECT journals. */
+    issued: ({ barrier, tree, reviewer, run, call, digest, version = m.TextVersion }) => ({
+      BarrierId: reviewBarrierId(barrier),
+      GitTreeHash: gitTreeHash(tree),
+      ReviewerSessionId: sessionId(reviewer),
+      FirstProviderRun: providerRun(run),
+      FirstToolCallId: toolCallId(call),
+      ChallengeTextVersion: version,
+      ChallengeContentDigest: digest,
+    }),
+  }
+})()
+
+/**
+ * REVIEW-010: the canonical provider input for one run.
+ *
+ * `included` is an array of digest STRINGS and is converted to an `FSharpSet`
+ * here. A JS array would make `Set.contains` answer `false` for everything, so
+ * every confirmation would be refused while looking like fail-closed behaviour.
+ */
+export const providerInputSeal = ({ session, run, physical = 'msg_u1', digest, included = [], version = 1 }) => ({
+  SessionId: sessionId(session),
+  ProviderRun: providerRun(run),
+  PhysicalUserMessageId: physicalUser(physical),
+  SealDigest: sealDigest(digest),
+  CanonicalVersion: version,
+  IncludedToolResultDigests: stringSet(included),
+})
 
 export const reviewProjection = (() => {
   const m = bind(ReviewProj, 'ReviewProjection', [
@@ -1509,16 +1626,32 @@ export const reviewProjection = (() => {
     'satisfiesGuard',
   ])
 
+  /** Rejections carry no payload, so the case name is the whole answer. */
+  const decided = (result) => {
+    const value = resultOf(result)
+    return value.ok ? value : { ok: false, error: caseOf(value.error) }
+  }
+
   return {
     empty: m.empty,
     startBarrier: (barrier, tree, current) => m.startBarrier(barrier, tree, current),
     applySeal: (seal, current) => m.applySeal(seal, current),
     applyChallengeIssued: (challenge, current) => m.applyChallengeIssued(challenge, current),
-    applyVerdict: (attempt, value, current) => resultOf(m.applyVerdict(attempt, value, current)),
+    applyVerdict: (attempt, value, current) => decided(m.applyVerdict(attempt, value, current)),
     applyConfirmedWitness: (barrier, challengeDigest, secondInputDigest, first, second, current) =>
-      resultOf(m.applyConfirmedWitness(barrier, challengeDigest, secondInputDigest, first, second, current)),
+      decided(m.applyConfirmedWitness(barrier, challengeDigest, secondInputDigest, first, second, current)),
     hasObservedAttempt: (attempt, current) => m.hasObservedAttempt(attempt, current),
     satisfiesGuard: (tree, current) => m.satisfiesGuard(tree, current),
+
+    /** The guard state as plain JS. */
+    read: (current) => ({
+      barrier: isSome(current.CurrentBarrierId) ? idValue.reviewBarrier(current.CurrentBarrierId) : undefined,
+      tree: isSome(current.LastGitTreeHash) ? idValue.gitTree(current.LastGitTreeHash) : undefined,
+      witness: caseOf(current.Witness),
+      hasPendingChallenge: isSome(current.PendingChallenge),
+      seals: mapCount(current.Seals),
+      observedAttempts: listItems(current.ObservedAttemptKeys).length,
+    }),
   }
 })()
 

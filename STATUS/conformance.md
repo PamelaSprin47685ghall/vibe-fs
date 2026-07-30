@@ -76,12 +76,33 @@ FALLBACK-010 「当前无 count 概念，故无从混淆」                 → 
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| REVIEW-003: 因果证明 | PARTIAL | `Domain/ReviewWitness.fs` | 包 0c/A：四种弱代理已清除（`AcceptedContinuationRoots`、`samePhysicalRootReevaluation`、`GuardPromptAccepted`、`Review/Guard.fs`）。seal 因果判定本体属包 D |
-| REVIEW-004: ReviewAttemptIdentity | NOT_IMPLEMENTED | `ReviewProjection.fs` | 类型不存在；去重只靠 `RecentProviderRunIds` 列表 |
-| REVIEW-005: 因果单调状态 | PARTIAL | `ReviewProjection.fs` | 无链 A / 链 B 分离；admission ID 仍可参与确认 |
-| REVIEW-006: 自包含 Witness | PARTIAL | `ReviewWitness.fs` | Witness 依赖外围 Map 补齐身份 |
-| REVIEW-007: Manager Guard | UNVERIFIED | `HostReviewGuard.fs` | 包 A：nudge 去重改读 PROMPT-005 `PendingClaims`；`AcceptedGuardKey` 与 `GuardPromptAccepted` 已删 |
-| REVIEW-010: ProviderInputSeal | PARTIAL | `Journal/ReviewProjection.ProviderInputSeal` | 包 0b/0c：事实与投影类型已存在。`messages.transform` 侧封装与因果校验属包 D。可实现性见 `evidence/host-transform-run-binding.md` |
+| REVIEW-002: REVISE | CONFORMANT | `ReviewProjection.applyVerdict` | 任何 REVISE 清除未完成的 PERFECT（`PendingChallenge` 置空、witness 转 `RevisionWitness`）。第 1 层测试 |
+| REVIEW-003: 因果证明 | CONFORMANT | `ReviewController.provenSeal` `ReviewWitness.isDistinctAttempt` | 条件 1–5 为两个 witness 的纯比较；条件 6 由 seal 判定——`Set.contains ChallengeContentDigest seal.IncludedToolResultDigests`，无 seal 即 fail closed。四种弱代理在 `next/` 全为 0（`AcceptedContinuationRoots`、`samePhysicalRootReevaluation`、`GuardPromptAccepted`、`RecentProviderRunIds`）。第 1 层测试逐条移除证据成分并断言确认消失 |
+| REVIEW-004: ReviewAttemptIdentity | CONFORMANT | `Kernel/Identity.fs:348` | 五元组类型存在，`dedupeKey` 以 `\u001f` 连接；同一 provider run 内的额外 PERFECT 由 `PendingChallenge.FirstProviderRun` 比对拦下，不计数不写 journal；窗口上限 8（PERSIST-008） |
+| REVIEW-005: 因果单调状态 | CONFORMANT | `VerdictDecision` `PromptClaim` `ProviderInputSeal` | 第二次 PERFECT 只有三种答案（`Confirmed` / `ChallengeUnproven` / `AlreadyCounted`），无 `Confirmed of bool` 形态。两条链各归其主：链 A 在 `PromptClaim`（`Receipt` = Submitted，`acceptClaim` = PhysicalAccepted），链 B 在 seal。确认只读链 B——`provenSeal` 是唯一路径，admission ID 无从参与 |
+| REVIEW-006: 自包含 Witness | CONFORMANT | `Domain/ReviewWitness.fs` | `confirm` 接收两个摘要而非 bool，故 witness 自带证据；不依赖外围 Map。第 1 层测试直接断言生产 record 的键集合（而非 facade 投影），确保无 authority root / physical message 字段 |
+| REVIEW-007: Manager Guard | PARTIAL | `HostReviewGuard.fs` `TerminalPolicy.isTopLevelManager` | 纯侧已有判据：requirement 按 Authority Root 键入并去重、确认后清除且对同一 run 幂等（第 1 层测试）。Host 侧 terminal 钩子接线属第 3 层，退火三补 |
+| REVIEW-008: Git tree 变化使 witness 无效 | CONFORMANT | `ReviewWitness.isValidForTree` | 有效性是对当前 tree 的派生问题而非 mutation：witness 历史保留且仍报 `Confirmed`，但 `satisfiesGuard` 对新 tree 为 false。新 barrier 清 pending 而保留 witness；同 barrier 重入幂等。第 1 层测试 |
+| REVIEW-010: ProviderInputSeal | CONFORMANT | `OpenCode/ReviewSeal.fs` `Journal/ReviewProjection.fs` | `shock-audit` 实测单一写入口 ok (1)。seal 记录 `IncludedToolResultDigests`，Fold 由 list 转 `Set<string>`；窗口上限 8。可实现性见 `evidence/host-transform-run-binding.md` |
+
+### Review 段此前的记录同样失效（包 T-3 更正）
+
+与 Fallback 段同一成因，六行里五行描述迁移前状态：
+
+```text
+REVIEW-004 「类型不存在；去重只靠 RecentProviderRunIds 列表」
+           → 类型在 Kernel/Identity.fs:348，RecentProviderRunIds 在 next/ 为 0
+REVIEW-005 「无链 A / 链 B 分离；admission ID 仍可参与确认」
+           → VerdictDecision 三答案已就位；provenSeal 是确认的唯一路径
+REVIEW-006 「Witness 依赖外围 Map 补齐身份」→ confirm 接收摘要，witness 自带证据
+REVIEW-003 「seal 因果判定本体属包 D」    → 包 D 已完成，判定在 provenSeal
+REVIEW-010 「transform 侧封装与因果校验属包 D」→ 同上
+```
+
+`GuardPromptAccepted` 在 `next/` 仍有 1 处，但那是 `FactCodec` 的 pre-0.5.0 标记名单——
+它必须留着，否则旧 journal 会以晦涩的 union 错误失败而不是给出迁移提示。这类「旧符号
+作为拒绝清单条目」的残留与真正的旧调用点不同，`shock-audit` 的计数看不出区别，故在此
+记名。
 
 ## Orchestrator
 
