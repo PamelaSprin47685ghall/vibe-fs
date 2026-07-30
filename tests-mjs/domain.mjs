@@ -67,6 +67,7 @@ const [
   CompanionPromptModule,
   CompanionIdentityModule,
   CompanionBuilderModule,
+  ProbeSelectionModule,
   Authority,
   AuthorityRun,
   Witness,
@@ -98,6 +99,7 @@ const [
   prod('Domain/CompanionPrompt'),
   prod('Domain/CompanionIdentity'),
   prod('Domain/CompanionProjectionBuilder'),
+  prod('Domain/PrefixProbeSelection'),
   prod('Domain/PromptAuthority'),
   prod('Domain/PromptAuthorityRun'),
   prod('Domain/ReviewWitness'),
@@ -921,6 +923,71 @@ export const hostCompaction = (() => {
   }
 })()
 
+/**
+ * CTX-011: candidate selection for one recovery slot.
+ *
+ * `recomputeDigest` is supplied by the test as a plain function, which is the point of
+ * the signature: the cutoff proof compares the Companion's recorded digest against a
+ * fresh hash of X's CURRENT prefix, so a test can make them agree or disagree without
+ * building a transcript.
+ */
+export const probeSelection = (() => {
+  const m = bind(ProbeSelectionModule, 'PrefixProbeSelection', ['select', 'describeNoCandidate'])
+
+  return {
+    /**
+     * `{ ok: true, probe }` or `{ ok: false, error, message }`.
+     *
+     * The reason NAME is what a test asserts; `message` is carried so a diagnostic
+     * regression is visible too — a refusal whose text says nothing useful is a
+     * refusal an operator cannot act on.
+     */
+    select: ({
+      session = 'ses_x',
+      committedEpoch,
+      committedSnapshot,
+      coverableCutoff,
+      coveredDigest,
+      requestStartCutoff,
+      frozenRef = 'blob-frozen',
+      frozenDigest = 'frozen-digest',
+      recomputeDigest,
+      sha256 = (input) => `«${input}»`,
+    }) => {
+      const result = resultOf(
+        m.select(
+          sha256,
+          sessionId(session),
+          prefixEpochId(committedEpoch),
+          committedSnapshot,
+          coverableCutoff,
+          coveredDigest,
+          requestStartCutoff,
+          blobRef(frozenRef),
+          blobDigest(frozenDigest),
+          recomputeDigest,
+        ),
+      )
+
+      if (!result.ok) {
+        return { ok: false, error: caseOf(result.error), message: m.describeNoCandidate(result.error) }
+      }
+
+      const probe = result.value
+
+      return {
+        ok: true,
+        probeId: probe.ProbeId,
+        basedOnEpoch: idValue.prefixEpoch(probe.BasedOnEpochId),
+        candidate: probe.Candidate,
+        cutoff: probe.Candidate.CutoffExclusive,
+        sealRoot: probe.Candidate.SealRoot,
+        syntheticId: probe.Candidate.SyntheticMessageId,
+      }
+    },
+  }
+})()
+
 /** CTX-004: the one content-level validity check. */
 export const terminalValidity = {
   isValid: (text) => TerminalValidity.isValid(text),
@@ -952,6 +1019,7 @@ export const blogProjection = (() => {
     'empty',
     'withSeed',
     'frameCount',
+    'coverableFrames',
     'squashWidth',
     'applyEntry',
     'applySquash',
@@ -983,7 +1051,11 @@ export const blogProjection = (() => {
       ingestPart: state.Coverage.IngestCursor.PartIndex,
       cutoff: state.Coverage.CoverableTurnCutoffExclusive,
       digest: state.Coverage.CoveredPrefixDigest,
+      coverableFrames: state.Coverage.CoverableFrameCount,
     }),
+
+    /** CTX-011: the frames a probe may build FrozenB from, by kind. */
+    coverableFrameKinds: (state) => listItems(m.coverableFrames(state)).map((f) => caseOf(f.Kind)),
 
     /** Rejections carry payloads; the name alone is what a test asserts on. */
     applyEntry: ({ epoch, previous, next, previousCutoff, nextCutoff, digest, frame }, state) => {

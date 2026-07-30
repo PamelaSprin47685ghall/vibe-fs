@@ -32,6 +32,7 @@
     <Compile Include="Domain/CompanionPrompt.fs"/>
     <Compile Include="Domain/CompanionIdentity.fs"/>
     <Compile Include="Domain/CompanionProjectionBuilder.fs"/>
+    <Compile Include="Domain/PrefixProbeSelection.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>

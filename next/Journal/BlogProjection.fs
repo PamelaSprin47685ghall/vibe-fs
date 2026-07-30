@@ -31,9 +31,24 @@ type BlogFrame =
 /// value this projection folds, and one type keeps the producer and the validator
 /// talking about the same position.
 type BlogCoverage =
-    { IngestCursor: SemanticCursor
-      CoverableTurnCutoffExclusive: int
-      CoveredPrefixDigest: string }
+    {
+        IngestCursor: SemanticCursor
+        CoverableTurnCutoffExclusive: int
+        CoveredPrefixDigest: string
+        /// CTX-011: how many frames existed when the cutoff last advanced.
+        ///
+        /// Frames and the cutoff do not move together. A chunk that stops mid-turn
+        /// appends a frame and leaves the cutoff alone (CTX-013 level two), so the frame
+        /// list runs ahead of what the cutoff claims.
+        ///
+        /// A probe must use only these frames. Using all of them would build a FrozenB
+        /// describing turns at or beyond the cutoff — which are still present as raw
+        /// messages after it — so the model would see the same turn twice, once
+        /// summarised and once verbatim. Not a correctness loss, but the design says
+        /// "probe uses CoverableB, not the possibly-ahead LatestB", and this count is
+        /// what makes CoverableB derivable rather than a second stored copy.
+        CoverableFrameCount: int
+    }
 
 /// The Companion's durable state: the frame sequence and what it covers.
 ///
@@ -80,9 +95,19 @@ module BlogProjection =
           Coverage =
             { IngestCursor = originCursor
               CoverableTurnCutoffExclusive = 0
-              CoveredPrefixDigest = "" } }
+              CoveredPrefixDigest = ""
+              CoverableFrameCount = 0 } }
 
     let frameCount (state: BlogProjectionState) = List.length state.Frames
+
+    /// CTX-011: the frames a probe may build FrozenB from.
+    ///
+    /// Derived from `CoverableFrameCount` rather than stored as a second blob. The
+    /// design draft carried a `CoverableBRef`/`CoverableBDigest` pair; a count is
+    /// equivalent because the frame list is append-only within an epoch, and it cannot
+    /// drift from the frames the way a separate materialised copy can.
+    let coverableFrames (state: BlogProjectionState) =
+        state.Frames |> List.truncate state.Coverage.CoverableFrameCount
 
     /// COMPANION-004: a new Y inherits the parent's work record as a `Seed` frame.
     ///
@@ -138,13 +163,24 @@ module BlogProjection =
         elif nextCutoff < previousCutoff then
             Error BlogFoldRejection.CoverageRetreated
         else
+            let frames = state.Frames @ [ frame ]
+
             Ok
                 { state with
-                    Frames = state.Frames @ [ frame ]
+                    Frames = frames
                     Coverage =
                         { IngestCursor = nextIngest
                           CoverableTurnCutoffExclusive = nextCutoff
-                          CoveredPrefixDigest = nextDigest } }
+                          CoveredPrefixDigest = nextDigest
+                          // The coverable boundary moves only when the cutoff does. A
+                          // chunk that stopped mid-turn appended a frame describing
+                          // material the cutoff does not yet claim, so counting it would
+                          // let a probe summarise a turn that is also still raw.
+                          CoverableFrameCount =
+                            if nextCutoff > previousCutoff then
+                                List.length frames
+                            else
+                                state.Coverage.CoverableFrameCount } }
 
     /// PERSIST-010 `BlogSquashCommitted`. Replaces the oldest `count` frames with
     /// one, advances the frame epoch, and leaves coverage untouched.
@@ -168,10 +204,32 @@ module BlogProjection =
         elif count < 1 || count > available then
             Error(BlogFoldRejection.CoveredFrameCountOutOfRange(count, available))
         else
+            // The coverable boundary is a frame INDEX, so collapsing frames below it
+            // moves it. The cutoff and the digest do not change — a squash rewrites how
+            // B is represented, not which X turns it covers (CTX-012).
+            //
+            // Three cases, and the middle one is why this is not just a subtraction:
+            //
+            //   count < coverable   the boundary shrinks by `count - 1`
+            //   count >= coverable  the whole covered region became one frame, so the
+            //                       boundary is that frame alone. The frame may also
+            //                       carry material past the cutoff; that is redundancy
+            //                       (those turns are still raw after it), not a false
+            //                       claim, because the cutoff and its digest are
+            //                       statements about X's prefix, not about B's contents.
+            //   coverable = 0       nothing was coverable, and a squash cannot create
+            //                       coverage out of frames the cutoff never claimed.
+            let coverable = state.Coverage.CoverableFrameCount
+
+            let nextCoverable = if coverable = 0 then 0 else max 1 (coverable - count + 1)
+
             Ok
                 { state with
                     FrameEpochId = nextEpoch
-                    Frames = frame :: List.skip count state.Frames }
+                    Frames = frame :: List.skip count state.Frames
+                    Coverage =
+                        { state.Coverage with
+                            CoverableFrameCount = nextCoverable } }
 
     /// HOST-006 containment: the numbering these positions refer to was voided by a
     /// Host compaction, so coverage returns to the origin.
@@ -186,7 +244,11 @@ module BlogProjection =
             Coverage =
                 { IngestCursor = originCursor
                   CoverableTurnCutoffExclusive = 0
-                  CoveredPrefixDigest = "" } }
+                  CoveredPrefixDigest = ""
+                  // Zero, not "all frames": the frames survive, but none of them is
+                  // coverable any more. A frame is coverable because the cutoff claims
+                  // the X turns it describes, and compaction voided every such claim.
+                  CoverableFrameCount = 0 } }
 
     /// CTX-011: is there a covered prefix a probe could be built from at all.
     ///

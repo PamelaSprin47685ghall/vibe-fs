@@ -38,7 +38,13 @@ const commitEntry = (state, { epoch = 0, from, to, cutoffFrom, cutoffTo, digest 
 test('PERSIST_010_empty_projection_covers_nothing', () => {
   assert.equal(blog.frameCount(blog.empty), 0)
   assert.equal(blog.hasCoverage(blog.empty), false)
-  assert.deepEqual(blog.coverage(blog.empty), { ingestTurn: 0, ingestPart: 0, cutoff: 0, digest: '' })
+  assert.deepEqual(blog.coverage(blog.empty), {
+    ingestTurn: 0,
+    ingestPart: 0,
+    cutoff: 0,
+    digest: '',
+    coverableFrames: 0,
+  })
 })
 
 // ── entry: append and coverage are one commit ───────────────────────────────
@@ -49,7 +55,17 @@ test('COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   assert.equal(blog.frameCount(result.value), 1)
   assert.deepEqual(blog.frameKinds(result.value), ['Entry'])
-  assert.deepEqual(blog.coverage(result.value), { ingestTurn: 1, ingestPart: 0, cutoff: 1, digest: 'd1' })
+  assert.deepEqual(blog.coverage(result.value), {
+    ingestTurn: 1,
+    ingestPart: 0,
+    cutoff: 1,
+    digest: 'd1',
+    coverableFrames: 1,
+  })
+
+  // The cutoff advanced, so the frame it produced is coverable: a probe may build
+  // FrozenB from it.
+  assert.deepEqual(blog.coverableFrameKinds(result.value), ['Entry'])
 })
 
 test('CTX_011_entry_that_consumed_nothing_is_refused', () => {
@@ -70,17 +86,39 @@ test('CTX_011_part_index_advances_within_one_turn', () => {
   // while the turn cutoff stays put.
   const chunk1 = commitEntry(blog.empty, { from: [0, 0], to: [0, 1], cutoffFrom: 0, cutoffTo: 0, digest: '' })
   assert.equal(chunk1.ok, true, chunk1.ok ? '' : chunk1.error)
-  assert.deepEqual(blog.coverage(chunk1.value), { ingestTurn: 0, ingestPart: 1, cutoff: 0, digest: '' })
+  assert.deepEqual(blog.coverage(chunk1.value), {
+    ingestTurn: 0,
+    ingestPart: 1,
+    cutoff: 0,
+    digest: '',
+    coverableFrames: 0,
+  })
   assert.equal(blog.hasCoverage(chunk1.value), false, 'a half-consumed turn is not coverage a probe may use')
+
+  // The frame exists but is NOT coverable. This is the gap the count closes: the
+  // frame describes material the cutoff does not yet claim, so a probe building
+  // FrozenB from it would summarise a turn that is also still present raw.
+  assert.equal(blog.frameCount(chunk1.value), 1)
+  assert.deepEqual(blog.coverableFrameKinds(chunk1.value), [])
 
   const chunk2 = commitEntry(chunk1.value, { from: [0, 1], to: [0, 2], cutoffFrom: 0, cutoffTo: 0, digest: '', n: 2 })
   assert.equal(chunk2.ok, true, chunk2.ok ? '' : chunk2.error)
+  assert.equal(blog.frameCount(chunk2.value), 2)
+  assert.deepEqual(blog.coverableFrameKinds(chunk2.value), [], 'still nothing coverable mid-turn')
 
-  // Only the chunk that crosses the turn end advances the cutoff.
+  // Only the chunk that crosses the turn end advances the cutoff — and it makes
+  // every frame so far coverable at once.
   const final = commitEntry(chunk2.value, { from: [0, 2], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, digest: 'd1', n: 3 })
   assert.equal(final.ok, true, final.ok ? '' : final.error)
-  assert.deepEqual(blog.coverage(final.value), { ingestTurn: 1, ingestPart: 0, cutoff: 1, digest: 'd1' })
+  assert.deepEqual(blog.coverage(final.value), {
+    ingestTurn: 1,
+    ingestPart: 0,
+    cutoff: 1,
+    digest: 'd1',
+    coverableFrames: 3,
+  })
   assert.equal(blog.hasCoverage(final.value), true)
+  assert.deepEqual(blog.coverableFrameKinds(final.value), ['Entry', 'Entry', 'Entry'])
 })
 
 test('PERSIST_010_entry_whose_previous_cursor_disagrees_is_refused', () => {
@@ -119,7 +157,7 @@ test('PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () =
 
 // ── squash: changes representation, never coverage ──────────────────────────
 
-test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_coverage_alone', () => {
+test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone', () => {
   let state = blog.empty
   for (let i = 1; i <= 4; i += 1) {
     state = commitEntry(state, { from: [i - 1, 0], to: [i, 0], cutoffFrom: i - 1, cutoffTo: i, n: i }).value
@@ -127,6 +165,7 @@ test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_coverage_alone', () =
 
   const before = blog.coverage(state)
   assert.equal(blog.frameCount(state), 4)
+  assert.equal(before.coverableFrames, 4)
 
   const result = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: squashFrame(1) }, state)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -135,8 +174,54 @@ test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_coverage_alone', () =
   assert.deepEqual(blog.frameKinds(result.value), ['Squash', 'Entry', 'Entry'])
   assert.equal(blog.frameCount(result.value), 3)
 
-  // A squash changes how B is REPRESENTED, not which X turns it covers.
-  assert.deepEqual(blog.coverage(result.value), before)
+  const after = blog.coverage(result.value)
+
+  // A squash changes how B is REPRESENTED, not which X turns it covers. So the
+  // cutoff, its digest and the ingest cursor are all untouched.
+  assert.deepEqual(
+    { ingestTurn: after.ingestTurn, ingestPart: after.ingestPart, cutoff: after.cutoff, digest: after.digest },
+    { ingestTurn: before.ingestTurn, ingestPart: before.ingestPart, cutoff: before.cutoff, digest: before.digest },
+  )
+
+  // `coverableFrames` DOES move, and must: it is a frame index, and two frames below
+  // it became one. Leaving it at 4 would point past the end of a 3-frame list;
+  // subtracting 2 would drop the newest covered frame out of the probe's reach.
+  assert.equal(after.coverableFrames, 3)
+  assert.deepEqual(blog.coverableFrameKinds(result.value), ['Squash', 'Entry', 'Entry'])
+})
+
+test('CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {
+  // The boundary case the arithmetic has to get right. Squashing every covered frame
+  // into one means the covered range is now that single frame — not zero, which would
+  // silently disable probes, and not the old count, which would overrun the list.
+  let state = blog.empty
+  for (let i = 1; i <= 3; i += 1) {
+    state = commitEntry(state, { from: [i - 1, 0], to: [i, 0], cutoffFrom: i - 1, cutoffTo: i, n: i }).value
+  }
+
+  const collapsed = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 3, frame: squashFrame(1) }, state)
+  assert.equal(collapsed.ok, true, collapsed.ok ? '' : collapsed.error)
+
+  assert.deepEqual(blog.frameKinds(collapsed.value), ['Squash'])
+  assert.equal(blog.coverage(collapsed.value).coverableFrames, 1)
+  assert.equal(blog.coverage(collapsed.value).cutoff, 3, 'the covered X range is unchanged')
+  assert.deepEqual(blog.coverableFrameKinds(collapsed.value), ['Squash'])
+})
+
+test('CTX_011_a_squash_cannot_make_an_uncovered_frame_coverable', () => {
+  // Mid-turn chunks only: nothing is coverable. A squash rewrites those frames but
+  // cannot create coverage the cutoff never claimed.
+  const chunk1 = commitEntry(blog.empty, { from: [0, 0], to: [0, 1], cutoffFrom: 0, cutoffTo: 0, digest: '' }).value
+  const chunk2 = commitEntry(chunk1, { from: [0, 1], to: [0, 2], cutoffFrom: 0, cutoffTo: 0, digest: '', n: 2 }).value
+
+  assert.equal(blog.coverage(chunk2).coverableFrames, 0)
+
+  const squashed = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: squashFrame(1) }, chunk2)
+  assert.equal(squashed.ok, true, squashed.ok ? '' : squashed.error)
+
+  assert.equal(blog.coverage(squashed.value).coverableFrames, 0)
+  assert.deepEqual(blog.coverableFrameKinds(squashed.value), [])
+  assert.equal(blog.hasCoverage(squashed.value), false)
 })
 
 test('CTX_012_squash_width_is_ceil_half_and_does_not_skip_a_single_frame', () => {
@@ -223,9 +308,18 @@ test('HOST_006_reanchor_zeroes_coverage_and_keeps_every_frame', () => {
   assert.equal(blog.frameCount(reanchored), blog.frameCount(state))
 
   // Coverage returns to the origin: the numbering those positions referred to no
-  // longer exists.
-  assert.deepEqual(blog.coverage(reanchored), { ingestTurn: 0, ingestPart: 0, cutoff: 0, digest: '' })
+  // longer exists. `coverableFrames` goes to 0 with it — the frames are still there,
+  // but none of them is coverable, because a frame is coverable only while the cutoff
+  // claims the X turns it describes.
+  assert.deepEqual(blog.coverage(reanchored), {
+    ingestTurn: 0,
+    ingestPart: 0,
+    cutoff: 0,
+    digest: '',
+    coverableFrames: 0,
+  })
   assert.equal(blog.hasCoverage(reanchored), false)
+  assert.deepEqual(blog.coverableFrameKinds(reanchored), [], 'no probe may be built until coverage rebuilds')
 })
 
 test('HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
@@ -249,10 +343,22 @@ test('HOST_006_coverage_rebuilds_from_the_origin_after_a_reanchor', () => {
   const rebuilt = commitEntry(reanchored, { from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, digest: 'new-d1' })
   assert.equal(rebuilt.ok, true, rebuilt.ok ? '' : rebuilt.error)
   assert.equal(blog.hasCoverage(rebuilt.value), true)
-  assert.deepEqual(blog.coverage(rebuilt.value), { ingestTurn: 1, ingestPart: 0, cutoff: 1, digest: 'new-d1' })
 
   // The pre-reanchor frames are still there, now joined by the new entry.
   assert.deepEqual(blog.frameKinds(rebuilt.value), ['Seed', 'Entry', 'Entry', 'Entry', 'Entry'])
+
+  // And all five become coverable at once, including the four written under the
+  // voided numbering. That is deliberate, not an oversight: those frames describe
+  // work that really happened, and the cutoff is a claim about X's CURRENT prefix,
+  // not about which turns B's text discusses. A FrozenB richer than the cutoff is
+  // extra context; a FrozenB poorer than it would be information loss.
+  assert.deepEqual(blog.coverage(rebuilt.value), {
+    ingestTurn: 1,
+    ingestPart: 0,
+    cutoff: 1,
+    digest: 'new-d1',
+    coverableFrames: 5,
+  })
 })
 
 test('HOST_006_reanchor_is_idempotent_on_the_frame_projection', () => {
@@ -279,8 +385,16 @@ function seedState() {
   let state = blog.withSeed(seedFrame(), blog.empty)
 
   // COMPANION-004: the seed describes the PARENT's history, so this session's
-  // coverage is still at the origin and the first entry starts from cursor 0.
-  assert.deepEqual(blog.coverage(state), { ingestTurn: 0, ingestPart: 0, cutoff: 0, digest: '' })
+  // coverage is still at the origin and the first entry starts from cursor 0. In
+  // particular the seed is NOT coverable: no cutoff claims the turns it discusses,
+  // because they belong to another session.
+  assert.deepEqual(blog.coverage(state), {
+    ingestTurn: 0,
+    ingestPart: 0,
+    cutoff: 0,
+    digest: '',
+    coverableFrames: 0,
+  })
   assert.deepEqual(blog.frameKinds(state), ['Seed'])
 
   for (let i = 1; i <= 3; i += 1) {
