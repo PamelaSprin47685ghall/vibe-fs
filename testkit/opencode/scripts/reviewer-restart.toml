@@ -1,0 +1,76 @@
+# HOST-004 + REVIEW-004: a restart must not silently change a Reviewer's tool surface. The
+# proof is that after the restart the SAME child session can still call `verdict` — a
+# reconcile that dropped the reviewer's schema would leave it answering in prose, which
+# looks like a model choice rather than a harness defect.
+#
+# Only one PERFECT per turn here, so this scenario is deliberately NOT about REVIEW-003
+# confirmation; `reviewer-verdict` owns that. The second PERFECT lands on a different Git
+# tree state after the restart, and the text says so.
+
+scenario = "reviewer-restart"
+description = "HOST-004 the verdict tool surface survives a restart on the same reviewer child"
+pass = "Reviewer restart reconcile canary passed: verdict tool surface intact across restart."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "reviewer restart reconcile canary\n" } } }
+session = { agent = "fast-manager", bind = ["fast-manager"] }
+
+must = ["reviewer-first.0", "reviewer-after-restart.0"]
+
+flow = [
+  { createChild = { agent = "fast-reviewer", bind = ["reviewer-title", "fast-reviewer"], title = "reviewer restart canary" } },
+
+  { prompt = { agent = "fast-reviewer", text = "Review the tree and submit a PERFECT verdict." }, session = "child" },
+  { wait = "reviewer-first.0" },
+  { wait = "reviewer-first.1" },
+  { awaitTerminal = true, session = "child", requireAssistantTerminal = true, requireIdleAfterActivity = true },
+
+  { restart = true },
+
+  { prompt = { agent = "fast-reviewer", text = "After restart, re-verify the tree with another PERFECT verdict." }, session = "child" },
+  { wait = "reviewer-after-restart.0" },
+  { wait = "reviewer-after-restart.1" },
+  { awaitTerminal = true, session = "child", requireAssistantTerminal = true, requireIdleAfterActivity = true },
+
+  { custom = "oracle" },
+  { expectSatisfied = true },
+]
+
+# The JSON form numbered these `lane.turn = 1..4` across BOTH user messages, so the ordinal
+# was the only thing separating the pre-restart pair from the post-restart pair. They are
+# two turns of two steps: `step` restarts at 0 for each new user message, which is what
+# makes the boundary a property of the request instead of the author's bookkeeping.
+
+[[turn]]
+id = "reviewer-first"
+lane = "fast-reviewer"
+user = "Review the tree and submit a PERFECT verdict."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The review requires another pass." }
+
+[[turn]]
+id = "reviewer-after-restart"
+lane = "fast-reviewer"
+user = "After restart, re-verify the tree with another PERFECT verdict."
+tools = ["verdict"]
+
+  # If the reconcile lost the reviewer's schema this step cannot be produced at all, which
+  # is the whole claim: `verdict` is still on the surface.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The review is complete." }
+
+[[turn]]
+id = "title"
+lane = "reviewer-title"
+kind = "title"
+user = "Review the tree and submit a PERFECT verdict."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

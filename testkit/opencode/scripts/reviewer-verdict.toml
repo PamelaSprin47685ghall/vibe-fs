@@ -1,0 +1,170 @@
+# REVIEW-003/006/007: a tree is confirmed only by two PERFECT verdicts from two distinct
+# ProviderRunIdentity, the second proving from its input seal that it consumed the first's
+# challenge. Plus the two fail-closed guards that make the rule enforceable:
+#
+#   a Manager that tries to finish unreviewed gets nudged (REVIEW-007)
+#   a Reviewer that answers in prose without the verdict tool gets nudged (REVIEW-004)
+#
+# Three sessions, because each guard needs a session that has NOT already satisfied the
+# rule. `createSession` names them; every lane below is declared in this one file.
+
+scenario = "reviewer-verdict"
+description = "REVIEW-003 two distinct PERFECT runs confirm a tree; REVIEW-004/007 guards nudge prose verdicts and unreviewed completion"
+pass = "Reviewer verdict canary passed: two distinct PERFECT runs confirmed the tree; both guards nudged."
+
+setup = { strict = true, project = { files = { "review_target.txt" = "review target\n" } } }
+session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report." }
+
+must = ["reviewer.1", "guard-manager-nudged", "reviewer-nudged"]
+
+flow = [
+  { wait = "manager.0" },
+  { wait = "reviewer.0" },
+  { wait = "reviewer.1" },
+  { wait = "reviewer.2" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { assertFacts = { name = "ReviewVerdictRecorded", eq = 2 } },
+  { custom = "oracle" },
+
+  # REVIEW-007. A fresh Manager, so the tree it would finish on has no verdicts.
+  { createSession = { agent = "fast-manager", bind = ["guard-manager-title", "guard-manager"], as = "guard" } },
+  { prompt = { agent = "fast-manager", text = "Attempt completion without review." }, session = "guard" },
+  { wait = "guard-manager.0" },
+  { wait = "guard-manager-nudged" },
+  { awaitTerminal = true, session = "guard", requireAssistantTerminal = true },
+  { assertFacts = { name = "GuardPromptAccepted", eq = 1 } },
+
+  # REVIEW-004. A Reviewer that reviews in prose and never calls the tool.
+  { createSession = { agent = "fast-reviewer", bind = ["reviewer-nudge-title", "reviewer-nudge"], as = "nudge" } },
+  { prompt = { agent = "fast-reviewer", text = "Review the tree but do not submit a verdict." }, session = "nudge" },
+  { wait = "reviewer-nudge.0" },
+  { wait = "reviewer-nudged" },
+
+  { expectSatisfied = true },
+]
+
+# Three provider steps, one user message. The JSON form wrote three edges at
+# `lane.turn = 1|2|3` whose only `match` was the same `requiredTools`/`forbiddenTools`
+# pair — so what distinguished them lived entirely in the hand-maintained ordinal.
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review review_target.txt and submit two PERFECT verdicts." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer joined and confirmed." }
+
+# The two PERFECTs are two STEPS of one turn, not two turns: production returns
+# `ReviewChallenge.Text` as the verdict tool RESULT (`VerdictTool.fs:64`), which leaves the
+# last user message unchanged. The JSON form said the same thing with
+# `afterToolResult: true`, a predicate for a fact the step count already carries.
+#
+# They are nonetheless two distinct ProviderRunIdentity, which is what REVIEW-003 requires
+# — the identity comes from the Host's run, not from how the scenario groups the text.
+
+[[turn]]
+id = "reviewer"
+lane = "fast-reviewer"
+user = "Review review_target.txt and submit two PERFECT verdicts."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
+[[turn]]
+id = "guard-manager"
+lane = "guard-manager"
+user = "Attempt completion without review."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager attempted completion without review." }
+
+# The guard nudge is a new user message composed by production
+# (`HostReviewGuard.fs:147`), so it is its own turn and no scenario text reaches it.
+# The retired `neverEnd` flag was standing in for this: the nudge may arrive more than
+# once, and each arrival is step 0 of this turn because nothing follows it yet.
+
+[[turn]]
+id = "guard-manager-nudged"
+lane = "guard-manager"
+internal = true
+user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager received the review guard." }
+
+[[turn]]
+id = "reviewer-nudge"
+lane = "reviewer-nudge"
+user = "Review the tree but do not submit a verdict."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "I reviewed the tree but omitted the structured verdict." }
+
+# `HostReviewGuard.fs:164`.
+
+[[turn]]
+id = "reviewer-nudged"
+lane = "reviewer-nudge"
+internal = true
+user = "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "The structured verdict prompt was received." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "manager-title"
+lane = "manager-title"
+kind = "title"
+user = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "guard-manager-title"
+lane = "guard-manager-title"
+kind = "title"
+user = "Attempt completion without review."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "reviewer-nudge-title"
+lane = "reviewer-nudge-title"
+kind = "title"
+user = "Review the tree but do not submit a verdict."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

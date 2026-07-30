@@ -1,0 +1,78 @@
+# EXEC-001/EXEC-004: the Manager delegation slice. `fork` creates a child, the child does
+# its work, `join` consumes the completion from the mailbox. The smallest scenario that
+# exercises a real parent/child pair, which is why it leads the canary registry.
+
+scenario = "agent-dsl"
+description = "EXEC-001/004 fork a Coder, the Coder writes, join consumes the completion"
+pass = "Agent DSL canary passed."
+
+setup = { strict = true }
+session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Delegate this canary to a Coder with fork, join the Coder, and report the result." }
+
+must = ["coder.0", "manager.2"]
+
+flow = [
+  { wait = "manager.0" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  { wait = "coder.0" },
+  { wait = "coder.1" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Delegate this canary to a Coder with fork, join the Coder, and report the result."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write canary_output.txt with exactly Coder canary slice OK\n, then report completion." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager joined Coder: canary complete." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = "Write canary_output.txt with exactly Coder canary slice OK"
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "canary_output.txt", content = "Coder canary slice OK\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder write complete." }
+
+# The JSON form also carried a `session-blogger-reanchor` edge matching the post-restart
+# re-anchor prompt (`CompanionHostBlogger.fs:72`). Dropped: this scenario has no restart in
+# its flow, so that edge could never be delivered. It was reachability-exempt by nature
+# (production composes the text), which is exactly why nothing noticed.
+#
+# The re-anchor frame is real behaviour with two live writers
+# (`CompanionHost.fs:64,73`) and it needs a scenario that actually restarts. That debt is
+# recorded against package K8f, not paid with a defensive edge here.
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "title"
+lane = "manager-title"
+kind = "title"
+user = "Delegate this canary to a Coder with fork, join the Coder, and report the result."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

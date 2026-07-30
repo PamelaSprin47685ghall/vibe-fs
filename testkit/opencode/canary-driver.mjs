@@ -172,8 +172,11 @@ async function runFlow(scenario, doc, ctx) {
       ctx.childId = event.sessionID;
       assert.ok(ctx.childId, 'bindChild: missing child session');
       scenario.sessionIds.push(ctx.childId);
-      const aliases = step.bindChild.aliases || [step.bindChild.agent || 'child'];
-      bindLaneSession(scenario.provider, ctx.childId, ...aliases);
+      // `bind` in TOML, `aliases` in the JSON scenarios K8 has not reached yet. The
+      // fallback goes away with the JSON path in K9; `aliases` is already rejected by
+      // `legacy-fields.js` at the TOML layer, so only the old files can reach it.
+      const bound = step.bindChild.bind || step.bindChild.aliases || [step.bindChild.agent || 'child'];
+      bindLaneSession(scenario.provider, ctx.childId, ...bound);
       scenario.watchdog?.advance({
         reason: 'child-created',
         lane: `session:${ctx.childId}`,

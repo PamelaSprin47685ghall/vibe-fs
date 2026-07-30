@@ -1,0 +1,84 @@
+# EXEC-002: a `fork` aimed at an agent that is ALREADY busy is a fire-and-forget nudge to
+# that same child, not a second child and not a queued prompt. The claim is what does NOT
+# happen: no prompt queue forms, and the first run is still streaming when the nudge lands.
+#
+# So this scenario deliberately never reaches a terminal — it aborts. `assertActiveRequests`
+# is the real assertion: a request must still be open at the moment the nudge is delivered.
+# A version that waited for idle first would prove the opposite of EXEC-002.
+
+scenario = "host-nudge"
+description = "EXEC-002 a fork at a busy child is a same-child nudge delivered while the first run streams"
+pass = "Host nudge canary passed: busy-overlap nudge while first run still streaming."
+
+setup = { strict = true }
+session = { agent = "fast-manager", bind = ["parent-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Fork a busy coder and nudge it while streaming." }
+
+must = ["coder-busy.0", "manager.1"]
+
+flow = [
+  { wait = "manager.0" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  { wait = "coder-busy.0" },
+  { assertActiveRequests = { gte = 1 } },
+  { wait = "manager.1" },
+  { assertActiveRequests = { gte = 1 } },
+  { custom = "proveNudge" },
+  { abort = true },
+]
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "Fork a busy coder and nudge it while streaming."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "first busy run: stay streaming until nudged" } }
+
+  # The second `fork` at the same agent. EXEC-002 makes this a nudge into the child that
+  # step 0 created, which is why no third lane appears anywhere below.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "nudge continue second run while first is busy" } }
+
+[[turn]]
+id = "coder-busy"
+lane = "fast-coder"
+user = "first busy run: stay streaming until nudged"
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder first run still working." }
+
+# The nudge arrives at the SAME child as a new user message, so it opens a new turn in the
+# same lane. The JSON form declared no edge for it and relied on `abort` landing first —
+# a race, and under a strict mock an unmatched request is a fatal mismatch. Declared here
+# because production does send it (that is the whole point of the scenario); whether the
+# abort beats it is then no longer load-bearing.
+
+[[turn]]
+id = "coder-nudged"
+lane = "fast-coder"
+user = "nudge continue second run while first is busy"
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder second run acknowledged the nudge." }
+
+[[turn]]
+id = "blogger"
+lane = "session-blogger"
+internal = true
+user = "You are the blogger of a coding agent session. Write one dense paragraph"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "title"
+lane = "parent-title"
+kind = "title"
+user = "Fork a busy coder and nudge it while streaming."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

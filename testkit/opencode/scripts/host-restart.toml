@@ -21,7 +21,7 @@ setup = { strict = true, project = { files = { "AGENTS.md" = "host restart canar
 session = { agent = "fast-manager", bind = ["parent-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews." }
 
-must = ["manager.5", "reviewer-confirm", "manager-after-restart.1", "child-a2"]
+must = ["manager.5", "reviewer.1", "manager-after-restart.1", "child-a2"]
 
 flow = [
   { afterExpectation = { id = "manager.5", restart = true } },
@@ -30,8 +30,8 @@ flow = [
   { wait = "child-a1" },
   { wait = "manager.2" },
   { wait = "manager.3" },
-  { wait = "reviewer" },
-  { wait = "reviewer-confirm" },
+  { wait = "reviewer.0" },
+  { wait = "reviewer.1" },
   { wait = "manager.5" },
 
   { awaitRestart = true },
@@ -79,9 +79,27 @@ tools = ["fork", "join", "list"]
   respond = { type = "text", text = "Reviewed." }
 
 # REVIEW-003: two PERFECT verdicts from two different ProviderRunIdentity, the second
-# proving it saw the first's challenge. The JSON form expressed this with `aliases` plus
-# `reusable` on one edge — one declaration pretending to be two runs. They are two turns,
-# because the challenge production sends is a new user message.
+# proving from its input seal that it consumed the first's challenge. The JSON form used
+# `aliases` plus `reusable` on ONE edge — a single declaration pretending to be two runs,
+# which is exactly what REVIEW-003 says it may not be.
+#
+# ── which shape the challenge takes, and why the old form could not say ──────
+#
+# Production has two paths for delivering `ReviewChallenge.Text`:
+#
+#   `VerdictTool.fs:64`        returns it as the verdict TOOL RESULT — same user
+#                              message, so `step` advances within this turn
+#   `HostReviewGuard.fs:189`   sends it as a guard nudge — a NEW user message, so a
+#                              new turn whose text is the challenge
+#
+# The old edge matched `userRegex = "Nope, let's re-evaluate:"`, a substring predicate
+# over the conversation. The challenge text is present either way, so that predicate
+# matched BOTH shapes and the scenario never said which production path fired.
+#
+# It is the tool-result path. `reviewer-verdict.json` measured the same production code
+# with `afterToolResult: true` — the last user message unchanged after the verdict result
+# came back. So these are three steps of one turn, and the nudge path (which exists for
+# when the Host goes idle instead of continuing) is not what this scenario exercises.
 
 [[turn]]
 id = "reviewer"
@@ -92,24 +110,14 @@ tools = ["verdict"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
 
-  # Step 1 is the same turn after the verdict tool result comes back. The retired
-  # `afterToolResult` predicate said exactly this, one layer less directly: a tool result
-  # is already part of the semantic prefix, so the step count says it.
-  [[turn.step]]
-  respond = { type = "text", text = "First PERFECT submitted; awaiting confirmation prompt." }
-
-# The challenge text is composed by production (`next/Domain/ReviewChallenge.fs:22`), so
-# no scenario text reaches this turn — the fourth measured `internal` site.
-
-[[turn]]
-id = "reviewer-confirm"
-lane = "fast-reviewer"
-internal = true
-user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
-
+  # Step 1: the challenge arrived as the tool result and is already part of the semantic
+  # prefix, so the step count says "after the tool result" without a predicate for it.
+  # That is what the retired `afterToolResult` flag was expressing one layer less directly.
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
 
 [[turn]]
 id = "child-a1"
