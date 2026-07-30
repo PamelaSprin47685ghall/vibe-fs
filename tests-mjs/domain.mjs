@@ -73,6 +73,7 @@ const [
   PrefixCandidateModule,
   RecoverySlotModule,
   CompactionPolicyModule,
+  SyntheticTomlModule,
   BloggerTomlModule,
   BloggerDeltaModule,
   CompanionPromptModule,
@@ -111,6 +112,7 @@ const [
   prod('Domain/PrefixCandidate'),
   prod('Domain/RecoverySlot'),
   prod('Domain/HostCompactionPolicy'),
+  prod('Domain/SyntheticToml'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
   prod('Domain/CompanionPrompt'),
@@ -762,6 +764,39 @@ export const fallbackProjection = (() => {
 // ── failure-driven context recovery (SSOT/12) ────────────────────────────────
 
 /**
+ * ARCH-010: the one canonical writer for runtime synthetic TOML.
+ *
+ * Exposed separately from `bloggerToml` because the ownership split is the point of the
+ * clause. Blogger owns which parts exist and their key order; the string rules and the
+ * document layout belong here, to every synthetic surface equally. A facade that let
+ * `bloggerToml.renderString` keep working would tell the next reader that Blogger owns
+ * string rendering — the local dialect ARCH-010 forbids.
+ *
+ * `document` resolves to Fable's `document$`: the plain name would collide with the DOM
+ * global, so Fable escapes it. `member()` tries the `$` spelling last, which is what
+ * turns that into a resolution rule rather than a per-call-site accident.
+ */
+export const syntheticToml = (() => {
+  const m = bind(SyntheticTomlModule, 'SyntheticToml', [
+    'normalizeNewlines',
+    'renderString',
+    'comment',
+    'field',
+    'document',
+    'byteCount',
+  ])
+
+  return {
+    normalizeNewlines: (text) => m.normalizeNewlines(text),
+    renderString: (text) => m.renderString(text),
+    comment: (text) => m.comment(text),
+    field: (name, renderedValue) => m.field(name, renderedValue),
+    document: (instructions, body) => m.document(toList(instructions), toList(body)),
+    byteCount: (text) => m.byteCount(text),
+  }
+})()
+
+/**
  * CTX-013: the deterministic TOML wire form of a Blogger delta.
  *
  * `part()` builds a `BloggerDeltaPart` by case NAME. The union has six cases whose
@@ -772,11 +807,9 @@ export const fallbackProjection = (() => {
 export const bloggerToml = (() => {
   const m = bind(BloggerTomlModule, 'BloggerToml', [
     'TruncationMarker',
-    'normalizeNewlines',
-    'renderString',
     'renderItem',
+    'renderWith',
     'render',
-    'byteCount',
   ])
   const buildPart = unionCase(BloggerTomlModule.BloggerDeltaPart, 'BloggerDeltaPart')
 
@@ -784,11 +817,9 @@ export const bloggerToml = (() => {
 
   return {
     truncationMarker: m.TruncationMarker,
-    normalizeNewlines: (text) => m.normalizeNewlines(text),
-    renderString: (text) => m.renderString(text),
     renderItem: (item) => m.renderItem(item),
+    renderWith: (instructions, items) => m.renderWith(toList(instructions), toList(items)),
     render: (items) => m.render(toList(items)),
-    byteCount: (text) => m.byteCount(text),
 
     text: (value) => part('TextPart', value),
     reasoning: (value) => part('ReasoningPart', value),
@@ -842,7 +873,7 @@ export const bloggerDelta = (() => {
 
       return {
         toml: chunk.Toml,
-        bytes: bloggerToml.byteCount(chunk.Toml),
+        bytes: syntheticToml.byteCount(chunk.Toml),
         itemCount: listItems(chunk.Items).length,
         kinds: listItems(chunk.Items).map((item) => caseOf(item.Part)),
         truncatedFlags: listItems(chunk.Items).map((item) => item.Truncated),

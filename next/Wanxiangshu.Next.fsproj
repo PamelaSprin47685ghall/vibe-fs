@@ -27,6 +27,7 @@
     <Compile Include="Domain/RecoverySlot.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
+    <Compile Include="Domain/SyntheticToml.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>
     <Compile Include="Domain/CompanionPrompt.fs"/>

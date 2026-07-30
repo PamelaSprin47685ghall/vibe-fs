@@ -114,7 +114,7 @@ module BloggerDelta =
         // invalid item.
         | None -> item
         | Some text ->
-            let normalized = BloggerToml.normalizeNewlines text
+            let normalized = SyntheticToml.normalizeNewlines text
 
             let withBody replacement =
                 match item.Part with
@@ -132,7 +132,7 @@ module BloggerDelta =
                     Truncated = true }
 
             let documentBytes candidate =
-                BloggerToml.byteCount (BloggerToml.render [ candidate ])
+                SyntheticToml.byteCount (BloggerToml.render [ candidate ])
 
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both
@@ -197,7 +197,7 @@ module BloggerDelta =
                     let candidate = accepted @ [ entry ]
                     let rendered = BloggerToml.render (candidate |> List.map (fun e -> e.Item))
 
-                    if BloggerToml.byteCount rendered <= limitBytes then
+                    if SyntheticToml.byteCount rendered <= limitBytes then
                         accepted <- candidate
                     else
                         stopped <- true

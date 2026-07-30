@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { bloggerDelta as delta, bloggerToml as toml } from '../domain.mjs'
+import { bloggerDelta as delta, bloggerToml as toml, syntheticToml as syn } from '../domain.mjs'
 
 const origin = delta.cursor(0, 0)
 
@@ -116,7 +116,7 @@ test('CTX_003_no_chunk_exceeds_the_limit', () => {
   const limit = 1500
   for (const chunk of drainAll(limit, messages)) {
     assert.equal(chunk.bytes <= limit, true, `chunk of ${chunk.bytes} bytes exceeds ${limit}`)
-    assert.equal(chunk.bytes, toml.byteCount(chunk.toml), 'reported bytes must be the rendered bytes')
+    assert.equal(chunk.bytes, syn.byteCount(chunk.toml), 'reported bytes must be the rendered bytes')
   }
 })
 
@@ -254,7 +254,7 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   // of 3-byte sequences, which a byte-level cut could not guarantee.
   const retained = (chunk.toml.match(/中/g) ?? []).length
   assert.equal(retained > 0, true, 'some content survived')
-  assert.equal(toml.byteCount('中'.repeat(retained)), retained * 3)
+  assert.equal(syn.byteCount('中'.repeat(retained)), retained * 3)
 })
 
 test('CTX_013_an_omission_marker_is_never_truncated', () => {
