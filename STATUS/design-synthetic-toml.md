@@ -1,14 +1,44 @@
+# STATUS/design-synthetic-toml — 运行时合成文本 TOML 记法动议（归档原文）
+
+## 本文件的性质
+
+这是动议审阅稿的完整归档，不是规范。 规范条款已并入 SSOT：
+
+| 内容 | 规范位置 |
+|------|---------|
+| 记法主规范：instruction=comment、data=field、instruction-first、三种合法形态、无统一 envelope、canonical 字符串、data containment、单向表示、排除范围、transport 边界、门禁清单 | SSOT/01.md（`ARCH-010`） |
+| Blogger delta 的 instruction/data 分野、删除 `'''`、instruction header 计入 chunk 限额 | SSOT/12.md（`CTX-013`） |
+| 文本形态不构成 Prompt Origin 或 Authority 证据 | SSOT/03.md（`PROMPT-001`） |
+| Instruction comment header、Native system instruction channel、Runtime Synthetic TOML 三术语 | SSOT/99.md |
+| 迁移顺序（M0–M5）、测试要求、完成定义、排期裁决 | STATUS/shock-anneal.md 包 N |
+
+冲突时以 SSOT 为准。 本文件保留的是规范不承载的内容：为何选 TOML 而非 XML tag 或 JSON envelope、为何 system prompt 必须排除、合法与非法示例总表、prompt injection 的 containment 示例、17 条「明确禁止的错误实现」、20 项完成定义清单。
+
+保留原因：这些推理解释了「为什么条款长这样」。条款只说应该如何，不说排除了别的做法及其代价。删掉它们，未来任何人想动这套记法都会重新踩一遍同样的坑。
+
+### 编号说明
+
+本文件标题自称「SSOT/13 修正动议」，但其 §13.1 明确要求主规范落为 `SSOT/01.md` 的 `ARCH-010`，因此没有创建 `SSOT/13.md`，`SSOT/13` 编号仍然空缺。
+
+`PENDING/14-Predict方案.md` 引用的「SSOT/13 — Projection Algebra」是另一份文档，不在 PENDING 中。该依赖必须在 14 / 15 合入前裁决，登记在 `shock-anneal.md` 包 N。
+
+正文逐字保留，未作术语同步。 唯一的机械改动是 `strip-doc-bold` 按仓库文档风格处理了 10 行（粗体标记与 6 处全角冒号后空格），文字本身未变。阅读时注意：文中「本动议」「建议主条款」等措辞是审阅期语气，条款已生效；§13 的 SSOT 修订清单已全部执行；§14 迁移策略与 §15 测试要求已重组为 `shock-anneal.md` 的包 N。
+
+原始审阅状态：通过审阅，主规范已合入。变更性质：LLM 可见文本表示层统一。
+
+---
+
 # SSOT/13 修正动议：运行时 LLM 可见合成内容的 TOML Instruction/Data 记法
 
-**动议编号：** `SSOT-MOTION-SYNTHETIC-TOML-001`
-**版本：** Final Review Draft
-**状态：** 提交最终审阅
-**建议主条款：** 新增 `ARCH-010`
-**连带修订：** `CTX-013`、Prompt Authority 交叉引用、验证条款与术语索引
-**不在范围内：** system prompt、developer prompt、角色 prompt assets
-**核心原则：**
+动议编号：`SSOT-MOTION-SYNTHETIC-TOML-001`
+版本：Final Review Draft
+状态：提交最终审阅
+建议主条款：新增 `ARCH-010`
+连带修订：`CTX-013`、Prompt Authority 交叉引用、验证条款与术语索引
+不在范围内：system prompt、developer prompt、角色 prompt assets
+核心原则：
 
-> **Instruction 用 comment，data 用 field；instruction 永远在前。**
+> Instruction 用 comment，data 用 field；instruction 永远在前。
 
 ---
 
@@ -88,7 +118,7 @@ status = "failed"
 * 不需要额外 sentinel；
 * 不需要为了单句 instruction 创建字段。
 
-这里的 TOML 是 **LLM-facing notation**，不是持久化协议。
+这里的 TOML 是 LLM-facing notation，不是持久化协议。
 
 ---
 
@@ -1338,4 +1368,4 @@ data-only 是合法形式。
 
 除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库既有 canonical 写法；多行字符串统一采用三双引号、四空格内容缩进，并使 closing delimiter 紧随最后一个内容行。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。
 
-> **除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库既有 canonical 写法；多行字符串统一采用三双引号、四空格内容缩进，并使 closing delimiter 紧随最后一个内容行。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。**
+> 除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库既有 canonical 写法；多行字符串统一采用三双引号、四空格内容缩进，并使 closing delimiter 紧随最后一个内容行。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。

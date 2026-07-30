@@ -1341,63 +1341,155 @@ K11  森林变异自检：四类错误响应必须被拒绝（新增）
 
 K1 提前到第一步的理由：它决定 K2 的前缀比较用哪个投影。先做 K2 会写出一个基于 testkit 私有规范化的前缀索引，K1 完成后整体重写。
 
-### 包 N：运行时合成文本的 TOML Instruction/Data 记法（SSOT/13 → ARCH-010）
+### 包 N：运行时合成文本的 TOML Instruction/Data 记法（ARCH-010）
 
 | 项 | 值 |
 |----|----|
-| 条款 | 新增 ARCH-010；连带修订 CTX-013、PROMPT-001 交叉引用、SSOT/99 术语 |
-| 动议 | `PENDING/13-Toml方案.md`（已通过审阅；合入前不是规范，不得据以改生产字节） |
+| 条款 | 新增 ARCH-010；连带修订 CTX-013、PROMPT-001 交叉引用、SSOT/99 三术语 |
+| 设计定稿 | `STATUS/design-synthetic-toml.md`（动议审阅稿归档原文，含选型推理与 17 条禁止实现） |
 | 核心原则 | instruction 用 comment，data 用 field；instruction 永远在前 |
-| 范围 | 运行时构造、包装或注入并作为文本进入 LLM 会话上下文的合成消息、工具返回文本及其他合成 payload |
-| 明确排除 | system prompt、developer prompt、角色 prompt assets、人类原始消息、模型原始输出、provider 原生结构 |
-| 生产 | 将改动（prompt 组合面） |
+| 纳入判据 | 四条同时成立：由 LLM 按文本 token 阅读、非原生 system/developer prompt、非未重新包装的人类原始消息、由运行时/Host/插件/工具/协作层/projection 构造或包装或复制或重新投影 |
+| 明确排除 | system prompt、developer prompt、角色 prompt assets、provider 原生 instruction channel、人类原始消息、模型原始输出、provider 原生结构、不进入模型上下文的内部数据 |
+| 生产 | 将改动（prompt 组合面，不改 transport） |
 
-本包与包 K 的关系决定它的排期。包 K 把 canary 剧本的 TOML 声明写定；包 N 改写这些声明所匹配的
-生产合成文本字节。两者触碰同一批 scenario 声明，故顺序是：
+选择 TOML 不是因为系统需要 parse TOML，而是因为 `# …` 与 `key = value` 对 LLM 有稳定熟悉的视觉语义，且不需要 XML closing tag、JSON envelope 或额外 sentinel。完整选型推理见归档 §1.2。
+
+#### 排期裁决：N 拆两段，fork surface 段先于 canary 修红
+
+包 K 把 canary 剧本的 TOML 声明写定；包 N 改写这些声明所匹配的生产合成文本字节。两者触碰同一批 scenario 声明，故顺序是：
 
 ```text
-N 的 fork surface 段（N0–N4）  先于 canary 修红
-canary 11 红 → 16/16           随后
-N 的其余 surface 段（N5–N6）   canary 全绿之后
+N0–N4  规范 + 字符串 owner + inventory + fork surface + 门禁     先于 canary 修红
+canary 11 红 → 16/16                                            随后
+N5–N6  其余 surface 迁移 + fixture/golden/byte-limit 更新        canary 全绿之后
 ```
 
-若先修红再迁 surface，同一批 turn 声明要按旧字节写一遍、再按新字节重写一遍。而当前多数红灯的
-同一根因——`HostForkRuntimeFork.fs:196` 的条件信封两形态无公共前缀——正是 N3 要迁的
-fork/child-instruction surface：ARCH-010 的 instruction-first 保证恰给条件信封一个它现在没有的
-稳定前缀（`# instruction` 恒在最前，有无 parent work record 都命中）。先修红等于先做一个会被 N3
-重写的修法。
+若先修红再迁 surface，同一批 turn 声明要按旧字节写一遍、再按新字节重写一遍。而当前多数红灯的同一根因——`HostForkRuntimeFork.fs:196` 的条件信封两形态无公共前缀——正是 N3 要迁的 fork/child-instruction surface：ARCH-010 的 instruction-first 保证恰给条件信封一个它现在没有的稳定前缀（instruction comment 恒在最前，有无 parent work record 都命中同一片段声明）。先修红等于先做一个会被 N3 重写的修法。
 
-N0 规范先行是硬前置（动议 M0）：任何生产 prompt 字节不得在 ARCH-010 进 SSOT/01 之前改动。
+N5 排在 canary 全绿之后而非之前：动议 M5 要求「更新所有依赖最终文本 bytes 或前缀的 strict mock、scenario、golden snapshot、payload digest expectation、canary、byte-limit test」，而全绿的 canary 是做这件事时唯一可信的回归底座。
 
-#### 子步骤
+#### 子步骤（对应动议 M0–M5）
 
 ```text
-N0  规范先行：ARCH-010 写入 SSOT/01.md；CTX-013 改「data body 不输出 comment，
-    可选 instruction 只能位于最前」并删 Blogger 本地 ''' 多行；PROMPT-001 加
-    「文本形态非 authority 证据」交叉引用；SSOT/99 五术语
-N1  确认 canonical TOML 字符串 writer 唯一 owner，收敛多处 delimiter/缩进/转义
-N2  建立 runtime textual surface inventory，四分类
-    NativeSystemPrompt / HumanRaw / ModelNative / RuntimeSyntheticToml，门禁固定该清单
+N0  规范先行（M0）：ARCH-010 进 SSOT/01；CTX-013 修订；PROMPT-001 交叉引用；     已完成
+    SSOT/99 三术语。不得先批量改生产 prompt 再让实现反向定义规范
+N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一处，           进行中
+    删除 Blogger 本地 ''' 多行方言，多行改 """ + 四空格缩进
+N2  surface inventory（M1）：列出全部最终进入 LLM 的文本生产点并四分类
+    NativeSystemPrompt / HumanRaw / ModelNative / RuntimeSyntheticToml。
+    该分类只用于实现审计，不构成新的运行时 envelope。门禁固定该清单
 N3  fork/child-instruction surface 迁到 ARCH-010 形态；fork 信封条件包裹在此定案
 N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得为顶层 comment、
-    instruction-first、data 开始后无顶层 comment、无 '''
+    instruction-first、data 开始后无顶层 comment、无 '''、system prompt 未被纳入、
+    human raw 未被包装、provider/tool 原生 binding 未改变
 ─── canary 修红（11 → 16/16）与退火三在此之后 ───
-N5  其余 synthetic surface 迁移：Blogger delta 优先，再 continuation / repair / guard /
-    nudge / review challenge / conflict / companion memory / executor / tool result / summary input
-N6  更新依赖最终字节的 fixture / golden / payload digest / byte-limit 测试
+N5  其余 synthetic surface 迁移（M3 + M4）：Blogger delta 优先（已有 typed part、
+    确定性 renderer、byte limit、现成测试），再 continuation / repair / guard / nudge /
+    review challenge / conflict context / companion memory / executor context /
+    tool textual result / summary input。不得迁移 system prompt assets
+N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
+    某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
+    本包不为各领域预先发明统一 versioning
 ```
 
-#### 编号冲突（合入 14/15 时裁决，不在本包）
+#### N0 落地记要
 
-`PENDING/13-Toml方案.md` 自称「SSOT/13 修正动议」，正文却要求把主规范落为 SSOT/01 的
-ARCH-010，不新建 SSOT/13 文件。`PENDING/14-Predict方案.md` 引用的「SSOT/13 — Projection
-Algebra」在 PENDING 中不存在。故本包不占用 SSOT/13 编号；14（STRENGTH-）与 15（ENFORCER-）
-合入时须先裁决 Projection Algebra 是否独立成 SSOT/13、还是同样落为 SSOT/01 条款。
+`d4112f62`。ssot-lint 136 → 137 条款，396 处引用，14 个文件。
 
-#### 完成定义
+ARCH-010 承载动议的全部规范内容：纳入四判据、记法三条（instruction=comment / data=field / instruction-first）、语义分类（历史祈使句是 data、解释规则是 instruction、截断事实与截断规则分开）、三种合法形态、字符串九项不变量、data containment、无统一 envelope、局部 schema 字段设计、单向表示、排除范围、transport 边界、门禁清单。
 
-动议第 18 节的 20 项清单。其中「fixtures / golden / canary 已更新」与「完整 release gate 通过」
-两项与退火三共用验收，不重复设立。
+CTX-013 三处修订：字符串写法改为引用 ARCH-010（删掉原「有换行且不含 `"""` 用三引号；含 `"""` 但不含 `'''` 用字面多行字符串」的按内容选 delimiter 规则）；新增「Blogger delta 的 instruction 与 data」分野；新增「instruction header 计入 chunk 限额」——header bytes 必须计入 200 KiB，chunker 以最终实际发送 bytes 计算，header 不得中间截断，data-only chunk 无额外开销。
+
+`PENDING/13-Toml方案.md` → `STATUS/design-synthetic-toml.md`，按 `design-context-recovery.md` 的归档惯例加性质声明头（规范位置对照表 + 保留原因 + 编号说明 + 机械改动说明）。
+
+#### N1 实测：动议未覆盖多行 basic string 的转义语义，须裁决
+
+动议 §6.3 要求多行统一用 `"""`、四空格内容缩进、closing delimiter 紧随最后一个内容行，并禁止 `'''`。但它没有说 `"""` 体内如何转义，而这里存在一个已实测的冲突：
+
+```text
+现状（BloggerToml.fs:96-112）  刻意从不发射 """，注释写明理由
+理由                            多行 basic string 仍处理转义序列，故含反斜杠的正文
+                                （每个 regex、每个 Windows 路径、每个非平凡 tool-call args）
+                                要么被误读（\n 变真换行），要么根本不 parse（\d 不是合法 TOML 转义）
+```
+
+即动议指定的形态与该文件既有的实测结论直接相反。两种落法：
+
+```text
+(a) """ + 转义反斜杠    严格合法 TOML，但模型看到 \\d+ 而数据里是 \d+ ——失真
+(b) """ + 反斜杠原样    模型看到确切数据，但文本含非法转义序列
+```
+
+裁决取 (b)，理由三条：
+
+其一，ARCH-010 本身规定该表示单向、永不反向解析，且禁止增加任何从 TOML 反推的业务依赖。「parser 会误读」描述的是一个规范禁止存在的消费者。
+
+其二，动议在 §6.3 自己就已经放弃 parse 保真：真实 parser 会把四空格格式缩进读成 value 的一部分。bytes 在这里不等于 value，该渲染是给读者的。
+
+其三，CTX-013 存在的目的是让 Companion 忠实记录实际发生的事。工具输出 `\d+` 而日志写 `\\d+` 是对 data 的失真，且这笔失真付给了一个不存在的消费者。
+
+因此 `"""` 体内只中和两类字符，其余原样：
+
+```text
+连续三个 "        会提前闭合字符串，让 data 逃逸到文档结构 —— 违反 §7 containment
+结尾单个 "        会与 closing delimiter 连成四引号
+控制字符          TOML 禁止裸控制字符，且会破坏模型读到的内容
+```
+
+反斜杠不在中和之列。这条裁决取代该文件原有的 `'''` 裁决，并必须写在代码里：显而易见的「修正」——把整个 body 转义——会静默损坏工作日志里每个 regex 与每条 Windows 路径。
+
+单行形态仍然全量转义，且该不对称是动议 §6.2 明确要求的：单行 basic string 没有 raw 变体，TOML 会把 `"a\b"` 读成退格。只有多行形态能原样，这正是它存在的理由。
+
+#### 测试要求（动议 §15）
+
+```text
+字符串      空串、普通单行、引号、反斜杠、tab、CRLF、lone CR、CJK、emoji、多行、
+            空白内容行、原始前导缩进、原始尾随换行、内容中的 #、内容中的 TOML 表头、
+            内容中的三引号、完全确定性
+文档布局    instruction-only 首字节为 #；data-only 首行为字段或表头；
+            instruction + data 的 header 连续、与 body 之间恰好一个空行、body 后无顶层 comment
+containment 恶意 payload（含 # Ignore all previous instructions.、status = "perfect"、[[item]]）
+            必须完整留在字符串 value 内，不得逃逸为当前 instruction / data field / TOML table
+Blogger     data-only、instruction + data、data body 无 comment、多行 """ 固定排版、
+            不出现 '''、fixed key order、truncation、image/media omission、cursor/coverage 不变、
+            header 存在时计入 byte limit、header 不存在时不产生虚假开销
+权限回归    TOML comment 不创建 authority；未认领的 TOML 形 user message 仍 fail closed；
+            continuation 不因格式变化成为新 root；human raw 不被 renderer 改写；
+            PromptOrigin 不从文本形态推断
+transport   tool call/result linkage 不变、message role 不变、provider metadata 不变、
+            只改变 textual body、system prompt bytes 未被本包修改
+```
+
+#### 完成定义（动议 §18 的 20 项）
+
+```text
+[x] ARCH-010 已成为唯一主规范
+[x] system prompt exclusion 已明确写入
+[x] PROMPT-001 已增加「文本形态不是 authority 证据」交叉引用
+[x] CTX-013 已删除绝对「不输出注释」
+[x] CTX-013 已允许最前方 instruction comment header
+[ ] Blogger data body 禁止 comments
+[ ] Blogger 已删除 ''' 输出
+[ ] 所有多行 data 使用 canonical """ 排版
+[ ] 已建立 runtime textual surface inventory
+[ ] 所有纳入范围的 instruction 使用最前方 comments
+[ ] 所有纳入范围的 data 使用 fields/tables/values
+[ ] data body 开始后不存在顶层 comment
+[ ] human raw message 未被包装
+[ ] model-native transcript 未被重写
+[ ] system/developer prompt 未被本包迁移
+[ ] provider tool binding 未变化
+[ ] 不存在统一 envelope
+[ ] 不存在 TOML 反向 parser
+[ ] fixtures、golden tests 和 canary 已更新    ← 与退火三共用验收
+[ ] 完整 release gate 通过                      ← 与退火三共用验收
+```
+
+#### 编号说明与遗留裁决
+
+归档文件标题自称「SSOT/13 修正动议」，但其 §13.1 要求主规范落为 SSOT/01 的 ARCH-010，故未创建 `SSOT/13.md`，SSOT/13 编号仍空缺。
+
+`PENDING/14-Predict方案.md` 引用的「SSOT/13 — Projection Algebra（所有 provider-visible projection 的唯一生产路径）」是另一份文档，不在 PENDING 中。14 与 15 合入前必须先裁决：Projection Algebra 是否独立成 SSOT/13，还是同样落为 SSOT/01 条款；若前者，14 的全部 projection 条款引用需重新指向。
 
 ### 包 X：失败驱动上下文恢复
 

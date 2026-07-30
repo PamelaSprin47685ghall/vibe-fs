@@ -94,10 +94,11 @@ assistant message 在 transform 之前已经创建并持久化。
 | `STATUS/shock-anneal.md` | 当前迁移总账（工作包状态、旧符号灭绝表） |
 | `STATUS/design-script-forest.md` | canary 剧本森林重建设计定稿 |
 | `STATUS/design-context-recovery.md` | 失败驱动上下文恢复设计定稿归档（含设计演化与代价推理） |
+| `STATUS/design-synthetic-toml.md` | ARCH-010 运行时合成文本 TOML 记法动议归档（含选型推理与 17 条禁止实现） |
 | `STATUS/blocker-HOST-006.md` | SSOT 例外 1 定案：手工 compaction 不可阻断的逻辑矛盾与两层解法 |
 | `SSOT/01.md` 的 `ARCH-009` | SSOT 例外 2：有界并发与共享原语契约，为 `mapBounded` 补的条款 |
 | `STATUS/evidence/` | 机器输出与 Host 行为证据，绑定 commit |
-| `PENDING/` | 已审阅通过但未合并的 SSOT 修正动议。合并前不是规范，不得据以改代码 |
+| `PENDING/` | 已审阅通过但未合并的 SSOT 修正动议。合并前不是规范，不得据以改代码。合并后移入 `STATUS/design-*.md` 并加性质声明头 |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
