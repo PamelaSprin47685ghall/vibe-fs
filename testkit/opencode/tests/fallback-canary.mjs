@@ -1,4 +1,4 @@
-/** fallback-canary — data-driven. Script: scripts/fallback.json
+/** fallback-canary — data-driven. Scenario: scripts/fallback.toml
  *
  * Product semantics: Fallback belongs to a Logical Run. New Authority Root
  * resets Failures=0/Side=A. Omit-model inherits LastAuthority.BaseModel only,
@@ -18,4 +18,4 @@ import { runStaticGate } from '../index.js';
 if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('fallback canary static gate failed');
 }
-process.exit(await runCanary('fallback.json'));
+process.exit(await runCanary('fallback'));

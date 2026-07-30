@@ -1,5 +1,5 @@
 /**
- * host-nudge-canary — data-driven. Script: scripts/host-nudge.json
+ * host-nudge-canary — data-driven. Scenario: scripts/host-nudge.toml
  * After manager-fork-nudge, prove exact completed fork tool before abort.
  */
 import assert from 'node:assert/strict';
@@ -69,30 +69,14 @@ if (!runStaticGate([__filename]).passed) {
   throw new Error('host-nudge canary static gate failed');
 }
 
-// Inject prove step by wrapping runCanary with a custom flow step after scripts load:
-// host-nudge.json ends with abort; we use custom map for 'proveNudge' if present.
-// Add prove via customs + script load: patch flow at runtime by re-export.
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath as fup } from 'node:url';
-import { resolveScriptPath } from '../script-loader.js';
-
-const scriptPath = resolveScriptPath('host-nudge.json');
-const doc = JSON.parse(fs.readFileSync(scriptPath, 'utf8'));
-// Insert prove custom before abort if missing
-const flow = doc.flow || [];
-const hasProve = flow.some((s) => s.custom === 'proveNudge');
-if (!hasProve) {
-  const abortIdx = flow.findIndex((s) => s.abort);
-  if (abortIdx >= 0) flow.splice(abortIdx, 0, { custom: 'proveNudge' });
-  else flow.push({ custom: 'proveNudge' });
-  doc.flow = flow;
-  // write temp next to script? runCanary reads file - write back to script
-  fs.writeFileSync(scriptPath, JSON.stringify(doc, null, 2) + '\n');
-}
-
+// The `{ custom = "proveNudge" }` step is declared in the scenario, ahead of `abort`.
+//
+// It used to be injected here: this file read the JSON, spliced a flow step in, and WROTE
+// THE SCENARIO FILE BACK to disk on every run. A canary that edits its own scenario cannot
+// be reasoned about — the file in git was not the file that ran, and a failed run left the
+// mutation behind for the next one.
 process.exit(
-  await runCanary('host-nudge.json', {
+  await runCanary('host-nudge', {
     customs: { proveNudge: proveNudgeForkCompleted },
   }),
 );

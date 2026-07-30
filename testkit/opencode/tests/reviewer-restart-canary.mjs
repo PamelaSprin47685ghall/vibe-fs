@@ -1,5 +1,5 @@
 /**
- * reviewer-restart-canary — data-driven. Script: scripts/reviewer-restart.json
+ * reviewer-restart-canary — data-driven. Scenario: scripts/reviewer-restart.toml
  * Verdict tool surface intact across restart via flow createChild + restart.
  */
 import assert from 'node:assert/strict';
@@ -25,4 +25,4 @@ async function oracleCheck(scenario, ctx, step) {
 }
 
 if (!runStaticGate([__filename]).passed) process.exit(1);
-process.exit(await runCanary('reviewer-restart.json', { customs: { oracle: oracleCheck } }));
+process.exit(await runCanary('reviewer-restart', { customs: { oracle: oracleCheck } }));

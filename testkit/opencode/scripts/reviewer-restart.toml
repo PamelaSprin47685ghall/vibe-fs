@@ -74,3 +74,22 @@ user = "Review the tree and submit a PERFECT verdict."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
+
+# COMPANION-002: every Managed Work Session gets exactly one Companion, so a scenario with a
+# work session must say what its Blogger replies — otherwise production sends a request the
+# forest cannot answer and the run fail-stops.
+#
+# Measured in K9: four scenarios were missing this, and all four were red before the rewrite
+# for exactly this reason. No lane, because the prompt is composed from the delta alone
+# (`../next/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
+#
+# The declared text is the sentence all three production shapes share — delta (:77),
+# post-restart re-anchor (:72) and condense (:118) — so one turn answers whichever fires.
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }

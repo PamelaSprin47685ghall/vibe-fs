@@ -1,5 +1,5 @@
 /**
- * reviewer-verdict-canary — data-driven. Script: scripts/reviewer-verdict.json
+ * reviewer-verdict-canary — data-driven. Scenario: scripts/reviewer-verdict.toml
  * 3 sessions via flow createSession; custom oracle for journal assertions.
  */
 import assert from 'node:assert/strict';
@@ -74,4 +74,4 @@ async function oracleCheck(scenario, ctx, step) {
 }
 
 if (!runStaticGate([__filename]).passed) process.exit(1);
-process.exit(await runCanary('reviewer-verdict.json', { customs: { oracle: oracleCheck } }));
+process.exit(await runCanary('reviewer-verdict', { customs: { oracle: oracleCheck } }));

@@ -56,6 +56,19 @@ export class ScenarioRuntime {
   }
 
   /**
+   * A Host restart makes every previous seal incomparable.
+   *
+   * The new process rebuilds its request view from the journal, so the next request is a
+   * fresh baseline rather than a continuation — comparing it against the pre-restart wire
+   * would report an ARCH-004 break for something that is not one. Deliveries and answers
+   * survive: `attempts` counts physical deliveries across the whole scenario, and a step
+   * answered before the restart was still answered.
+   */
+  clearSeals() {
+    this.seals.clear();
+  }
+
+  /**
    * Decide one chat request. Six outcomes, and every one is terminal for this request.
    *
    *   { unmatched }    nothing declared here — fail closed, never a default reply

@@ -479,6 +479,26 @@ user = "go on"
   },
 
   {
+    name: 'COMPANION-002 every scenario declares its Companion turn',
+    fn: () => {
+      // The other half of the rule. A lane-bound blogger turn answers too few sessions (the
+      // case above); NO blogger turn answers none at all, and production sends the request
+      // regardless — COMPANION-002 attaches a Companion to every Managed Work Session, and
+      // every scenario in this forest has at least one.
+      //
+      // Measured in K9: four scenarios (executor, fallback-aabb-trace, process-stress,
+      // reviewer-restart) had no declaration and all four fail-stopped on the Blogger
+      // request. A missing declaration is silent at load time and fatal at run time, which
+      // is precisely the asymmetry a load-time gate should remove.
+      const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
+        (file) => !readFileSync(file, 'utf8').includes('You are the blogger of a coding agent session.'),
+      );
+
+      assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);
+    },
+  },
+
+  {
     name: 'VERIFY-003 every scenario is already formatted',
     fn: () => {
       // `gate:toml` enforces this in CI, but that is a separate npm script: a scenario could

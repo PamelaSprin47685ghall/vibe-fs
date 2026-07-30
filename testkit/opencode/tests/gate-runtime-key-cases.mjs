@@ -67,18 +67,38 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 kind is read from position, not from prose matching',
+    name: 'VERIFY-003 kind is read from the preamble, not from position 0',
     fn: () => {
-      // The marker must be `messages[0]`. A user quoting the phrase mid-conversation is
-      // having an ordinary chat turn, and treating it as a title request would answer
-      // it with a title.
-      assertEq(kindOf(request([user('Generate a title for this conversation: no really')])), 'title');
+      // This case previously asserted the marker must be at `messages[0]` and cited
+      // `prompt.ts:235` for it. Measured against a live Host in K9, a real title request is:
+      //
+      //   roles   ["system", "user", "user"]
+      //   [0]     "You are a title generator. You output ONLY a thread title…"
+      //   [1]     "Generate a title for this conversation:\n"
+      //
+      // The title agent's system prompt comes first. So the old assertion was not merely
+      // incomplete — it pinned the WRONG position, every title request classified as `chat`,
+      // and no title turn could ever match. The case passed because its fixture built the
+      // shape the code expected.
+      assertEq(kindOf(titleRequest('Ship it.')), 'title', 'marker after a system preamble');
       assertEq(
-        kindOf(request([user('hello'), user('Generate a title for this conversation:')])),
-        'chat',
-        'the marker only counts at position 0',
+        kindOf(request([
+          { role: 'system', content: 'You are a title generator.' },
+          user('Generate a title for this conversation:\n'),
+          user('Ship it.'),
+        ])),
+        'title',
+        'the measured production shape',
       );
-      assertEq(kindOf(request([{ role: 'system', content: 'Generate a title for this conversation:' }])), 'chat');
+
+      // Still bounded: the marker is a preamble, so a real turn cannot push it back. A user
+      // quoting the phrase deep in a conversation is having an ordinary chat turn, and
+      // answering it with a title would be the prose-matching this avoids.
+      assertEq(
+        kindOf(request([user('a'), user('b'), user('c'), user('d'), user('Generate a title for this conversation:')])),
+        'chat',
+        'beyond the preamble it is just text',
+      );
       assertEq(kindOf(request([])), 'chat');
     },
   },
@@ -304,13 +324,29 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 the session id comes from the wire, not from harness headers',
+    name: 'VERIFY-003 the session id is a request HEADER, not a body field',
     fn: () => {
-      // `__testkitHeaders` used to be a fallback here. Reading it lets the mock
-      // answer from its own bookkeeping rather than from what the provider received.
-      assertEq(sessionIdOf({ sessionID: 'ses_a' }), 'ses_a');
-      assertEq(sessionIdOf({ sessionId: 'ses_b' }), 'ses_b');
-      assertEq(sessionIdOf({ __testkitHeaders: { 'x-session-id': 'ses_c' } }), null);
+      // This case previously asserted the opposite — that a header must be IGNORED — and it
+      // was the reason every lane came back unbound on a real request.
+      //
+      // Measured: `../opencode/packages/opencode/src/session/llm/request.ts:197` sets
+      // `x-session-affinity` and `X-Session-Id` on every non-`opencode` provider request,
+      // and the body carries no session field at all. These are PRODUCTION headers a real
+      // provider receives, so VERIFY-003 permits reading them; what it forbids is harness
+      // bookkeeping, and the confusion came from the capture field being named
+      // `__testkitHeaders` — the name says harness, the contents are the wire.
+      assertEq(sessionIdOf({ __testkitHeaders: { 'x-session-affinity': 'ses_a' } }), 'ses_a');
+      assertEq(sessionIdOf({ __testkitHeaders: { 'x-session-id': 'ses_b' } }), 'ses_b');
+      assertEq(
+        sessionIdOf({ __testkitHeaders: { 'x-opencode-session': 'ses_c' } }),
+        'ses_c',
+        'the first-party provider branch sets a different header for the same value',
+      );
+
+      // Body fields remain a fallback so a unit fixture can build a request without headers.
+      // They are not what production sends, which is exactly what this case failed to notice
+      // for as long as every fixture used them.
+      assertEq(sessionIdOf({ sessionID: 'ses_d' }), 'ses_d');
       assertEq(sessionIdOf({}), null);
     },
   },

@@ -6,7 +6,7 @@ import { runStaticGate } from '../index.js';
 if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('orchestrator-restart-publish canary static gate failed');
 }
-let code = await runCanary('orchestrator-restart-publish.json');
+let code = await runCanary('orchestrator-restart-publish');
 if (code !== 0) process.exit(code);
-code = await runCanary('orchestrator-restart-publish-conflict.json');
+code = await runCanary('orchestrator-restart-publish-conflict');
 process.exit(code);

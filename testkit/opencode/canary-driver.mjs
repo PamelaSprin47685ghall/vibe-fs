@@ -1,9 +1,23 @@
 /**
- * Shared canary driver. All canaries: node canary-driver.mjs <script.json>
- * (or import { runCanary } from '../canary-driver.mjs')
+ * canary-driver.mjs — one driver, one static TOML scenario per canary.
  *
- * Only the JSON script differs. Flow is data-driven; mock replies are scripts[].
- * First script mismatch already fail-stops the process (StrictMock onFatal).
+ *   node canary-driver.mjs process-stress        (or `runCanary('process-stress')`)
+ *
+ * The scenario file says what the model replies and what order things must happen in; this
+ * file turns the flow verbs into real Host calls. A request the scenario does not declare
+ * fail-stops the run immediately (StrictMock `onFatal`).
+ *
+ * ── what K9 removed here ────────────────────────────────────────────────────
+ *
+ * `loadScripts` — swapping in more edges mid-run. §8 retires it: a scenario is one static
+ * file and a restart does not change what the model would say. Measured while converting:
+ * one of the two recovery files it loaded was byte-identical to edges the main file already
+ * declared, and the other was `scripts: []` — an empty swap indistinguishable at runtime
+ * from a meaningful one.
+ *
+ * `readScript` + `loadScripts` reading the same file twice. The scenario is compiled once
+ * and the harness keys ride on the compiled object, so there is no second reader to
+ * disagree with the first.
  */
 
 import assert from 'node:assert/strict';
@@ -19,7 +33,27 @@ import {
 } from './index.js';
 import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
 import { bindLaneSession } from './tests/lane.mjs';
-import { loadScripts, readScript, resolveScriptPath } from './script-loader.js';
+import { requestKindOf } from './strict-mock-matches.js';
+import { compileScenario } from './scenario-schema.js';
+import { ScenarioRuntime } from './scenario-runtime.js';
+
+const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'scripts');
+
+/**
+ * Compile the named scenario, or fail with every problem at once.
+ *
+ * A scenario that half-loads is a scenario whose author believes something is covered and
+ * it is not — so there is no partial mode, and the problems are thrown rather than logged.
+ */
+function loadScenario(name) {
+  const file = path.isAbsolute(name)
+    ? name
+    : path.join(SCENARIO_DIR, name.endsWith('.toml') ? name : `${name}.toml`);
+
+  const result = compileScenario(fs.readFileSync(file, 'utf8'), { name: path.basename(file) });
+  if (!result.ok) throw new Error(`scenario did not compile:\n  ${result.problems.join('\n  ')}`);
+  return result.scenario;
+}
 
 function countFact(workDir, factName) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
@@ -127,12 +161,6 @@ async function runFlow(scenario, doc, ctx) {
     }
     if (step.restart) {
       await scenario.restart();
-      continue;
-    }
-    if (step.loadScripts) {
-      // Append more linear scripts after a real first-message boundary (e.g. restart).
-      // Not a phase system — just more script heads that only exist from this point on.
-      loadScripts(scenario.provider, step.loadScripts);
       continue;
     }
     if (step.awaitTerminal) {
@@ -314,6 +342,36 @@ async function runFlow(scenario, doc, ctx) {
       assert.equal(extra.length, 0, `extra worktrees remain: ${worktrees}`);
       continue;
     }
+    if (step.assertModelTrajectory) {
+      // FALLBACK-002's provider-visible A/A/B/B evidence, as an assertion rather than a
+      // matching input. PROMPT-008 makes `AttemptExecutionProfile` the only source of the
+      // effective model, so the model on the wire is a CONCLUSION of the run — a scenario
+      // that matched on it would silently agree with whatever the cursor did.
+      //
+      // The lane is resolved through the session binding, so this counts only requests that
+      // belong to the Logical Run under test. The old canary filtered by two hard-coded
+      // prompt substrings instead, which also swept in any other session that happened to
+      // send the same text.
+      const claim = step.assertModelTrajectory;
+      const sessionId = scenario.provider.sessionFor(claim.lane);
+      assert.ok(sessionId, `assertModelTrajectory lane '${claim.lane}' is not bound`);
+
+      const models = (scenario.provider.requests || [])
+        .filter((request) => (request?.sessionID ?? request?.sessionId) === sessionId)
+        .filter((request) => requestKindOf(request) === 'chat')
+        .map((request) => {
+          const model = request?.model;
+          return typeof model === 'string' ? model : (model?.modelID ?? model?.id ?? null);
+        });
+
+      // Exact, and deliberately so. The old canary carried a
+      // `rawModels.length === 5 → slice(1)` normalization to tolerate a duplicated first
+      // attempt — assertion weakening of the kind VERIFY-002 forbids. If the Host ever does
+      // deliver that duplicate, this must fail and be explained.
+      assert.deepEqual(models, claim.models, `model trajectory for lane ${claim.lane}`);
+      ctx.modelTrajectory = models;
+      continue;
+    }
     if (step.assertPtyEcho) {
       const results = [];
       for (const request of scenario.provider.requests || []) {
@@ -347,23 +405,21 @@ async function runFlow(scenario, doc, ctx) {
   }
 }
 
-export async function runCanary(scriptPath, { customs } = {}) {
-  const abs = resolveScriptPath(scriptPath);
-  const doc = readScript(abs);
-  // Static gate on the script file path is not useful; gate the driver caller.
+export async function runCanary(scriptName, { customs } = {}) {
+  const doc = loadScenario(scriptName);
   let scenario;
   const ctx = { customs: customs || {} };
   try {
     scenario = await setupScenario({
       project: doc.setup?.project || { files: {} },
       strict: doc.setup?.strict !== false,
-      extraEnv: doc.setup?.env || doc.env || {},
-      watchdogLabel: doc.setup?.watchdogLabel || doc.scenario,
+      extraEnv: doc.setup?.env || {},
+      watchdogLabel: doc.setup?.watchdogLabel || doc.name,
     });
 
-    loadScripts(scenario.provider, abs);
+    scenario.provider.attachScenario(new ScenarioRuntime(doc));
 
-    const agent = doc.session?.agent || doc.prompt?.agent || doc.prompts?.[0]?.agent;
+    const agent = doc.session?.agent || doc.prompt?.agent;
     if (agent || doc.session) {
       const created = await scenario.client.createSession({ agent: doc.session?.agent });
       ctx.sessionId = getSessionId(created);
@@ -373,22 +429,19 @@ export async function runCanary(scriptPath, { customs } = {}) {
       if (bind?.length) bindLaneSession(scenario.provider, ctx.sessionId, ...bind);
     }
 
-    // Optional initial prompts (before flow)
-    const prompts = doc.prompts || (doc.prompt ? [doc.prompt] : []);
-    for (const p of prompts) {
+    if (doc.prompt) {
       ctx.turn = scenario.turn.start(ctx.sessionId);
-      await sendPrompt(scenario, ctx.sessionId, p);
+      await sendPrompt(scenario, ctx.sessionId, doc.prompt);
     }
 
     await runFlow(scenario, doc, ctx);
 
-    if (doc.pass) console.log(doc.pass);
-    else console.log(`${doc.scenario} canary passed.`);
+    console.log(doc.pass ?? `${doc.name} canary passed.`);
 
     await teardownScenario(scenario);
     return 0;
   } catch (error) {
-    console.error(`${doc.scenario} canary failed: ${error.stack || error}`);
+    console.error(`${doc.name} canary failed: ${error.stack || error}`);
     if (scenario?.provider?.unexpectedRequests?.length) {
       console.error(JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 3)));
     }
@@ -409,12 +462,12 @@ export async function runCanary(scriptPath, { customs } = {}) {
   }
 }
 
-// CLI: node canary-driver.mjs scripts/foo.json
+// CLI: node canary-driver.mjs process-stress
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const script = process.argv[2];
   if (!script) {
-    console.error('usage: node canary-driver.mjs <script.json>');
+    console.error('usage: node canary-driver.mjs <scenario>');
     process.exit(2);
   }
   process.exit(await runCanary(script));

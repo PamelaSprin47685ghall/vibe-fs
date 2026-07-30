@@ -39,6 +39,7 @@ import {
   readRequestBody,
 } from './strict-mock-server.js';
 import { checkSatisfied } from './strict-mock-satisfy.js';
+import { faultBody } from './delivery-plan.js';
 import { StrictMockSignals } from './strict-mock-signals.js';
 import { WATCHDOG_TIMEOUT_MS } from './watchdog-constants.js';
 import { respond } from './strict-mock-responses.js';
@@ -56,6 +57,8 @@ export class StrictMockProvider {
     this._url = null;
     this._signals = new StrictMockSignals();
     this._afterExpectation = new Map();
+    /** @type {import('./scenario-runtime.js').ScenarioRuntime | null} */
+    this._scenario = null;
     this.onRequest = null;
     this.onExpectationConsumed = null;
     /** First unmatched script: canary must stop. Scenario wires process.exit. */
@@ -105,7 +108,46 @@ export class StrictMockProvider {
     });
   }
 
-  expectSatisfied() { checkSatisfied(this._state); }
+  /**
+   * Drive this provider from a compiled TOML scenario (K9).
+   *
+   * Mutually exclusive with `expect*` by construction: `_dispatchChat` consults the
+   * runtime when one is attached and never touches the edge list. The two paths must not
+   * interleave — an `expect*` edge and a declared turn answering the same request is the
+   * ambiguity the whole forest rebuild exists to remove.
+   */
+  attachScenario(runtime) {
+    if (this._state.edges.length > 0) {
+      throw new Error('a scenario cannot be attached to a provider that already has expect* edges');
+    }
+    this._scenario = runtime;
+  }
+
+  expectSatisfied() {
+    if (this._scenario === null) return checkSatisfied(this._state);
+
+    const errors = [];
+    if (this._state.fatal) {
+      const f = this._state.fatal;
+      errors.push(`FIRST SCRIPT MISMATCH (mock stopped): reason=${f.reason} session=${f.sessionId} lastUser=${JSON.stringify(f.lastUser)} candidates=${JSON.stringify(f.candidates)}`);
+    }
+
+    // A declared step no request reached. `internal` turns are exempt (production decides
+    // whether to compose them at all) — a scenario that needs one says `must`.
+    const unanswered = this._scenario.unanswered();
+    if (unanswered.length > 0) {
+      errors.push(`declared but never reached = ${unanswered.length}:\n${unanswered.slice(0, 5).map((e) => `  [${e.id}] lane=${e.lane ?? '(any)'} step=${e.step} respond=${e.respond?.type}`).join('\n')}`);
+    }
+
+    const unmet = this._scenario.unmetMust();
+    if (unmet.length > 0) errors.push(`must not satisfied: ${unmet.join(', ')}`);
+
+    if (this._state.unexpected.length > 0) {
+      errors.push(`unexpected requests = ${this._state.unexpected.length}: ${JSON.stringify(this._state.unexpected.slice(0, 3).map((u) => u.reason))}`);
+    }
+
+    if (errors.length > 0) throw new Error(`Scenario assertions failed:\n${errors.join('\n')}`);
+  }
   reset() {
     resetState(this._state);
     this._afterExpectation.clear();
@@ -116,11 +158,13 @@ export class StrictMockProvider {
     const bound = this._state.sessionBindings.get(alias);
     if (bound && bound !== sessionID) throw new Error(`StrictMock session alias ${alias} is already bound`);
     this._state.sessionBindings.set(alias, sessionID);
+    this._scenario?.bind(alias, sessionID);
   }
 
   /** Host restart / new process: old provider-visible seals are not comparable. */
   clearPrefixSeals() {
     this._state.sealedBySession.clear();
+    this._scenario?.clearSeals();
   }
   /// Read-only: which session (if any) currently owns an alias. Lets a scenario
   /// route a second session to a distinct alias instead of throwing on rebind.
@@ -227,6 +271,75 @@ export class StrictMockProvider {
       });
   }
 
+  /**
+   * One request against the compiled scenario (K9).
+   *
+   * The seal, the fault plan and the content lookup all live in `ScenarioRuntime`; this
+   * method only turns its verdict into HTTP. Nothing here inspects the request — that
+   * would be a second matcher, which is what K1-K8 spent their whole effort removing.
+   */
+  _dispatchScenario(res, parsed) {
+    const selection = this._scenario.select(parsed);
+
+    if (selection.unmatched !== undefined) {
+      const key = selection.unmatched.key;
+      return this._recordUnexpected(
+        res,
+        parsed,
+        'no-declared-turn',
+        selection.unmatched.candidates.map((entry) => ({ expectation: entry })),
+        `lane=${key.lane ?? '(unbound)'} kind=${key.kind} step=${key.step}`,
+      );
+    }
+    if (selection.ambiguous !== undefined) {
+      return this._recordUnexpected(
+        res,
+        parsed,
+        'ambiguous-turn',
+        selection.ambiguous.entries.map((entry) => ({ expectation: entry })),
+      );
+    }
+    if (selection.sealBroken !== undefined) {
+      return this._recordUnexpected(res, parsed, `seal-${selection.sealBroken.reason}`, []);
+    }
+
+    this._scenario.consume(parsed, selection);
+    this._state.requests.push(parsed);
+
+    // A fault is a transport outcome, so it wakes NOTHING. `wait` is a causal barrier on
+    // content arriving; waking it on a refused delivery would let a flow proceed past a
+    // step the model never answered.
+    if (selection.fault !== undefined) {
+      const fault = selection.fault;
+      if (fault.kind === 'disconnect') {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+        return res.destroy();
+      }
+      return sendJSON(res, fault.status ?? 500, faultBody(fault));
+    }
+
+    const entry = selection.entry;
+    // Both the step id and its turn id, so a flow may wait on either granularity —
+    // `wait = "mgr"` for "the turn happened" and `wait = "mgr.1"` for a specific step.
+    for (const id of new Set([entry.id, entry.turnId])) {
+      this._signals.consume({ id, permanent: true });
+      this._runAfterExpectation(id);
+    }
+
+    if (process.env.MOCK_TRACE) {
+      console.error(`[MOCK-TRACE] -> ${entry.id} lane=${entry.lane ?? '(any)'} step=${entry.step} attempt=${selection.attempt}`);
+    }
+
+    this.onExpectationConsumed?.({
+      id: entry.id,
+      lane: { scenario: this._scenario.scenario.name, session: entry.lane, role: entry.turnId, requestKind: entry.kind },
+      blocking: true,
+      requestKind: entry.kind,
+    });
+
+    return respond(this._state, res, entry, parsed);
+  }
+
   _dispatchChat(res, parsed) {
     this.onRequest?.(parsed);
     const s = this._state;
@@ -257,13 +370,15 @@ export class StrictMockProvider {
     // declaration (VERIFY-003, package K4).
     const sessionID = requestSessionOf(parsed);
     const kind = requestKindOf(parsed);
-    if (sessionID && kind === 'chat') {
+    if (this._scenario === null && sessionID && kind === 'chat') {
       const sealed = s.sealedBySession.get(sessionID);
       if (!sealHolds(sealed, parsed)) {
         this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', []);
         return;
       }
     }
+
+    if (this._scenario !== null) return this._dispatchScenario(res, parsed);
 
     const selection = selectExpectation(s, parsed);
     if (selection.match) return this._dispatchMatched(res, parsed, selection.match);
@@ -301,16 +416,22 @@ export class StrictMockProvider {
     return respond(this._state, res, exp, parsed);
   }
 
-  _recordUnexpected(res, parsed, reason, candidates = []) {
+  _recordUnexpected(res, parsed, reason, candidates = [], detail = '') {
     const sessId = requestSessionOf(parsed) || '(no-session-id)';
     const parentSessionId = requestParentSessionOf(parsed) || null;
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
-    const candidateLabels = candidates.map(({ expectation }) => edgeLabel(expectation));
+    // A scenario entry carries `lane` as a plain alias string; a legacy edge carries a lane
+    // record. Both label here so one diagnostic path serves both dispatchers.
+    const candidateLabels = candidates.map(({ expectation }) =>
+      typeof expectation.lane === 'object' || expectation.lane === undefined
+        ? edgeLabel(expectation)
+        : `${expectation.id}@${expectation.lane}/${expectation.kind}/step-${expectation.step}`,
+    );
     const lastUser = extractLastUserMsg(parsed);
     const fatal = {
       id: `unexpected-${this._state.unexpected.length + 1}`,
-      reason,
+      reason: detail === '' ? reason : `${reason} (${detail})`,
       sessionId: sessId,
       parentSessionId,
       lastUser: typeof lastUser === 'string' ? lastUser.slice(0, 400) : JSON.stringify(lastUser).slice(0, 400),

@@ -452,6 +452,14 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     scenario: {
       name: raw.scenario,
       description: raw.description,
+      // Harness-facing keys, passed through rather than compiled: they configure the
+      // workspace and the first prompt, and none of them participates in matching. Kept on
+      // the same object so a driver compiles ONCE — reading the file twice was how the JSON
+      // era ended up with `readScript` and `loadScripts` disagreeing about the same file.
+      setup: raw.setup ?? {},
+      session: raw.session,
+      prompt: raw.prompt,
+      pass: raw.pass,
       must: raw.must ?? [],
       flow: raw.flow ?? [],
       entries,

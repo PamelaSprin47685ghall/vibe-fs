@@ -71,11 +71,40 @@ export function lanesOf(body, bindings) {
 /**
  * The session id the Host put on this request.
  *
- * `__testkitHeaders` is deliberately absent. Reading harness-injected headers here
- * would let the mock answer from its own bookkeeping instead of from the wire, and
- * VERIFY-003 forbids the mock observing anything the provider cannot see.
+ * ── measured: it is a HEADER, and the body never carries it ─────────────────
+ *
+ * This function read `body.sessionId ?? body.sessionID` and nothing else, so on a real
+ * request it returned `null` — every lane unbound, every request unmatched. The gate
+ * cases did not catch it because their fixtures were hand-built objects carrying a
+ * `sessionID` field the wire has never had. A test that manufactures the data it is
+ * checking for proves only that the checker reads the field the test invented.
+ *
+ * OpenCode sets three headers on every non-`opencode` provider request
+ * (`../opencode/packages/opencode/src/session/llm/request.ts:197`):
+ *
+ *   x-session-affinity   input.sessionID
+ *   X-Session-Id         input.sessionID
+ *   x-parent-session-id  input.parentSessionID, when there is one
+ *
+ * These are PRODUCTION headers, not harness bookkeeping — a real provider receives them,
+ * so VERIFY-003 permits reading them. That distinction was blurred by the capture field
+ * being named `__testkitHeaders`: the name says "harness", the contents are the wire.
+ *
+ * `x-opencode-session` is the same value under the first-party provider branch. Both are
+ * read because a scenario should not depend on which provider id the Host was configured
+ * with.
  */
+const HEADER_SESSION_KEYS = ['x-session-affinity', 'x-session-id', 'x-opencode-session'];
+
 export function sessionIdOf(body) {
+  const headers = body?.__testkitHeaders ?? {};
+  for (const key of HEADER_SESSION_KEYS) {
+    const value = headers[key];
+    if (typeof value === 'string' && value !== '') return value;
+  }
+
+  // Body fields are kept as a fallback so unit fixtures can build a request without
+  // spelling headers, but they are NOT what production sends.
   const id = body?.sessionId ?? body?.sessionID ?? null;
   return typeof id === 'string' && id !== '' ? id : null;
 }
@@ -83,35 +112,54 @@ export function sessionIdOf(body) {
 // ── kind ────────────────────────────────────────────────────────────────────
 
 /**
- * The Host's own title marker, prepended as the FIRST message.
+ * The Host's own title marker, and where it actually appears.
  *
- * `../opencode/packages/opencode/src/session/prompt.ts:235`
- *   messages: [{ role: "user", content: "Generate a title for this conversation:\n" }, ...msgs]
+ * ── measured: not at messages[0] ────────────────────────────────────────────
  *
- * So a title request carries the whole conversation after the marker, and `turnOf`
- * reads the LAST user message — which is the same text the ordinary chat request for
- * that turn carries. Measured: the two produce an identical `turn` and an identical
- * `step`, so without a fourth component a title edge and a chat edge collide.
+ * The comment this replaces cited `prompt.ts:235` for
+ * `messages: [{ role: "user", content: "Generate a title…" }, ...msgs]` and so tested
+ * `messages[0].role === 'user'`. The real request is:
+ *
+ *   roles   ["system", "user", "user"]
+ *   [0]     "You are a title generator. You output ONLY a thread title…"
+ *   [1]     "Generate a title for this conversation:\n"
+ *
+ * The title agent's system prompt comes first, so the marker is at [1]. With the old
+ * check every title request classified as `chat`, and no title entry could ever match.
+ *
+ * Both defects here — this one and `sessionIdOf` — were invisible to 175 green gate
+ * cases because the fixtures built bodies in the shape the code expected. Hence
+ * `gate-lane-cases.mjs`, which posts to a live mock: the shape has to come from the
+ * Host, not from the test author's memory of it.
+ *
+ * Scanning for the marker instead of indexing a fixed position: the number of leading
+ * system messages is a Host prompt-assembly detail, and pinning it here would make this
+ * function wrong again the next time that assembly changes.
  */
 const TITLE_MARKER = 'Generate a title for this conversation:';
 
+/** How far in to look. The marker is a preamble; a real turn cannot push it back. */
+const TITLE_PREAMBLE_LIMIT = 4;
+
 /**
- * `title` or `chat`. Read from position, not from prose matching.
+ * `title` or `chat`. Read from the marker's presence in the preamble, not from prose
+ * matching over the whole conversation.
  *
  * There is deliberately no `synthetic`. The old classifier had one, decided by
  * `NUDGE_MARKERS` — a table of production prompt sentences copied into the mock, which
  * the extinction list condemns as a cross-product dead heuristic. It is unnecessary
  * anyway: a nudge's LAST user message IS the nudge sentence, so `turnOf` already tells
  * it apart from any real turn. Only the title case needs help, because its marker sits
- * at `messages[0]` while `turnOf` looks at the end.
+ * in the preamble while `turnOf` looks at the end.
  */
 export function kindOf(body) {
-  const first = Array.isArray(body?.messages) ? body.messages[0] : undefined;
-  if (first?.role !== 'user') return 'chat';
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
 
-  const content = first.content;
-  const text = typeof content === 'string' ? content : '';
-  return text.startsWith(TITLE_MARKER) ? 'title' : 'chat';
+  for (const message of messages.slice(0, TITLE_PREAMBLE_LIMIT)) {
+    const content = message?.content;
+    if (typeof content === 'string' && content.startsWith(TITLE_MARKER)) return 'title';
+  }
+  return 'chat';
 }
 
 // ── turn ────────────────────────────────────────────────────────────────────
