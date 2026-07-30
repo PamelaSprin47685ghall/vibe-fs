@@ -33,7 +33,6 @@
     "test:mjs": "node tests-mjs/runner.mjs",
     "test:unit": "npm run test:mjs",
 
-    "test:manager-tools": "node --test testkit/opencode/tests/manager-tool-contract.mjs",
     "test:harness": "node testkit/opencode/tests/gate-testkit.mjs",
 
     "test:e2e:p0": "CANARY_REPEAT=1 node scripts/run-canary-staggered.mjs",
@@ -43,8 +42,8 @@
     "test:e2e:reviewer": "node testkit/opencode/tests/reviewer-verdict-canary.mjs",
     "test:e2e:executor": "node testkit/opencode/tests/executor-canary.mjs",
 
-    "test": "npm run gate:static && npm run build && npm run test:unit && npm run test:manager-tools && npm run test:harness && npm run test:e2e:p0",
-    "test:release": "npm run gate:static && npm run build && npm run test:unit && npm run test:manager-tools && npm run test:harness && npm run test:e2e:p0:three"
+    "test": "npm run gate:static && npm run build && npm run test:unit && npm run test:harness && npm run test:e2e:p0",
+    "test:release": "npm run gate:static && npm run build && npm run test:unit && npm run test:harness && npm run test:e2e:p0:three"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.5.1",

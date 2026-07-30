@@ -12,7 +12,8 @@
 # `orchestrator.json` called itself the "tool-surface canary", and its extra content was
 # `forbiddenTools` lists. Those are retired: a tool set is part of the request identity, so
 # `tools` on the turn declares it, and a DIFFERENT tool set is a different turn rather than
-# a filter. The role surface itself is asserted by `manager-tool-contract`, which reads the
+# a filter. The role surface itself is asserted by `tests-mjs/Plugin/manager-tool-contract`,
+# which reads the
 # schemas directly instead of inferring them from what a mock refused to match.
 #
 # It was also broken. Its final edge matched `user = "Ship publish_proof.txt…"` — copied

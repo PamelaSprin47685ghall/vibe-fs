@@ -52,7 +52,6 @@ Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git �
 ```bash
 npm run build
 npm run test:mjs
-npm run test:manager-tools
 node testkit/opencode/tests/gate-testkit.mjs
 npm run test:e2e:p0:three
 ```

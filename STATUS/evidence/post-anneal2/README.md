@@ -93,4 +93,10 @@ guide-contract     10   VERIFY-005/008 生产入口可达性
 不采集 canary / E2E / `test:release` / `gate-testkit`。剧本 fixture 即将被包 K 整体
 重写为 TOML，采集旧结果不产生可用于新世界的判据。这四项在退火三采集。
 
-`test:manager-tools` 同理：它读 testkit 的 mock 森林，属包 K 的重写范围。
+`test:manager-tools` 当时也未采集，但本目录给出的理由是错的：它写「读 testkit 的 mock
+森林」，实测该测试唯一的项目 import 是 `build/next/OpenCode/SpikePlugin.js`，既无 mock
+provider 也无 HTTP、端口、HOME/XDG 隔离，只需 `git init` 到临时目录。它是放错目录的第 2 层
+资源契约测试，与剧本森林重写无关。真正该说的理由是：它当时已经是红的（见下）。
+
+该测试已于包 K 迁入 `tests-mjs/Plugin/manager-tool-contract.test.mjs`，`test:manager-tools`
+随之删除，覆盖面并入 `test:mjs`。

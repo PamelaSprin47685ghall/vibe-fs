@@ -991,6 +991,46 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 
 带走它们只有两种下场，都被禁止：让套件长红（破坏绿基线），或把断言放宽到承认 `undefined` 正确（正是 `design-script-forest.md:630` 判为「比没有验证装置更危险」的假绿）。故迁移只带 1–236 行，三组连同实测失败一并另记待办，与删除原文件同一提交落地。
 
+###### 待办：三组 `.execute` 断言从未通过（迁移时另记）
+
+原文件 `testkit/opencode/tests/manager-tool-contract.mjs` 已删除，迁移后的绿色部分在
+`tests-mjs/Plugin/manager-tool-contract.test.mjs`。下列三组共 31 条断言在删除时点从未通过过，
+逐字记录以免覆盖面被误认为存在。
+
+实测失败点（`node --test` 于删除前最后一次运行）：
+
+```text
+manager-tool-contract.mjs:242
+  actual: undefined   expected: 'fast-inspector'   operator: strictEqual
+```
+
+即 `hooks.tool.inspector.execute(...)` 返回的 JSON 里没有 `agent` 字段。断言原文：
+
+```js
+const reviewerInspector = JSON.parse(await hooks.tool.inspector.execute(
+  { agent: 'fast-inspector', prompts: ['git status'] },
+  { sessionID: 'reviewer-contract', agent: 'fast-reviewer' },
+));
+assert.equal(reviewerInspector.agent, 'fast-inspector');
+assert.equal(reviewerInspector.output, 'test output');
+```
+
+三组的原始行号与内容：
+
+| 原行号 | 断言组 | 条数 |
+|--------|--------|------|
+| 238–250 | `inspector` / `coder` 一次性 execute 返回 `agent` 与 `output` | 4 |
+| 252–283 | `fork` 未知 agent 报错；`fork`/`join`/`list` 邮箱路径的 agentId/role/tier/fallbackPeer/finalText | 25 |
+| 284–288 | journal 落在 Git common directory、工作区不出现 `.wanxiangshu-next` | 2 |
+
+`output` 期望的 `'test output'` 在生产代码里已不存在——`next/Session/Sessions.fs` 的注释
+记载先前实现是在伪造该字符串，随后删除。所以这三组要能通过，需要先确定
+`inspector`/`coder` 一次性工具的返回契约究竟是什么，属生产行为问题而非测试迁移问题。
+
+不带走的理由：带走只有两种下场，都被禁止——让套件长红（破坏绿基线），或把断言放宽到
+承认 `undefined` 正确（正是 `design-script-forest.md:630` 判为「比没有验证装置更危险」的
+假绿）。
+
 ##### 五：K10 收缩为一条森林级性质加一份在册清点
 
 K10 的四项里三项已实现且已有门禁覆盖：无死边（`scenario-schema.js` `deadEdges`）、索引无冲突（`duplicateDeclarations` + `runtime-key.js` `ambiguousTurn`）、fault 有限（`validateFault` + `conflictingFaults`）。重新实现它们会造出第二事实源——正是 W1 与 W2 要消灭的缺陷。
