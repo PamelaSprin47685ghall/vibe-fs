@@ -44,8 +44,6 @@ const CANARY_TESTS = [
   "testkit/opencode/tests/process-stress-canary.mjs",
   "testkit/opencode/tests/host-nudge-canary.mjs",
   "testkit/opencode/tests/host-restart-canary.mjs",
-  "testkit/opencode/tests/companion-replacement-canary.mjs",
-  "testkit/opencode/tests/companion-cache-canary.mjs",
   "testkit/opencode/tests/fallback-canary.mjs",
   "testkit/opencode/tests/fallback-aabb-trace-canary.mjs",
   "testkit/opencode/tests/orchestrator-canary.mjs",

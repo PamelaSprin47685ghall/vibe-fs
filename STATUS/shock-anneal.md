@@ -1130,7 +1130,38 @@ testkit/opencode/tests/run-data-driven.mjs         一个入口
 
 包 W 的实测缺陷之一「`CANARY_COUNT = 17` 而 `CANARY_TESTS` 实际 19 条，日志里的 `expected ~17` 是错的」在此顺带解决：清单成为唯一来源，数量由它派生，不再有第二处可漂移。这条跨包收益是把 K 与 W 排在同期的理由之一。
 
-余下 4 条内联 canary（companion / companion-cache / companion-replacement / manager-companion）不合并。它们是第 3 层轨迹：`expect*` 之外还有真实断言、文件读写、`execFileSync`。K8 对它们只做一件事——把内容声明搬进 TOML，把轨迹与断言留在 `.mjs`。
+余下 2 条内联 canary（companion-projection / manager-companion）不合并。它们是第 3 层轨迹：`expect*` 之外还有真实断言、文件读写、`execFileSync`。K8 对它们只做一件事——把内容声明搬进 TOML，把轨迹与断言留在 `.mjs`。
+
+原文写「4 条」，含 companion-cache 与 companion-replacement。包 K8d 实测两条都已随 X9 失效，予以淘汰，理由记在下方。
+
+##### 修订五：K8d 实测 —— 三条 companion 剧本的 JSON 文件零载入
+
+计入 19 条剧本的三个文件 `companion.json` / `companion-cache.json` / `companion-replacement.json` 都没有任何载入者。三个 canary 全部用 `provider.expect(...)` 在代码里注册期望（8 / 4 / 11 处），从不读 `scripts/`。把三个文件内容替换成 `NOT JSON` 后 `companion-cache` 与 `companion` 照常通过。
+
+在此之上，两条剧本的核心主张已随 X9 死亡：
+
+| 剧本 | 主张 | 实测 |
+|------|------|------|
+| `companion-cache` | `companion-b-head` 在各轮位置与内容不变 | 生产写入点 0。`CompanionTransform.fs:38` 只有一处 `StartsWith` 读取判断，无人写出该标记 |
+| `companion-replacement` 轮 3 与 resetfail | Blogger 收到 `Condense the following FULL companion context…` | `selfRebaseBlog` 调用点 0。触发者 `bloggerSelfRebaseDue` 已按 CTX-001 + CTX-002 删除 |
+
+`companion-cache` 因此落进 canary 的 `else` 分支并打印 `ℹ Prefix replacement did not activate within test rounds`，真正执行的断言退化为「消息数单调不减」——追加式对话永真。`companion-replacement` 则直接是红的（`[MOCK-FATAL] no-prefix-matched role=blogger`，等 `manager-blogger-3`），且工作区干净时即红，非本包引入。
+
+处置：
+
+```text
+companion.json                 删除文件（零载入）；角色无 sidecar 与两次投影两次 Blogger
+                               请求的内容由 companion-canary.mjs 完整承载
+companion-cache.*              整条淘汰。唯一主张无生产写入点，断言永真
+companion-replacement.*        整条淘汰。B′/self-rebase 半边无调用点；重锚半边是活的
+                               （bloggerNeedsReset 有 2 个写入点），债记在 K8f
+selfRebaseBlog                 删除生产函数（39 行）。与 applySquash 的 frame 序列形状
+                               不兼容，复用价值低于重写
+```
+
+被淘汰的两半正是 K8f 要按 SSOT/12 新建的题目：真实失败驱动的探针提升（CTX-012）与恢复槽内 squash（CTX-006）。把按旧语义写的剧本翻译成 TOML，只会得到一条检验不了新语义的剧本。
+
+K8f 因此多欠一条：重启后 FULL re-anchor 帧（`CompanionHost.fs:64,73` 的 `bloggerNeedsReset`）必须在 X 系列剧本里重新获得覆盖。这是本次淘汰唯一真正丢失的覆盖面。
 
 ##### 修订四：新增 K11 —— 森林的反向自检
 
@@ -1542,7 +1573,7 @@ turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squa
 | `shouldCompact` / `ensureCapacity` | 无（失败驱动） | CTX-002 | 0 | 0 |
 | `estimateTokens` / `estimateTokensUtf8` / `shouldSwitchEpoch` | 无（X9 新增行） | CTX-001 | 0 | 0 |
 | `CompanionBudgetStore` / `BudgetFacts` / `systemTransformHook` | 无（X9 新增行） | CTX-001 | 0 | 0 |
-| `bloggerSelfRebaseDue` / `TrySelfRebase` / `SelfRebase` | 恢复槽内 squash | CTX-006 | 0 | 0 |
+| `bloggerSelfRebaseDue` / `TrySelfRebase` / `SelfRebase` / `selfRebaseBlog` | 恢复槽内 squash | CTX-006 | 0 | 0 |
 | `LatestBBytes` 阈值判定 | 200 KiB 输入合同 | CTX-003 | 0 | 0 |
 | `OverflowPatterns` / `OverflowDetected` | 无（失败不分类） | CTX-005 | 0 | 0 |
 | `CompressionThreshold` / `SquashReason` | 无 | CTX-005 | 0 | 0 |
