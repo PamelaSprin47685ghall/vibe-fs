@@ -1,0 +1,29 @@
+npm notice run wanxiangshu@0.5.0-rc.1 build
+npm notice run node scripts/clean-fable-output.mjs build/next && dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @alfonsogarciacaro
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing next/Wanxiangshu.Next.fsproj...
+[39m[22m[37mProject and references (177 source files) parsed in 1595ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 10763ms
+
+[39m[22m[37m./next/OpenCode/ReconcileSupervisor.fs(28,13): (33,30) info FSHARP: XML comment is not placed on a valid language element. (code 3520)
+[39m[22m[37m./next/OpenCode/ReconcileSupervisor.fs(37,13): (47,71) info FSHARP: XML comment is not placed on a valid language element. (code 3520)
+[39m[22m[37mGenerating assembly...
+[39m[22m[37mAssembly generated in 6533ms
+[39m[22m[37mSaving precompiled info...
+[39m[22m[37mPrecompiled info saved in 157ms
+[39m[22mnpm notice run wanxiangshu@0.5.0-rc.1 postbuild
+npm notice run node scripts/postbuild.mjs
+✓ Copied package.json
+✓ Copied LICENSE
+Syncing assets...
+✓ Assets synced
+✓ Cleaned .gitignore
+Postbuild done.
