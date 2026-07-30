@@ -15,9 +15,9 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const SSOT_DIR = 'SSOT'
-const CLAUSE_RE = /\b(ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST)-(\d{3})\b/g
+const CLAUSE_RE = /\b(ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX)-(\d{3})\b/g
 const DEFINITION_RE =
-  /^##\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST)-\d{3})/gm
+  /^##\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX)-\d{3})/gm
 
 /** SSOT/00 声明的前缀 → 文件归属。硬编码是故意的：这是规范的一部分。 */
 const PREFIX_OWNER = {
@@ -32,6 +32,7 @@ const PREFIX_OWNER = {
   EXEC: '09.md',
   VERIFY: '10.md',
   PERSIST: '11.md',
+  CTX: '12.md',
 }
 
 /** SSOT 是规范，不是状态报告。这些词属于 STATUS/。 */

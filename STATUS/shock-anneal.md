@@ -10,11 +10,17 @@
 | 1 | 休克一：领域内核与持久事实（包 0） | 关闭 | 完成（包 0a–0e） |
 | 2 | 休克二：生产代码全部调用链（包 A–H） | 关闭 | 完成 |
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（`SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)） |
+| 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 进行中 |
 | 4 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 | 未开始 |
-| 5 | 退火一：恢复生产编译 | dotnet build → npm run build | 未开始 |
-| 6 | 退火二：恢复 mjs 单元套件 | test:next | 未开始 |
+| 5 | 退火一：恢复生产编译 | dotnet build → npm run build | 进行中（1a 约 70 个编译错误） |
+| 6 | 退火二：恢复 mjs 单元套件 | test:mjs | 未开始 |
+| 6.3 | 失败驱动上下文恢复（包 X） | 编译 + 第 0–3 层 | 未开始 |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
+
+阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在包 T 写测试前定稿，否则测试会锁定旧语义。
+
+包 X 排在退火二之后：它新增大量类型与 fold 校验，在无编译反馈下写等于盲改。它必须早于包 K，因为 X-A 至 X-D 四条剧本要与包 K 的 22 条一起手工写成 TOML。
 
 包 K 排在退火二之后、退火三之前：剧本的 lane 划分与 step 序列反映迁移后的生产行为，先重写会锁定旧语义；而它必须早于任何 canary 运行，因为旧剧本无法匹配新语义的请求。
 
@@ -561,11 +567,13 @@ PTY completion 的 `AgentName` 由 `AgentRole` 拼出 `fast-*`，无角色时得
 | 条款 | COMPANION-001 COMPANION-002 COMPANION-008 COMPANION-009 COMPANION-010 COMPANION-013 EXEC-008 HOST-005 HOST-006 |
 | 目标模块 | `Tools/MessageTransform.fs` `Session/Companion*.fs` `CompanionTransform.fs` `Journal/CompanionProjection.fs` |
 | 旧入口 | `MessageTransform.shouldCreateCompanion(agent)` 从 Agent 字符串判定 |
-| 新入口 | eligibility 只读 ActiveLogicalRun 的 `AttemptExecutionProfile.CanonicalRole` |
-| 必须删除 | `shouldCreateCompanion(agent)`；三次 busy skip 计数；child background 使用 FrozenB 的路径 |
-| 必须修正 | 六角色开启 Companion（含 Reviewer、Meditator、DevOps）；ARecord 按 ProviderRun 分段；child background 用最新 durable LatestB |
+| 新入口 | 无 eligibility 判定。Companion 由 `ManagedSessionKind` 决定（HOST-008），每个 Work Session 恰好一个叶子 Y |
+| 必须删除 | `shouldCreateCompanion(agent)` 及一切角色白名单；三次 busy skip 计数；child background 使用 FrozenB 的路径 |
+| 必须修正 | 全部工作角色开启 Companion（含 Inspector、Browser、Executor）；ARecord 按 ProviderRun 分段；child background 用最新 durable LatestB |
 | 生产 | UNTOUCHED |
 | 测试 | UNTOUCHED |
+
+本包在阶段 3.5 被 SSOT/12 修订：原「六角色开启 Companion」的白名单整体作废，改为 Session 种类不变量。实现时不得保留任何以 CanonicalRole 为输入的 Companion 判定函数——那正是被删除的语义。
 
 ### 包 F：Execution / Handle
 
@@ -766,6 +774,185 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 
 本包依赖包 A–H 完成：剧本的 lane 划分与 step 序列反映的是迁移后的生产行为，先重写剧本会锁定旧语义。因此排在休克三之后、退火三之前。
 
+包 X 新增四条剧本（X-A 至 X-D，见下），一并纳入 K8 的手工重写范围。
+
+### 包 X：失败驱动上下文恢复
+
+| 项 | 值 |
+|----|----|
+| 条款 | CTX-001…CTX-014 COMPANION-001…COMPANION-013 HOST-006 HOST-008 FALLBACK-011 FALLBACK-012 PROMPT-008 VERIFY-007 PERSIST-010 |
+| 目标模块 | `Session/Companion*.fs` `OpenCode/CompanionTransform.fs` `Journal/CompanionProjection.fs` `Session/FallbackController.fs` `OpenCode/Projection.fs` + 新增 delta/TOML/probe 模块 |
+| 设计定稿 | `STATUS/design-context-recovery.md`（归档原文，含设计演化与代价推理） |
+| 依赖 | 退火一（生产编译恢复）。本包新增大量类型与 fold，不能在无编译反馈下写 |
+| 生产 | 将改动 |
+| 测试 | 将改动 |
+
+本包替换的是既有机制的触发条件与投影内容，不是另建一套系统。modulo-4 cursor、PrefixEpoch、cutoff digest、synthetic 稳定身份、projection 分层、append-only journal 全部沿用。
+
+#### 子步骤
+
+```text
+X0  Host 源码确认（先于任何实现，见下方清单）
+X1  BlogFrame 数据模型 + BlogProjectionState + 三事实 fold（PERSIST-010）+ isValidTerminal
+    第 1 层纯函数测试；第 0 层静态门禁
+X2  静态灭绝旧机制（见灭绝表新增行）
+X3  delta 链路：SemanticCursor、CoverableTurnCutoff 推进、200 KiB 三级切块器、
+    确定性 TOML 发射器（CTX-013）+ 第 1 层测试
+X4  Companion 正常投影 + system/normal/squash prompt + synthetic ID 公式（COMPANION-013）
+    + 第 3 层 Fake Host 轨迹（busy skip、失败轮零帧、纯图片 turn）
+X5  Y squash + armed-by-advance 控制流 + 三结局分派（CTX-007）
+    + 第 3 层轨迹（squash 成功/失败、级联、预算耗尽）
+X6  ManagedSessionKind + SessionAssociation（HOST-008）；全部工作角色懒创建 Y；
+    Y 不递归；重启复用；X 删除时 Y 收敛
+X7  全局关闭 Host compaction（HOST-006）：配置、Hook 拒绝、autocontinue false、
+    启动能力门禁。此步未完成前不启用新 PrefixEpoch 逻辑
+X8  X probe：候选选择（CTX-011）、cutoff proof、FrozenB blob、attempt profile、
+    probe projection、promote/discard（CTX-012）、崩溃恢复
+X9  删除旧实现：主动 PrefixEpoch 更新、Host compaction rebase、角色 eligibility、
+    JSON Blogger delta、旧 Y transcript replay、错误字符串分类器、X 压缩请求
+X10 Canary 验收（X-A 至 X-D，随包 K 一并落地）
+```
+
+X7 必须早于 X8：两套压缩系统同时活着时，无法判断 PrefixEpoch 的变化来自 probe 还是 Host。
+
+#### X0：Host 源码确认清单
+
+按 ARCH-003 与 `AGENTS.md` 第 0 节，以下判断必须先读 `../opencode` 实际源码，不得只看 `.d.ts`，也不得只做黑盒实验：
+
+| # | 待确认 | 影响 |
+|---|-------|------|
+| 1 | `experimental.chat.messages.transform` 是否允许输出与物理 transcript 不同的消息集（含删除历史） | 整个 frame 投影可行性 |
+| 2 | transform 是否允许输出连续 user 消息 | COMPANION-005 投影形状 |
+| 3 | synthetic user ID 如何影响 assistant `parentID`；wire 上是否有 Host 侧校验冲突 | COMPANION-013 身份公式 |
+| 4 | transform 输出末条消息 id 是否必须等于物理末条 user 消息 id | delta 必须最后（COMPANION-005） |
+| 5 | transform 输入能否读取 Prompt metadata 或 request kind | squash 请求的直通方式 |
+| 6 | automatic compaction 的真实关闭位置 | HOST-006 |
+| 7 | overflow compaction 是否全部经过可拒绝 Hook | HOST-006 |
+| 8 | manual compaction 是否能被全局阻断 | HOST-006 |
+| 9 | autocontinue 的真实调用路径与条件 | HOST-006 |
+| 10 | Y 物理 transcript 中被投影删除的历史是否仍影响 Host 内部行为 | PERSIST-010 fold 唯一权威性 |
+
+不满足时调整投影方式或 fail closed。 不得修改 OpenCode 本体，不得要求上游加 Hook。第 6–9 项任一无法可靠关闭，则启动失败（HOST-006），不得静默运行两套压缩系统。
+
+#### 测试矩阵
+
+第 0 层静态门禁（并入 `architecture-gate`）：
+
+```text
+无第二个 Fallback cursor writer     无 context window 查询
+无 token 比例                       无主动 compact 判定
+无角色 Companion 白名单             无 Host compaction fallback
+无 PrefixProbe rollback 事实        无随机 synthetic ID
+```
+
+第 1 层纯函数：
+
+| 组 | 断言 |
+|----|------|
+| TOML | 同一输入逐字节相同；CRLF→LF；三引号选择正确；args 递归排序；末尾一个 LF；图片无内容；200 KiB 上限精确；UTF-8 截断不破字符；marker 后仍可解析 |
+| Fold | entry append 同时推进 coverage；squash 替换前 k 帧；squash 不改 coverage；PrefixRebase 只接受成功 probe；stale PreviousEpoch 拒绝；digest 不匹配拒绝；duplicate solving attempt 幂等 |
+| Candidate | cutoff 非完整 turn → 无候选；digest 不匹配 → 无候选；coverage 不增长 → 无候选；候选不覆盖当前 physical user；image identity 差异导致 digest 差异 |
+
+第 2 层资源合同：blob 先写后 event；CommitUnknown fail closed；Y session 创建幂等；X/Y dispose；PromptClaim 持久化 projection descriptor；orphan candidate blob 可清理。
+
+第 3 层 Fake Host 轨迹：
+
+```text
+X  A 失败 → A′ probe 成功 → commit new epoch
+X  A 失败 → A′ probe 失败 → B 必须使用旧 epoch
+X  A′ 失败 → B 失败 → B′ 用等价候选成功
+X  A 失败 → Y 无新 coverage → A′ 普通重试，不创建 epoch
+X  probe Completed 但空 → repair 失败 → 不 commit
+X  probe 成功后 crash → restart reconcile → 幂等 commit
+
+Y  A 成功 → entry append
+Y  A 失败 → A′ squash 成功 → main 成功 → squash + entry
+Y  A 失败 → A′ squash 成功 → main 失败 → squash 保留，B 使用新 frames
+Y  A 失败 → A′ squash 失败 → 不发 main，cursor 推进
+Y  squash invalid → repair 仍 invalid → 用原 frames 发 main
+Y  busy 跳过三个 turn → 下一 offer 覆盖全部未消化内容
+Y  一个 turn 分三 chunk → 前两块只推进 IngestCursor，最后一块推进 CoverableTurnCutoff
+Y  纯图片 turn → image_omitted → 正常推进 coverage
+
+Session      全部工作角色创建 Y；Y 不递归；重启复用同一 Y；
+             fallback Agent 改变不创建新 Y；X 删除时 Y 正确收敛
+Compaction   X auto/manual 被拒；Y overflow 被拒；autocontinue 恒 false；
+             compaction 不推进 cursor
+```
+
+第 4 层 canary（四条，随包 K 写成 TOML）：
+
+| 剧本 | 构造 | 断言 |
+|------|------|------|
+| X-A：Y 级联 squash | mock 连续返回大 entry 直到普通 Y 请求失败 | 下一 armed 槽先收到前半 frames；squash response 成为新 frame；后续 projection 不再含被覆盖 frames |
+| X-B：X probe 成功 | A 对原前缀失败，A′ 对 Y prefix 成功 | 下一请求沿用完全相同 SealRoot |
+| X-C：X probe 失败 | A′ 使用候选 P 后失败 | B 请求中不得出现 P |
+| X-D：图片 | 发送图片 + 文本 | X wire 中有图片；Semantic digest 可区分图片；Y TOML 无图片内容，只有 `image_omitted` |
+
+#### armed-by-advance 验收 trace
+
+本 trace 是 FALLBACK-012 的行为判据，X5 完成时必须逐行可复现：
+
+```text
+turn 1–3 成功：Frames=[R1,R2,R3]，Epoch=0，Offset=0
+
+turn 4：delta4=180KB，1 块 → slot0(fast) Completed → commit R4
+        Frames=[R1,R2,R3,R4]，Offset=0，count=0
+
+turn 5：slot0(fast) Failed → Offset 0→1（armed 激活）
+        slot1 armed → squash [R1,R2] 为 S1，Epoch=1，Frames=[S1,R3,R4]
+        main wire=[S1][R3][R4][normal-instruction][delta5] → Completed
+        → commit R5：Frames=[S1,R3,R4,R5]，count=0
+        Offset 停放 1（成功不清零）
+
+turn 6：从 Offset=1 起步，未武装
+        → 首槽直接 main，不 squash        ← 关键：停放不触发压缩
+        → Completed → commit R6，Offset 仍停放 1
+
+后续某 chunk：从 Offset=1 未武装起步
+        → slot1(fast) Failed → Offset 1→2
+        → slot2(deep) 普通请求 Failed → Offset 2→3（armed 激活）
+        → slot3(deep) armed → squash [S1,R3] 为 S2
+          Epoch=2，Frames=[S2,R4,R5,R6] → 级联成立
+```
+
+turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squash，从而每轮碾压一半帧。
+
+#### 发布验收清单
+
+规范（阶段 3.5 已完成，此处为回归检查）：
+
+```text
+[x] SSOT 不再出现主动上下文阈值
+[x] SSOT 不再定义 Companion eligibility
+[x] SSOT 明确所有 Work Session 有 Companion
+[x] SSOT 明确 Companion 不递归
+[x] SSOT 明确 Host compaction 全局关闭
+[x] SSOT 明确 X probe 成功后才 promote
+[x] SSOT 明确 Y squash 有效后立即提交
+[x] SSOT 明确图片内容不进入 Companion
+```
+
+实现：
+
+```text
+[ ] 无 context-window API 调用          [ ] 无 tokenizer 依赖
+[ ] 无 provider 错误分类器              [ ] 无 X 摘要请求
+[ ] Y delta TOML 不超过 200 KiB         [ ] A′ 失败后 B 使用旧 epoch
+[ ] B′ 可独立重试等价候选               [ ] squash 成功 + main 失败后 squash 仍存在
+[ ] Host compaction 不产生任何领域事实  [ ] 全部工作角色均创建 Y
+[ ] Y 不创建 Y                          [ ] 图片二进制/URL/hash 不进入 TOML
+[ ] Prompt 全部经 PromptDispatcher      [ ] Fallback cursor 只有一个写入口
+```
+
+恢复：
+
+```text
+[ ] completed entry 可在重启后补提交    [ ] completed squash 可在重启后补提交
+[ ] successful probe 可在重启后 promote [ ] failed probe 不产生 rollback
+[ ] CommitUnknown fail closed           [ ] unresolved prompt 不自动重发
+```
+
 ## 旧符号灭绝表
 
 残留数由 `node scripts/shock-audit.mjs` 测量。休克结束时全部为 0（除标注「允许 1」的唯一入口）。
@@ -813,6 +1000,28 @@ W4 与 W7 是本包的重点：现在的门禁声明了自己有能力，但没�
 | `OrchestratorPreRebaseReviewConfirmed` | `CandidateReady.PreRebaseReviewWitnessId` | ORCH-006 | 3 | 4 | 3 | 0 |
 | `OrchestratorPostRebaseReviewConfirmed` | `RebasedCandidateReady.PostRebaseReviewWitnessId` | ORCH-006 | 3 | 2 | 2 | 0 |
 | 双 transform hook 注册 | 单 hook | HOST-009 | 2 | 0 | 0 | 1 |
+
+### 上下文恢复侧（包 X，X2 步测量）
+
+基线未测量：这些符号在包 X 开始时才第一次全仓统计。`shouldCreateCompanion` 已在包 E 清零，此处不重复。
+
+| 旧符号 / 行为 | 新语义 | 条款 | 目标 |
+|--------------|--------|------|------|
+| `CompanionEligibility` / `isCompanionEligible` | Session 种类不变量 | COMPANION-001 | 0 |
+| 角色 Companion 白名单（任何以 Role 为输入的 Companion 判定） | `ManagedSessionKind` | HOST-008 | 0 |
+| `contextWindow` / `maxContextTokens` / `remainingTokens` | 无（不观察容量） | CTX-001 | 0 |
+| `contextRatio` / `headroom` / `nearLimit` | 无 | CTX-001 | 0 |
+| `shouldCompact` / `ensureCapacity` | 无（失败驱动） | CTX-002 | 0 |
+| `LatestBBytes` 阈值判定 | 200 KiB 输入合同 | CTX-003 | 0 |
+| `OverflowPatterns` / `OverflowDetected` | 无（失败不分类） | CTX-005 | 0 |
+| `CompressionThreshold` / `SquashReason` | 无 | CTX-005 | 0 |
+| X 侧摘要/压缩请求 | Companion 工作日志本地替换 | CTX-009 | 0 |
+| `PrefixProbeRolledBack` / `PrefixProbeCleared` / `RestoreOldEpoch` | 无（失败 probe 非事实） | CTX-010 | 0 |
+| Host compaction → PrefixEpoch rebase 路径 | 全局关闭 | HOST-006 | 0 |
+| JSON 形态的 Blogger delta | 确定性 TOML | CTX-013 | 0 |
+| 物理 Y transcript 作为投影历史来源 | Journal fold 派生 Frames | PERSIST-010 | 0 |
+
+X2 执行时注意不要误删与普通文件大小、进程输出预算（EXEC-011）有关的合法 byte 计数。判据是这个数字是否与模型上下文比较，不是它是否叫 bytes。
 
 ### 剧本森林侧（包 K）
 

@@ -59,7 +59,8 @@ assistant message 在 transform 之前已经创建并持久化。
 | Review、verdict、witness、seal | SSOT/05 + HOST-010/011 | conformance Review 段 + `evidence/host-transform-run-binding.md` |
 | Orchestrator、publish、rebase、恢复 | SSOT/06 | conformance Orchestrator 段 |
 | Host hook、事件、reconcile | SSOT/07 | `evidence/host-transform-run-binding.md` |
-| Companion、Blogger、projection、epoch | SSOT/08 | conformance Companion 段 |
+| Companion、Blogger、projection、epoch | SSOT/08 + SSOT/12 | conformance Companion 段 |
+| 上下文恢复、Blogger delta、X prefix probe、Y squash | SSOT/12（`CTX-`） | conformance Companion 段 + `design-context-recovery.md` |
 | fork/join/list、PTY、进程 | SSOT/09 | conformance Execution 段 |
 | 测试、门禁、canary 剧本 | SSOT/10 | `design-script-forest.md` |
 | Journal、事实、持久化 | SSOT/11 | — |
@@ -88,6 +89,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | `STATUS/conformance.md` | 条款 vs 代码合规表 |
 | `STATUS/shock-anneal.md` | 当前迁移总账（工作包状态、旧符号灭绝表） |
 | `STATUS/design-script-forest.md` | canary 剧本森林重建设计定稿 |
+| `STATUS/design-context-recovery.md` | 失败驱动上下文恢复设计定稿归档（含设计演化与代价推理） |
 | `STATUS/evidence/` | 机器输出与 Host 行为证据，绑定 commit |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
@@ -95,6 +97,7 @@ assistant message 在 transform 之前已经创建并持久化。
 `SSOT/` 只描述应该如何，不描述当前如何。实现状态词
 （`PARTIAL` / `CONTRADICTS` / `NOT_IMPLEMENTED` / `CONFORMANT`）只出现在 `STATUS/`。
 `node scripts/ssot-lint.mjs` 强制这一分离，并检查条款 ID 唯一性与悬空引用。
+新增条款前缀必须同时注册进 `scripts/ssot-lint.mjs` 的前缀表，否则该前缀的全部引用被判悬空。
 
 ### 发现条款本身有问题
 
