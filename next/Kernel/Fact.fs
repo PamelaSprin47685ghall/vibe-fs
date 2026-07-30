@@ -319,8 +319,6 @@ module Fact =
                Projection: string
                Content: string |}
 
-        | CompanionReplacementActiveSet of {| SessionId: SessionId; Active: bool |}
-
         /// COMPANION-003: Y is X's long-lived companion Blogger Session, so which
         /// session that is must survive a restart.
         ///
@@ -410,14 +408,12 @@ module Fact =
                NextEpochId: PrefixEpochId
                ObservedCompactionRun: ProviderRunIdentity |}
 
-        /// COMPANION-009: an epoch switch creates a new SealRoot and is the one
-        /// sanctioned prefix-cache cold boundary.
-        | CompanionEpochSwitched of
-            {| SessionId: SessionId
-               EpochId: string
-               FrozenB: string
-               CutoffMessageIndex: int
-               CoveredPrefixDigest: string |}
+        // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
+        // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
+        // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
+        // FrozenB text inline and was written from a token-budget comparison, which
+        // CTX-001 and CTX-002 both forbid. Its replacements carry a `BlobRef` instead
+        // (PERSIST-007) and are driven by a real attempt outcome.
 
         // ── Durable effects (PERSIST-009) ───────────────────────────────────
         // Requested → idempotent side effect → Accepted. After a crash,

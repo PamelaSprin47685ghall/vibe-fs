@@ -50,9 +50,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val NudgeSent = HashSet<string>()
     member val ManagerGuardNudges = HashSet<string>()
     member val AbortedSessions = HashSet<string>()
-    member val SessionBudgets = Dictionary<string, int>()
-    member val SessionOutputLimits = Dictionary<string, int>()
-    member val CompanionBudgets = CompanionBudgetStore()
 
     /// HOST-006 prevention layer: the config hook's finding.
     ///

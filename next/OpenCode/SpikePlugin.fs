@@ -83,9 +83,6 @@ module SpikePlugin =
                         scope.CompanionGate
                         sessionPort
                         journal
-                        scope.SessionBudgets
-                        scope.SessionOutputLimits
-                        scope.CompanionBudgets
                         (Some(fun bloggerId ->
                             // Register ownership + ActiveRun so idle→reconcile
                             // emits TerminalOutcome.Completed for this child.
@@ -141,10 +138,6 @@ module SpikePlugin =
                           // Companion rewrite and the REVIEW-010 seal twice over the
                           // same message array.
                           "experimental.chat.messages.transform", box (uncurriedExecute (box transform))
-                          "experimental.chat.system.transform",
-                          box (
-                              systemTransformHook scope.SessionBudgets scope.SessionOutputLimits scope.CompanionBudgets
-                          )
                           // HOST-006 prevention layer. The config hook is the only
                           // place the plugin can reach the compaction settings: the
                           // Host hands over the live instance-state object and runs
@@ -195,15 +188,16 @@ module SpikePlugin =
                         // Child background SSOT: parent B first; if no B, whole session A.
                         let backgroundBFor =
                             Some(fun sessionId ->
+                                // Was: prefer the frozen epoch B, fall back to LatestB.
+                                // The epoch existed only as the context-estimate
+                                // mechanism's output (CTX-001), and a child's background
+                                // brief wants the CURRENT memory regardless — the older
+                                // frozen copy was never the better answer here.
                                 let fromB =
                                     match scope.Companions.TryGetValue sessionId with
                                     | true, host ->
-                                        match host.Memory.ActivePrefixEpoch with
-                                        | Some epoch when not (String.IsNullOrWhiteSpace epoch.FrozenB) ->
-                                            Some epoch.FrozenB
-                                        | _ ->
-                                            host.Memory.LatestB
-                                            |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
+                                        host.Memory.LatestB
+                                        |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
                                     | false, _ -> None
 
                                 match fromB with

@@ -5,24 +5,26 @@ open Wanxiangshu.Next.Kernel.Identity
 type ProjectionSnapshot = string
 type BlogText = string
 
-type ActivePrefixEpochProjection =
-    { EpochId: string
-      FrozenB: BlogText
-      CutoffMessageIndex: int
-      CoveredPrefixDigest: string }
-
+/// Durable Companion cache: the Blogger link and the latest work log.
+///
+/// The prefix epoch used to live here too — `ActivePrefixEpoch` plus a
+/// `ReplacementActive` flag, written by `switchEpoch` from a token-budget comparison.
+/// That was a second writer of prefix-epoch state, and it decided WHEN to compress by
+/// estimating context (CTX-001, CTX-002 both forbid it). `Journal/PrefixEpochProjection`
+/// is the single owner now, and the only things that move it are a promoted probe
+/// (CTX-012) and a reanchor (HOST-006).
+///
+/// The flag went with it. It existed because compression was opt-in per session; under
+/// SSOT/12 a recovery slot either has a candidate or does not, so there is no state to
+/// enable.
 type CompanionProjection =
     {
         LastSuccessfulProjection: ProjectionSnapshot option
         LatestB: BlogText option
-        ActivePrefixEpoch: ActivePrefixEpochProjection option
         /// COMPANION-003: the companion Blogger Session Y, so a restart rebinds the
         /// same one instead of creating a second Y for the same X.
         BloggerSessionId: SessionId option
-        ReplacementActive: bool
     }
-
-    member this.PrefixReplacementEnabled = this.ReplacementActive
 
 /// Durable Companion cache facts. In-flight Blogger work remains runtime-only.
 ///
@@ -35,9 +37,7 @@ module CompanionProjection =
     let empty =
         { LastSuccessfulProjection = None
           LatestB = None
-          ActivePrefixEpoch = None
-          BloggerSessionId = None
-          ReplacementActive = false }
+          BloggerSessionId = None }
 
     let baseline projection (current: CompanionProjection) =
         { current with
@@ -49,20 +49,6 @@ module CompanionProjection =
         { current with
             LastSuccessfulProjection = Some projection
             LatestB = Some content }
-
-    let switchEpoch epochId frozenB cutoff digest (current: CompanionProjection) =
-        { current with
-            ActivePrefixEpoch =
-                Some
-                    { EpochId = epochId
-                      FrozenB = frozenB
-                      CutoffMessageIndex = cutoff
-                      CoveredPrefixDigest = digest }
-            ReplacementActive = true }
-
-    let setReplacement active (current: CompanionProjection) =
-        { current with
-            ReplacementActive = active }
 
     let linkBlogger (bloggerSessionId: SessionId) (current: CompanionProjection) =
         { current with

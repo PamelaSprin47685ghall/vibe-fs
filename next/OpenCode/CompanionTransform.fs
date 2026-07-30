@@ -11,18 +11,11 @@ open CompanionProjection
 
 module CompanionTransform =
 
-    let bloggerSelfRebaseDue = CompanionProjection.bloggerSelfRebaseDue
-    let shouldSwitchEpoch = CompanionProjection.shouldSwitchEpoch
-    let estimateTokensUtf8 = CompanionProjection.estimateTokensUtf8
-
     let handleCompanionTransform
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (sessionBudgets: Dictionary<string, int>)
-        (sessionOutputLimits: Dictionary<string, int>)
-        (budgetStore: CompanionBudgetStore)
         (onBloggerCreated: (SessionId -> unit) option)
         (inObj: obj)
         (rawOutObj: obj)
@@ -146,122 +139,19 @@ module CompanionTransform =
                             companions.[sessionId] <- value
                             value)
 
-                let budgetFacts =
-                    let outputLimit =
-                        match sessionOutputLimits.TryGetValue sessionId with
-                        | true, output when output > 0 -> Some output
-                        | _ -> None
-
-                    match sessionBudgets.TryGetValue sessionId with
-                    | true, context when context > 0 ->
-                        { ContextLimit = context
-                          InputLimit = None
-                          OutputLimit = outputLimit }
-                    | _ ->
-                        { ContextLimit = 0
-                          InputLimit = None
-                          OutputLimit = outputLimit }
-
-                let replacementEnabled =
-                    Environment.GetEnvironmentVariable("WANXIANGSHU_DISABLE_COMPANION_REPLACEMENT")
-                    <> "1"
-
-                let applyEpoch () =
-                    if replacementEnabled then
-                        let memory = companion.Memory
-
-                        match memory.LatestB with
-                        | None -> ()
-                        | Some latestB ->
-                            let current = CompanionDelta.jsonOfMessages CanonicalJson.canonicalJson rawMessages
-
-                            let coverageCutoff =
-                                match memory.LastSuccessfulProjection with
-                                | Some previous ->
-                                    CompanionDelta.prefixLength
-                                        CanonicalJson.equal
-                                        previous
-                                        current
-                                        (List.length rawMessages)
-                                | None -> 0
-
-                            let digest =
-                                if coverageCutoff <= 0 || coverageCutoff > List.length rawMessages then
-                                    ""
-                                else
-                                    CompanionDelta.prefixDigest CanonicalJson.canonicalJson rawMessages coverageCutoff
-
-                            match memory.ActivePrefixEpoch with
-                            | None ->
-                                match
-                                    shouldSwitchEpoch budgetFacts rawMessages (Some latestB) coverageCutoff digest
-                                with
-                                | Some candidate ->
-                                    if not companion.ReplacementActive then
-                                        companion.EnablePrefixReplacement() |> ignore
-
-                                    companion.FreezeEpoch(candidate.CutoffMessageIndex, candidate.CoveredPrefixDigest)
-                                    |> ignore
-                                | None -> ()
-                            | Some epoch ->
-                                let projected =
-                                    if
-                                        epoch.CutoffMessageIndex > 0
-                                        && epoch.CutoffMessageIndex <= List.length rawMessages
-                                    then
-                                        let head =
-                                            createObj
-                                                [ "info",
-                                                  box (
-                                                      createObj
-                                                          [ "id",
-                                                            box (CompanionDelta.bHeadDigest sessionId epoch.EpochId)
-                                                            "role", box "user" ]
-                                                  )
-                                                  "parts",
-                                                  box [| createObj [ "type", box "text"; "text", box epoch.FrozenB ] |] ]
-
-                                        head :: List.skip epoch.CutoffMessageIndex rawMessages
-                                    else
-                                        rawMessages
-
-                                match
-                                    shouldSwitchEpoch budgetFacts rawMessages (Some latestB) coverageCutoff digest
-                                with
-                                | Some candidate ->
-                                    let currentProjectedTokens = estimateTokens projected
-
-                                    let candidateProjectedTokens =
-                                        estimateTokensUtf8 candidate.FrozenB
-                                        + estimateTokens (List.skip candidate.CutoffMessageIndex rawMessages)
-
-                                    if candidateProjectedTokens < currentProjectedTokens then
-                                        companion.SwitchEpoch(
-                                            candidate.CutoffMessageIndex,
-                                            candidate.CoveredPrefixDigest
-                                        )
-                                        |> ignore
-                                | None -> ()
-
-                applyEpoch ()
-
-                // Y self-rebase must be evaluated against the already-accumulated
-                // LatestB *before* submitting the next delta. TransformRaw.Submit
-                // sets the companion busy for that delta; if we check afterwards,
-                // every non-empty turn permanently skips self-rebase and Y never
-                // condenses even after crossing its own budget.
-                let bloggerBudget = budgetStore.BudgetFor sessionId
-
-                // If the host never recorded a blogger-model budget for this
-                // primary (e.g. system.transform omitted parentID), still honour
-                // the operator/test override so threshold canaries stay deterministic.
-                budgetStore.Remember(sessionId, bloggerBudget)
-
-                match companion.Memory.LatestB with
-                | Some blog when bloggerSelfRebaseDue bloggerBudget blog -> companion.SelfRebase() |> ignore
-                | _ -> ()
-
-                // When a self-rebase is in flight, Submit is busy-skipped and the
-                // delta is naturally deferred to the next free transform. That is
-                // correct: condense first, then absorb the pending delta onto B'.
+                // COMPANION-005: accumulate the delta. Nothing here decides when to
+                // compress.
+                //
+                // What stood between these two statements was the whole active
+                // compression layer: a `BudgetFacts` record built from the Host's
+                // reported context and output limits, `shouldSwitchEpoch` comparing an
+                // estimated token count against that limit, `FreezeEpoch` / `SwitchEpoch`
+                // writing a prefix epoch from the comparison, and a `bloggerSelfRebaseDue`
+                // check firing a Y self-rebase at 80% of a budget.
+                //
+                // Every one of those read or estimated a context window, which CTX-001
+                // forbids outright, and acted before any failure, which CTX-002 forbids.
+                // Their replacements are driven by a real failed attempt: the X prefix by
+                // a promoted probe (CTX-012) and the Y frames by a squash in a recovery
+                // slot (CTX-006).
                 companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj

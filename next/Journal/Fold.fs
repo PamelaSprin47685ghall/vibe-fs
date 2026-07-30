@@ -541,21 +541,6 @@ module Fold =
                     projection
             )
 
-        | AgentFact.CompanionEpochSwitched payload ->
-            Ok(
-                updateCompanion
-                    payload.SessionId
-                    (CompanionProjection.switchEpoch
-                        payload.EpochId
-                        payload.FrozenB
-                        payload.CutoffMessageIndex
-                        payload.CoveredPrefixDigest)
-                    projection
-            )
-
-        | AgentFact.CompanionReplacementActiveSet payload ->
-            Ok(updateCompanion payload.SessionId (CompanionProjection.setReplacement payload.Active) projection)
-
         | AgentFact.CompanionBloggerLinked payload ->
             // HOST-008 / COMPANION-002: one fact, two projections.
             //

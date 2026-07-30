@@ -77,9 +77,9 @@
 |------|------|-------------|------|
 | COMPANION-001: 每个 Work Session 都有 Companion | CONFORMANT | `Journal/SessionAssociation.fs` | 角色白名单已删除。关联 API 不接受 role 参数，因此 role 无法影响它不是输入的决定 |
 | COMPANION-002: Companion 是叶子 | CONFORMANT | `SessionAssociationProjection.link` | 一次 `link` 写双向条目，`isCompanion` O(1)；递归、重复 Y、抢占 Y、自链四种非法态由 fold fail closed |
-| COMPANION-008: 忙时跳过 | PARTIAL | `CompanionHost.fs` | 存在「三次 busy skip」计数，规范只要求不推进 coverage。计数删除属包 X9 |
-| COMPANION-009: PrefixEpoch | PARTIAL | `Journal/PrefixEpochProjection.fs` | 新投影已实现 epoch 递增与 snapshot 退役；旧 `CompanionProjection.switchEpoch` 双轨仍在，删除属包 X9 |
-| COMPANION-013: Synthetic 稳定身份 | PARTIAL | `Domain/CompanionIdentity.fs` | 四个公式已实现且有第 1 层测试（可见 sha256 断言字段组合）；旧 `CompanionDelta.bHeadDigest` 仍被 `CompanionHost` 使用，双轨删除属包 X9。仍缺门禁证明无 GUID / random / 当前时间 |
+| COMPANION-008: 忙时跳过 | CONFORMANT | `Companion.Submit` | 忙时返回 `SkippedBusy` 并原样退出，不推进 coverage、不排队、不计数。「三次 busy skip」计数已删 |
+| COMPANION-009: PrefixEpoch | PARTIAL | `Journal/PrefixEpochProjection.fs` `Domain/XPrefixProjection.fs` | 单轨：epoch 递增、snapshot 退役、X 前缀计划全在新投影。旧 `switchEpoch` / `ReplacementActive` / `ActivePrefixEpoch` 双轨已删。差距是 `XPrefixProjection` 尚未接进 transform 边界，当前 X 一律发原始历史 |
+| COMPANION-013: Synthetic 稳定身份 | PARTIAL | `Domain/CompanionIdentity.fs` | 四个公式已实现且有第 1 层测试（可见 sha256 断言字段组合）。旧 `CompanionDelta.bHeadDigest` 已删，`companionMemoryMessageId` 成为唯一 synthetic 头部身份。仍缺门禁证明无 GUID / random / 当前时间 |
 
 ## Execution
 

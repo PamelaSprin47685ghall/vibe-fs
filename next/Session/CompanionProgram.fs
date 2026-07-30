@@ -7,13 +7,13 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Flow
 
 /// Production CompanionFlow program — the canonical `companion {}` builder usage.
-/// Companion flows manage projection delta computation, blogger step scheduling,
-/// and prefix-epoch lifecycle for Session X (KISS-N02).
+/// Companion flows manage projection delta computation and blogger step
+/// scheduling. Prefix-epoch lifecycle is NOT here: CTX-002 puts it after a failed
+/// attempt, where `Domain.AttemptPlanner` decides it from the attempt outcome.
 module CompanionProgram =
 
     /// Lift a plain Task into the CompanionFlow.
-    let private fromTask (f: CompanionContext -> CancellationToken -> Task<'a>) : CompanionFlow<'a> =
-        Flow.lift f
+    let private fromTask (f: CompanionContext -> CancellationToken -> Task<'a>) : CompanionFlow<'a> = Flow.lift f
 
     /// Build the next delta between the last successful projection and the
     /// current canonical projection.  Returns None when there is no delta.
@@ -24,9 +24,7 @@ module CompanionProgram =
         (current: ProjectionSnapshot)
         : CompanionFlow<ProjectionSnapshot option> =
         companion {
-            let! delta =
-                fromTask (fun _ _ct ->
-                    task { return Companion.jsonDelta previous current })
+            let! delta = fromTask (fun _ _ct -> task { return Companion.jsonDelta previous current })
 
             return delta
         }
@@ -38,21 +36,3 @@ module CompanionProgram =
         (flow: CompanionFlow<'a>)
         : Task<Result<'a, CompanionError>> =
         Flow.run ctx ct flow
-
-    /// Check whether prefix replacement should be enabled for this session,
-    /// given the context-limit budget and frozen-B coverage proof.
-    let shouldReplacePrefix
-        (projectedInputTokens: int)
-        (reservedOutputTokens: int)
-        (contextLimit: int)
-        : CompanionFlow<bool> =
-        companion {
-            let! decision =
-                fromTask (fun _ _ct ->
-                    task {
-                        let threshold = projectedInputTokens + reservedOutputTokens
-                        return threshold > contextLimit
-                    })
-
-            return decision
-        }

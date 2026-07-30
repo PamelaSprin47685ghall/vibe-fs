@@ -61,6 +61,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | Host hook、事件、reconcile | SSOT/07 | `evidence/host-transform-run-binding.md` |
 | Companion、Blogger、projection、epoch | SSOT/08 + SSOT/12 | conformance Companion 段 |
 | 上下文恢复、Blogger delta、X prefix probe、Y squash | SSOT/12（`CTX-`） | conformance Companion 段 + `design-context-recovery.md` |
+| compaction、`/compact`、reanchor | SSOT/07 + SSOT/12 | `blocker-HOST-006.md` + `evidence/host-context-recovery.md` |
 | fork/join/list、PTY、进程 | SSOT/09 | conformance Execution 段 |
 | 测试、门禁、canary 剧本 | SSOT/10 | `design-script-forest.md` |
 | Journal、事实、持久化 | SSOT/11 | — |
@@ -90,6 +91,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | `STATUS/shock-anneal.md` | 当前迁移总账（工作包状态、旧符号灭绝表） |
 | `STATUS/design-script-forest.md` | canary 剧本森林重建设计定稿 |
 | `STATUS/design-context-recovery.md` | 失败驱动上下文恢复设计定稿归档（含设计演化与代价推理） |
+| `STATUS/blocker-HOST-006.md` | SSOT 例外 1 定案：手工 compaction 不可阻断的逻辑矛盾与两层解法 |
 | `STATUS/evidence/` | 机器输出与 Host 行为证据，绑定 commit |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
@@ -121,6 +123,15 @@ assistant message 在 transform 之前已经创建并持久化。
 
 休克期的进度指标不是"今天能否编译"，而是"旧语义入口数量是否下降"。
 
+### 已知未闭合项
+
+删除旧机制会留下功能空洞，这些空洞本身合规，但要记账，不要当成 bug 去"修好"：
+
+- X 前缀替换当前不生效。`CompanionHost.TransformRaw` 只做 COMPANION-005 累积并原样
+  返回 `messages`。新链路（探针提交 → `XPrefixProjection` → 注入）尚未接进 transform
+- `CompanionDelta.jsonDelta` 仍在 `Companion.Submit` 路径上。包 X3 的 TOML delta
+  与三级 chunker 已实现但未接线，属包 X4 后半
+
 ---
 
 ## 3. 三条不可违反的架构 DNA
@@ -136,6 +147,32 @@ assistant message 在 transform 之前已经创建并持久化。
 3. 不修改 OpenCode 本体（ARCH-003）。只用现有 Hook 和 SDK API。
    读源码是允许且必须的；改源码、要求上游加 Hook、依赖未公开 API 都不允许。
 
+### 第四条：上下文恢复必须由失败驱动（CTX-001 / CTX-002）
+
+与上面三条同级的硬禁止，来自 SSOT/12。
+
+禁止观察或估算上下文容量（CTX-001）：不读 provider 的 context/input/output limit，
+不做 token 估算，不拿估算值与任何阈值比较。禁止在失败发生前压缩（CTX-002）：
+所有恢复动作的前置条件是一次真实失败的 attempt。
+
+被这两条判死的具体形态（均已在包 X9 删除，勿重新引入）：
+
+| 旧形态 | 违反 | 替代 |
+|--------|------|------|
+| `estimateTokens` / `estimateTokensUtf8` | CTX-001 | 无。不估算 |
+| `shouldSwitchEpoch`（估算值 vs contextLimit） | CTX-001 + CTX-002 | 探针被 Host 接受后提交（CTX-012） |
+| `bloggerSelfRebaseDue`（0.8 预算阈值） | CTX-001 + CTX-002 | 恢复槽内 squash（CTX-006） |
+| `CompanionBudgetStore` / `BudgetFacts` | CTX-001 | 无。不存容量 |
+| `CompanionHost.TransformRaw` 里的 epoch 注入 | CTX-002 | `AttemptPlanner.plan`（失败后） |
+| `CompanionProgram.shouldReplacePrefix` | CTX-001 | `PrefixProbeSelection` |
+
+推论：`transform` hook 里做不了恢复决策，因为它看不到 attempt 结局。
+没有已提交的探针时，X 看到的就是原始历史——这是 SSOT/12 的正确行为，不是降级。
+
+手工 `/compact` 无法阻断（SSOT 例外 1，见 `blocker-HOST-006.md`）。
+解法是两层：预防层关掉 `auto`/`prune`/`autocontinue` 并在首轮启动探测，
+收容层把任何观察到的 compaction 转成 `ContextReanchored` 重锚。
+
 ---
 
 ## 4. 单一写入口
@@ -150,6 +187,11 @@ assistant message 在 transform 之前已经创建并持久化。
 | Review confirmed | 只能从 witness 派生，不能赋值（REVIEW-006） |
 
 出现第二个 writer 是熔断条件，立即停止新增迁移。
+
+`scripts/architecture-gate.mjs` 的 `single-constructor` 检查双向：既查「没有旁路者」，
+也查「存在调用者」。只有前者时，一个零调用点的唯一入口能长期假装合规——
+`buildAttemptExecutionProfile` 就这样在 `PROMPT-008` 标着 `CONTRADICTS` 的情况下
+存活到包 X8 才拿到第一个真实调用点（`AttemptPlanner.plan`）。
 
 ---
 
@@ -214,6 +256,10 @@ tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试
 - 禁止只断言真值。mjs 无编译期重命名保护，字段改名会静默读到 `undefined`；
   断言必须比对完整结构或完整序列化文本
 - 禁止为测试可见性新增生产 export。缺契约面就补契约，不补 export
+- 新增契约面必须先在 `domain.mjs` 开出口再写测试。facade 现已覆盖 `blogProjection`、
+  `prefixEpochProjection`、`sessionAssociation`、`bloggerToml`、`bloggerDelta`、
+  `companionPrompt`、`companionIdentity`、`companionProjection`、`hostCompaction`、
+  `probeSelection`、`attemptPlanner`、`xPrefix`、`recoverySlot` 等命名空间
 
 三个已实证的静默陷阱，全部由 facade 封死，`domain.meta.test.mjs` 锁住：
 

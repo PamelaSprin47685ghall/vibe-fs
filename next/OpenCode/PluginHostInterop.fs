@@ -20,34 +20,6 @@ module PluginHostInterop =
     [<Emit("(args, context) => $0(args)(context)")>]
     let uncurriedExecute (fn: obj) : obj = jsNative
 
-    let systemTransformHook
-        (sessionBudgets: Dictionary<string, int>)
-        (sessionOutputLimits: Dictionary<string, int>)
-        (budgetStore: CompanionBudgetStore)
-        : obj =
-        let remember = fun sessionId budget -> budgetStore.Remember(sessionId, budget)
-
-        emitJsExpr
-            (sessionBudgets, sessionOutputLimits, remember)
-            """
-          (input, output) => {
-            if (input && input.sessionID && input.model && input.model.limit) {
-              const lim = input.model.limit;
-              if (lim.context > 0) {
-                $0.set(input.sessionID, lim.context);
-                const override = Number(process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || 0);
-                const budget = override > 0 ? Math.min(lim.context, override) : lim.context;
-                if (input.agent === 'blogger' || input.agent === 'fast-blogger' || input.agent === 'deep-blogger') {
-                  if (input.parentID) $2(input.parentID, budget);
-                } else if (input.agent && input.agent !== 'blogger' && input.agent !== 'fast-blogger' && input.agent !== 'deep-blogger' && input.agent !== 'title') {
-                  $2(input.sessionID, budget);
-                }
-              }
-              if (lim.output > 0) $1.set(input.sessionID, lim.output);
-            }
-          }
-        """
-
     let projectionSessionIdFromMessages (output: obj) =
         if isNull output || isNull output?messages then
             None

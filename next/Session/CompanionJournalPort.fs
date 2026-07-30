@@ -24,14 +24,6 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                 |> Option.map (fun companion ->
                     { LastSuccessfulProjection = companion.LastSuccessfulProjection
                       LatestB = companion.LatestB
-                      ActivePrefixEpoch =
-                        companion.ActivePrefixEpoch
-                        |> Option.map (fun epoch ->
-                            { EpochId = epoch.EpochId
-                              FrozenB = epoch.FrozenB
-                              CutoffMessageIndex = epoch.CutoffMessageIndex
-                              CoveredPrefixDigest = epoch.CoveredPrefixDigest })
-                      PrefixReplacementEnabled = companion.ReplacementActive
                       BloggerSessionId = companion.BloggerSessionId }))
 
         member _.AppendSuccessful(sessionId, projection, content) =
@@ -41,23 +33,6 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                     {| SessionId = sessionId
                        Projection = projection
                        Content = content |})
-
-        member _.AppendEpochSwitched(sessionId, epoch) =
-            append
-                sessionId
-                (AgentFact.CompanionEpochSwitched
-                    {| SessionId = sessionId
-                       EpochId = epoch.EpochId
-                       FrozenB = epoch.FrozenB
-                       CutoffMessageIndex = epoch.CutoffMessageIndex
-                       CoveredPrefixDigest = epoch.CoveredPrefixDigest |})
-
-        member _.EnableReplacement(sessionId) =
-            append
-                sessionId
-                (AgentFact.CompanionReplacementActiveSet
-                    {| SessionId = sessionId
-                       Active = true |})
 
         member _.LinkBlogger(sessionId, bloggerSessionId, bloggerAgent) =
             append

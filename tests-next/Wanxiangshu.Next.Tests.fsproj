@@ -71,7 +71,6 @@
     <Compile Include="OpenCode/HostEventRouterTerminalTests.fs"/>
     <Compile Include="OpenCode/ReviewRequirementBoundaryTests.fs"/>
     <Compile Include="OpenCode/HostEventRouterSessionDeadTests.fs"/>
-    <Compile Include="Tools/MessageTransformTests.fs"/>
     <Compile Include="OpenCode/OrchestratorHostTestSupport.fs"/>
     <Compile Include="OpenCode/OrchestratorHostTests.fs"/>
     <Compile Include="OpenCode/ManagerConfigTests.fs"/>

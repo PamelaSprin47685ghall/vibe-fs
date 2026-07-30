@@ -128,110 +128,31 @@ type CompanionHost
             System.Threading.CancellationToken.None
             (CompanionProgram.buildDelta companion.Memory.LastSuccessfulProjection projection)
 
-    member _.EnablePrefixReplacement() : bool = companion.TryEnableReplacement()
-
-
-    member _.FreezeEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
-        companion.FreezeEpoch(cutoffMessageIndex, coveredPrefixDigest)
-
-    member _.SwitchEpoch(cutoffMessageIndex: int, coveredPrefixDigest: string) : bool =
-        companion.SwitchEpoch(cutoffMessageIndex, coveredPrefixDigest)
-
-
-    /// Real Y self-rebase: ask the Blogger child to condense the FULL current B
-    /// into B' and durably persist (CompanionAdvanced with the EXISTING baseline,
-    /// so the projection baseline is NOT advanced — only B is replaced). The
-    /// Blogger sees only the old B when condensing and never processes the
-    /// P0→P1 delta, so advancing the baseline here would lose those messages.
-    /// Fire-and-forget; the underlying async rebase returns false (SkippedBusy)
-    /// when the Blogger is busy, and leaves B unchanged on failure.
-    member this.SelfRebase() : CompanionOutcome =
-        let before = companion.Memory
-
-        // Y self-rebase is independent of X prefix replacement: trigger once B
-        // exists. The 0.8 budget gate lives in CompanionTransform against the
-        // blogger child's own (usually smaller) model limit.
-        if before.LatestB.IsNone then
-            Submitted
-        else
-            let currentB = before.LatestB.Value
-            let deps = this.BloggerDeps
-
-            let started =
-                companion.TrySelfRebase(fun () -> CompanionHostBlogger.selfRebaseBlog deps currentB)
-
-            if started then Submitted else SkippedBusy
-
     member _.Memory = companion.Memory
-    member _.ReplacementActive = companion.ReplacementActive
 
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
 
+    /// COMPANION-005: hand the raw history to the Y as a projection and give the
+    /// Host back exactly what it passed in.
+    ///
+    /// This used to be where X's prefix got replaced: a watermark diff against the
+    /// last projection, a `FreezeEpoch` on first sight of a B, a coverage digest
+    /// re-checked on every later turn, and a synthetic B-head message spliced over
+    /// the deleted prefix. It ran on every single transform, before any failure, and
+    /// the epoch it consumed was written from a context-window estimate.
+    ///
+    /// CTX-002 puts prefix replacement behind a real failed attempt, and CTX-012
+    /// behind a probe the Host actually accepted, so the decision cannot be made
+    /// here — this hook has no attempt outcome to look at. Until an attempt fails,
+    /// SSOT/12 says X sees raw history, which is what returning `messages` means.
     member this.TransformRaw(messages: obj list) : obj list =
         let current = CompanionDelta.jsonOfMessages CanonicalJson.canonicalJson messages
-        let before = companion.Memory
-
-        // Watermark is only for Blogger baseline / first-freeze cutoff capture.
-        // Once an epoch exists, deletion range is epoch.CutoffMessageIndex only.
-        let watermark =
-            match before.LastSuccessfulProjection with
-            | Some previous -> CompanionDelta.prefixLength CanonicalJson.equal previous current (List.length messages)
-            | None -> 0
-
         let deps = this.BloggerDeps
 
         companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps current delta))
         |> ignore
 
-        let inject (frozenB: string) (epochId: string) (cutoff: int) =
-            if cutoff <= 0 || cutoff > List.length messages then
-                // Fail closed: never delete past the message list or invent a
-                // zero-cutoff wipe of context that FrozenB does not cover.
-                messages
-            else
-                let sessionId = SessionId.value primaryId
-                let bHeadId = CompanionDelta.bHeadDigest sessionId epochId
-
-                let synthetic =
-                    createObj
-                        [ "info", box (createObj [ "id", box bHeadId; "role", box "user" ])
-                          "parts", box [| createObj [ "type", box "text"; "text", box frozenB ] |] ]
-
-                synthetic :: (messages |> List.skip cutoff)
-
-        let memory = companion.Memory
-
-        match companion.ReplacementActive, memory.ActivePrefixEpoch with
-        | true, Some epoch ->
-            // Coverage proof before deleting raw prefix. Fail closed on mismatch.
-            if epoch.CutoffMessageIndex <= 0 || epoch.CutoffMessageIndex > List.length messages then
-                messages
-            else
-                let currentDigest =
-                    CompanionDelta.prefixDigest CanonicalJson.canonicalJson messages epoch.CutoffMessageIndex
-
-                if currentDigest <> epoch.CoveredPrefixDigest then
-                    messages
-                else
-                    inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
-        | true, None when watermark > 0 && before.LatestB.IsSome ->
-            let digest =
-                CompanionDelta.prefixDigest CanonicalJson.canonicalJson messages watermark
-
-            companion.FreezeEpoch(watermark, digest) |> ignore
-
-            match companion.Memory.ActivePrefixEpoch with
-            | Some epoch -> inject epoch.FrozenB epoch.EpochId epoch.CutoffMessageIndex
-            | None -> messages
-        | _ -> messages
-
-    member _.ReplacePrefix(messages: HostMessage list, watermarkIndex: int) =
-        let prefixB =
-            match companion.Memory.ActivePrefixEpoch with
-            | Some epoch -> Some epoch.FrozenB
-            | None -> companion.Memory.LatestB
-
-        Companion.compressPrefix messages prefixB watermarkIndex
+        messages
 
     member _.BloggerSession = lock gate (fun () -> bloggerId)
 

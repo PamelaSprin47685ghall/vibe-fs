@@ -186,7 +186,7 @@ const DSL_PROGRAMS = [
   {
     builder: 'companion',
     file: 'Session/CompanionProgram.fs',
-    names: ['buildDelta', 'shouldReplacePrefix', 'runCompanionFlow'],
+    names: ['buildDelta', 'runCompanionFlow'],
   },
   { builder: 'orchestrator', file: 'Orchestrator/OrchestratorProgram.fs', names: ['run'] },
   { builder: 'process', file: 'Process/ProcessRunner.fs', names: ['run', 'runWithHost'] },

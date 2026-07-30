@@ -12,7 +12,7 @@
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（`SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)） |
 | 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
-| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | 进行中（facade 修复后立即开始） |
+| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）；X10 随包 K |
 | 6 | 休克三：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 未开始 |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 未开始 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
@@ -820,6 +820,69 @@ X10 Canary 验收（X-A 至 X-D，随包 K 一并落地）
 
 X7 必须早于 X8：两套压缩系统同时活着时，无法判断 PrefixEpoch 的变化来自 probe 还是 Host。
 
+#### X9 实测结果
+
+编译绿、`test:mjs` 207/207、`gate:static` 全绿。生产文件 175 → 174（删 `Tools/MessageTransform.fs`）。
+
+已清零的旧机制符号（`next/` 全仓计数为 0）：
+
+```text
+estimateTokens estimateTokensUtf8 shouldSwitchEpoch bloggerSelfRebaseDue
+CompanionBudgetStore BudgetFacts SessionBudgets SessionOutputLimits
+ActivePrefixEpoch(Session 侧) ReplacementActive TryEnableReplacement
+FreezeEpoch SwitchEpoch TrySelfRebase TryRebase SelfRebase
+shouldReplacePrefix compressPrefix compressPrefixText replacePrefix
+bHeadDigest prefixDigest prefixLength latestBFor frozenBForProjection
+```
+
+连带删除的三处：
+
+`systemTransformHook` 整体删除。 它的唯一职责是把 provider 的 `model.limit.context`
+与 `.output` 抄进两个 Dictionary，即 CTX-001 禁止的观察本身。`experimental.chat.system.transform`
+注册点随之删除——插件对 system prompt 没有其他要说的。
+
+`Tools/MessageTransform.fs` 整体删除。 `replacePrefix` 的唯一消费者是
+`Companion.compressPrefix`，`sanitize` 零调用点，`HostMessage` / `MessageWatermark`
+是这两个函数的专用类型。新的前缀替换以消息位置计数表达（`XPrefixPlan.DropLeading`），
+不再需要一个 `Index` 包装类型。`GuideContract/Signatures.fs` 与
+`tests-next/Tools/MessageTransformTests.fs` 同步删除。
+
+`SpikePlugin` 的 `backgroundBFor` 改为只读 `LatestB`。 原逻辑优先取 epoch 的
+FrozenB。子会话的背景简报要的是当前记忆，更旧的冻结副本在这里从来不是更好的答案——
+它出现在这里只因为 epoch 存在。
+
+`domain.meta.test.mjs` 两处 fixture 换事实。 原本用 `CompanionReplacementActiveSet`
+当任意事实样本，该事实已随双轨删除。换为 `CompanionBloggerClosed`。这暴露了 meta
+测试的一个性质：它锁的是 facade 机制，不是某个事实，因此样本事实必须选长期存在的。
+
+#### X9 未清零的一行：`jsonDelta`
+
+灭绝表把 `CompanionDelta.jsonDelta` 记为 X3（发射器就位）+ X9（删旧路径）。X3 的
+TOML 发射器与三级切块器已实现且有第 1 层测试，但 X9 没有删除 `jsonDelta`，它仍在
+`Companion.Submit` 路径上。
+
+原因是接线不是删除。 `Submit` 的货币是 `ProjectionSnapshot = string`，而 TOML 链路的
+货币是 `SemanticMessage list` + `SemanticCursor`。换过去要同时改
+`ICompanionDurablePort.AppendSuccessful` 的签名与 `BlogEntryCommitted` 的 cursor
+推进——那是 X4 后半的工作。此刻删掉 `jsonDelta` 会让 Y 收不到任何 delta，直接违反
+COMPANION-005。
+
+adapter 侧不缺东西：`OpenCode/Projection.decodeMessageView` 已能把 Host raw obj 变成
+`ProviderWireProjection`，`ProviderProjection.toSemantic` 已能继续变成语义投影。缺的
+只是 Session 侧换币。登记为 X4 后半的必须项，不留在 X9。
+
+#### X9 留下的一个功能空洞
+
+`CompanionHost.TransformRaw` 现在只做 COMPANION-005 累积并原样返回 `messages`，
+X 前缀替换不生效。`Domain/XPrefixProjection.fs` 与 `Domain/AttemptPlanner.fs` 已实现
+并有第 1 层测试，但没有接进 transform 边界。
+
+这不是降级而是 SSOT/12 的正确中间态：CTX-002 要求前缀替换在一次真实失败之后发生，
+而 transform hook 看不到 attempt 结局，所以这个位置本来就不该做这个决定。没有已提交
+的探针时，X 看到原始历史（SSOT/12「无 snapshot → 原始历史」）。
+
+接线点属 X10 之前的一步，需要 attempt 结局能到达 transform 边界。
+
 #### X8 必须落地的门禁：零调用点的唯一构造函数
 
 包 X5 补 `RequestKind` / `ProjectionChoice` 时发现 `buildAttemptExecutionProfile`
@@ -1074,27 +1137,36 @@ turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squa
 | `OrchestratorPostRebaseReviewConfirmed` | `RebasedCandidateReady.PostRebaseReviewWitnessId` | ORCH-006 | 3 | 2 | 2 | 0 |
 | 双 transform hook 注册 | 单 hook | HOST-009 | 2 | 0 | 0 | 1 |
 
-### 上下文恢复侧（包 X，X2 步测量）
+### 上下文恢复侧（包 X，X2 步测量；X9 步复测）
 
 基线未测量：这些符号在包 X 开始时才第一次全仓统计。`shouldCreateCompanion` 已在包 E 清零，此处不重复。
 
-| 旧符号 / 行为 | 新语义 | 条款 | 目标 |
-|--------------|--------|------|------|
-| `CompanionEligibility` / `isCompanionEligible` | Session 种类不变量 | COMPANION-001 | 0 |
-| 角色 Companion 白名单（任何以 Role 为输入的 Companion 判定） | `ManagedSessionKind` | HOST-008 | 0 |
-| `contextWindow` / `maxContextTokens` / `remainingTokens` | 无（不观察容量） | CTX-001 | 0 |
-| `contextRatio` / `headroom` / `nearLimit` | 无 | CTX-001 | 0 |
-| `shouldCompact` / `ensureCapacity` | 无（失败驱动） | CTX-002 | 0 |
-| `LatestBBytes` 阈值判定 | 200 KiB 输入合同 | CTX-003 | 0 |
-| `OverflowPatterns` / `OverflowDetected` | 无（失败不分类） | CTX-005 | 0 |
-| `CompressionThreshold` / `SquashReason` | 无 | CTX-005 | 0 |
-| X 侧摘要/压缩请求 | Companion 工作日志本地替换 | CTX-009 | 0 |
-| `PrefixProbeRolledBack` / `PrefixProbeCleared` / `RestoreOldEpoch` | 无（失败 probe 非事实） | CTX-010 | 0 |
-| Host compaction → PrefixEpoch rebase 路径 | 收容层重锚（ContextReanchored） | HOST-006 | 0 |
-| JSON 形态的 Blogger delta | 确定性 TOML | CTX-013 | 0 |
-| 物理 Y transcript 作为投影历史来源 | Journal fold 派生 Frames | PERSIST-010 | 0 |
+`next` 列为 X9 完成后的实测值。
+
+| 旧符号 / 行为 | 新语义 | 条款 | next | 目标 |
+|--------------|--------|------|------|------|
+| `CompanionEligibility` / `isCompanionEligible` | Session 种类不变量 | COMPANION-001 | 0 | 0 |
+| 角色 Companion 白名单（任何以 Role 为输入的 Companion 判定） | `ManagedSessionKind` | HOST-008 | 0 | 0 |
+| `contextWindow` / `maxContextTokens` / `remainingTokens` | 无（不观察容量） | CTX-001 | 0 | 0 |
+| `contextRatio` / `headroom` / `nearLimit` | 无 | CTX-001 | 0 | 0 |
+| `shouldCompact` / `ensureCapacity` | 无（失败驱动） | CTX-002 | 0 | 0 |
+| `estimateTokens` / `estimateTokensUtf8` / `shouldSwitchEpoch` | 无（X9 新增行） | CTX-001 | 0 | 0 |
+| `CompanionBudgetStore` / `BudgetFacts` / `systemTransformHook` | 无（X9 新增行） | CTX-001 | 0 | 0 |
+| `bloggerSelfRebaseDue` / `TrySelfRebase` / `SelfRebase` | 恢复槽内 squash | CTX-006 | 0 | 0 |
+| `LatestBBytes` 阈值判定 | 200 KiB 输入合同 | CTX-003 | 0 | 0 |
+| `OverflowPatterns` / `OverflowDetected` | 无（失败不分类） | CTX-005 | 0 | 0 |
+| `CompressionThreshold` / `SquashReason` | 无 | CTX-005 | 0 | 0 |
+| X 侧摘要/压缩请求 | Companion 工作日志本地替换 | CTX-009 | 0 | 0 |
+| `PrefixProbeRolledBack` / `PrefixProbeCleared` / `RestoreOldEpoch` | 无（失败 probe 非事实） | CTX-010 | 0 | 0 |
+| Host compaction → PrefixEpoch rebase 路径 | 收容层重锚（ContextReanchored） | HOST-006 | 0 | 0 |
+| `switchEpoch` / `ReplacementActive` / Session 侧 `ActivePrefixEpoch` | 单轨 `PrefixEpochProjection` | COMPANION-009 | 0 | 0 |
+| `bHeadDigest` / `prefixDigest` / `prefixLength` / `compressPrefix` | `XPrefixPlan` + `companionMemoryMessageId` | COMPANION-013 | 0 | 0 |
+| JSON 形态的 Blogger delta（`jsonDelta`） | 确定性 TOML | CTX-013 | 4 | 0（改归 X4 后半） |
+| 物理 Y transcript 作为投影历史来源 | Journal fold 派生 Frames | PERSIST-010 | 0 | 0 |
 
 X2 执行时注意不要误删与普通文件大小、进程输出预算（EXEC-011）有关的合法 byte 计数。判据是这个数字是否与模型上下文比较，不是它是否叫 bytes。
+
+`jsonDelta` 是 X9 唯一未清零项，原因见「X9 未清零的一行」。它不是遗漏：删除前必须先把 `Submit` 链路的货币从 `ProjectionSnapshot = string` 换成 `SemanticMessage list`，否则 Y 收不到 delta（COMPANION-005）。
 
 ### 剧本森林侧（包 K）
 

@@ -134,7 +134,7 @@ test('fold.apply rejects a single envelope passed where a sequence was meant', (
   const single = envelope({
     seq: 1,
     stream: stream.session(session),
-    fact: fact('CompanionReplacementActiveSet', { SessionId: session, Active: true }),
+    fact: fact('CompanionBloggerClosed', { SessionId: session }),
   })
 
   assert.throws(() => fold.apply(fold.empty, single), /envelope sequence/)
@@ -162,10 +162,10 @@ test('facts are built by case name, and an unknown name fails loudly', () => {
 
 test('asFact wraps an AgentFact as the top-level Agent case', () => {
   const session = sessionId('ses_meta')
-  const wrapped = asFact(agentFact('CompanionReplacementActiveSet', { SessionId: session, Active: true }))
+  const wrapped = asFact(agentFact('CompanionBloggerClosed', { SessionId: session }))
 
   assert.equal(caseOf(wrapped), 'Agent')
-  assert.equal(caseOf(payloadOf(wrapped)), 'CompanionReplacementActiveSet')
+  assert.equal(caseOf(payloadOf(wrapped)), 'CompanionBloggerClosed')
 })
 
 test('caseOf refuses a non-union value instead of returning undefined', () => {

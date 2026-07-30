@@ -38,9 +38,6 @@ module Signatures =
         ignore (typeof<CommitResult<Envelope>>)
         ignore (typeof<BootSnapshot>)
         ignore (typeof<ProjectionSet>)
-        ignore MessageTransform.sanitize
-        ignore (typeof<MessageWatermark>)
-        ignore MessageTransform.replacePrefix
         ignore FactCodec.serializeFact
         ignore Boot.kWayMerge
 
