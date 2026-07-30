@@ -53,8 +53,26 @@ module Envelope =
             else
                 String.Compare(RuntimeId.value a.RuntimeId, RuntimeId.value b.RuntimeId, StringComparison.Ordinal)
 
+    /// PERSIST-001: the line is the durable artifact, so its bytes must not depend
+    /// on the machine that wrote it.
+    ///
+    /// `ObservedAt` is pinned to offset zero before encoding. Writers always pass
+    /// `DateTimeOffset.UtcNow`, so this changes nothing they produce — but the
+    /// DECODER attaches the reader's local offset, so without this a line read on a
+    /// `TZ=Asia/Shanghai` host and written back would render `+08:00` for the same
+    /// instant. Two hosts would then disagree on the bytes of one history, and a
+    /// byte comparison of two replicas would report a difference that is not one.
+    ///
+    /// `ToOffset TimeSpan.Zero` rather than `ToUniversalTime()`: Fable's
+    /// `toUniversalTime` leaves the emitted value's `offset` field `undefined`, and
+    /// the encoder then renders a bare `Z` by accident rather than by contract.
     let serialize (envelope: Envelope) : string =
-        Encode.Auto.toString (0, envelope, extra = extra)
+        Encode.Auto.toString (
+            0,
+            { envelope with
+                ObservedAt = envelope.ObservedAt.ToOffset TimeSpan.Zero },
+            extra = extra
+        )
 
     /// PERSIST-005: a pre-0.5.0 line is refused, never guessed into shape.
     let deserialize (json: string) : Result<Envelope, string> =

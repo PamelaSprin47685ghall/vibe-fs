@@ -16,7 +16,7 @@ module private NodeFsWriter =
     let mkdirSync (path: string, opts: obj) : unit = jsNative
 
     [<Import("openSync", "node:fs")>]
-    let openSync (path: string, flags: string) : int = jsNative
+    let openSync (path: string, flags: string, mode: int) : int = jsNative
 
     [<Import("writeSync", "node:fs")>]
     let writeSync (fd: int, buffer: obj) : int = jsNative
@@ -52,12 +52,20 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
         (startedAt: DateTimeOffset)
         : JournalWriter * Envelope =
         if not (NodeFsWriter.existsSync directory) then
-            NodeFsWriter.mkdirSync (directory, {| recursive = true |}) |> ignore
+            // PERSIST-006: 0700 on the runtime directory. `mode` must be passed at
+            // creation rather than chmod'ed after — between mkdir and chmod the
+            // directory is world-readable, and a journal line names sessions and
+            // Git trees.
+            NodeFsWriter.mkdirSync (directory, {| recursive = true; mode = 0o700 |})
+            |> ignore
 
         let filename = sprintf "%s.ndjson" (RuntimeId.value runtimeId)
         let filePath = NodeFsWriter.pathJoin (directory, filename)
 
-        let fd = NodeFsWriter.openSync (filePath, "wx")
+        // PERSIST-006: 0600 on the journal file. `wx` additionally makes a second
+        // writer for one RuntimeId fail with EEXIST instead of reopening the file
+        // and interleaving two LocalSeq sequences into it.
+        let fd = NodeFsWriter.openSync (filePath, "wx", 0o600)
 
         let initEventId = EventId.create (Guid.NewGuid().ToString("N"))
 

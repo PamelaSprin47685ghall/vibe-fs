@@ -17,7 +17,8 @@
 // otherwise the members are plain exports. That is the single Fable convention
 // this file exists to absorb.
 
-import { readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const BUILD_ROOT = new URL('../build/next/', import.meta.url).pathname
@@ -56,6 +57,8 @@ const [
   EnvelopeModule,
   FoldModule,
   FactCodec,
+  WriterModule,
+  BootModule,
   BlogProj,
   PrefixProj,
   FallbackProj,
@@ -91,6 +94,8 @@ const [
   prod('Journal/Envelope'),
   prod('Journal/Fold'),
   prod('Journal/FactCodec'),
+  prod('Journal/Writer'),
+  prod('Journal/Boot'),
   prod('Journal/BlogProjection'),
   prod('Journal/PrefixEpochProjection'),
   prod('Journal/FallbackProjection'),
@@ -172,6 +177,19 @@ const bind = (mod, moduleName, names) =>
  * sanctioned way to produce a clock value.
  */
 export const utcOffset = (iso) => DateOffset.fromDate(new Date(iso), 0)
+
+/**
+ * The same instant carrying a non-zero UTC offset.
+ *
+ * Only PERSIST-001's byte-stability test needs this: a decoded envelope picks up
+ * the READER's local offset, so proving the serialized bytes do not depend on it
+ * requires constructing that state deliberately rather than hoping CI runs in a
+ * particular timezone.
+ */
+export const offsetAt = (iso, offsetMinutes) => DateOffset.fromDate(new Date(iso), offsetMinutes * 60_000)
+
+/** The UTC offset a DateTimeOffset carries, in minutes. `0` for a UTC value. */
+export const offsetMinutesOf = (value) => DateOffset.offset(value) / 60_000
 
 /** Read a discriminated-union case name. Never compare `tag` in a test. */
 export const caseOf = (value) => {
@@ -516,6 +534,124 @@ export const fold = {
 
   orchestrator: (projection) => projection.AgentProjections.Orchestrator,
 }
+
+// ── journal on disk (PERSIST-002/004/005, verification layer 2) ───────────────
+//
+// `JournalWriter` and `Boot` are the only domain modules that touch a real
+// filesystem, so they are the only place a layer-2 resource-contract test can
+// exist at all. Everything below hands them a fresh temp directory: PERSIST-004
+// is about what a partially written file does at startup, and that cannot be
+// asserted against an in-memory stand-in without asserting the stand-in instead.
+//
+// The `.ndjson` filename is `<RuntimeId>.ndjson` and `Boot` re-derives the
+// RuntimeId from it, so tests must not choose paths freely — `store()` owns that.
+
+const Writers = bind(WriterModule, 'JournalWriter', ['create'])
+const Boots = bind(BootModule, 'Boot', ['boot', 'captureFrontiers', 'kWayMerge'])
+
+const writerMember = (name) => WriterModule[`JournalWriter__${name}`]
+const appendTo = writerMember('Append')
+const writerPath = writerMember('get_FilePath')
+const writerSeq = writerMember('get_LocalSeq')
+const writerCommitted = writerMember('get_LastCommittedLocalSeq')
+const writerPoisoned = writerMember('get_IsPoisoned')
+
+/**
+ * A disposable journal directory.
+ *
+ * `store.open()` creates the runtime's `.ndjson` and its mandatory first
+ * envelope (`RuntimeStarted`) in one step, because production has no way to get
+ * a writer without it — `create` uses the `wx` open flag, so a second writer for
+ * the same RuntimeId fails rather than reopening.
+ *
+ * The journal directory is a path INSIDE the temp dir that production creates
+ * itself. `mkdtemp` already produces 0700, so creating it here would make the
+ * PERSIST-006 assertion pass without production setting any mode at all.
+ */
+export const journalStore = () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-journal-'))
+  const directory = join(base, 'runtimes')
+  const opened = []
+
+  /** For corrupt-journal cases there is no writer, so nothing has made the dir. */
+  const ensureDirectory = () => {
+    if (!existsSync(directory)) mkdirSync(directory, { recursive: true })
+  }
+
+  return {
+    directory,
+
+    open: ({ runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
+      const [writer, initEnvelope] = Writers.create(directory, runtimeId(runtime), pid, utcOffset(startedAt))
+      opened.push(writer)
+
+      return {
+        initEnvelope,
+        path: writerPath(writer),
+
+        /** PERSIST-002: `{ committed: true, envelope }` or `{ committed: false, ... }`. */
+        append: (streamId, envelopeFact, run) => {
+          const result = appendTo(writer, streamId, run === undefined ? undefined : providerRun(run), envelopeFact)
+          return caseOf(result) === 'Committed'
+            ? { committed: true, envelope: payloadOf(result) }
+            : { committed: false, eventId: idValue.event(result.fields[0]), failure: caseOf(result.fields[1]) }
+        },
+
+        /** Next LocalSeq to be written, and the last one that reached the file. */
+        seq: () => Number(writerSeq(writer)),
+        lastCommittedSeq: () => Number(writerCommitted(writer)),
+        poisoned: () => writerPoisoned(writer),
+        dispose: () => writer.Dispose(),
+      }
+    },
+
+    /** PERSIST-006 permission bits, as octal strings production actually set. */
+    modes: (runtime = 'rt_1') => ({
+      directory: (statSync(directory).mode & 0o777).toString(8),
+      file: (statSync(join(directory, `${runtime}.ndjson`)).mode & 0o777).toString(8),
+    }),
+
+    /** Raw file text, for asserting the NDJSON shape rather than a decoded value. */
+    lines: (runtime = 'rt_1') =>
+      readFileSync(join(directory, `${runtime}.ndjson`), 'utf8')
+        .split('\n')
+        .filter((line) => line !== ''),
+
+    /** Write the file directly. The ONLY way to express a corrupt journal. */
+    writeRaw: (runtime, text) => {
+      ensureDirectory()
+      writeFileSync(join(directory, `${runtime}.ndjson`), text)
+    },
+
+    files: () => (existsSync(directory) ? readdirSync(directory).sort() : []),
+
+    /** PERSIST-004: `{ envelopes, diagnostics, frontier }`, all plain JS. */
+    boot: () => {
+      const snapshot = Boots.boot(directory)
+      return {
+        envelopes: listItems(snapshot.Envelopes),
+        diagnostics: listItems(snapshot.Diagnostics),
+        frontier: mapToObject(snapshot.Frontier, idValue.runtime),
+      }
+    },
+
+    frontier: () => mapToObject(Boots.captureFrontiers(directory), idValue.runtime),
+
+    close: () => {
+      for (const writer of opened) {
+        try {
+          writer.Dispose()
+        } catch {
+          // Already disposed by the test; closing twice is not a failure.
+        }
+      }
+      rmSync(base, { recursive: true, force: true })
+    },
+  }
+}
+
+/** PERSIST-004 merge order across runtime streams, without touching disk. */
+export const kWayMerge = (streams) => listItems(Boots.kWayMerge(toList(streams.map((s) => toList(s)))))
 
 // ── fallback (SSOT/04) ───────────────────────────────────────────────────────
 

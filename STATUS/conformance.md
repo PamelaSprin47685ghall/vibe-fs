@@ -118,11 +118,25 @@
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| PERSIST-001: Envelope 结构 | CONFORMANT | `Journal/Envelope.fs` | — |
-| PERSIST-002: Append 原子性 | CONFORMANT | `Journal/Writer.fs` | — |
-| PERSIST-005: 旧 Schema | CONFORMANT | `FactCodec.containsLegacyFallbackFields` | 发现旧 schema 直接失败 |
+| PERSIST-001: Envelope 结构 | CONFORMANT | `Journal/Envelope.fs` | 单行自包含、跨时区字节稳定（`ObservedAt` 编码前钉到 offset 0）、全序排序键。第 1 层测试在三个 TZ 下运行 |
+| PERSIST-002: Append 原子性 | CONFORMANT | `Journal/Writer.fs` | 两结局；`wx` 拒绝同 RuntimeId 第二个 writer；已释放 writer 返回 `CommitUnknown` 而非抛异常。第 2 层测试 |
+| PERSIST-004: 尾部损坏 | CONFORMANT | `Journal/Boot.fs` | 尾部截断静默丢弃；中间损坏 / LocalSeq 跳号 / RuntimeId 不匹配三者均在损坏处截断并报诊断；单个流损坏不牵连健康流。第 2 层测试 |
+| PERSIST-005: 旧 Schema | CONFORMANT | `FactCodec.containsLegacyFallbackFields` | 发现旧 schema 直接失败；退役事实名按名诊断而非报编解码错误 |
+| PERSIST-006: 文件权限 | CONFORMANT | `Journal/Writer.fs` | `mkdirSync` 传 `mode = 0o700`、`openSync` 传 `0o600`，创建时设定而非事后 chmod。第 2 层测试在 `umask 000` 下断言 |
 | PERSIST-008: Projection 查询 | PARTIAL | `Journal/Fold.fs` | 多数 projection 是 O(1) 积分；`Fold.reviewOwner` 用 `Map.tryPick` 扫描全部 session |
 | PERSIST-009: Durable Effect 协议 | PARTIAL | `EffectProjection.fs` | 事实存在；未覆盖 Prompt 发送与 Git publish |
+
+### PERSIST-001 与 PERSIST-006 的两处实测缺陷（包 T-2 修正）
+
+两条都标着 `CONFORMANT` 或未核验，但都不成立。共同点是缺陷只在测试真的观察物理产物时才可见。
+
+`serialize` 渲染读者的本地时区偏移。 `Encode.Auto` 直接编码 `DateTimeOffset`，而 `Decode.Auto` 解码时挂上读者的本地 offset。写入侧永远传 `DateTimeOffset.UtcNow` 所以新写的行没问题，但「读一行再写回」在 `TZ=Asia/Shanghai` 上把同一时刻渲染成 `+08:00`。两台不同时区的机器会对同一份历史产出不同字节，副本的字节比对报出并不存在的差异。修正是编码前 `ToOffset TimeSpan.Zero`。
+
+不用 `ToUniversalTime()`：Fable 的 `toUniversalTime` 让产出值的 `offset` 字段为 `undefined`，编码器于是靠巧合渲染出裸 `Z` 而非按契约渲染。
+
+权限位从未设定。 `mkdirSync` 只传 `recursive`，`openSync` 只传 flags，所以实际权限是 umask 的结果——默认 umask 022 下是 755/644，而 PERSIST-006 要求 700/600。journal 行里有 session id、Git tree hash、prompt payload 摘要。修正是在创建时传 mode，不是事后 chmod：mkdir 与 chmod 之间目录是全局可读的。
+
+测试必须让生产自己创建目录。 `mkdtemp` 本身就产出 0700，所以在 `mkdtemp` 的结果上直接断言会在生产完全不设 mode 的情况下通过。facade 因此把 journal 目录放在临时目录内的一个子路径，由 `JournalWriter.create` 创建。
 
 ## 零调用点的唯一构造函数（PROMPT-008，已解决）
 
@@ -148,7 +162,7 @@
 `EXEC-006` ~ `EXEC-008` `EXEC-010` `EXEC-012` ~ `EXEC-014`、`COMPANION-003` ~
 `COMPANION-007` `COMPANION-010` ~ `COMPANION-012`、`HOST-001` `HOST-006` `HOST-007`
 `HOST-008`、`ARCH-005` `ARCH-006` `ARCH-008`、`VERIFY-002` `VERIFY-006`、
-`PERSIST-003` `PERSIST-004` `PERSIST-006` `PERSIST-007` 当前未逐条核验，
+`PERSIST-003` `PERSIST-007` 当前未逐条核验，
 状态为 `UNVERIFIED`。
 
 这不是「大概符合」——是尚未产生判据。退火三之后逐条补齐；发布前本表不得存在

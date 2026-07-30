@@ -722,6 +722,54 @@ PromptAuthoritySendTests
 
 文件本身在封炉期删除；内容由 Git 历史保存（`c3c35756^`）。
 
+#### 包 T-2 实测结果
+
+13 个必须重建的断言中，Prompt 侧全部落地在 `tests-mjs/Prompt/authority.test.mjs`（21 个测试）。
+Journal 侧另开两个文件：`tests-mjs/Journal/envelope.test.mjs`（第 1 层，纯编解码与
+fold）与 `tests-mjs/Journal/boot.test.mjs`（第 2 层，真实文件）。
+
+`test:mjs` 228 → 263。三个时区（UTC / Asia-Shanghai / America-New_York）下均全绿。
+
+不重建的 2 个断言：它们断言 `accepted-*` 运输回执可以承载 authority，PROMPT-005
+现在明确禁止。替代物是同一情形的反向断言
+（`PROMPT_001_a_transport_receipt_can_never_become_an_authority_root`）。
+
+##### 三处只有真测试才能发现的缺陷
+
+`domain.mjs` 的 `claimScopeDigest` facade 签名多了个 `sha256` 形参。 生产签名不接受
+它——该函数返回 `\u001f` 连接的明文，不做哈希。旧 facade 会把 `sessionId` 当
+`logicalRunId` 传进去并抛 `TypeError`。此前零调用点，所以 facade 写错了半个包都没人知道。
+这正是 facade 层需要元测试的理由：facade 本身也是代码。
+
+`Envelope.serialize` 渲染读者的本地时区偏移（PERSIST-001）。 `Encode.Auto` 直接编码
+`DateTimeOffset`，`Decode.Auto` 解码时挂上读者本地 offset。写入侧永远传 `UtcNow` 所以
+新写的行没问题，但「读一行再写回」在 `TZ=Asia/Shanghai` 上把同一时刻渲染成 `+08:00`。
+两台不同时区的机器对同一份历史产出不同字节。修正是编码前 `ToOffset TimeSpan.Zero`。
+
+不用 `ToUniversalTime()`：Fable 的 `toUniversalTime` 让产出值的 `offset` 字段为
+`undefined`，编码器于是靠巧合渲染出裸 `Z` 而非按契约渲染。这条也解释了为什么该断言
+必须比对完整行文本——只断言「能解回来」会全绿。
+
+Journal 权限位从未设定（PERSIST-006）。 `mkdirSync` 只传 `recursive`，`openSync` 只传
+flags，实际权限是 umask 的结果：默认 umask 022 下 755/644，条款要求 700/600。修正是
+创建时传 mode 而非事后 chmod——mkdir 与 chmod 之间目录是全局可读的，而 journal 行里有
+session id、Git tree hash 与 prompt payload 摘要。
+
+测试自身的陷阱一并记账。 `mkdtemp` 本身就产出 0700，所以在 `mkdtemp` 结果上直接断言会
+在生产完全不设 mode 的情况下通过。facade 因此把 journal 目录放在临时目录内的子路径，
+由 `JournalWriter.create` 自己创建；`PERSIST_006_permissions_hold_regardless_of_the_process_umask`
+额外把 umask 设为 `000` 再断言。
+
+##### 第 2 层进入 tests-mjs 的边界
+
+`JournalWriter` 与 `Boot` 是唯一触碰真实文件系统的领域模块，因此也是唯一能写第 2 层
+资源契约测试的位置。PERSIST-004 问的是「半写的文件在启动时怎么办」，用内存替身断言
+只会断言替身。
+
+facade 出口 `journalStore()` 独占一个临时目录并负责清理（VERIFY-004）。`writeRaw` 是
+表达「损坏 journal」的唯一手段——损坏 fixture 必须只在测试意图的那一点上与健康文件
+不同，所以其余部分仍由生产的 `Envelope.serialize` 生成。
+
 ### 包 W：因果推进门禁重建
 
 | 项 | 值 |
