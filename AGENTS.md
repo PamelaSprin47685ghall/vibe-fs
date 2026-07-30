@@ -246,7 +246,7 @@ assistant message 在 transform 之前已经创建并持久化。
 命令：
 
 ```bash
-npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs + toml + budget
+npm run gate:static            # 第 0 层：ssot-lint + architecture-gate + docs + toml + budget + surface
 npm run gate:shock             # 第 0 层：旧符号灭绝 + 单一写入口（休克期专用）
 
 dotnet build next/Wanxiangshu.Next.fsproj    # 生产 .NET
@@ -267,6 +267,13 @@ formatter 输出逐字节一致。
 `testkit/opencode/time-budget.js`。判据是量级即语义线——轮询切片必须比它所受的界更快，
 故合法切片按构造 < 1000ms；≥1000ms 者本身即预算。门禁无豁免通道，字符串也不得把预算
 重述成带单位的时长。
+`gate:surface`（`scripts/surface-inventory.mjs`）是包 N2 新增的第 0 层门禁：ARCH-010
+纳入范围的运行时合成文本必须逐一登记并分类。清单由 sink 侧派生而非手写生产者清单——
+PROMPT-005 使 `PromptDispatcher` 的三个 send 成员加 `sendFirstPrompt` 成为插件文本到达
+provider 的唯一通路，故 sink 是可枚举的闭集。双向检查：新增 send 站点无条目判红，条目
+指向已消失的站点也判红；sink 名改动导致扫描为空同样 fail closed。system prompt 与
+human raw 的排除是结构性的而非声明式的——send 站点文件不得在代码里引用 prompt asset，
+send 行不得携带 `HumanRoot`。两项均已红过。
 
 `test:mjs` 拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
 
@@ -393,6 +400,7 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 | `time-budget.js` | 全部 wall-clock 兜底的单一来源，逐条带理由（VERIFY-004） |
 | `scripts/toml-format.mjs` | 行式 formatter，`gate:toml` 强制逐字节一致 |
 | `scripts/budget-gate.mjs` | `gate:budget`，禁止 ≥1000 的计时字面量散落，无豁免通道 |
+| `scripts/surface-inventory.mjs` | `gate:surface`，ARCH-010 合成文本 surface 清单由 sink 侧派生，双向检查 |
 
 内容层（VERIFY-003）：
 

@@ -25,7 +25,8 @@
     "gate:docs": "node scripts/strip-doc-bold.mjs",
     "gate:toml": "node scripts/toml-format.mjs",
     "gate:budget": "node scripts/budget-gate.mjs",
-    "gate:static": "npm run gate:ssot && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget",
+    "gate:surface": "node scripts/surface-inventory.mjs",
+    "gate:static": "npm run gate:ssot && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface",
 
     "build": "node scripts/clean-fable-output.mjs build/next && dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next",
     "postbuild": "node scripts/postbuild.mjs",
