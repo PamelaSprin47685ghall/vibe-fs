@@ -72,42 +72,76 @@ module BloggerToml =
     /// Can this text sit inside `'''…'''` unchanged?
     ///
     /// A literal multi-line string processes NO escapes, which is the only way to
-    /// print code and JSON verbatim. Its constraints: it cannot contain `'''`, it
-    /// cannot end with `'` (that would extend the closing delimiter), and TOML
-    /// forbids raw control characters other than tab and newline.
+    /// print code and JSON verbatim. Two things it cannot hold: `'''`, which would
+    /// close it early, and raw control characters other than tab and newline, which
+    /// TOML forbids in any string.
+    ///
+    /// It used to also reject a trailing `'`, because a closing delimiter written
+    /// immediately after the last content character would have run into it and formed
+    /// `''''`. ARCH-010 puts the closing delimiter on its own line, so that case no
+    /// longer exists and the check is gone rather than kept "for safety" — a predicate
+    /// nothing can fail is indistinguishable from one that is wrong.
     let private literalSafe (text: string) =
         not (text.Contains "'''")
-        && not (text.EndsWith "'")
         && text |> Seq.forall (fun c -> c = '\n' || c = '\t' || not (Char.IsControl c))
 
-    /// CTX-013 string selection. Deterministic and always valid, in this order:
+    /// ARCH-010 string selection. Deterministic, always valid, always parseable:
     ///
-    ///   no newline                  → basic `"…"` with standard escapes
-    ///   newline and literal-safe    → literal `'''…'''`, byte-for-byte verbatim
+    ///   no newline                  → basic `"…"` with canonical escapes
+    ///   newline and literal-safe    → `'''` + verbatim body + closing on its own line
     ///   anything else               → basic `"…"` with everything escaped
     ///
-    /// The first test is only "does it contain a newline". Every other character a
-    /// body can hold — tab, NUL, DEL — has a basic-string escape, so a newline is
-    /// the one thing that actually forces the multi-line form. An earlier version
-    /// also excluded tab here, which pushed single-line text containing a tab into
-    /// `'''…'''`: valid TOML, but it turned a one-line value into a three-line one
-    /// for no reason.
+    /// The first test is only "does it contain a newline". Every other character a body
+    /// can hold — tab, NUL, DEL — has a basic-string escape, so a newline is the one
+    /// thing that forces the multi-line form.
     ///
-    /// Multi-line BASIC strings (`"""…"""`) are deliberately never emitted, and this
-    /// corrects the rule as originally drafted. A `"""` string still processes escape
-    /// sequences, so a body containing a backslash — every non-trivial tool-call
-    /// argument, every Windows path, every regex — would either be misread (`\n`
-    /// becoming a real newline) or fail to parse at all (`\d` is not a valid TOML
-    /// escape). Preferring `"""` for readability therefore buys nothing: keeping it
-    /// valid requires escaping the backslashes it was supposed to avoid. `'''` is the
-    /// only multi-line form that is genuinely raw.
+    /// ── why `'''` and not `"""` ─────────────────────────────────────────────
+    ///
+    /// A multi-line BASIC string (`"""…"""`) still processes escape sequences, and this
+    /// notation has to carry tool output, file contents, diffs and compiler logs into
+    /// the value unchanged (ARCH-010 Data containment). A body holding a backslash —
+    /// every regex, every Windows path, every non-trivial tool-call argument — then has
+    /// only two outcomes, and both break something the clause requires:
+    ///
+    ///   backslash left alone   `\d` is not a valid TOML escape, so the document does
+    ///                          not parse at all
+    ///   backslash escaped      the model reads `\\d+` where the tool emitted `\d+`,
+    ///                          which is a distortion of the data CTX-013 exists to
+    ///                          record faithfully
+    ///
+    /// A literal multi-line string processes nothing, so the dilemma disappears. Which
+    /// is also why no format indentation is injected: TOML does not de-indent a literal
+    /// string, so indenting the body would put those spaces IN the value — the renderer
+    /// corrupting the data it promised to pass through.
+    ///
+    /// The closing delimiter is on its own line for readability, and because it removes
+    /// the trailing-quote edge case entirely. The cost is one trailing newline in the
+    /// value, which for a projection that is only ever read is not a cost.
+    ///
+    /// ── the fallback is not a delimiter choice ──────────────────────────────
+    ///
+    /// ARCH-010 forbids picking between multi-line delimiters by content. The `else`
+    /// branch is not that: a body containing `'''` or a raw control character has NO
+    /// legal multi-line representation, so it goes to the single-line form. The rule is
+    /// decidable and the same input always lands the same way.
+    ///
+    /// The single-line form still escapes everything, and that asymmetry is required
+    /// rather than accidental: a single-line basic string has no raw variant, since TOML
+    /// would read `"a\b"` as a backspace. Only the multi-line form can be verbatim,
+    /// which is what it is for.
+    ///
+    /// Being genuinely parseable is a hard requirement, not decoration. One-way means
+    /// no business logic may parse this back (ARCH-010 单向表示); it does not license
+    /// emitting invalid TOML. Parseability is the only mechanically checkable property
+    /// this notation has, and every gate, golden test and containment assertion rests
+    /// on it.
     let renderString (raw: string) : string =
         let text = normalizeNewlines raw
 
         if not (text.Contains "\n") then
             "\"" + escapeBasic text + "\""
         elif literalSafe text then
-            "'''\n" + text + "'''"
+            "'''\n" + text + "\n'''"
         else
             "\"" + escapeBasic text + "\""
 
