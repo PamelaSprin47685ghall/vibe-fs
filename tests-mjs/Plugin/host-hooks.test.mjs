@@ -31,13 +31,8 @@
 // to call a hook.
 
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import test from 'node:test'
-
-const { initSpikePlugin } = await import('../../build/next/OpenCode/SpikePlugin.js')
+import { withPlugin } from './plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
 
@@ -63,28 +58,6 @@ const hostFinalConfig = () => {
     }
   }
   return { agent }
-}
-
-/**
- * A plugin instance over a throwaway Git repo.
- *
- * The journal lives under the Git common directory (PERSIST-006), so `git init` is
- * what makes the runtime addressable at all. `events.listen` is the smallest port
- * that satisfies the signal source; no scenario, no HTTP, no mock provider.
- */
-const withPlugin = async (body) => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-hooks-'))
-  try {
-    execFileSync('git', ['init', '--quiet', directory])
-    const hooks = await initSpikePlugin({
-      client: {},
-      directory,
-      events: { listen: () => () => {} },
-    })
-    await body(hooks)
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
 }
 
 /**
