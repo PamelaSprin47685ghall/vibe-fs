@@ -68,6 +68,66 @@ export function deliveryOutcome(fault, attempt) {
   return fault.attempts.includes(attempt) ? { fault } : { deliver: true };
 }
 
+// ── rendering a fault the Host will actually classify ───────────────────────
+//
+// A fault declares `retryable`, and FALLBACK-009 turns on it: a retryable failure means
+// the HOST drives the retries and the plugin sends no continuation; a non-retryable one
+// means the Host gives up and `TurnCompletionProgram` must carry the Logical Run forward.
+// Declaring it is only half the job — the response body has to make the Host agree.
+//
+// ── measured: the old fault bodies said nothing the Host reads ──────────────
+//
+// Every JSON fault wrote its intent as `body.error.isRetryable`:
+//
+//   { "error": { "message": "aabb-fail-1", "type": "invalid_request_error",
+//                "isRetryable": false } }
+//
+// `../opencode/packages/opencode/src/session/message-v2.ts:706` calls
+// `ProviderError.parseStreamError`, and that function (`provider/error.ts:102`) returns
+// `undefined` unless the body's TOP-LEVEL `type` is `"error"`, then switches on
+// `body.error.code`. The old bodies had no top-level `type` and no `code`, so
+// `parseStreamError` bailed and the retry decision fell through to the AI SDK's own
+// `e.isRetryable`, derived from the HTTP status.
+//
+// So `isRetryable` in those bodies was decoration: `fallback.json` got its Host-driven
+// retries from the 500, and `fallback-aabb-trace.json` got its plugin continuations from
+// the 400 — the field agreeing with the status by luck in both cases. A scenario that
+// declared 500 + `isRetryable: false` would have silently behaved as retryable.
+//
+// Synthesising the body from the declaration removes the second source of truth.
+const RETRYABLE_CODE = 'server_error';
+const TERMINAL_CODE = 'invalid_prompt';
+
+/**
+ * The wire body for a declared fault, shaped so the Host's own parser reaches the
+ * declared conclusion.
+ *
+ * `context-overflow` is its own code because HOST-006/CTX-005 make it a different
+ * outcome entirely — the Host raises `ContextOverflowError` rather than an API error, and
+ * the recovery slot (CTX-006) is what responds to it.
+ */
+export function faultBody(fault) {
+  if (fault.kind === 'context-overflow') {
+    return {
+      type: 'error',
+      error: {
+        code: 'context_length_exceeded',
+        message: "This model's maximum context length is 100000 tokens.",
+        type: 'invalid_request_error',
+      },
+    };
+  }
+
+  return {
+    type: 'error',
+    error: {
+      code: fault.retryable === true ? RETRYABLE_CODE : TERMINAL_CODE,
+      message: `declared ${fault.kind} fault (retryable=${fault.retryable === true})`,
+      type: 'invalid_request_error',
+    },
+  };
+}
+
 // ── the delivery counter ────────────────────────────────────────────────────
 //
 // State, and named as such. It counts physical deliveries per key, which is the

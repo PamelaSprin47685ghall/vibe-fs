@@ -19,6 +19,7 @@ import {
   emptyDeliveries,
   faultFor,
   recordDelivery,
+  faultBody,
   validateFault,
 } from '../delivery-plan.js';
 import { resolveEntry, runtimeKeyOf } from '../runtime-key.js';
@@ -288,6 +289,69 @@ export const deliveryCases = [
           `'${kind}' is content and must not be a fault kind`,
         );
       }
+    },
+  },
+  // ── rendering a fault the Host will actually classify ─────────────────────
+
+  {
+    name: 'FALLBACK-009 a retryable fault renders a body the Host retries',
+    fn: () => {
+      // `../opencode/packages/opencode/src/session/message-v2.ts:706` hands the body to
+      // `ProviderError.parseStreamError`, which (`provider/error.ts:102`) returns undefined
+      // unless the TOP-LEVEL `type` is "error", then switches on `body.error.code`.
+      // `server_error` is the branch that yields `isRetryable: true`.
+      const body = faultBody({ kind: 'provider-error', status: 500, retryable: true });
+
+      assertEq(body.type, 'error', 'a body without top-level type is not parsed at all');
+      assertEq(body.error.code, 'server_error');
+    },
+  },
+
+  {
+    name: 'FALLBACK-009 a non-retryable fault renders a body the Host gives up on',
+    fn: () => {
+      // `invalid_prompt` yields `isRetryable: false`, so the Host stops and the plugin must
+      // continue the Logical Run itself (`../next/OpenCode/TurnCompletionProgram.fs:92`).
+      // That is the mechanism `fallback-aabb-trace` depends on to observe four attempts.
+      const body = faultBody({ kind: 'provider-error', status: 400, retryable: false });
+
+      assertEq(body.type, 'error');
+      assertEq(body.error.code, 'invalid_prompt');
+    },
+  },
+
+  {
+    name: 'FALLBACK-009 the retired isRetryable body field was never read',
+    fn: () => {
+      // Measured in K9. Every JSON fault wrote its intent as `body.error.isRetryable`:
+      //
+      //   { "error": { "message": "aabb-fail-1", "type": "invalid_request_error",
+      //                "isRetryable": false } }
+      //
+      // No top-level `type`, no `code` — so `parseStreamError` bailed and the decision fell
+      // through to the AI SDK's own `e.isRetryable`, derived from the HTTP status. The field
+      // was decoration that happened to agree with the status in both scenarios using it. A
+      // scenario declaring 500 with `isRetryable: false` would have behaved as retryable
+      // while reading as terminal.
+      //
+      // The rendered body carries no such field: the declaration is the only source.
+      const body = faultBody({ kind: 'provider-error', status: 400, retryable: false });
+
+      assertTrue(body.error.isRetryable === undefined, 'no second source of truth');
+      assertTrue(body.error.code !== undefined, 'the code is what the Host actually reads');
+    },
+  },
+
+  {
+    name: 'CTX-005 a context-overflow fault is a different outcome, not a retryable error',
+    fn: () => {
+      // `parseStreamError`'s `context_length_exceeded` branch raises `ContextOverflowError`
+      // rather than an API error, so it never reaches the retry decision at all. CTX-006's
+      // recovery slot is what responds to it — which is why it cannot be spelled as a
+      // provider-error with a status.
+      const body = faultBody({ kind: 'context-overflow' });
+
+      assertEq(body.error.code, 'context_length_exceeded');
     },
   },
 ];
