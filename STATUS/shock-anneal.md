@@ -1373,14 +1373,16 @@ N5 排在 canary 全绿之后而非之前：动议 M5 要求「更新所有依�
 ```text
 N0  规范先行（M0）：ARCH-010 进 SSOT/01；CTX-013 修订；PROMPT-001 交叉引用；     已完成
     SSOT/99 三术语。不得先批量改生产 prompt 再让实现反向定义规范
-N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一处，           进行中
-    删除 Blogger 本地 ''' 多行方言，多行改 """ + 四空格缩进
+N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一处；            进行中
+    多行定为 ''' + 零加工内容 + closing 独占一行；含 ''' 或裸控制字符者
+    回退单行 basic string。裁决与实测见下方 N1 记要
 N2  surface inventory（M1）：列出全部最终进入 LLM 的文本生产点并四分类
     NativeSystemPrompt / HumanRaw / ModelNative / RuntimeSyntheticToml。
     该分类只用于实现审计，不构成新的运行时 envelope。门禁固定该清单
 N3  fork/child-instruction surface 迁到 ARCH-010 形态；fork 信封条件包裹在此定案
 N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得为顶层 comment、
-    instruction-first、data 开始后无顶层 comment、无 '''、system prompt 未被纳入、
+    instruction-first、data 开始后无顶层 comment、无 """、closing 独占一行、
+    渲染结果 parse 成功且 value == 原文 + 尾换行、system prompt 未被纳入、
     human raw 未被包装、provider/tool 原生 binding 未改变
 ─── canary 修红（11 → 16/16）与退火三在此之后 ───
 N5  其余 synthetic surface 迁移（M3 + M4）：Blogger delta 优先（已有 typed part、
@@ -1402,41 +1404,63 @@ CTX-013 三处修订：字符串写法改为引用 ARCH-010（删掉原「有换
 
 `PENDING/13-Toml方案.md` → `STATUS/design-synthetic-toml.md`，按 `design-context-recovery.md` 的归档惯例加性质声明头（规范位置对照表 + 保留原因 + 编号说明 + 机械改动说明）。
 
-#### N1 实测：动议未覆盖多行 basic string 的转义语义，须裁决
+#### N1 裁决：多行 delimiter 定为 `'''`，无缩进，closing 独占一行
 
-动议 §6.3 要求多行统一用 `"""`、四空格内容缩进、closing delimiter 紧随最后一个内容行，并禁止 `'''`。但它没有说 `"""` 体内如何转义，而这里存在一个已实测的冲突：
+动议原稿 §6.3 要求 `"""` + 四空格内容缩进 + closing 紧随最后一个内容行，并禁止 `'''`。该形态经实测否决，按最终裁量权改定，动议原稿已同步修订（`design-synthetic-toml.md` §6.3 全节重写，新增 §6.3.1／§6.3.2／§6.3.3）。
 
-```text
-现状（BloggerToml.fs:96-112）  刻意从不发射 """，注释写明理由
-理由                            多行 basic string 仍处理转义序列，故含反斜杠的正文
-                                （每个 regex、每个 Windows 路径、每个非平凡 tool-call args）
-                                要么被误读（\n 变真换行），要么根本不 parse（\d 不是合法 TOML 转义）
-```
-
-即动议指定的形态与该文件既有的实测结论直接相反。两种落法：
+否决理由是原形态无法同时满足动议自己的两条要求：
 
 ```text
-(a) """ + 转义反斜杠    严格合法 TOML，但模型看到 \\d+ 而数据里是 \d+ ——失真
-(b) """ + 反斜杠原样    模型看到确切数据，但文本含非法转义序列
+§6.4 + §7   工具输出、文件内容、diff、编译日志必须原样进入 value
+§6.3 不变量  原始内容自身的缩进必须保留
 ```
 
-裁决取 (b)，理由三条：
-
-其一，ARCH-010 本身规定该表示单向、永不反向解析，且禁止增加任何从 TOML 反推的业务依赖。「parser 会误读」描述的是一个规范禁止存在的消费者。
-
-其二，动议在 §6.3 自己就已经放弃 parse 保真：真实 parser 会把四空格格式缩进读成 value 的一部分。bytes 在这里不等于 value，该渲染是给读者的。
-
-其三，CTX-013 存在的目的是让 Companion 忠实记录实际发生的事。工具输出 `\d+` 而日志写 `\\d+` 是对 data 的失真，且这笔失真付给了一个不存在的消费者。
-
-因此 `"""` 体内只中和两类字符，其余原样：
+`"""` 是 basic 多行字符串，处理转义序列。含反斜杠的正文——每个 regex、每条 Windows 路径、每个非平凡 tool-call args——只有两种下场，且两种都违反上面某一条：
 
 ```text
-连续三个 "        会提前闭合字符串，让 data 逃逸到文档结构 —— 违反 §7 containment
-结尾单个 "        会与 closing delimiter 连成四引号
-控制字符          TOML 禁止裸控制字符，且会破坏模型读到的内容
+不转义反斜杠   \d 不是合法 TOML 转义 → 文档根本不 parse
+转义反斜杠     模型看到 \\d+ 而工具输出的是 \d+ → data 失真
 ```
 
-反斜杠不在中和之列。这条裁决取代该文件原有的 `'''` 裁决，并必须写在代码里：显而易见的「修正」——把整个 body 转义——会静默损坏工作日志里每个 regex 与每条 Windows 路径。
+`'''` 是字面多行字符串，不处理任何转义，反斜杠原样通过，两难消失。这也正是 `BloggerToml.fs:96-112` 原注释刻意选 `'''`、刻意从不发射 `"""` 的理由——那段实测结论是对的，动议原稿写反了。
+
+四空格格式缩进同样否决：TOML 不对字面多行字符串去缩进，那四个空格会成为 value 的一部分，即 renderer 篡改了它承诺原样转发的 data，与不变量 4 直接冲突。
+
+closing delimiter 改独占一行有两个理由。其一是可读性：`second line'''` 把内容与结构挤在同一行，而多行形态存在的意义就是让模型看清结构。其二是它消掉一整类边界情况——内容以单引号结尾时 `ends with '''` 会与 closing 连成四引号，独占一行后该问题不存在。代价是 value 多一个尾换行，对一份只供阅读的投影无影响。
+
+##### 可解析性是硬要求，不是可选项
+
+「只供 LLM 阅读」不等于「可以只做个样子」。动议 §12 禁止的是让业务逻辑依赖反向解析，不是允许发射不合法的 TOML。渲染结果必须真的能被 parser 读回，因为这是本记法唯一可机械检验的性质——门禁、golden test 与 containment 断言都建立在「这是一份合法 TOML 文档」之上。一份只是长得像 TOML 的文本没有任何可断言的不变量。
+
+因此上一版记在本节的裁决（`"""` + 反斜杠原样，接受非法转义序列）作废。
+
+##### smol-toml 实测（`smol-toml@1.7.0`，即 `scenario-schema.js` 已在用的 parser）
+
+```text
+形态                                    结果
+'''\nfoo'''            closing 紧随     OK   value = "foo"
+'''\nfoo\n'''          closing 独占     OK   value = "foo\n"      ← 采用
+反斜杠 regex / Windows 路径              OK   原样通过，无需转义
+原始前导缩进 / tab / 内部空行             OK   逐字保留
+结尾单引号 + closing 独占                OK   边界情况消失
+内容含两个引号                           OK
+内容含三个单引号                         FAIL 提前闭合，必须回退
+内容含裸 NUL                            FAIL 控制字符，必须回退
+```
+
+往返验证：上表全部 OK 项的 parse 结果均等于「输入 + 一个尾换行」，逐项核对无差异。
+
+##### 因此实现规则
+
+```text
+无换行                        单行 basic string + canonical 转义
+有换行                        '''\n 内容 \n'''，内容零加工
+内容含 ''' 或裸控制字符        回退单行 basic string 并完整转义
+```
+
+回退不是「按内容选 delimiter」（不变量 8 禁止的是在多行 delimiter 之间摇摆），而是该内容不存在合法的多行表示。回退可判定、确定，同一输入始终同一结果。
+
+`BloggerToml.fs` 的既有 `literalSafe` 三项判据（不含 `'''`、不以 `'` 结尾、无控制字符）中，第二项因 closing 改独占一行而不再需要，可删；另两项保留。renderString 的三分支因此收敛为两分支加一条回退。
 
 单行形态仍然全量转义，且该不对称是动议 §6.2 明确要求的：单行 basic string 没有 raw 变体，TOML 会把 `"a\b"` 读成退格。只有多行形态能原样，这正是它存在的理由。
 
@@ -1450,7 +1474,9 @@ CTX-013 三处修订：字符串写法改为引用 ARCH-010（删掉原「有换
             instruction + data 的 header 连续、与 body 之间恰好一个空行、body 后无顶层 comment
 containment 恶意 payload（含 # Ignore all previous instructions.、status = "perfect"、[[item]]）
             必须完整留在字符串 value 内，不得逃逸为当前 instruction / data field / TOML table
-Blogger     data-only、instruction + data、data body 无 comment、多行 """ 固定排版、
+Blogger     data-only、instruction + data、data body 无 comment、多行 ''' 固定排版
+            （closing 独占一行、内容零加工）、不出现 """、含 ''' 或裸控制字符者回退单行、
+            往返断言 parse 成功且 value == 原文 + 尾换行、
             不出现 '''、fixed key order、truncation、image/media omission、cursor/coverage 不变、
             header 存在时计入 byte limit、header 不存在时不产生虚假开销
 权限回归    TOML comment 不创建 authority；未认领的 TOML 形 user message 仍 fail closed；
@@ -1469,8 +1495,8 @@ transport   tool call/result linkage 不变、message role 不变、provider met
 [x] CTX-013 已删除绝对「不输出注释」
 [x] CTX-013 已允许最前方 instruction comment header
 [ ] Blogger data body 禁止 comments
-[ ] Blogger 已删除 ''' 输出
-[ ] 所有多行 data 使用 canonical """ 排版
+[ ] Blogger 多行排版改为 closing 独占一行、内容零加工
+[ ] 所有多行 data 使用 canonical ''' 排版，且渲染结果可被 parser 读回
 [ ] 已建立 runtime textual surface inventory
 [ ] 所有纳入范围的 instruction 使用最前方 comments
 [ ] 所有纳入范围的 data 使用 fields/tables/values

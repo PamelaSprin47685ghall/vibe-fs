@@ -7,7 +7,7 @@
 | 内容 | 规范位置 |
 |------|---------|
 | 记法主规范：instruction=comment、data=field、instruction-first、三种合法形态、无统一 envelope、canonical 字符串、data containment、单向表示、排除范围、transport 边界、门禁清单 | SSOT/01.md（`ARCH-010`） |
-| Blogger delta 的 instruction/data 分野、删除 `'''`、instruction header 计入 chunk 限额 | SSOT/12.md（`CTX-013`） |
+| Blogger delta 的 instruction/data 分野、多行 `'''` 排版对齐、instruction header 计入 chunk 限额 | SSOT/12.md（`CTX-013`） |
 | 文本形态不构成 Prompt Origin 或 Authority 证据 | SSOT/03.md（`PROMPT-001`） |
 | Instruction comment header、Native system instruction channel、Runtime Synthetic TOML 三术语 | SSOT/99.md |
 | 迁移顺序（M0–M5）、测试要求、完成定义、排期裁决 | STATUS/shock-anneal.md 包 N |
@@ -22,7 +22,15 @@
 
 `PENDING/14-Predict方案.md` 引用的「SSOT/13 — Projection Algebra」是另一份文档，不在 PENDING 中。该依赖必须在 14 / 15 合入前裁决，登记在 `shock-anneal.md` 包 N。
 
-正文逐字保留，未作术语同步。 唯一的机械改动是 `strip-doc-bold` 按仓库文档风格处理了 10 行（粗体标记与 6 处全角冒号后空格），文字本身未变。阅读时注意：文中「本动议」「建议主条款」等措辞是审阅期语气，条款已生效；§13 的 SSOT 修订清单已全部执行；§14 迁移策略与 §15 测试要求已重组为 `shock-anneal.md` 的包 N。
+### 一处实质修订：多行 delimiter 由 `"""` 改为 `'''`
+
+动议原稿要求多行字符串用 `"""` 加四空格内容缩进、closing delimiter 紧随最后一个内容行。该形态经实测否决，按最终裁量权改为 `'''` 加无缩进、closing 独占一行。完整理由写在 §6.3.1，实测证据在 `shock-anneal.md` 包 N 的 N1 记要。
+
+一句话理由：`"""` 会处理转义序列，而本动议 §6.4 与 §7 要求工具输出、文件内容、diff、编译日志原样进入 value——含反斜杠的正文要么使文档不 parse，要么被迫双写反斜杠而失真。四空格格式缩进同样被否决，因为 TOML 不对字面多行 string 去缩进，那四个空格会进入 value，等于 renderer 篡改它承诺原样转发的 data。
+
+受该修订影响并已同步的位置：§0 裁决第 8 条、§6.3 全节（含新增 §6.3.1／§6.3.2／§6.3.3）、§7 containment 示例、§9.4 Blogger 字符串统一、§13.3 CTX-013 修订清单、§13.4 验证条款、§15.4 Blogger 测试、§16 示例总表、§17.5、§18 完成定义。
+
+其余正文逐字保留，未作术语同步。 机械改动是 `strip-doc-bold` 按仓库文档风格处理了 10 行（粗体标记与 6 处全角冒号后空格），文字本身未变。阅读时注意：文中「本动议」「建议主条款」等措辞是审阅期语气，条款已生效；§13 的 SSOT 修订清单已全部执行；§14 迁移策略与 §15 测试要求已重组为 `shock-anneal.md` 的包 N。
 
 原始审阅状态：通过审阅，主规范已合入。变更性质：LLM 可见文本表示层统一。
 
@@ -1042,7 +1050,8 @@ arbitrary TOML text
 * data 未作为顶层 comment 输出；
 * instruction 出现时始终位于最前；
 * data 开始后不存在顶层 comment；
-* 多行字符串不出现 `'''`；
+* 多行字符串不出现 `"""`，且 closing delimiter 独占一行；
+* 渲染结果可被 TOML parser 读回，且 value 等于原始内容加一个尾换行；
 * system prompt 未被错误纳入迁移；
 * human raw message 未被包装；
 * provider/tool 原生 binding 未改变。
@@ -1116,7 +1125,7 @@ Blogger 已有：
 
 * comment 规则；
 * instruction/data 分野；
-* `'''` → canonical `"""`；
+* `'''` 排版对齐：closing delimiter 独占一行，内容不加格式缩进；
 * byte accounting；
 * golden tests。
 
@@ -1219,8 +1228,10 @@ role = "system"
 * data-only delta；
 * instruction + data delta；
 * data body 无 comment；
-* 多行 `"""` 固定排版；
-* 不出现 `'''`；
+* 多行 `'''` 固定排版：closing delimiter 独占一行，内容不加格式缩进；
+* 不出现 `"""`；
+* 含 `'''` 或裸控制字符的内容回退到单行 basic string 并完整转义；
+* 渲染结果 parse 成功且 value 等于原始内容加一个尾换行；
 * fixed key order；
 * truncation；
 * image/media omission；
@@ -1306,18 +1317,19 @@ text = "Retry the operation."
 ## 合法：多行 data
 
 ```toml
-text = """
-    first line
-    second line"""
-```
-
-## 非法：三单引号
-
-```toml
 text = '''
 first line
 second line
 '''
+```
+
+## 非法：三双引号
+
+```toml
+text = """
+first line
+second line
+"""
 ```
 
 ## 不在范围：system prompt
@@ -1361,7 +1373,7 @@ data-only 是合法形式。
 
 ## 17.5 保留两套多行格式
 
-禁止同时支持 `'''` 和 `"""`。
+禁止同时支持 `'''` 和 `"""`。多行只用 `'''`。
 
 ## 17.6 从 TOML 反推 authority
 
@@ -1396,8 +1408,8 @@ data-only 是合法形式。
 * [ ] `CTX-013` 已删除绝对“不输出注释”。
 * [ ] `CTX-013` 已允许最前方 instruction comment header。
 * [ ] Blogger data body 禁止 comments。
-* [ ] Blogger 已删除 `'''` 输出。
-* [ ] 所有多行 data 使用 canonical `"""` 排版。
+* [ ] Blogger 多行排版改为 closing delimiter 独占一行、内容不加格式缩进。
+* [ ] 所有多行 data 使用 canonical `'''` 排版。
 * [ ] 已建立 runtime textual surface inventory。
 * [ ] 所有纳入范围的 instruction 使用最前方 comments。
 * [ ] 所有纳入范围的 data 使用 fields/tables/values。
