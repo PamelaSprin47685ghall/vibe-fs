@@ -1,0 +1,56 @@
+# EXEC-011: the process deadline is min(3 × estimate, administrator ceiling), and a
+# timeout SIGKILLs the whole tree then WAITS for the real onExit (EXEC-015).
+#
+# The estimate below is 0.2s, so the effective deadline is 0.6s while the command
+# traps TERM and sleeps 1000s — the only way it can finish is SIGKILL.
+
+scenario = "process-stress"
+description = "EXEC-011 timeout kills the process tree; completion waits for real onExit"
+pass = "Process stress canary passed."
+
+setup = { strict = true }
+session = { agent = "fast-inspector", bind = ["inspector-title", "fast-inspector"] }
+prompt = { agent = "fast-inspector", text = "Run the command and report if it timed out." }
+
+must = ["inspector.1"]
+
+flow = [
+  { wait = "title" },
+  { wait = "inspector.0" },
+  { wait = "inspector.1" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+# One turn, two provider steps. The JSON form wrote these as two edges at
+# `lane.turn = 1` and `lane.turn = 2` — an ordinal the author maintained by hand. They
+# are one user message: step 0 calls the tool, the Host appends the result, step 1
+# answers. `step` is the count of assistant messages after the last user message, so
+# the numbering is now a property of the request.
+
+[[turn]]
+id = "inspector"
+lane = "fast-inspector"
+user = "Run the command and report if it timed out."
+tools = ["executor"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "sh -lc 'trap \"\" TERM; sleep 1000'", estimated_running_secs = 0.2, estimated_output_bytes = 1024, estimated_mem_usage = "medium" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "timeout observed." }
+
+# The Host titles a session on its own after the first real turn
+# (../opencode/packages/opencode/src/session/prompt.ts:235), prepending its marker at
+# messages[0] and appending the conversation after it. `turnOf` reads the LAST user
+# message, so a title request reports the same turn and step as the chat request it
+# follows — which is why `kind` is part of the runtime key rather than derived.
+
+[[turn]]
+id = "title"
+lane = "inspector-title"
+kind = "title"
+user = "Run the command and report if it timed out."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

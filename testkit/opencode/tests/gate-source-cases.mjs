@@ -309,6 +309,70 @@ respond = { type = "text", text = "ok" }
   },
 
   {
+    name: 'VERIFY-003 a multi-line array indents its continuation lines',
+    fn: () => {
+      // Found by the first real conversion: `flow = [` spans lines, and the formatter
+      // flattened every step to column zero. Balance has to be COUNTED — a header line
+      // `[[turn]]` is balanced, inline tables nest, and a bracket inside
+      // `command = "sh -lc '[...]'"` must not count at all.
+      const formatted = formatToml(`scenario = "p"
+flow = [
+{ wait = "a" },
+{ awaitTerminal = true },
+]
+`);
+
+      assertTrue(formatted.includes('  { wait = "a" },'), 'a flow step is indented one level');
+      assertTrue(formatted.includes('\n]\n'), 'the closing bracket returns to the opener column');
+      assertEq(formatToml(formatted), formatted, 'still idempotent');
+    },
+  },
+
+  {
+    name: 'VERIFY-003 a bracket inside a string does not shift indentation',
+    fn: () => {
+      // The executor command in `process-stress` contains `'trap "" TERM'` and shell
+      // quoting; a pattern-matched bracket count would open a level and never close it,
+      // pushing the rest of the file rightwards on every format.
+      const formatted = formatToml(`scenario = "p"
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "tool-call", args = { command = "sh -lc '[ -f x ] && echo {y}'" } }
+`);
+
+      assertTrue(formatted.includes('  respond = { type = "tool-call"'), 'the step key keeps its indent');
+      assertEq(formatToml(formatted), formatted);
+    },
+  },
+
+  {
+    name: 'VERIFY-003 a file-header comment stays at column zero',
+    fn: () => {
+      // A comment adopts the indent of the next CONTENT line. Falling back to the
+      // running depth put a file-header comment at whatever depth the file ended on —
+      // measured on the first converted scenario, whose header moved two spaces right.
+      const formatted = formatToml(`# EXEC-011: the deadline is min(3 x estimate, ceiling)
+#
+scenario = "p"
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text" }
+`);
+
+      assertTrue(formatted.startsWith('# EXEC-011:'), 'a header comment is flush left');
+      assertEq(formatToml(formatted), formatted);
+    },
+  },
+
+  {
     name: 'VERIFY-003 blank runs collapse and turns read as blocks',
     fn: () => {
       const formatted = formatToml(`scenario = "p"

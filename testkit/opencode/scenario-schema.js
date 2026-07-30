@@ -157,11 +157,15 @@ const resolveReference = (entries, reference) => {
  * This is the one check that requires the static whole. It is also the one most
  * likely to be too strict; package K8 converts the real scenarios and will say.
  */
-export function reachableTurnIds(turns, entries, flow) {
+export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
   const prompts = [
-    ...(flow ?? []).map((flowStep) => flowStep.prompt?.text).filter((text) => typeof text === 'string'),
-    ...entries.map((entry) => entry.respond?.args?.prompt).filter((text) => typeof text === 'string'),
-  ];
+    // The scenario's opening prompt is a root key, not a flow step: 15 of the 19 JSON
+    // scenarios send exactly one prompt and never mention it in `flow`. Reading only
+    // `flow[].prompt` made every one of their first turns a dead edge.
+    prompt?.text,
+    ...(flow ?? []).map((flowStep) => flowStep.prompt?.text),
+    ...entries.map((entry) => entry.respond?.args?.prompt),
+  ].filter((text) => typeof text === 'string');
 
   return new Set(
     turns
@@ -254,8 +258,8 @@ const danglingReferences = (entries, scenario) => {
 };
 
 /** 6. A declared step no flow can reach. */
-const deadEdges = (turns, entries, flow) => {
-  const reachable = reachableTurnIds(turns, entries, flow);
+const deadEdges = (turns, entries, scenario) => {
+  const reachable = reachableTurnIds(turns, entries, scenario);
 
   return turns
     .filter((turn) => !reachable.has(turn.id))
@@ -312,7 +316,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     ...unknownFlowVerbs(raw.flow),
     ...duplicateDeclarations(entries),
     ...danglingReferences(entries, raw),
-    ...deadEdges(turns, entries, raw.flow),
+    ...deadEdges(turns, entries, raw),
   ];
 
   if (validationProblems.length > 0) {

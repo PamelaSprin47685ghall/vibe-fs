@@ -40,6 +40,38 @@ const isHeader = (text) => text.startsWith('[')
 const delimiterCount = (line) => (line.match(/"""|'''/g) ?? []).length
 
 /**
+ * Net unclosed `[` / `{` on one line, ignoring brackets inside strings and comments.
+ *
+ * The first real conversion showed the formatter flattening a multi-line `flow = [`
+ * array to column zero. Balance has to be counted rather than pattern-matched: a header
+ * line `[[turn]]` is balanced, inline tables nest, and a bracket inside
+ * `command = "sh -lc '[...]'"` must not count at all.
+ */
+const bracketDelta = (line) => {
+  let delta = 0
+  let quote = null
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+
+    if (quote !== null) {
+      if (char === '\\') index += 1
+      else if (char === quote) quote = null
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      continue
+    }
+    if (char === '#') break
+    if (char === '[' || char === '{') delta += 1
+    if (char === ']' || char === '}') delta -= 1
+  }
+
+  return delta
+}
+
+/**
  * Re-indent one scenario.
  *
  * Lines INSIDE a multi-line string are copied byte for byte. Trimming them changes the
@@ -64,26 +96,38 @@ export function formatToml(source) {
   const lines = raw.map((line, index) => (literal[index] ? line : line.trim()))
 
   // First pass: the indent each line will get, ignoring comments.
+  //
+  // `open` tracks unclosed brackets so the continuation lines of a multi-line
+  // `flow = [...]` array indent one level past the key that opened it. Without it the
+  // first real conversion flattened every flow step to column zero.
   const indents = []
   let depth = 0
+  let open = 0
   lines.forEach((text, index) => {
-    if (literal[index]) {
+    if (literal[index] || text === '' || text.startsWith('#')) {
       indents.push(null)
       return
     }
-    if (text === '' || text.startsWith('#')) {
-      indents.push(null)
-      return
-    }
-    if (isHeader(text)) depth = headerDepth(text)
-    indents.push(depth)
+
+    if (isHeader(text) && open === 0) depth = headerDepth(text)
+
+    // A line that STARTS by closing belongs to the level its opener was on, so a
+    // multi-line array's `]` returns to the column of `flow = [`.
+    const level = /^[\]}]/.test(text) ? Math.max(0, open - 1) : open
+    indents.push(depth + (level > 0 ? 1 : 0))
+    open = Math.max(0, open + bracketDelta(text))
   })
 
-  // Second pass: a comment adopts the next content line's indent.
+  // Second pass: a comment adopts the indent of the next CONTENT line, skipping blanks
+  // and other comments. Falling back to the running depth put a file-header comment at
+  // the depth the file happened to end on.
+  let nextContent = 0
   for (let index = indents.length - 1; index >= 0; index -= 1) {
-    if (indents[index] === null && !literal[index] && lines[index].startsWith('#')) {
-      indents[index] = indents[index + 1] ?? depth
+    if (indents[index] !== null) {
+      nextContent = indents[index]
+      continue
     }
+    if (!literal[index] && lines[index].startsWith('#')) indents[index] = nextContent
   }
 
   const out = []
