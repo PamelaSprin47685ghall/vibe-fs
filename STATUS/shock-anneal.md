@@ -818,6 +818,32 @@ X10 Canary 验收（X-A 至 X-D，随包 K 一并落地）
 
 X7 必须早于 X8：两套压缩系统同时活着时，无法判断 PrefixEpoch 的变化来自 probe 还是 Host。
 
+#### X2 的实测状态与一处未列入表的残留
+
+灭绝表 13 行中的 17 个符号在包 A–H 完成时已全部为 0，无需再删：
+
+```text
+isCompanionEligible CompanionEligibility contextWindow maxContextTokens
+remainingTokens contextRatio headroom nearLimit shouldCompact ensureCapacity
+LatestBBytes OverflowPatterns OverflowDetected CompressionThreshold
+SquashReason PrefixProbeRolledBack RestoreOldEpoch
+```
+
+但角色白名单本身仍在，以另一个名字： `Domain.PromptAuthority.hasCompanion`（`next/Domain/PromptAuthority.fs:528`）按 `CanonicalRole` 返回 bool，六个角色 true、四个 false。这正是 COMPANION-001 删除的东西——它没有进灭绝表，因为表是按旧符号名列的，而这个函数是包 B 期间新写的，当时的 COMPANION-001 还是白名单语义。
+
+唯一消费者：`next/OpenCode/CompanionTransform.fs:104`。
+
+它的删除归入 X6，不归 X2。 原因是替换物不是「删掉判断」而是「换一个问题」：transform 边界要问的不再是「这个角色配不配有 Companion」，而是「这个 Session 本身是不是 Companion Session」。后者需要 `ManagedSessionKind` 这个持久事实（HOST-008）才能 O(1) 回答；在没有该事实的情况下删掉 `hasCompanion`，只剩两条路——扫描全部 session 的 `Companion.BloggerSessionId` 找反向指针（违反 PERSIST-008），或在运行时内存里猜（违反 ARCH-002）。两条都是半状态。
+
+因此 X6 的必须删除项追加：
+
+```text
+Domain.PromptAuthority.hasCompanion            及其 CompanionTransform 调用点
+Kernel/Roles.fs:96-100 的 RoleDefinition 注释   （现在指向 hasCompanion 作为权威）
+```
+
+`Session/CompanionDelta.fs` 的 `jsonDelta` 归 X3（TOML 发射器就位）与 X9（删除旧路径），不归 X2：先删会让 Companion 链路无 delta 可发。
+
 #### X0：Host 源码确认清单
 
 按 ARCH-003 与 `AGENTS.md` 第 0 节，以下判断必须先读 `../opencode` 实际源码，不得只看 `.d.ts`，也不得只做黑盒实验：

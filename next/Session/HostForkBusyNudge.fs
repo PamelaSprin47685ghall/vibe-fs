@@ -13,9 +13,9 @@ module HostForkBusyNudge =
     /// Authority Root / RunId / completion.
     ///
     /// No journal means no Dispatcher, and PROMPT-005 admits no second sender: this
-    /// used to fall through to `sessions.SendChildPromptFireAndForget`, which is a
-    /// direct `prompt_async` with no claim, no PromptKey and no recovery anchor —
-    /// the exact bypass package A removed elsewhere. It fails closed instead.
+    /// used to fall through to `sessions.SendChildPromptFireAndForget`, which reaches
+    /// the Host prompt endpoint directly with no claim, no PromptKey and no recovery
+    /// anchor — the exact bypass package A removed elsewhere. It fails closed instead.
     let send
         (sessions: ISessionHostPort)
         (_parentId: SessionId)
