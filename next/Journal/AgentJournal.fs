@@ -143,6 +143,11 @@ module AgentJournal =
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
 
+    let handleProjection (journal: AgentJournal) (sessionId: SessionId) : AgentLinkageProjection =
+        AgentProjection.tryFind sessionId (snapshot journal).AgentProjections
+        |> Option.bind (fun session -> session.Handles)
+        |> Option.defaultValue HandleProjection.empty
+
     let runtimeId (journal: AgentJournal) : RuntimeId = journal.RuntimeId
 
     let writeBlob (content: string) (journal: AgentJournal) : Result<BlobWriteReceipt, string> =

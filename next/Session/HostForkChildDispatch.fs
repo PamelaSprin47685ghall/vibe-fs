@@ -88,12 +88,9 @@ module HostForkChildDispatch =
     /// synchronously by the caller before the async cleanup begins.
     let teardownChildren
         (sessions: ISessionHostPort)
-        (parentId: SessionId)
-        (children: Dictionary<string, SessionId>)
-        (gate: obj)
+        (childIds: SessionId list)
         : Task<Result<unit, string>> =
         task {
-            let childIds = lock gate (fun () -> children.Values |> Seq.distinct |> Seq.toList)
             let mutable firstError: string option = None
 
             for childId in childIds do
@@ -135,6 +132,7 @@ module HostForkChildDispatch =
         (children: Dictionary<string, SessionId>)
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
+        (durableHandles: AgentLinkageProjection option)
         (parentId: SessionId)
         (complete: PendingHostRun -> TerminalOutcome -> unit)
         : Async<unit> =
@@ -142,11 +140,16 @@ module HostForkChildDispatch =
         // callbacks) see cancellation immediately.
         runtime.Cancel()
 
-        // Agent ids and child session ids come from the same snapshot of `children`.
-        // Two separate reads could disagree if a fork landed between them, and the
-        // handle retired would then not be the session aborted.
         let owned =
-            lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+            match durableHandles with
+            | Some handles ->
+                HandleProjection.activeHandles handles
+                |> List.choose (fun record ->
+                    match HandleId.tryAgent record.Handle with
+                    | Some handle -> Some(AgentHandleId.value handle, record.ChildSessionId)
+                    | None -> None)
+            | None ->
+                lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
 
         let childIds = owned |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIds)
@@ -170,7 +173,7 @@ module HostForkChildDispatch =
 
                 do! Async.AwaitTask(awaitRecovery ())
 
-                let! teardown = Async.AwaitTask(teardownChildren sessions parentId children gate)
+                let! teardown = Async.AwaitTask(teardownChildren sessions (childIds |> List.distinct))
 
                 match teardown with
                 | Ok() ->

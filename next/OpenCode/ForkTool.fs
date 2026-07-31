@@ -60,12 +60,14 @@ module ForkTool =
                 match scope.RuntimeFor context with
                 | Error runtimeError -> return error runtimeError
                 | Ok runtime ->
+                    match runtime.IsRetiredHandle request.Agent with
+                    | Some true -> return error (sprintf "RetiredHandle: %s" request.Agent)
+                    | _ -> ()
+
                     match runtime.TryPty request.Agent with
                     | Some _ -> return error "PTY operations require the fork-pty tool on a DevOps agent"
                     | None ->
                         match runtime.TryFindAgent request.Agent with
-                        | Some record when record.Status = AgentStatus.Closed ->
-                            return error (sprintf "Retired agent handle '%s' cannot be reused" request.Agent)
                         | Some record ->
                             match! runtime.Reuse(request.Agent, request.Prompt) with
                             | Error reuseError -> return error reuseError
