@@ -168,33 +168,40 @@ module TurnCompletionProgram =
             // PROMPT-008: the Role comes from the reconciled turn, and there is no
             // default. Defaulting to Coder — as the previous `"coder"` string did —
             // reports a completion under a role nobody selected.
-            match turn.AgentRole with
-            | None ->
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
-                |> ignore
-            | Some role ->
-                let runResult: AgentRunResult =
-                    { SessionId = turn.SessionId
-                      AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
-                      ProviderRun = turn.ProviderRun
-                      Role = AgentRoleIdentity.toRole role
-                      Directory = turn.Directory
-                      SessionWideText = sessionWideText
-                      TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
-
-                // EXEC-006: `IsValid` is the single place that decides whether a
-                // completed run carries session-wide A. Re-testing the text here
-                // would be a second copy of that rule.
-                if runResult.IsValid then
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
-                    |> ignore
-                else
-                    eventPort.NotifyTerminal
-                        turn.SessionId
-                        (TerminalOutcome.Failed "completed with empty session-wide text")
+            let terminalValid =
+                match turn.AgentRole with
+                | None ->
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
                     |> ignore
 
-            wasAborted
+                    false
+                | Some role ->
+                    let runResult: AgentRunResult =
+                        { SessionId = turn.SessionId
+                          AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                          ProviderRun = turn.ProviderRun
+                          Role = AgentRoleIdentity.toRole role
+                          Directory = turn.Directory
+                          SessionWideText = sessionWideText
+                          TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
+
+                    // EXEC-006: `IsValid` is the single place that decides whether a
+                    // completed run carries session-wide A. Re-testing the text here
+                    // would be a second copy of that rule.
+                    if runResult.IsValid then
+                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                        |> ignore
+
+                        true
+                    else
+                        eventPort.NotifyTerminal
+                            turn.SessionId
+                            (TerminalOutcome.Failed "completed with empty session-wide text")
+                        |> ignore
+
+                        false
+
+            wasAborted, terminalValid
 
         let reviewerAlreadyConfirmed =
             turn.AgentRole = Some AgentRole.Reviewer
@@ -235,7 +242,10 @@ module TurnCompletionProgram =
             AsyncSupport.completedTask ()
         | TurnFailed error -> continueAfterProviderFailure sessionPort eventPort journal turn error
         | TurnCompleted ->
-            let wasAborted = completeReviewerOrAssistant reviewerAlreadyConfirmed
+            let wasAborted, terminalValid = completeReviewerOrAssistant reviewerAlreadyConfirmed
+
+            if terminalValid then
+                AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
 
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
                 AsyncSupport.completedTask ()

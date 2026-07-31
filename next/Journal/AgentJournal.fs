@@ -63,6 +63,31 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
 
     member _.Snapshot: ProjectionSet = lock gate (fun () -> projection)
 
+    /// FALLBACK-004: apply the success transition derived from a completed Host
+    /// snapshot. This is an in-memory projection update, not a journal fact: only
+    /// an existing session and its existing Fallback option may be changed.
+    member _.RecordDerivedFallbackSuccess(sessionId: SessionId) : unit =
+        lock gate (fun () ->
+            match AgentProjection.tryFind sessionId projection.AgentProjections with
+            | None -> ()
+            | Some session ->
+                match session.Fallback with
+                | None -> ()
+                | Some fallback ->
+                    let updatedSession =
+                        { session with
+                            Fallback = Some(FallbackProjection.recordSuccess fallback) }
+
+                    projection <-
+                        { projection with
+                            AgentProjections =
+                                { projection.AgentProjections with
+                                    Sessions =
+                                        Map.add
+                                            sessionId
+                                            updatedSession
+                                            projection.AgentProjections.Sessions } })
+
     /// Append one fact and fold it.
     ///
     /// Deduplication is deliberately absent here. FALLBACK-003 names the
@@ -142,6 +167,11 @@ module AgentJournal =
         journal.AppendAgent stream providerRun fact
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
+
+    /// FALLBACK-004: derive success from a valid completed turn without appending
+    /// a fact. Missing journals, sessions, and fallback projections are all no-op.
+    let recordDerivedFallbackSuccess (journal: AgentJournal option) (sessionId: SessionId) : unit =
+        journal |> Option.iter (fun value -> value.RecordDerivedFallbackSuccess sessionId)
 
     let handleProjection (journal: AgentJournal) (sessionId: SessionId) : AgentLinkageProjection =
         AgentProjection.tryFind sessionId (snapshot journal).AgentProjections
