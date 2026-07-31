@@ -1,0 +1,38 @@
+scenario = "manager-companion"
+description = "Manager content with one production-composed Blogger request"
+session = { agent = "fast-manager", bind = ["manager-title", "manager"] }
+prompt = { agent = "fast-manager", text = "Start manager work." }
+
+must = ["manager-title", "manager-first", "manager-blogger-1"]
+
+flow = [
+  { prompt = { text = "Start manager work." } },
+  { wait = "manager-first" },
+  { wait = "manager-blogger-1" },
+]
+
+[[turn]]
+id = "manager-title"
+lane = "manager-title"
+kind = "title"
+user = "Start manager work."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "manager-first"
+lane = "manager"
+user = "Start manager work."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager turn 1." }
+
+[[turn]]
+id = "manager-blogger-1"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager Blogger paragraph 1." }
