@@ -2,7 +2,7 @@
 
 状态允许值：`CONFORMANT` | `PARTIAL` | `CONTRADICTS` | `UNVERIFIED` | `NOT_IMPLEMENTED`
 
-绑定 commit：`b48e38bd`（PERSIST-009 journal-less Companion fail-closed；静态门禁通过）。本表只记录截至该提交的源码状态。
+绑定 commit：`2e5fc0c8`（PERSIST-009 journal-less Companion 与 Executor durable Journal；静态门禁通过）。本表只记录截至该提交的源码状态。
 
 休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
 

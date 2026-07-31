@@ -10,7 +10,7 @@
 封炉、休克一、休克二、清场、SSOT/12 并入、退火一、退火二、剧本森林与因果推进门禁均已完成。
 ARCH-010 的 N0–N5b 已落地；N5b 之后的工作仍处于休克期，只运行第 0 层静态检查。
 
-分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近代码动作 `b48e38bd`。
+分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近代码动作 `2e5fc0c8`。
 
 ## 下一步
 
