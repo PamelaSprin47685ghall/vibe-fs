@@ -147,6 +147,21 @@ type CompanionHost
     /// behind a probe the Host actually accepted, so the decision cannot be made
     /// here — this hook has no attempt outcome to look at. Until an attempt fails,
     /// SSOT/12 says X sees raw history, which is what returning `messages` means.
+    member this.SquashIfArmedAsync(armed: bool) : Task<unit> =
+        task {
+            if not armed then
+                return ()
+            else
+                let blog = companion.Memory.Blog
+                let coverable = BlogProjection.coverableFrames blog
+                let available = List.length coverable
+
+                if available > 0 then
+                    let frameCount = max 1 (available / 2)
+                    let! _ = CompanionHostBlogger.squash this.BloggerDeps frameCount
+                    ()
+        }
+
     member this.TransformRaw(messages: obj list) : obj list =
         let current = Projection.decodeMessageView messages |> ProviderProjection.toSemantic
         let deps = this.BloggerDeps

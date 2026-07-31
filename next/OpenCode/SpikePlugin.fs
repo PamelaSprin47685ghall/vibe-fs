@@ -62,7 +62,11 @@ module SpikePlugin =
 
                         projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
-                        do CompanionTransform.handleCompanionTransform
+                        let arming =
+                            projectionSessionIdOpt
+                            |> Option.bind (fun sid -> scope.TryRecoveryArming (SessionId.create sid))
+
+                        do! CompanionTransform.handleCompanionTransform
                             scope.Companions
                             scope.CompanionGate
                             sessionPort
@@ -74,6 +78,7 @@ module SpikePlugin =
                                 wired.BindActiveRun bloggerId AgentRole.Blogger None))
                             inObj
                             outObj
+                            arming
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
 
