@@ -1981,17 +1981,20 @@ Companion 的 PERSIST-009 休克标记，未声称 X-wire 已接线。
 
 ```text
 模块 / 事实                生产调用点或写入方    第 1 层 mjs 测试
-XPrefixProjection          0                     有
-AttemptPlanner             0                     有
-PrefixProbeSelection       0                     有
-PrefixProbeSubmitted       0                     有
-PrefixProbePromoted        0                     有
+XPrefixProjection          XWire.applyTransform  有
+AttemptPlanner             XWire.applyTransform  有
+PrefixProbeSelection       XWire.applyTransform  有
+PrefixProbeSubmitted       无此事实              有
+PrefixProbePromoted        无此事实              有
 BlogSquashCommitted        0                     有
 ```
 
-三个模块无任何 `open` 或限定名引用（注释除外），三个事实无 `AgentFact.<Name>` 构造点。
-`RecoverySlot` 唯一的引用来自 `AttemptPlanner.fs` 自身，而它本身零调用点——整条链是
-一个自洽但悬空的岛。
+X 恢复模块已有 `XWire` 生产调用点：失败/中止在 reconcile 边界 arm，下一次 transform
+调用 `AttemptPlanner.plan`，成功 reconcile 从同一 `ProviderRunIdentity` 提升
+`PrefixRebaseCommitted`。`PrefixProbeSubmitted` / `PrefixProbePromoted` 不是当前
+事实类型；提交是 attempt profile 的内存事实，提升由唯一的 `PrefixRebaseCommitted`
+writer 记录。`BlogSquashCommitted` 仍无生产 writer。
+`SHOCK-UNMIGRATED[CTX-006]: Blogger squash producer is absent; do not fabricate a writer.`
 
 canary 是第 4 层：驱动真实 Host 并断言生产行为。链条未接线时，X-A–X-D 只有两种下场：
 立刻红（什么都不发生），或者写成不断言任何东西——即包 K8d 刚淘汰的 `companion-cache`
@@ -2003,7 +2006,7 @@ canary 是第 4 层：驱动真实 Host 并断言生产行为。链条未接线�
 X4 后半   Submit 链路换币 ProviderSemanticProjection → BloggerDeltaChunk
           → BloggerCompletion → blob writer → BlogEntryCommitted
 X-wire    attempt 结局到达恢复决策点：失败 attempt → AttemptPlanner.plan
-          → 探针提交（PrefixProbeSubmitted）→ Host 接受后提升（PrefixProbePromoted）
+           → attempt profile 携带探针 → Host 接受后提升（PrefixRebaseCommitted）
           → 恢复槽内 squash（BlogSquashCommitted）
 ```
 

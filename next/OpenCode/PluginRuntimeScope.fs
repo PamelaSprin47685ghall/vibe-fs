@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
@@ -50,6 +51,32 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val NudgeSent = HashSet<string>()
     member val ManagerGuardNudges = HashSet<string>()
     member val AbortedSessions = HashSet<string>()
+    member val RecoveryArming = Dictionary<string, SlotArming>()
+    member val AttemptPlans = Dictionary<string, AttemptPlan>()
+
+    member _.ArmRecovery(sessionId: SessionId) =
+        RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
+
+    member _.TryRecoveryArming(sessionId: SessionId) =
+        match RecoveryArming.TryGetValue(SessionId.value sessionId) with
+        | true, arming -> Some arming
+        | false, _ -> None
+
+    member _.RecordAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
+        AttemptPlans.[SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun] <- plan
+
+    member _.TryAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        let key = SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
+
+        match AttemptPlans.TryGetValue(key) with
+        | true, plan -> Some plan
+        | false, _ -> None
+
+    member _.ClearRecovery(sessionId: SessionId) =
+        RecoveryArming.Remove(SessionId.value sessionId) |> ignore
+
+    member _.ClearAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun) |> ignore
 
     /// HOST-006 prevention layer: the config hook's finding.
     ///
@@ -113,6 +140,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.SessionDirectories.Remove sessionId |> ignore
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
+        this.RecoveryArming.Remove sessionId |> ignore
+        this.AttemptPlans.Keys
+        |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))
+        |> Seq.toList
+        |> List.iter (fun key -> this.AttemptPlans.Remove key |> ignore)
 
     member this.Dispose() =
         if not disposed then

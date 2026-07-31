@@ -65,7 +65,7 @@ module SpikePlugin =
 
                     | None -> ()
 
-                    CompanionTransform.handleCompanionTransform
+                    do! CompanionTransform.handleCompanionTransform
                         scope.Companions
                         scope.CompanionGate
                         sessionPort
@@ -77,6 +77,8 @@ module SpikePlugin =
                             wired.BindActiveRun bloggerId AgentRole.Blogger None))
                         inObj
                         outObj
+
+                    do! XWire.applyTransform snapshotOpt journal scope outObj
 
                     // REVIEW-010: seal LAST, and only after the Companion rewrite has
                     // mutated `outObj`. The seal must digest the message view the
