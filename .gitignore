@@ -86,4 +86,5 @@ diagnostics-archive/
 
 ## Coding-agent scratch state (not product artifacts)
 .omo/
+.codewhale/
 
