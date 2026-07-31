@@ -1,12 +1,13 @@
 /**
- * runtime-key.js — the scenario lookup key, as three pure functions of the request.
+ * runtime-key.js — the scenario lookup key, as semantic functions of body plus harness context.
  *
- * VERIFY-003. Every component is derived from the request alone; nothing here reads
+ * VERIFY-003. Every semantic component is derived from the request alone; lane routing reads
+ * only explicit harness context; nothing here reads
  * or writes state. That is the whole point: the matcher this replaces kept a
  * `pathCursor` per path and a `claimCount` per edge, so the answer depended on how
  * many requests had already arrived rather than on what this request says.
  *
- *   lane   which conversation thread — longest matching head discriminant
+ *   lane   which bound conversation thread — explicit harness session routing
  *   turn   the last user message's semantic content — longest-prefix matched
  *   step   how many assistant messages follow that user message
  *
@@ -57,8 +58,8 @@ import { toArray as listToArray } from '../../build/next/fable_modules/fable-lib
  * entry from the chat entry, which is what it was added for. Two entries that still
  * tie after that are an author error `resolveEntry` reports rather than resolves.
  */
-export function lanesOf(body, bindings) {
-  const sessionId = sessionIdOf(body);
+export function lanesOf(body, bindings, context) {
+  const sessionId = sessionIdOf(context);
   if (sessionId === null) return new Set();
 
   const lanes = new Set();
@@ -76,43 +77,13 @@ export function lanesOf(body, bindings) {
 }
 
 /**
- * The session id the Host put on this request.
+ * The session id explicitly supplied by the harness adapter.
  *
- * ── measured: it is a HEADER, and the body never carries it ─────────────────
- *
- * This function read `body.sessionId ?? body.sessionID` and nothing else, so on a real
- * request it returned `null` — every lane unbound, every request unmatched. The gate
- * cases did not catch it because their fixtures were hand-built objects carrying a
- * `sessionID` field the wire has never had. A test that manufactures the data it is
- * checking for proves only that the checker reads the field the test invented.
- *
- * OpenCode sets three headers on every non-`opencode` provider request
- * (`../opencode/packages/opencode/src/session/llm/request.ts:197`):
- *
- *   x-session-affinity   input.sessionID
- *   X-Session-Id         input.sessionID
- *   x-parent-session-id  input.parentSessionID, when there is one
- *
- * These are PRODUCTION headers, not harness bookkeeping — a real provider receives them,
- * so VERIFY-003 permits reading them. That distinction was blurred by the capture field
- * being named `__testkitHeaders`: the name says "harness", the contents are the wire.
- *
- * `x-opencode-session` is the same value under the first-party provider branch. Both are
- * read because a scenario should not depend on which provider id the Host was configured
- * with.
+ * Headers are observed at the HTTP boundary and never attached to the provider body. This
+ * identity is routing and seal context; semantic content remains body-derived.
  */
-const HEADER_SESSION_KEYS = ['x-session-affinity', 'x-session-id', 'x-opencode-session'];
-
-export function sessionIdOf(body) {
-  const headers = body?.__testkitHeaders ?? {};
-  for (const key of HEADER_SESSION_KEYS) {
-    const value = headers[key];
-    if (typeof value === 'string' && value !== '') return value;
-  }
-
-  // Body fields are kept as a fallback so unit fixtures can build a request without
-  // spelling headers, but they are NOT what production sends.
-  const id = body?.sessionId ?? body?.sessionID ?? null;
+export function sessionIdOf(context) {
+  const id = context?.sessionId ?? null;
   return typeof id === 'string' && id !== '' ? id : null;
 }
 
@@ -228,8 +199,8 @@ export function stepOf(body) {
  * the sorted join, so an unmatched-request report names every alias the session holds
  * instead of one arbitrarily chosen member.
  */
-export function runtimeKeyOf(body, bindings) {
-  const lanes = lanesOf(body, bindings);
+export function runtimeKeyOf(body, bindings, context) {
+  const lanes = lanesOf(body, bindings, context);
   return {
     lanes,
     lane: lanes.size === 0 ? null : [...lanes].sort().join('|'),
@@ -331,8 +302,8 @@ const prefixMatches = (turn, declarations) =>
  * same point in the conversation with two different responses, so the scenario does
  * not say what the model does next.
  */
-export function resolveEntry(body, entries, bindings) {
-  const key = runtimeKeyOf(body, bindings);
+export function resolveEntry(body, entries, bindings, context) {
+  const key = runtimeKeyOf(body, bindings, context);
 
   const atKey = entries.filter(
     (entry) =>

@@ -41,11 +41,10 @@ export class ScenarioRuntime {
     this.scenario = scenario;
     this.bindings = new Map();
     this.deliveries = emptyDeliveries();
-    // Keyed by the session id `runtime-key.js` resolves, not by a private copy of that
-    // question. K11 measured what a copy costs: the body-only version that stood here
-    // returned null for every real request, because OpenCode sends the session id as a
-    // header (`../opencode/packages/opencode/src/session/llm/request.ts:197`), so no seal
-    // was ever stored and ARCH-004's barrier was inert on this whole path.
+    // Keyed by the explicit harness session context, not by a private copy of that question.
+    // OpenCode sends the session id as a provider header
+    // (`../opencode/packages/opencode/src/session/llm/request.ts:197`); the HTTP adapter
+    // passes that identity separately from the semantic request body.
     this.seals = new Map();
     /** Which entry ids have been answered at least once — for `expectSatisfied` only. */
     this.answered = new Set();
@@ -99,8 +98,8 @@ export class ScenarioRuntime {
    * provider legitimately — counting it as a delivery would let an undeclared rewrite
    * consume a fault's `attempts` slot and change what the next legitimate request gets.
    */
-  select(body) {
-    const resolved = resolveEntry(body, this.scenario.entries, this.bindings);
+  select(body, context) {
+    const resolved = resolveEntry(body, this.scenario.entries, this.bindings, context);
 
     if (resolved.unmatched !== undefined) return { unmatched: resolved.unmatched };
     if (resolved.ambiguousTurn !== undefined) {
@@ -109,7 +108,7 @@ export class ScenarioRuntime {
 
     const { key, matched } = resolved;
 
-    const seal = this.#sealFor(body, key, matched);
+    const seal = this.#sealFor(body, key, matched, context);
     if (seal.broken !== undefined) return { sealBroken: { reason: seal.broken, key, kind: seal.kind } };
 
     const attempt = recordDelivery(this.deliveries, matched);
@@ -135,11 +134,11 @@ export class ScenarioRuntime {
    * cache entry for errors instead, which is the non-idempotency `delivery-plan.js`
    * exists to remove.
    */
-  consume(body, selection) {
+  consume(body, selection, context) {
     if (selection.entry !== undefined) this.answered.add(selection.entry.id);
 
-    const sessionId = sessionIdOf(body);
-    if (sessionId !== null && runtimeKeyOf(body, this.bindings).kind === 'chat') {
+    const sessionId = sessionIdOf(context);
+    if (sessionId !== null && runtimeKeyOf(body, this.bindings, context).kind === 'chat') {
       this.seals.set(sessionId, wireOf(body));
     }
   }
@@ -163,10 +162,10 @@ export class ScenarioRuntime {
     );
   }
 
-  #sealFor(body, key, entry) {
+  #sealFor(body, key, entry, context) {
     if (key.kind !== 'chat') return { held: true };
 
-    const sessionId = sessionIdOf(body);
+    const sessionId = sessionIdOf(context);
     if (sessionId === null) return { held: true };
 
     return sealDecision({
