@@ -303,16 +303,17 @@ user = ["HEAD", "yz"]
       // The absence half, asserted at the source because an absence has no input that
       // exhibits it. This is the one case in this file that is not a mutated input.
       //
-      // It is not hypothetical. K9 measured that `requestRoleOf` is retired as a scenario
-      // FIELD while its function body is still alive: `strict-mock-matches.js:104` defines it
-      // and `strict-mock-forest.js:113` still calls it to infer a role from the wire, because
-      // K9 moved `canary-driver` to `ScenarioRuntime` and left the old `selectExpectation`
-      // path for the two `expect*`-based canaries.
+      // It was not hypothetical. K9 measured that `requestRoleOf` was retired as a
+      // scenario FIELD while its function body stayed alive in the old matchers, and
+      // then closed the class by deleting `strict-mock-forest.js` /
+      // `strict-mock-matches.js` / `strict-mock-satisfy.js` outright: every canary
+      // drives the provider from a compiled `ScenarioRuntime`, so the old
+      // `selectExpectation` path had zero callers left.
       //
-      // So the assertion is scoped to the NEW path and says plainly what it does not cover.
-      // Widening it to the old path would fail today for a reason K9 owns, and a gate that
-      // fails for someone else's pending work gets disabled rather than fixed.
+      // The assertion therefore covers the whole live selection path, provider
+      // included — a role inference reintroduced anywhere on it fails here.
       const selectionPath = [
+        'testkit/opencode/strict-mock-provider.js',
         'testkit/opencode/scenario-runtime.js',
         'testkit/opencode/runtime-key.js',
         'testkit/opencode/scenario-schema.js',
