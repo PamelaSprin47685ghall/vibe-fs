@@ -224,6 +224,26 @@ VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未�
 没人会去看它的输出——状态表往乐观方向偏移会让人跳过检查，往悲观方向偏移会让人
 忽略已有的保护。两个方向都在削弱同一份判据。
 
+## 失败驱动上下文恢复
+
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| CTX-001: 不观察上下文容量 | UNVERIFIED | 全仓 | 包 X9 已删除 `estimateTokens`、`shouldSwitchEpoch`、`CompanionBudgetStore` 等估算机制；休克期未运行编译，需退火三以行为判据确认无残留观察 |
+| CTX-002: 不主动预测溢出 | UNVERIFIED | 全仓 | 正常请求先执行、真实失败才触发恢复的路径已在 `XWire.applyTransform` 与 `AttemptPlanner` 中表达；需要接线后的 canary 证明无主动阈值 |
+| CTX-003: 最低上下文环境合同 | UNVERIFIED | `Domain/CompanionTypes.fs` | `BloggerDeltaLimitBytes` 常量就位；单条 TOML delta 200 KiB 上限需 `test:mjs` 或 canary 判据 |
+| CTX-004: 输出预算属于 provider | UNVERIFIED | `Domain/TerminalValidity.fs` | 唯一内容级校验（非空、非 XML-only）已实现；输出缩短是否足够由后续失败自然推进，无主动判断 |
+| CTX-005: 失败不分类 | UNVERIFIED | `OpenCode/HostSignalAdapter.fs` | 旧 `OverflowPatterns` 已在 X9 删除；业务控制流只读 `Completed` / `Failed` / `Aborted` 三态，需编译与测试确认 |
+| CTX-006: 恢复槽的两种动作 | CONTRADICTS | `Domain/RecoverySlot.fs` | 槽判定 `mayRecover` / `onSquashOutcome` 已实现；Y 侧 squash 生产链路缺失，`BlogSquashCommitted` 无生产 writer。详见 `STATUS/blocker-CTX-006.md` |
+| CTX-010: X 前缀探针 attempt-local | UNVERIFIED | `Domain/XPrefixProjection.fs` `Domain/AttemptPlanner.fs` | 纯函数与第 1 层测试就位；尚未与 `XWire.applyTransform` 接成生产调用点 |
+| CTX-011: 候选选择 | UNVERIFIED | `Domain/PrefixProbeSelection.fs` | 候选选择纯函数就位；未经验证可到达生产 transform 路径 |
+| CTX-012: 提升条件 | UNVERIFIED | `Domain/XPrefixProjection.fs` `Domain/AttemptPlanner.fs` | `PrefixRebaseCommitted` 唯一 writer 已存在，但提升路径未闭合；需要真实 attempt 成功到达 reconcile |
+| CTX-013: Blogger delta 格式 | UNVERIFIED | `Domain/CompanionTypes.fs` `Session/CompanionHostBlogger.fs` | TOML delta 与三级 chunker 已实现；`Companion.Submit` 路径仍有 `jsonDelta` 残留，需 X4 后半换币验证 |
+| CTX-014: 冻结与覆盖 | NOT_IMPLEMENTED | — | `FrozenB` 覆盖与 `CoverableTurnCutoff` 推进需以 CTX-006/012 接线为前提；当前未形成可断言的生产行为 |
+
+### CTX 段缺表说明
+
+SSOT/12 在阶段 3.5 并入规范后，`conformance.md` 此前未单立 CTX 段，而是把上下文恢复条款分散在 `Companion` 与 `Host` 段。本段按 SSOT/00.md 的 `CTX-` 前缀集中补录，避免 `blocker-CTX-006.md` 与 `STATUS/00-current.md` 之间的状态断裂。
+
 ## 持久化
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
