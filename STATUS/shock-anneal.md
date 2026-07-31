@@ -1362,6 +1362,17 @@ pathCursor / sealToEdgeId / observedEdgeIds 已删）。`gate-mutation-cases.mjs
 时走 `selectExpectation`，`companion-canary.mjs` 等旧内联轨迹曾调用
 `provider.expect*`；当时只能称「ScenarioRuntime 核心已接入、旧路径共存」。
 
+##### K10 落地与红过证据（4924905a）
+
+K10 本体由 4b312cf6 落地：森林级性质「同请求序列 → 同内容序列」实测 15 条剧本全可
+派生（182 请求，mismatched=0 unanswered=0），其余三项改为在册清点（任一映射消失
+即失败）。4924905a 修通当前森林的两处红：重启两条剧本的 blogger/blogger-reanchor
+在 31d4958b 后声明了相同片段序列被 duplicateDeclarations 拒绝，取生产重启 prompt
+的真实区分语作 reanchor 中间锚片段；gate-source-cases 的 Companion 探针同步跟随
+31d4958b 的实际 header。红过一次证据：把在册清点中「无死边」行登记的用例名改一个
+字符，门禁立即红（`lost case "VERIFY-003 a turn no flow can reach is rejected":
+expected 0, got 1`，272 passed 1 failed），恢复后 273 passed 0 failed。
+
 ### 包 N：运行时合成文本的 TOML Instruction/Data 记法（ARCH-010）
 
 | 项 | 值 |
