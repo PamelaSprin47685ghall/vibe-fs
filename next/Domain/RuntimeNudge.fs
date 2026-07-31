@@ -18,9 +18,8 @@ namespace Wanxiangshu.Next.Domain
 /// like correct fail-closed behaviour — the failure mode `ReviewChallenge`'s own comment warns about.
 ///
 /// The zero-width continuation (`"\u200B"`, `TurnCompletionProgram.fs:215`) stays raw because its
-/// emptiness IS its meaning. `CompanionDelta.isBareContinuationMessage` classifies a continuation as
-/// transport rather than semantic delta by stripping U+200B and testing for empty; a `# ` prefix would
-/// make it non-empty and promote a transport nudge into the Companion's semantic history.
+/// emptiness IS its meaning. It is transport rather than semantic delta; a `# ` prefix would make it
+/// non-empty and promote a transport nudge into the Companion's semantic history.
 ///
 /// Both exclusions are ARCH-010's own: a payload whose bytes carry a domain contract is not a
 /// rendering choice, and the clause governs LLM-facing notation rather than transport markers.
