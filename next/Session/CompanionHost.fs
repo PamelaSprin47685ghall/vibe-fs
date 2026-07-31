@@ -8,6 +8,8 @@ open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.Kernel.Identity
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Domain.ProviderProjection
 
 type CompanionHost
     (
@@ -56,19 +58,11 @@ type CompanionHost
                     bloggerCreated sid
                     // One-shot: clear the restore opt so a failure creates new.
                     restoredBloggerIdOpt <- None
-                    // Cold plugin start after host restart cannot prove the
-                    // restored child still holds Y's in-memory context. If we
-                    // already have durable LatestB, force a FULL re-anchor frame
-                    // on the reused session id (or on the next newly created
-                    // child if this id is dead).
                     bloggerNeedsReset.Value <- companion.Memory.LatestB.IsSome
                     let t = Task.FromResult(sid)
                     bloggerTask <- Some t
                     t
                 | _ ->
-                    // A restored companion already holds B; the freshly created
-                    // blogger child must be re-anchored on the full context so it
-                    // does not delude itself with a lost baseline.
                     if companion.Memory.LatestB.IsSome then
                         bloggerNeedsReset.Value <- true
 
@@ -111,14 +105,14 @@ type CompanionHost
         { Sessions = sessions
           EnsureBlogger = ensureBlogger
           Gate = gate
-          BloggerNeedsReset = bloggerNeedsReset
           Companion = companion
+          BloggerNeedsReset = bloggerNeedsReset
           Journal = journal
           EffectiveAgent = bloggerEffectiveAgent }
 
     member this.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome =
         let deps = this.BloggerDeps
-        companion.Submit(projection, (fun delta -> CompanionHostBlogger.blog deps projection delta))
+        companion.Submit(projection, (fun current chunk -> CompanionHostBlogger.blog deps current chunk))
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests;
     /// SubmitProjection remains the non-blocking side-effecting operation.
@@ -126,7 +120,10 @@ type CompanionHost
         CompanionProgram.runCompanionFlow
             { SessionId = SessionId.value primaryId }
             System.Threading.CancellationToken.None
-            (CompanionProgram.buildDelta companion.Memory.LastSuccessfulProjection projection)
+            (CompanionProgram.buildDelta
+                companion.Memory.Blog.Coverage.IngestCursor
+                companion.Memory.Blog.Coverage.CoverableTurnCutoffExclusive
+                projection)
 
     member _.Memory = companion.Memory
 
@@ -146,10 +143,10 @@ type CompanionHost
     /// here — this hook has no attempt outcome to look at. Until an attempt fails,
     /// SSOT/12 says X sees raw history, which is what returning `messages` means.
     member this.TransformRaw(messages: obj list) : obj list =
-        let current = CompanionDelta.jsonOfMessages CanonicalJson.canonicalJson messages
+        let current = Projection.decodeMessageView messages |> ProviderProjection.toSemantic
         let deps = this.BloggerDeps
 
-        companion.Submit(current, (fun delta -> CompanionHostBlogger.blog deps current delta))
+        companion.Submit(current, (fun projection chunk -> CompanionHostBlogger.blog deps projection chunk))
         |> ignore
 
         messages

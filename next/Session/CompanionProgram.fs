@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Flow
+open Wanxiangshu.Next.Domain
 
 /// Production CompanionFlow program — the canonical `companion {}` builder usage.
 /// Companion flows manage projection delta computation and blogger step
@@ -20,11 +21,21 @@ module CompanionProgram =
     /// `previous` is the last snapshot that was successfully blogged (None on
     /// first run).
     let buildDelta
-        (previous: ProjectionSnapshot option)
+        (cursor: SemanticCursor)
+        (previousCutoff: int)
         (current: ProjectionSnapshot)
-        : CompanionFlow<ProjectionSnapshot option> =
+        : CompanionFlow<BloggerDeltaChunk option> =
         companion {
-            let! delta = fromTask (fun _ _ct -> task { return Companion.jsonDelta previous current })
+            let! delta =
+                fromTask (fun _ _ct ->
+                    task {
+                        return
+                            BloggerDelta.nextChunk
+                                BloggerDelta.DeltaLimitBytes
+                                cursor
+                                previousCutoff
+                                current.Messages
+                    })
 
             return delta
         }

@@ -9,6 +9,9 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Tools
 open Wanxiangshu.Next.Kernel.Identity
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Domain.ProviderProjection
+open Wanxiangshu.Next.Host
 
 module internal CompanionHostBlogger =
 
@@ -16,8 +19,8 @@ module internal CompanionHostBlogger =
         { Sessions: ISessionHostPort
           EnsureBlogger: unit -> Task<SessionId>
           Gate: obj
-          BloggerNeedsReset: bool ref
           Companion: Companion
+          BloggerNeedsReset: bool ref
           Journal: AgentJournal option
           EffectiveAgent: string }
 
@@ -44,7 +47,7 @@ module internal CompanionHostBlogger =
                 return! dispatcher.SendAgentOwnerRoot deps.Sessions childId prompt deps.EffectiveAgent None None
         }
 
-    let blog (deps: BloggerDeps) (currentProjection: ProjectionSnapshot) (delta: ProjectionSnapshot) : Task<BlogText> =
+    let blog (deps: BloggerDeps) (projection: ProjectionSnapshot) (chunk: BloggerDeltaChunk) : Task<BloggerCompletion> =
         task {
             let! childId = deps.EnsureBlogger()
 
@@ -60,22 +63,19 @@ module internal CompanionHostBlogger =
 
             use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
-            // Read pending-reset WITHOUT clearing: the flag is cleared only
-            // after a terminal (Completed with non-empty output), so any
-            // failure (send Error, Aborted, Failed, empty) leaves it set and
-            // the next blog call re-sends the FULL reset frame.
             let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
+            let projectionText = ProviderProjection.renderSemantic projection
 
             let prompt =
                 if reset then
                     sprintf
                         "You are the blogger of a coding agent session. This session resumed after a restart and your prior companion context was lost. Re-anchor on the FULL current companion context B and the FULL CURRENT projection, then continue. FULL B:\n%s\nFULL PROJECTION:\n%s"
                         (deps.Companion.Memory.LatestB |> Option.defaultValue "")
-                        currentProjection
+                        projectionText
                 else
                     sprintf
                         "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
-                        delta
+                        chunk.Toml
 
             let! sent = sendBloggerPrompt deps childId prompt
 
@@ -88,11 +88,27 @@ module internal CompanionHostBlogger =
                 | Completed result ->
                     let text = result.TurnFormalText
 
-                    if String.IsNullOrWhiteSpace text then
-                        return failBlog "Blogger returned no formal assistant text"
-                    else
+                    match TerminalValidity.check text with
+                    | Error rejection -> return failBlog (TerminalValidity.describe rejection)
+                    | Ok() ->
                         lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
-                        return text
+
+                        return
+                            { BloggerSessionId = childId
+                              ProviderRun = result.ProviderRun
+                              Text = text
+                              NextCursor = chunk.NextCursor
+                              NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
+                              NextCoveredPrefixDigest =
+                                let coveredMessages =
+                                    projection.Messages
+                                    |> List.truncate (min chunk.NextCoverableTurnCutoffExclusive (List.length projection.Messages))
+
+                                HostDigest.sha256Hex (
+                                    ProviderProjection.renderSemantic
+                                        { projection with
+                                            Messages = coveredMessages }
+                                ) }
                 | Aborted reason -> return failBlog reason
                 | Failed error -> return failBlog error
         }
