@@ -23,7 +23,10 @@ must = ["continue"]
 flow = [
   # The fault does not wake the strict provider expectation queue. Await the real Host
   # terminal/idle transition, then the durable fact written by FallbackController.
-  { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true },
+  # Host 1.18.9 writes `finish = null` on a 400 provider-error message (no finishReason),
+  # so a top-level `requireAssistantTerminal = true` can never be satisfied here — the
+  # settled snapshot is the legal wake-up (same nested form as fallback-aabb-trace).
+  { awaitTerminal = { requireIdleAfterActivity = true } },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   # This is the production continuation response, not a provider-fault signal.
   { wait = "continue" },
