@@ -1341,14 +1341,26 @@ K11  森林变异自检：四类错误响应必须被拒绝（新增）
 
 K1 提前到第一步的理由：它决定 K2 的前缀比较用哪个投影。先做 K2 会写出一个基于 testkit 私有规范化的前缀索引，K1 完成后整体重写。
 
-##### K9 状态修正（b48e38bd 静态复核）
+##### K9 状态修正（b48e38bd 静态复核，后于本提交完成）
 
-K9 的「删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径」尚未完成。
-`testkit/opencode/strict-mock-provider.js` 在无 `ScenarioRuntime` 时仍走
-`selectExpectation`，而 `companion-canary.mjs` 等旧内联轨迹仍调用 `provider.expect*`。
-因此当前状态只能称为「ScenarioRuntime 核心已接入、旧路径共存」，不能把 K1–K11
-整体标为完成；`VERIFY-003` 的 CONTRADICTS 记录仍有效。下一步需先把剩余旧轨迹
-迁入静态森林或明确淘汰，再删除两份旧 matcher。
+K9 的「删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径」已完成。
+旧路径判定为「明确淘汰」而非「迁入静态森林」：全仓 grep 确认无任何 canary /
+gate 仍调用 `provider.expect*`，旧 expect 路径无调用方可迁。已删除
+`strict-mock-forest.js`（selectExpectation / consumeExpectation / edgeLabel /
+edgeWaitIds / pendingExpectations / normalizeLane / laneLabel / indexPathEdge /
+templateFingerprint）与 `strict-mock-satisfy.js`（checkSatisfied）；provider 内
+`expect*` 方法、`_dispatchMatched`、无 ScenarioRuntime 时的 `selectExpectation`
+路径与 reseal 分支一并移除，无 scenario 的 chat 请求一律记 `no-scenario-attached`
+未匹配。`strict-mock-matches.js` 仅保留 request-kind 分类（title/synthetic/chat）
+与两条诊断 extractor（`matchesExpectation` / `requestRoleOf` / `NUDGE_MARKERS` /
+`requestSessionOf` / `requestParentSessionOf` 已删）；`strict-mock-state.js`
+仅保留请求簿记与 alias 绑定（edges / templateIndex / aliasToEdge / pathEdges /
+pathCursor / sealToEdgeId / observedEdgeIds 已删）。`gate-mutation-cases.mjs`
+的 PROMPT-008 案例注释同步。至此 VERIFY-003 的 CONTRADICTS 记录随本提交失效。
+
+历史复核原文（保留备查）：`strict-mock-provider.js` 曾在无 `ScenarioRuntime`
+时走 `selectExpectation`，`companion-canary.mjs` 等旧内联轨迹曾调用
+`provider.expect*`；当时只能称「ScenarioRuntime 核心已接入、旧路径共存」。
 
 ### 包 N：运行时合成文本的 TOML Instruction/Data 记法（ARCH-010）
 

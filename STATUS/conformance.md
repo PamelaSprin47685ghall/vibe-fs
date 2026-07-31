@@ -198,7 +198,7 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
 | VERIFY-001: 测试金字塔 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0 层静态检查器已齐备，本次 `gate:static` 六门通过；第 1–2 层在 `tests-mjs/`，第 3 层 Fake Host 轨迹与第 4–5 层 canary/发布门禁仍待退火三 |
-| VERIFY-003: Canary Mock 剧本 | CONTRADICTS | `strict-mock-forest.js` `strict-mock-matches.js` | 六项违规：`specificity` 打分消歧、`pathCursor` 游标、失败时删 seal 缓存、`requestRoleOf` 反推角色、`loadScripts` 运行期换剧本、`epochCold` / `modelSideCold` 嗅探式冷边界豁免。分析见 `design-script-forest.md` |
+| VERIFY-003: Canary Mock 剧本 | PARTIAL | `testkit/opencode/scenario-runtime.js` `testkit/opencode/strict-mock-provider.js` | K9 已物理删除旧匹配路径（`strict-mock-forest.js` / `strict-mock-satisfy.js` 删除，`strict-mock-matches.js` 仅剩 request-kind 分类与诊断 extractor，provider 无 scenario 时一律记未匹配）。六项旧违规机制随删除消失；静态森林由 gate-testkit 的 VERIFY-003 系列守护。canary 运行期证据仍待退火三 |
 | VERIFY-004: Stability Gate | CONFORMANT | `run-canary-staggered.mjs` `stability-checker.js` | 三轮 + leak check 已实现。原理与实现的偏差（含「断言心跳从未接线」）记于 `shock-anneal.md` 包 W |
 | VERIFY-005: Architecture Gates | CONFORMANT | `scripts/architecture-gate.mjs` | 已是静态检查器而非测试，故不需先编译即可运行；单一写入口门禁实现为 `SINGLE_WRITER_FACTS`，八个事实实测 ok (1)；`single-constructor` 双向检查（无人绕过 + 有人调用）。行数门禁按条款保持删除 |
 | VERIFY-007: 两种 Provider Projection | UNVERIFIED | `Domain/ProviderProjection.fs` `testkit/opencode/provider-wire.js` | 生产侧两投影已分离；testkit 仅解码 OpenAI wire，再调用 `build/next` 的生产 projection，不再维护 `sealProviderVisible` 第二套规范。本次仅有静态门禁证据 |
