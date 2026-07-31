@@ -103,6 +103,13 @@ export class StrictMockProvider {
 
       const unmet = this._scenario.unmetMust();
       if (unmet.length > 0) errors.push(`must not satisfied: ${unmet.join(', ')}`);
+
+      const unfired = this._scenario.unfiredBoundaries();
+      if (unfired.length > 0) {
+        errors.push(
+          `cold boundary never fired: ${unfired.map((b) => `${b.entryId} (${b.kind})`).join(', ')} — the declaration admits a break the run never produced`,
+        );
+      }
     }
 
     if (this._state.unexpected.length > 0) {

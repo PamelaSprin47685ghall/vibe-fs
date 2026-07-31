@@ -145,6 +145,52 @@ export const coldBoundaryCases = [
     },
   },
 
+  // ── CTX-010: prefix probe ────────────────────────────────────────────────
+
+  {
+    name: 'CTX-010 a declared prefix probe admits a rebased prefix with fixed system/tools',
+    fn: () => {
+      // The probe replaces the covered head with the synthetic companion memory and
+      // keeps the live tail; the system prompt and the tool set are the attempt's
+      // fixed parts (PROMPT-008) and must survive byte-identical.
+      const probed = body('test-model-b', [SYSTEM, user('[companion memory]'), user('Round 2')]);
+      assertEq(decide(FIRST, probed, at('prefix-probe')).resealed, 'prefix-probe');
+    },
+  },
+
+  {
+    name: 'CTX-010 a prefix probe may not rewrite the tool set',
+    fn: () => {
+      // The tools belong to the attempt profile (PROMPT-008); a probe that swapped
+      // them would be changing what the model may call, not rebasing the covered
+      // prefix. The system prompt is deliberately exempt: Host 1.18.9 injects the
+      // model name into it (system.ts:67), so a fallback side switch — the usual
+      // companion of a recovery attempt — changes the system bytes by construction.
+      const retooled = body('test-model-b', [SYSTEM, user('[companion memory]'), user('Round 2')], ['write', 'read']);
+      assertEq(
+        decide(FIRST, retooled, at('prefix-probe')).broken,
+        'prefix-probe-rewrote-fixed',
+        'tool rewrite is not a probe',
+      );
+
+      // A side switch with a rebased prefix and unchanged tools is exactly the
+      // recovery shape, and it is admitted.
+      const sideSwitchedProbe = body('test-model-b', [SYSTEM, user('[companion memory]'), user('Round 2')]);
+      assertEq(decide(FIRST, sideSwitchedProbe, at('prefix-probe')).resealed, 'prefix-probe');
+    },
+  },
+
+  {
+    name: 'CTX-010 an append-only delivery of a probe entry is legal',
+    fn: () => {
+      // A recovery sequence alternates probe slots and ordinary slots (FALLBACK-012
+      // arms only odd offsets), so the same entry delivers breaking and
+      // non-breaking requests. The "never fired" check lives at scenario end.
+      const decision = decide(FIRST, APPENDED, at('prefix-probe'));
+      assertEq(decision.held, true);
+    },
+  },
+
   // ── a declaration that never fires is also fatal ─────────────────────────
 
   {
@@ -225,13 +271,16 @@ export const coldBoundaryCases = [
   // ── load-time validation ─────────────────────────────────────────────────
 
   {
-    name: 'ARCH-004 only the two named kinds exist',
+    name: 'ARCH-004 only the three named kinds exist',
     fn: () => {
       assertEq(validateBoundary(at('epoch-switch')).length, 0);
       assertEq(validateBoundary(at('fallback-side')).length, 0);
+      assertEq(validateBoundary(at('prefix-probe')).length, 0);
 
       // Every rejected name below is a sniffed exemption from the old matcher or a
-      // capacity-driven switch CTX-001/CTX-002 forbid outright.
+      // capacity-driven switch CTX-001/CTX-002 forbid outright. `prefix-reset` is the
+      // old matcher's unvalidated exemption; `prefix-probe` differs by structurally
+      // verifying that the fixed parts survive.
       for (const kind of ['epochCold', 'modelSideCold', 'context-overflow', 'compaction', 'prefix-reset']) {
         const problems = validateBoundary({ ...at('epoch-switch'), kind });
         assertEq(problems.length, 1, `'${kind}' must be rejected`);

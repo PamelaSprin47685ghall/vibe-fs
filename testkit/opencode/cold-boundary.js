@@ -27,8 +27,9 @@
  */
 
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
+import { equals } from '../../build/next/fable_modules/fable-library-js.5.13.0/Util.js';
 
-export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side'];
+export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side', 'prefix-probe'];
 
 // ── declaration lookup ──────────────────────────────────────────────────────
 
@@ -80,6 +81,20 @@ const withModelOf = (previousWire, nextWire) => ({
 });
 
 /**
+ * CTX-010 probe admission: the tool set is a fixed part of the attempt
+ * (PROMPT-008), everything else may move.
+ *
+ * The system prompt is deliberately NOT compared, and this is a measured Host
+ * fact rather than a compromise: Host 1.18.9 injects the model name into the
+ * system prompt (`../opencode/packages/opencode/src/session/system.ts:67`:
+ * "You are powered by the model named ${model.api.id}…"), so a fallback side
+ * switch — which is exactly what accompanies a recovery attempt — changes the
+ * system bytes by construction. The probe's own claim is about the MESSAGE
+ * prefix; the declaration admits the whole recovery request.
+ */
+const probeKeepsFixedParts = (previousWire, nextWire) => equals(previousWire.Tools, nextWire.Tools);
+
+/**
  * Decide one chat request against the session's seal.
  *
  * Four outcomes, and the caller must treat them as four:
@@ -107,7 +122,16 @@ export function sealDecision({ previousWire, body, boundary }) {
     return held ? { held: true } : { broken: 'undeclared' };
   }
 
-  if (held) return { broken: 'boundary-not-reached', kind: boundary.kind };
+  if (held) {
+    // A `prefix-probe` declaration governs an ENTRY, and an entry is delivered
+    // several times across a recovery sequence (probe slots and ordinary slots
+    // alternate as the cursor advances). Only some of those deliveries break the
+    // prefix, so an append-only delivery is legal; "the declaration never fired at
+    // all" is checked at scenario end by `ScenarioRuntime.unfiredBoundaries`.
+    return boundary.kind === 'prefix-probe'
+      ? { held: true }
+      : { broken: 'boundary-not-reached', kind: boundary.kind };
+  }
 
   switch (boundary.kind) {
     // COMPANION-009: the prefix is deliberately rebased, so no message-level claim
@@ -122,6 +146,18 @@ export function sealDecision({ previousWire, body, boundary }) {
       return messagesStillAppendOnly(previousWire, nextWire)
         ? { resealed: 'fallback-side' }
         : { broken: 'fallback-side-rewrote-messages' };
+
+    // CTX-010: an attempt-local X prefix probe replaces the committed prefix with a
+    // synthetic companion-memory head plus the tail after the candidate cutoff. The
+    // declaration admits exactly that: the system prompt and the tool set are fixed
+    // for the attempt (they belong to the profile, PROMPT-008), while the message
+    // prefix is deliberately rebased and the model may move with the fallback side
+    // switch that usually accompanies a recovery attempt. Anything that rewrites the
+    // fixed parts is not a probe.
+    case 'prefix-probe':
+      return probeKeepsFixedParts(previousWire, nextWire)
+        ? { resealed: 'prefix-probe' }
+        : { broken: 'prefix-probe-rewrote-fixed' };
 
     default:
       throw new Error(`unknown cold boundary kind '${boundary.kind}'`);

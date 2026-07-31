@@ -48,6 +48,11 @@ function fieldValues(value, fieldName, values = []) {
       else if (child && typeof child === 'object') {
         if (typeof child.Value === 'string') values.push(child.Value);
         if (typeof child.value === 'string') values.push(child.value);
+        // A typed identity serialises as `["Tag","value"]`; the value is the
+        // payload, not the Fable tag.
+        if (Array.isArray(child) && child.length === 2 && typeof child[1] === 'string') {
+          values.push(child[1]);
+        }
       }
     }
     fieldValues(child, fieldName, values);

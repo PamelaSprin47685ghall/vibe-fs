@@ -27,9 +27,14 @@ flow = [
   # so a top-level `requireAssistantTerminal = true` can never be satisfied here — the
   # settled snapshot is the legal wake-up (same nested form as fallback-aabb-trace).
   { awaitTerminal = { requireIdleAfterActivity = true } },
-  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
-  # This is the production continuation response, not a provider-fault signal.
+  # The continuation response is the causal wake for the rest of the flow. It is waited
+  # on BEFORE the journal fact: `waitFact` polls on 500ms slices, and by the time the
+  # fact is observed the continuation's SSE (and its session.idle) may already be over —
+  # an `awaitEvent` after it would wait for an idle that never comes again.
   { wait = "continue" },
+  # The durable cursor fact is written before the continuation is sent, so it is
+  # guaranteed to exist by the time the continuation response has been consumed.
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   { awaitEvent = { type = "session.idle", session = "self" } },
   { custom = "oracle" },
   { expectSatisfied = true },
@@ -62,6 +67,15 @@ delivery = "provider-error"
 status = 400
 retryable = false
 attempts = [1]
+
+# CTX-010: the failed attempt arms the recovery slot, so the continuation below
+# carries an attempt-local X prefix probe — the committed prefix is replaced by the
+# companion-memory head. ARCH-004 admits that as an explicit cold boundary; the
+# system prompt and tool set stay byte-identical while the message prefix rebases.
+[[epoch]]
+turn = "continue"
+step = 0
+reason = "prefix-probe"
 
 # Production composes the Blogger prompt itself (`CompanionHostBlogger.fs:72,77,118`),
 # so no scenario text reaches this lane — hence `internal`. Every Blogger request is at

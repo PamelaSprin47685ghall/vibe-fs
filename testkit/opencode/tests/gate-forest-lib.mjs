@@ -194,9 +194,12 @@ const FRAGMENT_GAP = '\n\n';
  * nothing.
  */
 const TITLE_MARKER = 'Generate a title for this conversation:\n';
+/** The fixed system head every chat request carries on the real wire. */
+const SYSTEM_MARKER = 'You are a managed agent.';
 
 const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
+const systemMessage = () => ({ role: 'system', content: SYSTEM_MARKER });
 
 /** The declared text as one prefix-comparable string. */
 export const declaredText = (turn) => turnFragments(turn).join(FRAGMENT_GAP);
@@ -224,6 +227,22 @@ const deliveryCount = (scenario, entry) => {
 };
 
 /**
+ * CTX-010: a cold-boundary turn continues the SAME session as the turn before it —
+ * production retries a failed attempt in the same session, and the probe rebases
+ * that session's prefix. The forest's one-session-per-turn rule would give the
+ * continuation a fresh session with no seal, where the declaration can only ever
+ * report `boundary-not-reached` — making every boundary-declaring scenario fail K10
+ * by construction. Reusing the previous turn's session (TOML declaration order) is
+ * the model's one piece of causal knowledge, and it matches how the wire actually
+ * behaves.
+ */
+const hasBoundary = (scenario, entries) => entries.some((entry) => boundaryAt(scenario, entry) !== undefined);
+
+/** The boundary declared AT an entry, if any. */
+const boundaryAt = (scenario, entry) =>
+  (scenario.boundaries ?? []).find((boundary) => boundary.entryId === entry.id);
+
+/**
  * A request sequence for one compiled scenario.
  *
  * Returns `{ bindings, requests }`, or `{ underivable }` naming the reason. Never a
@@ -238,20 +257,41 @@ const deliveryCount = (scenario, entry) => {
 export function deriveRequests(scenario) {
   const bindings = [];
   const requests = [];
+  let previousSessionId = null;
+  let previousTools = null;
 
   turnGroups(scenario).forEach((group, groupIndex) => {
     const first = group.entries[0];
     // Derived from the declaration, not from a counter shared with other scenarios, so the
     // same scenario always yields the same ids no matter which order the forest is walked.
-    const sessionId = `ses_${String(groupIndex).padStart(2, '0')}_${first.turnId}`;
+    // A cold-boundary turn continues the previous turn's session (see `hasBoundary`).
+    const continued = hasBoundary(scenario, group.entries) && previousSessionId !== null;
+    const sessionId = continued ? previousSessionId : `ses_${String(groupIndex).padStart(2, '0')}_${first.turnId}`;
+    previousSessionId = sessionId;
     if (first.lane !== undefined) bindings.push([first.lane, sessionId]);
 
     const text = declaredText(first.turn);
-    const tools = (first.tools ?? []).map((name) => ({ type: 'function', function: { name } }));
+    // Same causal model as the session reuse: a continuation stays in the same role, so
+    // its tool set is the previous turn's. `internal` turns rarely declare `tools`
+    // (production decides them), and a boundary turn MUST keep the fixed parts of the
+    // previous request byte-identical for the probe admission to hold.
+    const declaredTools = (first.tools ?? []).map((name) => ({ type: 'function', function: { name } }));
+    const tools = continued && previousTools !== null ? previousTools : declaredTools;
+    previousTools = tools;
 
     // The conversation this session accumulates. Growing it in place is what keeps every
-    // chat request an append-only continuation of the previous one (ARCH-004).
-    const messages = first.kind === 'title' ? [user(TITLE_MARKER), user(text)] : [user(text)];
+    // chat request an append-only continuation of the previous one (ARCH-004). A
+    // boundary turn starts from its own declared text: its first delivery is NOT an
+    // append-only continuation of the previous turn (that is the whole point of the
+    // declaration), and later deliveries of the same entry append to it.
+    //
+    // A chat request carries its system prompt as `messages[0]` on the real wire, and
+    // the prefix-probe admission compares that head byte-for-byte — so the derived
+    // sequence must carry one too, or every probe-declared entry would look like it
+    // rewrote the fixed parts. Title requests keep their marker shape (the seal does
+    // not compare them).
+    const messages =
+      first.kind === 'title' ? [user(TITLE_MARKER), user(text)] : [systemMessage(), user(text)];
 
     for (const entry of group.entries) {
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {

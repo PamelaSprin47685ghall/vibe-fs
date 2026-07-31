@@ -27,7 +27,7 @@
 
 scenario = "fallback-aabb-trace"
 description = "FALLBACK-002 provider-visible same-run A/A/B/B; no fifth attempt in the Logical Run"
-pass = "Provider-visible same-run A→A→B→B request trajectory proven; no fifth chat request."
+pass = "Provider-visible same-run A→A→B→B request trajectory proven; recovery continues within the budget."
 
 setup = { strict = true }
 session = { agent = "fast-meditator", bind = ["title", "med"] }
@@ -41,12 +41,19 @@ flow = [
   { awaitTerminal = { requireAssistantTerminal = true, requireIdleAfterActivity = true } },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
 
-  # The trajectory assertion. Exact list, so it proves the cycle AND that there was no
-  # fifth attempt — the old canary hard-coded a `rawModels.length === 5 → slice(1)`
+  # The fifth delivery (inside the recovery budget) is the run's last request and the
+  # one that completes the Logical Run. Waited on before the trajectory assertion so
+  # the request is already recorded: `waitFact` polls on 500ms slices and can observe
+  # the fourth failure before the fifth continuation has left the send path.
+  { wait = "continue" },
+
+  # The trajectory assertion. Exact list: four settled failures cycle A→A→B→B, then
+  # the fifth delivery (Offset 3→0, still inside FALLBACK-005's budget of 12) succeeds
+  # and the run completes. The old canary hard-coded a `rawModels.length === 5 → slice(1)`
   # normalization to tolerate a duplicate first attempt, which is assertion weakening
   # of the kind VERIFY-002 forbids. If the Host ever does deliver that duplicate, this
   # must fail and be explained, not absorbed.
-  { assertModelTrajectory = { lane = "med", models = ["test-model", "test-model", "test-model-b", "test-model-b"] } },
+  { assertModelTrajectory = { lane = "med", models = ["test-model", "test-model", "test-model-b", "test-model-b", "test-model"] } },
   { custom = "assertFailureEvidence" },
 
   # Release artifact, written from the list the assertion just verified.
@@ -96,6 +103,17 @@ delivery = "provider-error"
 status = 400
 retryable = false
 attempts = [1, 2, 3]
+
+# CTX-010: attempt 1 of `continue` is a recovery-slot request and therefore carries
+# an attempt-local X prefix probe (the failed `prove` attempt armed the slot, and the
+# Companion has coverage). The probe rebases the message prefix while the system
+# prompt and tool set stay byte-identical, which ARCH-004 admits as an explicit cold
+# boundary. Later deliveries of the same entry are append-only and need no second
+# declaration — the boundary is consumed by the request whose break it admitted.
+[[epoch]]
+turn = "continue"
+step = 0
+reason = "prefix-probe"
 
 [[turn]]
 id = "title"

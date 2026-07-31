@@ -90,28 +90,29 @@ module SessionSnapshotPort =
             None
 
     let private errorNameOf (info: obj) (raw: obj) =
-        let candidates =
-            [ if not (isNull info) && not (isNull info?error) then
-                  info?error?name
-              else
-                  null
-              if not (isNull info) && not (isNull info?error) then
-                  info?error?``type``
-              else
-                  null
-              if not (isNull raw) && not (isNull raw?error) then
-                  raw?error?name
-              else
-                  null
-              if not (isNull raw) && not (isNull raw?error) then
-                  raw?error?``type``
-              else
-                  null
-              // Some host payloads put abort on the message root.
-              if not (isNull info) then info?errorName else null
-              if not (isNull raw) then raw?errorName else null ]
+        // NOTE: this must stay plain sequential code. Fable miscompiles an
+        // if-branch inside a list literal into a JS comma expression
+        // `(value, [])` — the value is evaluated and discarded, so every
+        // candidate reads as `None`. Measured on Host 1.18.9 error messages:
+        // `info.error.name = "APIError"` decoded as `ErrorName = None`, which
+        // turned a settled provider failure into `TurnUnknown`.
+        let readError (error: obj) =
+            match readString (if isNull error then null else error?name) with
+            | Some value -> Some value
+            | None -> readString (if isNull error then null else error?``type``)
 
-        candidates |> List.tryPick readString
+        let infoError = if isNull info then null else info?error
+        let rawError = if isNull raw then null else raw?error
+
+        match readError infoError with
+        | Some _ as result -> result
+        | None ->
+            match readError rawError with
+            | Some _ as result -> result
+            | None ->
+                match readString (if isNull info then null else info?errorName) with
+                | Some _ as result -> result
+                | None -> readString (if isNull raw then null else raw?errorName)
 
     /// `summary = true` in Host 1.18.9 is a boolean on assistant messages. User
     /// messages carry a summary OBJECT (`{ title?, body?, diffs }`), so a non-null
@@ -131,10 +132,12 @@ module SessionSnapshotPort =
         not (isNull (timeOf info)) || not (isNull (timeOf raw))
 
     let private isCompactionOf (info: obj) (raw: obj) =
+        // Same Fable constraint as `errorNameOf`: no if-branches inside list
+        // literals (they compile to a discarded JS comma expression).
         let field name =
-            [ if isNull info then null else info?(name)
-              if isNull raw then null else raw?(name) ]
-            |> List.tryPick readString
+            match readString (if isNull info then null else info?(name)) with
+            | Some value -> Some value
+            | None -> readString (if isNull raw then null else raw?(name))
 
         field "agent" = Some "compaction"
         || field "mode" = Some "compaction"
@@ -254,9 +257,18 @@ module SessionSnapshotPort =
                                     [ "path", box (createObj [ "id", box sid ])
                                       "query",
                                       box (
+                                          // HOST 1.18.9 `session.messages` defaults to
+                                          // `order = "desc"` (newest first) unless the
+                                          // caller asks otherwise. Every consumer of
+                                          // `ISessionSnapshotPort` (TurnReconcile,
+                                          // ReviewSeal, PromptRecovery, XWire) reads the
+                                          // list as chronological, so the port must
+                                          // pin the order it hands out. Evidence:
+                                          // `packages/core/src/session.ts:308`
+                                          // (`requestedOrder = input.order ?? "desc"`).
                                           match workspaceDirectory with
-                                          | Some dir -> createObj [ "directory", box dir ]
-                                          | None -> createObj []
+                                          | Some dir -> createObj [ "directory", box dir; "order", box "asc" ]
+                                          | None -> createObj [ "order", box "asc" ]
                                       )
                                       "headers", box (headersObj ()) ]
 
@@ -280,7 +292,8 @@ module SessionSnapshotPort =
             member _.GetMessages(sessionId) =
                 task {
                     try
-                        let url = sprintf "%s/session/%s/message" cleanBase (SessionId.value sessionId)
+                        let url =
+                            sprintf "%s/session/%s/message?order=asc" cleanBase (SessionId.value sessionId)
 
                         let init = createObj [ "method", box "GET" ]
                         let! response = jsFetch url init

@@ -48,6 +48,18 @@ export class ScenarioRuntime {
     this.seals = new Map();
     /** Which entry ids have been answered at least once — for `expectSatisfied` only. */
     this.answered = new Set();
+    /**
+     * Cold boundaries whose break was already admitted, keyed by entry id.
+     *
+     * A `prefix-probe` declaration governs an entry across ALL its deliveries
+     * (probe slots and ordinary slots alternate as the cursor advances), so the
+     * declaration itself is checked on every request. This set records which
+     * declarations have fired at least once, so `unfiredBoundaries` can fail a
+     * declaration that never broke anything — the `boundary-not-reached` defence
+     * moved to scenario end, because an entry with several deliveries legitimately
+     * mixes breaking and non-breaking requests.
+     */
+    this.firedBoundaries = new Set();
   }
 
   /**
@@ -81,6 +93,10 @@ export class ScenarioRuntime {
    */
   clearSeals() {
     this.seals.clear();
+    // A restart rebuilds the request view from the journal: every previous seal is
+    // incomparable. The new process starts unsealed, and a declaration that never
+    // fires on the new timeline must still be reported.
+    this.firedBoundaries.clear();
   }
 
   /**
@@ -162,16 +178,31 @@ export class ScenarioRuntime {
     );
   }
 
+  /**
+   * Declarations that never admitted a break.
+   *
+   * `prefix-probe` declarations permit but do not require every delivery to break
+   * (probe and ordinary slots alternate), so the "declared but never fired" check
+   * cannot live in `sealDecision` for them — it lives here, at scenario end.
+   */
+  unfiredBoundaries() {
+    return (this.scenario.boundaries ?? []).filter(
+      (boundary) => boundary.kind === 'prefix-probe' && !this.firedBoundaries.has(boundary.entryId),
+    );
+  }
+
   #sealFor(body, key, entry, context) {
     if (key.kind !== 'chat') return { held: true };
 
     const sessionId = sessionIdOf(context);
     if (sessionId === null) return { held: true };
 
-    return sealDecision({
+    const decision = sealDecision({
       previousWire: this.seals.get(sessionId) ?? null,
       body,
       boundary: boundaryFor(this.scenario.boundaries, entry),
     });
+    if (decision.resealed !== undefined) this.firedBoundaries.add(entry.id);
+    return decision;
   }
 }
