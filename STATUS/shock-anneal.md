@@ -1379,8 +1379,8 @@ N1  唯一字符串 owner（M2）：canonical TOML 字符串 writer 收敛为一
 N2  surface inventory（M1）：列出全部最终进入 LLM 的文本生产点并四分类            已完成
     NativeSystemPrompt / HumanRaw / ModelNative / RuntimeSyntheticToml。
     该分类只用于实现审计，不构成新的运行时 envelope。门禁固定该清单
-N3  fork/child-instruction surface 迁到 ARCH-010 形态；fork 信封条件包裹在此定案
-N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得为顶层 comment、
+N3  fork/child-instruction surface 迁到 ARCH-010 形态；fork 信封条件包裹在此定案   已完成
+N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得为顶层 comment、      已完成
     instruction-first、data 开始后无顶层 comment、无 """、closing 独占一行、
     渲染结果 parse 成功且 value == 原文 + 尾换行、system prompt 未被纳入、
     human raw 未被包装、provider/tool 原生 binding 未改变
@@ -1644,6 +1644,80 @@ system/developer prompt 未被迁移     N2 结构性判据：send 站点文件�
 归档文件标题自称「SSOT/13 修正动议」，但其 §13.1 要求主规范落为 SSOT/01 的 ARCH-010，故未创建 `SSOT/13.md`，SSOT/13 编号仍空缺。
 
 `PENDING/14-Predict方案.md` 引用的「SSOT/13 — Projection Algebra（所有 provider-visible projection 的唯一生产路径）」是另一份文档，不在 PENDING 中。14 与 15 合入前必须先裁决：Projection Algebra 是否独立成 SSOT/13，还是同样落为 SSOT/01 条款；若前者，14 的全部 projection 条款引用需重新指向。
+
+#### N3 落地记要
+
+`d87a5fcd` + `202682ee`。`test:mjs` 421 → 432、gate-testkit 259、gate:static 六门绿。
+
+替换两个各自独立、各自条件的信封（`HostForkRuntimeFork.fs:196` 与 `:98`），故子会话首 prompt 从四种无公共前缀的形态收敛为单一 payload。可选部分变为可选字段，位于两个稳定锚点之间，片段声明可跨过。
+
+`gate-runtime-key-cases.mjs` 的 `WRAP` 常量删除，改为从生产 import `BaseInstructions[0]` 并经 `comment()` 渲染。原常量是镜像：N3 删掉信封后它会继续描述不再发送的文本而用例保持绿——对着生产已停止产出的形态验证匹配器。
+
+八个剧本、15 条 turn 声明改为有序片段。一处不能照抄原文：`pty-stress` 的 assignment 含 `agent="pty"`，单行 basic string 会转义引号，故作者原文不再是子串，片段截到引号之前。这类地方按渲染后的 bytes 取片段，不按作者写的原文。
+
+写测试时自己踩中一次：声明锚点写成 instruction 原文而非渲染后的 comment 行，表现为 unmatched 而非任何指出成因的信息。已把 `headerOf` 助手与该陷阱写进测试文件头。
+
+#### N4 落地记要
+
+`6aec5e93`。gate-testkit 259 → 273。
+
+`arch010.js` 校验输出而非渲染器：writer 测试证明 `SyntheticToml` 行为正确，条款要求的是「每个到达模型的 payload 遵守 ARCH-010」。一个手工拼装文档、或调用 writer 后再追加内容的 producer，能通过全部 writer 测试而违反条款。
+
+三处设计要点各由实测逼出：
+
+```text
+splitDocument 必须区分结构行与字面量内容   payload 的 value 合法地含 #、[[table]]、
+                                          key = value。不跟踪字面量块的扫描会对正确
+                                          payload 报违规，而「自然的修法」是弱化规则
+                                          直到它们通过，得到同时接受真实违规的门禁
+delimiter 检查必须先抹掉单行字符串 value   注入 payload 含 ''' 时 renderString 回退单行，
+                                          文档合法地在一行内含 assignment = "… ''' …"。
+                                          第一版对完全正确的 payload 报了三条违规
+删掉不可达的 unterminated 分支             实测三种形态（无 closing、EOF 截断、closing 后
+                                          有尾随文本）全部 parse 失败，parse 守卫先返回。
+                                          改为一条用例钉住「由 parse 守卫捕获」，因为读
+                                          代码的自然结论是「缺少该规则」——它不缺，在上游
+```
+
+`testkit/opencode/production.js`：testkit 侧生产 facade。存在理由是一个实测陷阱——`ForkChildPayload.render` 接到普通 JS 数组不抛错，而是读成空 F# 列表。`gate-runtime-key-cases.mjs` 正中此坑：reviewer 用例传 `['Ship it.']` 却收到无 requirements 的 payload，且因断言的声明是 `[anchor, assignment]`（两片段在四形态中都存在）而依然全绿——证明了匹配器工作，却从未走过它为之而写的路径。修法不是「记得调 `ofArray`」，而是任何调用方都不直接碰生产函数。另有一条用例断言四种 fork 形态必须是四份不同文档：输出相同即意味着可选输入根本没到达 renderer。
+
+同时修掉 fable-library 版本硬编码：第一版写死 `4.30.0` 而本仓在 `5.13.0`，import 即抛。改为扫描目录，与 `tests-mjs/domain.mjs` 同一手法。
+
+#### canary 现状与红灯分类（N4 后实测）
+
+```text
+6 / 16 绿    manager-companion  inspector-oneshot  process-stress
+             agent-dsl（新绿）   host-nudge（新绿）  reviewer-restart
+```
+
+基线是 5 绿。N3 落地后先跌到 3 绿——生产文本已改而声明未跟，这是 N3 与剧本更新必须同属一个工作单元的直接证据，不是回归。剧本跟上后到 6 绿。
+
+余下 10 条红按成因分三类，每类的处置不同：
+
+```text
+类一  N5 目标（prompt 文本尚未迁移）
+      companion            reason=no-prefix-matched，role=blogger。
+                           CompanionHostBlogger.fs:72,77 的散文外壳
+      executor             expectation map.0。ExecutorSummarize.fs:95 的 summary input
+
+类二  既有行为红（与 ARCH-010 无关，改动前后同一签名）
+      fallback             expectation round1
+      fallback-aabb-trace  expectation prove
+      reviewer-verdict     AssertionError ReviewVerdictRecorded count
+      pty-stress           expectation devops.5，第二个 PTY 的 trap TERM 行为
+      host-restart         expectation=none
+      orchestrator-publish             expectation manager.0
+      orchestrator-restart-publish     expectation manager.3
+
+类三  前进但未到底
+      manager-full-loop    首轮停在 role=inspector（no-declared-turn，从未到达任何
+                           expectation），现推进到 coder-edit.0，即已通过 inspector /
+                           browser / meditator 三条。属类一与类二的混合，需在 N5 后复测
+```
+
+分类依据是可复核的：类二六个签名在剧本改动前的首轮日志中逐字出现，故非本轮引入。`coder-edit.0` 是唯一首轮不存在的签名，因为首轮 manager-full-loop 更早就停了。
+
+推论：fork 信封这一根因已在结构上消除，它此前掩盖了类二的六条。类二不属包 N——它们是 fallback、review verdict、PTY 与 orchestrator 的行为债，须各自定位。包 N 只欠类一两条，且都在 N5 的既定清单上。
 
 ### 包 X：失败驱动上下文恢复
 
