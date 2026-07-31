@@ -66,6 +66,16 @@ module HostSignalBootstrap =
                 | true, directory when not (String.IsNullOrWhiteSpace directory) -> Some(GitTree.create directory)
                 | _ -> gitTreePort
 
+            match turn.Outcome with
+            | TurnFailed _
+            | TurnAborted _ -> scope.ArmRecovery turn.SessionId
+            | TurnCompleted
+            | TurnNeedsContinuation _
+            | TurnInProgress
+            | TurnUnknown -> ()
+
+            XWire.reconcileAttempt journal scope turn
+
             TurnCompletionProgram.applyWithContinuation
                 sessionPort
                 eventPort
