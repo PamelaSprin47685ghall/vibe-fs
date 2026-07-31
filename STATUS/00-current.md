@@ -8,27 +8,30 @@
 ## 当前阶段
 
 封炉、休克一、休克二、清场、SSOT/12 并入、退火一、退火二、剧本森林与因果推进门禁均已完成。
-ARCH-010 的 N0–N5b 已落地；N5b 之后的工作仍处于休克期，只运行第 0 层静态检查。
+ARCH-010 的 N0–N5b 已落地。CTX-006 的 X-wire 与 Y squash 生产链路已由 P1–P5 接线闭合
+（`blocker-CTX-006.md` 标记解除），`SHOCK-UNMIGRATED` 归零。
 
-分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近代码动作 `36cd235e`（`docs(CTX-006): record blocker and ignore .codewhale`）。
+当前出口：`dotnet build` 绿（0 warning 0 error）、`npm run test:mjs` 433/433 三时区全绿、
+`gate:static` 绿。已具备启动退火三的全部前置。
 
-X-wire 失败驱动恢复链已接通至 `XWire.applyTransform`；真实 settled attempt 的恢复决策尚未闭合最小生产调用点。`BlogSquashCommitted` 生产 writer 缺失已由 `STATUS/blocker-CTX-006.md` 记录，对应 `next/Session/CompanionHostBlogger.fs:155` 的 `SHOCK-UNMIGRATED[CTX-006]` 标记。`shock-audit` 因此仍报告 1 处未迁移标记。
+分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近代码动作 `63e9d5d6`
+（`fix(CTX-006): squash failure returns Result so reconcile advances parent cursor`）。
 
 ## 下一步
 
-处置 CTX-006 阻塞：补充 invalid terminal repair、attempt 持久绑定与失败后下一槽行为的生产接线，使 `BlogSquashCommitted` 获得唯一 durable writer；或者确认该阻塞无法在本轮消除，并将 `SHOCK-UNMIGRATED` 标记显式转为可接受的阶段阻塞（需与 `blocker-CTX-006.md` 一致）。
-
-`SHOCK-UNMIGRATED` 归零之前不得启动退火三（编译 + canary）。
+退火三（阶段 7），按序：
 
 ```text
-reconciled TurnFailed
-→ AttemptPlanner.plan / RecoverySlot
-→ PrefixProbe 选择与 XPrefixProjection
-→ 成功 terminal 才追加 PrefixRebaseCommitted
-→ 失败继续由 FallbackController 唯一推进
+1. 包 K9   删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径
+           （旧 expect* 轨迹须先迁入静态森林或明确淘汰）
+2. test:harness                     gate-testkit 全绿
+3. canary 修红                      类一（N5 surface）+ 类二（行为债）+ manager-full-loop
+4. 包 K8f  X-A–X-D                  恢复剧本接线验收（X-wire 已通，阻断解除）
+5. 包 N6   fixture/golden/byte-limit 更新（M5，需全绿 canary 作回归底座）
+6. P0×3 → npm run test:release      发布门禁
 ```
 
-条款：CTX-006、CTX-010、CTX-011、CTX-012、FALLBACK-003、PROMPT-008、PERSIST-010。
+条款：VERIFY-001 六层阶梯，禁止跨级；VERIFY-003 剧本只匹配 provider 真正收到的东西。
 
 ## 阅读顺序
 
