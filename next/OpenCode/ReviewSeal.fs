@@ -34,6 +34,9 @@ module ReviewSeal =
         /// most likely a version change. Guessing between them could seal the wrong
         /// run's input and confirm a review that never saw the challenge.
         | AmbiguousRun of count: int
+        /// The only matching assistant is not the newest assistant in the session.
+        /// Accepting it would bind the seal to an older provider run.
+        | NotLatestRun
         /// The transform output carries no user message, so there is no
         /// `PhysicalUserMessageId` to seal against (PROMPT-001).
         | NoPhysicalUserMessage
@@ -58,7 +61,14 @@ module ReviewSeal =
 
         match candidates with
         | [] -> Error NoBindableRun
-        | [ single ] -> Ok single
+        | [ single ] ->
+            let assistants = messages |> List.filter (fun message -> message.Role = "assistant")
+
+            match assistants with
+            | [] -> Error NoBindableRun
+            | _ ->
+                let latest = assistants |> List.maxBy (fun message -> message.Id)
+                if latest.Id = single.Id then Ok single else Error NotLatestRun
         // `MessageID.ascending` is monotonic, so the newest is the largest. Reported
         // rather than silently taking the max: the clause's premise is that exactly
         // one exists, and more than one means the premise no longer holds.
@@ -75,7 +85,7 @@ module ReviewSeal =
         (sha256: string -> string)
         (sessionId: SessionId)
         (transformed: ProviderProjection.ProviderWireProjection)
-        (physicalUserAddress: string option)
+        (physicalUserAddress: PhysicalUserMessageId option)
         : Task<Result<ProviderRunIdentity, SealRejection>> =
         task {
             match journal, snapshot, physicalUserAddress with
@@ -83,10 +93,12 @@ module ReviewSeal =
             | _, None, _ -> return Error(SnapshotUnavailable "no session snapshot port")
             | _, _, None -> return Error NoPhysicalUserMessage
             | Some durable, Some port, Some physicalAddress ->
+                let physicalAddressValue = PhysicalUserMessageId.value physicalAddress
+
                 match! port.GetMessages sessionId with
                 | Error reason -> return Error(SnapshotUnavailable reason)
                 | Ok messages ->
-                    match bindableRun physicalAddress messages with
+                    match bindableRun physicalAddressValue messages with
                     | Error rejection -> return Error rejection
                     | Ok assistant ->
                         let providerRun = ProviderRunIdentity.create assistant.Id
@@ -95,7 +107,7 @@ module ReviewSeal =
                             AgentFact.ProviderInputSealed
                                 {| SessionId = sessionId
                                    ProviderRun = providerRun
-                                   PhysicalUserMessageId = PhysicalUserMessageId.create physicalAddress
+                                   PhysicalUserMessageId = physicalAddress
                                    SealDigest = ProviderProjection.sealDigest sha256 transformed
                                    CanonicalVersion = ProviderProjection.CanonicalVersion
                                    IncludedToolResultDigests = ProviderProjection.toolResultDigests sha256 transformed |}
@@ -120,7 +132,8 @@ module ReviewSeal =
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (rawMessages: obj list)
+        (transformed: ProviderProjection.ProviderWireProjection)
+        (physicalUserAddress: PhysicalUserMessageId option)
         : Task<unit> =
         task {
             let isReviewer =
@@ -136,8 +149,8 @@ module ReviewSeal =
                         journal
                         HostDigest.sha256Hex
                         sessionId
-                        (Projection.decodeMessageView rawMessages)
-                        (Projection.lastUserMessageId rawMessages)
+                        transformed
+                        physicalUserAddress
 
                 return ()
             else

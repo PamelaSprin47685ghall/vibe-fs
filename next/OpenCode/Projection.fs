@@ -198,11 +198,12 @@ module Projection =
     /// projection's messages with a parallel id list: `decodeMessageView` drops
     /// messages it cannot decode, so positional pairing silently shifts and would
     /// seal against the wrong address.
-    let lastUserMessageId (rawMessages: obj list) : string option =
+    let lastUserMessageId (rawMessages: obj list) : PhysicalUserMessageId option =
         rawMessages
         |> List.choose (fun raw ->
             match decodeMessage raw with
-            | Some message when message.Role = "user" -> hostMessageId raw
+            | Some message when message.Role = "user" ->
+                hostMessageId raw |> Option.map PhysicalUserMessageId.create
             | _ -> None)
         |> List.tryLast
 
