@@ -1,33 +1,22 @@
 /**
  * strict-mock-provider.js — Strict mock LLM server for OpenCode E2E.
  *
- * Every LLM request must have a queued expectation. This includes title
- * generation and synthetic continuation requests. On mismatch, the failing
- * expectation is not consumed; the request is recorded as unexpected and a
- * 500 is returned.
+ * Driven exclusively by a compiled TOML scenario (`ScenarioRuntime`): every
+ * request must hit a declared turn. On mismatch the request is recorded as
+ * unexpected, the first mismatch is fatal, and a 500 is returned.
  *
- * Server lifecycle / web endpoints live in strict-mock-server.js; legacy
- * args decoration in strict-mock-decorate.js; SSE chunks in strict-mock-sse.js;
- * matchers in strict-mock-matches.js; expectSatisfied in strict-mock-satisfy.js;
- * state record in strict-mock-state.js. This file stays under the
- * 200-line Kolmogorov line budget.
+ * Server lifecycle / web endpoints live in strict-mock-server.js; SSE chunks in
+ * strict-mock-sse.js; request-body inspection (diagnostics + request-kind
+ * classification) in strict-mock-matches.js; state record in
+ * strict-mock-state.js. This file stays under the 200-line Kolmogorov line
+ * budget.
  */
 
 import { sendJSON } from './strict-mock-sse.js';
 import {
   extractToolNames,
   extractLastUserMsg,
-  requestKindOf,
 } from './strict-mock-matches.js';
-import { sealHolds, wireOf } from './provider-wire.js';
-import {
-  consumeExpectation,
-  edgeLabel,
-  edgeWaitIds,
-  laneLabel,
-  pendingExpectations,
-  selectExpectation,
-} from './strict-mock-forest.js';
 import {
   startHttpServer,
   stopHttpServer,
@@ -35,14 +24,12 @@ import {
   handleWebFetch,
   readRequestBody,
 } from './strict-mock-server.js';
-import { checkSatisfied } from './strict-mock-satisfy.js';
 import { faultBody } from './delivery-plan.js';
 import { StrictMockSignals } from './strict-mock-signals.js';
 import { WATCHDOG_TIMEOUT_MS } from './time-budget.js';
 import { respond } from './strict-mock-responses.js';
 import {
   createState,
-  pushExpectation,
   resetState,
 } from './strict-mock-state.js';
 
@@ -84,82 +71,39 @@ export class StrictMockProvider {
     this.onFatal = null;
   }
 
-  expectToolCall(opts) { pushExpectation(this._state, { type: 'tool-call', tool: opts.tool, args: opts.args || {} }, opts); }
-  expectText(opts) { pushExpectation(this._state, { type: 'text', text: opts.text ?? 'ok' }, opts); }
-  expectTitle(opts) { pushExpectation(this._state, { type: 'title', text: opts.text ?? 'E2E Test Session' }, opts); }
-  expectError(opts) {
-    pushExpectation(this._state, {
-      type: 'error',
-      status: opts.status || 500,
-      body: opts.body || { error: 'mock error' },
-      headers: opts.headers,
-    }, opts);
-  }
-  expectDisconnect(opts = {}) { pushExpectation(this._state, { type: 'disconnect' }, opts); }
-
-  expectSyntheticTodoNudge(opts = {}) {
-    this.expectText({
-      ...opts,
-      id: opts.id || 'synthetic-todo-nudge',
-      lane: { ...opts.lane, requestKind: 'synthetic' },
-      text: 'done',
-      match: { ...opts.match, containsText: ['There are still incomplete todos. Continue working through the remaining items.'] },
-    });
-  }
-
-  expectLoopNudge(opts = {}) {
-    this.expectText({
-      ...opts,
-      id: opts.id || 'synthetic-loop-nudge',
-      lane: { ...opts.lane, requestKind: 'synthetic' },
-      text: 'done',
-      match: { ...opts.match, containsText: ['You are in loop mode. You must call the submit_review tool'] },
-    });
-  }
-
-  expectSyntheticBudgetNudge(opts = {}) {
-    this.expectText({
-      ...opts,
-      id: opts.id || 'synthetic-budget-nudge',
-      lane: { ...opts.lane, requestKind: 'synthetic' },
-      text: 'done',
-      match: { ...opts.match, containsText: ['the system context is about to be suspended'] },
-    });
-  }
-
   /**
-   * Drive this provider from a compiled TOML scenario (K9).
+   * Drive this provider from a compiled TOML scenario.
    *
-   * Mutually exclusive with `expect*` by construction: `_dispatchChat` consults the
-   * runtime when one is attached and never touches the edge list. The two paths must not
-   * interleave — an `expect*` edge and a declared turn answering the same request is the
-   * ambiguity the whole forest rebuild exists to remove.
+   * There is exactly one matching path: `ScenarioRuntime`. An attached runtime is
+   * the provider's whole script; `_dispatchChat` refuses to answer without one.
    */
   attachScenario(runtime) {
-    if (this._state.edges.length > 0) {
-      throw new Error('a scenario cannot be attached to a provider that already has expect* edges');
-    }
     this._scenario = runtime;
   }
 
   expectSatisfied() {
-    if (this._scenario === null) return checkSatisfied(this._state);
-
     const errors = [];
     if (this._state.fatal) {
       const f = this._state.fatal;
       errors.push(`FIRST SCRIPT MISMATCH (mock stopped): reason=${f.reason} session=${f.sessionId} lastUser=${JSON.stringify(f.lastUser)} candidates=${JSON.stringify(f.candidates)}`);
     }
 
-    // A declared step no request reached. `internal` turns are exempt (production decides
-    // whether to compose them at all) — a scenario that needs one says `must`.
-    const unanswered = this._scenario.unanswered();
-    if (unanswered.length > 0) {
-      errors.push(`declared but never reached = ${unanswered.length}:\n${unanswered.slice(0, 5).map((e) => `  [${e.id}] lane=${e.lane ?? '(any)'} step=${e.step} respond=${e.respond?.type}`).join('\n')}`);
-    }
+    if (this._scenario === null) {
+      // No scenario attached: only fatal / unexpected state can be asserted.
+      if (this._state.unexpected.length === 0 && !this._state.fatal) {
+        errors.push('no scenario attached; nothing was declared');
+      }
+    } else {
+      // A declared step no request reached. `internal` turns are exempt (production
+      // decides whether to compose them at all) — a scenario that needs one says `must`.
+      const unanswered = this._scenario.unanswered();
+      if (unanswered.length > 0) {
+        errors.push(`declared but never reached = ${unanswered.length}:\n${unanswered.slice(0, 5).map((e) => `  [${e.id}] lane=${e.lane ?? '(any)'} step=${e.step} respond=${e.respond?.type}`).join('\n')}`);
+      }
 
-    const unmet = this._scenario.unmetMust();
-    if (unmet.length > 0) errors.push(`must not satisfied: ${unmet.join(', ')}`);
+      const unmet = this._scenario.unmetMust();
+      if (unmet.length > 0) errors.push(`must not satisfied: ${unmet.join(', ')}`);
+    }
 
     if (this._state.unexpected.length > 0) {
       errors.push(`unexpected requests = ${this._state.unexpected.length}: ${JSON.stringify(this._state.unexpected.slice(0, 3).map((u) => u.reason))}`);
@@ -174,27 +118,16 @@ export class StrictMockProvider {
   /**
    * Associate a scenario alias with a real session id (HOST-008).
    *
-   * The scenario is told FIRST, and the legacy single-binding rule below only applies to the
-   * `expect*` path. That ordering is load-bearing: a scenario alias names a ROLE, and
-   * production forks as many children of a role as the work needs — `orchestrator-publish`
-   * reviews before and after the rebase, so `fast-reviewer` legitimately holds two sessions.
-   *
-   * Measured in K9: `scenario-parallel.js:136` auto-binds on every `session.created` inside a
-   * `try {} catch {}`, so the throw below silently dropped every child after the first. The
-   * swallowed exception is why the old forest needed `reusable` aliases to answer a second
-   * Reviewer at all.
+   * The scenario is told FIRST: a scenario alias names a ROLE, and production
+   * forks as many children of a role as the work needs — `orchestrator-publish`
+   * reviews before and after the rebase, so `fast-reviewer` legitimately holds
+   * two sessions. Rebinding a role alias is therefore not an error.
    */
   bindSession(alias, sessionID) {
     if (typeof alias !== 'string' || alias.trim() === '') throw new Error('StrictMock session alias must be non-empty');
     if (typeof sessionID !== 'string' || sessionID.trim() === '') throw new Error('StrictMock session ID must be non-empty');
 
     this._scenario?.bind(alias, sessionID);
-
-    const bound = this._state.sessionBindings.get(alias);
-    if (bound && bound !== sessionID) {
-      if (this._scenario !== null) return;
-      throw new Error(`StrictMock session alias ${alias} is already bound`);
-    }
     this._state.sessionBindings.set(alias, sessionID);
   }
 
@@ -208,42 +141,30 @@ export class StrictMockProvider {
   sessionFor(alias) {
     return this._state.sessionBindings.get(alias) || null;
   }
-  /** Map authoring wait ids (including reusable aliases) onto the primary edge id. */
-  _primaryWaitId(id) {
-    const aliased = this._state.aliasToEdge?.get(id);
-    if (aliased?.id) return aliased.id;
-    return id;
-  }
 
   waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) {
-    // Alias-merged reusable templates (perfect-3 → perfect-1) wait on the primary
-    // edge. Each successive wait blocks until the next primary match — so the
-    // canary flow inserts post-rebase PERFECT as a real intermediate event under
-    // the default 2s causal budget, without wall-clock timeout inflation.
-    return this._signals.waitForExpectation(this._primaryWaitId(id), timeoutMs);
+    return this._signals.waitForExpectation(id, timeoutMs);
   }
   waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
   afterExpectation(id, callback) {
-    const primary = this._primaryWaitId(id);
     // Permanent one-shot only: already satisfied ⇒ run immediately.
-    // Reusable primary never permanently consumes, so later registration waits
-    // for the next match (intermediate post-rebase event).
-    if (this._signals.hasConsumed(primary)) return callback();
-    const callbacks = this._afterExpectation.get(primary) || [];
+    if (this._signals.hasConsumed(id)) return callback();
+    const callbacks = this._afterExpectation.get(id) || [];
     callbacks.push(callback);
-    this._afterExpectation.set(primary, callbacks);
+    this._afterExpectation.set(id, callbacks);
   }
 
   get requests() { return this._state.requests; }
   get url() { return this._url; }
   get port() { return this._port; }
   get unexpectedRequests() { return this._state.unexpected; }
-  get remainingExpectations() { return pendingExpectations(this._state).length; }
+  get remainingExpectations() { return this.blockedExpectations.length; }
   get blockedExpectations() {
-    return pendingExpectations(this._state).map((expectation) => ({
-      id: expectation.id,
-      lane: edgeLabel(expectation),
-      blocking: expectation.blocking,
+    if (this._scenario === null) return [];
+    return this._scenario.unanswered().map((entry) => ({
+      id: entry.id,
+      lane: `${entry.id}@${entry.lane ?? '(any)'}/${entry.kind}/step-${entry.step}`,
+      blocking: true,
     }));
   }
   get activeRequestCount() { return this._signals.activeRequestCount; }
@@ -308,7 +229,7 @@ export class StrictMockProvider {
   }
 
   /**
-   * One request against the compiled scenario (K9).
+   * One request against the compiled scenario.
    *
    * The seal, the fault plan and the content lookup all live in `ScenarioRuntime`; this
    * method only turns its verdict into HTTP. Nothing here inspects the request — that
@@ -399,60 +320,9 @@ export class StrictMockProvider {
 
     if (this._scenario !== null) return this._dispatchScenario(res, parsed, context);
 
-    // ARCH-004 / COMPANION-009: no sniffed cold-boundary exemptions.
-    //
-    // `epochCold` (tools + system unchanged) and `modelSideCold` (model id changed)
-    // used to reseal here. Both admitted a rewritten body — most of what a wrong
-    // prefix replacement looks like — so they passed exactly the mutations they
-    // existed to catch. `modelSideCold` was also obsolete: no prompt asset
-    // interpolates a model id any more (measured 0 occurrences).
-    //
-    // A legitimate cold boundary belongs in the scenario as an explicit `[[epoch]]`
-    // declaration (VERIFY-003, package K4).
-    const sessionID = context.sessionId;
-    const kind = requestKindOf(parsed);
-    if (this._scenario === null && sessionID && kind === 'chat') {
-      const sealed = s.sealedBySession.get(sessionID);
-      if (!sealHolds(sealed, parsed)) {
-        this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', [], '', context);
-        return;
-      }
-    }
-
-    const selection = selectExpectation(s, parsed, context);
-    if (selection.match) return this._dispatchMatched(res, parsed, selection.match, context);
-    this._recordUnexpected(res, parsed, selection.reason, selection.candidates, '', context);
-  }
-
-  _dispatchMatched(res, parsed, match, context) {
-    const s = this._state;
-    const sessionID = context.sessionId;
-    const exp = consumeExpectation(s, match, sessionID);
-    // Dual-PERFECT reusable templates (reusable && !neverEnd) wake only the
-    // primary wait id once per match so later waits claim the next occurrence.
-    // neverEnd / pathless / one-shot edges permanently satisfy every alias wait
-    // id (busy hang, blogger, title, guard nudge absorb forever).
-    const multiWaitReusable = exp.reusable === true && exp.neverEnd !== true;
-    const waitIds = multiWaitReusable ? [exp.id] : edgeWaitIds(exp);
-    const permanent = !multiWaitReusable;
-    for (const wid of waitIds) {
-      this._signals.consume({ id: wid, permanent });
-      // afterExpectation may be registered on primary or (one-shot) alias ids.
-      this._runAfterExpectation(wid);
-    }
-    if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${edgeLabel(exp)}`);
-    s.requests.push(requestRecordOf(parsed, context));
-    // Seal only chat turns (title/synthetic may reshuffle without product cache).
-    if (sessionID && requestKindOf(parsed) === 'chat') {
-      s.sealedBySession.set(sessionID, wireOf(parsed));
-    }
-    this.onExpectationConsumed?.({
-      id: exp.id,
-      lane: exp.lane,
-      blocking: exp.blocking,
-      requestKind: requestKindOf(parsed),
-    });
-    return respond(this._state, res, exp, parsed);
+    // No scenario attached: every chat request is unexpected (ARCH-004). A strict
+    // mock must be told what the model may say; an empty script answers nothing.
+    this._recordUnexpected(res, parsed, 'no-scenario-attached', [], '', context);
   }
 
   _recordUnexpected(res, parsed, reason, candidates = [], detail = '', context = {}) {
@@ -460,12 +330,10 @@ export class StrictMockProvider {
     const parentSessionId = context.parentSessionId || null;
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
-    // A scenario entry carries `lane` as a plain alias string; a legacy edge carries a lane
-    // record. Both label here so one diagnostic path serves both dispatchers.
+    // A scenario entry carries `lane` as a plain alias string. The diagnostic labels
+    // it directly; there is no legacy lane record any more.
     const candidateLabels = candidates.map(({ expectation }) =>
-      typeof expectation.lane === 'object' || expectation.lane === undefined
-        ? edgeLabel(expectation)
-        : `${expectation.id}@${expectation.lane}/${expectation.kind}/step-${expectation.step}`,
+      `${expectation.id}@${expectation.lane}/${expectation.kind}/step-${expectation.step}`,
     );
     const lastUser = extractLastUserMsg(parsed);
     const fatal = {
