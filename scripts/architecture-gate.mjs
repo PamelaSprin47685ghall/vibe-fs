@@ -101,7 +101,6 @@ const HOST_INTEROP_NAME =
   /(Host|Port|Codec|Adapter|Boot|Runtime|Writer|Node|Plugin|Supervisor|Backend|Projection|Transform|Signal|Json|Git|Flow|Pty|Tool|Subscribe|Canonical|Process)/i
 
 const HOST_INTEROP_ALLOWLIST = new Map([
-  ['next/Session/CompanionDelta.fs', 'companion canonical hash and projection delta'],
   ['next/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
   ['next/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
   ['next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
