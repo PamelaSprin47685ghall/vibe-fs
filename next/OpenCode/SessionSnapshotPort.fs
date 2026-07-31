@@ -113,7 +113,13 @@ module SessionSnapshotPort =
 
         candidates |> List.tryPick readString
 
-    let private isTrue (value: obj) = not (isNull value) && unbox<bool> value
+    /// `summary = true` in Host 1.18.9 is a boolean on assistant messages. User
+    /// messages carry a summary OBJECT (`{ title?, body?, diffs }`), so a non-null
+    /// test alone would treat every ordinary user message as a compaction
+    /// pseudo-run — `judgeStartup` then refuses to start (HOST-006). Strict boolean
+    /// equality is the only faithful reading of the SDK contract.
+    let private isTrue (value: obj) =
+        not (isNull value) && unbox<bool> value = true
 
     let private completedOf (info: obj) (raw: obj) =
         let timeOf (source: obj) =
