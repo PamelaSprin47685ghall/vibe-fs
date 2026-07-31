@@ -55,6 +55,37 @@ export const SURFACE_CLASSES = Object.freeze([
   'RuntimeSyntheticToml',
 ]);
 
+/**
+ * How a surface stands relative to ARCH-010, which is a different question from its class.
+ *
+ * The class says what KIND of text a surface carries. This says whether the surface owes the clause
+ * anything, and the three-way split is what ARCH-010 §3.2 draws rather than something invented here:
+ *
+ *   CanonicalPayload    the runtime composes its OWN instruction or data alongside the caller's
+ *                       text, so the result is a synthetic payload and must route through the
+ *                       canonical writer. Migrated.
+ *
+ *   VerbatimForward     the runtime delivers the caller's or the model's text UNCHANGED as the whole
+ *                       message, adding nothing. §3.2 excludes this: model-native text 「不因本动议
+ *                       而重写」 when delivered, and only becomes a value when 「被复制进其他合成
+ *                       payload」. Wrapping a bare assignment in `assignment = "…"` would add a layer
+ *                       the model must unwrap for zero information, which §17.3 forbids as
+ *                       「每个 data payload 强制附加 instruction」.
+ *
+ *   RuntimeInstruction  the runtime composes instruction text of its own but has not been migrated
+ *                       yet. This is the honest N5 worklist, and naming it here is what stops
+ *                       §17.8's 「旧 continuation 用裸英语，新 continuation 用 TOML」 from becoming
+ *                       permanent by inattention.
+ *
+ * The distinction is checkable rather than declarative: a `CanonicalPayload` file must reference a
+ * canonical writer, and the other two must not. So a surface that quietly starts composing, or one
+ * that quietly stops routing, fails here.
+ */
+export const SURFACE_STANDINGS = Object.freeze(['CanonicalPayload', 'VerbatimForward', 'RuntimeInstruction']);
+
+/** The modules that ARE the canonical writer. Referencing one is what `CanonicalPayload` means. */
+const CANONICAL_WRITERS = Object.freeze(['SyntheticToml', 'ForkChildPayload', 'BloggerToml']);
+
 /** The only ways plugin-composed text reaches `ISessionHostPort.SendPrompt` (PROMPT-005). */
 const SINKS = Object.freeze([
   'SendAgentOwnerRoot',
@@ -81,23 +112,28 @@ const SURFACES = new Map([
     'next/OpenCode/OneShotAgentTool.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
+      standing: 'VerbatimForward',
       surface: 'one-shot agent assignment',
-      composer: 'the calling tool s arguments, wrapped by the tool handler',
+      composer: 'promptFrom: the caller s own prompt args, joined; the runtime adds nothing',
     },
   ],
   [
     'next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
+      standing: 'RuntimeInstruction',
       surface: 'Blogger delta prompt (normal and post-restart re-anchor)',
-      composer: 'CompanionHostBlogger.fs:72,77 + CompanionPrompt.fs + BloggerToml',
+      composer:
+        'CompanionHostBlogger.fs:72,77 prose wrapper around a BloggerToml document — the delta is ' +
+        'canonical, the wrapper is not. N5 target',
     },
   ],
   [
     'next/Session/HostForkRunLifecycle.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
-      surface: 'forked child first prompt (lifecycle path)',
+      standing: 'VerbatimForward',
+      surface: 'forked child prompt (lifecycle path)',
       composer: 'caller-supplied assignment, unwrapped',
     },
   ],
@@ -105,42 +141,45 @@ const SURFACES = new Map([
     'next/Session/HostForkAgentOwner.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
-      surface: 'forked child first prompt (shared helper)',
-      composer: 'caller-supplied assignment, unwrapped',
+      standing: 'VerbatimForward',
+      surface: 'forked child prompt (shared helper)',
+      composer: 'caller-supplied text, unwrapped; the fork path composes before calling this',
     },
   ],
   [
     'next/Session/HostForkRuntimeFork.fs#sendFirstPrompt',
     {
       class: 'RuntimeSyntheticToml',
-      surface: 'forked child assignment envelope',
-      composer:
-        'HostForkRuntimeFork.fs:196 conditional envelope + :98 reviewer requirements — N3 target, ' +
-        'and the shared root cause of the currently red canaries',
+      standing: 'CanonicalPayload',
+      surface: 'forked child first prompt',
+      composer: 'ForkChildPayload.render — N3 replaced two conditional envelopes',
     },
   ],
   [
     'next/OpenCode/HostSessionNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
+      standing: 'RuntimeInstruction',
       surface: 'continuation nudge',
-      composer: 'TurnCompletionProgram.fs:92,158,227 + HostReviewGuard.fs:147,164',
+      composer: 'TurnCompletionProgram.fs:92,158 + HostReviewGuard.fs:147,164 prose. N5 target',
     },
   ],
   [
     'next/Session/HostForkBusyNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
+      standing: 'VerbatimForward',
       surface: 'busy-agent fire-and-forget nudge (EXEC-002)',
-      composer: 'caller-supplied assignment, unwrapped',
+      composer: 'the same assignment the caller supplied, re-delivered; nothing added',
     },
   ],
   [
     'next/OpenCode/HostSessionNudge.fs#SendInteractionRepair',
     {
       class: 'RuntimeSyntheticToml',
+      standing: 'RuntimeInstruction',
       surface: 'interaction repair',
-      composer: 'TurnCompletionProgram.fs:227 missing-final-report text',
+      composer: 'TurnCompletionProgram.fs:227 missing-final-report prose. N5 target',
     },
   ],
 ]);
@@ -219,6 +258,22 @@ const humanRawLeaks = (sites) =>
   });
 
 /**
+ * Whether a send-site file references a canonical writer, in CODE.
+ *
+ * Comment lines are skipped for the same reason `systemPromptLeaks` skips them: a doc comment saying
+ * "this forwards verbatim, so it does not route through `SyntheticToml`" must not be punished, and
+ * that sentence is exactly what a reader needs.
+ */
+const routesThroughCanonicalWriter = (file) =>
+  readFileSync(`${REPO_ROOT}${file}`, 'utf8')
+    .split('\n')
+    .some((text) => {
+      const trimmed = text.trim();
+      if (trimmed.startsWith('///') || trimmed.startsWith('//')) return false;
+      return CANONICAL_WRITERS.some((writer) => text.includes(`${writer}.`));
+    });
+
+/**
  * Audit the tree. Returns violation strings; empty means the inventory matches reality.
  */
 export function auditSurfaces(files = productionFiles()) {
@@ -254,6 +309,32 @@ export function auditSurfaces(files = productionFiles()) {
     if (!SURFACE_CLASSES.includes(entry.class)) {
       violations.push(`${key} has class '${entry.class}', which is not one of ${SURFACE_CLASSES.join(', ')}`);
     }
+    if (!SURFACE_STANDINGS.includes(entry.standing)) {
+      violations.push(
+        `${key} has standing '${entry.standing}', which is not one of ${SURFACE_STANDINGS.join(', ')}`,
+      );
+    }
+  }
+
+  // The standing↔code agreement, in both directions. This is what keeps the N5 worklist honest: a
+  // surface cannot be relabelled migrated without routing, and a migrated one cannot silently stop.
+  for (const [key, entry] of SURFACES) {
+    const file = key.split('#')[0];
+    const routes = routesThroughCanonicalWriter(file);
+
+    if (entry.standing === 'CanonicalPayload' && !routes) {
+      violations.push(
+        `${key} is marked CanonicalPayload but ${file} references no canonical writer ` +
+          `(${CANONICAL_WRITERS.join(', ')}); the label claims a migration that did not happen`,
+      );
+    }
+
+    if (entry.standing !== 'CanonicalPayload' && routes) {
+      violations.push(
+        `${key} is marked ${entry.standing} but ${file} references a canonical writer; either it ` +
+          'composes a payload and the standing is wrong, or the reference is a second dialect',
+      );
+    }
   }
 
   for (const leak of systemPromptLeaks(sites)) {
@@ -288,9 +369,13 @@ const main = () => {
     process.exit(1);
   }
 
-  const inScope = inventory().filter((entry) => entry.class === 'RuntimeSyntheticToml');
+  const byStanding = (standing) => inventory().filter((entry) => entry.standing === standing).length;
+
   console.log(
-    `surface-inventory: OK — ${SURFACES.size} surface(s), ${inScope.length} in ARCH-010 scope, ` +
+    `surface-inventory: OK — ${SURFACES.size} surface(s): ` +
+      `${byStanding('CanonicalPayload')} canonical, ` +
+      `${byStanding('VerbatimForward')} verbatim-forward, ` +
+      `${byStanding('RuntimeInstruction')} awaiting N5; ` +
       'system prompt and human raw structurally excluded',
   );
 };
