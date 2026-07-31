@@ -124,7 +124,25 @@ type HostForkRuntime
             | TerminalOutcome.Completed _ -> AgentCompletion.snapshotOption (childWorkRecordOf run.ChildId)
             | _ -> None
 
+        let completionKind =
+            match outcome with
+            | TerminalOutcome.Completed _ -> HandleCompletionKind.Terminal
+            | TerminalOutcome.Aborted _
+            | TerminalOutcome.Failed _ -> HandleCompletionKind.SendFailure
+
+        // Persist the single-assignment handle completion before consuming the
+        // pending run.  The Host lifecycle must still release its subscription
+        // and source when persistence reports an error, so surface the journal
+        // failure only after cleanup rather than silently claiming success.
+        let completionResult =
+            HandleController.recordCompletion journal parentId run.AgentId completionKind
+
         HostForkRunLifecycle.complete gate pendingRuns sessions run outcome workRecord
+
+        match completionResult with
+        | Ok() -> ()
+        | Error error ->
+            failwith (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
 
     member this.InstallRun(agentId: string, childId: SessionId, role: AgentRole) =
         let run =
