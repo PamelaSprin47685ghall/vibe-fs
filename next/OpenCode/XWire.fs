@@ -245,4 +245,27 @@ module XWire =
             | None -> ()
 
             scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+        | Some durable, None when isCompanionSession durable turn.SessionId ->
+            // CTX-006: a Blogger child session has no AttemptPlan of its own.
+            // A Failed or Aborted squash/main means the parent Work Session's
+            // recovery slot has consumed one attempt, so its cursor must advance.
+            match turn.Outcome with
+            | TurnFailed reason
+            | TurnAborted reason ->
+                match scope.SessionParents.TryGetValue(SessionId.value turn.SessionId) with
+                | true, parentKey ->
+                    let parentId = SessionId.create parentKey
+
+                    FallbackController.recordConfirmedFailure
+                        durable
+                        12
+                        parentId
+                        turn.ProviderRun
+                        reason
+                    |> ignore
+                | false, _ -> ()
+            | TurnCompleted
+            | TurnNeedsContinuation _
+            | TurnInProgress
+            | TurnUnknown -> ()
         | _ -> ()
