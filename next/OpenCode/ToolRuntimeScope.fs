@@ -158,7 +158,7 @@ type ToolRuntimeScope
                     HostForkRuntime(
                         SessionId.create ctx.SessionId,
                         sessions,
-                        ?journal = None,
+                        ?journal = journal,
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId)
                     )
 

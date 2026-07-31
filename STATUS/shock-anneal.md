@@ -1729,6 +1729,14 @@ delimiter 检查必须先抹掉单行字符串 value   注入 payload 含 ''' �
 
 推论：fork 信封这一根因已在结构上消除，它此前掩盖了类二的六条。类二不属包 N——它们是 fallback、review verdict、PTY 与 orchestrator 的行为债，须各自定位。包 N 只欠类一两条，且都在 N5 的既定清单上。
 
+##### Executor durable Journal 修复（PERSIST-009 / PROMPT-005）
+
+静态追踪 `executor` 的 `map.0` 停止在 `ToolRuntimeScope.ExecutorRuntimeFor`：该路径曾以
+`?journal = None` 构造 `HostForkRuntime`，随后 `ExecutorSummarize` 的 child prompt 进入
+`HostForkRunLifecycle.sendAgentOwnerRoot`，因无 Journal 被 PromptDispatcher fail closed，
+provider 永远收不到 map child。已改为复用 `ToolRuntimeScope` 的 durable `journal`，与普通
+runtime 使用同一 Journal 入口；本次休克复核只证明静态接线，canary 仍待退火三复测。
+
 #### N5 拆分：M3 的前提在本仓不成立（迁移前实测，已由 X4 解除）
 
 动议 M3 说「优先迁移 Blogger，因为已有 typed semantic parts、deterministic renderer、byte limit、现成测试」。这四项对 `BloggerToml` / `BloggerDelta` 全部为真，但它们都不在活路径上。实测：
