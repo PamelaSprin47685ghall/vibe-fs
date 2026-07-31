@@ -8,7 +8,6 @@ import {
 } from '../index.js';
 import { WATCHDOG_TIMEOUT_MS } from '../time-budget.js';
 import { bindLaneSession, expectationLane } from './lane.mjs';
-import { requestRoleOf } from '../strict-mock-matches.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
@@ -17,8 +16,8 @@ const primaryAgent = 'fast-orchestrator';
 const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
 
-function bloggerRequests(provider) {
-  return provider.requests.filter((body) => requestRoleOf(body) === 'blogger');
+function bloggerRequests(provider, bloggerId) {
+  return provider.requests.filter((body) => body.sessionID === bloggerId);
 }
 
 function sessionCreatedIds(scenario) {
@@ -93,14 +92,14 @@ async function runProjectionScenario(scenario) {
   assert.ok(firstPrompt.ok, `first primary prompt failed: ${JSON.stringify(firstPrompt.data)}`);
   await firstTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
-  const firstBlogRequests = bloggerRequests(scenario.provider);
+  const childIdsAfterFirstProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
+  assert.equal(childIdsAfterFirstProjection.length, 1, 'first primary projection must create exactly one Blogger child session');
+  const bloggerId = childIdsAfterFirstProjection[0];
+  const firstBlogRequests = bloggerRequests(scenario.provider, bloggerId);
   assert.ok(
     firstBlogRequests.length >= 1,
     'Companion gap: first primary projection did not emit a real Blogger child request',
   );
-  const childIdsAfterFirstProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
-  assert.equal(childIdsAfterFirstProjection.length, 1, 'first primary projection must create exactly one Blogger child session');
-  const bloggerId = childIdsAfterFirstProjection[0];
   await scenario.events.awaitEvent(
     (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
     WATCHDOG_TIMEOUT_MS,
@@ -125,7 +124,7 @@ async function runProjectionScenario(scenario) {
   );
   scenario.watchdog?.advance({ reason: 'primary-blogger-idle', lane: 'primary-blogger', blocking: true });
 
-  const allBlogRequests = bloggerRequests(scenario.provider);
+  const allBlogRequests = bloggerRequests(scenario.provider, bloggerId);
   assert.equal(allBlogRequests.length, 2, 'two primary projections must produce exactly two Blogger requests');
   const childIdsAfterSecondProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
   assert.deepEqual(
@@ -138,7 +137,7 @@ async function runProjectionScenario(scenario) {
   return { primaryId, bloggerId };
 }
 
-async function assertRoleHasNoSidecar(scenario, role, prompt) {
+async function assertRoleHasNoSidecar(scenario, bloggerId, role, prompt) {
   const sessionResponse = await scenario.client.request('POST', '/api/session', {
     body: { agent: `fast-${role}`, model: { providerID: 'test', id: 'test-model' } },
   });
@@ -160,7 +159,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
   });
 
   const before = scenario.provider.requests.length;
-  const bloggerBefore = bloggerRequests(scenario.provider).length;
+  const bloggerBefore = bloggerRequests(scenario.provider, bloggerId).length;
   const turn = scenario.turn.start(sessionId);
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
     body: {
@@ -175,7 +174,7 @@ async function assertRoleHasNoSidecar(scenario, role, prompt) {
   const requests = scenario.provider.requests.slice(before);
   assert.ok(requests.length > 0, `${role} produced no provider request`);
   assert.equal(
-    bloggerRequests(scenario.provider).length,
+    bloggerRequests(scenario.provider, bloggerId).length,
     bloggerBefore,
     `${role} must not create a Blogger companion`,
   );
@@ -211,9 +210,9 @@ try {
 
   });
 
-  await runProjectionScenario(scenario);
+  const { bloggerId } = await runProjectionScenario(scenario);
   for (const [role, prompt] of Object.entries(ROLE_PROMPTS)) {
-    await assertRoleHasNoSidecar(scenario, role, prompt);
+    await assertRoleHasNoSidecar(scenario, bloggerId, role, prompt);
   }
   scenario.provider.expectSatisfied();
   console.log('Companion projection canary passed: same Blogger child, B1/B2 accumulation, and no forbidden role sidecars.');
