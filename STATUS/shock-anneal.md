@@ -9,7 +9,7 @@
 | 0 | 封炉：冻结 SSOT、基线、迁移地图、验证层工装 | 静态检查 + 最后一次完整编译测试 | 完成 |
 | 1 | 休克一：领域内核与持久事实（包 0） | 关闭 | 完成（包 0a–0e） |
 | 2 | 休克二：生产代码全部调用链（包 A–H） | 关闭 | 完成 |
-| 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（`SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)） |
+| 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（清场阶段 `SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)；后续 X4 仍有一处 PERSIST-009 阻断） |
 | 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
 | 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）。完成指删除与领域实现，不含接线；X10 被接线空洞阻断，见「包 K8f 摸底」 |
@@ -1388,8 +1388,8 @@ N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得�
 N5a 不依赖 delta 货币的 surface（M4）：continuation / interaction repair /            已完成
     review guard nudge / executor summary input。输入都是运行时自己的固定文本或
     命令输出，与 Companion delta 无关。不得迁移 system prompt assets
-N5b Blogger delta surface（M3）——阻断。前置是 X4 后半的换币，不是文本迁移。
-    理由见下方「N5 拆分：M3 的前提在本仓不成立」
+N5b Blogger delta surface（M3）——前置已解除。X4 后半已完成换币；恢复侧仍待 X-wire。
+    迁移前的阻断证据见下方「N5 拆分：M3 的前提在本仓不成立」
 N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
     某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
     本包不为各领域预先发明统一 versioning
@@ -1720,19 +1720,19 @@ delimiter 检查必须先抹掉单行字符串 value   注入 payload 含 ''' �
 
 推论：fork 信封这一根因已在结构上消除，它此前掩盖了类二的六条。类二不属包 N——它们是 fallback、review verdict、PTY 与 orchestrator 的行为债，须各自定位。包 N 只欠类一两条，且都在 N5 的既定清单上。
 
-#### N5 拆分：M3 的前提在本仓不成立（实测）
+#### N5 拆分：M3 的前提在本仓不成立（迁移前实测，已由 X4 解除）
 
 动议 M3 说「优先迁移 Blogger，因为已有 typed semantic parts、deterministic renderer、byte limit、现成测试」。这四项对 `BloggerToml` / `BloggerDelta` 全部为真，但它们都不在活路径上。实测：
 
 ```text
-活路径    Companion.Submit → Companion.jsonDelta → blogFn delta
+迁移前活路径    Companion.Submit → Companion.jsonDelta → blogFn delta
                            → CompanionHostBlogger.blog:69-78 散文外壳 + 该字符串
-          即 delta 仍是 JSON 字符串（CompanionDelta.fs:93 的 jsonDelta）
+                 即 delta 仍是 JSON 字符串（CompanionDelta.fs:93 的 jsonDelta）
 
-零生产调用点
-          BloggerDelta.nextChunk                 0
-          CompanionProjectionBuilder.build       0
-          BloggerToml.*                          仅由 BloggerDelta 调用，而它本身零调用点
+迁移前零生产调用点
+                 BloggerDelta.nextChunk                 0
+                 CompanionProjectionBuilder.build       0
+                 BloggerToml.*                          仅由 BloggerDelta 调用，而它本身零调用点
 ```
 
 整条 TOML delta 链是一个自洽但悬空的岛，与阻断 K8f 的 X 恢复链同一形态。
@@ -1758,15 +1758,15 @@ N5a  不依赖 delta 货币的 surface，现在可迁
      executor summary input                    ExecutorSummarize.fs:95,113
      三者的输入都是运行时自己的固定文本或命令输出，与 Companion delta 无关
 
-N5b  Blogger delta surface，阻断
-     前置不是文本迁移，而是 X4 后半的换币：
+N5b  Blogger delta surface，迁移前阻断，现已由 X4 后半解除
+     前置不是文本迁移，而是当时尚未完成的换币：
        ICompanionDurablePort.AppendSuccessful 的签名
        ProjectionSnapshot = string → SemanticMessage list + SemanticCursor
        BlogEntryCommitted 的 cursor 推进
-     此前置早已登记在「X9 未清零的一行：jsonDelta」，本节只是确认它同时阻断 N5b
+     此前置早已登记在「X9 未清零的一行：jsonDelta」；X4 已完成该货币切换。
 ```
 
-推论与 K8f 一致：欠的不是剧本也不是文本，而是接线。包 N 不代包 X 做换币——那会把一个架构级改动塞进一个记法包，且 N5b 的验收（header bytes 计入 200 KiB、图片 marker、三级切块）必须对着真实的 TOML delta 才有意义。
+推论与 K8f 一致：迁移前欠的不是剧本也不是文本，而是接线。包 N 不代包 X 做换币——那会把一个架构级改动塞进一个记法包；X4 完成后，N5b 的验收（header bytes 计入 200 KiB、图片 marker、三级切块）才有真实 TOML delta 可验证。
 
 `companion` canary 的 `no-prefix-matched`（role=blogger）因此归入 N5b 而非 N5a，与 `executor` 的 `map.0` 分属两段。
 
@@ -1828,7 +1828,7 @@ N5a 后仍 6/16 绿。四条 nudge 都在流程后段才到达，而余下十条
 推论：包 N 对 canary 的贡献已经出尽。fork 信封那一根因消除后，剩下的十条都不是文本问题：
 
 ```text
-1 条  N5b 阻断（companion，需 X4 后半换币）
+0 条  N5b 阻断（X4 后半换币已完成；恢复侧 X-wire 仍未接线）
 9 条  类二行为债，各自定位：fallback / fallback-aabb / reviewer-verdict 计数 /
       pty-stress PTY 行为 / host-restart / 两个 orchestrator / manager-full-loop /
       executor spool→summarizeSpool 未 fork
@@ -1910,21 +1910,23 @@ FrozenB。子会话的背景简报要的是当前记忆，更旧的冻结副本�
 当任意事实样本，该事实已随双轨删除。换为 `CompanionBloggerClosed`。这暴露了 meta
 测试的一个性质：它锁的是 facade 机制，不是某个事实，因此样本事实必须选长期存在的。
 
-#### X9 未清零的一行：`jsonDelta`
+#### X4 后半已换币：旧 `jsonDelta` 入口灭绝
 
-灭绝表把 `CompanionDelta.jsonDelta` 记为 X3（发射器就位）+ X9（删旧路径）。X3 的
-TOML 发射器与三级切块器已实现且有第 1 层测试，但 X9 没有删除 `jsonDelta`，它仍在
-`Companion.Submit` 路径上。
+灭绝表把 `CompanionDelta.jsonDelta` 记为 X3（发射器就位）+ X9（删旧路径）。X4
+后半已完成接线：`Companion.Submit` 接收 `ProviderSemanticProjection`，由
+`BloggerDelta.nextChunk` 产生 `BloggerDeltaChunk`，成功结果携带完整
+`BloggerCompletion`。
 
-原因是接线不是删除。 `Submit` 的货币是 `ProjectionSnapshot = string`，而 TOML 链路的
-货币是 `SemanticMessage list` + `SemanticCursor`。换过去要同时改
-`ICompanionDurablePort.AppendSuccessful` 的签名与 `BlogEntryCommitted` 的 cursor
-推进——那是 X4 后半的工作。此刻删掉 `jsonDelta` 会让 Y 收不到任何 delta，直接违反
-COMPANION-005。
+`ICompanionDurablePort.AppendSuccessful` 现在只接受 `BloggerCompletion`。唯一 durable
+writer 先写 blob，再追加 `BlogEntryCommitted`，由 journal fold 同时推进 frame、cursor
+与 coverage；不得用旧字符串或默认事实替代。
 
 adapter 侧不缺东西：`OpenCode/Projection.decodeMessageView` 已能把 Host raw obj 变成
 `ProviderWireProjection`，`ProviderProjection.toSemantic` 已能继续变成语义投影。缺的
-只是 Session 侧换币。登记为 X4 后半的必须项，不留在 X9。
+只是 recovery-side projection 与 squash writer 尚未接线；这不属于本次 currency switch。
+journal-less Companion producer 仍未配备 durable port，生产路径现以
+`SHOCK-UNMIGRATED[PERSIST-009]` fail closed，不制造 `ProviderRunIdentity`、cursor、digest
+或 blob 事实。
 
 #### X9 留下的一个功能空洞
 
@@ -1964,8 +1966,8 @@ canary 是第 4 层：驱动真实 Host 并断言生产行为。链条未接线�
 因此 K8f 的前置不是剧本，而是接线，属包 X 而非包 K：
 
 ```text
-X4 后半   Submit 链路换币 ProjectionSnapshot = string → SemanticMessage list
-          （否则 Y 收不到 TOML delta，jsonDelta 无法删）
+X4 后半   Submit 链路换币 ProviderSemanticProjection → BloggerDeltaChunk
+          → BloggerCompletion → blob writer → BlogEntryCommitted
 X-wire    attempt 结局到达恢复决策点：失败 attempt → AttemptPlanner.plan
           → 探针提交（PrefixProbeSubmitted）→ Host 接受后提升（PrefixProbePromoted）
           → 恢复槽内 squash（BlogSquashCommitted）
@@ -2027,7 +2029,7 @@ Domain.PromptAuthority.hasCompanion            及其 CompanionTransform 调用�
 Kernel/Roles.fs:96-100 的 RoleDefinition 注释   （现在指向 hasCompanion 作为权威）
 ```
 
-`Session/CompanionDelta.fs` 的 `jsonDelta` 归 X3（TOML 发射器就位）与 X9（删除旧路径），不归 X2：先删会让 Companion 链路无 delta 可发。
+迁移前记录：`Session/CompanionDelta.fs` 的 `jsonDelta` 归 X3（TOML 发射器就位）与 X9（删除旧路径），不归 X2；X4 后半已完成该删除与接线。
 
 #### X0：Host 源码确认清单（已完成）
 
@@ -2254,12 +2256,14 @@ turn 6 是本包最容易实现错的一行：只看 Offset 奇偶会让它 squa
 | Host compaction → PrefixEpoch rebase 路径 | 收容层重锚（ContextReanchored） | HOST-006 | 0 | 0 |
 | `switchEpoch` / `ReplacementActive` / Session 侧 `ActivePrefixEpoch` | 单轨 `PrefixEpochProjection` | COMPANION-009 | 0 | 0 |
 | `bHeadDigest` / `prefixDigest` / `prefixLength` / `compressPrefix` | `XPrefixPlan` + `companionMemoryMessageId` | COMPANION-013 | 0 | 0 |
-| JSON 形态的 Blogger delta（`jsonDelta`） | 确定性 TOML | CTX-013 | 4 | 0（改归 X4 后半） |
+| JSON 形态的 Blogger delta（`jsonDelta`） | 确定性 TOML | CTX-013 | 0 | 0 |
 | 物理 Y transcript 作为投影历史来源 | Journal fold 派生 Frames | PERSIST-010 | 0 | 0 |
 
 X2 执行时注意不要误删与普通文件大小、进程输出预算（EXEC-011）有关的合法 byte 计数。判据是这个数字是否与模型上下文比较，不是它是否叫 bytes。
 
-`jsonDelta` 是 X9 唯一未清零项，原因见「X9 未清零的一行」。它不是遗漏：删除前必须先把 `Submit` 链路的货币从 `ProjectionSnapshot = string` 换成 `SemanticMessage list`，否则 Y 收不到 delta（COMPANION-005）。
+`jsonDelta` 已由 X4 后半清零。当前 Blogger normal 请求的货币是
+`ProviderSemanticProjection → BloggerDeltaChunk → BloggerCompletion`；成功后由 durable
+writer 追加 `BlogEntryCommitted`，否则 fail closed（COMPANION-005、PERSIST-009）。
 
 ### 剧本森林侧（包 K）
 
