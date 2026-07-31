@@ -22,13 +22,13 @@ import {
   faultBody,
   validateFault,
 } from '../delivery-plan.js';
-import { resolveEntry, runtimeKeyOf } from '../runtime-key.js';
+import { resolveEntry } from '../runtime-key.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([['fast-coder', SESSION]]);
 
 const user = (text) => ({ role: 'user', content: text });
-const request = (text, sessionID = SESSION) => ({ sessionID, messages: [user(text)] });
+const request = (text) => ({ messages: [user(text)] });
 
 const TURN = 'Round 1 fallback attempt.';
 const OTHER_TURN = 'Round 2 fallback attempt.';
@@ -82,7 +82,7 @@ const sourceFault = (overrides = {}) => ({
  * in full, which every fixture here happened to do.
  */
 const arrive = (deliveries, faults, body) => {
-  const resolved = resolveEntry(body, ENTRIES, BINDINGS);
+  const resolved = resolveEntry(body, ENTRIES, BINDINGS, { sessionId: SESSION });
   const entry = resolved.matched;
   const attempt = entry === undefined ? 0 : recordDelivery(deliveries, entry);
   return {

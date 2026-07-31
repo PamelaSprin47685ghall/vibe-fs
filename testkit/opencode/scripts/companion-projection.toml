@@ -1,0 +1,110 @@
+scenario = "companion-projection"
+description = "Orchestrator projection with one reusable production-composed Blogger session"
+session = { agent = "fast-orchestrator", bind = ["primary-title", "primary"] }
+prompt = { agent = "fast-orchestrator", text = "Produce the first projection for Orchestrator X." }
+must = [
+  "primary-title",
+  "primary-first",
+  "primary-second",
+  "role-executor-title",
+  "role-executor",
+  "role-inspector-title",
+  "role-inspector",
+  "role-reviewer-title",
+  "role-reviewer",
+]
+
+flow = [
+  { prompt = { text = "Produce the first projection for Orchestrator X." } },
+  { prompt = { text = "Produce the second projection for Orchestrator X." } },
+  { prompt = { text = "Role canary: executor must answer without creating a companion." } },
+  { prompt = { text = "Role canary: inspector must answer without creating a companion." } },
+  { prompt = { text = "Role canary: reviewer must answer without creating a companion." } },
+]
+
+[[turn]]
+id = "primary-title"
+lane = "primary-title"
+kind = "title"
+user = "Produce the first projection for Orchestrator X."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "primary-first"
+lane = "primary"
+user = "Produce the first projection for Orchestrator X."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Orchestrator first projection complete." }
+
+[[turn]]
+id = "primary-second"
+lane = "primary"
+user = "Produce the second projection for Orchestrator X."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Orchestrator second projection complete." }
+
+# Companion prompts are production-composed, and every submit appends a fresh delta as
+# the last user message in the Blogger session. One step at step 0 therefore answers both
+# projections without a neverEnd matcher flag.
+[[turn]]
+id = "primary-blogger"
+internal = true
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Blogger paragraph." }
+
+[[turn]]
+id = "role-executor-title"
+lane = "role-executor-title"
+kind = "title"
+user = "Role canary: executor must answer without creating a companion."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "role-executor"
+lane = "role-executor"
+user = "Role canary: executor must answer without creating a companion."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Role complete." }
+
+[[turn]]
+id = "role-inspector-title"
+lane = "role-inspector-title"
+kind = "title"
+user = "Role canary: inspector must answer without creating a companion."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "role-inspector"
+lane = "role-inspector"
+user = "Role canary: inspector must answer without creating a companion."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Role complete." }
+
+[[turn]]
+id = "role-reviewer-title"
+lane = "role-reviewer-title"
+kind = "title"
+user = "Role canary: reviewer must answer without creating a companion."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "role-reviewer"
+lane = "role-reviewer"
+user = "Role canary: reviewer must answer without creating a companion."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Role complete." }

@@ -66,7 +66,7 @@ test('REVIEW_002_one_fragment_declaration_reaches_every_shape', () => {
   const body = (text) => ({ sessionID: 'ses_child', messages: [{ role: 'user', content: text }] })
 
   for (const [label, document] of Object.entries(shapes())) {
-    const resolved = resolveEntry(body(document), entries, bindings)
+    const resolved = resolveEntry(body(document), entries, bindings, { sessionId: 'ses_child' })
     assert.equal(
       resolved.matched?.id,
       'child',

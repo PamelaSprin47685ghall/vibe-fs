@@ -14,6 +14,7 @@
 import { readFileSync } from 'node:fs';
 
 import { assertEq, assertTrue } from './gate-lib.mjs';
+import { contextOf } from './gate-forest-lib.mjs';
 import { compileScenario } from '../scenario-schema.js';
 import { ScenarioRuntime } from '../scenario-runtime.js';
 
@@ -35,7 +36,7 @@ const runtimeOf = (source, alias = 'fast-manager') => {
 const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
 
-/** One provider request. `sessionID` is what the Host puts on the wire. */
+/** One provider request fixture; its explicit session id is passed separately as runtime context. */
 const request = (messages, extra = {}) => ({
   sessionID: SESSION,
   model: 'test-model',
@@ -45,8 +46,9 @@ const request = (messages, extra = {}) => ({
 
 /** Deliver a request and record it, the way the provider path does. */
 const deliver = (runtime, body) => {
-  const selection = runtime.select(body);
-  runtime.consume(body, selection);
+  const context = contextOf(body.sessionID);
+  const selection = runtime.select(body, context);
+  runtime.consume(body, selection, context);
   return selection;
 };
 
@@ -109,11 +111,13 @@ export const scenarioRuntimeCases = [
       // mistaking "step is pure" for "requests may arrive in any order".
       const runtime = runtimeOf(TWO_STEPS);
 
-      const later = runtime.select(request([user('Ship the parser fix.'), assistant('step zero')]));
+      const laterBody = request([user('Ship the parser fix.'), assistant('step zero')]);
+      const later = runtime.select(laterBody, contextOf(laterBody.sessionID));
       assertEq(later.entry.id, 'mgr.1', 'step is counted off the request');
 
       const fresh = runtimeOf(TWO_STEPS);
-      assertEq(fresh.select(request([user('Ship the parser fix.')])).entry.id, 'mgr.0');
+      const freshBody = request([user('Ship the parser fix.')]);
+      assertEq(fresh.select(freshBody, contextOf(freshBody.sessionID)).entry.id, 'mgr.0');
     },
   },
 
@@ -123,7 +127,8 @@ export const scenarioRuntimeCases = [
     name: 'VERIFY-003 an undeclared request is unmatched, never a default reply',
     fn: () => {
       const runtime = runtimeOf(TWO_STEPS);
-      const selection = runtime.select(request([user('Something nobody declared.')]));
+      const body = request([user('Something nobody declared.')]);
+      const selection = runtime.select(body, contextOf(body.sessionID));
 
       assertTrue(selection.unmatched !== undefined, 'must fail closed');
       assertEq(selection.unmatched.key.lane, 'fast-manager', 'the diagnostic names the lane');
@@ -137,7 +142,8 @@ export const scenarioRuntimeCases = [
       // HOST-008 makes the alias→session association durable and the harness is TOLD it.
       // A mock that guessed would answer a question it cannot know.
       const runtime = new ScenarioRuntime(compile(TWO_STEPS));
-      const selection = runtime.select(request([user('Ship the parser fix.')]));
+      const body = request([user('Ship the parser fix.')]);
+      const selection = runtime.select(body, contextOf(body.sessionID));
 
       assertTrue(selection.unmatched !== undefined, 'no binding means no lane');
       assertEq(selection.unmatched.key.lane, null);
@@ -217,9 +223,12 @@ export const scenarioRuntimeCases = [
       //
       // A real prefix rewrite inserts ahead of the live turn: the last user message is
       // untouched (so the key still resolves) while the transcript is no longer append-only.
-      const rewritten = runtime.select(
-        request([user('Injected head.'), user('Ship the parser fix.'), assistant('step zero')]),
-      );
+      const rewrittenBody = request([
+        user('Injected head.'),
+        user('Ship the parser fix.'),
+        assistant('step zero'),
+      ]);
+      const rewritten = runtime.select(rewrittenBody, contextOf(rewrittenBody.sessionID));
 
       assertTrue(rewritten.sealBroken !== undefined, 'the barrier must hold');
       assertEq(rewritten.sealBroken.reason, 'undeclared');
@@ -240,13 +249,12 @@ reason = "epoch-switch"
 
       // A rebase replaces the head with the companion summary and keeps the live tail, so
       // the turn text still matches at step 1 while the prefix is no longer append-only.
-      const rebased = runtime.select(
-        request([
-          user('Condensed companion context.'),
-          user('Ship the parser fix.'),
-          assistant('step zero'),
-        ]),
-      );
+      const rebasedBody = request([
+        user('Condensed companion context.'),
+        user('Ship the parser fix.'),
+        assistant('step zero'),
+      ]);
+      const rebased = runtime.select(rebasedBody, contextOf(rebasedBody.sessionID));
 
       assertEq(rebased.resealed, 'epoch-switch');
       assertEq(rebased.entry.id, 'mgr.1');
@@ -268,7 +276,8 @@ reason = "epoch-switch"
 
       deliver(runtime, request([user('Ship the parser fix.')]));
 
-      const appendOnly = runtime.select(request([user('Ship the parser fix.'), assistant('step zero')]));
+      const appendOnlyBody = request([user('Ship the parser fix.'), assistant('step zero')]);
+      const appendOnly = runtime.select(appendOnlyBody, contextOf(appendOnlyBody.sessionID));
 
       assertTrue(appendOnly.sealBroken !== undefined);
       assertEq(appendOnly.sealBroken.reason, 'boundary-not-reached');
@@ -300,7 +309,8 @@ user = "Ship the parser fix."
       );
       assertEq(title.entry.id, 'title.0');
 
-      const next = runtime.select(request([user('Ship the parser fix.'), assistant('step zero')]));
+      const nextBody = request([user('Ship the parser fix.'), assistant('step zero')]);
+      const next = runtime.select(nextBody, contextOf(nextBody.sessionID));
       assertTrue(next.sealBroken === undefined, 'the chat seal survived the title request');
       assertEq(next.entry.id, 'mgr.1');
     },

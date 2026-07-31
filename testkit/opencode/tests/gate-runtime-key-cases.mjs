@@ -33,7 +33,7 @@ const toolCall = (name, args = '{}') => ({
   tool_calls: [{ id: 'c1', type: 'function', function: { name, arguments: args } }],
 });
 
-const request = (messages, sessionID = SESSION) => ({ sessionID, messages });
+const request = (messages) => ({ messages });
 
 const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, turn, step });
 
@@ -54,8 +54,7 @@ const forkPrompt = (assignment, requirements = []) => forkRelay(assignment, unde
 const titleRequest = (text) =>
   request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)]);
 
-const titleRequestOn = (text, sessionID) =>
-  request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)], sessionID);
+const titleRequestOn = (text) => titleRequest(text);
 
 export const runtimeKeyCases = [
   // ── kind: the fourth component, and why turn alone cannot carry it ────────
@@ -143,11 +142,11 @@ export const runtimeKeyCases = [
         { id: 'title', lane: 'fast-manager', kind: 'title', turn: 'Ship it.', step: 0 },
       ];
 
-      assertEq(resolveEntry(request([user('Ship it.')]), entries, BINDINGS).matched?.id, 'chat');
-      assertEq(resolveEntry(titleRequest('Ship it.'), entries, BINDINGS).matched?.id, 'title');
+      assertEq(resolveEntry(request([user('Ship it.')]), entries, BINDINGS, { sessionId: SESSION }).matched?.id, 'chat');
+      assertEq(resolveEntry(titleRequest('Ship it.'), entries, BINDINGS, { sessionId: SESSION }).matched?.id, 'title');
 
       // An undeclared kind means chat, so single-lane scenarios need not say so.
-      assertEq(runtimeKeyOf(request([user('Ship it.')]), BINDINGS).kind, 'chat');
+      assertEq(runtimeKeyOf(request([user('Ship it.')]), BINDINGS, { sessionId: SESSION }).kind, 'chat');
     },
   },
 
@@ -199,8 +198,8 @@ export const runtimeKeyCases = [
       // Purity, stated directly. The old `pathCursor` advanced on observation, so
       // asking twice moved the answer.
       const body = request([user('go'), assistant('r1')]);
-      const first = runtimeKeyOf(body, BINDINGS);
-      const second = runtimeKeyOf(body, BINDINGS);
+      const first = runtimeKeyOf(body, BINDINGS, { sessionId: SESSION });
+      const second = runtimeKeyOf(body, BINDINGS, { sessionId: SESSION });
 
       assertEq(first.lane, second.lane);
       assertEq(first.turn, second.turn);
@@ -292,8 +291,8 @@ export const runtimeKeyCases = [
       const revise = forkPrompt('Review current worktree', ['Ship it.']);
       const perfect = forkPrompt('Re-review the fixed tree', ['Ship it.']);
 
-      assertEq(resolveEntry(request([user(revise)]), entries, BINDINGS).matched.id, 'revise');
-      assertEq(resolveEntry(request([user(perfect)]), entries, BINDINGS).matched.id, 'perfect');
+      assertEq(resolveEntry(request([user(revise)]), entries, BINDINGS, { sessionId: SESSION }).matched.id, 'revise');
+      assertEq(resolveEntry(request([user(perfect)]), entries, BINDINGS, { sessionId: SESSION }).matched.id, 'perfect');
     },
   },
 
@@ -313,7 +312,7 @@ export const runtimeKeyCases = [
       ];
 
       for (const [index, text] of shapes.entries()) {
-        const resolved = resolveEntry(request([user(text)]), entries, BINDINGS);
+        const resolved = resolveEntry(request([user(text)]), entries, BINDINGS, { sessionId: SESSION });
         assertEq(resolved.matched?.id, 'child', `shape ${index} did not match the single declaration`);
       }
     },
@@ -327,7 +326,7 @@ export const runtimeKeyCases = [
       // anywhere, which is what needed `specificity` scoring to disambiguate.
       const entries = [entry({ id: 'a', turn: [ANCHOR, 'Review current worktree'] })];
 
-      const noWrapper = resolveEntry(request([user('Review current worktree now')]), entries, BINDINGS);
+      const noWrapper = resolveEntry(request([user('Review current worktree now')]), entries, BINDINGS, { sessionId: SESSION });
       assertTrue(noWrapper.unmatched !== undefined, 'the anchor must be a true prefix');
     },
   },
@@ -340,9 +339,9 @@ export const runtimeKeyCases = [
       // than a set of coincidences.
       const entries = [entry({ id: 'a', turn: ['HEAD', 'middle', 'tail'] })];
 
-      assertEq(resolveEntry(request([user('HEAD then middle then tail')]), entries, BINDINGS).matched.id, 'a');
+      assertEq(resolveEntry(request([user('HEAD then middle then tail')]), entries, BINDINGS, { sessionId: SESSION }).matched.id, 'a');
 
-      const reordered = resolveEntry(request([user('HEAD then tail then middle')]), entries, BINDINGS);
+      const reordered = resolveEntry(request([user('HEAD then tail then middle')]), entries, BINDINGS, { sessionId: SESSION });
       assertTrue(reordered.unmatched !== undefined, 'out of order is not a match');
     },
   },
@@ -355,8 +354,8 @@ export const runtimeKeyCases = [
       // claiming more text than the request contains.
       const entries = [entry({ id: 'a', turn: ['abc', 'bc'] })];
 
-      assertTrue(resolveEntry(request([user('abc')]), entries, BINDINGS).unmatched !== undefined);
-      assertEq(resolveEntry(request([user('abcbc')]), entries, BINDINGS).matched.id, 'a');
+      assertTrue(resolveEntry(request([user('abc')]), entries, BINDINGS, { sessionId: SESSION }).unmatched !== undefined);
+      assertEq(resolveEntry(request([user('abcbc')]), entries, BINDINGS, { sessionId: SESSION }).matched.id, 'a');
     },
   },
 
@@ -374,7 +373,7 @@ export const runtimeKeyCases = [
 
       // 'span' covers to the very end of the turn; 'declared' names more characters.
       assertEq(
-        resolveEntry(request([user('HEAD then middle then z')]), entries, BINDINGS).matched.id,
+        resolveEntry(request([user('HEAD then middle then z')]), entries, BINDINGS, { sessionId: SESSION }).matched.id,
         'declared',
       );
     },
@@ -390,7 +389,7 @@ export const runtimeKeyCases = [
         entry({ id: 'right', turn: ['HEAD', 'yz'] }),
       ];
 
-      const resolved = resolveEntry(request([user('HEAD xy yz')]), entries, BINDINGS);
+      const resolved = resolveEntry(request([user('HEAD xy yz')]), entries, BINDINGS, { sessionId: SESSION });
       assertEq(resolved.ambiguousTurn?.length, 2, JSON.stringify(resolved.matched ?? resolved.unmatched));
     },
   },
@@ -400,8 +399,8 @@ export const runtimeKeyCases = [
   {
     name: 'HOST-008 lane resolves through the session binding',
     fn: () => {
-      assertEq([...lanesOf(request([user('go')]), BINDINGS)].join(), 'fast-manager');
-      assertEq([...lanesOf(request([user('go')], 'ses_real_2'), BINDINGS)].join(), 'coder-after');
+      assertEq([...lanesOf(request([user('go')]), BINDINGS, { sessionId: SESSION })].join(), 'fast-manager');
+      assertEq([...lanesOf(request([user('go')]), BINDINGS, { sessionId: 'ses_real_2' })].join(), 'coder-after');
     },
   },
 
@@ -410,9 +409,9 @@ export const runtimeKeyCases = [
     fn: () => {
       // The mock cannot know which alias an unbound session belongs to. Inventing
       // one would answer a question only the durable association can answer.
-      assertEq(lanesOf(request([user('go')], 'ses_unknown'), BINDINGS).size, 0);
-      assertEq(lanesOf({ messages: [] }, BINDINGS).size, 0);
-      assertEq(lanesOf(request([user('go')]), undefined).size, 0);
+      assertEq(lanesOf(request([user('go')]), BINDINGS, { sessionId: 'ses_unknown' }).size, 0);
+      assertEq(lanesOf({ messages: [] }, BINDINGS, { sessionId: 'ses_unknown' }).size, 0);
+      assertEq(lanesOf(request([user('go')]), undefined, { sessionId: SESSION }).size, 0);
     },
   },
 
@@ -431,12 +430,12 @@ export const runtimeKeyCases = [
       const shared = 'ses_shared';
       const titleFirst = new Map([['inspector-title', shared], ['fast-inspector', shared]]);
       const chatFirst = new Map([['fast-inspector', shared], ['inspector-title', shared]]);
-      const body = request([user('go')], shared);
+      const body = request([user('go')]);
 
-      assertEq([...lanesOf(body, titleFirst)].sort().join('|'), 'fast-inspector|inspector-title');
+      assertEq([...lanesOf(body, titleFirst, { sessionId: shared })].sort().join('|'), 'fast-inspector|inspector-title');
       assertEq(
-        [...lanesOf(body, chatFirst)].sort().join('|'),
-        [...lanesOf(body, titleFirst)].sort().join('|'),
+        [...lanesOf(body, chatFirst, { sessionId: shared })].sort().join('|'),
+        [...lanesOf(body, titleFirst, { sessionId: shared })].sort().join('|'),
         'insertion order may not change the answer',
       );
     },
@@ -454,38 +453,23 @@ export const runtimeKeyCases = [
         { id: 'title.0', lane: 't', kind: 'title', turn: 'Ship it.', step: 0 },
       ];
 
-      assertEq(resolveEntry(request([user('Ship it.')], shared), entries, bindings).matched.id, 'chat.0');
+      assertEq(resolveEntry(request([user('Ship it.')]), entries, bindings, { sessionId: shared }).matched.id, 'chat.0');
       assertEq(
-        resolveEntry(titleRequestOn('Ship it.', shared), entries, bindings).matched.id,
+        resolveEntry(titleRequestOn('Ship it.'), entries, bindings, { sessionId: shared }).matched.id,
         'title.0',
       );
     },
   },
 
   {
-    name: 'VERIFY-003 the session id is a request HEADER, not a body field',
+    name: 'VERIFY-003 the session id comes from explicit runtime context',
     fn: () => {
-      // This case previously asserted the opposite — that a header must be IGNORED — and it
-      // was the reason every lane came back unbound on a real request.
-      //
-      // Measured: `../opencode/packages/opencode/src/session/llm/request.ts:197` sets
-      // `x-session-affinity` and `X-Session-Id` on every non-`opencode` provider request,
-      // and the body carries no session field at all. These are PRODUCTION headers a real
-      // provider receives, so VERIFY-003 permits reading them; what it forbids is harness
-      // bookkeeping, and the confusion came from the capture field being named
-      // `__testkitHeaders` — the name says harness, the contents are the wire.
-      assertEq(sessionIdOf({ __testkitHeaders: { 'x-session-affinity': 'ses_a' } }), 'ses_a');
-      assertEq(sessionIdOf({ __testkitHeaders: { 'x-session-id': 'ses_b' } }), 'ses_b');
-      assertEq(
-        sessionIdOf({ __testkitHeaders: { 'x-opencode-session': 'ses_c' } }),
-        'ses_c',
-        'the first-party provider branch sets a different header for the same value',
-      );
-
-      // Body fields remain a fallback so a unit fixture can build a request without headers.
-      // They are not what production sends, which is exactly what this case failed to notice
-      // for as long as every fixture used them.
-      assertEq(sessionIdOf({ sessionID: 'ses_d' }), 'ses_d');
+      // Session identity is routing context supplied by the provider adapter. It is not part
+      // of semantic request content and must not be inferred from a request body.
+      assertEq(sessionIdOf({ sessionId: 'ses_a' }), 'ses_a');
+      assertEq(sessionIdOf({ sessionId: 'ses_b' }), 'ses_b');
+      assertEq(sessionIdOf({ sessionId: '' }), null);
+      assertEq(sessionIdOf({ messages: [] }), null);
       assertEq(sessionIdOf({}), null);
     },
   },
@@ -501,7 +485,7 @@ export const runtimeKeyCases = [
         entry({ id: 'other', turn: 'Ship it' }),
       ];
 
-      const resolved = resolveEntry(request([user('Fix the bug in parser')]), entries, BINDINGS);
+      const resolved = resolveEntry(request([user('Fix the bug in parser')]), entries, BINDINGS, { sessionId: SESSION });
       assertEq(resolved.matched?.id, 'long', 'longest matching prefix, not first or most specific');
     },
   },
@@ -511,7 +495,7 @@ export const runtimeKeyCases = [
     fn: () => {
       const entries = [entry({ id: 'short', turn: 'Fix' }), entry({ id: 'long', turn: 'Fix the bug' })];
 
-      const resolved = resolveEntry(request([user('Fixate on this')]), entries, BINDINGS);
+      const resolved = resolveEntry(request([user('Fixate on this')]), entries, BINDINGS, { sessionId: SESSION });
       assertEq(resolved.matched?.id, 'short');
     },
   },
@@ -525,7 +509,7 @@ export const runtimeKeyCases = [
       // a question the author never answered.
       const entries = [entry({ id: 'x', turn: 'Do it' }), entry({ id: 'y', turn: 'Do it' })];
 
-      const resolved = resolveEntry(request([user('Do it now')]), entries, BINDINGS);
+      const resolved = resolveEntry(request([user('Do it now')]), entries, BINDINGS, { sessionId: SESSION });
 
       assertTrue(resolved.matched === undefined, 'a tie must not resolve to a match');
       assertEq(resolved.ambiguousTurn?.length, 2);
@@ -549,16 +533,16 @@ export const runtimeKeyCases = [
         entry({ id: 'step1', turn: 'Do it', step: 1 }),
       ];
 
-      assertEq(resolveEntry(request([user('Do it')]), entries, BINDINGS).matched?.id, 'step0');
-      assertEq(resolveEntry(request([user('Do it'), assistant('r1')]), entries, BINDINGS).matched?.id, 'step1');
+      assertEq(resolveEntry(request([user('Do it')]), entries, BINDINGS, { sessionId: SESSION }).matched?.id, 'step0');
+      assertEq(resolveEntry(request([user('Do it'), assistant('r1')]), entries, BINDINGS, { sessionId: SESSION }).matched?.id, 'step1');
 
       // And the same turn in another lane is another conversation.
       const laned = [
         entry({ id: 'mgr', turn: 'Do it', lane: 'fast-manager' }),
         entry({ id: 'coder', turn: 'Do it', lane: 'coder-after' }),
       ];
-      assertEq(resolveEntry(request([user('Do it')]), laned, BINDINGS).matched?.id, 'mgr');
-      assertEq(resolveEntry(request([user('Do it')], 'ses_real_2'), laned, BINDINGS).matched?.id, 'coder');
+      assertEq(resolveEntry(request([user('Do it')]), laned, BINDINGS, { sessionId: SESSION }).matched?.id, 'mgr');
+      assertEq(resolveEntry(request([user('Do it')]), laned, BINDINGS, { sessionId: 'ses_real_2' }).matched?.id, 'coder');
     },
   },
 
@@ -566,7 +550,7 @@ export const runtimeKeyCases = [
     name: 'VERIFY-003 nothing declared fails closed with the key that missed',
     fn: () => {
       const entries = [entry({ id: 'only', turn: 'Ship it' })];
-      const resolved = resolveEntry(request([user('Something else')]), entries, BINDINGS);
+      const resolved = resolveEntry(request([user('Something else')]), entries, BINDINGS, { sessionId: SESSION });
 
       assertTrue(resolved.matched === undefined, 'no match must not produce a match');
       assertEq(resolved.unmatched?.key.turn, 'Something else');
@@ -581,7 +565,7 @@ export const runtimeKeyCases = [
       // A bare continuation cannot begin with any declared user text. Admitting it
       // would make every scenario match every synthetic nudge.
       const entries = [entry({ id: 'any', turn: '' })];
-      const resolved = resolveEntry(request([assistant('r1')]), entries, BINDINGS);
+      const resolved = resolveEntry(request([assistant('r1')]), entries, BINDINGS, { sessionId: SESSION });
 
       assertTrue(resolved.matched === undefined, 'a null turn must not match the empty declaration');
     },
@@ -595,12 +579,12 @@ export const runtimeKeyCases = [
       // produces — so an unbound session cannot silently match a lane-bound edge.
       const entries = [{ id: 'anywhere', turn: 'Do it', step: 0 }];
 
-      assertEq(resolveEntry(request([user('Do it')]), entries, BINDINGS).matched?.id, 'anywhere');
-      assertEq(resolveEntry(request([user('Do it')], 'ses_unbound'), entries, BINDINGS).matched?.id, 'anywhere');
+      assertEq(resolveEntry(request([user('Do it')]), entries, BINDINGS, { sessionId: SESSION }).matched?.id, 'anywhere');
+      assertEq(resolveEntry(request([user('Do it')]), entries, BINDINGS, { sessionId: 'ses_unbound' }).matched?.id, 'anywhere');
 
       const bound = [entry({ id: 'mgr-only', turn: 'Do it' })];
       assertTrue(
-        resolveEntry(request([user('Do it')], 'ses_unbound'), bound, BINDINGS).matched === undefined,
+        resolveEntry(request([user('Do it')]), bound, BINDINGS, { sessionId: 'ses_unbound' }).matched === undefined,
         'an unbound session must not match a lane-bound declaration',
       );
     },

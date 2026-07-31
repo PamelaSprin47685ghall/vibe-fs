@@ -7,36 +7,11 @@ import { StrictMockProvider } from '../strict-mock-provider.js';
 import { compileScenario } from '../scenario-schema.js';
 import { ScenarioRuntime } from '../scenario-runtime.js';
 
-// neverEnd SSE keeps stream open; read status without waiting for body.
-async function postJsonNoBody(url, body, headers = {}) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  });
-  const status = res.status;
-  res.body?.cancel();
-  return { status, ok: status >= 200 && status < 300 };
-}
-
-
-function lane(role, turn = 1, session = role) {
-  return { scenario: 'gate', session, role, turn, requestKind: 'chat' };
-}
-
 function chat(content, tools = [], extraMessages = []) {
   return {
     model: 'test-model',
     messages: [...extraMessages, { role: 'user', content }],
     tools: tools.map((name) => ({ type: 'function', function: { name } })),
-  };
-}
-
-function bloggerChat(content) {
-  return {
-    model: 'test-model',
-    messages: [{ role: 'user', content: 'You are the blogger of a coding agent session.\n' + content }],
-    tools: [],
   };
 }
 
@@ -250,26 +225,28 @@ tools = ["fork", "join", "list"]
   }
 }
 
-// K12.2 blocker: the schema retires `neverEnd`, and delivery-plan has no valid never-end transport.
-async function runNeverEndStillIdempotent() {
-  const provider = new StrictMockProvider();
-  await provider.start();
-  try {
-    provider.expectText({
-      id: 'blog',
-      lane: { ...lane('blogger', 1), requestKind: 'chat' },
-      neverEnd: true,
-      blocking: false,
-      text: 'bg',
-      match: { user: 'You are the blogger' },
-    });
-    const r1 = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('delta one'));
-    const r2 = await postJsonNoBody(`${provider.url}/v1/chat/completions`, bloggerChat('delta two'));
-    assertTrue(r1.ok && r2.ok, 'blogger template rematches without mute');
-    provider.expectSatisfied();
-  } finally {
-    await provider.stop();
-  }
+// K12.2: neverEnd has no valid ScenarioRuntime meaning. A static fixture must reject it
+// and name the replacement instead of reintroducing a stream-lifetime matcher flag.
+function runNeverEndRejected() {
+  const result = compileScenario(`scenario = "never-end-retired"
+flow = [
+  { prompt = { text = "blog delta" } },
+]
+
+[[turn]]
+id = "blog"
+lane = "blogger"
+user = "You are the blogger of a coding agent session."
+
+  [[turn.step]]
+  neverEnd = true
+  respond = { type = "text", text = "blog" }
+`, { name: 'never-end-retired.toml' });
+  assertTrue(result.ok === false, 'neverEnd must be rejected by the static scenario contract');
+  assertTrue(
+    result.problems.some((problem) => problem.includes('neverEnd is retired') && problem.includes('declare those steps')),
+    `neverEnd rejection must name the step-based replacement: ${result.problems.join(' | ')}`,
+  );
 }
 
 async function runPrefixCacheInvalidation() {
@@ -414,7 +391,7 @@ tools = ["fork", "join", "list"]
     } catch (err) {
       threw = true;
       assertTrue(err.message.includes('declared but never reached'), 'must report unanswered scenario turns');
-      assertTrue(err.message.includes('[never-hit]'), 'must report the unanswered turn id');
+      assertTrue(err.message.includes('[never-hit.'), 'must report the unanswered turn id');
     }
     assertTrue(threw, 'unobserved blocking edge fails satisfied');
   } finally {
@@ -487,7 +464,7 @@ export const laneCases = [
   { name: 'identical prefix is idempotent', fn: runIdempotentSamePrefix },
   { name: 'ambiguous equal templates rejected', fn: runAmbiguousPrefixRejected },
   { name: 'user-text fork disambiguates parallel jobs', fn: runUserForkDisambiguates },
-  { name: 'blogger template rematches', fn: runNeverEndStillIdempotent },
+  { name: 'neverEnd is rejected by the scenario contract', fn: runNeverEndRejected },
   { name: 'prefix cache invalidation fails closed', fn: runPrefixCacheInvalidation },
   { name: 'prefix cache append-only succeeds', fn: runPrefixCacheAppendOk },
   { name: 'unobserved blocking edge fails satisfied', fn: runMissingEdgeFailsSatisfied },

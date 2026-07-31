@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { compileScenario } from '../scenario-schema.js';
+import { ScenarioRuntime } from '../scenario-runtime.js';
 import {
   runStaticGate,
   setupScenario,
@@ -7,11 +10,9 @@ import {
   getSessionId,
 } from '../index.js';
 import { WATCHDOG_TIMEOUT_MS } from '../time-budget.js';
-import { bindLaneSession, expectationLane } from './lane.mjs';
+import { bindLaneSession } from './lane.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
-const BLOGGER_MARKER = 'You are the blogger of a coding agent session.';
-const primaryRole = 'orchestrator';
 const primaryAgent = 'fast-orchestrator';
 const primaryTools = ['fork-manager', 'join'];
 const forbiddenPrimaryTools = ['read', 'write', 'edit', 'bash', 'glob', 'grep', 'list', 'verdict'];
@@ -31,48 +32,10 @@ async function assertBloggerTranscript(scenario, bloggerId) {
   const res = await scenario.client.messages(bloggerId);
   assert.ok(res.ok, `failed to fetch Blogger messages: ${JSON.stringify(res.data)}`);
   const transcript = JSON.stringify(res.data);
-  assert.ok(transcript.includes('Blogger paragraph.') || transcript.includes('B1'), `Blogger transcript missing paragraph: ${transcript}`);
+  assert.ok(transcript.includes('Blogger paragraph.'), `Blogger transcript missing paragraph: ${transcript}`);
 }
 
 async function runProjectionScenario(scenario) {
-  scenario.provider.expectTitle({
-    id: 'primary-title',
-    lane: expectationLane('companion-projection', 'primary-title', 'title', 1, 'title'),
-  });
-
-  scenario.provider.expectText({
-    id: 'primary-first',
-    lane: expectationLane('companion-projection', 'primary', primaryRole, 1),
-    text: 'Orchestrator first projection complete.',
-    match: {
-      containsText: ['first projection'],
-      requiredTools: primaryTools,
-      forbiddenTools: forbiddenPrimaryTools,
-    },
-  });
-  scenario.provider.expectText({
-    id: 'blogger-b1',
-    lane: expectationLane('companion-projection', 'primary-blogger', 'blogger', 1, 'chat', 'primary'),
-    text: 'B1',
-    match: { containsText: [BLOGGER_MARKER] },
-  });
-  scenario.provider.expectText({
-    id: 'primary-second',
-    lane: expectationLane('companion-projection', 'primary', primaryRole, 2),
-    text: 'Orchestrator second projection complete.',
-    match: {
-      containsText: ['second projection'],
-      requiredTools: primaryTools,
-      forbiddenTools: forbiddenPrimaryTools,
-    },
-  });
-  scenario.provider.expectText({
-    id: 'blogger-b2',
-    lane: expectationLane('companion-projection', 'primary-blogger', 'blogger', 2, 'chat', 'primary'),
-    text: 'B2',
-    match: { containsText: [BLOGGER_MARKER] },
-  });
-
   const primaryResponse = await scenario.client.request('POST', '/api/session', {
     body: { agent: primaryAgent, model: { providerID: 'test', id: 'test-model' } },
   });
@@ -134,6 +97,16 @@ async function runProjectionScenario(scenario) {
   );
   await assertBloggerTranscript(scenario, bloggerId);
 
+  const primaryRequests = scenario.provider.requests.filter(
+    (request) => request.sessionID === primaryId && Array.isArray(request.tools) && request.tools.length > 0,
+  );
+  assert.equal(primaryRequests.length, 2, 'two primary projections must produce two tool-bearing requests');
+  for (const request of primaryRequests) {
+    const tools = request.tools.map((tool) => tool?.function?.name ?? tool?.name);
+    assert.ok(primaryTools.every((tool) => tools.includes(tool)), 'primary tool schema must include orchestrator tools');
+    assert.ok(forbiddenPrimaryTools.every((tool) => !tools.includes(tool)), 'primary tool schema must exclude forbidden tools');
+  }
+
   return { primaryId, bloggerId };
 }
 
@@ -145,18 +118,6 @@ async function assertRoleHasNoSidecar(scenario, bloggerId, role, prompt) {
   assert.ok(sessionId, `${role} session creation failed: ${JSON.stringify(sessionResponse)}`);
   scenario.sessionIds.push(sessionId);
   bindLaneSession(scenario.provider, sessionId, `role-${role}-title`, `role-${role}`);
-
-  scenario.provider.expectTitle({
-    id: `role-${role}-title`,
-    lane: expectationLane('companion-projection', `role-${role}-title`, 'title', 1, 'title'),
-  });
-
-  scenario.provider.expectText({
-    id: `role-${role}`,
-    lane: expectationLane('companion-projection', `role-${role}`, role, 1),
-    text: 'Role complete.',
-    match: { containsText: [prompt] },
-  });
 
   const before = scenario.provider.requests.length;
   const bloggerBefore = bloggerRequests(scenario.provider, bloggerId).length;
@@ -207,15 +168,22 @@ try {
   scenario = await setupScenario({
     project: { files: { 'AGENTS.md': '- companion projection canary\n' } },
     strict: true,
-
   });
+
+  const source = fs.readFileSync(new URL('../scripts/companion-projection.toml', import.meta.url), 'utf8');
+  const compiled = compileScenario(source, { name: 'companion-projection.toml' });
+  assert.equal(compiled.ok, true, compiled.ok ? '' : compiled.problems.join(' | '));
+  const runtime = new ScenarioRuntime(compiled.scenario);
+  scenario.provider.attachScenario(runtime);
 
   const { bloggerId } = await runProjectionScenario(scenario);
   for (const [role, prompt] of Object.entries(ROLE_PROMPTS)) {
     await assertRoleHasNoSidecar(scenario, bloggerId, role, prompt);
   }
-  scenario.provider.expectSatisfied();
-  console.log('Companion projection canary passed: same Blogger child, B1/B2 accumulation, and no forbidden role sidecars.');
+  assert.deepEqual(runtime.unanswered(), [], 'all non-internal scenario steps must complete');
+  assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
+  assert.equal(scenario.provider.unexpectedRequests.length, 0, 'scenario must not receive unexpected provider requests');
+  console.log('Companion projection canary passed: same Blogger child, Blogger accumulation, and no forbidden role sidecars.');
   await teardownScenario(scenario);
 } catch (error) {
   console.error(`Companion projection canary failed: ${error.stack || error}`);

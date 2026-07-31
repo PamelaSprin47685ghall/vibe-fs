@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { assertEq, assertTrue } from './gate-lib.mjs';
-import { rejectsSelect } from './gate-forest-lib.mjs';
+import { contextOf, rejectsSelect } from './gate-forest-lib.mjs';
 import { compileScenario } from '../scenario-schema.js';
 import { RETIRED_FIELDS, retiredFieldProblems } from '../legacy-fields.js';
 import { ScenarioRuntime } from '../scenario-runtime.js';
@@ -44,9 +44,9 @@ const SYSTEM = { role: 'system', content: 'You are a coder.' };
 const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
 
-/** One request, in the shape the Host actually sends (the session id is a HEADER, K9). */
-const request = (messages, { tools = ['write'] } = {}) => ({
-  __testkitHeaders: { 'x-session-affinity': SESSION },
+/** One request with an explicit session id for its test context. */
+const request = (messages, { tools = ['write'], sessionId = SESSION } = {}) => ({
+  sessionID: sessionId,
   model: 'test-model',
   tools: tools.map((name) => ({ type: 'function', function: { name } })),
   messages,
@@ -123,9 +123,10 @@ export const mutationCases = [
       const runtime = runtimeOf(TWO_STEPS);
 
       const first = request([SYSTEM, user('Ship the parser fix.')]);
-      const selection = runtime.select(first);
+      const context = contextOf(first.sessionID);
+      const selection = runtime.select(first, context);
       assertEq(selection.entry.id, 'mgr.0', 'the baseline delivery must land before a seal can break');
-      runtime.consume(first, selection);
+      runtime.consume(first, selection, context);
 
       // Same tools, same system, same last user message. Only history changed.
       const rewritten = request([
@@ -158,16 +159,17 @@ reason = "epoch-switch"
 `);
 
       const first = request([SYSTEM, user('Ship the parser fix.')]);
-      runtime.consume(first, runtime.select(first));
+      const firstContext = contextOf(first.sessionID);
+      const firstSelection = runtime.select(first, firstContext);
+      runtime.consume(first, firstSelection, firstContext);
 
-      const rebased = runtime.select(
-        request([
-          SYSTEM,
-          user('Condensed companion context.'),
-          user('Ship the parser fix.'),
-          assistant('step zero'),
-        ]),
-      );
+      const rebasedBody = request([
+        SYSTEM,
+        user('Condensed companion context.'),
+        user('Ship the parser fix.'),
+        assistant('step zero'),
+      ]);
+      const rebased = runtime.select(rebasedBody, contextOf(rebasedBody.sessionID));
 
       assertEq(rebased.resealed, 'epoch-switch');
       assertEq(rebased.entry.id, 'mgr.1');
@@ -352,16 +354,17 @@ user = ["HEAD", "yz"]
       const runtime = runtimeOf(TWO_STEPS);
 
       const first = request([SYSTEM, user('Ship the parser fix.')]);
-      const before = runtime.select(first);
+      const context = contextOf(first.sessionID);
+      const before = runtime.select(first, context);
       assertEq(before.entry.id, 'mgr.0');
-      runtime.consume(first, before);
+      runtime.consume(first, before, context);
 
       runtime.clearSeals();
 
       // The SAME request, after the restart. It must resolve to the same declaration — that is
       // what "the scenario is static" means — and it must not be refused as a seal break, since
       // a fresh baseline is not a broken prefix.
-      const after = runtime.select(first);
+      const after = runtime.select(first, contextOf(first.sessionID));
       assertTrue(after.sealBroken === undefined, 'a post-restart baseline is not an ARCH-004 break');
       assertEq(after.entry.id, 'mgr.0', 'a static scenario answers the same request the same way after a restart');
       assertEq(after.attempt, 2, 'deliveries still accumulate across the restart; only the seal resets');
@@ -378,10 +381,13 @@ user = ["HEAD", "yz"]
       const runtime = runtimeOf(TWO_STEPS);
 
       const first = request([SYSTEM, user('Ship the parser fix.')]);
-      runtime.consume(first, runtime.select(first));
+      const context = contextOf(first.sessionID);
+      const selection = runtime.select(first, context);
+      runtime.consume(first, selection, context);
       runtime.clearSeals();
 
-      rejectsSelect(runtime, request([SYSTEM, user('Something this scenario never declared.')]), 'unmatched');
+      const unknown = request([SYSTEM, user('Something this scenario never declared.')]);
+      rejectsSelect(runtime, unknown, 'unmatched');
     },
   },
 ];

@@ -125,6 +125,9 @@ import { ScenarioRuntime } from '../scenario-runtime.js';
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const SCENARIO_DIR = fileURLToPath(new URL('../scripts', import.meta.url));
 
+/** Build the explicit runtime context from the session id carried by a test request. */
+export const contextOf = (sessionId) => ({ sessionId });
+
 const repoPath = (file) => relative(REPO_ROOT, file);
 
 // ── 1. load the forest ──────────────────────────────────────────────────────
@@ -256,7 +259,7 @@ export function deriveRequests(scenario) {
           expectedEntryId: entry.id,
           sessionId,
           body: {
-            __testkitHeaders: { 'x-session-affinity': sessionId },
+            sessionID: sessionId,
             model: 'forest-lib-model',
             tools,
             messages: [...messages],
@@ -320,8 +323,9 @@ export function runForest(scenario, { bindings, requests }) {
   const mismatches = [];
 
   for (const request of requests) {
-    const selection = runtime.select(request.body);
-    runtime.consume(request.body, selection);
+    const context = contextOf(request.body.sessionID);
+    const selection = runtime.select(request.body, context);
+    runtime.consume(request.body, selection, context);
 
     const fields = lineOf(selection);
     lines.push(fields.join(' '));
@@ -380,7 +384,7 @@ export function rejectsSelect(runtime, body, expectedDiscriminant) {
     );
   }
 
-  const selection = runtime.select(body);
+  const selection = runtime.select(body, contextOf(body.sessionID));
   const present = SELECT_DISCRIMINANTS.filter((name) => selection[name] !== undefined);
 
   if (present.length === 1 && present[0] === expectedDiscriminant) return selection;

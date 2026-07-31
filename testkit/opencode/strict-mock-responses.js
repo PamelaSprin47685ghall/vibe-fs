@@ -1,8 +1,11 @@
 import { buildToolCallChunks, buildTextChunks, sendJSON } from './strict-mock-sse.js';
-import { estimatePromptTokens } from './strict-mock-matches.js';
 import { decorateLegacyArgs } from './strict-mock-decorate.js';
 
 const MOCK_MODEL = 'mock';
+
+// Provider metadata only: this is deliberately independent of context-limit logic.
+const estimatePromptTokens = (body) =>
+  Math.max(1, Math.ceil(JSON.stringify(body?.messages || []).length / 2));
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',

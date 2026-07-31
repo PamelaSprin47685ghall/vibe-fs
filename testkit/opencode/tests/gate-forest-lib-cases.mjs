@@ -21,6 +21,7 @@ import { assertEq, assertTrue } from './gate-lib.mjs';
 import { compileScenario } from '../scenario-schema.js';
 import { ScenarioRuntime } from '../scenario-runtime.js';
 import {
+  contextOf,
   deriveRequests,
   forestSources,
   loadForest,
@@ -55,7 +56,7 @@ const runtimeOf = (source) => {
 };
 
 const request = (messages) => ({
-  __testkitHeaders: { 'x-session-affinity': SESSION },
+  sessionID: SESSION,
   model: 'test-model',
   messages,
 });
@@ -91,11 +92,12 @@ export const forestLibCases = [
       const original = ScenarioRuntime.prototype.select;
       const runtime = runtimeOf(TWO_STEPS);
       const body = request([user('Ship the parser fix.')]);
+      const context = contextOf(body.sessionID);
 
-      assertEq(runtime.select(body).entry.id, 'mgr.0', 'unpatched selection first');
+      assertEq(runtime.select(body, context).entry.id, 'mgr.0', 'unpatched selection first');
 
       const observed = withPatched(ScenarioRuntime.prototype, 'select', () => ({ unmatched: { mutated: true } }), () =>
-        runtime.select(body),
+        runtime.select(body, context),
       );
 
       assertEq(
@@ -104,7 +106,7 @@ export const forestLibCases = [
         'the replacement must be what the call site reached',
       );
       assertTrue(ScenarioRuntime.prototype.select === original, 'the original binding is restored by identity');
-      assertEq(runtime.select(body).entry.id, 'mgr.0', 'and the real implementation answers again');
+      assertEq(runtime.select(body, context).entry.id, 'mgr.0', 'and the real implementation answers again');
     },
   },
 
@@ -123,7 +125,8 @@ export const forestLibCases = [
 
       assertEq(message, 'the mutation case failed, as a mutation case does', 'the body error propagates unwrapped');
       assertTrue(ScenarioRuntime.prototype.select === original, 'the mutation may not leak into the next case');
-      assertEq(runtimeOf(TWO_STEPS).select(request([user('Ship the parser fix.')])).entry.id, 'mgr.0');
+      const body = request([user('Ship the parser fix.')]);
+      assertEq(runtimeOf(TWO_STEPS).select(body, contextOf(body.sessionID)).entry.id, 'mgr.0');
     },
   },
 

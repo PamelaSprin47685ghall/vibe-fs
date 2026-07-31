@@ -238,12 +238,3 @@ export function matchesExpectation(body, expectation, sessionBindings, context) 
   return true;
 }
 
-
-/**
- * The mock plays a provider, and a provider reports token usage — CTX-001 forbids
- * the PLUGIN observing context capacity, not the provider reporting it. Gate:
- * this function must never appear under `next/` (measured 0).
- */
-export function estimatePromptTokens(body) {
-  return Math.max(1, Math.ceil(JSON.stringify(body?.messages || []).length / 2));
-}

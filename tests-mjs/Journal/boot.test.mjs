@@ -73,7 +73,7 @@ test('PERSIST_002_creating_a_writer_writes_the_runtime_started_envelope_first', 
 
     // There is no way to obtain a writer without this line, which is what makes
     // "every journal has a RuntimeStarted at LocalSeq 1" structural.
-    assert.deepEqual(store.files(), ['rt_1.ndjson'])
+    assert.deepEqual(store.files(), ['blobs', 'rt_1.ndjson'])
     assert.equal(store.lines().length, 1)
     assert.deepEqual(
       {
@@ -165,7 +165,7 @@ test('PERSIST_002_a_second_writer_for_one_runtime_id_is_refused', () => {
 
     // A different runtime is a different file, and both coexist.
     store.open({ runtime: 'rt_2' })
-    assert.deepEqual(store.files(), ['rt_1.ndjson', 'rt_2.ndjson'])
+    assert.deepEqual(store.files(), ['blobs', 'rt_1.ndjson', 'rt_2.ndjson'])
   })
 })
 
