@@ -41,7 +41,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = "Write canary_output.txt with exactly Coder canary slice OK"
+user = ["# Complete the assignment in `assignment`.", "Write canary_output.txt with exactly Coder canary slice OK"]
 tools = ["write"]
 
   [[turn.step]]

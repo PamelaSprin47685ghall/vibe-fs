@@ -75,7 +75,7 @@ tools = ["fork-manager", "join"]
 [[turn]]
 id = "manager"
 lane = "fast-manager"
-user = "Ship publish_proof.txt to the target branch."
+user = ["# Complete the assignment in `assignment`.", "Ship publish_proof.txt to the target branch."]
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
@@ -109,7 +109,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = "Write publish_proof.txt."
+user = ["# Complete the assignment in `assignment`.", "Write publish_proof.txt."]
 tools = ["write"]
 
   [[turn.step]]

@@ -61,7 +61,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "devops"
 lane = "fast-devops"
-user = "Use fork-pty only (not executor): 1) fork-pty agent=\"pty\" with command: echo CWD=$(pwd); exec cat"
+user = ["# Complete the assignment in `assignment`.", "Use fork-pty only (not executor): 1) fork-pty agent="]
 tools = ["fork-pty", "join", "list", "executor", "read", "glob", "grep", "inspector", "coder"]
 
   # First PTY: `cat` holds the session open so the write/read echo is observable.

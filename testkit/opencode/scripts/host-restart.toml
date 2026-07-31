@@ -122,7 +122,7 @@ tools = ["verdict"]
 [[turn]]
 id = "child-a1"
 lane = "fast-coder"
-user = "Write host_restart_proof.txt with OK."
+user = ["# Complete the assignment in `assignment`.", "Write host_restart_proof.txt with OK."]
 
   [[turn.step]]
   respond = { type = "text", text = "child-a1 done." }
@@ -145,7 +145,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "child-a2"
 lane = "coder-after"
-user = "Report child-a2."
+user = ["# Complete the assignment in `assignment`.", "Report child-a2."]
 
   [[turn.step]]
   respond = { type = "text", text = "child-a2 done." }
