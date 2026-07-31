@@ -86,6 +86,13 @@ export const SURFACE_STANDINGS = Object.freeze(['CanonicalPayload', 'VerbatimFor
 /** The modules that ARE the canonical writer, or compose exclusively through it. */
 const CANONICAL_WRITERS = Object.freeze(['SyntheticToml', 'ForkChildPayload', 'RuntimeNudge', 'BloggerToml']);
 
+const TYPED_PAYLOAD_ROUTES = Object.freeze({
+  'BloggerDeltaChunk.Toml': Object.freeze({
+    pattern: /\belse\s+chunk\.Toml\b/,
+    description: 'the normal Blogger branch must forward chunk.Toml without a prose wrapper',
+  }),
+});
+
 /** The only ways plugin-composed text reaches `ISessionHostPort.SendPrompt` (PROMPT-005). */
 const SINKS = Object.freeze([
   'SendAgentOwnerRoot',
@@ -129,11 +136,13 @@ const SURFACES = new Map([
     'next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
-      standing: 'RuntimeInstruction',
-      surface: 'Blogger delta prompt (normal and post-restart re-anchor)',
+      standing: 'CanonicalPayload',
+      surface: 'Blogger normal delta prompt',
       composer:
-        'CompanionHostBlogger.fs:69,76 prose wrapper around the typed BloggerDeltaChunk.Toml payload; ' +
-        'post-restart re-anchor remains a separate recovery surface',
+        'BloggerDelta.fs:33-34 renders CompanionPrompt.NormalInstruction plus typed ' +
+        'BloggerDeltaChunk.Toml; CompanionHostBlogger.fs:69-76 forwards chunk.Toml on the normal path',
+      composerFiles: ['next/Domain/BloggerDelta.fs', 'next/Session/CompanionHostBlogger.fs'],
+      typedPayload: 'BloggerDeltaChunk.Toml',
     },
   ],
   [
@@ -283,6 +292,13 @@ const routesThroughCanonicalWriter = (file) =>
       return CANONICAL_WRITERS.some((writer) => text.includes(`${writer}.`));
     });
 
+const routesThroughTypedPayload = (payload, files) => {
+  const contract = TYPED_PAYLOAD_ROUTES[payload];
+  if (!contract) return false;
+
+  return files.some((file) => contract.pattern.test(readFileSync(`${REPO_ROOT}${file}`, 'utf8')));
+};
+
 /**
  * Audit the tree. Returns violation strings; empty means the inventory matches reality.
  */
@@ -330,7 +346,20 @@ export function auditSurfaces(files = productionFiles()) {
   // surface cannot be relabelled migrated without routing, and a migrated one cannot silently stop.
   for (const [key, entry] of SURFACES) {
     const composerFiles = entry.composerFiles ?? [key.split('#')[0]];
-    const routes = composerFiles.some(routesThroughCanonicalWriter);
+    const typedRoute = routesThroughTypedPayload(entry.typedPayload, composerFiles);
+    const routes = composerFiles.some(routesThroughCanonicalWriter) || typedRoute;
+
+    if (entry.typedPayload && !TYPED_PAYLOAD_ROUTES[entry.typedPayload]) {
+      violations.push(`${key} names unknown typed payload '${entry.typedPayload}'`);
+    }
+
+    if (entry.typedPayload && !typedRoute) {
+      const contract = TYPED_PAYLOAD_ROUTES[entry.typedPayload];
+      violations.push(
+        `${key} claims ${entry.typedPayload} but none of ${composerFiles.join(', ')} satisfies ` +
+          `${contract?.description ?? 'its typed payload contract'}`,
+      );
+    }
 
     if (entry.standing === 'CanonicalPayload' && !routes) {
       violations.push(

@@ -30,6 +30,9 @@ type BloggerDeltaChunk =
 [<RequireQualifiedAccess>]
 module BloggerDelta =
 
+    let private renderChunk (items: BloggerDeltaItem list) =
+        BloggerToml.renderWith [ CompanionPrompt.NormalInstruction ] items
+
     /// CTX-003: the input contract. Not an estimate and not compared to any model's
     /// window — it only bounds one rendered TOML chunk.
     ///
@@ -86,7 +89,7 @@ module BloggerDelta =
     /// CTX-013 third level: cut one part's body so the rendered CHUNK fits.
     ///
     /// The budget applies to the rendered document, not to the item in isolation.
-    /// `render` appends a trailing LF, so an item measured alone fits a budget the
+    /// `renderChunk` appends a trailing LF, so an item measured alone fits a budget the
     /// one-item document then exceeds by exactly that byte — a limit violation small
     /// enough to pass every eyeball review and still be a limit violation.
     ///
@@ -131,8 +134,7 @@ module BloggerDelta =
                     Part = withBody (kept + "\n" + BloggerToml.TruncationMarker)
                     Truncated = true }
 
-            let documentBytes candidate =
-                SyntheticToml.byteCount (BloggerToml.render [ candidate ])
+            let documentBytes candidate = SyntheticToml.byteCount (renderChunk [ candidate ])
 
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both
@@ -182,7 +184,7 @@ module BloggerDelta =
         | first :: _ ->
             // Accumulate while the rendered document still fits. Rendering the whole
             // accumulation each time — rather than summing per-item sizes — is what
-            // makes the limit exact: `render` adds separators and a trailing newline
+            // makes the limit exact: `renderChunk` adds the header, separators and a trailing newline
             // that a per-item sum would miss.
             let mutable accepted
                 : {| Turn: int
@@ -195,7 +197,7 @@ module BloggerDelta =
             for entry in pending do
                 if not stopped then
                     let candidate = accepted @ [ entry ]
-                    let rendered = BloggerToml.render (candidate |> List.map (fun e -> e.Item))
+                    let rendered = renderChunk (candidate |> List.map (fun e -> e.Item))
 
                     if SyntheticToml.byteCount rendered <= limitBytes then
                         accepted <- candidate
@@ -233,6 +235,6 @@ module BloggerDelta =
 
             Some
                 { Items = finalItems
-                  Toml = BloggerToml.render finalItems
+                  Toml = renderChunk finalItems
                   NextCursor = nextCursor
                   NextCoverableTurnCutoffExclusive = nextCutoff }

@@ -105,5 +105,5 @@ module BloggerToml =
     let renderWith (instructions: string list) (items: BloggerDeltaItem list) : string =
         SyntheticToml.document instructions (items |> List.map renderItem)
 
-    /// The data-only document, which is what every current caller wants.
+    /// The data-only document for callers whose instruction is carried separately.
     let render (items: BloggerDeltaItem list) : string = renderWith [] items
