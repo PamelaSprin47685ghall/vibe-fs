@@ -20,11 +20,16 @@ module internal CompanionHostBlogger =
           EnsureBlogger: unit -> Task<SessionId>
           Gate: obj
           Companion: Companion
+          RequestKind: ProviderRequestKind ref
+          SquashFrameCount: int option ref
           BloggerNeedsReset: bool ref
           Journal: AgentJournal option
           EffectiveAgent: string }
 
     let private failBlog (message: string) : BloggerCompletion =
+        raise (InvalidOperationException message)
+
+    let private failSquash (message: string) : BloggerSquashCompletion =
         raise (InvalidOperationException message)
 
     /// COMPANION-002: the Blogger is prompted like any other agent-owned child.
@@ -65,6 +70,9 @@ module internal CompanionHostBlogger =
 
             let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
             let projectionText = ProviderProjection.renderSemantic projection
+
+            deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
+            deps.SquashFrameCount.Value <- None
 
             let prompt =
                 if reset then
@@ -109,4 +117,47 @@ module internal CompanionHostBlogger =
                                 ) }
                 | Aborted reason -> return failBlog reason
                 | Failed error -> return failBlog error
+        }
+
+    let squash (deps: BloggerDeps) (frameCount: int) : Task<BloggerSquashCompletion> =
+        task {
+            let! childId = deps.EnsureBlogger()
+            let completion =
+                TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let mutable terminalDelivered = false
+
+            let onTerminal _ outcome =
+                if not terminalDelivered then
+                    terminalDelivered <- true
+                    completion.SetResult outcome
+
+            use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
+            deps.RequestKind.Value <- ProviderRequestKind.BloggerSquash
+            deps.SquashFrameCount.Value <- Some frameCount
+
+            let! sent = sendBloggerPrompt deps childId CompanionPrompt.SquashInstruction
+
+            match sent with
+            | Error error ->
+                deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
+                deps.SquashFrameCount.Value <- None
+                return failSquash error
+            | Ok _ ->
+                let! outcome = completion.Task
+                deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
+                deps.SquashFrameCount.Value <- None
+
+                match outcome with
+                | Completed result ->
+                    match TerminalValidity.check result.TurnFormalText with
+                    | Error rejection -> return failSquash (TerminalValidity.describe rejection)
+                    | Ok() ->
+                        return
+                            { BloggerSessionId = childId
+                              ProviderRun = result.ProviderRun
+                              Text = result.TurnFormalText
+                              CoveredFrameCount = frameCount }
+                | Aborted reason -> return failSquash reason
+                | Failed error -> return failSquash error
         }
