@@ -1385,10 +1385,14 @@ N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得�
     渲染结果 parse 成功且 value == 原文 + 尾换行、system prompt 未被纳入、
     human raw 未被包装、provider/tool 原生 binding 未改变
 ─── canary 修红（11 → 16/16）与退火三在此之后 ───
-N5  其余 synthetic surface 迁移（M3 + M4）：Blogger delta 优先（已有 typed part、
-    确定性 renderer、byte limit、现成测试），再 continuation / repair / guard / nudge /
-    review challenge / conflict context / companion memory / executor context /
-    tool textual result / summary input。不得迁移 system prompt assets
+N5a 不依赖 delta 货币的 surface（M4）：continuation / interaction repair /
+    review guard nudge / executor summary input。输入都是运行时自己的固定文本或
+    命令输出，与 Companion delta 无关。不得迁移 system prompt assets
+N5b Blogger delta surface（M3）——阻断。前置是 X4 后半的换币，不是文本迁移。
+    理由见下方「N5 拆分：M3 的前提在本仓不成立」
+N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
+    某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
+    本包不为各领域预先发明统一 versioning
 N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
     某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
     本包不为各领域预先发明统一 versioning
@@ -1718,6 +1722,56 @@ delimiter 检查必须先抹掉单行字符串 value   注入 payload 含 ''' �
 分类依据是可复核的：类二六个签名在剧本改动前的首轮日志中逐字出现，故非本轮引入。`coder-edit.0` 是唯一首轮不存在的签名，因为首轮 manager-full-loop 更早就停了。
 
 推论：fork 信封这一根因已在结构上消除，它此前掩盖了类二的六条。类二不属包 N——它们是 fallback、review verdict、PTY 与 orchestrator 的行为债，须各自定位。包 N 只欠类一两条，且都在 N5 的既定清单上。
+
+#### N5 拆分：M3 的前提在本仓不成立（实测）
+
+动议 M3 说「优先迁移 Blogger，因为已有 typed semantic parts、deterministic renderer、byte limit、现成测试」。这四项对 `BloggerToml` / `BloggerDelta` 全部为真，但它们都不在活路径上。实测：
+
+```text
+活路径    Companion.Submit → Companion.jsonDelta → blogFn delta
+                           → CompanionHostBlogger.blog:69-78 散文外壳 + 该字符串
+          即 delta 仍是 JSON 字符串（CompanionDelta.fs:93 的 jsonDelta）
+
+零生产调用点
+          BloggerDelta.nextChunk                 0
+          CompanionProjectionBuilder.build       0
+          BloggerToml.*                          仅由 BloggerDelta 调用，而它本身零调用点
+```
+
+整条 TOML delta 链是一个自洽但悬空的岛，与阻断 K8f 的 X 恢复链同一形态。
+
+若按 M3 就地把散文外壳改成 ARCH-010，产出的是：
+
+```toml
+# Write one dense work-log entry for the delta below.
+
+delta = '''
+{"messages":[…]}     ← JSON，不是 TOML
+'''
+```
+
+该文档形态上完全合规：`gate:surface` 的 standing 会翻成 `CanonicalPayload`，`arch010.js` 全部规则通过。而 CTX-013 的 delta 契约——固定键序、三级切块、200 KiB、图片 omission marker——一条都没有到达。那是一个「绿灯描述的不是它所声称的东西」，本次迁移已实测四次的同一形态，且这次是门禁自己宣布的。
+
+故 N5 拆两段：
+
+```text
+N5a  不依赖 delta 货币的 surface，现在可迁
+     continuation nudge / interaction repair   TurnCompletionProgram.fs:92,158,227
+     review guard nudge                        HostReviewGuard.fs:147,164
+     executor summary input                    ExecutorSummarize.fs:95,113
+     三者的输入都是运行时自己的固定文本或命令输出，与 Companion delta 无关
+
+N5b  Blogger delta surface，阻断
+     前置不是文本迁移，而是 X4 后半的换币：
+       ICompanionDurablePort.AppendSuccessful 的签名
+       ProjectionSnapshot = string → SemanticMessage list + SemanticCursor
+       BlogEntryCommitted 的 cursor 推进
+     此前置早已登记在「X9 未清零的一行：jsonDelta」，本节只是确认它同时阻断 N5b
+```
+
+推论与 K8f 一致：欠的不是剧本也不是文本，而是接线。包 N 不代包 X 做换币——那会把一个架构级改动塞进一个记法包，且 N5b 的验收（header bytes 计入 200 KiB、图片 marker、三级切块）必须对着真实的 TOML delta 才有意义。
+
+`companion` canary 的 `no-prefix-matched`（role=blogger）因此归入 N5b 而非 N5a，与 `executor` 的 `map.0` 分属两段。
 
 ### 包 X：失败驱动上下文恢复
 
