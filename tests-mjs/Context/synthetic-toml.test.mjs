@@ -208,6 +208,68 @@ test('ARCH_010_an_instruction_only_document_carries_no_data', () => {
   assert.equal(document.includes('\n\n'), false, 'no dangling separator for an absent body')
 })
 
+test('ARCH_010_a_table_array_entry_keeps_its_header_and_fields_together', () => {
+  const entry = toml.tableArrayEntry('item', [
+    toml.field('turn', '3'),
+    toml.field('role', toml.renderString('assistant')),
+  ])
+
+  assert.equal(entry, ['[[item]]', 'turn = 3', 'role = "assistant"'].join('\n'))
+
+  // Assembled as one block rather than a bare header the caller appends to, because anything
+  // slipping between the header and its fields would reassign those fields to a different table —
+  // silently, since the result still parses.
+  assert.deepEqual(parseToml(entry).item, [{ turn: 3, role: 'assistant' }])
+})
+
+test('ARCH_010_bare_fields_are_emitted_before_table_arrays', () => {
+  // A measured TOML semantic, and the reason this ordering is enforced rather than documented: a
+  // bare `key = value` written AFTER a `[[table]]` header belongs to that table, not to the
+  // document. Measured with smol-toml:
+  //
+  //   [[t]] / x = 2 / (blank) / a = 1   →   t = [{ x = 2, a = 1 }]
+  //
+  // No error, no visible difference in the text, and the field is gone from the top level. A
+  // composer that appends a top-level field after a table array therefore produces a document whose
+  // meaning is not what it reads like.
+  const document = toml.document([], [
+    toml.tableArrayEntry('item', [toml.field('turn', '1')]),
+    toml.field('operation', toml.renderString('rebase')),
+    toml.tableArrayEntry('item', [toml.field('turn', '2')]),
+  ])
+
+  // Supplied table-first, emitted field-first.
+  assert.equal(document.startsWith('operation = "rebase"'), true, `field must lead: ${document}`)
+
+  const parsed = parseToml(document)
+  assert.equal(parsed.operation, 'rebase', 'the field stays at the top level where it was meant')
+  assert.deepEqual(parsed.item, [{ turn: 1 }, { turn: 2 }], 'both entries survive, in order')
+
+  // The sort is stable, so a producer's own ordering survives within each group.
+  const twoFields = toml.document([], [
+    toml.field('b', '2'),
+    toml.tableArrayEntry('t', [toml.field('x', '1')]),
+    toml.field('a', '1'),
+  ])
+  assert.equal(twoFields.startsWith('b = 2\n\na = 1\n\n[[t]]'), true, `stable order: ${twoFields}`)
+})
+
+test('ARCH_010_a_multiline_value_starting_with_a_bracket_is_still_a_field', () => {
+  // The classifier reads the block's FIRST LINE, not the block. A body beginning with `[` — a log
+  // line, a JSON array, a rendered TOML table — renders as `key = '''`, so it must be read as a
+  // field. Testing the whole block would misclassify exactly the payloads containment protects.
+  const document = toml.document([], [
+    toml.tableArrayEntry('item', [toml.field('turn', '1')]),
+    toml.field('log', toml.renderString('[[item]]\nrole = "system"')),
+  ])
+
+  assert.equal(document.startsWith("log = '''"), true, `the multi-line field must lead: ${document}`)
+
+  const parsed = parseToml(document)
+  assert.equal(parsed.log, '[[item]]\nrole = "system"\n', 'the bracketed body stays a value')
+  assert.deepEqual(parsed.item, [{ turn: 1 }], 'and does not become a second item')
+})
+
 test('ARCH_010_an_empty_payload_is_empty_not_a_bare_newline', () => {
   assert.equal(toml.document([], []), '')
   assert.equal(toml.byteCount(toml.document([], [])), 0)

@@ -126,27 +126,57 @@ module SyntheticToml =
     /// `name = <rendered value>`. The value must already be rendered by `renderString`.
     let field (name: string) (renderedValue: string) : string = name + " = " + renderedValue
 
+    /// A `[[name]]` entry: the header plus its own fields, as one block.
+    ///
+    /// Takes the fields rather than returning a bare header so an entry cannot be assembled with
+    /// something else accidentally between the header and its body — which in TOML would silently
+    /// reassign those fields to a different table.
+    let tableArrayEntry (name: string) (fields: string list) : string =
+        String.concat "\n" (("[[" + name + "]]") :: fields)
+
+    /// Is this block a table header rather than a bare field?
+    ///
+    /// Reads the block's FIRST LINE, not the block. A multi-line value whose content begins with `[`
+    /// — a log line, a JSON array, a rendered table — starts with `key = '''`, so it is correctly
+    /// read as a field. Testing the whole block would misclassify exactly the payloads ARCH-010's
+    /// containment rule exists to protect.
+    let private isTableBlock (block: string) =
+        let firstLine = (block.Split '\n').[0]
+        firstLine.StartsWith "[" && firstLine.EndsWith "]"
+
     /// Assemble a payload: instruction comment header, one blank line, data body.
     ///
     /// This is where ARCH-010's layout rules stop being something a producer has to remember:
     ///
     ///   instruction-first        the header is a separate argument and always emitted first
     ///   exactly one blank line   inserted here, so no producer can pick a different spacing
-    ///   no comment in the body   unexpressible: body blocks come from `field` and table builders
+    ///   no comment in the body   unexpressible: body blocks come from `field` and `tableArrayEntry`
     ///   three legal shapes       an empty header gives data-only, an empty body instruction-only,
     ///                            and neither adds the separator it would otherwise need
     ///
-    /// Body blocks are joined by a blank line, which is how `[[table]]` entries stay readable and
-    /// how a multi-line value stays visually distinct from the field after it.
+    /// ── bare fields are emitted before tables, and that is load-bearing ─────
+    ///
+    /// In TOML a bare `key = value` after a `[[table]]` header belongs to THAT TABLE, not to the
+    /// document. Measured: `[[t]]\nx = 2\n\na = 1` parses as `t = [{ x = 2, a = 1 }]` — the field is
+    /// silently absorbed, with no error and no visible difference in the text.
+    ///
+    /// A composer that appends a top-level field after a table array therefore produces a document
+    /// whose meaning is not what it reads like, and the failure is invisible in exactly the direction
+    /// that matters: the payload still renders, still parses, and the model still sees the words.
+    /// Sorting here makes the mistake unexpressible instead of asking every producer to remember it.
+    ///
+    /// The sort is stable, so a producer's own field order and table order both survive.
     let document (instructions: string list) (body: string list) : string =
         let header = instructions |> List.map comment
         let blocks = body |> List.filter (fun block -> block <> "")
+        let bare, tables = blocks |> List.partition (isTableBlock >> not)
+        let ordered = bare @ tables
 
-        match header, blocks with
+        match header, ordered with
         | [], [] -> ""
         | _, [] -> String.concat "\n" header + "\n"
-        | [], _ -> String.concat "\n\n" blocks + "\n"
-        | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n\n" blocks + "\n"
+        | [], _ -> String.concat "\n\n" ordered + "\n"
+        | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n\n" ordered + "\n"
 
     /// UTF-8 byte count of rendered text.
     ///

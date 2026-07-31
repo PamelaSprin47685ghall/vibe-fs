@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Next.Domain
 
-open System
-
 /// CTX-013: what a Blogger delta part is, and how it renders as TOML.
 ///
 /// The string rules and the document layout are NOT here — they belong to
@@ -92,7 +90,7 @@ module BloggerToml =
 
         // media_type precedes text/args in the fixed order, and only one of the two
         // groups is ever non-empty, so appending is enough to honour it.
-        String.Join("\n", "[[item]]" :: (head @ body @ truncated))
+        SyntheticToml.tableArrayEntry "item" (head @ body @ truncated)
 
     /// CTX-013: the whole document, optionally carrying an instruction header.
     ///

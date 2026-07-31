@@ -782,6 +782,7 @@ export const syntheticToml = (() => {
     'renderString',
     'comment',
     'field',
+    'tableArrayEntry',
     'document',
     'byteCount',
   ])
@@ -791,6 +792,7 @@ export const syntheticToml = (() => {
     renderString: (text) => m.renderString(text),
     comment: (text) => m.comment(text),
     field: (name, renderedValue) => m.field(name, renderedValue),
+    tableArrayEntry: (name, fields) => m.tableArrayEntry(name, toList(fields)),
     document: (instructions, body) => m.document(toList(instructions), toList(body)),
     byteCount: (text) => m.byteCount(text),
   }
