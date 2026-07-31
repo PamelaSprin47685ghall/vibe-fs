@@ -66,9 +66,16 @@ module CompletedTurnClassifier =
             lower.Contains("abort")
         | None -> false
 
-    let classifyOutcome (finish: string option) (errorName: string option) (parts: MessagePart array) : TurnOutcome =
+    let classifyOutcome
+        (completed: bool)
+        (finish: string option)
+        (errorName: string option)
+        (parts: MessagePart array)
+        : TurnOutcome =
         if isAbortErrorName errorName then
             TurnAborted(defaultArg errorName "aborted")
+        elif completed && Option.isSome errorName then
+            TurnFailed(defaultArg errorName "assistant completed with error")
         elif
             finish
             |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase))
@@ -124,7 +131,7 @@ module CompletedTurnClassifier =
         (directory: string option)
         : ReconciledTurn =
         let role = roleOfAgent assistant.Agent roleFallback
-        let outcome = classifyOutcome assistant.Finish assistant.ErrorName assistant.Parts
+        let outcome = classifyOutcome assistant.Completed assistant.Finish assistant.ErrorName assistant.Parts
 
         { SessionId = sessionId
           PhysicalUserMessageId = physicalUserMessageId
