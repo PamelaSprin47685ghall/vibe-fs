@@ -12,7 +12,7 @@
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（清场阶段 `SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)；后续 X4 仍有一处 PERSIST-009 阻断） |
 | 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
-| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 的删除与领域实现完成；X-wire 探针链已接线（`SpikePlugin.transform → XWire.applyTransform`，`HostSignalBootstrap.onTurn → ArmRecovery + reconcileAttempt`，提交 `c6ac0eb1…5ff3c53a`）；BlogSquash 生产链仍未接线（`CompanionHostBlogger.squash` 零调用点 + `SHOCK-UNMIGRATED[CTX-006]`），X-A–X-D 剧本仍被阻断，见「包 K8f 摸底」 |
+| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 的删除与领域实现完成；X-wire 探针链已接线（`SpikePlugin.transform → XWire.applyTransform`，`HostSignalBootstrap.onTurn → ArmRecovery + reconcileAttempt`，提交 `c6ac0eb1…5ff3c53a`）；BlogSquash 生产链已接线（d5c49125：`AppendSquash` 唯一构造点 + armed 槽触发 + SHOCK-UNMIGRATED[CTX-006] 清零），剩余缺口为第 1 层测试与 K8f 端到端剧本，见「包 K8f 摸底」 |
 | 6 | 休克三 + 退火二：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5e；386 测试三时区全绿，证据 `evidence/post-anneal2/`） |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 核心静态森林已落地；K9 仅剩物理删除：canary 已全部走 `ScenarioRuntime`（14 条经 `canary-driver`，2 条直接 `attachScenario`），`strict-mock-forest/matches` 仅被 provider 内部旧 expect 路径引用。K8f 另因 BlogSquash 生产链未接线阻断，见「包 K8f 摸底」 |
 | 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W7 完成（W7 为 13 项 VERIFY-004 禁止退化清单的双向覆盖与注册完整性门禁；休克期未运行编译或测试） |

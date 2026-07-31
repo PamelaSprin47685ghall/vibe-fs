@@ -1,14 +1,18 @@
 # STATUS/blocker-CTX-006 — BlogSquash 生产链路缺失
 
-状态：实现阻塞，不是 SSOT 例外。
-触发日期：2026-07-31。
+状态：接线已落地（d5c49125），剩余缺口为第 1 层测试与 CTX-007 结局链验证，不是 SSOT 例外。
+触发日期：2026-07-31。解除日期：2026-07-31。
 绑定范围：当前工作树 `refactor/ssot-shock-anneal`。
 
 ## 结论
 
-`BlogSquashCommitted` 的事实、fold、纯函数投影、唯一 durable writer 与首版生产调用
-路径已存在，但完整 CTX-007 结局链仍未验证：invalid terminal repair、attempt 计划的
-持久绑定与失败后下一槽重试尚未闭合。
+`BlogSquashCommitted` 的事实、fold、纯函数投影、唯一 durable writer（
+`ICompanionDurablePort.AppendSquash`）与生产调用路径（`Companion.Submit`  armed 槽 →
+`CompanionHostBlogger.squash` → port.AppendSquash）已接线并全量验证（dotnet build 0 错误、
+Fable build OK、test:mjs 436/0、gate:static 6/6、SHOCK-UNMIGRATED[CTX-006] 清零、
+shock-audit 0 标记）。剩余缺口：squash 链无第 1 层测试（domain.mjs facade 无
+companionPort 出口，journal-backed 测试属第 2 层）；invalid terminal repair、attempt 计划
+持久绑定与失败后下一槽重试的端到端验证属于 K8f 剧本范畴。
 
 ## 已验证的断点
 
