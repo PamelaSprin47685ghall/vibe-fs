@@ -33,9 +33,9 @@ import {
 } from './index.js';
 import { WATCHDOG_TIMEOUT_MS, WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { bindLaneSession } from './tests/lane.mjs';
-import { requestKindOf } from './strict-mock-matches.js';
 import { compileScenario } from './scenario-schema.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
+import { kindOf } from './runtime-key.js';
 
 const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'scripts');
 
@@ -415,7 +415,7 @@ async function runFlow(scenario, doc, ctx) {
 
       const models = (scenario.provider.requests || [])
         .filter((request) => (request?.sessionID ?? request?.sessionId) === sessionId)
-        .filter((request) => requestKindOf(request) === 'chat')
+        .filter((request) => kindOf(request) === 'chat')
         .map((request) => {
           const model = request?.model;
           return typeof model === 'string' ? model : (model?.modelID ?? model?.id ?? null);

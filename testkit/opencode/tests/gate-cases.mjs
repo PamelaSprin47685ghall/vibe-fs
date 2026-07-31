@@ -14,7 +14,7 @@ import {
   postJson,
 } from './gate-lib.mjs';
 import { StrictMockProvider } from '../strict-mock-provider.js';
-import { requestKindOf } from '../strict-mock-matches.js';
+import { kindOf } from '../runtime-key.js';
 import { EventProbe } from '../event-probe.js';
 import { shapeFromParsed } from '../event-shape.js';
 import { ProcessHost } from '../process-host.js';
@@ -115,12 +115,16 @@ async function runStabilityRepeatCap() {
 function runTitleHistoryIsolation() {
   const body = {
     messages: [
+      { role: 'system', content: 'You are a coding agent.' },
+      { role: 'user', content: 'An older request.' },
+      { role: 'assistant', content: 'An older answer.' },
+      { role: 'user', content: 'Another older request.' },
       { role: 'user', content: 'Generate a title for this conversation: old request' },
       { role: 'assistant', content: 'Old title' },
       { role: 'user', content: 'Continue the real task.' },
     ],
   };
-  assertEq(requestKindOf(body), 'chat', 'historical title prompt must not classify the current request as title');
+  assertEq(kindOf(body), 'chat', 'historical title prompt must not classify the current request as title');
 }
 
 function runSessionCreatedIsNotWatchdogHeartbeat() {
