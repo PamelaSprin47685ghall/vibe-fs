@@ -117,9 +117,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                 | Some delta ->
                     match durable, sessionId with
                     | None, _
-                    | _, None ->
-                        failwith
-                            "SHOCK-UNMIGRATED[PERSIST-009]: Companion success path requires a durable journal"
+                    | _, None -> DurableJournalUnavailable
                     | Some _, Some _ ->
                         let previousCutoff = blogProjection.Coverage.CoverableTurnCutoffExclusive
                         let previousDigest = blogProjection.Coverage.CoveredPrefixDigest

@@ -20,6 +20,7 @@ type BloggerCompletion =
 type CompanionOutcome =
     | Submitted
     | SkippedBusy
+    | DurableJournalUnavailable
 
 type CompanionMemory =
     {
