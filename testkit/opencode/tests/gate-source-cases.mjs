@@ -512,7 +512,7 @@ user = "go on"
       // request. A missing declaration is silent at load time and fatal at run time, which
       // is precisely the asymmetry a load-time gate should remove.
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('You are the blogger of a coding agent session.'),
+        (file) => !readFileSync(file, 'utf8').includes('The next user message is the new session material in TOML.'),
       );
 
       assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);

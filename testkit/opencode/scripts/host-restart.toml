@@ -159,6 +159,14 @@ user = ["# The next user message is the new session material in TOML.", "[[item]
   respond = { type = "text", text = "Session background." }
 
 [[turn]]
+id = "blogger-reanchor"
+internal = true
+user = ["You are the blogger of a coding agent session.", "Re-anchor on the FULL current companion context B"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session reanchor background." }
+
+[[turn]]
 id = "title"
 lane = "parent-title"
 kind = "title"
