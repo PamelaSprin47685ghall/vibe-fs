@@ -100,7 +100,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-guard"
 internal = true
-user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+user = "# Review is required before completion."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]

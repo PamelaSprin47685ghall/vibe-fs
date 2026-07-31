@@ -83,8 +83,8 @@ export const SURFACE_CLASSES = Object.freeze([
  */
 export const SURFACE_STANDINGS = Object.freeze(['CanonicalPayload', 'VerbatimForward', 'RuntimeInstruction']);
 
-/** The modules that ARE the canonical writer. Referencing one is what `CanonicalPayload` means. */
-const CANONICAL_WRITERS = Object.freeze(['SyntheticToml', 'ForkChildPayload', 'BloggerToml']);
+/** The modules that ARE the canonical writer, or compose exclusively through it. */
+const CANONICAL_WRITERS = Object.freeze(['SyntheticToml', 'ForkChildPayload', 'RuntimeNudge', 'BloggerToml']);
 
 /** The only ways plugin-composed text reaches `ISessionHostPort.SendPrompt` (PROMPT-005). */
 const SINKS = Object.freeze([
@@ -106,6 +106,14 @@ const SYSTEM_PROMPT_MARKERS = Object.freeze(['PromptAssets', 'systemPromptOf', '
  * `composer` is where the text is actually built, which is the field that makes this inventory
  * actionable: N3 and N5 migrate composers, not sinks. Several sites share a sink and differ only
  * in composer, which is why the key is the pair rather than the sink alone.
+ *
+ * `composerFiles` is that same fact made checkable. The standing↔code check below must read the file
+ * that COMPOSES, and for the two nudge surfaces that is not the send site: `HostSessionNudge.fs`
+ * only sends, while `TurnCompletionProgram.fs` and `HostReviewGuard.fs` decide the text. Reading the
+ * send site alone would report those two as unmigrated forever, and the tempting response would be to
+ * relabel them rather than to look at where the prose actually lives.
+ *
+ * Omitted when the composer IS the send-site file, so the common case stays quiet.
  */
 const SURFACES = new Map([
   [
@@ -124,8 +132,9 @@ const SURFACES = new Map([
       standing: 'RuntimeInstruction',
       surface: 'Blogger delta prompt (normal and post-restart re-anchor)',
       composer:
-        'CompanionHostBlogger.fs:72,77 prose wrapper around a BloggerToml document — the delta is ' +
-        'canonical, the wrapper is not. N5 target',
+        'CompanionHostBlogger.fs:72,77 prose wrapper around a JSON delta. Blocked on N5b: the delta ' +
+        'currency is still ProjectionSnapshot = string, so wrapping it in ARCH-010 would produce a ' +
+        'conforming document carrying JSON in its value',
     },
   ],
   [
@@ -159,9 +168,10 @@ const SURFACES = new Map([
     'next/OpenCode/HostSessionNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
-      standing: 'RuntimeInstruction',
-      surface: 'continuation nudge',
-      composer: 'TurnCompletionProgram.fs:92,158 + HostReviewGuard.fs:147,164 prose. N5 target',
+      standing: 'CanonicalPayload',
+      surface: 'continuation nudge (provider retry, manager and reviewer review guards)',
+      composer: 'RuntimeNudge.providerRetry / managerReviewGuard / reviewerVerdictGuard',
+      composerFiles: ['next/OpenCode/TurnCompletionProgram.fs', 'next/OpenCode/HostReviewGuard.fs'],
     },
   ],
   [
@@ -177,9 +187,10 @@ const SURFACES = new Map([
     'next/OpenCode/HostSessionNudge.fs#SendInteractionRepair',
     {
       class: 'RuntimeSyntheticToml',
-      standing: 'RuntimeInstruction',
-      surface: 'interaction repair',
-      composer: 'TurnCompletionProgram.fs:227 missing-final-report prose. N5 target',
+      standing: 'CanonicalPayload',
+      surface: 'interaction repair (missing final report)',
+      composer: 'RuntimeNudge.missingFinalReport',
+      composerFiles: ['next/OpenCode/TurnCompletionProgram.fs'],
     },
   ],
 ]);
@@ -319,20 +330,22 @@ export function auditSurfaces(files = productionFiles()) {
   // The standing↔code agreement, in both directions. This is what keeps the N5 worklist honest: a
   // surface cannot be relabelled migrated without routing, and a migrated one cannot silently stop.
   for (const [key, entry] of SURFACES) {
-    const file = key.split('#')[0];
-    const routes = routesThroughCanonicalWriter(file);
+    const composerFiles = entry.composerFiles ?? [key.split('#')[0]];
+    const routes = composerFiles.some(routesThroughCanonicalWriter);
 
     if (entry.standing === 'CanonicalPayload' && !routes) {
       violations.push(
-        `${key} is marked CanonicalPayload but ${file} references no canonical writer ` +
-          `(${CANONICAL_WRITERS.join(', ')}); the label claims a migration that did not happen`,
+        `${key} is marked CanonicalPayload but none of ${composerFiles.join(', ')} references a ` +
+          `canonical writer (${CANONICAL_WRITERS.join(', ')}); the label claims a migration that ` +
+          'did not happen',
       );
     }
 
     if (entry.standing !== 'CanonicalPayload' && routes) {
       violations.push(
-        `${key} is marked ${entry.standing} but ${file} references a canonical writer; either it ` +
-          'composes a payload and the standing is wrong, or the reference is a second dialect',
+        `${key} is marked ${entry.standing} but ${composerFiles.join(', ')} references a canonical ` +
+          'writer; either it composes a payload and the standing is wrong, or the reference is a ' +
+          'second dialect',
       );
     }
   }

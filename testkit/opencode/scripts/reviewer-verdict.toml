@@ -105,7 +105,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "guard-manager-nudged"
 internal = true
-user = "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+user = "# Review is required before completion."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
@@ -125,7 +125,7 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-nudged"
 internal = true
-user = "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
+user = "# Submit a structured verdict with the verdict tool: PERFECT or REVISE."
 tools = ["verdict"]
 
   [[turn.step]]

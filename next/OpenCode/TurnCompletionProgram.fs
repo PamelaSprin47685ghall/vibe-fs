@@ -89,7 +89,7 @@ module TurnCompletionProgram =
                         HostSessionNudge.sendContinuationResult
                             sessionPort
                             turn.SessionId
-                            "Continue after provider failure."
+                            RuntimeNudge.providerRetry
                             PromptAuthority.ProviderRetryAttempt
                             turn.Directory
                             journal
@@ -223,13 +223,7 @@ module TurnCompletionProgram =
             // not completable, then ask for the missing report. Still not fallback.
             TerminalSessionA.accumulateTurn eventPort turn |> ignore
 
-            let repairPrompt =
-                "Your tool work is complete, but no final task report was produced. "
-                + "Return a concise final report containing:\n"
-                + "- result\n- evidence\n- files changed\n- tests run\n- remaining risks or blockers\n"
-                + "Do not call another tool unless necessary."
-
-            sendRepair sessionPort eventPort journal turn repairPrompt "missing-final-report"
+            sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore
             Pty.abortParent sessionKey

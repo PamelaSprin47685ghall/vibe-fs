@@ -144,7 +144,7 @@ module HostReviewGuard =
             sessionId
             triggerProviderRun
             (sprintf "missing-review:%s" treeHash)
-            "Review is required before completion. Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+            RuntimeNudge.managerReviewGuard
             "manager"
 
     let nudgeReviewer
@@ -161,7 +161,7 @@ module HostReviewGuard =
             sessionId
             triggerProviderRun
             "missing-verdict"
-            "Submit a structured verdict with the verdict tool: PERFECT or REVISE. Do not put a verdict in prose."
+            RuntimeNudge.reviewerVerdictGuard
             "reviewer"
 
     /// REVIEW-003: the first PERFECT is recorded but not confirmed. This nudge only

@@ -11,7 +11,7 @@
 # ── why five edges became two turns ─────────────────────────────────────────
 #
 # The JSON form had `req-a2`, `req-b1`, `req-b2` as three separate edges whose `user`
-# text was character-identical ("Continue after provider failure."). They were told
+# text was character-identical (the provider-retry nudge). They were told
 # apart by `lane.turn = 2|3|4` — a hand-maintained ordinal — and by `match.model`.
 #
 # Both of those are retired, and correctly so: under (lane, turn, step) the three
@@ -70,7 +70,7 @@ user = "Prove same-run provider AABB trajectory."
 [[turn]]
 id = "continue"
 internal = true
-user = "Continue after provider failure."
+user = "# Continue after provider failure."
 
   [[turn.step]]
   respond = { type = "text", text = "unreachable: every delivery of this step is refused" }

@@ -328,7 +328,7 @@ user = "Ship the parser fix."
 [[turn]]
 id = "guard"
 internal = true
-user = "Review is required before completion."
+user = "# Review is required before completion."
 
   [[turn.step]]
   respond = { type = "text", text = "acknowledged" }
@@ -360,7 +360,7 @@ user = "Ship the parser fix."
 [[turn]]
 id = "guard"
 internal = true
-user = "Review is required before completion."
+user = "# Review is required before completion."
 
   [[turn.step]]
   respond = { type = "text", text = "acknowledged" }
@@ -376,7 +376,7 @@ user = "Review is required before completion."
         request([
           user('Ship the parser fix.'),
           assistant('done'),
-          user('Review is required before completion.'),
+          user('# Review is required before completion.'),
         ]),
       );
       assertEq(runtime.unmetMust().length, 0);

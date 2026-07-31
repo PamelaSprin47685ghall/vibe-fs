@@ -28,6 +28,7 @@
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
+    <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Domain/ForkChildPayload.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>
