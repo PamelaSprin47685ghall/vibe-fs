@@ -114,8 +114,8 @@ module VerdictTool =
                           ReviewerSessionId = SessionId.create reviewerId
                           ManagerJobId = managerJobId
                           WorktreeIdentity = worktreeIdentity
-                          ProviderRun = ProviderRunIdentity.create providerRunId
-                          ToolCallId = ToolCallId.create toolCallId
+                          ProviderRun = providerRunId
+                          ToolCallId = toolCallId
                           Verdict = value }
 
                     // No terminal notification here. A confirmed dual-PERFECT

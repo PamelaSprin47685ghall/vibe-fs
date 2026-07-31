@@ -202,8 +202,8 @@ HandleProjection.isRetired       0   EXEC-009 的 fork 前置检查
 | HOST-004: Reconciler | CONFORMANT | `SessionReconciler.fs` | single-flight + dirty latch 已实现 |
 | HOST-005: A 版分段 | PARTIAL | `TerminalSessionA.fs` | ARecord 未按 ProviderRun 分段 |
 | HOST-009: Host 生命周期 | PARTIAL | `SpikePlugin.fs:120,127` | 双 transform hook 注册 + 幂等 guard |
-| HOST-010: Transform → ProviderRunIdentity 绑定 | NOT_IMPLEMENTED | — | 绑定判据与 fail-closed 条件均不存在。可实现性已证明 |
-| HOST-011: Tool 身份两个半边 | PARTIAL | `ToolHostCodec.fs:149-151` | `messageID` / `callID` 读取正确；`userMessageID` 是死字段（Host 源码中不存在该字段） |
+| HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
+| HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
 
 ## 验证
 
@@ -323,4 +323,3 @@ VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未�
 表达前者的位置。后者更隐蔽，因为它不会在任何一列里显示成非 `CONFORMANT`——代码正确、
 测试全绿、状态表满分，而约束根本不存在于规范里。发现途径也只有一条：写测试时问「这条
 断言的权威在哪」，答不出来就是缺口。
-

@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Thoth.Json
+open Wanxiangshu.Next.Kernel.Identity
 
 /// Opaque Host arguments. Dynamic property access is confined to this codec.
 type HostToolArguments internal (raw: obj) =
@@ -58,8 +59,8 @@ type HostToolArguments internal (raw: obj) =
 type HostToolContext =
     { SessionId: string
       Agent: string option
-      ToolCallId: string option
-      ProviderRunId: string option
+      ToolCallId: ToolCallId option
+      ProviderRunId: ProviderRunIdentity option
       PromptText: string option
       AttachAbort: (unit -> unit) -> (unit -> unit) }
 
@@ -173,8 +174,12 @@ module ToolHostCodec =
     let decodeContext (raw: obj) =
         { SessionId = contextString raw "sessionID" |> Option.defaultValue ""
           Agent = contextString raw "agent"
-          ToolCallId = contextString raw "toolCallId" |> Option.orElse (contextString raw "callID")
-          ProviderRunId = contextString raw "messageID" |> Option.orElse (contextString raw "messageId")
+          ToolCallId =
+              contextString raw "callID"
+              |> Option.map ToolCallId.create
+          ProviderRunId =
+              contextString raw "messageID"
+              |> Option.map ProviderRunIdentity.create
           PromptText = promptText raw
           AttachAbort = attachAbort raw }
 
