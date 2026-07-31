@@ -2,7 +2,7 @@
 
 状态允许值：`CONFORMANT` | `PARTIAL` | `CONTRADICTS` | `UNVERIFIED` | `NOT_IMPLEMENTED`
 
-绑定 commit：`2e5fc0c8`（PERSIST-009 journal-less Companion 与 Executor durable Journal；静态门禁通过）。本表只记录截至该提交的源码状态。
+绑定 commit：`5b546450`（CTX-006 账目书：X-wire 探针链与 BlogSquash 生产链接线完成、K9 物理删除收尾。dotnet 0 错误、Fable 新鲜、436 测试三时区全绿、gate:static 6/6 绿、test:harness 273 绿）。本表只记录截至该提交的源码状态。
 
 休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
 
@@ -27,7 +27,7 @@
 | PROMPT-005: 四阶段协议 | UNVERIFIED | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 包 A：四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生 |
 | PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定 |
 | PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
-| PROMPT-008: 原子 AttemptExecutionProfile | CONTRADICTS | `Domain/AttemptPlanner.fs` | `buildAttemptExecutionProfile` 的唯一构造函数已定义，但当前全仓生产调用点为 0；现有 provider request 尚未从该 profile 出发。`single-constructor` 只证明无旁路，不能把零调用误报为合规；X-wire 前置必须先接线 |
+| PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.fs` `OpenCode/XWire.fs` `OpenCode/CompanionTransform.fs` | `buildAttemptExecutionProfile` 唯一调用点 `AttemptPlanner.plan`（`AttemptPlanner.fs:65`），被 `XWire.applyTransform` 与 `CompanionTransform` 真实调用；`RequestKind` / `ProjectionChoice` 作为 profile 不可变字段进入 transform 边界，`XWire.reconcileAttempt` 从同一 profile 判 promote。`single-constructor` 双向检查（无旁路 + 有调用）由 `architecture-gate` 守护。第 1 层测试 18 项（`Context/attempt-plan.test.mjs`） |
 | PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
 | PROMPT-011: 未决发送恢复 | PARTIAL | `Domain/PromptAuthority.derivePromptKey` | 包 A：PromptKey 已按条款派生并写入 Host metadata，`ClaimSequence` 由 fold 推进。仍缺启动期 tail window 查找与 `RecoveryAttemptBudget = 3`（属清场期） |
 
@@ -147,8 +147,13 @@ target ref 的工作再拉起一个 Manager。
 |------|------|-------------|------|
 | COMPANION-001: 每个 Work Session 都有 Companion | CONFORMANT | `Journal/SessionAssociation.fs` | 角色白名单已删除。关联 API 不接受 role 参数，因此 role 无法影响它不是输入的决定 |
 | COMPANION-002: Companion 是叶子 | CONFORMANT | `SessionAssociationProjection.link` | 一次 `link` 写双向条目，`isCompanion` O(1)；递归、重复 Y、抢占 Y、自链四种非法态由 fold fail closed |
+| COMPANION-003: A(X) 与 B(X) | CONFORMANT | `Domain/CompanionProjectionBuilder.fs` `Session/CompanionHostBlogger.fs` | LatestB / CoverableB / FrozenB 三分：probe 只用 CoverableB（CTX-011），`join().workRecord` = LatestB，FrozenB 只在 rebase 时变。`Context/blog-projection.test.mjs` 锁 Coverage 与 frame 语义 |
+| COMPANION-004: Y 的 System Prompt | CONFORMANT | `Session/CompanionPrompt.fs` `Session/CompanionTransform.fs` | system prompt 只建立投影形状三事实，不携带 token/预算（CTX-001 负向断言）；Y 的 system prompt 与 X 无共享可变文本。第 1 层测试 `COMPANION_004_system_prompt_establishes_the_three_facts_the_shape_needs` |
+| COMPANION-005: BlogFrame 增量投影 | CONFORMANT | `Session/BloggerDelta.fs` `OpenCode/CompanionTransform.fs` | delta 物理最后（理由改为「让物理 delta 同时是 provider 看到的最后一条」）；忙时跳过不排队；累积与发送分离。第 1 层测试 `COMPANION_005_normal_instruction_forbids_rewriting_prior_frames` |
 | COMPANION-008: 忙时跳过 | CONFORMANT | `Companion.Submit` | 忙时返回 `SkippedBusy` 并原样退出，不推进 coverage、不排队、不计数。「三次 busy skip」计数已删 |
-| COMPANION-009: PrefixEpoch | PARTIAL | `Journal/PrefixEpochProjection.fs` `Domain/XPrefixProjection.fs` | 单轨：epoch 递增、snapshot 退役、X 前缀计划全在新投影。旧 `switchEpoch` / `ReplacementActive` / `ActivePrefixEpoch` 双轨已删。差距是 `XPrefixProjection` 尚未接进 transform 边界，当前 X 一律发原始历史 |
+| COMPANION-009: PrefixEpoch | CONFORMANT | `Journal/PrefixEpochProjection.fs` `Domain/XPrefixProjection.fs` `OpenCode/XWire.fs` | 单轨：epoch 递增、snapshot 退役、X 前缀计划全在新投影。X-wire 已接进 transform 边界：`XWire.applyTransform` 在 armed 恢复槽经 `AttemptPlanner.plan` 构造 `XPrefixPlan` 并 `replaceMessagesInPlace`；`reconcileAttempt` 提升 `PrefixRebaseCommitted`。无 snapshot / 无探针时 X 看到原始历史（SSOT/12 正确中间态，非降级）。第 1 层测试覆盖 `Context/prefix-epoch.test.mjs` 与 `Context/probe-selection.test.mjs` |
+| COMPANION-010: 低信任 Companion Memory 注入 | CONFORMANT | `Domain/CompanionIdentity.fs` `OpenCode/XWire.fs` | FrozenB 以低信任 context block 注入（`rawWithPrefix`），不伪装 human/system instruction，无随机 ID / 当前时间。第 1 层测试 `COMPANION_010_the_memory_is_wrapped_as_low_trust_context` |
+| COMPANION-011: Cutoff 证明 | CONFORMANT | `Domain/PrefixProbeSelection.fs` `OpenCode/XWire.fs` | 投影前重算 `hash(messages[0..cutoff])`，失配 fail closed；digest 失配不作 compaction 处置（归 HOST-006 重锚）。第 1 层测试 `COMPANION_011_a_digest_mismatch_fails_closed` 等 |
 | COMPANION-013: Synthetic 稳定身份 | PARTIAL | `Domain/CompanionIdentity.fs` | 四个公式已实现且有第 1 层测试（可见 sha256 断言字段组合）。旧 `CompanionDelta.bHeadDigest` 已删，`companionMemoryMessageId` 成为唯一 synthetic 头部身份。仍缺门禁证明无 GUID / random / 当前时间 |
 
 ## Execution
@@ -189,6 +194,8 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | HOST-003: Transport 与 Domain 分离 | CONFORMANT | `HostSignal.fs` | — |
 | HOST-004: Reconciler | CONFORMANT | `SessionReconciler.fs` | single-flight + dirty latch 已实现 |
 | HOST-005: A 版分段 | PARTIAL | `TerminalSessionA.fs` | ARecord 未按 ProviderRun 分段 |
+| HOST-006: Compaction 预防与收容 | CONFORMANT | `OpenCode/HostCompactionGate.fs` `OpenCode/HostSignalBootstrap.fs` | 预防层四项（auto/overflow/autocontinue/prune）关闭，写不进配置则启动失败；收容层把任何观察到的 compaction 转成一次 `ContextReanchored`（永远 armed，幂等，不分类来源）。第 1 层测试 14 项（`Context/host-compaction-policy.test.mjs`） |
+| HOST-008: Session 关联 | CONFORMANT | `Journal/SessionAssociation.fs` `Domain/ManagedSessionKind.fs` | `ManagedSessionKind` 持久化，`isCompanion` O(1)；递归/重复 Y/自链/一 Y 两主均 fail closed；role 不影响关联。第 1 层测试 16 项（`Context/session-association.test.mjs`） |
 | HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。本次仅有静态证据，Host canary 待退火三 |
 | HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
 | HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
@@ -264,16 +271,39 @@ VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未�
 
 `single-constructor` 门禁现在检查两侧：无人手工拼装，且 builder 至少有一个调用点。
 当前唯一调用点是 `AttemptPlanner.plan` 内部对 builder 的调用；门禁不等价于检查
-`AttemptPlanner.plan` 自身是否被 provider 发送链调用。X-wire 接线前，PROMPT-008
-仍为 `CONTRADICTS`。
+`AttemptPlanner.plan` 自身是否被 provider 发送链调用。
+
+X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.plan` 被
+`XWire.applyTransform` 与 `CompanionTransform` 真实调用，profile 携带
+`RequestKind` / `ProjectionChoice` 进入 transform 边界的投影决策，`reconcileAttempt`
+从同一 profile 判 promote。本表 PROMPT-008 行相应从 `CONTRADICTS` 升为 `CONFORMANT`。
+
+## 失败驱动上下文恢复（SSOT/12）
+
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| CTX-001: 不观察上下文容量 | CONFORMANT | 全仓灭绝表 | 包 X9 灭绝 `estimateTokens` / `shouldSwitchEpoch` / `CompanionBudgetStore` 等全部容量观察；唯一字节计量是 CTX-003 的 `BloggerDeltaLimitBytes`（输入合同，不与窗口比较）。第 1 层测试 `CTX_001_no_prompt_carries_a_token_count_or_output_budget` |
+| CTX-002: 不主动预测溢出 | CONFORMANT | `OpenCode/CompanionTransform.fs` | 主动压缩层整体删除（注释逐条列明旧机制）；恢复只由真实失败驱动——`HostSignalBootstrap.onTurn` 失败后 `ArmRecovery`，下一次 transform 才规划探针。第 1 层测试在 `Context/` 各文件 |
+| CTX-003: 最低上下文环境合同 | CONFORMANT | `Domain/BloggerDelta.fs:41` | `DeltaLimitBytes = 200 * 1024`，约束渲染后 UTF-8 字节数；与模型窗口无关。第 1 层测试 `CTX_003_delta_limit_is_200_KiB` 等 |
+| CTX-004: 输出预算属于 provider | CONFORMANT | `Domain/TerminalValidity.fs` | 唯一内容级校验（非空 + 非 XML-only），无供应商依赖；repair 预算由 `ClaimSequences` 派生。第 1 层测试 5 项 |
+| CTX-005: 失败不分类 | CONFORMANT | `Domain/RecoverySlot.fs` | `AttemptOutcome` 只有 `Completed` / `CompletedInvalid` / `Failed` / `Aborted`，无 Overflow 分支；Failed/Aborted 同路径；HOST-006 收容不分类来源。第 1 层测试 `CTX_005_Failed_and_Aborted_take_the_identical_path` 等 |
+| CTX-006: 恢复槽的两种动作 | CONFORMANT | `Domain/RecoverySlot.fs` `OpenCode/XWire.fs` `Session/CompanionHostBlogger.fs` | `mayRecover` 三条件合取（armed + primed + material）；X 走 prefix probe（无额外 LLM），Y 走 squash（一次额外 LLM）。两条生产链均已接线。第 1 层测试含 parked-cursor 反例 |
+| CTX-007: Attempt 三结局按 RequestKind 分派 | CONFORMANT | `Domain/RecoverySlot.fs` `Session/CompanionHostBlogger.fs` | `onSquashOutcome` / `onMainOutcome` 覆盖六行分派表；`CommitSquashThenMain` 是 `BlogSquashCommitted` 唯一提交路径（`AppendSquash`）；repair 一次预算。第 1 层测试 9 项 |
+| CTX-008: 恢复槽的失败计数 | CONFORMANT | `RecoverySlot.advancesCursor` | 恰好一个决策推进 cursor；squash 成功不清零 count。第 1 层测试 `CTX_008_only_a_failed_slot_advances_the_cursor` |
+| CTX-009: X 不发压缩请求 | CONFORMANT | `OpenCode/XWire.fs` | X 的恢复操作只有本地投影变换（前缀替换），无摘要/压缩 LLM 请求路径 |
+| CTX-010: X 前缀替换是 attempt-local probe | CONFORMANT | `Domain/XPrefixProjection.fs` `Domain/AttemptPlanner.fs` | probe 是不可变 `AttemptExecutionProfile.ProjectionChoice` 的一部分（PROMPT-008），非 session 状态；`promotableProbe` 只接受 Completed+valid；失败 probe 无任何事实。第 1 层测试 13 项 |
+| CTX-011: 覆盖游标与候选选择 | CONFORMANT | `Domain/PrefixProbeSelection.fs` `Domain/BloggerDelta.fs` | `SemanticCursor` / `Coverage` 两量分离；候选选择 9 步含 cutoff proof、digest fail-closed、squash 让 B 更紧凑仍为新候选。第 1 层测试 14 项 |
+| CTX-012: 提交语义 | CONFORMANT | `OpenCode/XWire.fs` `Journal/BlogProjection.fs` | `PrefixRebaseCommitted` 唯一 writer 是 `XWire.reconcileAttempt`；probe SealRoot 被 promote 原样继承；squash 永久提交不回滚、级联成立、宽度 ceil(m/2)。第 1 层测试跨 4 文件 |
+| CTX-013: BloggerDeltaProjection 与 TOML 编码 | CONFORMANT | `Session/BloggerDelta.fs` `Session/BloggerToml.fs` `Session/SyntheticToml.fs` | 三级切块 + 硬截断 + 图片 omitted marker + 确定性 TOML（固定键序、`'''` 字面量、closing 独占一行、无时间/随机/Host ID）；instruction header 计入 200 KiB。第 1 层测试 55 项跨 3 文件 |
+| CTX-014: 诊断可观测性边界 | PARTIAL | `OpenCode/HostCompactionGate.fs` `OpenCode/HostSignal.fs` | 允许字段与禁止字段清单已在规范定稿；诊断只进日志不进 Journal 判据（HOST-007）。仍缺一处统一诊断 schema 与「禁止字段」负向测试 |
 
 ## 未列入本表的条款
 
 `AGENT-*` 中除 AGENT-007 外的条款（20 个 Agent、能力矩阵、内部 Agent 不可见）与 `REVIEW-001` `REVIEW-002`
 `REVIEW-008` `REVIEW-009`、`ORCH-004`、`EXEC-001` ~ `EXEC-003`
-`EXEC-006` ~ `EXEC-008` `EXEC-010` `EXEC-012` ~ `EXEC-014`、`COMPANION-003` ~
-`COMPANION-007` `COMPANION-010` ~ `COMPANION-012`、`HOST-001` `HOST-006` `HOST-007`
-`HOST-008`、`ARCH-005` `ARCH-006` `ARCH-008`、`VERIFY-002` `VERIFY-006`、
+`EXEC-006` ~ `EXEC-008` `EXEC-010` `EXEC-012` ~ `EXEC-014`、`COMPANION-006`
+`COMPANION-007` `COMPANION-012`、`HOST-001` `HOST-007`
+`ARCH-005` `ARCH-006` `ARCH-008`、`VERIFY-002` `VERIFY-006`、
 `PERSIST-003` `PERSIST-007` 当前未逐条核验，
 状态为 `UNVERIFIED`。
 
