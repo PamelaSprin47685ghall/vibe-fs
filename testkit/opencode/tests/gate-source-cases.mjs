@@ -511,8 +511,12 @@ user = "go on"
       // reviewer-restart) had no declaration and all four fail-stopped on the Blogger
       // request. A missing declaration is silent at load time and fatal at run time, which
       // is precisely the asymmetry a load-time gate should remove.
+      // `31d4958b` switched the blogger turns to the actual header production sends
+      // (`CompanionPrompt.fs:40`), so the probe must look for the same header — the stale
+      // literal below reported all 15 scenarios as missing while every one of them
+      // declared the turn.
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('You are the blogger of a coding agent session.'),
+        (file) => !readFileSync(file, 'utf8').includes('The next user message is the new session material in TOML.'),
       );
 
       assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);
