@@ -99,6 +99,9 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         | Some t -> t :> Task
         | None -> Task.FromResult(()) :> Task
 
+    member _.UpdateBlog(blog: BlogProjectionState) : unit =
+        lock lockObj (fun () -> blogProjection <- blog)
+
     member this.Submit
         (currentProjection: ProviderSemanticProjection, blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<BloggerCompletion>)
         : CompanionOutcome =

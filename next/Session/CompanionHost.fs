@@ -112,6 +112,7 @@ type CompanionHost
           RequestKind = bloggerRequestKind
           SquashFrameCount = bloggerSquashFrameCount
           Journal = journal
+          Durable = durable
           EffectiveAgent = bloggerEffectiveAgent }
 
     member this.SubmitProjection(projection: ProviderSemanticProjection) : CompanionOutcome =

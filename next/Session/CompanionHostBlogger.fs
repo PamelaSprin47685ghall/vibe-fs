@@ -24,12 +24,13 @@ module internal CompanionHostBlogger =
           SquashFrameCount: int option ref
           BloggerNeedsReset: bool ref
           Journal: AgentJournal option
+          Durable: ICompanionDurablePort option
           EffectiveAgent: string }
 
     let private failBlog (message: string) : BloggerCompletion =
         raise (InvalidOperationException message)
 
-    let private failSquash (message: string) : BloggerCompletion =
+    let private failSquash (message: string) : BloggerSquashCompletion =
         raise (InvalidOperationException message)
 
     /// COMPANION-002: the Blogger is prompted like any other agent-owned child.
@@ -119,7 +120,7 @@ module internal CompanionHostBlogger =
                 | Failed error -> return failBlog error
         }
 
-    let squash (deps: BloggerDeps) (frameCount: int) : Task<BloggerCompletion> =
+    let squash (deps: BloggerDeps) (frameCount: int) : Task<BloggerSquashCompletion> =
         task {
             let! childId = deps.EnsureBlogger()
             let completion =
@@ -152,7 +153,26 @@ module internal CompanionHostBlogger =
                 | Completed result ->
                     match TerminalValidity.check result.TurnFormalText with
                     | Error rejection -> return failSquash (TerminalValidity.describe rejection)
-                    | Ok() -> return failSquash "SHOCK-UNMIGRATED[CTX-006]: squash not wired"
+                    | Ok() ->
+                        match deps.Durable with
+                        | None -> return failSquash "No durable Companion port: squash cannot be committed"
+                        | Some durable ->
+                            let completion =
+                                { BloggerSessionId = childId
+                                  ProviderRun = result.ProviderRun
+                                  Text = result.TurnFormalText
+                                  CoveredFrameCount = frameCount }
+
+                            match durable.AppendSquash(childId, completion) with
+                            | Error error -> return failSquash error
+                            | Ok updatedBlog ->
+                                deps.Companion.UpdateBlog updatedBlog
+
+                                return
+                                    { BloggerSessionId = childId
+                                      ProviderRun = result.ProviderRun
+                                      Text = result.TurnFormalText
+                                      CoveredFrameCount = frameCount }
                 | Aborted reason -> return failSquash reason
                 | Failed error -> return failSquash error
         }

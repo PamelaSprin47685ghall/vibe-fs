@@ -140,6 +140,11 @@ D2. `BloggerSquash` 成功后如何继续 BloggerMain：
 P1  源码判定：Y 的 squash 能否在现有 Host hook 内异步完成
     输入：`../opencode/packages/opencode/src/session/prompt.ts` transform 调用点
     输出：判定 D2c 可行，或需要 SSOT 例外 / 改 Host（后者被 ARCH-003 禁止）
+    结论：可行。`plugin/index.ts:282-290` 将 `experimental.chat.messages.transform`
+          声明为 `Promise<void>`；`prompt.ts:1255` 以 `yield*` 等待该 Promise。
+          `SpikePlugin.fs:59` 的 `transform inObj outObj : Task<unit>` 已是异步，
+          故 `handleCompanionTransform` 可改为 `Task<unit>`，在 Y Session 内部异步
+          完成 squash 后再设置 `outObj.messages` 为 BloggerMain。
 
 P2  将 Y arming 接入 CompanionTransform（方案 A1a 或根据 P1 调整）
     输入：XWire.applyTransform 的 armed 槽信息、Blog.hasCoverage

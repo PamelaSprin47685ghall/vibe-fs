@@ -17,6 +17,12 @@ type BloggerCompletion =
       NextCoverableTurnCutoffExclusive: int
       NextCoveredPrefixDigest: string }
 
+type BloggerSquashCompletion =
+    { BloggerSessionId: SessionId
+      ProviderRun: ProviderRunIdentity
+      Text: BlogText
+      CoveredFrameCount: int }
+
 type CompanionOutcome =
     | Submitted
     | SkippedBusy
@@ -43,6 +49,7 @@ type CompanionMemory =
 type ICompanionDurablePort =
     abstract Load: SessionId -> Result<CompanionMemory option, string>
     abstract AppendSuccessful: SessionId * BloggerCompletion -> Result<BlogProjectionState, string>
+    abstract AppendSquash: SessionId * BloggerSquashCompletion -> Result<BlogProjectionState, string>
 
     /// COMPANION-003. Takes the Blogger's own SessionId, not a `ChildId` plus a
     /// `"blogger"` target string: the previous shape recorded an EXEC-009 handle

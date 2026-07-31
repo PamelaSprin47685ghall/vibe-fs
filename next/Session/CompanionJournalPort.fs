@@ -99,6 +99,46 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                 | Some _ -> Error "Blogger completion belongs to a different Blogger session"
                 | None -> Error "BlogEntryCommitted requires a durably linked Blogger session"
 
+        member _.AppendSquash(sessionId, completion) =
+            let projection = AgentJournal.snapshot journal
+
+            match Map.tryFind sessionId projection.AgentProjections.Sessions with
+            | None -> Error "BlogSquashCommitted requires an existing work session projection"
+            | Some session ->
+                match session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId) with
+                | Some bloggerSessionId when bloggerSessionId = completion.BloggerSessionId ->
+                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+
+                    match blobWriter.Write completion.Text with
+                    | Error error -> Error error
+                    | Ok blob ->
+                        let previousEpoch = blog.FrameEpochId
+                        let nextEpoch = FrameEpochId.next previousEpoch
+
+                        let fact =
+                            AgentFact.BlogSquashCommitted
+                                {| SessionId = sessionId
+                                   BloggerSessionId = completion.BloggerSessionId
+                                   PreviousFrameEpochId = previousEpoch
+                                   NextFrameEpochId = nextEpoch
+                                   CoveredFrameCount = completion.CoveredFrameCount
+                                   TextRef = blob.BlobRef
+                                   TextDigest = blob.BlobDigest
+                                   ProviderRun = completion.ProviderRun |}
+
+                        match AgentJournal.appendAgent
+                                  (StreamId.Session sessionId)
+                                  (Some completion.ProviderRun)
+                                  fact
+                                  journal with
+                        | Error failure -> Error(JournalAppendFailure.describe failure)
+                        | Ok updated ->
+                            match Map.tryFind sessionId updated.AgentProjections.Sessions with
+                            | Some { Blog = Some blog } -> Ok blog
+                            | _ -> Error "BlogSquashCommitted append returned no blog projection"
+                | Some _ -> Error "Blogger squash completion belongs to a different Blogger session"
+                | None -> Error "BlogSquashCommitted requires a durably linked Blogger session"
+
         member _.LinkBlogger(sessionId, bloggerSessionId, bloggerAgent) =
             append
                 sessionId
