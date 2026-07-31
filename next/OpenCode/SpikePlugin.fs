@@ -67,18 +67,18 @@ module SpikePlugin =
                             |> Option.bind (fun sid -> scope.TryRecoveryArming (SessionId.create sid))
 
                         do! CompanionTransform.handleCompanionTransform
-                            scope.Companions
-                            scope.CompanionGate
-                            sessionPort
-                            journal
-                            (Some(fun bloggerId ->
-                                // Register ownership + ActiveRun so idle→reconcile
-                                // emits TerminalOutcome.Completed for this child.
-                                wired.RegisterOwned(SessionId.value bloggerId)
-                                wired.BindActiveRun bloggerId AgentRole.Blogger None))
-                            inObj
-                            outObj
-                            arming
+                                scope.Companions
+                                scope.CompanionGate
+                                sessionPort
+                                journal
+                                (Some(fun bloggerId ->
+                                    // Register ownership + ActiveRun so idle→reconcile
+                                    // emits TerminalOutcome.Completed for this child.
+                                    wired.RegisterOwned(SessionId.value bloggerId)
+                                    wired.BindActiveRun bloggerId AgentRole.Blogger None))
+                                inObj
+                                outObj
+                                arming
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
 

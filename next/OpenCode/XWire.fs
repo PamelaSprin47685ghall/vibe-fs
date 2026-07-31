@@ -182,16 +182,16 @@ module XWire =
                                             prefix.Snapshot
                                             frozenBody
 
-                                     let transformed = rawWithPrefix rawMessages prefixPlan
-                                     Wanxiangshu.Next.Session.CompanionProjection.replaceMessagesInPlace output transformed
-                                     scope.RecordAttemptPlan sessionId providerRun plan
+                                    let transformed = rawWithPrefix rawMessages prefixPlan
+                                    Wanxiangshu.Next.Session.CompanionProjection.replaceMessagesInPlace output transformed
+                                    scope.RecordAttemptPlan sessionId providerRun plan
 
-                                     if mayRecover then
-                                         state.Companion
-                                         |> Option.bind (fun companion -> companion.BloggerSessionId)
-                                         |> Option.iter scope.ArmRecovery
+                                    if mayRecover then
+                                        state.Companion
+                                        |> Option.bind (fun companion -> companion.BloggerSessionId)
+                                        |> Option.iter scope.ArmRecovery
 
-                                     scope.ClearRecovery sessionId
+                                    scope.ClearRecovery sessionId
                                 | _ ->
                                     raise (InvalidOperationException "X-wire cannot plan a retry without authority, fallback, and session projections")
             | _ -> return ()
@@ -254,12 +254,10 @@ module XWire =
             | TurnAborted reason ->
                 match scope.SessionParents.TryGetValue(SessionId.value turn.SessionId) with
                 | true, parentKey ->
-                    let parentId = SessionId.create parentKey
-
                     FallbackController.recordConfirmedFailure
                         durable
                         12
-                        parentId
+                        (SessionId.create parentKey)
                         turn.ProviderRun
                         reason
                     |> ignore
