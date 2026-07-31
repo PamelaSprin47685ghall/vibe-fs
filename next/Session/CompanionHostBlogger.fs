@@ -73,9 +73,7 @@ module internal CompanionHostBlogger =
                         (deps.Companion.Memory.LatestB |> Option.defaultValue "")
                         projectionText
                 else
-                    sprintf
-                        "You are the blogger of a coding agent session. Write one dense paragraph for these delta messages.\n%s"
-                        chunk.Toml
+                    chunk.Toml
 
             let! sent = sendBloggerPrompt deps childId prompt
 
