@@ -18,9 +18,6 @@ import {
   extractToolNames,
   extractLastUserMsg,
   requestKindOf,
-  requestRoleOf,
-  requestSessionOf,
-  requestParentSessionOf,
 } from './strict-mock-matches.js';
 import { sealHolds, wireOf } from './provider-wire.js';
 import {
@@ -48,6 +45,19 @@ import {
   pushExpectation,
   resetState,
 } from './strict-mock-state.js';
+
+const headerValue = (headers, names) => {
+  for (const name of names) {
+    const value = headers[name];
+    if (typeof value === 'string' && value !== '') return value;
+  }
+  return null;
+};
+
+const requestContextOf = (headers) => ({
+  sessionId: headerValue(headers, ['x-session-affinity', 'x-session-id', 'x-opencode-session']),
+  parentSessionId: headerValue(headers, ['x-parent-session-id']),
+});
 
 export class StrictMockProvider {
   constructor() {
@@ -277,8 +287,7 @@ export class StrictMockProvider {
 
   _handleChat(req, res) {
     readRequestBody(req).then((parsed) => {
-      Object.defineProperty(parsed, '__testkitHeaders', { value: req.headers, enumerable: false });
-      this._dispatchChat(res, parsed);
+      this._dispatchChat(res, parsed, requestContextOf(req.headers));
     })
       .catch((error) => {
         // Never mask a dispatch/hook failure as a body-parse failure: the
@@ -296,8 +305,8 @@ export class StrictMockProvider {
    * method only turns its verdict into HTTP. Nothing here inspects the request — that
    * would be a second matcher, which is what K1-K8 spent their whole effort removing.
    */
-  _dispatchScenario(res, parsed) {
-    const selection = this._scenario.select(parsed);
+  _dispatchScenario(res, parsed, context) {
+    const selection = this._scenario.select(parsed, context);
 
     if (selection.unmatched !== undefined) {
       const key = selection.unmatched.key;
@@ -307,6 +316,7 @@ export class StrictMockProvider {
         'no-declared-turn',
         selection.unmatched.candidates.map((entry) => ({ expectation: entry })),
         `lane=${key.lane ?? '(unbound)'} kind=${key.kind} step=${key.step}`,
+        context,
       );
     }
     if (selection.ambiguous !== undefined) {
@@ -315,13 +325,15 @@ export class StrictMockProvider {
         parsed,
         'ambiguous-turn',
         selection.ambiguous.entries.map((entry) => ({ expectation: entry })),
+        '',
+        context,
       );
     }
     if (selection.sealBroken !== undefined) {
-      return this._recordUnexpected(res, parsed, `seal-${selection.sealBroken.reason}`, []);
+      return this._recordUnexpected(res, parsed, `seal-${selection.sealBroken.reason}`, [], '', context);
     }
 
-    this._scenario.consume(parsed, selection);
+    this._scenario.consume(parsed, selection, context);
     this._state.requests.push(parsed);
 
     // A fault is a transport outcome, so it wakes NOTHING. `wait` is a causal barrier on
@@ -358,7 +370,7 @@ export class StrictMockProvider {
     return respond(this._state, res, entry, parsed);
   }
 
-  _dispatchChat(res, parsed) {
+  _dispatchChat(res, parsed, context) {
     this.onRequest?.(parsed);
     const s = this._state;
     // First script mismatch already happened: do not attempt further matches.
@@ -376,6 +388,8 @@ export class StrictMockProvider {
       console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} chars=${JSON.stringify(parsed.messages || []).length} lastUser=${lastUser}`);
     }
 
+    if (this._scenario !== null) return this._dispatchScenario(res, parsed, context);
+
     // ARCH-004 / COMPANION-009: no sniffed cold-boundary exemptions.
     //
     // `epochCold` (tools + system unchanged) and `modelSideCold` (model id changed)
@@ -386,26 +400,24 @@ export class StrictMockProvider {
     //
     // A legitimate cold boundary belongs in the scenario as an explicit `[[epoch]]`
     // declaration (VERIFY-003, package K4).
-    const sessionID = requestSessionOf(parsed);
+    const sessionID = context.sessionId;
     const kind = requestKindOf(parsed);
     if (this._scenario === null && sessionID && kind === 'chat') {
       const sealed = s.sealedBySession.get(sessionID);
       if (!sealHolds(sealed, parsed)) {
-        this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', []);
+        this._recordUnexpected(res, parsed, 'prefix-cache-invalidated', [], '', context);
         return;
       }
     }
 
-    if (this._scenario !== null) return this._dispatchScenario(res, parsed);
-
-    const selection = selectExpectation(s, parsed);
-    if (selection.match) return this._dispatchMatched(res, parsed, selection.match);
-    this._recordUnexpected(res, parsed, selection.reason, selection.candidates);
+    const selection = selectExpectation(s, parsed, context);
+    if (selection.match) return this._dispatchMatched(res, parsed, selection.match, context);
+    this._recordUnexpected(res, parsed, selection.reason, selection.candidates, '', context);
   }
 
-  _dispatchMatched(res, parsed, match) {
+  _dispatchMatched(res, parsed, match, context) {
     const s = this._state;
-    const sessionID = requestSessionOf(parsed);
+    const sessionID = context.sessionId;
     const exp = consumeExpectation(s, match, sessionID);
     // Dual-PERFECT reusable templates (reusable && !neverEnd) wake only the
     // primary wait id once per match so later waits claim the next occurrence.
@@ -434,9 +446,9 @@ export class StrictMockProvider {
     return respond(this._state, res, exp, parsed);
   }
 
-  _recordUnexpected(res, parsed, reason, candidates = [], detail = '') {
-    const sessId = requestSessionOf(parsed) || '(no-session-id)';
-    const parentSessionId = requestParentSessionOf(parsed) || null;
+  _recordUnexpected(res, parsed, reason, candidates = [], detail = '', context = {}) {
+    const sessId = context.sessionId || '(no-session-id)';
+    const parentSessionId = context.parentSessionId || null;
     const msgs = parsed?.messages || [];
     const hasToolResults = msgs.some((m) => m?.role === 'tool' || m?.role === 'toolResult');
     // A scenario entry carries `lane` as a plain alias string; a legacy edge carries a lane
@@ -466,7 +478,7 @@ export class StrictMockProvider {
       reason,
       candidates: candidateLabels,
     });
-    console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} role=${requestRoleOf(parsed)} kind=${requestKindOf(parsed)} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
+    console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
     if (isFirst) {
       const err = new Error(
         `FIRST SCRIPT MISMATCH: ${reason} session=${sessId} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`,

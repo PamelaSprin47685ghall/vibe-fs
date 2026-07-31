@@ -106,7 +106,7 @@ function hasToolAfterLastUser(body) {
   return false;
 }
 
-export function templateMatches(body, edge) {
+export function templateMatches(body, edge, context) {
   const match = { ...(edge.match || {}) };
   const role = match.role;
   if (role && role !== '*' && role !== 'synthetic' && role !== 'title' && role !== 'blogger') {
@@ -122,7 +122,7 @@ export function templateMatches(body, edge) {
   if (match.afterToolResult === false && toolAfter) return false;
 
   const { afterToolResult, ...rest } = match;
-  return matchesExpectation(body, { ...edge, match: rest, neverEnd: true }, new Map());
+  return matchesExpectation(body, { ...edge, match: rest, neverEnd: true }, new Map(), context);
 }
 
 function pathHead(state, edge) {
@@ -155,7 +155,7 @@ function pathIndex(state, edge) {
  * so the same conversation replayed on a second run produced a different key and
  * never hit the cache (measured). Wire equality belongs to the seal barrier only.
  */
-export function selectExpectation(state, body) {
+export function selectExpectation(state, body, context) {
   const seal = fixtureKeyOf(body);
   const cached = state.sealToEdgeId?.get(seal);
   if (cached) {
@@ -169,7 +169,7 @@ export function selectExpectation(state, body) {
   }
 
   const candidates = allEdges(state);
-  const hits = candidates.filter((e) => pathHead(state, e) && templateMatches(body, e));
+  const hits = candidates.filter((e) => pathHead(state, e) && templateMatches(body, e, context));
   if (hits.length === 0) {
     return {
       match: null,

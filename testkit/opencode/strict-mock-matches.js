@@ -86,7 +86,8 @@ export function requestKindOf(body) {
   return 'chat';
 }
 
-export function requestSessionOf(body) {
+export function requestSessionOf(body, context) {
+  if (typeof context?.sessionId === 'string' && context.sessionId !== '') return context.sessionId;
   return body?.sessionId
     || body?.sessionID
     || body?.__testkitHeaders?.['x-session-affinity']
@@ -94,7 +95,8 @@ export function requestSessionOf(body) {
     || null;
 }
 
-export function requestParentSessionOf(body) {
+export function requestParentSessionOf(body, context) {
+  if (typeof context?.parentSessionId === 'string' && context.parentSessionId !== '') return context.parentSessionId;
   return body?.parentSessionId
     || body?.parentSessionID
     || body?.__testkitHeaders?.['x-parent-session-id']
@@ -172,10 +174,10 @@ function modelMatches(actual, expected) {
  * Concurrent heads must be mutually unique. Ambiguity is a script-author bug.
  * No agent/role tags.
  */
-export function matchesExpectation(body, expectation, sessionBindings) {
+export function matchesExpectation(body, expectation, sessionBindings, context) {
   const match = expectation.match || {};
-  const sessionID = requestSessionOf(body);
-  const parentSessionID = requestParentSessionOf(body);
+  const sessionID = requestSessionOf(body, context);
+  const parentSessionID = requestParentSessionOf(body, context);
   const expectedSessionID = sessionBindings?.get(expectation.lane.session);
   const expectedParentSessionID = expectation.lane.parentSession
     ? sessionBindings?.get(expectation.lane.parentSession)
