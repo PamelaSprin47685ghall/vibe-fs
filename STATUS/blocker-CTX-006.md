@@ -18,7 +18,7 @@
 | squash projection | 只有纯函数 builder，未被生产调用 | `next/Domain/CompanionProjectionBuilder.fs:66-106` |
 | Blogger 发送 | squash 已有局部 request-kind 标记，但仍经普通 `SendAgentOwnerRoot`，未进入 `AttemptExecutionProfile` | `next/Session/CompanionHostBlogger.fs:38-52`、`next/OpenCode/PromptDispatcherSend.fs:101-150` |
 | Blogger transform | 已按父 Work Session 找到 CompanionHost，并在 `Squash` request kind 下替换消息；未编译验证 | `next/OpenCode/CompanionTransform.fs:98-121`、`next/Session/CompanionHost.fs:148-151` |
-| durable writer | `AppendSquash` 已成为唯一 `BlogSquashCommitted` writer | `next/Session/CompanionTypes.fs:49-52`、`next/Session/CompanionJournalPort.fs:102-145` |
+| durable writer | **不存在**。`BlogSquashCommitted` 只有 fold 消费（`Journal/Fold.fs:582`），`AgentFact.BlogSquashCommitted` 无任何生产构造点；`ICompanionDurablePort` 无 AppendSquash 抽象（原文档误引，该成员从未存在） | `next/Journal/Fold.fs:582`、`next/Kernel/Fact.fs:355` |
 | terminal reconcile | squash 目前从真实 `TerminalOutcome.Completed` 直接调用 durable writer；仍缺 profile 绑定、显式 repair 与 attempt-plan projection | `next/Session/CompanionHostBlogger.fs`、`next/OpenCode/XWire.fs:194-242` |
 
 ## 必须同时落地的最小链路
