@@ -24,7 +24,7 @@ module internal CompanionHostBlogger =
           Journal: AgentJournal option
           EffectiveAgent: string }
 
-    let failBlog (message: string) : string =
+    let private failBlog (message: string) : BloggerCompletion =
         raise (InvalidOperationException message)
 
     /// COMPANION-002: the Blogger is prompted like any other agent-owned child.

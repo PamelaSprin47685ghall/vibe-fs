@@ -13,7 +13,7 @@ module JoinTool =
     let private optionalString value =
         value |> Option.map Encode.string |> Option.defaultValue Encode.nil
 
-    let private workRecord value =
+    let private workRecord (value: WorkRecordSnapshot option) =
         value
         |> Option.map (fun record ->
             Encode.object

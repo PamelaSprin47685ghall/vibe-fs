@@ -108,9 +108,7 @@ module HostForkRuntimeFork =
             task {
                 do! this.AwaitRecovery()
 
-                match this.IsRetiredHandle agentId with
-                | Some true -> return Error(sprintf "RetiredHandle: %s" agentId)
-                | _ -> ()
+                let retired = this.IsRetiredHandle agentId
 
                 let existing =
                     lock this.Gate (fun () ->
@@ -118,8 +116,9 @@ module HostForkRuntimeFork =
                         | true, childId -> Some childId
                         | false, _ -> None)
 
-                match existing with
-                | Some childId ->
+                match retired, existing with
+                | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
+                | _, Some childId ->
                     match HostPendingRun.sessionDeadRefusal this.Journal childId with
                     | Some refusal -> return Error refusal
                     | None ->
@@ -138,7 +137,7 @@ module HostForkRuntimeFork =
                                 role
                                 prompt
                                 agentName
-                | None ->
+                | _, None ->
                     let! requirementsResult =
                         match role with
                         | AgentRole.Reviewer ->
@@ -211,9 +210,7 @@ module HostForkRuntimeFork =
             task {
                 do! this.AwaitRecovery()
 
-                match this.IsRetiredHandle agentId with
-                | Some true -> return Error(sprintf "RetiredHandle: %s" agentId)
-                | _ -> ()
+                let retired = this.IsRetiredHandle agentId
 
                 let existing =
                     lock this.Gate (fun () ->
@@ -221,9 +218,10 @@ module HostForkRuntimeFork =
                         | true, childId -> Some childId
                         | false, _ -> None)
 
-                match existing with
-                | None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                | Some childId ->
+                match retired, existing with
+                | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
+                | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
+                | _, Some childId ->
                     match HostPendingRun.sessionDeadRefusal this.Journal childId with
                     | Some refusal -> return Error refusal
                     | None ->

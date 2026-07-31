@@ -65,8 +65,8 @@ type BlobWriter private (directory: string) =
     member _.Write(content: string) : Result<BlobWriteReceipt, string> =
         let digest = BlobDigest.create (HostDigest.sha256Hex content)
         let name = BlobDigest.value digest
-        let blobRef = BlobRef.create (NodeFsWriter.pathJoin "blobs" name)
-        let path = NodeFsWriter.pathJoin directory name
+        let blobRef = BlobRef.create (NodeFsWriter.pathJoin ("blobs", name))
+        let path = NodeFsWriter.pathJoin (directory, name)
         let bytes = System.Text.Encoding.UTF8.GetBytes content
 
         try
@@ -102,7 +102,7 @@ type BlobWriter private (directory: string) =
                 Error(sprintf "invalid blob reference: %s" relative)
             else
                 try
-                    Ok(NodeFsWriter.readFileSync (NodeFsWriter.pathJoin directory name, "utf8"))
+                    Ok(NodeFsWriter.readFileSync (NodeFsWriter.pathJoin (directory, name), "utf8"))
                 with ex ->
                     Error(sprintf "blob read failed: %s" ex.Message)
 
@@ -111,7 +111,7 @@ type BlobWriter private (directory: string) =
         member this.Read(blobRef) = this.Read blobRef
 
     static member Create(parentDirectory: string) : IBlobWriter =
-        let directory = NodeFsWriter.pathJoin parentDirectory "blobs"
+        let directory = NodeFsWriter.pathJoin (parentDirectory, "blobs")
 
         if not (NodeFsWriter.existsSync directory) then
             NodeFsWriter.mkdirSync (directory, {| recursive = true; mode = 0o700 |})
