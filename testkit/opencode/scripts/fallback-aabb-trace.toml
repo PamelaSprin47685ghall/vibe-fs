@@ -33,13 +33,13 @@ setup = { strict = true }
 session = { agent = "fast-meditator", bind = ["title", "med"] }
 prompt = { agent = "fast-meditator", text = "Prove same-run provider AABB trajectory." }
 
-must = ["prove", "continue"]
+must = []
 
 flow = [
-  { wait = "prove" },
-  { wait = "continue" },
+  # A non-retryable provider error does not emit a scenario response signal. The
+  # settled assistant snapshot is the only legal wake-up for FALLBACK-003.
+  { awaitTerminal = { requireAssistantTerminal = true, requireIdleAfterActivity = true } },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
-  { awaitEvent = { type = "session.idle", reason = "aabb-dead-idle" } },
 
   # The trajectory assertion. Exact list, so it proves the cycle AND that there was no
   # fifth attempt — the old canary hard-coded a `rawModels.length === 5 → slice(1)`
@@ -47,6 +47,7 @@ flow = [
   # of the kind VERIFY-002 forbids. If the Host ever does deliver that duplicate, this
   # must fail and be explained, not absorbed.
   { assertModelTrajectory = { lane = "med", models = ["test-model", "test-model", "test-model-b", "test-model-b"] } },
+  { custom = "assertFailureEvidence" },
 
   # Release artifact, written from the list the assertion just verified.
   { custom = "writeTrace" },
@@ -119,7 +120,7 @@ user = "Prove same-run provider AABB trajectory."
 [[turn]]
 id = "blogger"
 internal = true
-user = "You are the blogger of a coding agent session."
+user = ["# The next user message is the new session material in TOML.", "[[item]]"]
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }

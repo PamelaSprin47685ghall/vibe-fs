@@ -35,8 +35,8 @@ if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('fallback-aabb-trace canary static gate failed');
 }
 
-/** How many times a fact name appears across this runtime's journals. */
-function countFact(workDir, name) {
+/** Read the real journal envelopes carrying a fact name. */
+function factsIn(workDir, name) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
     encoding: 'utf8',
   }).trim();
@@ -45,15 +45,77 @@ function countFact(workDir, name) {
     'wanxiangshu-next',
     'runtimes',
   );
-  if (!fs.existsSync(runtimeDir)) return 0;
+  if (!fs.existsSync(runtimeDir)) return [];
 
-  let total = 0;
-  for (const file of fs.readdirSync(runtimeDir).filter((name) => name.endsWith('.ndjson'))) {
-    for (const line of fs.readFileSync(path.join(runtimeDir, file), 'utf8').split('\n')) {
-      if (line.includes(name)) total += 1;
-    }
+  return fs.readdirSync(runtimeDir)
+    .filter((file) => file.endsWith('.ndjson'))
+    .flatMap((file) => fs.readFileSync(path.join(runtimeDir, file), 'utf8').split('\n'))
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line))
+    .filter((fact) => JSON.stringify(fact).includes(name));
+}
+
+function countFact(workDir, name) {
+  return factsIn(workDir, name).length;
+}
+
+function fieldValues(value, fieldName, values = []) {
+  if (value === null || value === undefined) return values;
+  if (Array.isArray(value)) {
+    for (const item of value) fieldValues(item, fieldName, values);
+    return values;
   }
-  return total;
+  if (typeof value !== 'object') return values;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key.toLowerCase() === fieldName.toLowerCase()) {
+      if (typeof child === 'string' || typeof child === 'number') values.push(String(child));
+      else if (child && typeof child === 'object') {
+        if (typeof child.Value === 'string') values.push(child.Value);
+        if (typeof child.value === 'string') values.push(child.value);
+      }
+    }
+    fieldValues(child, fieldName, values);
+  }
+  return values;
+}
+
+function messagesOf(response) {
+  const data = response?.data?.data ?? response?.data;
+  return Array.isArray(data) ? data : [];
+}
+
+function messageInfo(message) {
+  return message?.info ?? message ?? {};
+}
+
+function completedTime(message) {
+  const info = messageInfo(message);
+  return info.time?.completed ?? message?.time?.completed ?? info.completed ?? message?.completed;
+}
+
+function errorName(message) {
+  const info = messageInfo(message);
+  const error = info.error ?? message?.error;
+  return error?.name ?? error?.type ?? info.errorName ?? message?.errorName;
+}
+
+async function assertFailureEvidence(scenario, ctx) {
+  const response = await scenario.client.messages(ctx.sessionId);
+  assert.ok(response.ok, `failed to read AABB Host transcript: ${JSON.stringify(response.data)}`);
+
+  const messages = messagesOf(response);
+  const assistants = messages.filter((message) => messageInfo(message).role === 'assistant');
+  const settledFailures = assistants.filter((message) => completedTime(message) !== undefined && errorName(message));
+  assert.equal(settledFailures.length, 4, 'AABB must settle exactly four assistant failures');
+
+  const facts = factsIn(scenario.host.workDir, 'FallbackCursorAdvanced');
+  assert.equal(facts.length, 4, 'AABB must write exactly four cursor advances');
+  assert.equal(new Set(fieldValues(facts, 'LogicalRunId')).size, 1, 'all AABB failures stay in one Logical Run');
+  assert.equal(new Set(fieldValues(facts, 'ProviderRun')).size, 4, 'each failed ProviderRun is distinct before dedupe');
+  assert.deepEqual(fieldValues(facts, 'PreviousOffset'), ['0', '1', '2', '3'], 'AABB previous offsets');
+  assert.deepEqual(fieldValues(facts, 'NextOffset'), ['1', '2', '3', '0'], 'AABB modulo-4 successors');
+  assert.deepEqual(fieldValues(facts, 'ConsecutiveFailureCount'), ['1', '2', '3', '4'], 'AABB failures are consecutive');
 }
 
 /**
@@ -81,4 +143,9 @@ async function writeTraceEvidence(scenario, ctx) {
   );
 }
 
-process.exit(await runCanary('fallback-aabb-trace', { customs: { writeTrace: writeTraceEvidence } }));
+process.exit(await runCanary('fallback-aabb-trace', {
+  customs: {
+    assertFailureEvidence,
+    writeTrace: writeTraceEvidence,
+  },
+}));

@@ -52,7 +52,7 @@ tools = ["inspector"]
 [[turn]]
 id = "blogger"
 internal = true
-user = "You are the blogger of a coding agent session."
+user = ["# The next user message is the new session material in TOML.", "[[item]]"]
 
   [[turn.step]]
   respond = { type = "text", text = "coder blog" }

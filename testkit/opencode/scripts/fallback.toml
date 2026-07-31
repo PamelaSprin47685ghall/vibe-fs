@@ -1,60 +1,40 @@
-# FALLBACK-003/004: a failed provider attempt advances the cursor exactly once, and a
-# SUCCESS clears ConsecutiveFailureCount without moving Offset. That second half is why
-# there is more than one round here — round 2 advances the cursor to 2 even though
-# round 1 ended in success, which is the observable form of "成功不重置 Offset".
+# FALLBACK-003/004: a settled provider failure advances the cursor once. The Host's
+# non-retryable 400 is reconciled as a completed assistant error, then the production
+# completion program sends the ProviderRetryAttempt continuation in the SAME Logical Run.
+# The continuation succeeds, so the success path derives ConsecutiveFailureCount = 0
+# without writing a cursor fact or moving Offset. The A/A/B/B multi-failure trace lives in
+# `fallback-aabb-trace`; this scenario keeps one root so it cannot mistake new HumanRoots
+# for one fallback run.
 #
-# What this scenario does NOT prove: the A/A/B/B side cycle. Every round below is
-# delivered at `test-model` — measured on all eight JSON edges, round 3 and 4 included,
-# despite `omitModel`. The provider-visible trajectory lives in `fallback-aabb-trace`,
-# and the exhaustion budget in `fallback-exhaustion`.
-#
-# The JSON form wrote each round as TWO edges (`round1-failure`, `round1-retry`) whose
-# `match` predicates were character-identical. One conversation step delivered twice is
-# one turn and one fault; see `delivery-plan.js`.
+# A transport fault never consumes a provider expectation signal. The flow therefore waits
+# on the settled terminal/idle transcript, the durable cursor fact, and the real continuation
+# response only.
 
 scenario = "fallback"
-description = "FALLBACK-003/004 a failure advances the cursor once; success does not reset Offset; omit-model inherits BaseModel on a restarted Authority Root"
-pass = "Fallback canary passed: durable failures recorded; omit-model inherits BaseModel on new Authority Root."
+description = "FALLBACK-003/004 settled non-retryable failure advances once; same-run continuation succeeds without resetting Offset"
+pass = "Fallback canary passed: settled failure and same-run continuation are reflected in Host transcript and journal."
 
 setup = { strict = true }
 session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
 prompt = { agent = "fast-coder", text = "Round 1 fallback attempt." }
 
-must = ["round1", "round2", "round3"]
+must = ["continue"]
 
 flow = [
-  { wait = "round1" },
-  { awaitEvent = { type = "session.status", statusType = "retry", reason = "fallback-retry" } },
-  { awaitEvent = { type = "session.idle", reason = "fallback-idle" } },
-  { awaitTerminal = true, requireAssistantTerminal = false },
-  { assertFacts = { name = "FallbackCursorAdvanced", eq = 1 } },
-
-  { prompt = { agent = "fast-coder", text = "Round 2 fallback attempt." } },
-  { wait = "round2" },
-  { awaitEvent = { type = "session.status", statusType = "retry", reason = "fallback-retry" } },
-  { awaitEvent = { type = "session.idle", reason = "fallback-idle" } },
-  { awaitTerminal = true, requireAssistantTerminal = false },
-  { assertFacts = { name = "FallbackCursorAdvanced", eq = 2 } },
-
-  # The restart is the point of round 3: the cursor must be read back from the journal,
-  # and `omitModel` must inherit BaseModel on the Authority Root the restart established
-  # rather than fail closed for want of an explicit model.
-  { restart = true },
-  { prompt = { agent = "fast-coder", text = "Round 3 fallback attempt.", omitModel = true } },
-  { wait = "round3" },
-  { awaitEvent = { type = "session.status", statusType = "retry", reason = "fallback-retry" } },
-  { awaitEvent = { type = "session.idle", reason = "fallback-idle" } },
-  { awaitTerminal = true, requireAssistantTerminal = false },
-  { assertFacts = { name = "FallbackCursorAdvanced", eq = 3 } },
-
+  # The fault does not wake the strict provider expectation queue. Await the real Host
+  # terminal/idle transition, then the durable fact written by FallbackController.
+  { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true },
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
+  # This is the production continuation response, not a provider-fault signal.
+  { wait = "continue" },
+  { awaitEvent = { type = "session.idle", session = "self" } },
+  { custom = "oracle" },
   { expectSatisfied = true },
 ]
 
-# Each round is ONE conversation step. Its first physical delivery is refused with a
-# retryable 500, so the Host retries on its own (FALLBACK-004: no continuation when the
-# Host still retries) and the second delivery gets the text below. A retry re-selects
-# this same step — which is the property `retryReselectsSameContent` asserts.
-
+# The first delivery is a settled, non-retryable provider failure. Because the Host has
+# stopped retrying, TurnCompletionProgram reconciles TurnFailed and sends the internal
+# ProviderRetryAttempt prompt below. Its successful response is the only response edge.
 [[turn]]
 id = "round1"
 lane = "fast-coder"
@@ -62,48 +42,22 @@ user = "Round 1 fallback attempt."
 tools = ["write"]
 
   [[turn.step]]
-  respond = { type = "text", text = "round1 retry completed." }
+  respond = { type = "text", text = "unreachable: the first delivery is refused" }
 
 [[turn]]
-id = "round2"
-lane = "fast-coder"
-user = "Round 2 fallback attempt."
-tools = ["write"]
+id = "continue"
+internal = true
+user = "# Continue after provider failure."
 
   [[turn.step]]
-  respond = { type = "text", text = "round2 retry completed." }
-
-[[turn]]
-id = "round3"
-lane = "fast-coder"
-user = "Round 3 fallback attempt."
-tools = ["write"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "round3 retry completed." }
+  respond = { type = "text", text = "fallback continuation completed." }
 
 [[fault]]
 turn = "round1"
 step = 0
 delivery = "provider-error"
-status = 500
-retryable = true
-attempts = [1]
-
-[[fault]]
-turn = "round2"
-step = 0
-delivery = "provider-error"
-status = 500
-retryable = true
-attempts = [1]
-
-[[fault]]
-turn = "round3"
-step = 0
-delivery = "provider-error"
-status = 500
-retryable = true
+status = 400
+retryable = false
 attempts = [1]
 
 # Production composes the Blogger prompt itself (`CompanionHostBlogger.fs:72,77,118`),
@@ -115,7 +69,7 @@ attempts = [1]
 [[turn]]
 id = "blogger"
 internal = true
-user = "You are the blogger of a coding agent session."
+user = ["# The next user message is the new session material in TOML.", "[[item]]"]
 
   [[turn.step]]
   respond = { type = "text", text = "Coder background." }

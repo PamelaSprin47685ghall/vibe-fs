@@ -62,7 +62,7 @@ tools = ["write"]
 [[turn]]
 id = "blogger"
 internal = true
-user = "You are the blogger of a coding agent session. Write one dense paragraph"
+user = ["# The next user message is the new session material in TOML.", "[[item]]"]
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }
