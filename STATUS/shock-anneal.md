@@ -15,7 +15,7 @@
 | 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）。完成指删除与领域实现，不含接线；X10 被接线空洞阻断，见「包 K8f 摸底」 |
 | 6 | 休克三 + 退火二：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5e；386 测试三时区全绿，证据 `evidence/post-anneal2/`） |
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 完成（K1–K11；15 剧本 TOML，`script-loader.js` 与 18 个 JSON 删，driver 改接 `ScenarioRuntime`）。K8f 阻断：X 恢复链零生产调用点，见「包 K8f 摸底」 |
-| 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W6 完成（254 门禁用例、404 mjs 测试全绿）；W7 进行中 |
+| 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W7 完成（W7 为 13 项 VERIFY-004 禁止退化清单的双向覆盖与注册完整性门禁；休克期未运行编译或测试） |
 | 6.7 | 运行时合成文本 TOML 记法（包 N，SSOT/13 → ARCH-010） | gate:static + canary | 未开始。排序裁决见「包 N」：N 拆两段，fork surface 段（N3）必须先于 canary 修红 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
 
@@ -929,7 +929,7 @@ W4  重建单测运行器的因果推进门禁：以「距上次判决的静默�
     而不污染下一个测试的归因；(c) 干净结束不等满静默窗口                     已完成
 W5  启动阶段因果判据，消除只有 wall-clock 的时间窗                           已完成
 W6  watchdog 重写：语义投喂、背景不续期、诊断完整、不持有事件循环           已完成
-W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试         进行中
+W7  gate-testkit 增加门禁自检：每条「禁止退化清单」都有对应失败测试         已完成
 ```
 
 W1 落地记要。26 个常量进 `testkit/opencode/time-budget.js`，`scripts/budget-gate.mjs`
