@@ -59,6 +59,15 @@ const requestContextOf = (headers) => ({
   parentSessionId: headerValue(headers, ['x-parent-session-id']),
 });
 
+const requestRecordOf = (body, context) => {
+  const record = { ...body };
+  Object.defineProperties(record, {
+    sessionID: { value: context.sessionId, enumerable: false },
+    parentSessionID: { value: context.parentSessionId, enumerable: false },
+  });
+  return record;
+};
+
 export class StrictMockProvider {
   constructor() {
     this._state = createState();
@@ -334,7 +343,7 @@ export class StrictMockProvider {
     }
 
     this._scenario.consume(parsed, selection, context);
-    this._state.requests.push(parsed);
+    this._state.requests.push(requestRecordOf(parsed, context));
 
     // A fault is a transport outcome, so it wakes NOTHING. `wait` is a causal barrier on
     // content arriving; waking it on a refused delivery would let a flow proceed past a
@@ -432,7 +441,7 @@ export class StrictMockProvider {
       this._runAfterExpectation(wid);
     }
     if (process.env.MOCK_TRACE) console.error(`[MOCK-TRACE] -> matched ${edgeLabel(exp)}`);
-    s.requests.push(parsed);
+    s.requests.push(requestRecordOf(parsed, context));
     // Seal only chat turns (title/synthetic may reshuffle without product cache).
     if (sessionID && requestKindOf(parsed) === 'chat') {
       s.sealedBySession.set(sessionID, wireOf(parsed));
