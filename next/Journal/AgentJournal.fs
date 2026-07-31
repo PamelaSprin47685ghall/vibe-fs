@@ -55,6 +55,7 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
+    member _.WriteBlob(content: string) : Result<BlobWriteReceipt, string> = writer.BlobWriter.Write content
 
     /// PERSIST-003: a poisoned writer or a rejected fact both mean this journal
     /// may no longer be appended to.
@@ -143,6 +144,9 @@ module AgentJournal =
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
 
     let runtimeId (journal: AgentJournal) : RuntimeId = journal.RuntimeId
+
+    let writeBlob (content: string) (journal: AgentJournal) : Result<BlobWriteReceipt, string> =
+        journal.WriteBlob content
 
     let isPoisoned (journal: AgentJournal) : bool = journal.IsPoisoned
 

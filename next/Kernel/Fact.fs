@@ -306,19 +306,6 @@ module Fact =
 
         // ── Companion (SSOT/08) ─────────────────────────────────────────────
 
-        | CompanionBaselineSet of
-            {| SessionId: SessionId
-               Projection: string |}
-
-        | CompanionCheckpointReplaced of
-            {| SessionId: SessionId
-               Content: string |}
-
-        | CompanionAdvanced of
-            {| SessionId: SessionId
-               Projection: string
-               Content: string |}
-
         /// COMPANION-003: Y is X's long-lived companion Blogger Session, so which
         /// session that is must survive a restart.
         ///

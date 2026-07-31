@@ -2,10 +2,7 @@ namespace Wanxiangshu.Next.Journal
 
 open Wanxiangshu.Next.Kernel.Identity
 
-type ProjectionSnapshot = string
-type BlogText = string
-
-/// Durable Companion cache: the Blogger link and the latest work log.
+/// Durable Companion link. Blog frames and coverage belong to `BlogProjection`.
 ///
 /// The prefix epoch used to live here too — `ActivePrefixEpoch` plus a
 /// `ReplacementActive` flag, written by `switchEpoch` from a token-budget comparison.
@@ -19,8 +16,6 @@ type BlogText = string
 /// enable.
 type CompanionProjection =
     {
-        LastSuccessfulProjection: ProjectionSnapshot option
-        LatestB: BlogText option
         /// COMPANION-003: the companion Blogger Session Y, so a restart rebinds the
         /// same one instead of creating a second Y for the same X.
         BloggerSessionId: SessionId option
@@ -35,20 +30,7 @@ type CompanionProjection =
 module CompanionProjection =
 
     let empty =
-        { LastSuccessfulProjection = None
-          LatestB = None
-          BloggerSessionId = None }
-
-    let baseline projection (current: CompanionProjection) =
-        { current with
-            LastSuccessfulProjection = Some projection }
-
-    let checkpoint content (current: CompanionProjection) = { current with LatestB = Some content }
-
-    let recordBlogAdvance projection content (current: CompanionProjection) =
-        { current with
-            LastSuccessfulProjection = Some projection
-            LatestB = Some content }
+        { BloggerSessionId = None }
 
     let linkBlogger (bloggerSessionId: SessionId) (current: CompanionProjection) =
         { current with

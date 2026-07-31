@@ -529,20 +529,6 @@ module Fold =
 
         // ── companion ───────────────────────────────────────────────────────
 
-        | AgentFact.CompanionBaselineSet payload ->
-            Ok(updateCompanion payload.SessionId (CompanionProjection.baseline payload.Projection) projection)
-
-        | AgentFact.CompanionCheckpointReplaced payload ->
-            Ok(updateCompanion payload.SessionId (CompanionProjection.checkpoint payload.Content) projection)
-
-        | AgentFact.CompanionAdvanced payload ->
-            Ok(
-                updateCompanion
-                    payload.SessionId
-                    (CompanionProjection.recordBlogAdvance payload.Projection payload.Content)
-                    projection
-            )
-
         | AgentFact.CompanionBloggerLinked payload ->
             // HOST-008 / COMPANION-002: one fact, two projections.
             //
