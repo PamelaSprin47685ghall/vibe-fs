@@ -3,13 +3,11 @@ namespace Wanxiangshu.Next.Session
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
-open Wanxiangshu.Next.Domain.ProviderProjection
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 
 type BlogText = string
-type ProjectionSnapshot = ProviderSemanticProjection
 
 type BloggerCompletion =
     { BloggerSessionId: SessionId
