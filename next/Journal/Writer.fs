@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Outcome
@@ -30,16 +31,101 @@ module private NodeFsWriter =
     [<Import("closeSync", "node:fs")>]
     let closeSync (fd: int) : unit = jsNative
 
+    [<Import("readFileSync", "node:fs")>]
+    let readFileSync (path: string, encoding: string) : string = jsNative
+
     [<Import("join", "node:path")>]
     let pathJoin (a: string, b: string) : string = jsNative
 
-type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
+type BlobWriteReceipt =
+    { BlobRef: BlobRef
+      BlobDigest: BlobDigest }
+
+type IBlobWriter =
+    abstract Write: string -> Result<BlobWriteReceipt, string>
+    abstract Read: BlobRef -> Result<string, string>
+
+type BlobWriter private (directory: string) =
+    let writeNew (path: string) (bytes: byte array) =
+        let fd = NodeFsWriter.openSync (path, "wx", 0o600)
+
+        try
+            let written = NodeFsWriter.writeSync (fd, bytes)
+
+            if written <> bytes.Length then
+                raise (InvalidOperationException "blob write was partial")
+
+            try
+                NodeFsWriter.fdatasyncSync fd
+            with _ ->
+                NodeFsWriter.fsyncSync fd
+        finally
+            NodeFsWriter.closeSync fd
+
+    member _.Write(content: string) : Result<BlobWriteReceipt, string> =
+        let digest = BlobDigest.create (HostDigest.sha256Hex content)
+        let name = BlobDigest.value digest
+        let blobRef = BlobRef.create (NodeFsWriter.pathJoin "blobs" name)
+        let path = NodeFsWriter.pathJoin directory name
+        let bytes = System.Text.Encoding.UTF8.GetBytes content
+
+        try
+            writeNew path bytes
+
+            Ok
+                { BlobRef = blobRef
+                  BlobDigest = digest }
+        with ex ->
+            if ex.Message.Contains("EEXIST") then
+                try
+                    if NodeFsWriter.readFileSync (path, "utf8") = content then
+                        Ok
+                            { BlobRef = blobRef
+                              BlobDigest = digest }
+                    else
+                        Error(sprintf "blob path exists with different content: %s" path)
+                with readEx ->
+                    Error(sprintf "existing blob unreadable: %s" readEx.Message)
+            else
+                Error(sprintf "blob write failed: %s" ex.Message)
+
+    member _.Read(blobRef: BlobRef) : Result<string, string> =
+        let relative = BlobRef.value blobRef
+        let prefix = "blobs/"
+
+        if not (relative.StartsWith(prefix, StringComparison.Ordinal)) then
+            Error(sprintf "invalid blob reference: %s" relative)
+        else
+            let name = relative.Substring(prefix.Length)
+
+            if String.IsNullOrWhiteSpace name || name.Contains "/" then
+                Error(sprintf "invalid blob reference: %s" relative)
+            else
+                try
+                    Ok(NodeFsWriter.readFileSync (NodeFsWriter.pathJoin directory name, "utf8"))
+                with ex ->
+                    Error(sprintf "blob read failed: %s" ex.Message)
+
+    interface IBlobWriter with
+        member this.Write(content) = this.Write content
+        member this.Read(blobRef) = this.Read blobRef
+
+    static member Create(parentDirectory: string) : IBlobWriter =
+        let directory = NodeFsWriter.pathJoin parentDirectory "blobs"
+
+        if not (NodeFsWriter.existsSync directory) then
+            NodeFsWriter.mkdirSync (directory, {| recursive = true; mode = 0o700 |})
+
+        BlobWriter(directory) :> IBlobWriter
+
+type JournalWriter private (runtimeId: RuntimeId, blobWriter: IBlobWriter, filePath: string, fd: int) =
     let gate = obj ()
     let mutable currentSeq = 2L
     let mutable poisoned = false
     let mutable disposed = false
 
     member _.RuntimeId = runtimeId
+    member _.BlobWriter = blobWriter
     member _.FilePath = filePath
     member this.LocalSeq = lock gate (fun () -> currentSeq)
     member this.LastCommittedLocalSeq = lock gate (fun () -> currentSeq - 1L)
@@ -58,6 +144,8 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
             // Git trees.
             NodeFsWriter.mkdirSync (directory, {| recursive = true; mode = 0o700 |})
             |> ignore
+
+        let blobWriter = BlobWriter.Create directory
 
         let filename = sprintf "%s.ndjson" (RuntimeId.value runtimeId)
         let filePath = NodeFsWriter.pathJoin (directory, filename)
@@ -95,7 +183,7 @@ type JournalWriter private (runtimeId: RuntimeId, filePath: string, fd: int) =
         with _ ->
             NodeFsWriter.fsyncSync fd
 
-        (new JournalWriter(runtimeId, filePath, fd), initEnvelope)
+        (new JournalWriter(runtimeId, blobWriter, filePath, fd), initEnvelope)
 
     member private this.WriteAndFlush (env: Envelope) (eventId: EventId) =
         let line = Envelope.serialize env + "\n"
