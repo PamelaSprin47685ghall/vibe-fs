@@ -158,8 +158,11 @@ type CompanionHost
 
                 if available > 0 then
                     let frameCount = max 1 (available / 2)
-                    let! _ = CompanionHostBlogger.squash this.BloggerDeps frameCount
-                    ()
+                    let! result = CompanionHostBlogger.squash this.BloggerDeps frameCount
+
+                    match result with
+                    | Ok _ -> ()
+                    | Error _ -> ()
         }
 
     member this.TransformRaw(messages: obj list) : obj list =

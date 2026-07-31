@@ -30,8 +30,8 @@ module internal CompanionHostBlogger =
     let private failBlog (message: string) : BloggerCompletion =
         raise (InvalidOperationException message)
 
-    let private failSquash (message: string) : BloggerSquashCompletion =
-        raise (InvalidOperationException message)
+    let private failSquash (message: string) : Result<BloggerSquashCompletion, string> =
+        Error message
 
     /// COMPANION-002: the Blogger is prompted like any other agent-owned child.
     ///
@@ -120,7 +120,7 @@ module internal CompanionHostBlogger =
                 | Failed error -> return failBlog error
         }
 
-    let squash (deps: BloggerDeps) (frameCount: int) : Task<BloggerSquashCompletion> =
+    let squash (deps: BloggerDeps) (frameCount: int) : Task<Result<BloggerSquashCompletion, string>> =
         task {
             let! childId = deps.EnsureBlogger()
             let completion =
@@ -169,10 +169,11 @@ module internal CompanionHostBlogger =
                                 deps.Companion.UpdateBlog updatedBlog
 
                                 return
-                                    { BloggerSessionId = childId
-                                      ProviderRun = result.ProviderRun
-                                      Text = result.TurnFormalText
-                                      CoveredFrameCount = frameCount }
+                                    Ok
+                                        { BloggerSessionId = childId
+                                          ProviderRun = result.ProviderRun
+                                          Text = result.TurnFormalText
+                                          CoveredFrameCount = frameCount }
                 | Aborted reason -> return failSquash reason
                 | Failed error -> return failSquash error
         }
