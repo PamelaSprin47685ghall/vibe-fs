@@ -6,6 +6,7 @@ open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Domain.ProviderProjection
 
 /// Companion state wrapper with a single mutable in-flight Task gate.
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
@@ -99,7 +100,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         | None -> Task.FromResult(()) :> Task
 
     member this.Submit
-        (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> BloggerDeltaChunk -> Async<BloggerCompletion>)
+        (currentProjection: ProviderSemanticProjection, blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<BloggerCompletion>)
         : CompanionOutcome =
         lock lockObj (fun () ->
             if isBusyUnlocked () then
@@ -114,39 +115,40 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                 with
                 | None -> Submitted
                 | Some delta ->
-                    let previousCutoff = blogProjection.Coverage.CoverableTurnCutoffExclusive
-                    let previousDigest = blogProjection.Coverage.CoveredPrefixDigest
+                    match durable, sessionId with
+                    | None, _
+                    | _, None ->
+                        failwith
+                            "SHOCK-UNMIGRATED[PERSIST-009]: Companion success path requires a durable journal"
+                    | Some _, Some _ ->
+                        let previousCutoff = blogProjection.Coverage.CoverableTurnCutoffExclusive
+                        let previousDigest = blogProjection.Coverage.CoveredPrefixDigest
 
-                    let t =
-                        async {
-                            try
-                                let! produced = blogFn currentProjection delta
+                        let t =
+                            async {
+                                try
+                                    let! produced = blogFn currentProjection delta |> Async.AwaitTask
 
-                                let completion =
-                                    if delta.NextCoverableTurnCutoffExclusive = previousCutoff then
-                                        { produced with
-                                            NextCoveredPrefixDigest = previousDigest }
-                                    else
-                                        produced
+                                    let completion =
+                                        if delta.NextCoverableTurnCutoffExclusive = previousCutoff then
+                                            { produced with
+                                                NextCoveredPrefixDigest = previousDigest }
+                                        else
+                                            produced
 
-                                persistSuccessful completion
+                                    persistSuccessful completion
 
-                                let nextB =
-                                    match latestB with
-                                    | None -> completion.Text
-                                    | Some old -> old + "\n\n" + completion.Text
+                                    let nextB =
+                                        match latestB with
+                                        | None -> completion.Text
+                                        | Some old -> old + "\n\n" + completion.Text
 
-                                lock lockObj (fun () ->
-                                    latestB <- Some nextB)
-                            with _ ->
-                                ()
-                        }
-                        |> startAsTask
+                                    lock lockObj (fun () ->
+                                        latestB <- Some nextB)
+                                with _ ->
+                                    ()
+                            }
+                            |> startAsTask
 
-                    inFlightTask <- Some t
-                    Submitted)
-
-    member this.Submit
-        (currentProjection: ProjectionSnapshot, blogFn: ProjectionSnapshot -> BloggerDeltaChunk -> Task<BloggerCompletion>)
-        : CompanionOutcome =
-        this.Submit(currentProjection, (fun projection delta -> blogFn projection delta |> Async.AwaitTask))
+                        inFlightTask <- Some t
+                        Submitted)

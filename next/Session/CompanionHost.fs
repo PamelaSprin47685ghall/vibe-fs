@@ -110,13 +110,13 @@ type CompanionHost
           Journal = journal
           EffectiveAgent = bloggerEffectiveAgent }
 
-    member this.SubmitProjection(projection: ProjectionSnapshot) : CompanionOutcome =
+    member this.SubmitProjection(projection: ProviderSemanticProjection) : CompanionOutcome =
         let deps = this.BloggerDeps
         companion.Submit(projection, (fun current chunk -> CompanionHostBlogger.blog deps current chunk))
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests;
     /// SubmitProjection remains the non-blocking side-effecting operation.
-    member _.PreviewDelta(projection: ProjectionSnapshot) =
+    member _.PreviewDelta(projection: ProviderSemanticProjection) =
         CompanionProgram.runCompanionFlow
             { SessionId = SessionId.value primaryId }
             System.Threading.CancellationToken.None

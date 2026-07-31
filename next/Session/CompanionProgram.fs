@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Flow
 open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Domain.ProviderProjection
 
 /// Production CompanionFlow program — the canonical `companion {}` builder usage.
 /// Companion flows manage projection delta computation and blogger step
@@ -23,7 +24,7 @@ module CompanionProgram =
     let buildDelta
         (cursor: SemanticCursor)
         (previousCutoff: int)
-        (current: ProjectionSnapshot)
+        (current: ProviderSemanticProjection)
         : CompanionFlow<BloggerDeltaChunk option> =
         companion {
             let! delta =
