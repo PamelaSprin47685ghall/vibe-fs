@@ -182,10 +182,16 @@ module XWire =
                                             prefix.Snapshot
                                             frozenBody
 
-                                    let transformed = rawWithPrefix rawMessages prefixPlan
-                                    Wanxiangshu.Next.Session.CompanionProjection.replaceMessagesInPlace output transformed
-                                    scope.RecordAttemptPlan sessionId providerRun plan
-                                    scope.ClearRecovery sessionId
+                                     let transformed = rawWithPrefix rawMessages prefixPlan
+                                     Wanxiangshu.Next.Session.CompanionProjection.replaceMessagesInPlace output transformed
+                                     scope.RecordAttemptPlan sessionId providerRun plan
+
+                                     if mayRecover then
+                                         state.Companion
+                                         |> Option.bind (fun companion -> companion.BloggerSessionId)
+                                         |> Option.iter scope.ArmRecovery
+
+                                     scope.ClearRecovery sessionId
                                 | _ ->
                                     raise (InvalidOperationException "X-wire cannot plan a retry without authority, fallback, and session projections")
             | _ -> return ()
