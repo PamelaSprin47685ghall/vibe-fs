@@ -76,7 +76,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["[Original user requirements — authoritative review scope]", "Review review_target.txt and submit two PERFECT verdicts."]
+user = ["# Complete the assignment in `assignment`.", "Review review_target.txt and submit two PERFECT verdicts."]
 tools = ["verdict"]
 
   [[turn.step]]

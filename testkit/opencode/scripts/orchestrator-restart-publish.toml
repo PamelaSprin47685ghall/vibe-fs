@@ -138,7 +138,7 @@ tools = ["write"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["[Original user requirements — authoritative review scope]", "Review the current worktree for correctness"]
+user = ["# Complete the assignment in `assignment`.", "Review the current worktree for correctness"]
 tools = ["verdict"]
 
   [[turn.step]]

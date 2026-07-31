@@ -194,7 +194,7 @@ tools = ["write"]
 [[turn]]
 id = "review-revise"
 lane = "fast-reviewer"
-user = ["[Original user requirements — authoritative review scope]", "Review current worktree and submit structured verdicts."]
+user = ["# Complete the assignment in `assignment`.", "Review current worktree and submit structured verdicts."]
 tools = ["verdict"]
 
   [[turn.step]]
@@ -206,7 +206,7 @@ tools = ["verdict"]
 [[turn]]
 id = "review-perfect"
 lane = "fast-reviewer"
-user = ["[Original user requirements — authoritative review scope]", "Re-review the fixed tree and submit dual PERFECT."]
+user = ["# Complete the assignment in `assignment`.", "Re-review the fixed tree and submit dual PERFECT."]
 tools = ["verdict"]
 
   [[turn.step]]

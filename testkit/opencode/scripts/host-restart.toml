@@ -104,7 +104,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["[Original user requirements — authoritative review scope]", "Review and PERFECT twice."]
+user = ["# Complete the assignment in `assignment`.", "Review and PERFECT twice."]
 tools = ["verdict"]
 
   [[turn.step]]

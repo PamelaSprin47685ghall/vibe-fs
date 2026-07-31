@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel.Fact
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.OpenCode
 open Wanxiangshu.Next.Session.AgentRoleIdentity
@@ -65,42 +66,33 @@ module HostForkRuntimeFork =
                         | None -> return missingReviewRequirement input
         }
 
-    let private enrichReviewerPrompt
+    /// REVIEW-002's authoritative review scope, as the texts themselves.
+    ///
+    /// Returns the requirement list rather than a composed prompt, which is the N3 change. It used to
+    /// return `assignment` wrapped in a `[Original user requirements …]` envelope, so the reviewer's
+    /// first prompt had one shape with requirements and another without — and the caller then wrapped
+    /// THAT in a second conditional envelope. ARCH-010 wants the instruction/data split decided by the
+    /// producer, so the producer hands over data and `ForkChildPayload` decides the shape.
+    ///
+    /// An empty list is the ordinary case: every non-Reviewer fork, and a Reviewer forked when no new
+    /// HumanRoot has arrived since the last double-PERFECT barrier.
+    let private resolveReviewerRequirements
         (journal: AgentJournal option)
         (snapshot: ISessionSnapshotPort option)
         (parentId: SessionId)
-        (assignment: string)
-        : Task<Result<string, string>> =
+        : Task<Result<string list, string>> =
         task {
             let promptInputs = AgentJournal.pendingReviewRequirements journal parentId
 
             if List.isEmpty promptInputs then
-                return Ok assignment
+                return Ok []
             else
                 match snapshot with
                 | None ->
                     return
                         Error
                             "Cannot start reviewer: original user requirements are unavailable without a session transcript"
-                | Some port ->
-                    let! resolved = resolveReviewRequirementInputs port promptInputs Map.empty []
-
-                    match resolved with
-                    | Error err -> return Error err
-                    | Ok texts ->
-                        let requirements =
-                            texts
-                            |> List.mapi (fun index text -> sprintf "User prompt %d:\n%s" (index + 1) text)
-                            |> String.concat "\n\n"
-
-                        return
-                            Ok(
-                                "[Original user requirements — authoritative review scope]\n"
-                                + "These are verified HumanRoot prompts received since the prior review completed its double-PERFECT barrier and reached terminal idle. Verify every applicable requirement. The manager request below is supplementary and must not narrow or override this scope.\n\n"
-                                + requirements
-                                + "\n\n[Manager review request — supplementary]\n"
-                                + assignment
-                            )
+                | Some port -> return! resolveReviewRequirementInputs port promptInputs Map.empty []
         }
 
     type HostForkRuntime with
@@ -143,15 +135,15 @@ module HostForkRuntimeFork =
                                 prompt
                                 agentName
                 | None ->
-                    let! promptResult =
+                    let! requirementsResult =
                         match role with
                         | AgentRole.Reviewer ->
-                            enrichReviewerPrompt this.Journal this.SessionSnapshot this.ParentId prompt
-                        | _ -> Task.FromResult(Ok prompt)
+                            resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
+                        | _ -> Task.FromResult(Ok [])
 
-                    match promptResult with
+                    match requirementsResult with
                     | Error err -> return Error err
-                    | Ok reviewerPrompt ->
+                    | Ok requirements ->
                         let! childResult =
                             this.Sessions.CreateChildSession(
                                 this.ParentId,
@@ -190,13 +182,10 @@ module HostForkRuntimeFork =
                                     this.MarkReady(run)
 
                                     let enrichedPrompt =
-                                        match this.ParentWorkRecordOf this.ParentId with
-                                        | Some workRecord when not (System.String.IsNullOrWhiteSpace workRecord) ->
-                                            sprintf
-                                                "[Parent work record — background only; B preferred, else session A]\n%s\n\n[Assignment]\n%s\n\n[Required final report]\nResult:\nFiles changed:\nTests run:\nEvidence:\nRemaining risks:\nBlockers:"
-                                                workRecord
-                                                reviewerPrompt
-                                        | _ -> reviewerPrompt
+                                        ForkChildPayload.render
+                                            { Assignment = prompt
+                                              ParentWorkRecord = this.ParentWorkRecordOf this.ParentId
+                                              OriginalUserRequirements = requirements }
 
                                     let! sent =
                                         HostForkAgentOwner.sendFirstPrompt

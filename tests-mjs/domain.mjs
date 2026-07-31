@@ -74,6 +74,7 @@ const [
   RecoverySlotModule,
   CompactionPolicyModule,
   SyntheticTomlModule,
+  ForkChildPayloadModule,
   BloggerTomlModule,
   BloggerDeltaModule,
   CompanionPromptModule,
@@ -113,6 +114,7 @@ const [
   prod('Domain/RecoverySlot'),
   prod('Domain/HostCompactionPolicy'),
   prod('Domain/SyntheticToml'),
+  prod('Domain/ForkChildPayload'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
   prod('Domain/CompanionPrompt'),
@@ -762,6 +764,37 @@ export const fallbackProjection = (() => {
 })()
 
 // ── failure-driven context recovery (SSOT/12) ────────────────────────────────
+
+/**
+ * ARCH-010 / REVIEW-002: what a newly forked child is told, as one payload.
+ *
+ * `assignment()` takes the three inputs positionally in record order, because the record has three
+ * fields of which two are optional-ish — building it by field name here is what keeps a caller from
+ * silently passing the work record as the assignment.
+ */
+export const forkChildPayload = (() => {
+  const m = bind(ForkChildPayloadModule, 'ForkChildPayload', [
+    'BaseInstructions',
+    'ParentWorkRecordInstruction',
+    'RequirementsInstruction',
+    'render',
+  ])
+
+  return {
+    baseInstructions: listItems(m.BaseInstructions),
+    parentWorkRecordInstruction: m.ParentWorkRecordInstruction,
+    requirementsInstruction: m.RequirementsInstruction,
+
+    render: ({ assignment, parentWorkRecord, originalUserRequirements = [] }) =>
+      m.render(
+        new ForkChildPayloadModule.ForkChildAssignment(
+          assignment,
+          parentWorkRecord,
+          toList(originalUserRequirements),
+        ),
+      ),
+  }
+})()
 
 /**
  * ARCH-010: the one canonical writer for runtime synthetic TOML.

@@ -16,6 +16,8 @@
 
 import { assertEq, assertTrue } from './gate-lib.mjs';
 import { kindOf, lanesOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../runtime-key.js';
+import { ForkChildPayload_BaseInstructions, ForkChildPayload_render, ForkChildAssignment } from '../../../build/next/Domain/ForkChildPayload.js';
+import { comment } from '../../../build/next/Domain/SyntheticToml.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([
@@ -36,8 +38,19 @@ const request = (messages, sessionID = SESSION) => ({ sessionID, messages });
 
 const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, turn, step });
 
-/** `HostForkRuntimeFork.fs:98`'s first line — the anchor a reviewer declaration uses. */
-const WRAP = '[Original user requirements — authoritative review scope]';
+/**
+ * The anchor a forked-child declaration uses, taken from production rather than copied.
+ *
+ * It used to be a literal copy of `HostForkRuntimeFork.fs:98`'s first envelope line. That copy was a
+ * mirror: N3 deleted the envelope and the constant would have kept describing text no longer sent,
+ * while these cases stayed green — proving the matcher against a shape production had stopped
+ * producing. Importing the real value makes a future rewording fail here instead.
+ */
+const ANCHOR = comment([...ForkChildPayload_BaseInstructions][0]);
+
+/** Production's own renderer, so a declaration is tested against bytes a child will actually see. */
+const forkPrompt = (assignment, requirements = []) =>
+  ForkChildPayload_render(new ForkChildAssignment(assignment, undefined, requirements));
 
 /** `prompt.ts:235` prepends this as `messages[0]`, then appends the real conversation. */
 const titleRequest = (text) =>
@@ -262,24 +275,49 @@ export const runtimeKeyCases = [
   // ── an ordered fragment declaration ──────────────────────────────────────
 
   {
-    name: 'REVIEW-002 a fragment declaration reaches text production put at the end',
+    name: 'REVIEW-002 a fragment declaration reaches text production put after the anchor',
     fn: () => {
-      // Measured in K9. When a Manager forks a Reviewer, production WRAPS the assignment
-      // (`../next/Session/HostForkRuntimeFork.fs:98`): the verified HumanRoot requirements
-      // come first, the Manager's request last under a `[Manager review request]` heading.
+      // Measured in K9, and the reason ordered fragments exist. When a Manager forks a child,
+      // production composes the prompt (`../next/Domain/ForkChildPayload.fs`): unconditional
+      // instruction comments first, then `assignment`, with optional fields in between.
       //
-      // So the text a scenario knows is a SUFFIX of what arrives, and a single prefix cannot
-      // reach it. Every reviewer turn in the forest failed to match for exactly this reason.
-      const wrapped = (assignment) =>
-        `${WRAP}\nUser prompt 1:\nShip it.\n\n[Manager review request — supplementary]\n${assignment}`;
-
+      // So the text a scenario knows is neither a prefix nor a suffix — it sits at a position that
+      // moves with runtime state. Every forked-child turn in the forest failed to match before this.
+      //
+      // Driven through production's own renderer rather than a hand-built string: a local template
+      // would keep passing after the real one changed shape.
       const entries = [
-        entry({ id: 'revise', lane: 'fast-manager', turn: [WRAP, 'Review current worktree'] }),
-        entry({ id: 'perfect', lane: 'fast-manager', turn: [WRAP, 'Re-review the fixed tree'] }),
+        entry({ id: 'revise', lane: 'fast-manager', turn: [ANCHOR, 'Review current worktree'] }),
+        entry({ id: 'perfect', lane: 'fast-manager', turn: [ANCHOR, 'Re-review the fixed tree'] }),
       ];
 
-      assertEq(resolveEntry(request([user(wrapped('Review current worktree'))]), entries, BINDINGS).matched.id, 'revise');
-      assertEq(resolveEntry(request([user(wrapped('Re-review the fixed tree'))]), entries, BINDINGS).matched.id, 'perfect');
+      const revise = forkPrompt('Review current worktree', ['Ship it.']);
+      const perfect = forkPrompt('Re-review the fixed tree', ['Ship it.']);
+
+      assertEq(resolveEntry(request([user(revise)]), entries, BINDINGS).matched.id, 'revise');
+      assertEq(resolveEntry(request([user(perfect)]), entries, BINDINGS).matched.id, 'perfect');
+    },
+  },
+
+  {
+    name: 'REVIEW-002 one declaration matches whether the optional fields are present or absent',
+    fn: () => {
+      // The property N3 bought, and the one the four-shape envelope made impossible. A scenario
+      // author knows a child was forked and what the assignment said; they do not know whether the
+      // parent had produced a work record yet, and must not have to.
+      const entries = [entry({ id: 'child', lane: 'fast-manager', turn: [ANCHOR, 'Write proof.txt'] })];
+
+      const shapes = [
+        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', undefined, [])),
+        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', 'B says background.', [])),
+        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', undefined, ['Ship it.'])),
+        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', 'B says background.', ['Ship it.'])),
+      ];
+
+      for (const [index, text] of shapes.entries()) {
+        const resolved = resolveEntry(request([user(text)]), entries, BINDINGS);
+        assertEq(resolved.matched?.id, 'child', `shape ${index} did not match the single declaration`);
+      }
     },
   },
 
@@ -289,7 +327,7 @@ export const runtimeKeyCases = [
       // Anchoring is the first of the three properties that separate this from the retired
       // `containsText`. Without it a fragment list would be a bag of substrings free to match
       // anywhere, which is what needed `specificity` scoring to disambiguate.
-      const entries = [entry({ id: 'a', turn: [WRAP, 'Review current worktree'] })];
+      const entries = [entry({ id: 'a', turn: [ANCHOR, 'Review current worktree'] })];
 
       const noWrapper = resolveEntry(request([user('Review current worktree now')]), entries, BINDINGS);
       assertTrue(noWrapper.unmatched !== undefined, 'the anchor must be a true prefix');
