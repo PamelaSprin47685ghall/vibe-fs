@@ -101,7 +101,6 @@
     <Compile Include="Orchestrator/OrchestratorProgram.fs"/>
     <Compile Include="Orchestrator.fs"/>
     <Compile Include="Orchestrator.GitOperations.fs"/>
-    <Compile Include="Session/CompanionDelta.fs"/>
     <Compile Include="Session/CompanionTypes.fs"/>
     <Compile Include="Session/Companion.fs"/>
     <Compile Include="Session/CompanionProgram.fs"/>

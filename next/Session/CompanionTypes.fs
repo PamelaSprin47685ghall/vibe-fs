@@ -2,11 +2,22 @@ namespace Wanxiangshu.Next.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Domain.ProviderProjection
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Journal
 
 type BlogText = string
+type ProjectionSnapshot = ProviderSemanticProjection
+
+type BloggerCompletion =
+    { BloggerSessionId: SessionId
+      ProviderRun: ProviderRunIdentity
+      Text: BlogText
+      NextCursor: SemanticCursor
+      NextCoverableTurnCutoffExclusive: int
+      NextCoveredPrefixDigest: string }
 
 type CompanionOutcome =
     | Submitted
@@ -14,7 +25,7 @@ type CompanionOutcome =
 
 type CompanionMemory =
     {
-        LastSuccessfulProjection: ProjectionSnapshot option
+        Blog: BlogProjectionState
         LatestB: BlogText option
         /// COMPANION-003: the durable companion Blogger Session Y.
         BloggerSessionId: SessionId option
@@ -31,8 +42,8 @@ type CompanionMemory =
 /// single owner. A recovery slot either has a candidate or does not, so there is no
 /// enable flag left to persist.
 type ICompanionDurablePort =
-    abstract Load: SessionId -> CompanionMemory option
-    abstract AppendSuccessful: SessionId * ProjectionSnapshot * BlogText -> Result<unit, string>
+    abstract Load: SessionId -> Result<CompanionMemory option, string>
+    abstract AppendSuccessful: SessionId * BloggerCompletion -> Result<BlogProjectionState, string>
 
     /// COMPANION-003. Takes the Blogger's own SessionId, not a `ChildId` plus a
     /// `"blogger"` target string: the previous shape recorded an EXEC-009 handle
@@ -41,8 +52,3 @@ type ICompanionDurablePort =
     abstract LinkBlogger: SessionId * SessionId * string -> Result<unit, string>
 
     abstract CloseBlogger: SessionId -> Result<unit, string>
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Companion =
-
-    let jsonDelta = CompanionDelta.jsonDelta
