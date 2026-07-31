@@ -181,6 +181,25 @@ module Projection =
           System = []
           Messages = rawMessages |> List.choose decodeMessage }
 
+    let messagesFromTransformOutput (output: obj) : obj list =
+        unbox<obj array> output?messages |> Array.toList
+
+    let prependCompanionMemory
+        (rawMessages: obj list)
+        (syntheticId: string)
+        (memory: string)
+        (dropLeading: int)
+        : obj list =
+        if dropLeading > List.length rawMessages then
+            invalidArg "dropLeading" "X-wire prefix cutoff exceeds the current provider snapshot"
+
+        let head =
+            createObj
+                [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
+                  "parts", box [| createObj [ "type", box "text"; "text", box memory ] |] ]
+
+        head :: List.skip dropLeading rawMessages
+
     /// The Host's own message id.
     ///
     /// Not part of either projection: an id identifies a message, it is not

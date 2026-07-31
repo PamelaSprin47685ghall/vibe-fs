@@ -50,7 +50,7 @@ module ReviewSeal =
     /// `ParentId` a different branch matches, without the max-id rule two
     /// concurrent runs are indistinguishable, and without the compaction exclusion
     /// the Host's summariser is mistaken for a managed run.
-    let private bindableRun (physicalUserMessage: string) (messages: SessionMessage list) =
+    let bindableRun (physicalUserMessage: string) (messages: SessionMessage list) =
         let candidates =
             messages
             |> List.filter (fun message ->
