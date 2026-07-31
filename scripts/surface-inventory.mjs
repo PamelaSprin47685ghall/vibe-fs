@@ -132,9 +132,8 @@ const SURFACES = new Map([
       standing: 'RuntimeInstruction',
       surface: 'Blogger delta prompt (normal and post-restart re-anchor)',
       composer:
-        'CompanionHostBlogger.fs:72,77 prose wrapper around a JSON delta. Blocked on N5b: the delta ' +
-        'currency is still ProjectionSnapshot = string, so wrapping it in ARCH-010 would produce a ' +
-        'conforming document carrying JSON in its value',
+        'CompanionHostBlogger.fs:69,76 prose wrapper around the typed BloggerDeltaChunk.Toml payload; ' +
+        'post-restart re-anchor remains a separate recovery surface',
     },
   ],
   [

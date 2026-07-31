@@ -47,7 +47,7 @@ module internal CompanionHostBlogger =
                 return! dispatcher.SendAgentOwnerRoot deps.Sessions childId prompt deps.EffectiveAgent None None
         }
 
-    let blog (deps: BloggerDeps) (projection: ProjectionSnapshot) (chunk: BloggerDeltaChunk) : Task<BloggerCompletion> =
+    let blog (deps: BloggerDeps) (projection: ProviderSemanticProjection) (chunk: BloggerDeltaChunk) : Task<BloggerCompletion> =
         task {
             let! childId = deps.EnsureBlogger()
 
