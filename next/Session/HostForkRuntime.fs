@@ -103,6 +103,13 @@ type HostForkRuntime
     member internal _.SendBusyNudge = sendBusyNudge
     member internal _.ParentAbortToken = parentAbortToken
 
+    member _.IsRetiredHandle(agentId: string) =
+        journal
+        |> Option.map (fun durable ->
+            HandleProjection.isRetired
+                (HandleController.agentHandle agentId)
+                (AgentJournal.handleProjection durable parentId))
+
     member this.AwaitRecovery() =
         task {
             try
@@ -146,6 +153,7 @@ type HostForkRuntime
                 children
                 sessions
                 journal
+                (journal |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
                 parentId
                 (fun run outcome -> this.Complete(run, outcome))
         )

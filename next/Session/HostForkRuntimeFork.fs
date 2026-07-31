@@ -108,6 +108,10 @@ module HostForkRuntimeFork =
             task {
                 do! this.AwaitRecovery()
 
+                match this.IsRetiredHandle agentId with
+                | Some true -> return Error(sprintf "RetiredHandle: %s" agentId)
+                | _ -> ()
+
                 let existing =
                     lock this.Gate (fun () ->
                         match this.Children.TryGetValue agentId with
@@ -206,6 +210,10 @@ module HostForkRuntimeFork =
         member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
             task {
                 do! this.AwaitRecovery()
+
+                match this.IsRetiredHandle agentId with
+                | Some true -> return Error(sprintf "RetiredHandle: %s" agentId)
+                | _ -> ()
 
                 let existing =
                     lock this.Gate (fun () ->
