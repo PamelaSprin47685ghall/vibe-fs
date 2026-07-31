@@ -79,17 +79,14 @@ export const forkBaseInstructions = [...ForkModule.ForkChildPayload_BaseInstruct
 export const forkParentWorkRecordInstruction = ForkModule.ForkChildPayload_ParentWorkRecordInstruction;
 export const forkRequirementsInstruction = ForkModule.ForkChildPayload_RequirementsInstruction;
 
-/**
- * Render a forked child's first prompt.
- *
- * Named parameters rather than positional, because the record's three fields are all strings or
- * collections of strings — passing the work record as the assignment is a mistake positional
- * arguments invite and types cannot catch here.
- */
+/** Render a forked child's first prompt by field name. */
 export const forkPayload = ({ assignment, parentWorkRecord, originalUserRequirements = [] }) =>
   ForkModule.ForkChildPayload_render(
     new ForkModule.ForkChildAssignment(assignment, parentWorkRecord, toList(originalUserRequirements)),
   );
+
+export const forkRelay = (assignment, parentWorkRecord, requirements = []) =>
+  ForkModule.ForkChildPayload_relay(assignment, parentWorkRecord, toList(requirements));
 
 /** The anchor a scenario declaration uses: the first base instruction, as it appears rendered. */
 export const forkAnchor = () => comment(forkBaseInstructions[0]);

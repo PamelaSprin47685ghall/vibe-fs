@@ -768,9 +768,8 @@ export const fallbackProjection = (() => {
 /**
  * ARCH-010 / REVIEW-002: what a newly forked child is told, as one payload.
  *
- * `assignment()` takes the three inputs positionally in record order, because the record has three
- * fields of which two are optional-ish — building it by field name here is what keeps a caller from
- * silently passing the work record as the assignment.
+ * `render` takes named fields rather than positional arguments: the record's three fields are all
+ * strings or string collections, so a positional call cannot be read for correctness.
  */
 export const forkChildPayload = (() => {
   const m = bind(ForkChildPayloadModule, 'ForkChildPayload', [
@@ -778,6 +777,7 @@ export const forkChildPayload = (() => {
     'ParentWorkRecordInstruction',
     'RequirementsInstruction',
     'render',
+    'relay',
   ])
 
   return {
@@ -793,6 +793,9 @@ export const forkChildPayload = (() => {
           toList(originalUserRequirements),
         ),
       ),
+
+    relay: (assignment, parentWorkRecord, requirements = []) =>
+      m.relay(assignment, parentWorkRecord, toList(requirements)),
   }
 })()
 

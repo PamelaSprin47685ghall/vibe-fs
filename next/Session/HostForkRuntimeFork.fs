@@ -182,10 +182,10 @@ module HostForkRuntimeFork =
                                     this.MarkReady(run)
 
                                     let enrichedPrompt =
-                                        ForkChildPayload.render
-                                            { Assignment = prompt
-                                              ParentWorkRecord = this.ParentWorkRecordOf this.ParentId
-                                              OriginalUserRequirements = requirements }
+                                        ForkChildPayload.relay
+                                            prompt
+                                            (this.ParentWorkRecordOf this.ParentId)
+                                            requirements
 
                                     let! sent =
                                         HostForkAgentOwner.sendFirstPrompt

@@ -16,8 +16,7 @@
 
 import { assertEq, assertTrue } from './gate-lib.mjs';
 import { kindOf, lanesOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../runtime-key.js';
-import { ForkChildPayload_BaseInstructions, ForkChildPayload_render, ForkChildAssignment } from '../../../build/next/Domain/ForkChildPayload.js';
-import { comment } from '../../../build/next/Domain/SyntheticToml.js';
+import { forkAnchor, forkRelay } from '../production.js';
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([
@@ -44,13 +43,12 @@ const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, tu
  * It used to be a literal copy of `HostForkRuntimeFork.fs:98`'s first envelope line. That copy was a
  * mirror: N3 deleted the envelope and the constant would have kept describing text no longer sent,
  * while these cases stayed green — proving the matcher against a shape production had stopped
- * producing. Importing the real value makes a future rewording fail here instead.
+ * producing. Reading the real value makes a future rewording fail here instead.
  */
-const ANCHOR = comment([...ForkChildPayload_BaseInstructions][0]);
+const ANCHOR = forkAnchor();
 
 /** Production's own renderer, so a declaration is tested against bytes a child will actually see. */
-const forkPrompt = (assignment, requirements = []) =>
-  ForkChildPayload_render(new ForkChildAssignment(assignment, undefined, requirements));
+const forkPrompt = (assignment, requirements = []) => forkRelay(assignment, undefined, requirements);
 
 /** `prompt.ts:235` prepends this as `messages[0]`, then appends the real conversation. */
 const titleRequest = (text) =>
@@ -308,10 +306,10 @@ export const runtimeKeyCases = [
       const entries = [entry({ id: 'child', lane: 'fast-manager', turn: [ANCHOR, 'Write proof.txt'] })];
 
       const shapes = [
-        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', undefined, [])),
-        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', 'B says background.', [])),
-        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', undefined, ['Ship it.'])),
-        ForkChildPayload_render(new ForkChildAssignment('Write proof.txt', 'B says background.', ['Ship it.'])),
+        forkRelay('Write proof.txt', undefined, []),
+        forkRelay('Write proof.txt', 'B says background.', []),
+        forkRelay('Write proof.txt', undefined, ['Ship it.']),
+        forkRelay('Write proof.txt', 'B says background.', ['Ship it.']),
       ];
 
       for (const [index, text] of shapes.entries()) {

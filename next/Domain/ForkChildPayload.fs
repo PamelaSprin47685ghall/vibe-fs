@@ -82,9 +82,24 @@ module ForkChildPayload =
     /// `SyntheticToml.document` emits bare fields before table arrays regardless of the order given
     /// here, which is what keeps `[[original_user_requirement]]` from swallowing a field written after
     /// it. That rule lives there because it is a property of TOML, not of forks.
+    ///
+    /// ── every fork-composed prompt arrives here, including the runtime's own ──
+    ///
+    /// `Assignment` is data to this renderer, whatever it means to the caller. A runtime that forks an
+    /// Executor to summarise a spool chunk composes "summarise this, preserve exact numbers" as part
+    /// of the assignment, and that is correct rather than a compromise: `HostForkRuntime.Fork` is the
+    /// single entry, so the composite payload reads coherently — the base header says complete the
+    /// assignment, and the assignment says what to do.
+    ///
+    /// Measured while migrating the Executor path: having that caller render its own ARCH-010 document
+    /// and pass it as `Assignment` produces one payload nested inside another's value — the notation
+    /// appears twice, the model must unwrap it, and the inner instructions sit below the outer data.
+    /// Threading typed caller instructions through instead would mean changing the fork signature
+    /// chain, which buys nothing here and is why there is no `TaskInstructions` field.
     let render (input: ForkChildAssignment) : string =
         let requirements =
-            input.OriginalUserRequirements |> List.filter (fun text -> text <> "")
+            input.OriginalUserRequirements
+            |> List.filter (fun text -> not (System.String.IsNullOrWhiteSpace text))
 
         let parentRecord =
             input.ParentWorkRecord
@@ -114,3 +129,10 @@ module ForkChildPayload =
                          SyntheticToml.field "text" (SyntheticToml.renderString text) ]))
 
         SyntheticToml.document instructions body
+
+    /// The positional form, for a call site that reads better without a record literal.
+    let relay (assignment: string) (parentWorkRecord: string option) (requirements: string list) : string =
+        render
+            { Assignment = assignment
+              ParentWorkRecord = parentWorkRecord
+              OriginalUserRequirements = requirements }

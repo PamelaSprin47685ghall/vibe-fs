@@ -49,7 +49,7 @@ tools = ["executor"]
 [[turn]]
 id = "map"
 internal = true
-user = "Summarize command output chunk"
+user = ["# Complete the assignment in `assignment`.", "Summarize command output chunk"]
 
   [[turn.step]]
   respond = { type = "text", text = "chunk-0" }
