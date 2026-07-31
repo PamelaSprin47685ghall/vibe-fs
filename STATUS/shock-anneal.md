@@ -12,11 +12,11 @@
 | 3 | 清场：删除旧语义与临时标记 | 静态检查 | 完成（清场阶段 `SHOCK-UNMIGRATED` = 0，八个单一写入口 ok(1)；后续 X4 仍有一处 PERSIST-009 阻断） |
 | 3.5 | SSOT/12 并入规范（`CTX-` 前缀 + 六个受影响文件） | ssot-lint | 完成（`c95429b3`） |
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
-| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 完成（编译绿、test:mjs 207/207、gate:static 绿）。完成指删除与领域实现，不含接线；X10 被接线空洞阻断，见「包 K8f 摸底」 |
+| 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 的删除与领域实现完成；X-wire 尚未接线，X10 被接线空洞阻断，见「包 K8f 摸底」 |
 | 6 | 休克三 + 退火二：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5e；386 测试三时区全绿，证据 `evidence/post-anneal2/`） |
-| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 完成（K1–K11；15 剧本 TOML，`script-loader.js` 与 18 个 JSON 删，driver 改接 `ScenarioRuntime`）。K8f 阻断：X 恢复链零生产调用点，见「包 K8f 摸底」 |
+| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 核心静态森林已落地；K9 未完成：`strict-mock-forest.js` / `strict-mock-matches.js` 仍被旧 expect* canary 路径使用。K8f 另因 X-wire 零生产调用点阻断，见「包 K8f 摸底」 |
 | 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W7 完成（W7 为 13 项 VERIFY-004 禁止退化清单的双向覆盖与注册完整性门禁；休克期未运行编译或测试） |
-| 6.7 | 运行时合成文本 TOML 记法（包 N，SSOT/13 → ARCH-010） | gate:static + canary | 未开始。排序裁决见「包 N」：N 拆两段，fork surface 段（N3）必须先于 canary 修红 |
+| 6.7 | 运行时合成文本 TOML 记法（包 N，SSOT/13 → ARCH-010） | gate:static + canary | N0–N5b 完成；N6 与退火三待办。canary 仍有行为债，X-wire 仍是 K8f 前置 |
 | 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
 
 阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在写测试前定稿。
@@ -1341,6 +1341,15 @@ K11  森林变异自检：四类错误响应必须被拒绝（新增）
 
 K1 提前到第一步的理由：它决定 K2 的前缀比较用哪个投影。先做 K2 会写出一个基于 testkit 私有规范化的前缀索引，K1 完成后整体重写。
 
+##### K9 状态修正（b48e38bd 静态复核）
+
+K9 的「删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径」尚未完成。
+`testkit/opencode/strict-mock-provider.js` 在无 `ScenarioRuntime` 时仍走
+`selectExpectation`，而 `companion-canary.mjs` 等旧内联轨迹仍调用 `provider.expect*`。
+因此当前状态只能称为「ScenarioRuntime 核心已接入、旧路径共存」，不能把 K1–K11
+整体标为完成；`VERIFY-003` 的 CONTRADICTS 记录仍有效。下一步需先把剩余旧轨迹
+迁入静态森林或明确淘汰，再删除两份旧 matcher。
+
 ### 包 N：运行时合成文本的 TOML Instruction/Data 记法（ARCH-010）
 
 | 项 | 值 |
@@ -1388,8 +1397,8 @@ N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得�
 N5a 不依赖 delta 货币的 surface（M4）：continuation / interaction repair /            已完成
     review guard nudge / executor summary input。输入都是运行时自己的固定文本或
     命令输出，与 Companion delta 无关。不得迁移 system prompt assets
-N5b Blogger delta surface（M3）——前置已解除。X4 后半已完成换币；恢复侧仍待 X-wire。
-    迁移前的阻断证据见下方「N5 拆分：M3 的前提在本仓不成立」
+N5b Blogger delta surface（M3）——前置已解除。X4 后半已完成换币；正常 delta surface 已迁入 typed TOML。
+    恢复侧仍待 X-wire；迁移前的阻断证据见下方「N5 拆分：M3 的前提在本仓不成立」
 N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
     某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
     本包不为各领域预先发明统一 versioning
@@ -1606,9 +1615,9 @@ transport   tool call/result linkage 不变、message role 不变、provider met
 [x] Blogger 多行排版改为 closing 独占一行、内容零加工
 [x] 所有多行 data 使用 canonical ''' 排版，且渲染结果可被 parser 读回
 [x] 已建立 runtime textual surface inventory
-[ ] 所有纳入范围的 instruction 使用最前方 comments      ← N5a 已完成，余 N5b（Blogger）
-[ ] 所有纳入范围的 data 使用 fields/tables/values       ← 同上
-[ ] data body 开始后不存在顶层 comment                  ← 渲染器已保证，余 N5b 未经它
+[x] 所有纳入范围的 instruction 使用最前方 comments      ← N5a + N5b 已完成
+[x] 所有纳入范围的 data 使用 fields/tables/values       ← N5a + N5b 已完成
+[x] data body 开始后不存在顶层 comment                  ← SyntheticToml.document + N5b 已完成
 [x] human raw message 未被包装
 [ ] model-native transcript 未被重写                    ← 与权限/transport 回归共同验收
 [x] system/developer prompt 未被本包迁移
@@ -1774,6 +1783,22 @@ N5b  Blogger delta surface，迁移前阻断，现已由 X4 后半解除
 
 `a5ce0d40` + `3e49242f`。`test:mjs` 432/0、gate-testkit 273/0、gate:static 六门绿。standing 分布 1 canonical → 3 canonical，1 awaiting N5。
 
+#### N5b 落地记要
+
+N5b 合并提交 `6f78de2f`，其三个前置动作可由提交链逐项定位：
+
+```text
+81e0b9e6  CTX-013  Blogger normal surface 改用 typed BloggerDeltaChunk/TOML
+7d1d5ea5  ARCH-010 surface inventory 门禁锁定 typed Blogger payload route
+253f5b87  CTX-013  header bytes 计入 Blogger chunk limit
+```
+
+当前源码证据：`CompanionHostBlogger.blog` 只把 `chunk.Toml` 送入 Blogger，
+`BloggerDelta` 负责 chunk/cursor，`surface-inventory` 报告 8 个 surface、4 canonical、
+4 verbatim-forward、0 awaiting N5。上述提交的编译与第 1–3 层数字沿用提交时记录；本轮
+休克复核只运行静态门禁，未重新宣称 canary 全绿。X-wire 仍未接线。
+
+
 ##### executor summary：已在 ARCH-010 内，欠的是 fork 签名链
 
 试着迁移时发现该项已由 N3 结构性满足。`ExecutorSummarize` 唯一的送出路径是 `runtime.Fork`（`ExecutorSummarize.fs:76` → `ExecutorSummarizeRuntime.fs:23` → `HostForkRuntime.Fork`），而 N3 已让该入口把每条 fork prompt 交给 `ForkChildPayload.relay`。map/reduce prompt 因此早已以 `assignment` 字段抵达子会话。
@@ -1924,15 +1949,16 @@ writer 先写 blob，再追加 `BlogEntryCommitted`，由 journal fold 同时推
 adapter 侧不缺东西：`OpenCode/Projection.decodeMessageView` 已能把 Host raw obj 变成
 `ProviderWireProjection`，`ProviderProjection.toSemantic` 已能继续变成语义投影。缺的
 只是 recovery-side projection 与 squash writer 尚未接线；这不属于本次 currency switch。
-journal-less Companion producer 仍未配备 durable port，生产路径现以
-`SHOCK-UNMIGRATED[PERSIST-009]` fail closed，不制造 `ProviderRunIdentity`、cursor、digest
-或 blob 事实。
+journal-less Companion producer 现在返回 `CompanionOutcome.DurableJournalUnavailable`，不调用
+Blogger、不制造 `ProviderRunIdentity`、cursor、digest 或 blob 事实；PERSIST-009 的
+`SHOCK-UNMIGRATED` 标记已在 `b48e38bd` 清零。
 
 #### X9 留下的一个功能空洞
 
 `CompanionHost.TransformRaw` 现在只做 COMPANION-005 累积并原样返回 `messages`，
 X 前缀替换不生效。`Domain/XPrefixProjection.fs` 与 `Domain/AttemptPlanner.fs` 已实现
-并有第 1 层测试，但没有接进 transform 边界。
+并有第 1 层测试，但没有接进 transform 边界；`b48e38bd` 只清除了 journal-less
+Companion 的 PERSIST-009 休克标记，未声称 X-wire 已接线。
 
 这不是降级而是 SSOT/12 的正确中间态：CTX-002 要求前缀替换在一次真实失败之后发生，
 而 transform hook 看不到 attempt 结局，所以这个位置本来就不该做这个决定。没有已提交

@@ -7,21 +7,24 @@
 
 ## 当前阶段
 
-封炉（阶段 0）完成。SSOT 冻结于 tag `ssot-freeze-0.5.0`。
+封炉、休克一、休克二、清场、SSOT/12 并入、退火一、退火二、剧本森林与因果推进门禁均已完成。
+ARCH-010 的 N0–N5b 已落地；N5b 之后的工作仍处于休克期，只运行第 0 层静态检查。
 
-分支 `refactor/ssot-shock-anneal`，基线 commit `274a30aa`。
+分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近代码动作 `b48e38bd`。
 
 ## 下一步
 
-休克一（阶段 1），工作包 0：Identity 与基础类型。
+X-wire：把真实 settled attempt 接入失败驱动恢复链；先闭合最小生产调用点，再写 K8f 的 X-A–X-D canary。
 
 ```text
-next/Kernel/Identity.fs + next/Domain/
-→ 建立 typed identity，消灭裸 string 身份
-→ 破坏面最大，必须最先做
+reconciled TurnFailed
+→ AttemptPlanner.plan / RecoverySlot
+→ PrefixProbe 选择与 XPrefixProjection
+→ 成功 terminal 才追加 PrefixRebaseCommitted
+→ 失败继续由 FallbackController 唯一推进
 ```
 
-条款：PROMPT-008、ARCH-006、EXEC-009、ORCH-006。
+条款：CTX-006、CTX-010、CTX-011、CTX-012、FALLBACK-003、PROMPT-008、PERSIST-010。
 
 ## 阅读顺序
 

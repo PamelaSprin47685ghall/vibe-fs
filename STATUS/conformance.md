@@ -2,7 +2,7 @@
 
 状态允许值：`CONFORMANT` | `PARTIAL` | `CONTRADICTS` | `UNVERIFIED` | `NOT_IMPLEMENTED`
 
-绑定 commit：`274a30aa`（pre-shock baseline）。休克期开始后本表随工作包推进更新。
+绑定 commit：`b48e38bd`（PERSIST-009 journal-less Companion fail-closed；静态门禁通过）。本表只记录截至该提交的源码状态。
 
 休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
 
@@ -27,7 +27,7 @@
 | PROMPT-005: 四阶段协议 | UNVERIFIED | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 包 A：四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生 |
 | PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定 |
 | PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
-| PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.plan` | 唯一构造函数现有唯一调用点；`single-constructor` 门禁同时检查「无人绕过」与「有人调用」两侧 |
+| PROMPT-008: 原子 AttemptExecutionProfile | CONTRADICTS | `Domain/AttemptPlanner.fs` | `buildAttemptExecutionProfile` 的唯一构造函数已定义，但当前全仓生产调用点为 0；现有 provider request 尚未从该 profile 出发。`single-constructor` 只证明无旁路，不能把零调用误报为合规；X-wire 前置必须先接线 |
 | PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
 | PROMPT-011: 未决发送恢复 | PARTIAL | `Domain/PromptAuthority.derivePromptKey` | 包 A：PromptKey 已按条款派生并写入 Host metadata，`ClaimSequence` 由 fold 推进。仍缺启动期 tail window 查找与 `RecoveryAttemptBudget = 3`（属清场期） |
 
@@ -156,42 +156,30 @@ target ref 的工作再拉起一个 Manager。
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
 | EXEC-004: Join 语义 | CONFORMANT | `Journal/LinkageProjection.fs` `HandleController.retire` `HostForkRuntime.Join` | single-assignment cell：首个完成者唯一生效，后到者报 `AlreadyCompleted` 而非覆盖；`Join()` 消费后写 `HandleRetired`，且退休失败时不交出 completion（否则调用方以为已消费而 journal 仍在提供）。第 1 层测试覆盖三种 completion kind 与四种拒绝理由 |
-| EXEC-005: List 语义 | CONTRADICTS | `OpenCode/ListTool.fs` | 投影侧齐备（`listable` 含 `CompletedAwaitingJoin`、排除 `Retired`），但 `list` 工具不读它——它编码 `AgentRecord.Status`（`Idle`/`Busy`/`Interrupted`/`Closed`）加一个 `hasPendingCompletion` 布尔。「已完成待 join」因此报成 `idle` + `true`，而 `Retired` 无从排除。见下方零消费者一节 |
-| EXEC-009: Handle 持久化 + tombstone | PARTIAL | `Journal/LinkageProjection.fs` `Session/HandleController.fs` | 三事实、三态投影、typed handle（agent/pty/manager-job 为三个独立键）、tombstone 永久性、`HandleLinked.ChildSessionId` 全部就位并有第 1 层测试。读侧仍有两处悬空：`isRetired` 与三个派生视图全仓零调用点 |
+| EXEC-005: List 语义 | UNVERIFIED | `OpenCode/ListTool.fs` `Journal/LinkageProjection.fs` | `list` 已按 durable `HandleProjection.listable` 枚举，`CompletedAwaitingJoin` 输出专用状态，`Retired` 被排除；本次仅有静态证据，休克期不重跑编译/行为测试 |
+| EXEC-009: Handle 持久化 + tombstone | PARTIAL | `Journal/LinkageProjection.fs` `Session/HandleController.fs` `OpenCode/HostForkRuntime.fs` `OpenCode/HostForkChildDispatch.fs` | 三事实、三态投影、typed handle、永久 tombstone 与 `ChildSessionId` 已接线；fork 前置读取 `isRetired`，父取消读取 `activeHandles`，但 `join` 仍走运行期 mailbox，`HandleProjection.joinable` 无生产调用点。本次仅有静态证据，休克期不重跑编译/行为测试 |
 | EXEC-011: Process Deadline | CONFORMANT | `Process/ProcessRequest.fs` `Process/Deadline.fs` | `min(3 × estimate, hardLimit)`，`DefaultHardLimit = 1h` 有限；估算为 0/负/NaN/∞ 时回落到硬上限而非「无 deadline」；deadline 存为时刻故 `remaining` 每次由时钟派生、不递减；`nextWaitMs` 钳到 `2^31-1`（JS 定时器超过即立刻触发，会把长 deadline 变成忙循环）。第 1 层测试 |
 | EXEC-015: PTY 行为 | CONFORMANT | `Process/Pty*.fs` | onExit-only completion 已验证 |
 
-### 零调用点的读侧：`isRetired` 与三个派生视图（包 T-4 发现）
+### EXEC-009 读侧接线复核（b48e38bd）
 
-写第 1 层测试时逐个确认消费者，发现四个函数全仓生产调用点为 0：
+前一版记录的「四个 durable HandleProjection 读侧零调用点」已过时。当前静态调用点为：
 
 ```text
-HandleProjection.listable        0   EXEC-005 的 list 视图
-HandleProjection.joinable        0   EXEC-004 的 join 候选
-HandleProjection.activeHandles   0   EXEC-009 的父取消逐项清单
-HandleProjection.isRetired       0   EXEC-009 的 fork 前置检查
-                                     （`Kernel/Identity.fs:308` 只是注释提及）
+HandleProjection.listable        OpenCode/ListTool.fs
+HandleProjection.joinable        0（JoinTool 仍走运行期 mailbox）
+HandleProjection.activeHandles   OpenCode/HostForkChildDispatch.fs
+HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 ```
 
 这与包 X8 之前的 `buildAttemptExecutionProfile` 是同一形态：函数正确、有测试、
 且没有任何生产路径走它。差别在于那一个是唯一写入口（门禁能问「谁在绕过」），
 这四个是唯一读入口——而「没有人读」不构成任何现有门禁的违规。
 
-后果按条款分两类。 `listable` 无人读是 EXEC-005 的直接违反：`list` 报的是运行期
-`AgentStatus`，`CompletedAwaitingJoin` 塌成 `idle` + `hasPendingCompletion=true`，
-`Retired` 则完全无从排除——而三态可区分正是这个投影替换双 map 的理由。
-`joinable` 与 `activeHandles` 无人读目前不产生错误行为：join 走运行期 mailbox，
-父取消走 `HostForkChildDispatch` 的 owned 列表，两者当前答案与投影一致。但它们是
-两套并行的真相来源，重启后运行期那套要靠 `HostForkRestart` 重建，投影这套是权威。
-
-`isRetired` 无人读是最需要记账的一处。 EXEC-009 明确要求「Retired ID 永远返回
-`RetiredHandle`，不得退回到把输入当成 Agent 名称重新 fork」，而 fork 路径当前不问
-这个问题。tombstone 因此是写下了但没人查的——投影正确地永久保留它，测试也证明
-`isRetired` 答对，但没有任何生产分支因此改变行为。
-
-三项均登记为退火三之前的接线工作，不在包 T 内（包 T 只换验证层语言，不改
-`next/`）。写成 `CONTRADICTS` 与 `PARTIAL` 而非 `CONFORMANT`，正是因为「纯函数对
-+ 测试绿」不等于条款成立——条款约束的是系统行为，而没有调用点的正确函数不产生行为。
+当前调用点覆盖 `list`、父取消和 fork 前置 tombstone；`join` 仍未消费 durable
+`joinable`，因此 `CompletedAwaitingJoin` 的 durable 消费链尚未闭合。
+该结论只绑定静态源码与 `shock-audit`；`EXEC-005` 可在退火三补 Host 轨迹后升格，
+`EXEC-009` 还需先迁移 JoinTool 的 durable 读侧。
 
 ## Host 集成
 
@@ -201,7 +189,7 @@ HandleProjection.isRetired       0   EXEC-009 的 fork 前置检查
 | HOST-003: Transport 与 Domain 分离 | CONFORMANT | `HostSignal.fs` | — |
 | HOST-004: Reconciler | CONFORMANT | `SessionReconciler.fs` | single-flight + dirty latch 已实现 |
 | HOST-005: A 版分段 | PARTIAL | `TerminalSessionA.fs` | ARecord 未按 ProviderRun 分段 |
-| HOST-009: Host 生命周期 | PARTIAL | `SpikePlugin.fs:120,127` | 双 transform hook 注册 + 幂等 guard |
+| HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。本次仅有静态证据，Host canary 待退火三 |
 | HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
 | HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
 
@@ -209,12 +197,12 @@ HandleProjection.isRetired       0   EXEC-009 的 fork 前置检查
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| VERIFY-001: 测试金字塔 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0 层齐备（`ssot-lint` / `shock-audit` / `architecture-gate`，均为 `scripts/` 下静态检查器）；第 1–2 层在 `tests-mjs/`（374 测试）。第 3 层 Fake Host 轨迹与第 4–5 层 canary/发布门禁待包 K/W 与退火三 |
+| VERIFY-001: 测试金字塔 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0 层静态检查器已齐备，本次 `gate:static` 六门通过；第 1–2 层在 `tests-mjs/`，第 3 层 Fake Host 轨迹与第 4–5 层 canary/发布门禁仍待退火三 |
 | VERIFY-003: Canary Mock 剧本 | CONTRADICTS | `strict-mock-forest.js` `strict-mock-matches.js` | 六项违规：`specificity` 打分消歧、`pathCursor` 游标、失败时删 seal 缓存、`requestRoleOf` 反推角色、`loadScripts` 运行期换剧本、`epochCold` / `modelSideCold` 嗅探式冷边界豁免。分析见 `design-script-forest.md` |
 | VERIFY-004: Stability Gate | CONFORMANT | `run-canary-staggered.mjs` `stability-checker.js` | 三轮 + leak check 已实现。原理与实现的偏差（含「断言心跳从未接线」）记于 `shock-anneal.md` 包 W |
 | VERIFY-005: Architecture Gates | CONFORMANT | `scripts/architecture-gate.mjs` | 已是静态检查器而非测试，故不需先编译即可运行；单一写入口门禁实现为 `SINGLE_WRITER_FACTS`，八个事实实测 ok (1)；`single-constructor` 双向检查（无人绕过 + 有人调用）。行数门禁按条款保持删除 |
-| VERIFY-007: 两种 Provider Projection | PARTIAL | `Domain/ProviderProjection.fs` | 生产侧两投影已分离：`ProviderWireProjection`（含 ID、字节相等）与 `ProviderSemanticProjection`（去 ID、语义相等），`toSemantic` 单向降级。testkit 侧仍是单一 `sealProviderVisible` 同时承担两种相等性，属包 K |
-| VERIFY-008: 测试语言边界 | CONFORMANT | `tests-mjs/` `scripts/architecture-gate.mjs` | 生产 `.fs`、第 1–3 层全 `.mjs` 直接 import `build/next`；`tests-next/` 已删（75 文件 / 11654 行 / 234 断言）；Fable 约定仅存于 `domain.mjs`，由 `domain.meta.test.mjs` 的四个陷阱锁 + 全量 undefined 扫描守住；门禁 `TESTS_ROOT`/`TEST_EXTENSIONS` 指向 `tests-mjs`+`.mjs`，并新增测试侧 scanner witness 防止扫描静默变空 |
+| VERIFY-007: 两种 Provider Projection | UNVERIFIED | `Domain/ProviderProjection.fs` `testkit/opencode/provider-wire.js` | 生产侧两投影已分离；testkit 仅解码 OpenAI wire，再调用 `build/next` 的生产 projection，不再维护 `sealProviderVisible` 第二套规范。本次仅有静态门禁证据 |
+| VERIFY-008: 测试语言边界 | UNVERIFIED | `tests-mjs/` `scripts/architecture-gate.mjs` | 生产保持 `.fs`，第 1–3 层测试保持 `.mjs` 并直接 import `build/next`；`tests-next/` 已删除，Fable 约定集中在 `domain.mjs`，门禁指向 `tests-mjs`+`.mjs`。本次仅有静态门禁证据 |
 
 ### VERIFY 段此前四行失效（包 T-5 更正）
 
@@ -245,8 +233,8 @@ VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未�
 | PERSIST-004: 尾部损坏 | CONFORMANT | `Journal/Boot.fs` | 尾部截断静默丢弃；中间损坏 / LocalSeq 跳号 / RuntimeId 不匹配三者均在损坏处截断并报诊断；单个流损坏不牵连健康流。第 2 层测试 |
 | PERSIST-005: 旧 Schema | CONFORMANT | `FactCodec.containsLegacyFallbackFields` | 发现旧 schema 直接失败；退役事实名按名诊断而非报编解码错误 |
 | PERSIST-006: 文件权限 | CONFORMANT | `Journal/Writer.fs` | `mkdirSync` 传 `mode = 0o700`、`openSync` 传 `0o600`，创建时设定而非事后 chmod。第 2 层测试在 `umask 000` 下断言 |
-| PERSIST-008: Projection 查询 | PARTIAL | `Journal/Fold.fs` | 多数 projection 是 O(1) 积分；`Fold.reviewOwner` 用 `Map.tryPick` 扫描全部 session |
-| PERSIST-009: Durable Effect 协议 | PARTIAL | `EffectProjection.fs` | 事实存在；未覆盖 Prompt 发送与 Git publish |
+| PERSIST-008: Projection 查询 | PARTIAL | `Journal/Fold.fs` `OpenCode/TerminalPolicy.fs` | 多数 projection 是 O(1) 积分；`TerminalPolicy.tryLinkedChild` 仍按 session 扫描 child session，需迁移为等价的 keyed association查询 |
+| PERSIST-009: Durable Effect 协议 | PARTIAL | `EffectProjection.fs` `Session/Companion.fs` | Companion 无 Journal 时现在返回 `DurableJournalUnavailable` 并不发送；Prompt 发送与 Git publish 的 durable effect 仍未闭合 |
 
 ### PERSIST-001 与 PERSIST-006 的两处实测缺陷（包 T-2 修正）
 
@@ -274,8 +262,10 @@ VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未�
 构造它的那个函数的调用方。一个零调用点的构造函数通过所有「不得绕过」检查，
 因为无路可绕。
 
-`single-constructor` 门禁现在检查两侧：无人手工拼装，且至少有一个调用点。
-两条都红过一次以确认门禁真的会响。
+`single-constructor` 门禁现在检查两侧：无人手工拼装，且 builder 至少有一个调用点。
+当前唯一调用点是 `AttemptPlanner.plan` 内部对 builder 的调用；门禁不等价于检查
+`AttemptPlanner.plan` 自身是否被 provider 发送链调用。X-wire 接线前，PROMPT-008
+仍为 `CONTRADICTS`。
 
 ## 未列入本表的条款
 
