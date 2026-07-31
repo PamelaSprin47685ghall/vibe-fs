@@ -57,25 +57,12 @@ module SpikePlugin =
                 let! _reconciled = PromptRecovery.reconcile journal snapshotOpt
 
                 let transform inObj outObj : Task<unit> =
-                    let projectionSessionIdOpt =
-                        if
-                            not (isNull inObj)
-                            && not (isNull inObj?sessionID)
-                            && not (String.IsNullOrWhiteSpace(unbox<string> inObj?sessionID))
-                        then
-                            Some(unbox<string> inObj?sessionID)
-                        else
-                            projectionSessionIdFromMessages outObj
+                    let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
 
                     match projectionSessionIdOpt with
                     | Some projectionSessionId ->
                         wired.RegisterOwned projectionSessionId
 
-                        // Filling in the session id lets the transform address a
-                        // session; it says nothing about eligibility, which
-                        // COMPANION-002 reads from ActiveLogicalRun alone.
-                        if not (isNull inObj) && isNull inObj?sessionID then
-                            inObj?sessionID <- projectionSessionId
                     | None -> ()
 
                     CompanionTransform.handleCompanionTransform
@@ -102,11 +89,14 @@ module SpikePlugin =
                     match projectionSessionIdOpt with
                     | None -> Task.FromResult()
                     | Some projectionSessionId ->
+                        let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
                         ReviewSeal.sealTransform
                             snapshotOpt
                             journal
                             (SessionId.create projectionSessionId)
-                            (unbox<obj array> outObj?messages |> Array.toList)
+                            (Projection.decodeMessageView rawMessages)
+                            (Projection.lastUserMessageId rawMessages)
 
                 let chatParams = ChatParamsHook.create journal
 

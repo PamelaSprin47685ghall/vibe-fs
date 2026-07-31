@@ -46,12 +46,18 @@ module PluginHostInterop =
         else
             let messages = unbox<obj array> output?messages
 
-            messages
-            |> Array.tryPick (fun msg ->
-                if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
-                    Some(unbox<string> msg?info?sessionID)
-                else
-                    None)
+            let sessionIds =
+                messages
+                |> Array.choose (fun msg ->
+                    if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
+                        Some(unbox<string> msg?info?sessionID)
+                    else
+                        None)
+                |> Array.distinct
+
+            match sessionIds with
+            | [| sessionId |] -> Some sessionId
+            | _ -> None
 
     let toolHooks
         (toolModule: obj)
