@@ -4,7 +4,7 @@
     <RootNamespace>Wanxiangshu.Next</RootNamespace>
     <LangVersion>preview</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <OtherFlags>--nowarn:1182 --nowarn:1108</OtherFlags>
+    <OtherFlags>--nowarn:1182 --nowarn:1108 --nowarn:3511</OtherFlags>
     <NoWarn>$(NoWarn);NU1510</NoWarn>
     <ArtifactsDir Condition="'$(ArtifactsDir)' == ''">$(MSBuildThisFileDirectory)../artifacts/</ArtifactsDir>
     <BaseIntermediateOutputPath>$(ArtifactsDir)obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
