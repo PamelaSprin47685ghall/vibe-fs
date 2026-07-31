@@ -1385,14 +1385,11 @@ N4  ARCH-010 门禁并红过一次：instruction 不得为字段、data 不得�
     渲染结果 parse 成功且 value == 原文 + 尾换行、system prompt 未被纳入、
     human raw 未被包装、provider/tool 原生 binding 未改变
 ─── canary 修红（11 → 16/16）与退火三在此之后 ───
-N5a 不依赖 delta 货币的 surface（M4）：continuation / interaction repair /
+N5a 不依赖 delta 货币的 surface（M4）：continuation / interaction repair /            已完成
     review guard nudge / executor summary input。输入都是运行时自己的固定文本或
     命令输出，与 Companion delta 无关。不得迁移 system prompt assets
 N5b Blogger delta surface（M3）——阻断。前置是 X4 后半的换币，不是文本迁移。
     理由见下方「N5 拆分：M3 的前提在本仓不成立」
-N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
-    某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
-    本包不为各领域预先发明统一 versioning
 N6  更新依赖最终 bytes 的 fixture / golden / payload digest / byte-limit / canary（M5）。
     某固定文本若有自己的 version/digest 合同，由该文本的 SSOT owner 按既有规则决定是否 bump；
     本包不为各领域预先发明统一 versioning
@@ -1609,9 +1606,9 @@ transport   tool call/result linkage 不变、message role 不变、provider met
 [x] Blogger 多行排版改为 closing 独占一行、内容零加工
 [x] 所有多行 data 使用 canonical ''' 排版，且渲染结果可被 parser 读回
 [x] 已建立 runtime textual surface inventory
-[ ] 所有纳入范围的 instruction 使用最前方 comments      ← N3 + N5
-[ ] 所有纳入范围的 data 使用 fields/tables/values       ← N3 + N5
-[ ] data body 开始后不存在顶层 comment                  ← 渲染器已保证，待全部 surface 经它
+[ ] 所有纳入范围的 instruction 使用最前方 comments      ← N5a 已完成，余 N5b（Blogger）
+[ ] 所有纳入范围的 data 使用 fields/tables/values       ← 同上
+[ ] data body 开始后不存在顶层 comment                  ← 渲染器已保证，余 N5b 未经它
 [x] human raw message 未被包装
 [ ] model-native transcript 未被重写                    ← 与权限/transport 回归共同验收
 [x] system/developer prompt 未被本包迁移
@@ -1772,6 +1769,70 @@ N5b  Blogger delta surface，阻断
 推论与 K8f 一致：欠的不是剧本也不是文本，而是接线。包 N 不代包 X 做换币——那会把一个架构级改动塞进一个记法包，且 N5b 的验收（header bytes 计入 200 KiB、图片 marker、三级切块）必须对着真实的 TOML delta 才有意义。
 
 `companion` canary 的 `no-prefix-matched`（role=blogger）因此归入 N5b 而非 N5a，与 `executor` 的 `map.0` 分属两段。
+
+#### N5a 落地记要
+
+`a5ce0d40` + `3e49242f`。`test:mjs` 432/0、gate-testkit 273/0、gate:static 六门绿。standing 分布 1 canonical → 3 canonical，1 awaiting N5。
+
+##### executor summary：已在 ARCH-010 内，欠的是 fork 签名链
+
+试着迁移时发现该项已由 N3 结构性满足。`ExecutorSummarize` 唯一的送出路径是 `runtime.Fork`（`ExecutorSummarize.fs:76` → `ExecutorSummarizeRuntime.fs:23` → `HostForkRuntime.Fork`），而 N3 已让该入口把每条 fork prompt 交给 `ForkChildPayload.relay`。map/reduce prompt 因此早已以 `assignment` 字段抵达子会话。
+
+强行再迁会造出嵌套 payload。实测让 `ExecutorSummarize` 自行渲染文档再作为 assignment 传入：
+
+```text
+# Complete the assignment in `assignment`.
+# Report back with exactly these fields: …
+
+assignment = '''
+# Complete the assignment in `assignment`.      ← 记法出现两次
+# Report back with exactly these fields: …
+# Summarize command output chunk 0, …           ← 内层 instruction 落在外层 data 之下
+
+assignment = "raw spool bytes"
+'''
+```
+
+另一条路——给 `ForkChildAssignment` 加 `TaskInstructions` 字段让调用方传 typed instruction——试过并回退。F# record 的位置构造使新字段插在第二位，`(assignment, parentWorkRecord, requirements)` 的全部调用点静默变成「把 work record 当 instruction 传」且不抛错。要修得改整条 fork 签名链，而收益仅是把「Summarize chunk N」从 assignment 值提到 comment 里——ARCH-010 不要求这个层级的拆分，assignment 对 renderer 而言就是 data。
+
+结论写进 `ForkChildPayload.render` 的注释，含上述两条实测，防止下一个人重做一遍。
+
+##### 四条 instruction-only nudge
+
+`next/Domain/RuntimeNudge.fs`：provider retry、manager review guard、reviewer verdict guard、missing final report。四者都是条款所称 instruction-only，故渲染为纯 comment header 无 body。
+
+两处文本刻意不迁，理由写在模块头：
+
+```text
+ReviewChallenge.Text     REVIEW-003 把其 digest 记入 PerfectChallengeIssued 并在第二轮
+                         input seal 里搜同一值。bytes 是领域事实而非渲染选择；包裹会改变
+                         digest，令每次确认失败而外观上仍像正确的 fail-closed——正是该
+                         文件自身注释警告的形态
+零宽 "\u200B"            它的空即其含义。CompanionDelta.isBareContinuationMessage 靠剥掉
+                         U+200B 后判空来把 continuation 归为 transport 而非语义 delta；
+                         加 "# " 前缀会把一个传输 nudge 提升进 Companion 的语义历史
+```
+
+`missing-final-report` 的字段清单从 Markdown 项目符号改为单行，与 `ForkChildPayload.BaseInstructions` 一致：comment 里的项目符号渲染成 `# - result`，读起来像「关于一个列表的注释」而非列表。
+
+##### surface-inventory 补 composerFiles
+
+standing↔代码校验必须读「合成」的文件，而两条 nudge surface 的合成不在 send site：`HostSessionNudge` 只负责发送，`TurnCompletionProgram` 与 `HostReviewGuard` 才决定文本。只读 send site 会把这两条永久报为未迁移，而顺手的反应是改标签而不是去看散文实际在哪。两条红证：删掉 `composerFiles` 判红；把生产改回散文字面量判红并指出是哪个 composer 文件。
+
+##### canary 未变绿，且这是预期的
+
+N5a 后仍 6/16 绿。四条 nudge 都在流程后段才到达，而余下十条红各自在更早处停住，故迁移不改变结局。唯一位移是 pty-stress：由 `no-declared-turn`（devops turn 文本失配）前进到 `expectation devops.5`（第二个 PTY 的 trap TERM 行为），即从「文本类」跨到「行为类」。
+
+`no-prefix-matched`（role=blogger）仍在，属 N5b。余下 `no-declared-turn` 一条为 `role=orchestrator`、`msgs=6`、候选仅 `manager-guard.2`——该签名在剧本改动前的首轮日志中即已存在，非本轮引入。
+
+推论：包 N 对 canary 的贡献已经出尽。fork 信封那一根因消除后，剩下的十条都不是文本问题：
+
+```text
+1 条  N5b 阻断（companion，需 X4 后半换币）
+9 条  类二行为债，各自定位：fallback / fallback-aabb / reviewer-verdict 计数 /
+      pty-stress PTY 行为 / host-restart / 两个 orchestrator / manager-full-loop /
+      executor spool→summarizeSpool 未 fork
+```
 
 ### 包 X：失败驱动上下文恢复
 
