@@ -105,6 +105,8 @@ type CompanionHost
 
     member private this.BloggerDeps: CompanionHostBlogger.BloggerDeps =
         { Sessions = sessions
+          PrimaryId = primaryId
+          Durable = durable
           EnsureBlogger = ensureBlogger
           Gate = gate
           Companion = companion
@@ -112,11 +114,46 @@ type CompanionHost
           RequestKind = bloggerRequestKind
           SquashFrameCount = bloggerSquashFrameCount
           Journal = journal
-          EffectiveAgent = bloggerEffectiveAgent }
+          EffectiveAgent = bloggerEffectiveAgent
+          RecordSquashPlan = fun bloggerId providerRun -> this.RecordSquashPlan bloggerId providerRun }
+
+    /// CTX-006 step 5: the squash attempt's plan hook on the Y chain.
+    ///
+    /// The default here is a no-op because `Plugin.fs` is the only owner of the
+    /// `PluginRuntimeScope`; the composition root rebinds this when it constructs
+    /// the CompanionHost so the squash attempt lands in `scope.AttemptPlans` like
+    /// any X attempt. A no-op is correct for a scope-less CompanionHost (tests,
+    /// tools), which has no reconcile pass that could consult a plan.
+    member val RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit = fun _ _ -> () with get, set
+
+    /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
+    ///
+    /// Called by the composition root from the reconcile path when the Y session's
+    /// turn failed — the Y half of `PluginRuntimeScope.ArmRecovery`. The Companion
+    /// owns the flag; this member only forwards through the gate.
+    member this.ArmRecoverySlot() = companion.ArmRecoverySlot()
+
+    /// CTX-006: the primary session's current fallback cursor Offset.
+    ///
+    /// Read from the durable projection at decision time rather than cached, so a
+    /// cursor advanced by the X chain or a squash failure is never stale.
+    member private this.BloggerCursorOffset() : byte =
+        match journal with
+        | Some j ->
+            match DurableFallback.tryCurrentState primaryId (AgentJournal.snapshot j) with
+            | Some current -> current.Cursor.Offset
+            | None -> 0uy
+        | None -> 0uy
 
     member this.SubmitProjection(projection: ProviderSemanticProjection) : CompanionOutcome =
         let deps = this.BloggerDeps
-        companion.Submit(projection, (fun current chunk -> CompanionHostBlogger.blog deps current chunk))
+
+        companion.Submit(
+            projection,
+            (fun current chunk -> CompanionHostBlogger.blog deps current chunk),
+            (fun frameCount -> CompanionHostBlogger.squash deps frameCount),
+            this.BloggerCursorOffset
+        )
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests;
     /// SubmitProjection remains the non-blocking side-effecting operation.
@@ -150,7 +187,12 @@ type CompanionHost
         let current = Projection.decodeMessageView messages |> ProviderProjection.toSemantic
         let deps = this.BloggerDeps
 
-        companion.Submit(current, (fun projection chunk -> CompanionHostBlogger.blog deps projection chunk))
+        companion.Submit(
+            current,
+            (fun projection chunk -> CompanionHostBlogger.blog deps projection chunk),
+            (fun frameCount -> CompanionHostBlogger.squash deps frameCount),
+            this.BloggerCursorOffset
+        )
         |> ignore
 
         messages

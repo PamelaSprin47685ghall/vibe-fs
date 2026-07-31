@@ -7,6 +7,7 @@ open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 open Wanxiangshu.Next.Tools
+open Wanxiangshu.Next.Domain
 open CompanionProjection
 
 module CompanionTransform =
@@ -14,6 +15,7 @@ module CompanionTransform =
     let handleCompanionTransform
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
+        (scope: PluginRuntimeScope)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
@@ -137,6 +139,34 @@ module CompanionTransform =
                                 )
 
                             companions.[sessionId] <- value
+
+                            // CTX-006 step 5: the squash attempt's plan goes through
+                            // the same scope dictionary an X attempt uses — no second
+                            // attempt registry on the Y chain.
+                            value.RecordSquashPlan <-
+                                fun bloggerId providerRun ->
+                                    match journal with
+                                    | None -> ()
+                                    | Some j ->
+                                        let projections = (AgentJournal.snapshot j).AgentProjections
+
+                                        match PromptAuthorityLedger.activeProfile bloggerId projections with
+                                        | None -> ()
+                                        | Some authority ->
+                                            let plan =
+                                                AttemptPlanner.plan
+                                                    authority
+                                                    AgentPairCursor.initial
+                                                    (PhysicalUserMessageId.create (SessionId.value bloggerId))
+                                                    providerRun
+                                                    (PromptAuthority.PromptOrigin.AuthorityRoot
+                                                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                                                    ProviderRequestKind.BloggerSquash
+                                                    false
+                                                    (fun () -> Error NoCandidateReason.NoCoverage)
+
+                                            scope.RecordAttemptPlan bloggerId providerRun plan
+
                             value)
 
                 // COMPANION-005: accumulate the delta. Nothing here decides when to

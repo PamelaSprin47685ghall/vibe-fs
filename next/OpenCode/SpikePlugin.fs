@@ -62,18 +62,20 @@ module SpikePlugin =
 
                         projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
-                        do CompanionTransform.handleCompanionTransform
-                            scope.Companions
-                            scope.CompanionGate
-                            sessionPort
-                            journal
-                            (Some(fun bloggerId ->
-                                // Register ownership + ActiveRun so idle→reconcile
-                                // emits TerminalOutcome.Completed for this child.
-                                wired.RegisterOwned(SessionId.value bloggerId)
-                                wired.BindActiveRun bloggerId AgentRole.Blogger None))
-                            inObj
-                            outObj
+                        do
+                            CompanionTransform.handleCompanionTransform
+                                scope.Companions
+                                scope.CompanionGate
+                                scope
+                                sessionPort
+                                journal
+                                (Some(fun bloggerId ->
+                                    // Register ownership + ActiveRun so idle→reconcile
+                                    // emits TerminalOutcome.Completed for this child.
+                                    wired.RegisterOwned(SessionId.value bloggerId)
+                                    wired.BindActiveRun bloggerId AgentRole.Blogger None))
+                                inObj
+                                outObj
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
 

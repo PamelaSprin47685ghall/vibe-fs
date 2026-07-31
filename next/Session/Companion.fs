@@ -12,6 +12,13 @@ open Wanxiangshu.Next.Domain.ProviderProjection
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
     let lockObj = obj ()
 
+    /// CTX-006 / FALLBACK-012: whether this slot was reached by a real failure.
+    ///
+    /// Control-flow state only — never journalled, never derived from the cursor's
+    /// parity. A restart leaves it false (`RecoverySlot.afterRestart`), which is the
+    /// safe side: the worst case is one missed compression opportunity.
+    let mutable slotArmed = false
+
     let restoredMemory =
         match initialMemory with
         | Some memory -> Some memory
@@ -24,7 +31,9 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             | _ -> None
 
     let mutable blogProjection: BlogProjectionState =
-        restoredMemory |> Option.map (fun m -> m.Blog) |> Option.defaultValue BlogProjection.empty
+        restoredMemory
+        |> Option.map (fun m -> m.Blog)
+        |> Option.defaultValue BlogProjection.empty
 
     let mutable latestB: BlogText option =
         restoredMemory |> Option.bind (fun m -> m.LatestB)
@@ -87,6 +96,17 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.RecordBloggerClosed() : unit =
         lock lockObj (fun () -> bloggerSessionId <- None)
 
+    /// FALLBACK-012 / CTX-006: arm the recovery slot after a real failure.
+    ///
+    /// One writer, one scope: this is the Y half of `PluginRuntimeScope.ArmRecovery`.
+    /// The Companion's single-flight gate guarantees the slot sequence is linear, so
+    /// arming cannot race a concurrent squash decision.
+    member _.ArmRecoverySlot() : unit =
+        lock lockObj (fun () -> slotArmed <- true)
+
+    member private _.DisarmRecoverySlot() : unit =
+        lock lockObj (fun () -> slotArmed <- false)
+
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory
     member _.IsBusy: bool = lock lockObj isBusyUnlocked
@@ -99,9 +119,19 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         | Some t -> t :> Task
         | None -> Task.FromResult(()) :> Task
 
+    /// CTX-006: one armed slot may prepend a squash sub-request to the main request.
+    ///
+    /// All three `RecoverySlot.mayRecover` conditions are checked here, inside the
+    /// single flight: the arming flag (this sequence saw a real failure), the odd
+    /// fallback Offset, and at least one frame to squash. The decision never reaches
+    /// the transform boundary (CTX-002).
     member this.Submit
-        (currentProjection: ProviderSemanticProjection, blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<BloggerCompletion>)
-        : CompanionOutcome =
+        (
+            currentProjection: ProviderSemanticProjection,
+            blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<BloggerCompletion>,
+            ?squashFn: int -> Task<Result<BlogProjectionState, string>>,
+            ?cursorOffset: unit -> byte
+        ) : CompanionOutcome =
         lock lockObj (fun () ->
             if isBusyUnlocked () then
                 SkippedBusy
@@ -122,27 +152,73 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                         let previousCutoff = blogProjection.Coverage.CoverableTurnCutoffExclusive
                         let previousDigest = blogProjection.Coverage.CoveredPrefixDigest
 
+                        // CTX-006: decide the slot BEFORE the flight starts so the same
+                        // flight owns the whole slot sequence (squash, then main).
+                        let arming =
+                            if slotArmed then
+                                RecoverySlot.afterFailureAdvance
+                            else
+                                RecoverySlot.beginSequence
+
+                        let offset = defaultArg cursorOffset (fun () -> 0uy) ()
+                        let hasMaterial = not (List.isEmpty blogProjection.Frames)
+                        let maySquash = squashFn.IsSome && RecoverySlot.mayRecover arming offset hasMaterial
+
+                        // The squash covers the oldest ceil(m/2) frames (design §13.1).
+                        let squashFrameCount =
+                            if maySquash then
+                                (List.length blogProjection.Frames + 1) / 2
+                            else
+                                0
+
+                        // FALLBACK-012: whatever this slot decides, the arming it
+                        // consumed does not survive into a later slot — a new failure
+                        // is the only thing that arms again.
+                        slotArmed <- false
+
+                        let squashPhase =
+                            async {
+                                match squashFn, maySquash with
+                                | Some squash, true ->
+                                    let! outcome = squash squashFrameCount |> Async.AwaitTask
+
+                                    match outcome with
+                                    | Ok updated ->
+                                        // CTX-012: the committed squash frames become
+                                        // the base for the same slot's main request.
+                                        lock lockObj (fun () -> blogProjection <- updated)
+                                        return true
+                                    | Error _ ->
+                                        // SquashFailed: the slot failed (cursor already
+                                        // advanced by the squash writer). Skip the main
+                                        // request of this slot (design §13.4).
+                                        return false
+                                | _ -> return true
+                            }
+
                         let t =
                             async {
                                 try
-                                    let! produced = blogFn currentProjection delta |> Async.AwaitTask
+                                    let! proceedToMain = squashPhase
 
-                                    let completion =
-                                        if delta.NextCoverableTurnCutoffExclusive = previousCutoff then
-                                            { produced with
-                                                NextCoveredPrefixDigest = previousDigest }
-                                        else
-                                            produced
+                                    if proceedToMain then
+                                        let! produced = blogFn currentProjection delta |> Async.AwaitTask
 
-                                    persistSuccessful completion
+                                        let completion =
+                                            if delta.NextCoverableTurnCutoffExclusive = previousCutoff then
+                                                { produced with
+                                                    NextCoveredPrefixDigest = previousDigest }
+                                            else
+                                                produced
 
-                                    let nextB =
-                                        match latestB with
-                                        | None -> completion.Text
-                                        | Some old -> old + "\n\n" + completion.Text
+                                        persistSuccessful completion
 
-                                    lock lockObj (fun () ->
-                                        latestB <- Some nextB)
+                                        let nextB =
+                                            match latestB with
+                                            | None -> completion.Text
+                                            | Some old -> old + "\n\n" + completion.Text
+
+                                        lock lockObj (fun () -> latestB <- Some nextB)
                                 with _ ->
                                     ()
                             }

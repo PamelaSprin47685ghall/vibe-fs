@@ -68,7 +68,17 @@ module HostSignalBootstrap =
 
             match turn.Outcome with
             | TurnFailed _
-            | TurnAborted _ -> scope.ArmRecovery turn.SessionId
+            | TurnAborted _ ->
+                scope.ArmRecovery turn.SessionId
+
+                // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
+                // slot of the Companion that owns it, through the same failure event.
+                // The Companion's single-flight gate serialises the slot sequence,
+                // so this flag cannot race a squash decision.
+                for KeyValue(_, companion) in scope.Companions do
+                    match companion.BloggerSession with
+                    | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
+                    | _ -> ()
             | TurnCompleted
             | TurnNeedsContinuation _
             | TurnInProgress
