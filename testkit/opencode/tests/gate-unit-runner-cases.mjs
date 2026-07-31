@@ -39,12 +39,12 @@ const FIXTURE_DIR = 'tests-mjs/fixtures';
  * `TESTS_MJS_FILES` overrides discovery, which is what lets a fixture be driven through the real
  * supervisor while staying undiscoverable by the real suite — two properties otherwise in conflict.
  */
-const runFixture = (fixture) =>
+const runFixture = (fixture, budgetEnv = {}) =>
   new Promise((resolve) => {
     const started = Date.now();
     const child = spawn(process.execPath, [RUNNER, '--skip-staleness-check'], {
       cwd: REPO_ROOT,
-      env: { ...process.env, TESTS_MJS_FILES: `${FIXTURE_DIR}/${fixture}` },
+      env: { ...process.env, TESTS_MJS_FILES: `${FIXTURE_DIR}/${fixture}`, ...budgetEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -60,8 +60,25 @@ const runFixture = (fixture) =>
     child.on('exit', (code, signal) => resolve({ code, signal, stdout, stderr, elapsedMs: Date.now() - started }));
   });
 
+// 时间尺度注入（依赖注入的预算，不是新语义）：同一套监督语义在半尺度上跑。判据全部由
+// 不等式承载——窗口 > 单测界、判据间隔 < 窗口、合法工作总量 > 窗口、停摆以 SUITE_BACKSTOP_MS
+// 为界——整体缩放不改动任一不等式。子进程经环境变量拿缩放后的预算（time-budget.js 的
+// budgetFromEnv），本文件的值全部派生自 time-budget.js，不持有新的计时字面量（budget-gate）。
+//
+// 窗口下限由实测决定而非拍脑袋：watchdog 在 spawn 前武装（覆盖必须无缝），首个判据约 700ms
+// 后到达，故窗口 1500ms 是「不误杀正常启动」与「尽可能短」的交点；leak 用例有判据覆盖启动段，
+// 窗口可再压到 1000ms。
+const SCALED_PER_TEST_MS = PER_TEST_TIMEOUT_MS / 2;
+const SCALED_SILENCE_MS = UNIT_VERDICT_SILENCE_MS / 2;
+const TIGHT_SILENCE_MS = UNIT_VERDICT_SILENCE_MS / 3;
+
+const scaledBudget = (silenceMs) => ({
+  PER_TEST_TIMEOUT_MS: String(SCALED_PER_TEST_MS),
+  UNIT_VERDICT_SILENCE_MS: String(silenceMs),
+});
+
 /** Generous enough for process startup, far below the backstop a parked run would reach. */
-const PARKED_IF_SLOWER_THAN_MS = UNIT_VERDICT_SILENCE_MS * 3;
+const PARKED_IF_SLOWER_THAN_MS = SCALED_SILENCE_MS * 3;
 
 const fixtureNames = () => readdirSync(`${REPO_ROOT}${FIXTURE_DIR}`);
 
@@ -78,12 +95,16 @@ export const unitRunnerCases = [
       //
       // Measured before W4: this fixture's shape produced a verdict at the per-test bound and then
       // parked, because node:test's stream never emits `end` for a test holding a live handle.
-      const run = await runFixture('hangs-with-handle-and-chatter.fixture.mjs');
+      //
+      // Window at SCALED_SILENCE_MS, not TIGHT: the chatter must start BEFORE the fire, or the
+      // noise-rejection property is unproven while the case stays green (W4's own lesson). First
+      // tick lands ~700ms after spawn, so 1500ms leaves ~16 ticks of evidence.
+      const run = await runFixture('hangs-with-handle-and-chatter.fixture.mjs', scaledBudget(SCALED_SILENCE_MS));
 
       assertTrue(run.code !== 0 || run.signal !== null, `a hung run must not succeed: code=${run.code}`);
       assertTrue(
         run.elapsedMs < PARKED_IF_SLOWER_THAN_MS,
-        `the run took ${run.elapsedMs}ms; the window is ${UNIT_VERDICT_SILENCE_MS}ms and the backstop ` +
+        `the run took ${run.elapsedMs}ms; the injected window is ${SCALED_SILENCE_MS}ms and the backstop ` +
           `${SUITE_BACKSTOP_MS}ms, so this means nothing renewed or everything did`,
       );
       assertTrue(
@@ -107,7 +128,7 @@ export const unitRunnerCases = [
       //
       // Asserted through the runner's authoritative summary rather than the reporter's, because the
       // reporter undercounts on exactly this input — measured: `ℹ fail 1` for two `test:fail`.
-      const run = await runFixture('overrun-then-pass.fixture.mjs');
+      const run = await runFixture('overrun-then-pass.fixture.mjs', scaledBudget(SCALED_SILENCE_MS));
 
       assertEq(run.code, 1, `an overrun is a failure: ${run.stderr.slice(-300)}`);
       assertTrue(
@@ -128,12 +149,12 @@ export const unitRunnerCases = [
       // `Watchdog._arm`; W6 measured 2004ms of a 2000ms window with the call removed. Here the same
       // property is asserted through the supervisor, where the timer lives in a different process
       // from the work it bounds.
-      const run = await runFixture('all-pass.fixture.mjs');
+      const run = await runFixture('all-pass.fixture.mjs', scaledBudget(SCALED_SILENCE_MS));
 
       assertEq(run.code, 0, `a passing fixture must exit 0: ${run.stderr.slice(-300)}`);
       assertTrue(
-        run.elapsedMs < UNIT_VERDICT_SILENCE_MS,
-        `a clean run took ${run.elapsedMs}ms, at or past the ${UNIT_VERDICT_SILENCE_MS}ms window; the ` +
+        run.elapsedMs < SCALED_SILENCE_MS,
+        `a clean run took ${run.elapsedMs}ms, at or past the injected ${SCALED_SILENCE_MS}ms window; the ` +
           'watchdog timer is holding the event loop',
       );
       assertTrue(
@@ -150,7 +171,9 @@ export const unitRunnerCases = [
       // DOES arrive for this fixture — node:test finished its work — so it would have exited 0 while
       // the suite left an interval open. Every verdict passing and the process being able to leave
       // are two different claims, and only the second is what a developer means by green.
-      const run = await runFixture('leaks-handle-after-pass.fixture.mjs');
+      // Window at TIGHT_SILENCE_MS: this fixture's verdict covers the startup segment, so the
+      // window only bounds post-verdict silence and can sit below the first-verdict latency.
+      const run = await runFixture('leaks-handle-after-pass.fixture.mjs', scaledBudget(TIGHT_SILENCE_MS));
 
       assertEq(run.code, 1, `a leaked handle must fail the run even with every verdict green: ${run.stderr.slice(-300)}`);
       assertTrue(
@@ -178,9 +201,10 @@ export const unitRunnerCases = [
       // 「门禁必须红过一次才算存在」 stated as cheaply as it can be stated.
       //
       // The distinguishing input is work that is legitimately slower than the window: five tests at
-      // 800ms each, none near the 1000ms per-test bound, 4000ms against a 3000ms window. Only
-      // per-verdict renewal survives it.
-      const run = await runFixture('slower-than-the-window.fixture.mjs');
+      // 80% of the per-test bound each, none near the bound, the total past the window. Only
+      // per-verdict renewal survives it. The window must cover first-verdict latency (~700ms,
+      // measured) plus one verdict gap, so it stays at SCALED_SILENCE_MS rather than TIGHT.
+      const run = await runFixture('slower-than-the-window.fixture.mjs', scaledBudget(SCALED_SILENCE_MS));
 
       assertEq(run.code, 0, `legitimate slow work must complete: ${run.stderr.slice(-400)}`);
       assertTrue(
@@ -192,8 +216,8 @@ export const unitRunnerCases = [
         `the watchdog must not fire while verdicts keep arriving: ${run.stderr.slice(-400)}`,
       );
       assertTrue(
-        run.elapsedMs > UNIT_VERDICT_SILENCE_MS,
-        `the fixture must outlast one window (${run.elapsedMs}ms) or it proves nothing about renewal`,
+        run.elapsedMs > SCALED_SILENCE_MS,
+        `the fixture must outlast one injected window (${run.elapsedMs}ms) or it proves nothing about renewal`,
       );
     },
   },

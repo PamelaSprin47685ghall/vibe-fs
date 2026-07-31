@@ -42,9 +42,12 @@ const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
  * SIGTERM arrives as `signal`, not as an exit code, so a child that had to be killed cannot be
  * mistaken for one that decided to exit 1.
  */
-async function runWatchdogChild(script, killAfterMs) {
+async function runWatchdogChild(script, killAfterMs, budgetEnv) {
   const startedAt = Date.now();
-  const options = killAfterMs ? { timeout: killAfterMs, killSignal: 'SIGKILL' } : {};
+  const options = {
+    ...(killAfterMs ? { timeout: killAfterMs, killSignal: 'SIGKILL' } : {}),
+    ...(budgetEnv ? { env: { ...process.env, ...budgetEnv } } : {}),
+  };
   try {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
@@ -282,11 +285,16 @@ async function runTimerDoesNotHoldEventLoop() {
  * having exited 1.
  */
 async function runWaitFactRenewsOnlyOnObservation() {
+  // 时间尺度注入：同一「只认观察」语义在半尺度上跑。缩放后仍满足轮询切片（500ms）< 窗口
+  // （1000ms）的构造性不等式；值派生自 time-budget.js，经 budgetFromEnv 进子进程。
+  const scaledWatchdogMs = WATCHDOG_TIMEOUT_MS / 2;
+  const budgetEnv = { WATCHDOG_TIMEOUT_MS: String(scaledWatchdogMs) };
   const silentDir = tmpScenarioDir();
   execFileSync('git', ['-C', silentDir, 'init', '-q'], { encoding: 'utf8' });
   const silent = await runWatchdogChild(
     factBarrierScript(silentDir, 'FactThatNeverAppears', 'gate-wait-fact-silent'),
-    WATCHDOG_TIMEOUT_MS * 2,
+    scaledWatchdogMs * 2,
+    budgetEnv,
   );
   assertEq(
     silent.code,
@@ -296,8 +304,8 @@ async function runWaitFactRenewsOnlyOnObservation() {
       `after ${silent.elapsedMs}ms`,
   );
   assertTrue(
-    silent.elapsedMs < WATCHDOG_TIMEOUT_MS * 2,
-    `barrier survived two silence windows (${silent.elapsedMs}ms), so a poll slice renewed it`,
+    silent.elapsedMs < scaledWatchdogMs * 2,
+    `barrier survived two injected silence windows (${silent.elapsedMs}ms), so a poll slice renewed it`,
   );
   assertTrue(silent.stderr.includes('WATCHDOG'), `the watchdog must be what ended it: ${silent.stderr}`);
   assertTrue(
@@ -311,7 +319,9 @@ async function runWaitFactRenewsOnlyOnObservation() {
   mkdirSync(journalDir, { recursive: true });
   const journalFile = join(journalDir, 'gate.ndjson');
   writeFileSync(journalFile, '');
-  const appendEvery = Math.floor(WATCHDOG_TIMEOUT_MS / 4);
+  // appendEvery 在父进程求值后插值进子脚本，故必须用注入尺度派生——用 WATCHDOG_TIMEOUT_MS
+  // 会让子进程的追加节奏停留在未缩放尺度上（实测：窗口已缩而间隔未缩，用例耗时不变）。
+  const appendEvery = Math.floor(scaledWatchdogMs / 4);
   const appendsBeforeFact = 12;
   const appending = await runWatchdogChild(
     `import { appendFileSync } from 'node:fs';\n` +
@@ -325,6 +335,7 @@ async function runWaitFactRenewsOnlyOnObservation() {
       `clearInterval(iv);\n` +
       `console.log('barrier returned after ' + appended + ' appends');\n`,
     WAIT_FACT_WINDOW_MS,
+    budgetEnv,
   );
   assertEq(
     appending.code,
@@ -333,8 +344,8 @@ async function runWaitFactRenewsOnlyOnObservation() {
       `them: ${appending.stderr}`,
   );
   assertTrue(
-    appending.elapsedMs > WATCHDOG_TIMEOUT_MS,
-    `this child must outlive one silence window for its survival to mean anything, ran ${appending.elapsedMs}ms`,
+    appending.elapsedMs > scaledWatchdogMs,
+    `this child must outlive one injected silence window for its survival to mean anything, ran ${appending.elapsedMs}ms`,
   );
   assertEq(
     appending.stdout.trim(),

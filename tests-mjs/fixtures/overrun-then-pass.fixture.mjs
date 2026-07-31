@@ -7,8 +7,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import { PER_TEST_TIMEOUT_MS } from '../../testkit/opencode/time-budget.js'
+
 test('A overruns its bound', async () => {
-  await new Promise((resolve) => setTimeout(resolve, 1500))
+  // 1.5× the injected bound: overruns at whatever scale the gate injects, and the margin keeps
+  // the verdict-fail strictly ahead of the sleep resolving, so B cannot inherit the blame.
+  await new Promise((resolve) => setTimeout(resolve, Math.floor(PER_TEST_TIMEOUT_MS * 1.5)))
 })
 
 test('B is trivially correct', () => {

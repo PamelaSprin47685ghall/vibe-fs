@@ -38,6 +38,23 @@
  */
 export const LITERAL_BUDGET_THRESHOLD_MS = 1000;
 
+/**
+ * 依赖注入入口：同名环境变量覆盖默认值，让门禁用例把同一套监督语义跑到更小的时间尺度。
+ *
+ * 判据不依赖值的绝对大小，依赖值之间的不等式（静默窗口 > 单测界、轮询切片 < 窗口、
+ * 合法工作总量 > 窗口），故整体缩放不破坏任何判据，只缩短墙钟。只接受正有限数；非法值
+ * 拒绝启动而非静默回退——一个拼错的环境变量若回退默认值，门禁会在错误的窗口上给出绿灯。
+ */
+const budgetFromEnv = (name, fallback) => {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive finite number, got ${JSON.stringify(raw)}`);
+  }
+  return value;
+};
+
 // ── causal progress ─────────────────────────────────────────────────────────
 
 /**
@@ -45,7 +62,7 @@ export const LITERAL_BUDGET_THRESHOLD_MS = 1000;
  * canary is declared hung. Short on purpose — VERIFY-004 asks 「距上次因果进展过了多久」, and 2s
  * means the diagnostic is taken at the causal scene instead of minutes downstream.
  */
-export const WATCHDOG_TIMEOUT_MS = 2000;
+export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 2000);
 
 /**
  * Ceiling on the watchdog's own teardown once it has already decided to fire. `watchdog.js`
@@ -116,7 +133,7 @@ export const FORK_RECONCILE_SLICE_MS = 2000;
  * take a second, so this doubles as a design constraint: raising it is how a race gets papered
  * over (VERIFY-002).
  */
-export const PER_TEST_TIMEOUT_MS = 1000;
+export const PER_TEST_TIMEOUT_MS = budgetFromEnv('PER_TEST_TIMEOUT_MS', 1000);
 
 /**
  * Whole-suite ceiling, now a 兜底 rather than the hang criterion.
@@ -140,7 +157,7 @@ export const SUITE_BACKSTOP_MS = 300000;
  * that bound covers the overrun plus scheduling jitter under `concurrency: true` while still ending
  * a genuinely hung run two orders of magnitude sooner than the backstop.
  */
-export const UNIT_VERDICT_SILENCE_MS = 3000;
+export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 3000);
 
 // ── waiting for one semantic event ──────────────────────────────────────────
 
