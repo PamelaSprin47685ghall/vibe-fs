@@ -29,7 +29,7 @@ module internal CompanionHostBlogger =
     let private failBlog (message: string) : BloggerCompletion =
         raise (InvalidOperationException message)
 
-    let private failSquash (message: string) : BloggerSquashCompletion =
+    let private failSquash (message: string) : BloggerCompletion =
         raise (InvalidOperationException message)
 
     /// COMPANION-002: the Blogger is prompted like any other agent-owned child.
@@ -119,7 +119,7 @@ module internal CompanionHostBlogger =
                 | Failed error -> return failBlog error
         }
 
-    let squash (deps: BloggerDeps) (frameCount: int) : Task<BloggerSquashCompletion> =
+    let squash (deps: BloggerDeps) (frameCount: int) : Task<BloggerCompletion> =
         task {
             let! childId = deps.EnsureBlogger()
             let completion =
@@ -152,12 +152,7 @@ module internal CompanionHostBlogger =
                 | Completed result ->
                     match TerminalValidity.check result.TurnFormalText with
                     | Error rejection -> return failSquash (TerminalValidity.describe rejection)
-                    | Ok() ->
-                        return
-                            { BloggerSessionId = childId
-                              ProviderRun = result.ProviderRun
-                              Text = result.TurnFormalText
-                              CoveredFrameCount = frameCount }
+                    | Ok() -> return failSquash "SHOCK-UNMIGRATED[CTX-006]: squash not wired"
                 | Aborted reason -> return failSquash reason
                 | Failed error -> return failSquash error
         }

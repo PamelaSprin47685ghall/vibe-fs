@@ -54,29 +54,29 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val RecoveryArming = Dictionary<string, SlotArming>()
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
 
-    member _.ArmRecovery(sessionId: SessionId) =
-        RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
+    member this.ArmRecovery(sessionId: SessionId) =
+        this.RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
 
-    member _.TryRecoveryArming(sessionId: SessionId) =
-        match RecoveryArming.TryGetValue(SessionId.value sessionId) with
+    member this.TryRecoveryArming(sessionId: SessionId) =
+        match this.RecoveryArming.TryGetValue(SessionId.value sessionId) with
         | true, arming -> Some arming
         | false, _ -> None
 
-    member _.RecordAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
-        AttemptPlans.[SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun] <- plan
+    member this.RecordAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
+        this.AttemptPlans.[SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun] <- plan
 
-    member _.TryAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+    member this.TryAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         let key = SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
 
-        match AttemptPlans.TryGetValue(key) with
+        match this.AttemptPlans.TryGetValue(key) with
         | true, plan -> Some plan
         | false, _ -> None
 
-    member _.ClearRecovery(sessionId: SessionId) =
-        RecoveryArming.Remove(SessionId.value sessionId) |> ignore
+    member this.ClearRecovery(sessionId: SessionId) =
+        this.RecoveryArming.Remove(SessionId.value sessionId) |> ignore
 
-    member _.ClearAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun) |> ignore
+    member this.ClearAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        this.AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun) |> ignore
 
     /// HOST-006 prevention layer: the config hook's finding.
     ///

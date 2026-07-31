@@ -30,6 +30,8 @@ type CompanionHost
     let mutable bloggerId: SessionId option = None
     let mutable bloggerFailed = false
     let bloggerNeedsReset = ref false
+    let bloggerRequestKind = ref ProviderRequestKind.BloggerMain
+    let bloggerSquashFrameCount = ref None
     let mutable restoredBloggerIdOpt = restoredBloggerId
 
     let ensureBlogger () =
@@ -107,6 +109,8 @@ type CompanionHost
           Gate = gate
           Companion = companion
           BloggerNeedsReset = bloggerNeedsReset
+          RequestKind = bloggerRequestKind
+          SquashFrameCount = bloggerSquashFrameCount
           Journal = journal
           EffectiveAgent = bloggerEffectiveAgent }
 

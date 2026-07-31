@@ -14,7 +14,7 @@ open Wanxiangshu.Next.Session
 module XWire =
 
     let private sessionIdOfOutput (output: obj) : SessionId option =
-        projectionSessionIdFromMessages output |> Option.map SessionId.create
+        Projection.projectionSessionIdFromMessages output |> Option.map SessionId.create
 
     let private sessionProjection (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
@@ -40,7 +40,7 @@ module XWire =
 
     let private requestStartCutoff (physical: PhysicalUserMessageId) (rawMessages: obj list) =
         rawMessages
-        |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some physical)
+        |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some (PhysicalUserMessageId.value physical))
         |> Option.defaultWith (fun () ->
             raise (InvalidOperationException "X-wire cannot bind the physical user message to the transform snapshot"))
 

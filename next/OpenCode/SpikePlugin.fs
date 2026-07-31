@@ -57,48 +57,50 @@ module SpikePlugin =
                 let! _reconciled = PromptRecovery.reconcile journal snapshotOpt
 
                 let transform inObj outObj : Task<unit> =
-                    let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
+                    task {
+                        let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
 
-                    match projectionSessionIdOpt with
-                    | Some projectionSessionId ->
-                        wired.RegisterOwned projectionSessionId
+                        projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
-                    | None -> ()
-
-                    do! CompanionTransform.handleCompanionTransform
-                        scope.Companions
-                        scope.CompanionGate
-                        sessionPort
-                        journal
-                        (Some(fun bloggerId ->
-                            // Register ownership + ActiveRun so idle→reconcile
-                            // emits TerminalOutcome.Completed for this child.
-                            wired.RegisterOwned(SessionId.value bloggerId)
-                            wired.BindActiveRun bloggerId AgentRole.Blogger None))
-                        inObj
-                        outObj
-
-                    do! XWire.applyTransform snapshotOpt journal scope outObj
-
-                    // REVIEW-010: seal LAST, and only after the Companion rewrite has
-                    // mutated `outObj`. The seal must digest the message view the
-                    // provider actually receives; sealing before the rewrite would
-                    // record bytes the Host never sends.
-                    //
-                    // Host source awaits every hook in turn (`plugin/index.ts:280-292`),
-                    // so returning a Task here makes the SDK read complete before the
-                    // provider request is built.
-                    match projectionSessionIdOpt with
-                    | None -> Task.FromResult()
-                    | Some projectionSessionId ->
-                        let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                        ReviewSeal.sealTransform
-                            snapshotOpt
+                        do CompanionTransform.handleCompanionTransform
+                            scope.Companions
+                            scope.CompanionGate
+                            sessionPort
                             journal
-                            (SessionId.create projectionSessionId)
-                            (Projection.decodeMessageView rawMessages)
-                            (Projection.lastUserMessageId rawMessages)
+                            (Some(fun bloggerId ->
+                                // Register ownership + ActiveRun so idle→reconcile
+                                // emits TerminalOutcome.Completed for this child.
+                                wired.RegisterOwned(SessionId.value bloggerId)
+                                wired.BindActiveRun bloggerId AgentRole.Blogger None))
+                            inObj
+                            outObj
+
+                        do! XWire.applyTransform snapshotOpt journal scope outObj
+
+                        // REVIEW-010: seal LAST, and only after the Companion rewrite has
+                        // mutated `outObj`. The seal must digest the message view the
+                        // provider actually receives; sealing before the rewrite would
+                        // record bytes the Host never sends.
+                        //
+                        // Host source awaits every hook in turn (`plugin/index.ts:280-292`),
+                        // so returning a Task here makes the SDK read complete before the
+                        // provider request is built.
+                        let sealTask =
+                            match projectionSessionIdOpt with
+                            | None -> Task.FromResult()
+                            | Some projectionSessionId ->
+                                let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+                                ReviewSeal.sealTransform
+                                    snapshotOpt
+                                    journal
+                                    (SessionId.create projectionSessionId)
+                                    (Projection.decodeMessageView rawMessages)
+                                    (Projection.lastUserMessageId rawMessages)
+
+                        do! sealTask
+                        ()
+                    }
 
                 let chatParams = ChatParamsHook.create journal
 

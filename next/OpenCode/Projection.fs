@@ -209,6 +209,30 @@ module Projection =
         let info = infoObject rawObj
         readString info "id" |> Option.orElse (readString rawObj "id")
 
+    /// Extract the single, unambiguous session id from a transform output's
+    /// `messages` array. Used by hooks that need to identify the managed session
+    /// before the Host has bound the run.
+    ///
+    /// Returns `None` when there are zero, multiple, or malformed session ids.
+    let projectionSessionIdFromMessages (output: obj) : string option =
+        if isNull output || isNull output?messages then
+            None
+        else
+            let messages = unbox<obj array> output?messages
+
+            let sessionIds =
+                messages
+                |> Array.choose (fun msg ->
+                    if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
+                        Some(unbox<string> msg?info?sessionID)
+                    else
+                        None)
+                |> Array.distinct
+
+            match sessionIds with
+            | [| sessionId |] -> Some sessionId
+            | _ -> None
+
     /// The last `role=user` message's wire address in a transform output.
     ///
     /// REVIEW-010's seal binds to the physical user message this request answers

@@ -41,23 +41,7 @@ module PluginHostInterop =
     let pairedHook (fn: obj) : obj = jsNative
 
     let projectionSessionIdFromMessages (output: obj) =
-        if isNull output || isNull output?messages then
-            None
-        else
-            let messages = unbox<obj array> output?messages
-
-            let sessionIds =
-                messages
-                |> Array.choose (fun msg ->
-                    if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
-                        Some(unbox<string> msg?info?sessionID)
-                    else
-                        None)
-                |> Array.distinct
-
-            match sessionIds with
-            | [| sessionId |] -> Some sessionId
-            | _ -> None
+        Projection.projectionSessionIdFromMessages output
 
     let toolHooks
         (toolModule: obj)
