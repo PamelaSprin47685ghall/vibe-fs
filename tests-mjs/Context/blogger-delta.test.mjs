@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { bloggerDelta as delta, bloggerToml as toml, syntheticToml as syn } from '../domain.mjs'
+import { bloggerDelta as delta, bloggerToml as toml, companionPrompt as prompt, syntheticToml as syn } from '../domain.mjs'
 
 const origin = delta.cursor(0, 0)
 
@@ -118,6 +118,30 @@ test('CTX_003_no_chunk_exceeds_the_limit', () => {
     assert.equal(chunk.bytes <= limit, true, `chunk of ${chunk.bytes} bytes exceeds ${limit}`)
     assert.equal(chunk.bytes, syn.byteCount(chunk.toml), 'reported bytes must be the rendered bytes')
   }
+})
+
+test('CTX_013_normal_chunk_counts_instruction_header_and_keeps_delta_as_toml_data', () => {
+  const body = 'observed work ' + 'x'.repeat(500)
+  const messages = delta.messages([{ role: 'user', parts: [delta.text(body)] }])
+  const item = toml.item({ turn: 0, role: 'user', part: toml.text(body) })
+  const dataOnlyBytes = syn.byteCount(toml.render([item]))
+  const normalBytes = syn.byteCount(toml.renderWith([prompt.normalInstruction], [item]))
+  const limit = normalBytes - 1
+
+  assert.equal(normalBytes > dataOnlyBytes, true, 'the instruction header must add real bytes')
+  assert.equal(dataOnlyBytes <= limit, true, 'the data-only rendering must fit the distinguishing limit')
+
+  const chunk = delta.nextChunk({ limit, cursor: origin, messages })
+  assert.equal(chunk.bytes <= limit, true, 'the final sent bytes must include the instruction header')
+  assert.equal(chunk.bytes, syn.byteCount(chunk.toml))
+  assert.equal(chunk.toml.startsWith('# '), true, 'normal delta begins with the instruction header')
+  assert.equal(chunk.toml.includes('\n\n[[item]]'), true, 'the typed delta remains the data body')
+
+  const parsed = parseToml(chunk.toml)
+  assert.equal(parsed.item.length, 1)
+  assert.equal(parsed.item[0].role, 'user')
+  assert.equal(parsed.item[0].truncated, true)
+  assert.equal('messages' in parsed, false, 'the payload is Blogger TOML data, not a JSON envelope')
 })
 
 // ── level two: part boundaries within one message ──────────────────────────
