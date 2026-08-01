@@ -1999,6 +1999,24 @@ Companion 的 PERSIST-009 休克标记，未声称 X-wire 已接线。
 
 ##### 包 K8f 摸底：X10 被这个空洞阻断（实测）
 
+##### HOST-012 决策记录：多实例共享（2026-08-01 实测）
+
+orchestrator-publish canary 修复推进中，deep-reviewer 的 verdict 必拒
+（"manager session is unknown"）。DIAG 实测定位根因：Host `InstanceStore`
+（`../opencode/packages/opencode/src/project/instance-store.ts` 的 `load`：
+`cache.get(directory)`）按 directory 缓存实例——orchestrator 的 manager
+worktree（`Path.GetTempPath()/wanxiangshu-{jobId}`，独立 git worktree project）
+触发第二个插件实例（`initSpikePlugin` 实测两次，`input.directory` 分别为主
+workspace 与 worktree；`ToolRuntimeScope` 构造两次，uid 不同）。主实例的
+reverify fork 的 deep-reviewer 由 worktree 实例的工具处理，per-instance
+`SessionParents` 读不到主实例的注册 → REVIEW-008 fail closed。
+
+决策（用户确认）：插件状态跨实例共享——SessionParents / VerdictSessions /
+SessionDirectories 改为模块级单例（HOST-012）。每实例独有：AgentJournal
+（独立 runtimeId 文件）、Companions、OwnedSessions、订阅。
+
+##### 包 K8f 摸底：X10 被这个空洞阻断（实测）
+
 包 K8f 计划写 X-A 至 X-D 四条 canary 验收剧本。摸底测量后判定不可写，原因不是剧本
 难写，而是没有可观察的生产行为：
 

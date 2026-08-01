@@ -199,6 +199,7 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。本次仅有静态证据，Host canary 待退火三 |
 | HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
 | HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
+| HOST-012: 多实例共享边界 | NOT_IMPLEMENTED | `OpenCode/PluginRuntimeScope.fs` | Host `InstanceStore` 按 directory 实例化插件（worktree = 独立实例），fork→verdict 跨实例。共享清单（SessionParents/VerdictSessions/SessionDirectories）尚未落地为模块级单例；决策依据：SSOT/07 + 实测（deep-reviewer 的 VerdictTool 读不到主实例注册的 SessionParents） |
 
 ## 验证
 

@@ -143,6 +143,7 @@
     <Compile Include="Session/CompanionJournalPort.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="Session/CompanionProjection.fs"/>
+    <Compile Include="OpenCode/SharedState.fs"/>
     <Compile Include="OpenCode/PluginRuntimeScope.fs"/>
     <Compile Include="OpenCode/HostSessionContext.fs"/>
     <Compile Include="OpenCode/HostSessionNudge.fs"/>

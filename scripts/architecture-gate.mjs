@@ -106,6 +106,7 @@ const HOST_INTEROP_ALLOWLIST = new Map([
   ['next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
   ['next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
   ['next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
+  ['next/OpenCode/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
   [
     'next/Kernel/Flow.fs',
     'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',

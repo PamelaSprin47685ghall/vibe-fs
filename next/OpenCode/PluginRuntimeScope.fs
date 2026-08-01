@@ -41,13 +41,16 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable startupProbeDone = false
 
     member _.Journal = journal
-    member val SessionDirectories = Dictionary<string, string>()
+    // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
+    // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
+    // Companions 等）保持 per-instance。
+    member val SessionDirectories = SharedState.SessionDirectories
     member val OwnedSessions = HashSet<string>()
     member val UserMessageBindings = Dictionary<string, PhysicalUserMessageId>()
-    member val SessionParents = Dictionary<string, string>()
+    member val SessionParents = SharedState.SessionParents
     member val Companions = Dictionary<string, CompanionHost>()
     member val CompanionGate = obj ()
-    member val VerdictSessions = HashSet<string>()
+    member val VerdictSessions = SharedState.VerdictSessions
     member val NudgeSent = HashSet<string>()
     member val ManagerGuardNudges = HashSet<string>()
     member val AbortedSessions = HashSet<string>()
@@ -62,11 +65,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | true, arming -> Some arming
         | false, _ -> None
 
-    member this.RecordAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
+    member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
         this.AttemptPlans.[SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun] <- plan
 
-    member this.TryAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        let key = SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
+    member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        let key =
+            SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
 
         match this.AttemptPlans.TryGetValue(key) with
         | true, plan -> Some plan
@@ -75,8 +79,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member this.ClearRecovery(sessionId: SessionId) =
         this.RecoveryArming.Remove(SessionId.value sessionId) |> ignore
 
-    member this.ClearAttemptPlan(sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        this.AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun) |> ignore
+    member this.ClearAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        this.AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun)
+        |> ignore
 
     /// HOST-006 prevention layer: the config hook's finding.
     ///
@@ -141,6 +146,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
+
         this.AttemptPlans.Keys
         |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))
         |> Seq.toList
