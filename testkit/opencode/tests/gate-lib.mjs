@@ -24,7 +24,7 @@ export function tmpScenarioDir() {
 export async function startSseServer(events) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      if (req.url !== '/event') {
+      if (req.url !== '/event' && req.url !== '/global/event') {
         res.writeHead(404).end();
         return;
       }

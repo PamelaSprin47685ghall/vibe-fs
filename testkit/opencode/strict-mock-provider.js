@@ -25,6 +25,8 @@ import {
   readRequestBody,
 } from './strict-mock-server.js';
 import { faultBody } from './delivery-plan.js';
+import { wireOf } from './provider-wire.js';
+import { createHash } from 'node:crypto';
 import { StrictMockSignals } from './strict-mock-signals.js';
 import { WATCHDOG_TIMEOUT_MS } from './time-budget.js';
 import { respond } from './strict-mock-responses.js';
@@ -267,6 +269,40 @@ export class StrictMockProvider {
       );
     }
     if (selection.sealBroken !== undefined) {
+      // 诊断：打印 previous 与 next wire 的逐条哈希
+      try {
+        const sessionId = context?.sessionId;
+        const prev = this._scenario?.seals?.get(sessionId);
+        const next = wireOf(parsed);
+        const h = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
+        const fmt = (w) => (w ? Array.from(w.Messages).map((m) => `${m.Role}:${h(JSON.stringify(m.Parts))}`).join('|') : 'null');
+        const prevW = prev ? Array.from(prev.Messages) : [];
+        const nextW = next ? Array.from(next.Messages) : [];
+        const minLen = Math.min(prevW.length, nextW.length);
+        const diffs = [];
+        for (let i = 0; i < minLen; i += 1) {
+          const a = h(JSON.stringify(prevW[i].Parts));
+          const b = h(JSON.stringify(nextW[i].Parts));
+          if (a !== b) diffs.push(`msg[${i}] ${prevW[i].Role}:${a} != ${nextW[i].Role}:${b}`);
+        }
+        if (prevW.length !== nextW.length) diffs.push(`len ${prevW.length} != ${nextW.length}`);
+        // system 内容差异定位
+        const prevSys = Array.from(prevW[0]?.Parts ?? [])[0]?.fields?.[0] ?? '';
+        const nextSys = Array.from(nextW[0]?.Parts ?? [])[0]?.fields?.[0] ?? '';
+        if (typeof prevSys === 'string' && typeof nextSys === 'string' && prevSys !== nextSys) {
+          let at = -1;
+          const max = Math.min(prevSys.length, nextSys.length);
+          for (let i = 0; i < max; i += 1) {
+            if (prevSys[i] !== nextSys[i]) { at = i; break; }
+          }
+          console.error(`[SEAL-SYS] firstDiffAt=${at} prevHead=${prevSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
+          console.error(`[SEAL-SYS] nextHead=${nextSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
+        }
+        console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
+        console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
+      } catch (diagErr) {
+        console.error(`[SEAL-DIAG-ERR] ${diagErr?.message}`);
+      }
       return this._recordUnexpected(res, parsed, `seal-${selection.sealBroken.reason}`, [], '', context);
     }
 

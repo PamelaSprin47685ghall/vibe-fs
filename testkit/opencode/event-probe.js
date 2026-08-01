@@ -45,7 +45,14 @@ export class EventProbe {
     for (let attempt = 1; attempt <= 3; attempt++) {
       this._abortController = new AbortController();
       try {
-        const response = await fetch(`${this._baseUrl}/event`, {
+        // /global/event, not /event: sessions forked into a manager WORKTREE live in
+        // a different directory, and the directory-scoped /event stream never
+        // carries their events (measured: an orchestrator-forked manager session
+        // produced zero events on /event while its requests reached the mock).
+        // The global stream wraps every event as
+        // `{ directory, project, workspace, payload: { id, type, properties } }`,
+        // which `_processLine` unwraps.
+        const response = await fetch(`${this._baseUrl}/global/event`, {
           headers: {
             'Accept': 'text/event-stream',
             'x-opencode-directory': this._workDir,
@@ -122,11 +129,18 @@ export class EventProbe {
       });
       return;
     }
+    // /global/event wraps the event as `{ directory, project, workspace, payload }`.
+    // Unwrap the payload and keep the directory as a diagnostic field.
+    let eventBody = parsed;
+    if (parsed && typeof parsed === 'object' && parsed.payload && typeof parsed.payload === 'object') {
+      eventBody = parsed.payload;
+      eventBody = { ...eventBody, directory: parsed.directory };
+    }
     const eventObj = {
       seq: ++this._seq,
       time: Date.now(),
       raw: jsonStr,
-      ...shapeFromParsed(parsed),
+      ...shapeFromParsed(eventBody),
     };
     this._events.push(eventObj);
     for (const cb of this._onEventCallbacks) {

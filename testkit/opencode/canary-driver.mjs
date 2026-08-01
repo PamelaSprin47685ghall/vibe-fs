@@ -247,7 +247,20 @@ async function runFlow(scenario, doc, ctx) {
       continue;
     }
     if (step.bindChild) {
-      const parentId = ctx.sessionId;
+      // `parent` names whose child to wait for:
+      //   `self` (default)      the scenario's top-level session
+      //   `child`               the session the previous bindChild found
+      //   an agent name         the session bound by an earlier bindChild for that
+      //                         agent — nested forks (orchestrator → manager →
+      //                         coder/reviewer) need this, because `child` is
+      //                         overwritten by every later bindChild
+      ctx.sessionsByAgent = ctx.sessionsByAgent || {};
+      const parentId = step.bindChild.parent === 'self' || step.bindChild.parent === undefined
+        ? ctx.sessionId
+        : step.bindChild.parent === 'child'
+          ? ctx.childId
+          : ctx.sessionsByAgent[step.bindChild.parent];
+      assert.ok(parentId, `bindChild requires a parent session for parent '${step.bindChild.parent ?? 'self'}'`);
       const event = await scenario.events.awaitEvent(
         (e) => e.type === 'session.created'
           && e.parentSessionID === parentId
@@ -255,6 +268,7 @@ async function runFlow(scenario, doc, ctx) {
         step.timeoutMs || WATCHDOG_TIMEOUT_MS,
       );
       ctx.childId = event.sessionID;
+      if (step.bindChild.agent) ctx.sessionsByAgent[step.bindChild.agent] = ctx.childId;
       assert.ok(ctx.childId, 'bindChild: missing child session');
       scenario.sessionIds.push(ctx.childId);
       // `bind` in TOML, `aliases` in the JSON scenarios K8 has not reached yet. The
