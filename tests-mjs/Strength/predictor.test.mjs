@@ -118,6 +118,29 @@ test('STRENGTH_022_sparse_context_falls_back_to_lower_order', () => {
   assert.ok(p1 > 0, `backoff should produce a nonzero probability, got ${p1}`)
 })
 
+// ── continuation backoff（STRENGTH-022 KN 一元续接）─────────────────────────
+
+test('STRENGTH_022_unigram_continuation_backoff_is_alive', () => {
+  // With an EMPTY history and zero structure features, predictRead's p1 IS the
+  // unigram continuation pCont (backoff to order 0). Training read→eot habits
+  // must make "read" a known successor, so p1 rises above the untrained state.
+  // This pins the KN backoff: if continuation keys were built or queried wrong
+  // (length-1 key, head-vs-last confusion), pCont is 0 and this fails.
+  const zeroFeatures = features() // hitFiles 0, empty:false etc.
+  const untrained = strength.predictRead(strength.emptyRoleState(), [], zeroFeatures)
+
+  let state = strength.emptyRoleState()
+  for (let i = 0; i < 40; i++) {
+    state = strength.observeRequest(state, [read(1), eot()])
+  }
+  const trained = strength.predictRead(state, [], zeroFeatures)
+
+  assert.ok(
+    trained.p1 > untrained.p1,
+    `trained empty-history p1 (${trained.p1}) should exceed untrained (${untrained.p1})`,
+  )
+})
+
 // ── structure features (STRENGTH-023) ───────────────────────────────────────
 
 test('STRENGTH_023_many_grep_hits_boost_read_probability', () => {

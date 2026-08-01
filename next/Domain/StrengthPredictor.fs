@@ -143,16 +143,28 @@ module StrengthPredictor =
         let trimmed = history |> List.truncate maxOrder
 
         // P_cont(next) = continuationCount(next) / continuationTotal
-        let continuationTotal =
+        //
+        // `updateCounts` builds continuation keys as `prefix @ [successor]`, so
+        // every key has length ≥ 2 and its value is always 1 (distinct-successor
+        // count). The unigram continuation for `next` is therefore the number of
+        // length-2 keys whose LAST element is `next`, over all length-2 keys —
+        // the standard KN unigram backoff, NOT `Map.tryFind [next]` (length 1,
+        // never present) and NOT `List.head = next` (that is the context, not
+        // the successor). Both mistakes silently zero the backoff.
+        let totalKeys =
             state.Continuations
             |> Map.toSeq
-            |> Seq.filter (fun (key, _) -> List.length key = 2 && List.head key = next)
-            |> Seq.sumBy snd
+            |> Seq.filter (fun (key, _) -> List.length key = 2)
+            |> Seq.length
 
-        let continuationCount =
-            match Map.tryFind [ next ] state.Continuations with
-            | Some n -> n
-            | None -> 0L
+        let nextKeys =
+            state.Continuations
+            |> Map.toSeq
+            |> Seq.filter (fun (key, _) -> List.length key = 2 && List.last key = next)
+            |> Seq.length
+
+        let continuationTotal = int64 totalKeys
+        let continuationCount = int64 nextKeys
 
         let pCont =
             if continuationTotal > 0L then

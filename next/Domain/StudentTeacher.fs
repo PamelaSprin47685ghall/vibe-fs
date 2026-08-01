@@ -76,7 +76,9 @@ module StudentTeacher =
     /// 具体路径是实现建议；这里承载结构校验（不执行文件 IO）。
     let isIgnoredTmpPath (path: string) : bool =
         // `.agent/.tmp/` 必须被版本控制忽略（LEARN-032 第 5 条）。
-        path.Contains(".agent/.tmp/") || path.Contains(".agent/.tmp")
+        // 只判带路径分隔符的形式：裸前缀会误报 `.agent/.tmpx` 之类邻居目录。
+        path.Contains(".agent/.tmp/")
+        || path.EndsWith(".agent/.tmp", System.StringComparison.Ordinal)
 
     /// LEARN-033：QA.md 内容完全非结构化——按真实发生顺序追加的自然语言字节流。
     /// 物理追加时只插入防止文本粘连所需的换行；框架不得写入分隔线/标题/标记。
