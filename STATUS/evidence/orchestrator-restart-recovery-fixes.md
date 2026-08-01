@@ -74,10 +74,33 @@ system prompt 变短 → ARCH-004 seal 断裂。
 
 ## 残留（诚实记录，更新）
 
-1. **manager 家族 session 的 seal 残留**：blogger 已钉住；manager/reviewer/coder 的
+1. manager 家族 session 的 seal 残留：blogger 已钉住；manager/reviewer/coder 的
    worktree 目录仍随释放丢失指令。家族 session 在 publish 后的后续请求（guard 继续轮、
    reviewer 续答）仍会 seal 断裂。修复方向：家族 session 目录与工具 cwd 分离，或 guard
    轮在 publish 后停止——均需进一步设计，未在本次范围内。
-2. **guard 轮 flake/循环**：`manager-guard.2` 偶发超时 + guard 多轮触发（实测第四轮
+2. guard 轮 flake/循环：`manager-guard.2` 偶发超时 + guard 多轮触发（实测第四轮
    fast-reviewer），与 `orchestrator-publish` 的 bindChild/join 竞争同类，属运行期时序。
-3. **orchestrator-publish**：bindChild(fast-coder) 偶发 awaitEvent 超时 + join 链 flake。
+3. `orchestrator-publish`：bindChild(fast-coder) 偶发 awaitEvent 超时 + join 链 flake。
+
+## 固定 2s 复查（2026-08-01，未提交）
+
+时限回退已完成：运行期 watchdog 固定 2000ms；gate Host spawn→bootstrap 与各 readiness
+级仍各守 1000ms；P0 并发 8。删除默认 flow wait 的竞争总时限，不把 Blogger/internal
+expectation 算 blocking progress。最近 `test:mjs` 445/0、`test:harness` 284/0；P0 13/16。
+
+三个失败现场：
+
+- `reviewer-restart`：最后 blocking progress = `restart-journal:11`。新 runtime journal 仅
+  `RuntimeStarted`；旧 runtime 尾部依次含 `PluginPromptClaimed` 且无 accepted/submitted。
+  Host stdout 已到 bootstrap、listen、global health、`OPENCODE-SIGNAL-SOURCE global.event`，
+  未到 model config/project health。Host await 插件构造，插件构造 await PromptRecovery，
+  PromptRecovery 经 SDK 回读同一 project session；startup re-entry 是下一轮第一根因。
+- `orchestrator-restart-publish`：`Timed out waiting for expectation reviewer.0`。internal
+  expectation 已是 background，不能再归因 Blogger 心跳；需单独记录该 scenario 的
+  journal 尾，确认 startup recovery 与 Manager reviewer 创建二者之一。
+- `orchestrator-publish`：provider 在 publish/worktree release 后仍收到 Manager guard，
+  lastUser 为 `# Review is required before completion`；system prompt 仅丢 AGENTS.md 块，
+  seal 以 `seal-undeclared` fail closed。job-state 二次检查不足以取消已 admitted nudge；
+  需要 durable guard-close ↔ PromptDispatcher claim/admission 同步边界。
+
+详细续工约束与源码锚点见 `STATUS/orchestrator-recovery-puzzle.md` §10。

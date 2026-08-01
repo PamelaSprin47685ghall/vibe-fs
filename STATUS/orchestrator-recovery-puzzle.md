@@ -129,7 +129,7 @@ tracked 调试插桩已全部还原：
 3. 把诊断永久化为正式 mjs/Host 轨迹测试；禁止只留临时 print。
 4. 该 canary 绿后，依 VERIFY-002 继续单 canary → P0×3 → `test:release`。
 
-## 9. 未解困惑（2026-08-01 续查，退火三收尾）
+## 9. 前轮未解困惑（历史，2026-08-01）
 
 > 续查 `orchestrator-restart-publish` 修复链（提交 `783caf3b`、`3a2944f2`，证据
 > `evidence/orchestrator-restart-recovery-fixes.md`）后，canary 森林仍有三处红灯，
@@ -150,12 +150,12 @@ REBASE 改变 worktree 树 → 镜像树 ≠ 当前树 → manager 每次 termin
 
 未解点：
 
-- **为什么 post-rebase 的 fast-reviewer 确认没有让 guard 停轮？** 观察到的顺序：
+- 为什么 post-rebase 的 fast-reviewer 确认没有让 guard 停轮？观察到的顺序：
   `manager-guard.0 attempt=4` 早于 `reviewer-confirm.0 attempt=1`（fast-reviewer #1 的
   challenge 答案）——guard 第 4 轮触发时 #1 尚未确认，时序纠缠。post-rebase 轮
   （#3/#4）的确认（镜像带 post-rebase 树）应满足 guard——实测没有，需证明
   post-rebase 轮是否真的 Confirmed（seal 链）还是 ChallengeUnproven。
-- **guard 的触发时机未建模完整**：manager 的哪些 terminal 触发 guard？manager.2
+- guard 的触发时机未建模完整：manager 的哪些 terminal 触发 guard？manager.2
   （assignment 文本）→ guard #1 无疑；manager-guard.2（guard 轮的文本）也触发？
   每个 guard 轮的 fork+join 是否都产生一次 terminal 判定？
 - 修复方向：guard 确认应对 rebase 后的新树重新满足——「已确认 barrier」语义 vs
@@ -171,14 +171,14 @@ manager/reviewer/coder 未处理。
 
 未解点：
 
-- **家族 session 为什么在 job 已 publish（终态）后仍在发请求？** 9.1 的 guard 循环是
+- 家族 session 为什么在 job 已 publish（终态）后仍在发请求？9.1 的 guard 循环是
   主因，但 manager 的 guard 轮在 job 终态后为何还继续——ORCH 程序已返回 Published，
   谁还在驱动 manager 的 session？
-- **session 目录的真实决定机制未完全确认**：`handlers/session.ts:75` 读 body
+- session 目录的真实决定机制未完全确认：`handlers/session.ts:75` 读 body
   `location ?? process.cwd()`，`session.ts:682` 读 `ctx.directory`；实测家族 session =
   worktree（x-opencode-directory header 路由），orchestrator = workspace——两条代码
   路径的矛盾未用运行证据收口。
-- **Instruction.systemPaths 的 ScopedCache**：按 directory 缓存指令文件；目录被释放后
+- `Instruction.systemPaths` 的 `ScopedCache`：按 directory 缓存指令文件；目录被释放后
   缓存是否失效、globUp 对已消失 cwd 的行为——未验证。
 
 ### 9.3 bindChild awaitEvent 偶发超时（orchestrator-publish）
@@ -194,3 +194,40 @@ bindChild 稳定成功，coder 的偶发失败。
 - EventProbe 的 SSE 事件是否有丢失窗口（重连/心跳间隙），还是谓词本身偶发失配？
   40 个请求都到了 mock，事件却不在 buffer——需要一次失败现场的 created 事件全量
   dump 才能收口。
+
+## 10. 固定 2s 后的困难点账（2026-08-01）
+
+不可退让的判据已经恢复：`WATCHDOG_TIMEOUT_MS = 2000` 是运行期唯一静默线；
+`GATE_HOST_START_TIMEOUT_MS = 1000`；P0 并发恢复 8。默认 `wait`、`bindChild`、
+`awaitEvent`、`awaitTerminal` 不再另起一个与 watchdog 竞争的总时限；显式长时限只剩兜底，
+不能续期。`internal = true` expectation 已归类为背景，Blogger 不再替死路径续命。
+
+最后一轮 P0：13/16 绿。三个红灯均有独立物理证据：
+
+1. `reviewer-restart` 卡在 Host 项目初始化。新进程已经经过 bootstrap、listen、
+   `/global/health`、插件 `global.event` signal source；journal 新 runtime 只写到
+   `RuntimeStarted`，总事实数 11 后静默 2s。旧 runtime 尾部是未收口的
+   `PluginPromptClaimed`。Host 源码 `plugin/index.ts:112-123,222-224` await 插件构造；
+   `SpikePlugin.fs:59-65` 又在构造内 await `PromptRecovery.reconcile`；恢复读侧
+   `PromptRecovery.fs:81` 调 SDK `session.messages`。当前最强根因：插件初始化中经 SDK
+   重入同一个尚未完成的 project instance。下一刀必须是 post-init lazy single-flight
+   recovery gate：首个真实 Host 事件启动；`PromptDispatcher` 四个 send 在发出前 await；
+   禁止 timer、禁止放宽 2s、禁止把 pending claim 猜成 accepted/abandoned。
+2. `orchestrator-restart-publish` 仍停在 `reviewer.0`。Blogger expectation 已降为背景，
+   所以这不再是背景流量掩盖。它与上一项都穿过 restart；下一轮先把同样的 journal 事实尾
+   固化进该失败分支，确认是同一个 startup recovery 重入，还是 Manager guard 未产生
+   reviewer session。未取证前禁止合并两个根因。
+3. `orchestrator-publish` 仍有 publish 后 Manager guard。P0 物理请求携带
+   `# Review is required before completion`，此时 worktree 已释放，Host system prompt 少
+   AGENTS.md，seal fail closed。`CandidateReady/Published` job-state 前置检查仍挡不住已经
+   admitted、尚未落到 provider 的 nudge。进程内 HashSet 也不是跨 instance 的事务。
+   下一刀必须把「guard requirement 已关闭」与 PromptDispatcher claim/admission 放进同一
+   durable 同步边界；禁止靠 tree 次数上限、sleep、目录兜底或放宽 seal。
+
+已闭合但尚未提交的基础修复：Host readiness 拆成 9 个单调事件；启动每级仍守原时限；
+restart 额外只用 durable journal 事实续期；`session.created` 只作信号，child 身份从
+`GET /session?scope=project` snapshot 读取；never-end 从内容字段移到 transport fault；
+Manager review barrier 同步进 manager projection，`satisfiesGuard` 同时校验当前 barrier + tree。
+
+最近验证：`test:mjs` 445/0；`test:harness` 284/0；单跑 reviewer restart、manager companion、
+restart normal+conflict 均绿；八路 P0 13/16，故不得提升 conformance 或进入三轮门禁。
