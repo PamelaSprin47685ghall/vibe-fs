@@ -29,6 +29,11 @@
     <Compile Include="Domain/StrengthPredictor.fs"/>
     <Compile Include="Domain/StrengthController.fs"/>
     <Compile Include="Domain/StrengthValue.fs"/>
+    <Compile Include="Domain/EnforcerCatalog.gen.fs"/>
+    <Compile Include="Domain/EnforcerCodec.fs"/>
+    <Compile Include="Domain/EnforcerThrottle.fs"/>
+    <Compile Include="Domain/EnforcerNudge.fs"/>
+    <Compile Include="Domain/EnforcerCycle.fs"/>
     <Compile Include="Domain/RecoverySlot.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>

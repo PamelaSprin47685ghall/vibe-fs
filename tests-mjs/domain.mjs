@@ -99,6 +99,11 @@ const [
   StrengthPredictorModule,
   StrengthControllerModule,
   StrengthValueModule,
+  EnforcerCatalogModule,
+  EnforcerCodecModule,
+  EnforcerThrottleModule,
+  EnforcerNudgeModule,
+  EnforcerCycleModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -147,6 +152,11 @@ const [
   prod('Domain/StrengthPredictor'),
   prod('Domain/StrengthController'),
   prod('Domain/StrengthValue'),
+  prod('Domain/EnforcerCatalog.gen'),
+  prod('Domain/EnforcerCodec'),
+  prod('Domain/EnforcerThrottle'),
+  prod('Domain/EnforcerNudge'),
+  prod('Domain/EnforcerCycle'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -254,6 +264,10 @@ export const mapToObject = (map, keyToString) =>
 
 export const mapCount = (map) => FsMap.count(map)
 export const mapTryFind = (key, map) => unwrapOption(FsMap.tryFind(key, map))
+
+/** Plain object → FSharpMap (for string-keyed maps). */
+export const mapOf = (obj) =>
+  FsMap.ofArray(Object.entries(obj).map(([k, v]) => [k, v]), ordinalComparer)
 
 /** FSharpList → array. */
 export const listItems = (list) => FsList.toArray(list)
@@ -2177,3 +2191,103 @@ const tier = (name) => {
   if (name === 'Deep') return RolesModule.AgentTier.Deep
   throw new Error(`unknown tier: ${name}`)
 }
+
+// ── SSOT/15: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
+
+export const enforcer = (() => {
+  const catalog = bind(EnforcerCatalogModule, 'EnforcerCatalogData', ['rules'])
+  const codec = bind(EnforcerCodecModule, 'EnforcerCodec', [
+    'CanonicalBlogCall',
+    'normalizeFieldName',
+    'hasEnfPrefix',
+    'parseScore',
+    'damerauLevenshtein',
+    'resolveField',
+    'decodeCall',
+    'hasValidText',
+  ])
+  const throttle = bind(EnforcerThrottleModule, 'EnforcerThrottle', [
+    'ThrottleState',
+    'ThrottleTauObservations',
+    'decay',
+    'normalizedObservation',
+    'epochStart',
+    'observe',
+    'shouldTrigger',
+    'consume',
+    'pressureAt',
+    'steadyEvidence',
+    'isolatedPressure',
+  ])
+  const nudge = bind(EnforcerNudgeModule, 'EnforcerNudge', [
+    'renderLine',
+    'renderEvidence',
+    'renderBatch',
+    'mergeEvidence',
+  ])
+  const cycle = bind(EnforcerCycleModule, 'EnforcerCycle', ['MergedCycle', 'mergeCalls', 'isValidCycle'])
+
+  const catalogRules = listItems(catalog.rules)
+
+  return {
+    /** 全部 120 项规则（生成自 SSOT/15.md，ENFORCER-170）。 */
+    rules: catalogRules,
+    ruleCount: catalogRules.length,
+    fieldNames: () => catalogRules.map((r) => r.FieldName),
+
+    /** ENFORCER-022/023/024/025：解析一个 blog 调用的参数。 */
+    decodeCall: (rawArgs) => {
+      // Production expects Map<string, obj>; tests hand plain objects.
+      const mapped = mapOf(rawArgs)
+      return codec.decodeCall(
+        toList(catalogRules.map((r) => [r.FieldName, r.RuleId, r.CatalogOrdinal])),
+        mapped,
+      )
+    },
+
+    /** ENFORCER-023：值容错。 */
+    parseScore: (v) => codec.parseScore(v),
+
+    /** ENFORCER-024：字段名规范化。 */
+    normalizeFieldName: (s) => codec.normalizeFieldName(s),
+
+    /** ENFORCER-024：DL 距离。 */
+    damerauLevenshtein: (a, b) => codec.damerauLevenshtein(a, b),
+
+    /** ENFORCER-081/083/084：throttle。 */
+    epochStart: (ordinal) => throttle.epochStart(BigInt(ordinal)),
+    observe: (state, score, ordinal) => {
+      const [next, pressure] = throttle.observe(throttle.ThrottleTauObservations, state, score, BigInt(ordinal))
+      return { state: next, pressure }
+    },
+    shouldTrigger: (pressure) => throttle.shouldTrigger(pressure),
+    consume: (state, ordinal) => throttle.consume(state, BigInt(ordinal)),
+    steadyEvidence: (score) => throttle.steadyEvidence(throttle.ThrottleTauObservations, score),
+    pressureAt: (evidence, sinceConsumed) => throttle.pressureAt(throttle.ThrottleTauObservations, evidence, sinceConsumed),
+    isolatedPressure: (initialEvidence, elapsed) =>
+      throttle.isolatedPressure(throttle.ThrottleTauObservations, initialEvidence, elapsed),
+
+    /** ENFORCER-100/101/102：nudge 渲染。 */
+    renderLine: (key, text) => nudge.renderLine(key, text),
+    renderEvidence: (e) => nudge.renderEvidence(e),
+    renderBatch: (rules, evidence) =>
+      nudge.renderBatch(toList(rules.map((r) => [r[0], r[1], r[2]])), evidence),
+    mergeEvidence: (items) => nudge.mergeEvidence(toList(items)),
+
+    /** ENFORCER-042/043：cycle 合并。 */
+    mergeCalls: (calls) => {
+      const list = toList(
+        calls.map(([ordinal, call]) => [
+          ordinal,
+          {
+            Text: call.Text ?? undefined,
+            Evidence: call.Evidence ?? undefined,
+            Scores: mapOf(call.Scores ?? {}),
+          },
+        ]),
+      )
+      return cycle.mergeCalls(list)
+    },
+    isValidCycle: (merged) => cycle.isValidCycle(merged),
+  }
+})()
