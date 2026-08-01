@@ -8,29 +8,30 @@
 ## 当前阶段
 
 封炉、休克一至三、退火一与退火二、剧本森林、因果推进门禁、ARCH-010 N0–N5b 均已落地。
-退火三进行中：`orchestrator-restart-publish` 的 durable recovery 已修复（5 个生产缺陷），
-进入 canary 森林收尾与发布门禁。
+**退火三已完成**：canary 森林 16/16 全绿，`test:release`（gate:static → build → unit →
+harness → P0×3）完整通过。
 
-分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近生产修复 `783caf3b`。
+分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近生产修复 `71763142`。
 
 当前已知：
 
 - `orchestrator-restart-publish` 单 canary 3/3 绿（修复链：
   seal tool-result 解码、sweep `+` 标记、fork 首 prompt 信封、已确认 barrier 不重开挑战、
   终端双投递去重；证据 `evidence/orchestrator-restart-recovery-fixes.md`）；
-- `test:mjs` 442 绿、`test:harness` 278 绿、`gate:static` 全过；
-- P0 一轮 12/15：残留 = restart-publish（guard 轮 flake）、orchestrator-publish
-  （bindChild/join 竞争）、conflict（post-publish blogger seal 残留，Host 系统组装行为，
-  见证据文档 §残留）。
+- **P0 16/16 全绿，`test:release` 完整通过**（证据：本轮 `71763142` 修复链 + P0×3 三轮全绿）。
+  三处历史残留全部闭合：
+  - `reviewer-restart` 并发红：插件构造期 `PromptRecovery.reconcile` 经 SDK 重入未就绪
+    Host → 改为 post-init single-flight `RecoveryGate`（`2a2660be`）；
+  - `orchestrator-publish` seal-undeclared：guard 轮 continuation 的 `turn.Directory`
+    = worktree，worktree 释放后 instruction 丢失 → `liveDirectory` 回退 root + 
+    `TurnInProgress` 在 job 离开 `ManagerStarted` 后直接完成 manager（`71763142`）；
+  - teardown 端口泄漏 flake：`terminateChild` 在 `terminateTree` 报 survivors 后
+    补一次 SIGKILL（非调大超时，`71763142`）。
 
 ## 下一步
 
-canary 森林收尾，按优先级：
-
-1. guard 轮 flake（`manager-guard.2` 偶发超时 + `orchestrator-publish` 的
-   bindChild/join 竞争）——同属运行期时序，调查 guard 双触发与 join 消费竞争；
-2. conflict canary 的 post-publish blogger seal 残留——评估 canary 侧处理；
-3. 上述清零后按 VERIFY-002：P0 单轮 → P0×3 → `test:release`。
+退火三已完，进入新一轮工作包：合入 PENDING/14-16 方案为 SSOT 并实现（见
+`shock-anneal.md` 登记）。
 
 ## 阅读顺序
 

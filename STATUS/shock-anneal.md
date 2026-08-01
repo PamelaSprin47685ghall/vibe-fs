@@ -17,7 +17,7 @@
 | 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 完成：canary 全部走 `ScenarioRuntime`；旧 forest/satisfy 匹配入口已物理删除，`strict-mock-matches.js` 仅保留 request-kind 分类与诊断 extractor。退火三另发现 ORCH-006 durable worktree ownership 缺陷，已由 `9fcaad24` 修复 |
 | 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W7 完成（W7 为 13 项 VERIFY-004 禁止退化清单的双向覆盖与注册完整性门禁；休克期未运行编译或测试） |
 | 6.7 | 运行时合成文本 TOML 记法（包 N，SSOT/13 → ARCH-010） | gate:static + canary | N0–N5b 完成；N6 与退火三待办。canary 仍有行为债，X-wire 仍是 K8f 前置 |
-| 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 阻断：固定 2s、八路 P0 当前 13/16。红灯 = startup PromptRecovery 重入、restart reviewer.0 未出现、publish 后 admitted Manager guard；证据与下一刀见 `orchestrator-recovery-puzzle.md` §10。未进入 P0×3 / release |
+| 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 完成：P0 16/16、P0×3 三轮全绿、`test:release` 完整通过。三个红灯修复链：`2a2660be`（PROMPT-011 post-init RecoveryGate：构造期 SDK 重入）、`71763142`（ORCH-006/ARCH-004：guard 轮 continuation 目录回退 root + TurnInProgress 完成管理；teardown SIGKILL 重试）。证据见 `00-current.md` |
 
 阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在写测试前定稿。
 
