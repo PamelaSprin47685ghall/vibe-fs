@@ -8,62 +8,44 @@
 ## 当前阶段
 
 封炉、休克一至三、退火一与退火二、剧本森林、因果推进门禁、ARCH-010 N0–N5b 均已落地。
-退火三进行中：单 canary 调查阶段，尚未进入 P0×3 与 `test:release`。
+退火三进行中：`orchestrator-restart-publish` 的 durable recovery 已修复（5 个生产缺陷），
+进入 canary 森林收尾与发布门禁。
 
-分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近生产修复 `9fcaad24`。
+分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近生产修复 `783caf3b`。
 
 当前已知：
 
-- ORCH-006 durable worktree 被 `NeedsReview` 作用域析构删除的根因已修复；
-- `reviewer-restart` 已通过单 canary；
-- `orchestrator-restart-publish` 已越过 deep-reviewer / Blogger TOML 声明缺口，现阻断于
-  restart 后 `OrchestratorPublished=0`；
-- `orchestrator-publish` 尚缺修复后的最终单 canary 绿证据；
-- Orchestrator 显式 barrier 与 REVIEW-007 随机 barrier 重叠仍为独立 `UNVERIFIED` 项。
-
-根因与证据：`evidence/manager-worktree-durable-ownership.md`。
+- `orchestrator-restart-publish` 单 canary 3/3 绿（修复链：
+  seal tool-result 解码、sweep `+` 标记、fork 首 prompt 信封、已确认 barrier 不重开挑战、
+  终端双投递去重；证据 `evidence/orchestrator-restart-recovery-fixes.md`）；
+- `test:mjs` 442 绿、`test:harness` 278 绿、`gate:static` 全过；
+- P0 一轮 12/15：残留 = restart-publish（guard 轮 flake）、orchestrator-publish
+  （bindChild/join 竞争）、conflict（post-publish blogger seal 残留，Host 系统组装行为，
+  见证据文档 §残留）。
 
 ## 下一步
 
-只调查 `orchestrator-restart-publish` durable recovery：
+canary 森林收尾，按优先级：
 
-```text
-restart 前同一 ManagerJobId 的最后 durable progress
-→ restart boot 的 activeJobs
-→ recoveryAction
-→ RecoverManagerJob 是否启动 program
-→ terminal verdict 是否进入新 VerdictMailbox
-→ OrchestratorPublished 恰好一次
-```
-
-禁止继续放宽 TOML、seal 或 assert；禁止用 worktree 文件存在推导 job active。恢复只信 durable
-journal projection。
-
-取得该 canary 绿证据后，按 VERIFY-002 顺序继续：
-
-```text
-orchestrator-publish 单 canary
-→ P0 单轮
-→ P0×3
-→ test:release
-```
+1. guard 轮 flake（`manager-guard.2` 偶发超时 + `orchestrator-publish` 的
+   bindChild/join 竞争）——同属运行期时序，调查 guard 双触发与 join 消费竞争；
+2. conflict canary 的 post-publish blogger seal 残留——评估 canary 侧处理；
+3. 上述清零后按 VERIFY-002：P0 单轮 → P0×3 → `test:release`。
 
 ## 阅读顺序
 
 ```text
 1. AGENTS.md §1
-2. STATUS/evidence/manager-worktree-durable-ownership.md
-3. SSOT/06 + SSOT/07
-4. STATUS/conformance.md
-5. STATUS/shock-anneal.md
-6. STATUS/orchestrator-recovery-puzzle.md
+2. STATUS/evidence/orchestrator-restart-recovery-fixes.md
+3. STATUS/evidence/manager-worktree-durable-ownership.md
+4. SSOT/06 + SSOT/07
+5. STATUS/conformance.md
+6. STATUS/shock-anneal.md
 ```
 
 ## 退火三反馈纪律
 
-先跑最小目标测试；该层绿后才扩大。允许并要求编译、mjs、harness 与单 canary，但不得跨过红层。
-
-当前可直接运行：
+先跑最小目标测试；该层绿后才扩大。当前可直接运行：
 
 ```bash
 npm run gate:static
@@ -71,8 +53,6 @@ npm run build
 node --test tests-mjs/Orchestrator/runtime.test.mjs
 WANXIANG_RUN_ID=<run> timeout 180 node testkit/opencode/tests/orchestrator-restart-publish-canary.mjs
 ```
-
-单 canary 未绿前，不运行 P0×3 或 `test:release` 宣称交付。
 
 ## 已确立的关键决定
 
@@ -86,3 +66,5 @@ WANXIANG_RUN_ID=<run> timeout 180 node testkit/opencode/tests/orchestrator-resta
 | Fallback：Offset 循环无界，自动恢复预算有界 | FALLBACK-005 |
 | Host `Attempt` 与 `ConsecutiveFailureCount` 是不同的量 | FALLBACK-010 |
 | durable worktree 只在终态显式释放；`NeedsReview` 不释放 | ORCH-003、ORCH-006、ORCH-007 |
+| fork 首 prompt 一律 ARCH-010 信封，continuation 一律原样 | PROMPT-008、N3（`783caf3b`） |
+| 已确认 barrier 的多余 PERFECT 不重开挑战 | REVIEW-003（`783caf3b`） |
