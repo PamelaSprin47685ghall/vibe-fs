@@ -74,7 +74,11 @@ type ToolRuntimeScope
             openReviewBarrier = true,
             treeHashFor =
                 (fun agentId ->
+                    // 主会话（无父）的目录从未经 RegisterChildDirectory 注册——
+                    // 兜底主 workspace，否则 Manager 自己 fork 的 Reviewer 永远
+                    // 打不开 barrier（REVIEW-008 fail closed 拒绝 verdict）。
                     directoryFor agentId
+                    |> Option.orElse workspaceDirectory
                     |> Option.map (fun path ->
                         let tree = GitTree.create path
 
