@@ -345,3 +345,21 @@ X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.pla
 表达前者的位置。后者更隐蔽，因为它不会在任何一列里显示成非 `CONFORMANT`——代码正确、
 测试全绿、状态表满分，而约束根本不存在于规范里。发现途径也只有一条：写测试时问「这条
 断言的权威在哪」，答不出来就是缺口。
+
+## SSOT/14 — Predict & Reduce Strength（`STRENGTH-`）
+
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| STRENGTH-001…135（全部） | NOT_IMPLEMENTED | — | 规范已合入（2026-08-02），代码零实现；实现受 STRENGTH-078 Host canary（C-01…C-21）与阶段 A（Projection DSL 迁移）门禁 |
+
+## SSOT/15 — Blogger as Enforcer（`ENFORCER-`）
+
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| ENFORCER-001…201（全部） | NOT_IMPLEMENTED | — | 规范已合入（2026-08-02），代码零实现；实现受 ENFORCER-180 第 0 步九条 Host canary 阻断门 |
+
+## SSOT/16 — Student & Teacher（`LEARN-`）
+
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| LEARN-001…114（全部） | NOT_IMPLEMENTED | — | 规范已合入（2026-08-02），代码零实现；实现受 Host canary（LEARN-082…088）门禁 |

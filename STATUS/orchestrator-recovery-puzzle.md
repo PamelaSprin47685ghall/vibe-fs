@@ -236,13 +236,13 @@ restart normal+conflict 均绿；八路 P0 13/16，故不得提升 conformance �
 
 §10 的三个红灯全部闭合，`test:release` 完整通过（P0×3 三轮全绿）：
 
-1. **`reviewer-restart` 并发红** — 根因是插件构造期 `PromptRecovery.reconcile` 经 SDK
+1. `reviewer-restart` 并发红 — 根因是插件构造期 `PromptRecovery.reconcile` 经 SDK
    `session.messages` 重入尚未就绪的 Host project instance（`plugin/index.ts:112-123,222-224`
    await 插件构造）。并发 8 路时 SDK 读取超过 2s 静默线，构造挂起 → restart 后新 runtime
    永不派发 hook。修复 `2a2660be`：`RecoveryGate` 把 reconcile 延迟到首个真实 Host 事件
    （onTurn/onSnapshot），single-flight 任务闩（`Task.IsCompleted` 即状态，无 Stage 计数器）。
 
-2. **`orchestrator-publish` seal-undeclared** — 根因是 guard 轮 continuation 的
+2. `orchestrator-publish` seal-undeclared — 根因是 guard 轮 continuation 的
    `turn.Directory` = worktree，`Worktree.Release()`（publish）后 instruction 从已删目录
    加载，AGENTS.md 块消失，ARCH-004 seal 断裂。10 路高并发复现率 ~10-15%。修复
    `71763142` 三层：`HostSessionNudge.liveDirectory`（目录不存在回退 root）、
@@ -250,7 +250,7 @@ restart normal+conflict 均绿；八路 P0 13/16，故不得提升 conformance �
    `TurnCompletionProgram` 在 job 离开 `ManagerStarted` 后直接完成 manager（guard 轮残余
    工具循环不再竞速 release）。10 路复现 seal-undeclared 归零。
 
-3. **teardown 端口泄漏 flake** — `terminateChild` 吞掉 `terminateTree` 的 survivors 错误，
+3. teardown 端口泄漏 flake — `terminateChild` 吞掉 `terminateTree` 的 survivors 错误，
    高并发下后代进程在组 kill 期间 fork 逃逸。修复：捕获后补一次进程组 SIGKILL（非调大
    超时，`assertNoLeak` 仍验证端口真正关闭）。
 

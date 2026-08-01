@@ -8,7 +8,7 @@
 ## 当前阶段
 
 封炉、休克一至三、退火一与退火二、剧本森林、因果推进门禁、ARCH-010 N0–N5b 均已落地。
-**退火三已完成**：canary 森林 16/16 全绿，`test:release`（gate:static → build → unit →
+退火三已完成：canary 森林 16/16 全绿，`test:release`（gate:static → build → unit →
 harness → P0×3）完整通过。
 
 分支 `refactor/ssot-shock-anneal`，封炉基线 `274a30aa`，最近生产修复 `71763142`。
@@ -18,7 +18,7 @@ harness → P0×3）完整通过。
 - `orchestrator-restart-publish` 单 canary 3/3 绿（修复链：
   seal tool-result 解码、sweep `+` 标记、fork 首 prompt 信封、已确认 barrier 不重开挑战、
   终端双投递去重；证据 `evidence/orchestrator-restart-recovery-fixes.md`）；
-- **P0 16/16 全绿，`test:release` 完整通过**（证据：本轮 `71763142` 修复链 + P0×3 三轮全绿）。
+- P0 16/16 全绿，`test:release` 完整通过（证据：本轮 `71763142` 修复链 + P0×3 三轮全绿）。
   三处历史残留全部闭合：
   - `reviewer-restart` 并发红：插件构造期 `PromptRecovery.reconcile` 经 SDK 重入未就绪
     Host → 改为 post-init single-flight `RecoveryGate`（`2a2660be`）；

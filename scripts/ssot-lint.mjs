@@ -15,9 +15,6 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const SSOT_DIR = 'SSOT'
-const CLAUSE_RE = /\b(ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX)-(\d{3})\b/g
-const DEFINITION_RE =
-  /^##\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX)-\d{3})/gm
 
 /** SSOT/00 声明的前缀 → 文件归属。硬编码是故意的：这是规范的一部分。 */
 const PREFIX_OWNER = {
@@ -33,7 +30,15 @@ const PREFIX_OWNER = {
   VERIFY: '10.md',
   PERSIST: '11.md',
   CTX: '12.md',
+  STRENGTH: '14.md',
+  ENFORCER: '15.md',
+  LEARN: '16.md',
 }
+
+// 前缀列表派生自 PREFIX_OWNER：新增规范文件只改一处。顺序无关（正则匹配）。
+const PREFIX_ALTERNATION = Object.keys(PREFIX_OWNER).join('|')
+const CLAUSE_RE = new RegExp(`\\b(${PREFIX_ALTERNATION})-(\\d{3})\\b`, 'g')
+const DEFINITION_RE = new RegExp(`^##\\s+((?:${PREFIX_ALTERNATION})-\\d{3})\\b`, 'gm')
 
 /** SSOT 是规范，不是状态报告。这些词属于 STATUS/。 */
 const STATUS_ONLY_WORDS = ['NOT_IMPLEMENTED', 'PARTIAL', 'CONTRADICTS', 'UNVERIFIED', 'CONFORMANT']
