@@ -21,14 +21,14 @@
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| PROMPT-002: Authority Root 固定执行画像 | UNVERIFIED | `PromptAuthorityRun.createAuthorityRoot` | 包 A：唯一构造入口；`AuthorityExecutionProfile` 无 model 字段，故「root 覆盖 model」不可表达 |
-| PROMPT-003: Continuation | UNVERIFIED | `PromptDispatcherSend.SendContinuation` | 包 A：继承 run 与 root，EffectiveAgent 参与 PromptKey |
-| PROMPT-004: 来源类型 | UNVERIFIED | `PromptIngress.fs` `Fact.AuthorityRootAccepted` | 包 A/0b：`HumanPromptAccepted` 已替换；解析顺序为「journal 已知 → 显式 managed agent」，已知来源不得被 agent 字段改判 |
-| PROMPT-005: 四阶段协议 | UNVERIFIED | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 包 A：四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生 |
-| PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定 |
-| PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
+| PROMPT-002: Authority Root 固定执行画像 | CONFORMANT | `PromptAuthorityRun.createAuthorityRoot` | 唯一构造入口；`AuthorityExecutionProfile` 无 model 字段，故「root 覆盖 model」不可表达。第 1 层测试：`PROMPT_002_authority_root_profile_cannot_express_a_model`、`PROMPT_002_root_derives_peer_role_and_tier_from_the_selected_agent_alone`、`PROMPT_002_a_new_root_replaces_the_profile_and_clears_everything_run_scoped`（`tests-mjs/Prompt/authority.test.mjs`） |
+| PROMPT-003: Continuation | CONFORMANT | `PromptDispatcherSend.SendContinuation` | 继承 run 与 root，EffectiveAgent 参与 PromptKey。第 1 层测试：`PROMPT_003_a_continuation_never_replaces_the_authority_root`、`PROMPT_003_every_continuation_kind_is_representable_and_none_is_a_root`（`tests-mjs/Prompt/authority.test.mjs`） |
+| PROMPT-004: 来源类型 | UNVERIFIED | `PromptIngress.fs` `Fact.AuthorityRootAccepted` | 包 A/0b：`HumanPromptAccepted` 已替换；解析顺序为「journal 已知 → 显式 managed agent」，已知来源不得被 agent 字段改判。判据待补：无直接第 1 层测试，来源解析路径需 canary 全绿后补断言 |
+| PROMPT-005: 四阶段协议 | CONFORMANT | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生。第 1 层测试：`PROMPT_005_submit_records_the_receipt_without_resolving_the_claim`、`PROMPT_005_abandon_removes_the_claim_and_leaves_the_active_run_alone`；fallback canary 实测 journal 四事实（PluginPromptClaimed/Submitted/PhysicalAccepted） |
+| PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定。判据待补：需第 1 层测试断言发送 payload 的 model/agent 字段 |
+| PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删。判据待补：architecture-gate 的直发分支检查 + canary 覆盖 |
 | PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.fs` `OpenCode/XWire.fs` `OpenCode/CompanionTransform.fs` | `buildAttemptExecutionProfile` 唯一调用点 `AttemptPlanner.plan`（`AttemptPlanner.fs:65`），被 `XWire.applyTransform` 与 `CompanionTransform` 真实调用；`RequestKind` / `ProjectionChoice` 作为 profile 不可变字段进入 transform 边界，`XWire.reconcileAttempt` 从同一 profile 判 promote。`single-constructor` 双向检查（无旁路 + 有调用）由 `architecture-gate` 守护。第 1 层测试 18 项（`Context/attempt-plan.test.mjs`） |
-| PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
+| PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed。判据待补：PERSIST-008 索引已落地，来源解析顺序需第 1 层测试补断言 |
 | PROMPT-011: 未决发送恢复 | CONFORMANT | `OpenCode/PromptRecovery.fs` `OpenCode/SpikePlugin.fs` | `PromptRecovery.reconcile` 在插件启动时（`SpikePlugin.fs:57`，早于任何 hook 派发）扫描 tail window（`RecoveryTailWindow = 50`）找物理消息；`RecoveryAttemptBudget = 3` 由 fold 记账（`recoveryBudgetSpent`），耗尽即 `Abandoned(UnresolvedAfterRecovery)`；只证明接受或放弃，绝不重发 |
 
 ## Fallback
@@ -139,7 +139,7 @@ target ref 的工作再拉起一个 Manager。
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| AGENT-007: 工具权限双层 fail-closed | UNVERIFIED | `ToolRuntimeScope.RoleFor` `ToolRegistry.fs` | 包 B：Role 唯一来源为 `ActiveLogicalRun.CanonicalRole`；`sessionRoles` 三来源链与 Role 未解析时放行 `inspector` 的豁免均已删除 |
+| AGENT-007: 工具权限双层 fail-closed | UNVERIFIED | `ToolRuntimeScope.RoleFor` `ToolRegistry.fs` | 包 B：Role 唯一来源为 `ActiveLogicalRun.CanonicalRole`；`sessionRoles` 三来源链与 Role 未解析时放行 `inspector` 的豁免均已删除。判据待补：manager-tool-contract 的权限矩阵用例覆盖声明层，`RoleFor` 的 fail-closed 分支需第 1 层测试 |
 
 ## Companion
 
@@ -161,7 +161,7 @@ target ref 的工作再拉起一个 Manager。
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
 | EXEC-004: Join 语义 | CONFORMANT | `Journal/LinkageProjection.fs` `HandleController.retire` `HostForkRuntime.Join` | single-assignment cell：首个完成者唯一生效，后到者报 `AlreadyCompleted` 而非覆盖；`Join()` 消费后写 `HandleRetired`，且退休失败时不交出 completion（否则调用方以为已消费而 journal 仍在提供）。第 1 层测试覆盖三种 completion kind 与四种拒绝理由 |
-| EXEC-005: List 语义 | UNVERIFIED | `OpenCode/ListTool.fs` `Journal/LinkageProjection.fs` | `list` 已按 durable `HandleProjection.listable` 枚举，`CompletedAwaitingJoin` 输出专用状态，`Retired` 被排除；本次仅有静态证据，休克期不重跑编译/行为测试 |
+| EXEC-005: List 语义 | CONFORMANT | `OpenCode/ListTool.fs` `Journal/LinkageProjection.fs` | `list` 按 durable `HandleProjection.listable` 枚举，`CompletedAwaitingJoin` 输出专用状态，`Retired` 被排除。第 1 层测试：`EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired`（`tests-mjs/Execution/handle.test.mjs`） |
 | EXEC-009: Handle 持久化 + tombstone | PARTIAL | `Journal/LinkageProjection.fs` `Session/HandleController.fs` `OpenCode/HostForkRuntime.fs` `OpenCode/HostForkChildDispatch.fs` | 三事实、三态投影、typed handle、永久 tombstone 与 `ChildSessionId` 已接线；fork 前置读取 `isRetired`，父取消读取 `activeHandles`，但 `join` 仍走运行期 mailbox，`HandleProjection.joinable` 无生产调用点。本次仅有静态证据，休克期不重跑编译/行为测试 |
 | EXEC-011: Process Deadline | CONFORMANT | `Process/ProcessRequest.fs` `Process/Deadline.fs` | `min(3 × estimate, hardLimit)`，`DefaultHardLimit = 1h` 有限；估算为 0/负/NaN/∞ 时回落到硬上限而非「无 deadline」；deadline 存为时刻故 `remaining` 每次由时钟派生、不递减；`nextWaitMs` 钳到 `2^31-1`（JS 定时器超过即立刻触发，会把长 deadline 变成忙循环）。第 1 层测试 |
 | EXEC-015: PTY 行为 | CONFORMANT | `Process/Pty*.fs` | onExit-only completion 已验证 |
@@ -196,7 +196,7 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | HOST-005: A 版分段 | PARTIAL | `TerminalSessionA.fs` | ARecord 未按 ProviderRun 分段 |
 | HOST-006: Compaction 预防与收容 | CONFORMANT | `OpenCode/HostCompactionGate.fs` `OpenCode/HostSignalBootstrap.fs` | 预防层四项（auto/overflow/autocontinue/prune）关闭，写不进配置则启动失败；收容层把任何观察到的 compaction 转成一次 `ContextReanchored`（永远 armed，幂等，不分类来源）。第 1 层测试 14 项（`Context/host-compaction-policy.test.mjs`） |
 | HOST-008: Session 关联 | CONFORMANT | `Journal/SessionAssociation.fs` `Domain/ManagedSessionKind.fs` | `ManagedSessionKind` 持久化，`isCompanion` O(1)；递归/重复 Y/自链/一 Y 两主均 fail closed；role 不影响关联。第 1 层测试 16 项（`Context/session-association.test.mjs`） |
-| HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。本次仅有静态证据，Host canary 待退火三 |
+| HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。判据待退火三：host-restart / host-nudge canary 覆盖生命周期（HOST-012 已实测多实例加载——`initSpikePlugin` 每 project 一次） |
 | HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
 | HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
 | HOST-012: 多实例共享边界 | CONFORMANT | `OpenCode/SharedState.fs` `OpenCode/PluginRuntimeScope.fs` | Host `InstanceStore` 按 directory 实例化插件（worktree = 独立实例），fork→verdict 跨实例。SessionParents/VerdictSessions/SessionDirectories 为 `SharedState` 模块级单例（所有插件实例同一引用）；每实例独有 AgentJournal/Companions/OwnedSessions/订阅。实测 deep-reviewer 的 verdict 不再 "manager session is unknown" |
@@ -209,8 +209,8 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | VERIFY-003: Canary Mock 剧本 | PARTIAL | `testkit/opencode/scenario-runtime.js` `testkit/opencode/strict-mock-provider.js` | K9 已物理删除旧匹配路径（`strict-mock-forest.js` / `strict-mock-satisfy.js` 删除，`strict-mock-matches.js` 仅剩 request-kind 分类与诊断 extractor，provider 无 scenario 时一律记未匹配）。六项旧违规机制随删除消失；静态森林由 gate-testkit 的 VERIFY-003 系列守护。canary 运行期证据仍待退火三 |
 | VERIFY-004: Stability Gate | CONFORMANT | `run-canary-staggered.mjs` `stability-checker.js` | 三轮 + leak check 已实现。原理与实现的偏差（含「断言心跳从未接线」）记于 `shock-anneal.md` 包 W |
 | VERIFY-005: Architecture Gates | CONFORMANT | `scripts/architecture-gate.mjs` | 已是静态检查器而非测试，故不需先编译即可运行；单一写入口门禁实现为 `SINGLE_WRITER_FACTS`，八个事实实测 ok (1)；`single-constructor` 双向检查（无人绕过 + 有人调用）。行数门禁按条款保持删除 |
-| VERIFY-007: 两种 Provider Projection | UNVERIFIED | `Domain/ProviderProjection.fs` `testkit/opencode/provider-wire.js` | 生产侧两投影已分离；testkit 仅解码 OpenAI wire，再调用 `build/next` 的生产 projection，不再维护 `sealProviderVisible` 第二套规范。本次仅有静态门禁证据 |
-| VERIFY-008: 测试语言边界 | UNVERIFIED | `tests-mjs/` `scripts/architecture-gate.mjs` | 生产保持 `.fs`，第 1–3 层测试保持 `.mjs` 并直接 import `build/next`；`tests-next/` 已删除，Fable 约定集中在 `domain.mjs`，门禁指向 `tests-mjs`+`.mjs`。本次仅有静态门禁证据 |
+| VERIFY-007: 两种 Provider Projection | CONFORMANT | `Domain/ProviderProjection.fs` `testkit/opencode/provider-wire.js` | 生产侧两投影分离；testkit 仅解码 OpenAI wire 再调生产 projection。判据：`gate-projection-cases.mjs` 的 `semanticallyEqual` / `isAppendOnlyPrefix` / `sealDigest` 用例，gate-testkit 278 全绿实测 |
+| VERIFY-008: 测试语言边界 | CONFORMANT | `tests-mjs/` `scripts/architecture-gate.mjs` | 生产保持 `.fs`，第 1–3 层测试保持 `.mjs` 并直接 import `build/next`；`tests-next/` 已删除，Fable 约定集中在 `domain.mjs`（`domain.meta.test.mjs` 锁三个静默陷阱）。判据：test:mjs 438 全绿 + architecture-gate 实测 + `domain.meta.test.mjs` 契约 |
 
 ### VERIFY 段此前四行失效（包 T-5 更正）
 
