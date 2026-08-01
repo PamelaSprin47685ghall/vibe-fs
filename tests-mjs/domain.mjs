@@ -73,6 +73,7 @@ const [
   PrefixCandidateModule,
   RecoverySlotModule,
   CompactionPolicyModule,
+  DiagnosticModule,
   SyntheticTomlModule,
   ForkChildPayloadModule,
   BloggerTomlModule,
@@ -113,6 +114,7 @@ const [
   prod('Domain/PrefixCandidate'),
   prod('Domain/RecoverySlot'),
   prod('Domain/HostCompactionPolicy'),
+  prod('OpenCode/Diagnostic'),
   prod('Domain/SyntheticToml'),
   prod('Domain/ForkChildPayload'),
   prod('Domain/BloggerToml'),
@@ -1999,3 +2001,12 @@ export const introspect = {
     JobProgress: OrchestratorProj.JobProgress,
   },
 }
+
+// ── CTX-014: diagnostic schema ───────────────────────────────────────────────
+
+export const diagnostic = (() => {
+  const m = bind(DiagnosticModule, 'Diagnostic', ['emit'])
+  return {
+    emit: (operation, fields) => m.emit(operation, toList(fields)),
+  }
+})()

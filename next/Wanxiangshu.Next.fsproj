@@ -158,6 +158,7 @@
     <Compile Include="OpenCode/TerminalPolicy.fs"/>
     <Compile Include="OpenCode/TurnCompletionProgram.fs"/>
     <Compile Include="OpenCode/GitTree.fs"/>
+    <Compile Include="OpenCode/Diagnostic.fs"/>
     <Compile Include="OpenCode/HostCompactionGate.fs"/>
     <Compile Include="OpenCode/XWire.fs"/>
     <Compile Include="OpenCode/HostSignalBootstrap.fs"/>

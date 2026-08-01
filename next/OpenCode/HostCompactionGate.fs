@@ -15,11 +15,9 @@ open Wanxiangshu.Next.Kernel.Identity
 /// exercises, which is why the judgement is not inlined here (VERIFY-008).
 module HostCompactionGate =
 
-    /// HOST-007 diagnostic. Second `console` emit in the codebase after
-    /// `HostSignalSubscribe.logInfo`; a third should become one adapter, the way six
-    /// sha256 wrappers became `HostDigest`.
-    [<Emit("console.warn($0)")>]
-    let private logWarn (message: string) : unit = jsNative
+    /// HOST-007 diagnostic. All emits go through `Diagnostic.emit` (CTX-014
+    /// whitelist); there is deliberately no raw `console.warn` here.
+    let private logWarn = Diagnostic.emit
 
     /// Write one setting into the Host config object, creating intermediate nodes.
     ///
@@ -96,11 +94,7 @@ module HostCompactionGate =
             else
                 unbox<string> input?sessionID
 
-        logWarn (
-            sprintf
-                "wanxiangshu: compaction starting on session %s; HOST-006 cannot refuse it (this hook has no cancel field) — the containment layer will reanchor"
-                sessionId
-        )
+        logWarn "compaction_started" [ "session_id", sessionId; "result", "cannot-refuse" ]
 
     /// The `experimental.compaction.autocontinue` hook.
     ///
@@ -121,12 +115,7 @@ module HostCompactionGate =
     /// The consequence of a missed reanchor is bounded and self-correcting: the
     /// compaction message stays in the transcript, so the next pass observes it again.
     let logReanchorFailure (sessionId: SessionId) (reason: string) : unit =
-        logWarn (
-            sprintf
-                "wanxiangshu: could not reanchor session %s after a Host compaction (%s); the next reconcile will retry (HOST-006)"
-                (SessionId.value sessionId)
-                reason
-        )
+        logWarn "reanchor_failed" [ "session_id", SessionId.value sessionId; "result", reason ]
 
     /// HOST-006 containment: write one `ContextReanchored` for an observed pseudo-run.
     ///

@@ -40,6 +40,14 @@ type AgentProjectionSet =
         /// scanning every session.
         Associations: Map<SessionId, SessionAssociation>
         Orchestrator: OrchestratorProjection
+        /// PERSIST-008: child session → handle record, across ALL parents.
+        ///
+        /// `TerminalPolicy.tryLinkedChild` answers "is this session somebody's
+        /// child" from this one keyed lookup; scanning every parent's handle map
+        /// instead is the scan PERSIST-008 forbids. Fold keeps it in step with the
+        /// three handle facts (link / complete / retire), and retired records stay
+        /// — the tombstone is permanent (EXEC-009).
+        HandleByChildSession: Map<SessionId, HandleRecord>
     }
 
 /// Composition of bounded session projections. Fact routing lives in Fold.fs.
@@ -59,7 +67,8 @@ module AgentProjection =
     let empty =
         { Sessions = Map.empty
           Associations = SessionAssociationProjection.empty
-          Orchestrator = OrchestratorProjection.empty }
+          Orchestrator = OrchestratorProjection.empty
+          HandleByChildSession = Map.empty }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
         Map.tryFind sessionId projection.Sessions

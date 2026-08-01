@@ -17,7 +17,11 @@ module TerminalPolicy =
     let roleName (role: Wanxiangshu.Next.Session.AgentRole option) =
         role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
 
-    /// The durable handle record for a child session, searched across parents.
+    /// The durable handle record for a child session, across all parents.
+    ///
+    /// PERSIST-008: one keyed lookup in the fold-maintained
+    /// `HandleByChildSession` index. The previous version scanned every session's
+    /// handle map for a `ChildSessionId` match — the scan PERSIST-008 forbids.
     ///
     /// Returns the record rather than a bool because callers need `TargetAgent`:
     /// PROMPT-008 forbids rebuilding a managed agent name from a role, so the only
@@ -31,11 +35,7 @@ module TerminalPolicy =
         | None -> None
         | Some j ->
             let childSessionId = SessionId.create sessionKey
-
-            (AgentJournal.snapshot j).AgentProjections.Sessions
-            |> Map.tryPick (fun _ session ->
-                session.Handles
-                |> Option.bind (HandleProjection.tryFindByChildSession childSessionId))
+            Map.tryFind childSessionId (AgentJournal.snapshot j).AgentProjections.HandleByChildSession
 
     let isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
         (tryLinkedChild journal sessionKey).IsSome

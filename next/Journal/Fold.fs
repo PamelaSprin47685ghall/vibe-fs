@@ -72,6 +72,25 @@ module Fold =
         | Error UnknownHandle -> reject factName "handle completion or retirement for a handle that was never linked"
         | Error NotCompleted -> reject factName "join retired a handle that had no completion (EXEC-004)"
 
+    /// PERSIST-008: keep `HandleByChildSession` in step with a handle change.
+    ///
+    /// Runs after the per-session fold succeeded, so the index always mirrors the
+    /// authoritative `Handles` map. `handleOutcome` absorbs duplicate replays, and
+    /// a replay re-syncs the index to the same record — idempotent by
+    /// construction.
+    let private syncHandleIndex (parentId: SessionId) (handle: HandleId) (projection: AgentProjectionSet) =
+        match AgentProjection.tryFind parentId projection with
+        | Some session ->
+            match session.Handles with
+            | Some handles ->
+                match HandleProjection.tryFind handle handles with
+                | Some record ->
+                    { projection with
+                        HandleByChildSession = Map.add record.ChildSessionId record projection.HandleByChildSession }
+                | None -> projection
+            | None -> projection
+        | None -> projection
+
     /// PERSIST-010: every Companion frame refusal describes a line a correct
     /// writer could not have produced, so none of them is absorbed.
     ///
@@ -444,6 +463,7 @@ module Fold =
                     |> Result.map (fun updated -> { session with Handles = Some updated }))
                 projection
             |> handleOutcome "HandleLinked" projection
+            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
         | AgentFact.HandleCompleted payload ->
             AgentProjection.tryUpdate
@@ -456,6 +476,7 @@ module Fold =
                     |> Result.map (fun updated -> { session with Handles = Some updated }))
                 projection
             |> handleOutcome "HandleCompleted" projection
+            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
         | AgentFact.HandleRetired payload ->
             AgentProjection.tryUpdate
@@ -465,6 +486,7 @@ module Fold =
                     |> Result.map (fun updated -> { session with Handles = Some updated }))
                 projection
             |> handleOutcome "HandleRetired" projection
+            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
         // ── orchestrator ────────────────────────────────────────────────────
 

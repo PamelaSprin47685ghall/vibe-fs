@@ -29,7 +29,7 @@
 | PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删 |
 | PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.fs` `OpenCode/XWire.fs` `OpenCode/CompanionTransform.fs` | `buildAttemptExecutionProfile` 唯一调用点 `AttemptPlanner.plan`（`AttemptPlanner.fs:65`），被 `XWire.applyTransform` 与 `CompanionTransform` 真实调用；`RequestKind` / `ProjectionChoice` 作为 profile 不可变字段进入 transform 边界，`XWire.reconcileAttempt` 从同一 profile 判 promote。`single-constructor` 双向检查（无旁路 + 有调用）由 `architecture-gate` 守护。第 1 层测试 18 项（`Context/attempt-plan.test.mjs`） |
 | PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed |
-| PROMPT-011: 未决发送恢复 | PARTIAL | `Domain/PromptAuthority.derivePromptKey` | 包 A：PromptKey 已按条款派生并写入 Host metadata，`ClaimSequence` 由 fold 推进。仍缺启动期 tail window 查找与 `RecoveryAttemptBudget = 3`（属清场期） |
+| PROMPT-011: 未决发送恢复 | CONFORMANT | `OpenCode/PromptRecovery.fs` `OpenCode/SpikePlugin.fs` | `PromptRecovery.reconcile` 在插件启动时（`SpikePlugin.fs:57`，早于任何 hook 派发）扫描 tail window（`RecoveryTailWindow = 50`）找物理消息；`RecoveryAttemptBudget = 3` 由 fold 记账（`recoveryBudgetSpent`），耗尽即 `Abandoned(UnresolvedAfterRecovery)`；只证明接受或放弃，绝不重发 |
 
 ## Fallback
 
@@ -240,7 +240,7 @@ VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未�
 | PERSIST-004: 尾部损坏 | CONFORMANT | `Journal/Boot.fs` | 尾部截断静默丢弃；中间损坏 / LocalSeq 跳号 / RuntimeId 不匹配三者均在损坏处截断并报诊断；单个流损坏不牵连健康流。第 2 层测试 |
 | PERSIST-005: 旧 Schema | CONFORMANT | `FactCodec.containsLegacyFallbackFields` | 发现旧 schema 直接失败；退役事实名按名诊断而非报编解码错误 |
 | PERSIST-006: 文件权限 | CONFORMANT | `Journal/Writer.fs` | `mkdirSync` 传 `mode = 0o700`、`openSync` 传 `0o600`，创建时设定而非事后 chmod。第 2 层测试在 `umask 000` 下断言 |
-| PERSIST-008: Projection 查询 | PARTIAL | `Journal/Fold.fs` `OpenCode/TerminalPolicy.fs` | 多数 projection 是 O(1) 积分；`TerminalPolicy.tryLinkedChild` 仍按 session 扫描 child session，需迁移为等价的 keyed association查询 |
+| PERSIST-008: Projection 查询 | CONFORMANT | `Journal/Fold.fs` `OpenCode/TerminalPolicy.fs` | 多数 projection 是 O(1) 积分；`TerminalPolicy.tryLinkedChild` 现经 Fold 维护的 `HandleByChildSession` 全局索引（child → record，retired 保留）单键查询，不再跨 session 扫描 |
 | PERSIST-009: Durable Effect 协议 | PARTIAL | `EffectProjection.fs` `Session/Companion.fs` | Companion 无 Journal 时现在返回 `DurableJournalUnavailable` 并不发送；Prompt 发送与 Git publish 的 durable effect 仍未闭合 |
 
 ### PERSIST-001 与 PERSIST-006 的两处实测缺陷（包 T-2 修正）
@@ -295,7 +295,7 @@ X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.pla
 | CTX-011: 覆盖游标与候选选择 | CONFORMANT | `Domain/PrefixProbeSelection.fs` `Domain/BloggerDelta.fs` | `SemanticCursor` / `Coverage` 两量分离；候选选择 9 步含 cutoff proof、digest fail-closed、squash 让 B 更紧凑仍为新候选。第 1 层测试 14 项 |
 | CTX-012: 提交语义 | CONFORMANT | `OpenCode/XWire.fs` `Journal/BlogProjection.fs` | `PrefixRebaseCommitted` 唯一 writer 是 `XWire.reconcileAttempt`；probe SealRoot 被 promote 原样继承；squash 永久提交不回滚、级联成立、宽度 ceil(m/2)。第 1 层测试跨 4 文件 |
 | CTX-013: BloggerDeltaProjection 与 TOML 编码 | CONFORMANT | `Session/BloggerDelta.fs` `Session/BloggerToml.fs` `Session/SyntheticToml.fs` | 三级切块 + 硬截断 + 图片 omitted marker + 确定性 TOML（固定键序、`'''` 字面量、closing 独占一行、无时间/随机/Host ID）；instruction header 计入 200 KiB。第 1 层测试 55 项跨 3 文件 |
-| CTX-014: 诊断可观测性边界 | PARTIAL | `OpenCode/HostCompactionGate.fs` `OpenCode/HostSignal.fs` | 允许字段与禁止字段清单已在规范定稿；诊断只进日志不进 Journal 判据（HOST-007）。仍缺一处统一诊断 schema 与「禁止字段」负向测试 |
+| CTX-014: 诊断可观测性边界 | CONFORMANT | `OpenCode/Diagnostic.fs` `OpenCode/HostCompactionGate.fs` | 统一 schema：`Diagnostic.emit` 校验字段白名单（CTX-014 清单），白名单外字段 fail closed；禁止字段名在 `next/**/*.fs` 的负向扫描 + 白名单外字段拒绝测试（`tests-mjs/Context/ctx014.test.mjs`） |
 
 ## 未列入本表的条款
 
