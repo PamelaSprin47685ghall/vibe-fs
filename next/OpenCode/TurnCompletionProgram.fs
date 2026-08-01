@@ -221,9 +221,44 @@ module TurnCompletionProgram =
             completeReviewerOrAssistant true |> ignore
             AsyncSupport.completedTask ()
         | TurnInProgress ->
-            // The Host settled a provider step with tool calls only. Interaction
-            // repair continues the Logical Run; this is never provider fallback.
-            if CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
+            // A Manager whose job the Orchestrator has already taken over must not
+            // keep its tool loop running. The worktree is released once the job
+            // lands (ORCH-006), and a further provider request from the manager
+            // family would load Host instructions from the deleted directory,
+            // truncating the system prompt and breaking the ARCH-004 seal
+            // (measured: seal-undeclared in orchestrator-publish under
+            // concurrency — the guard-round join raced the release, which happens
+            // when the Orchestrator's own review finishes while the Manager is
+            // still mid-guard-loop). Once the job has left ManagerStarted the
+            // Orchestrator's barrier owns the review; the guard round's residual
+            // tool loop has no work left and must not continue.
+            let managerJobHandedOff =
+                match turn.AgentRole with
+                | Some AgentRole.Manager ->
+                    match journal with
+                    | Some durable ->
+                        let snapshot = AgentJournal.snapshot durable
+
+                        OrchestratorProjection.tryFindByManagerSession
+                            turn.SessionId
+                            snapshot.AgentProjections.Orchestrator
+                        |> Option.exists (fun job ->
+                            match job.Progress with
+                            | JobProgress.ManagerStarted
+                            | JobProgress.ConflictPending _ -> false
+                            | JobProgress.CandidateReady _
+                            | JobProgress.RebasedCandidateReady _
+                            | JobProgress.PublishClaimed _
+                            | JobProgress.Published _
+                            | JobProgress.Failed _
+                            | JobProgress.Abandoned -> true)
+                    | None -> false
+                | _ -> false
+
+            if managerJobHandedOff then
+                completeReviewerOrAssistant false |> ignore
+                AsyncSupport.completedTask ()
+            elif CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
                 sendRepair sessionPort eventPort journal turn "\u200B" "zero-width"
             else
                 AsyncSupport.completedTask ()

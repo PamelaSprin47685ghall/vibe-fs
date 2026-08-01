@@ -76,7 +76,15 @@ export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = 
   try {
     await terminateTree(child, { termGraceMs: termMs, killGraceMs: killMs });
   } catch (err) {
-    console.error(`[ProcessHost] terminateTree error: ${err.message}`);
+    // terminateTree already sent SIGTERM then SIGKILL to the whole process group
+    // and still found survivors. Under heavy parallel load a descendant can be
+    // mid-fork when the group kill runs, escaping the group; one more SIGKILL
+    // aimed at the group (plus the leader) closes that race. Not a budget bump —
+    // SIGKILL is unconditional, and the caller's assertNoLeak still verifies the
+    // port is actually gone afterwards.
+    console.error(`[ProcessHost] terminateTree error: ${err.message}; retrying SIGKILL`);
+    try { process.kill(-pid, "SIGKILL"); } catch {}
+    try { process.kill(pid, "SIGKILL"); } catch {}
   }
 }
 

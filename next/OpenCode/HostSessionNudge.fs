@@ -66,6 +66,18 @@ module HostSessionNudge =
                     agent
                 |> Result.bind rt.RegisterAuthority
 
+    /// The continuation target directory, or the root workspace when the
+    /// recorded directory no longer exists.
+    ///
+    /// ORCH-006: a manager-family session's directory is the worktree, which is
+    /// removed at publish. A residual guard-round continuation would otherwise
+    /// load Host instructions from the deleted path, truncating the system
+    /// prompt and breaking the ARCH-004 seal (measured: seal-undeclared in
+    /// orchestrator-publish under concurrency). The manager has no worktree work
+    /// left once its job landed, so the root workspace is the correct fallback.
+    let private liveDirectory (directory: string option) =
+        directory |> Option.filter (fun path -> System.IO.Directory.Exists path)
+
     let sendContinuationResult
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -83,7 +95,16 @@ module HostSessionNudge =
                 let agent = agentForActiveCursor journal sessionId profile
                 let rt = PromptDispatcher.forJournal durable
 
-                return! rt.SendContinuation sessionPort sessionId prompt kind profile agent directory onAccepted
+                return!
+                    rt.SendContinuation
+                        sessionPort
+                        sessionId
+                        prompt
+                        kind
+                        profile
+                        agent
+                        (liveDirectory directory)
+                        onAccepted
         }
 
     /// PROMPT-007 fire-and-forget: the caller does not await physical acceptance.
@@ -142,6 +163,6 @@ module HostSessionNudge =
                             repairKind
                             profile
                             agent
-                            directory
+                            (liveDirectory directory)
                             onAccepted
         }

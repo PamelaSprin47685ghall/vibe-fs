@@ -34,8 +34,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             directoryFor =
                 (fun agentId ->
                     match worktrees.TryGetValue agentId with
-                    | true, path -> Some path
-                    | false, _ -> None),
+                    // ORCH-006 defence: the worktree is removed at publish. A
+                    // residual manager-family prompt must not keep pointing at the
+                    // deleted path (ARCH-004 seal break); fall back to the root
+                    // workspace once the worktree is gone.
+                    | true, path when System.IO.Directory.Exists path -> Some path
+                    | _ -> None),
             ?sessionSnapshot = deps.SessionSnapshot,
             onRunStarted = deps.OnRunStarted,
             parentWorkRecordFor = deps.ParentWorkRecordFor,

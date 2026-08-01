@@ -48,8 +48,15 @@ type ToolRuntimeScope
 
     let directoryFor sid =
         match sessionDirectories.TryGetValue sid with
-        | true, path -> Some path
-        | false, _ -> None
+        // ORCH-006 defence: a manager-family directory is the worktree, which is
+        // removed at publish. A request that races the release would otherwise keep
+        // pointing at the deleted path and lose the AGENTS.md instruction block
+        // (ARCH-004 seal break, measured on orchestrator-publish under concurrency).
+        // Verify the path still exists; fall back to None (root workspace) when the
+        // worktree is gone — the residual guard-round request has no worktree work
+        // left to do.
+        | true, path when System.IO.Directory.Exists path -> Some path
+        | _ -> None
 
     let createRuntime sid =
         HostForkRuntime(
