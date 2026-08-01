@@ -37,8 +37,9 @@ test('STRENGTH_027_sampling_uses_decisionId_and_ordinal_not_time', () => {
 
 test('STRENGTH_027_hash_lands_in_half_open_unit_interval', () => {
   // u must be in [0,1): the all-ones digest must NOT map to exactly 1.0 (that
-  // would make the decision never included for any p < 1). Normalizing by 2^63
-  // instead of Int64.MaxValue guarantees it.
+  // would make the decision never included for any p < 1). The 53-bit mask over
+  // 2^53 guarantees it — 2^63 fails because JS doubles cannot represent 2^63-1
+  // and 2^63 distinctly (measured in 03528232).
   const allOnes = 'f'.repeat(64)
   const u = strength.hashToUnitInterval(sha, 'whatever')
   assert.ok(u >= 0 && u < 1, `u must be in [0,1), got ${u}`)
