@@ -59,13 +59,25 @@ journal 显示同一 reviewer handle 两次 `HandleCompleted`。修复：port �
 - P0 一轮：12/15 绿；3 红 = restart-publish（guard 轮 flake）、orchestrator-publish
   （bindChild/join flake）、conflict（seal 残留，见下）
 
-## 残留（诚实记录）
+## 追加修复（`3a2944f2`）：blogger 钉到 root workspace
 
-1. **conflict canary seal 残留**：manager 的 blogger 在 publish 之后发 post-publish delta，
-   worktree 已按 ORCH-006 显式释放，Host 对 resumed session 的 instruction 加载（globUp 从
-   worktree 目录）随目录消失丢失 AGENTS.md 块 → system prompt 变短 → ARCH-004 seal 断裂。
-   worktree 释放本身正确；这是 Host 侧系统组装行为，插件无法干预（ARCH-003），且 canary 的
-   boundary 机制无法在共享 blogger entry 上表达（first-delivery 必破）。已改剧本等待
-   reviewer-confirm 前不依赖 post-publish delta。
-2. **guard 轮 flake**：`manager-guard.2` 偶发超时（guard 双触发 + join 竞争），与
-   `orchestrator-publish` 的 bindChild/join 竞争同类，属运行期时序，未在本次修复范围内。
+继续追 seal 残留时发现断裂不止 blogger：manager 家族全部 session（manager、reviewer、
+coder、blogger）的目录都是 manager worktree，Host 按 session 目录加载 workspace
+instructions（`globUp`），worktree 在 publish 时按 ORCH-006 释放后，家族 session 的
+后续请求（实测 fast-reviewer 第二请求、manager guard 继续轮）都会丢 AGENTS.md 块 →
+system prompt 变短 → ARCH-004 seal 断裂。
+
+修复：blogger 是 companion 不是 worktree worker——其 session 改在
+`SharedState.RootWorkspace` 创建（首个 boot 写入；主 workspace 先于 worktree 实例
+加载），该目录在 worktree 释放后仍存活且携带相同 AGENTS.md 内容。blogger 的 system
+全程字节稳定。
+
+## 残留（诚实记录，更新）
+
+1. **manager 家族 session 的 seal 残留**：blogger 已钉住；manager/reviewer/coder 的
+   worktree 目录仍随释放丢失指令。家族 session 在 publish 后的后续请求（guard 继续轮、
+   reviewer 续答）仍会 seal 断裂。修复方向：家族 session 目录与工具 cwd 分离，或 guard
+   轮在 publish 后停止——均需进一步设计，未在本次范围内。
+2. **guard 轮 flake/循环**：`manager-guard.2` 偶发超时 + guard 多轮触发（实测第四轮
+   fast-reviewer），与 `orchestrator-publish` 的 bindChild/join 竞争同类，属运行期时序。
+3. **orchestrator-publish**：bindChild(fast-coder) 偶发 awaitEvent 超时 + join 链 flake。
