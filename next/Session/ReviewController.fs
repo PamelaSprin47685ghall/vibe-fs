@@ -130,26 +130,39 @@ module ReviewController =
                     Ok VerdictDecision.AlreadyCounted
 
                 | None ->
-                    // First PERFECT. The verdict and its challenge are two facts:
-                    // the verdict is what happened, the challenge is the evidence
-                    // the second run must consume. Recording only the latter would
-                    // leave the attempt uncounted for REVIEW-004.
-                    let challengeDigest = ReviewChallenge.contentDigest sha256
+                    // REVIEW-003: a barrier that already has a confirmed dual
+                    // PERFECT for THIS tree cannot be re-opened by an extra
+                    // PERFECT. Issuing a new challenge would replace the
+                    // confirmed witness with a pending one (applyChallengeIssued),
+                    // and every reader — the reviewer guard's terminal nudge and
+                    // the Orchestrator's read — would then see PendingConfirmation
+                    // forever while the reviewer kept answering new challenges
+                    // (measured: a post-restart review cycled through four
+                    // challenge rounds and never confirmed). An extra PERFECT
+                    // counts nothing new.
+                    if ReviewProjection.satisfiesGuard submission.GitTreeHash guard then
+                        Ok VerdictDecision.AlreadyCounted
+                    else
+                        // First PERFECT. The verdict and its challenge are two facts:
+                        // the verdict is what happened, the challenge is the evidence
+                        // the second run must consume. Recording only the latter would
+                        // leave the attempt uncounted for REVIEW-004.
+                        let challengeDigest = ReviewChallenge.contentDigest sha256
 
-                    append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
-                    |> Result.bind (fun _ ->
-                        let issued =
-                            AgentFact.PerfectChallengeIssued
-                                {| BarrierId = submission.BarrierId
-                                   GitTreeHash = submission.GitTreeHash
-                                   ReviewerSessionId = submission.ReviewerSessionId
-                                   FirstProviderRun = submission.ProviderRun
-                                   FirstToolCallId = submission.ToolCallId
-                                   ChallengeTextVersion = ReviewChallenge.TextVersion
-                                   ChallengeContentDigest = challengeDigest |}
+                        append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+                        |> Result.bind (fun _ ->
+                            let issued =
+                                AgentFact.PerfectChallengeIssued
+                                    {| BarrierId = submission.BarrierId
+                                       GitTreeHash = submission.GitTreeHash
+                                       ReviewerSessionId = submission.ReviewerSessionId
+                                       FirstProviderRun = submission.ProviderRun
+                                       FirstToolCallId = submission.ToolCallId
+                                       ChallengeTextVersion = ReviewChallenge.TextVersion
+                                       ChallengeContentDigest = challengeDigest |}
 
-                        append submission.ReviewerSessionId submission.ProviderRun issued journal)
-                    |> Result.map (fun _ -> VerdictDecision.ChallengeIssued ReviewChallenge.Text)
+                            append submission.ReviewerSessionId submission.ProviderRun issued journal)
+                        |> Result.map (fun _ -> VerdictDecision.ChallengeIssued ReviewChallenge.Text)
 
                 | Some challenge ->
                     match provenSeal challenge submission.ProviderRun guard with

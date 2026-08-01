@@ -1,6 +1,6 @@
 # ORCH-005/PERSIST-009: the Host dies after a publish candidate exists but before the
 # publish is durably accepted. On restart the job must resume and publish EXACTLY ONCE —
-# `OrchestratorPublished eq 1` is the whole point, and a second publish would also show up
+# `Published eq 1` is the whole point, and a second publish would also show up
 # as a dirty worktree.
 #
 # ── the recovery file was the same five keys ────────────────────────────────
@@ -60,7 +60,7 @@ flow = [
 
   { awaitTerminal = true, requireAssistantTerminal = false, timeoutMs = 20000 },
   { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
-  { assertFacts = { name = "OrchestratorPublished", eq = 1 } },
+  { assertFacts = { name = "Published", eq = 1 } },
   { assertWorktreeClean = true },
   { expectSatisfied = true },
 ]

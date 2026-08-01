@@ -101,9 +101,10 @@ module HostForkRuntimeFork =
         /// it is required. Defaulting it to `fast-ROLE` invented a tier, and the
         /// invented name then travelled to the Host send boundary as if chosen.
         member this.Fork
-            (agentId: string, role: AgentRole, agent: string, prompt: string)
+            (agentId: string, role: AgentRole, agent: string, prompt: string, ?firstPrompt: bool)
             : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
+            let isFirstPrompt = defaultArg firstPrompt true
 
             task {
                 do! this.AwaitRecovery()
@@ -116,39 +117,58 @@ module HostForkRuntimeFork =
                         | true, childId -> Some childId
                         | false, _ -> None)
 
-                match retired, existing with
-                | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
-                | _, Some childId ->
-                    match HostPendingRun.sessionDeadRefusal this.Journal childId with
-                    | Some refusal -> return Error refusal
-                    | None ->
-                        return!
-                            HostForkChildDispatch.sendToExistingChild
-                                this.Gate
-                                this.PendingRuns
-                                this.Journal
-                                this.ParentId
-                                this.Sessions
-                                this.ChildWorkRecordOf
-                                this.Runtime
-                                this.SendChildPrompt
-                                this.SendBusyNudge
-                                (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                agentId
-                                childId
-                                role
-                                prompt
-                                agentName
-                | _, None ->
-                    let! requirementsResult =
-                        match role with
-                        | AgentRole.Reviewer ->
-                            resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
-                        | _ -> Task.FromResult(Ok [])
+                // The ARCH-010 first-prompt payload is computed once and used by
+                // both child paths: a brand-new child AND an idle restored child
+                // receive the same envelope, so a canary declaration anchored on
+                // the envelope cannot tell which path produced the request
+                // (measured: the post-restart review fork sent the raw opening
+                // prompt and every barrier-reviewer declaration failed to match).
+                // Continuations (busy nudge, challenge, manager resume) opt out.
+                let! enrichedResult =
+                    if isFirstPrompt then
+                        task {
+                            let! requirementsResult =
+                                match role with
+                                | AgentRole.Reviewer ->
+                                    resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
+                                | _ -> Task.FromResult(Ok [])
 
-                    match requirementsResult with
-                    | Error err -> return Error err
-                    | Ok requirements ->
+                            return
+                                requirementsResult
+                                |> Result.map (fun requirements ->
+                                    ForkChildPayload.relay prompt (this.ParentWorkRecordOf this.ParentId) requirements)
+                        }
+                    else
+                        Task.FromResult(Ok prompt)
+
+                match enrichedResult with
+                | Error err -> return Error err
+                | Ok enrichedPrompt ->
+                    match retired, existing with
+                    | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
+                    | _, Some childId ->
+                        match HostPendingRun.sessionDeadRefusal this.Journal childId with
+                        | Some refusal -> return Error refusal
+                        | None ->
+                            return!
+                                HostForkChildDispatch.sendToExistingChild
+                                    this.Gate
+                                    this.PendingRuns
+                                    this.Journal
+                                    this.ParentId
+                                    this.Sessions
+                                    this.ChildWorkRecordOf
+                                    this.Runtime
+                                    this.SendChildPrompt
+                                    this.SendBusyNudge
+                                    (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
+                                    agentId
+                                    childId
+                                    role
+                                    prompt
+                                    agentName
+                                    (if isFirstPrompt then Some enrichedPrompt else None)
+                    | _, None ->
                         let! childResult =
                             this.Sessions.CreateChildSession(
                                 this.ParentId,
@@ -213,12 +233,6 @@ module HostForkRuntimeFork =
                                         return Error "Fork runtime is cancelled"
                                     | _ ->
                                         this.MarkReady(run)
-
-                                        let enrichedPrompt =
-                                            ForkChildPayload.relay
-                                                prompt
-                                                (this.ParentWorkRecordOf this.ParentId)
-                                                requirements
 
                                         let! sent =
                                             HostForkAgentOwner.sendFirstPrompt
@@ -288,4 +302,5 @@ module HostForkRuntimeFork =
                                     role
                                     prompt
                                     agentName
+                                    None
             }

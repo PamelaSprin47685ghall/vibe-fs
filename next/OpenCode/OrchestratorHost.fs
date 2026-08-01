@@ -116,7 +116,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 let agentId = managerAgentId jobId
                 worktrees.[agentId] <- WorktreePath.value worktree
 
-                match! runtime.Fork(agentId, AgentRole.Manager, record.ManagerAgent, prompt) with
+                match! runtime.Fork(agentId, AgentRole.Manager, record.ManagerAgent, prompt, firstPrompt = false) with
                 | Error error -> return Error error
                 | Ok _ -> return! awaitManager jobId
         }
@@ -144,7 +144,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                             reviewerAgentId,
                             AgentRole.Reviewer,
                             OrchestratorHostReview.DeepReviewerAgent,
-                            prompt
+                            prompt,
+                            firstPrompt = false
                         )
                     with
                     | Error error -> return Error error

@@ -35,6 +35,7 @@ module HostForkChildDispatch =
         (role: AgentRole)
         (prompt: string)
         (agent: string)
+        (enrichedPrompt: string option)
         : Task<Result<ForkResult, string>> =
         task {
             let activeRun =
@@ -54,6 +55,14 @@ module HostForkChildDispatch =
                 | Error err -> return Error err
             | None ->
                 // Idle existing child: new AgentOwnerRoot work via ordinary send.
+                //
+                // A first-prompt fork (the `enrichedPrompt` Some case) carries the
+                // same ARCH-010 payload a brand-new child would receive. The fork
+                // boundary must produce one shape for "the child's round
+                // assignment" whether the session is fresh or restored from the
+                // journal — measured: a post-restart review fork that sent the raw
+                // opening prompt broke every canary declaration anchored on the
+                // envelope, while a busy nudge (a continuation) must stay raw.
                 let run =
                     HostForkRunLifecycle.installRun
                         gate
@@ -85,7 +94,8 @@ module HostForkChildDispatch =
                     return Error "Fork runtime is cancelled"
                 | _ ->
                     HostForkRunLifecycle.markReady gate run
-                    let! sent = sendChildPrompt agentId childId role agent prompt
+                    let payload = Option.defaultValue prompt enrichedPrompt
+                    let! sent = sendChildPrompt agentId childId role agent payload
 
                     match sent, result with
                     | Ok(), ForkResult.Nudged _ -> return Ok result

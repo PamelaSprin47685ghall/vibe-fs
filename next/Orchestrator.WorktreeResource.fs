@@ -186,7 +186,14 @@ module WorktreeCommands =
             else
                 return
                     stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
-                    |> Array.map (fun value -> value.Trim().TrimStart('*').Trim())
+                    // `git branch` prefixes a branch checked out in ANOTHER worktree
+                    // with `+` (and the current branch of this repo with `*`). The
+                    // manager worktree keeps its branch checked out, so an owned
+                    // job's branch arrives as `+ manager/<job>` — without stripping
+                    // the marker, `isStale` classifies the job's own branch as
+                    // stale and the sweep tries to delete it (measured: sweep init
+                    // failed with "branch '+ manager/<job>' not found").
+                    |> Array.map (fun value -> value.Trim().TrimStart('*', '+').Trim())
                     |> Array.filter (String.IsNullOrWhiteSpace >> not)
                     |> Array.map WorktreeIdentity.create
                     |> Array.toList

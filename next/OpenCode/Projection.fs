@@ -87,15 +87,45 @@ module Projection =
             | "tool-call"
             | "tool_call"
             | "tool" ->
-                let args =
-                    firstCanonical partObj [ "args"; "arguments" ] |> Option.defaultValue "{}"
-
                 // REVIEW-004 needs the call id, so a tool call without one is not
                 // usable evidence. Dropped rather than given an empty id, which
                 // would let "no identity" look like a real one.
                 match firstString partObj [ "callID"; "callId"; "id" ], firstString partObj [ "tool"; "name" ] with
-                | Some callId, Some name -> Some(WireToolCall(ToolCallId.create callId, name, args))
-                | _ -> None
+                | None, _
+                | _, None -> None
+                | Some callId, Some name ->
+                    // Host session-shaped tool part (message-v2.ts): one part
+                    // carries the call AND its completed result — `{ type:
+                    // "tool", tool, callID, state: { status, input, output?,
+                    // error? } }`. The result the model saw is `state.output`
+                    // (or `state.error`). REVIEW-010's `IncludedToolResultDigests`
+                    // must contain it — the challenge text lives in the previous
+                    // verdict's tool result — so a completed/errored tool part
+                    // projects as the RESULT, and only a pending call (this
+                    // request's own previous assistant turn, or a legacy shape
+                    // with no state object) projects as the call.
+                    let stateObj = readField partObj "state"
+
+                    match readString stateObj "status" with
+                    | Some "completed" ->
+                        let result =
+                            firstCanonical stateObj [ "output"; "result"; "content" ]
+                            |> Option.defaultValue "null"
+
+                        Some(WireToolResult(ToolCallId.create callId, result))
+                    | Some "error" ->
+                        let result =
+                            firstCanonical stateObj [ "error"; "errorText"; "output" ]
+                            |> Option.defaultValue "null"
+
+                        Some(WireToolResult(ToolCallId.create callId, result))
+                    | _ ->
+                        let args =
+                            firstCanonical stateObj [ "input" ]
+                            |> Option.orElse (firstCanonical partObj [ "args"; "arguments" ])
+                            |> Option.defaultValue "{}"
+
+                        Some(WireToolCall(ToolCallId.create callId, name, args))
 
             | "tool-result"
             | "tool_result" ->

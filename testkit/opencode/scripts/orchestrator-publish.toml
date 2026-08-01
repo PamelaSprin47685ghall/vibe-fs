@@ -63,7 +63,7 @@ flow = [
   # Its step counter restarts at 0 because it is a fresh conversation — which is why the
   # eight `reviewer-perfect-N` edges of the JSON form are one declaration here.
   { waitFact = { name = "OrchestratorPostRebaseReviewConfirmed", eq = 1 } },
-  { waitFact = { name = "OrchestratorPublished", eq = 1 } },
+  { waitFact = { name = "Published", eq = 1 } },
 
   { wait = "orch.2" },
   { awaitTerminal = true, requireAssistantTerminal = true },
