@@ -99,6 +99,7 @@ module SpikePlugin =
                                     (SessionId.create projectionSessionId)
                                     (Projection.decodeMessageView rawMessages)
                                     (Projection.lastUserMessageId rawMessages)
+                                    wired.PendingReviewSeals
 
                         do! sealTask
                         ()

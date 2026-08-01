@@ -23,12 +23,18 @@ module HostSignalBootstrap =
     /// functions are called internally by the binding helpers. Handing them out as
     /// well made the signal stack look like it had six more entry points than it does.
     type WiredSignals =
-        { RegisterOwned: string -> unit
-          CancelSignals: SessionId seq -> unit
-          BindActiveRun: SessionId -> AgentRole -> string option -> unit
-          CurrentPhysicalUserMessage: string -> string option
-          ChatMessageHook: obj
-          ObserveEvent: obj -> unit }
+        {
+            RegisterOwned: string -> unit
+            CancelSignals: SessionId seq -> unit
+            BindActiveRun: SessionId -> AgentRole -> string option -> unit
+            CurrentPhysicalUserMessage: string -> string option
+            ChatMessageHook: obj
+            ObserveEvent: obj -> unit
+            /// REVIEW-010 deferred-binding park: challenge requests have no
+            /// assistant to bind at transform time; the reconcile `onTurn` binds
+            /// the parked candidate to the turn's run.
+            PendingReviewSeals: Dictionary<string, ReviewSeal.PendingSeal>
+        }
 
     let wire
         (sessionPort: ISessionHostPort)
@@ -54,12 +60,22 @@ module HostSignalBootstrap =
 
         let binding = TurnBinding.Store()
 
+        let pendingReviewSeals = Dictionary<string, ReviewSeal.PendingSeal>()
+
         let onTurn (turn: ReconciledTurn) : Task =
             // Manager sessions run inside their own worktree, not the plugin's
             // root workspace. The review-guard tree check must resolve that
             // worktree's GitTreePort; otherwise it compares against a
             // different Git object graph and can never see the confirmed tree.
             let sessionKey = SessionId.value turn.SessionId
+
+            // REVIEW-010 deferred binding: a challenge request parked its seal
+            // candidate (its assistant did not exist at transform time); this
+            // turn IS that assistant, so bind the run and persist. The append is
+            // synchronous up to its first await, so it is committed before the
+            // next provider request; a failure fails closed (no seal → the
+            // second PERFECT cannot confirm, REVIEW-003).
+            ReviewSeal.bindPendingSeal journal pendingReviewSeals turn |> ignore
 
             let managerGitTreePort =
                 match scope.SessionDirectories.TryGetValue sessionKey with
@@ -271,4 +287,5 @@ module HostSignalBootstrap =
                 reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                 |> Option.map PhysicalUserMessageId.value)
           ChatMessageHook = chatMessageHook
-          ObserveEvent = signalRouter.ObserveLocal }
+          ObserveEvent = signalRouter.ObserveLocal
+          PendingReviewSeals = pendingReviewSeals }

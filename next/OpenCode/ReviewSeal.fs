@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Host
@@ -68,7 +69,11 @@ module ReviewSeal =
             | [] -> Error NoBindableRun
             | _ ->
                 let latest = assistants |> List.maxBy (fun message -> message.Id)
-                if latest.Id = single.Id then Ok single else Error NotLatestRun
+
+                if latest.Id = single.Id then
+                    Ok single
+                else
+                    Error NotLatestRun
         // `MessageID.ascending` is monotonic, so the newest is the largest. Reported
         // rather than silently taking the max: the clause's premise is that exactly
         // one exists, and more than one means the premise no longer holds.
@@ -117,6 +122,72 @@ module ReviewSeal =
                         | Error failure -> return Error(SnapshotUnavailable(JournalAppendFailure.describe failure))
         }
 
+    /// REVIEW-010: a seal candidate before its provider run exists.
+    ///
+    /// `sealTransform` runs before the request is answered, so the assistant that
+    /// carries the run is not in the snapshot yet. The ordinary case binds the
+    /// run in `seal` via `bindableRun`; a challenge request (the previous
+    /// turn's tool result IS the challenge, and no assistant follows the
+    /// challenge user yet) has nothing to bind. REVIEW-010 says "the next
+    /// assistant/provider run, when it appears, binds the identity" — so the
+    /// candidate is parked here and `bindPendingSeal` commits it once the
+    /// assistant exists. Without this, a second PERFECT always failed with
+    /// `ChallengeUnproven` (measured on Host 1.18.10: every dual-PERFECT flow).
+    type PendingSeal =
+        { SessionId: SessionId
+          PhysicalUserMessageId: PhysicalUserMessageId
+          SealDigest: SealDigest
+          CanonicalVersion: int
+          IncludedToolResultDigests: SealDigest list }
+
+    /// Bind a parked seal to the turn's provider run and persist it.
+    ///
+    /// Called from the reconcile `onTurn` path: the assistant that answers the
+    /// sealed request is the run REVIEW-003's second PERFECT will query, so the
+    /// seal must be keyed by exactly that run. Fail closed: a journal failure
+    /// here means the second PERFECT cannot confirm, which is the correct
+    /// outcome when persistence is unavailable.
+    let bindPendingSeal
+        (journal: AgentJournal option)
+        (pendingSeals: Dictionary<string, PendingSeal>)
+        (turn: ReconciledTurn)
+        : Task =
+        task {
+            let key = SessionId.value turn.SessionId
+
+            match pendingSeals.TryGetValue key with
+            | false, _ -> return ()
+            | true, pending ->
+                pendingSeals.Remove key |> ignore
+
+                match journal with
+                | None -> return ()
+                | Some durable ->
+                    let fact =
+                        AgentFact.ProviderInputSealed
+                            {| SessionId = pending.SessionId
+                               ProviderRun = turn.ProviderRun
+                               PhysicalUserMessageId = pending.PhysicalUserMessageId
+                               SealDigest = pending.SealDigest
+                               CanonicalVersion = pending.CanonicalVersion
+                               IncludedToolResultDigests = pending.IncludedToolResultDigests |}
+
+                    match
+                        AgentJournal.appendAgent
+                            (StreamId.Session pending.SessionId)
+                            (Some turn.ProviderRun)
+                            fact
+                            durable
+                    with
+                    | Ok _ -> return ()
+                    | Error failure ->
+                        failwith (
+                            sprintf
+                                "REVIEW-010 ProviderInputSealed append failed: %s"
+                                (JournalAppendFailure.describe failure)
+                        )
+        }
+
     /// Seal at the `messages.transform` boundary.
     ///
     /// Only reviewer sessions are sealed. REVIEW-010's seal exists to prove a
@@ -134,6 +205,7 @@ module ReviewSeal =
         (sessionId: SessionId)
         (transformed: ProviderProjection.ProviderWireProjection)
         (physicalUserAddress: PhysicalUserMessageId option)
+        (pendingSeals: Dictionary<string, PendingSeal>)
         : Task<unit> =
         task {
             let isReviewer =
@@ -143,16 +215,26 @@ module ReviewSeal =
                 |> Option.exists (fun profile -> profile.CanonicalRole = Role.Reviewer)
 
             if isReviewer then
-                let! _ =
-                    seal
-                        snapshot
-                        journal
-                        HostDigest.sha256Hex
-                        sessionId
-                        transformed
-                        physicalUserAddress
+                match! seal snapshot journal HostDigest.sha256Hex sessionId transformed physicalUserAddress with
+                | Ok _ -> return ()
+                | Error NoBindableRun ->
+                    // REVIEW-010 deferred binding: this request's assistant does
+                    // not exist yet (the challenge is the tool result of the
+                    // previous turn), so park the candidate for the reconcile
+                    // `onTurn` to bind.
+                    match physicalUserAddress with
+                    | None -> return ()
+                    | Some physical ->
+                        pendingSeals.[SessionId.value sessionId] <-
+                            { SessionId = sessionId
+                              PhysicalUserMessageId = physical
+                              SealDigest = ProviderProjection.sealDigest HostDigest.sha256Hex transformed
+                              CanonicalVersion = ProviderProjection.CanonicalVersion
+                              IncludedToolResultDigests =
+                                ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed }
 
-                return ()
+                        return ()
+                | Error _ -> return ()
             else
                 return ()
         }
