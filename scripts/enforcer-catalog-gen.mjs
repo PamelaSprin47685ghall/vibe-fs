@@ -5,6 +5,7 @@
 // is the exact drift ENFORCER-170 forbids.
 //
 //   node scripts/enforcer-catalog-gen.mjs --write   (rewrite the generated .fs)
+//   node scripts/enforcer-catalog-gen.mjs --check   (fail if the .fs is stale; gate:generated)
 //   node scripts/enforcer-catalog-gen.mjs           (report only)
 
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -38,8 +39,18 @@ for (const line of lines) {
   }
   if (!current) continue
 
-  // Section separators and other chrome.
-  if (line.trim() === '---' || line.startsWith('#') || line.startsWith('```')) continue
+  // `---` terminates the rules catalog: the last rule (ENF-L10) is followed by
+  // a separator and then the implementation-order chapter. Without finalizing
+  // here, that chapter's prose is swallowed into L10's Nudge continuation
+  // (measured: generated L10 exceeded 8,000 chars).
+  if (line.trim() === '---') {
+    rules.push(current)
+    current = null
+    continue
+  }
+
+  // Section headers and code fences are chrome.
+  if (line.startsWith('#') || line.startsWith('```')) continue
 
   const score = line.match(/^Score when: (.*)$/)
   if (score) {
@@ -94,6 +105,18 @@ ${entries}
 if (process.argv.includes('--write')) {
   writeFileSync(OUT, out)
   console.log(`wrote ${rules.length} rules to ${OUT}`)
+} else if (process.argv.includes('--check')) {
+  // Generated-artifact sync gate: the checked-in EnforcerCatalog.gen.fs must be
+  // byte-for-byte what the generator would produce from SSOT/15.md today. A
+  // stale artifact (edited by hand, or the generator changed without a
+  // regen) fails the gate — this is what caught the L10 Nudge corruption class.
+  const current = readFileSync(OUT, 'utf8')
+  if (current === out) {
+    console.log(`generated-artifact: ${OUT} is in sync with SSOT/15.md (${rules.length} rules)`)
+  } else {
+    console.error(`generated-artifact: ${OUT} is OUT OF SYNC with SSOT/15.md — run: node scripts/enforcer-catalog-gen.mjs --write`)
+    process.exit(1)
+  }
 } else {
   console.log(`${rules.length} rules extracted (${OUT} dry run)`)
 }

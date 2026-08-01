@@ -66,9 +66,23 @@ test('ENFORCER_172_field_names_match_the_ssot_spelling', () => {
   }
 })
 
-test('ENFORCER_170_schema_digest_is_stable_across_runs', () => {
-  // The catalog is generated; the same SSOT yields the same list (pure).
-  const a = JSON.stringify(enforcer.rules)
-  const b = JSON.stringify(enforcer.rules)
-  assert.equal(a, b)
+test('ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
+  // Regression for the L10 corruption: the generator once swallowed the entire
+  // implementation-order chapter into ENF-L10's Nudge (measured >8,000 chars).
+  // The last rule's Nudge must be exactly the SSOT text — no trailing chapter
+  // prose, no "在修改生产语义前" content.
+  const l10 = enforcer.rules.find((r) => r.FieldName === 'incidental-complexity-dominates')
+  assert.equal(
+    l10.Nudge,
+    'Incidental complexity is dominating the design. Remove ceremony until the essential domain concepts become the visible structure.',
+  )
+  assert.ok(l10.Nudge.length < 200, `ENF-L10 Nudge must be short, got ${l10.Nudge.length} chars`)
+
+  // Field names are the contract surface (provider-visible args); their exact
+  // list is part of the catalog contract.
+  const fields = enforcer.rules.map((r) => r.FieldName)
+  assert.equal(fields.length, new Set(fields).size)
+  // Spot-check the first and last fields stay stable.
+  assert.equal(fields[0], 'primitive-obsession')
+  assert.equal(fields[119], 'incidental-complexity-dominates')
 })
