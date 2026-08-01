@@ -133,13 +133,8 @@ module ReviewSeal =
     /// candidate is parked here and `bindPendingSeal` commits it once the
     /// assistant exists. Without this, a second PERFECT always failed with
     /// `ChallengeUnproven` (measured on Host 1.18.10: every dual-PERFECT flow).
-    type PendingSeal =
-        { SessionId: SessionId
-          PhysicalUserMessageId: PhysicalUserMessageId
-          SealDigest: SealDigest
-          CanonicalVersion: int
-          IncludedToolResultDigests: SealDigest list }
-
+    /// The type lives in `SharedState` so the shared dictionary (HOST-012) can
+    /// be typed before this module compiles.
     /// Bind a parked seal to the turn's provider run and persist it.
     ///
     /// Called from the reconcile `onTurn` path: the assistant that answers the
@@ -149,7 +144,7 @@ module ReviewSeal =
     /// outcome when persistence is unavailable.
     let bindPendingSeal
         (journal: AgentJournal option)
-        (pendingSeals: Dictionary<string, PendingSeal>)
+        (pendingSeals: Dictionary<string, SharedState.PendingSeal>)
         (turn: ReconciledTurn)
         : Task =
         task {
@@ -158,7 +153,15 @@ module ReviewSeal =
             match pendingSeals.TryGetValue key with
             | false, _ -> return ()
             | true, pending ->
-                pendingSeals.Remove key |> ignore
+                // REVIEW-010: the parked candidate is intentionally NOT removed
+                // here. The `onTurn` binding keys the seal by the reconcile run,
+                // but the tool executes under `context.ProviderRunId`, which on
+                // Host 1.18.10 disagrees for challenge responses; the second
+                // PERFECT then fails `ChallengeUnproven` and VerdictTool's
+                // fallback re-binds the same candidate to the tool's run. The
+                // fallback removes it once the retry succeeds. A stale candidate
+                // is harmless: the next transform of the same reviewer session
+                // overwrites the same key.
 
                 match journal with
                 | None -> return ()
@@ -198,6 +201,57 @@ module ReviewSeal =
     /// Returns `unit`: a rejection here IS the fail-closed outcome. No seal means
     /// `ReviewController` cannot confirm, which is what REVIEW-003 requires when the
     /// binding is unavailable. The `Result` stays on `seal` so tests can assert
+    /// Whether this request is the answer to an outstanding challenge.
+    ///
+    /// The challenge request's wire carries the challenge as the previous turn's
+    /// tool result, so its view's tool-result digests contain the pending
+    /// challenge's content digest. REVIEW-003 needs the SEAL of the challenge
+    /// request's own assistant run — which does not exist at transform time — so
+    /// these requests must always defer binding, even when `bindableRun` finds a
+    /// candidate (it would bind the PREVIOUS attempt's assistant, whose run is
+    /// not the one the next PERFECT will query — measured: every challenge
+    /// request sealed the prior attempt and the second PERFECT still failed
+    /// `ChallengeUnproven`).
+    let private isChallengeRequest
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (transformed: ProviderProjection.ProviderWireProjection)
+        =
+        match journal with
+        | None -> false
+        | Some durable ->
+            let projection = (AgentJournal.snapshot durable).AgentProjections
+
+            match AgentProjection.tryFind sessionId projection with
+            | Some session ->
+                match session.ReviewGuard with
+                | Some guard ->
+                    match guard.PendingChallenge with
+                    | Some challenge ->
+                        let challengeDigest = SealDigest.value challenge.ChallengeContentDigest
+
+                        ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed
+                        |> List.exists (fun digest -> SealDigest.value digest = challengeDigest)
+                    | None -> false
+                | None -> false
+            | None -> false
+
+    let private parkSeal
+        (pendingSeals: Dictionary<string, SharedState.PendingSeal>)
+        (sessionId: SessionId)
+        (physicalUserAddress: PhysicalUserMessageId option)
+        (transformed: ProviderProjection.ProviderWireProjection)
+        : unit =
+        match physicalUserAddress with
+        | None -> ()
+        | Some physical ->
+            pendingSeals.[SessionId.value sessionId] <-
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physical
+                  SealDigest = ProviderProjection.sealDigest HostDigest.sha256Hex transformed
+                  CanonicalVersion = ProviderProjection.CanonicalVersion
+                  IncludedToolResultDigests = ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed }
+
     /// which rejection occurred.
     let sealTransform
         (snapshot: ISessionSnapshotPort option)
@@ -205,7 +259,7 @@ module ReviewSeal =
         (sessionId: SessionId)
         (transformed: ProviderProjection.ProviderWireProjection)
         (physicalUserAddress: PhysicalUserMessageId option)
-        (pendingSeals: Dictionary<string, PendingSeal>)
+        (pendingSeals: Dictionary<string, SharedState.PendingSeal>)
         : Task<unit> =
         task {
             let isReviewer =
@@ -215,26 +269,23 @@ module ReviewSeal =
                 |> Option.exists (fun profile -> profile.CanonicalRole = Role.Reviewer)
 
             if isReviewer then
-                match! seal snapshot journal HostDigest.sha256Hex sessionId transformed physicalUserAddress with
-                | Ok _ -> return ()
-                | Error NoBindableRun ->
-                    // REVIEW-010 deferred binding: this request's assistant does
-                    // not exist yet (the challenge is the tool result of the
-                    // previous turn), so park the candidate for the reconcile
-                    // `onTurn` to bind.
-                    match physicalUserAddress with
-                    | None -> return ()
-                    | Some physical ->
-                        pendingSeals.[SessionId.value sessionId] <-
-                            { SessionId = sessionId
-                              PhysicalUserMessageId = physical
-                              SealDigest = ProviderProjection.sealDigest HostDigest.sha256Hex transformed
-                              CanonicalVersion = ProviderProjection.CanonicalVersion
-                              IncludedToolResultDigests =
-                                ProviderProjection.toolResultDigests HostDigest.sha256Hex transformed }
-
-                        return ()
-                | Error _ -> return ()
+                // REVIEW-010 deferred binding for EVERY reviewer request.
+                //
+                // `bindableRun` only works for a request whose own assistant
+                // already exists at transform time. A challenge request's wire
+                // carries the challenge as the PREVIOUS turn's tool result and
+                // its own assistant does not exist yet — but once the previous
+                // attempt's assistant is on disk (a rejected second PERFECT),
+                // `bindableRun` binds THAT run, and the next PERFECT queries a
+                // different run, so it always fails `ChallengeUnproven`
+                // (measured: every dual-PERFECT flow on Host 1.18.10). Parking
+                // unconditionally and binding the turn's run at `onTurn` is the
+                // exact REVIEW-010 contract: transform → candidate → bind when
+                // the assistant appears. First-PERFECT submissions never query a
+                // seal (there is no pending challenge yet), so the deferred
+                // binding is safe for them too.
+                parkSeal pendingSeals sessionId physicalUserAddress transformed
+                return ()
             else
                 return ()
         }

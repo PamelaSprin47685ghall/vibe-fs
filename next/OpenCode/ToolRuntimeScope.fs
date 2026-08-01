@@ -123,6 +123,8 @@ type ToolRuntimeScope
     member _.Snapshot = snapshot
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
+    // REVIEW-010/HOST-012: deferred seal candidates, shared across instances.
+    member _.PendingReviewSeals = SharedState.PendingReviewSeals
 
     /// EXEC-011: the administrator's ceiling on any single process.
     ///

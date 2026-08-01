@@ -74,6 +74,7 @@ const [
   RecoverySlotModule,
   CompactionPolicyModule,
   DiagnosticModule,
+  ProjectionModule,
   SyntheticTomlModule,
   ForkChildPayloadModule,
   BloggerTomlModule,
@@ -115,6 +116,7 @@ const [
   prod('Domain/RecoverySlot'),
   prod('Domain/HostCompactionPolicy'),
   prod('OpenCode/Diagnostic'),
+  prod('OpenCode/Projection'),
   prod('Domain/SyntheticToml'),
   prod('Domain/ForkChildPayload'),
   prod('Domain/BloggerToml'),
@@ -1748,9 +1750,12 @@ export const providerProjection = {
   isAppendOnlyPrefix: (previous, next) => ProviderProj.isAppendOnlyPrefix(previous, next),
   sealDigest: (sha256, wire) => ProviderProj.sealDigest(sha256, wire),
   toolResultDigest: (sha256, canonical) => ProviderProj.toolResultDigest(sha256, canonical),
-  toolResultDigests: (sha256, wire) => listItems(ProviderProj.toolResultDigests(sha256, wire)),
+  toolResultDigests: (sha256, wire) => listItems(ProviderProj.toolResultDigests(sha256, wire)).map((d) => d.fields[0]),
   fixtureKey: (semantic) => ProviderProj.fixtureKey(semantic),
   semanticallyEqual: (a, b) => ProviderProj.semanticallyEqual(a, b),
+  // OpenCode/Projection: Host-assembled message view (1.18.10 `tool-<tool>`
+  // parts live on assistant messages; see HOST-012 tool-part test).
+  decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
 }
 
 // ── execution handles (SSOT/09) ──────────────────────────────────────────────

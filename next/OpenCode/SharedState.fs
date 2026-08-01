@@ -1,6 +1,9 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System.Collections.Generic
+open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Kernel
+open Wanxiangshu.Next.Kernel.Identity
 
 /// HOST-012: 跨实例共享状态——模块级单例，所有插件实例同一引用。
 ///
@@ -14,6 +17,22 @@ open System.Collections.Generic
 /// OwnedSessions、UserMessageBindings、hook 订阅。
 module SharedState =
 
+    /// REVIEW-010: a seal candidate before its provider run exists (see
+    /// `ReviewSeal.bindPendingSeal`). Defined here so the shared dictionary can
+    /// be typed before `ReviewSeal` compiles.
+    type PendingSeal =
+        { SessionId: SessionId
+          PhysicalUserMessageId: PhysicalUserMessageId
+          SealDigest: SealDigest
+          CanonicalVersion: int
+          IncludedToolResultDigests: SealDigest list }
+
     let SessionParents = Dictionary<string, string>()
     let VerdictSessions = HashSet<string>()
     let SessionDirectories = Dictionary<string, string>()
+
+    /// REVIEW-010 deferred-binding candidates (challenge requests), shared
+    /// across instances like the other cross-instance state: the transform that
+    /// parks a candidate and the tool that binds it may run under different
+    /// plugin instances (orchestrator worktree).
+    let PendingReviewSeals = Dictionary<string, PendingSeal>()

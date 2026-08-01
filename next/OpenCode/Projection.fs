@@ -106,6 +106,22 @@ module Projection =
                 firstString partObj [ "callID"; "callId"; "id" ]
                 |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
 
+            // Host 1.18.10's assembled tool part: `{ type: "tool-<tool>", state:
+            // "output-available"|"output-error", toolCallId, input, output?,
+            // errorText? }` (message-v2.ts). The result the model actually saw is
+            // `output` (or `errorText` on failure). Without this case the tool
+            // results in every assembled request projected to an empty
+            // `IncludedToolResultDigests`, so REVIEW-003's challenge proof could
+            // never be satisfied (measured: dual-PERFECT always
+            // `ChallengeUnproven`).
+            | kind when kind.StartsWith "tool-" ->
+                let result =
+                    firstCanonical partObj [ "output"; "errorText"; "result"; "content" ]
+                    |> Option.defaultValue "null"
+
+                firstString partObj [ "toolCallId"; "callID"; "callId"; "id" ]
+                |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
+
             // A Host `FilePart` (`{ type: "file", mime, url, filename? }`). The model
             // genuinely saw it, so ARCH-004's prefix check and COMPANION-011's cutoff
             // proof must both account for it.
@@ -245,8 +261,7 @@ module Projection =
         rawMessages
         |> List.choose (fun raw ->
             match decodeMessage raw with
-            | Some message when message.Role = "user" ->
-                hostMessageId raw |> Option.map PhysicalUserMessageId.create
+            | Some message when message.Role = "user" -> hostMessageId raw |> Option.map PhysicalUserMessageId.create
             | _ -> None)
         |> List.tryLast
 

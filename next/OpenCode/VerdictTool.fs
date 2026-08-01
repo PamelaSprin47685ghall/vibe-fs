@@ -125,10 +125,56 @@ module VerdictTool =
                     // root from this tool's physical user message id — fabricating a
                     // PROMPT-002 identity from a PROMPT-001 one.
                     match ReviewController.submit journal HostDigest.sha256Hex submission with
-                    | Error error -> return sprintf "Verdict rejected: %s." error
+                    | Ok VerdictDecision.ChallengeUnproven ->
+                        // REVIEW-010 fallback: the `onTurn` deferred binding keys
+                        // the seal by the reconcile run, but the tool executes
+                        // under `context.ProviderRunId` — measured on Host
+                        // 1.18.10 these disagree for challenge responses, so the
+                        // second PERFECT would always fail `ChallengeUnproven`.
+                        // If a parked candidate exists for this reviewer, bind it
+                        // to THIS run (the run the next PERFECT actually queries)
+                        // and retry once.
+                        match scope.PendingReviewSeals.TryGetValue reviewerId with
+                        | false, _ ->
+                            return
+                                "Verdict rejected: this provider run has no input seal proving it received the previous challenge."
+                        | true, pending ->
+                            let sealFact =
+                                AgentFact.ProviderInputSealed
+                                    {| SessionId = pending.SessionId
+                                       ProviderRun = providerRunId
+                                       PhysicalUserMessageId = pending.PhysicalUserMessageId
+                                       SealDigest = pending.SealDigest
+                                       CanonicalVersion = pending.CanonicalVersion
+                                       IncludedToolResultDigests = pending.IncludedToolResultDigests |}
+
+                            match
+                                AgentJournal.appendAgent
+                                    (StreamId.Session pending.SessionId)
+                                    (Some providerRunId)
+                                    sealFact
+                                    journal
+                            with
+                            | Error appendFailure ->
+                                return
+                                    sprintf
+                                        "Verdict rejected: challenge unproven (seal bind failed: %s)"
+                                        (JournalAppendFailure.describe appendFailure)
+                            | Ok _ ->
+                                match ReviewController.submit journal HostDigest.sha256Hex submission with
+                                | Error retryError ->
+                                    return sprintf "Verdict rejected: challenge unproven (retry: %s)" retryError
+                                | Ok VerdictDecision.ChallengeUnproven ->
+                                    return
+                                        "Verdict rejected: this provider run has no input seal proving it received the previous challenge."
+                                | Ok decision ->
+                                    scope.PendingReviewSeals.Remove reviewerId |> ignore
+                                    scope.MarkVerdictSubmitted reviewerId
+                                    return report decision
                     | Ok decision ->
                         scope.MarkVerdictSubmitted reviewerId
                         return report decision
+                    | Error error -> return sprintf "Verdict rejected: %s." error
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

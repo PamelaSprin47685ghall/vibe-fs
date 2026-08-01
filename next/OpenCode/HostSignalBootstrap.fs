@@ -33,7 +33,7 @@ module HostSignalBootstrap =
             /// REVIEW-010 deferred-binding park: challenge requests have no
             /// assistant to bind at transform time; the reconcile `onTurn` binds
             /// the parked candidate to the turn's run.
-            PendingReviewSeals: Dictionary<string, ReviewSeal.PendingSeal>
+            PendingReviewSeals: Dictionary<string, SharedState.PendingSeal>
         }
 
     let wire
@@ -60,7 +60,8 @@ module HostSignalBootstrap =
 
         let binding = TurnBinding.Store()
 
-        let pendingReviewSeals = Dictionary<string, ReviewSeal.PendingSeal>()
+        // HOST-012: shared across plugin instances (transform parks, tool binds).
+        let pendingReviewSeals = SharedState.PendingReviewSeals
 
         let onTurn (turn: ReconciledTurn) : Task =
             // Manager sessions run inside their own worktree, not the plugin's

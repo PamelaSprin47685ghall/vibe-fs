@@ -257,18 +257,23 @@ module ProviderProjection =
     let toolResultDigest (sha256: string -> string) (resultCanonical: string) : SealDigest =
         SealDigest.create (sha256 resultCanonical)
 
-    /// REVIEW-010: which tool results this request carried, as digests.
+    /// REVIEW-010: which parts this request carried, as digests.
     ///
-    /// The set a second PERFECT is checked against. Only results are digested:
-    /// the challenge is delivered AS a tool result (REVIEW-003), so digesting
-    /// anything else would widen what counts as proof.
+    /// The set a second PERFECT is checked against. Tool results are digested
+    /// as the challenge's delivery shape (REVIEW-003). Host 1.18.10's assembled
+    /// view may carry the tool result as a TEXT part instead (`message-v2.ts`
+    /// flattens completed tool outputs into assistant text), so text parts are
+    /// digested too: the proof is "the model's input contained the challenge
+    /// text", and a specific digest only matches that exact text — other text
+    /// cannot impersonate it. Reasoning/media/tool-calls are not input the
+    /// model could quote, so they stay out.
     let toolResultDigests (sha256: string -> string) (wire: ProviderWireProjection) : SealDigest list =
         wire.Messages
         |> List.collect (fun message -> message.Parts)
         |> List.choose (fun part ->
             match part with
             | WireToolResult(_callId, result) -> Some(toolResultDigest sha256 result)
-            | WireText _
+            | WireText text -> Some(toolResultDigest sha256 text)
             | WireReasoning _
             | WireMedia _
             | WireToolCall _ -> None)
