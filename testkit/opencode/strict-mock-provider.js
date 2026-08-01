@@ -295,8 +295,12 @@ export class StrictMockProvider {
           for (let i = 0; i < max; i += 1) {
             if (prevSys[i] !== nextSys[i]) { at = i; break; }
           }
-          console.error(`[SEAL-SYS] firstDiffAt=${at} prevHead=${prevSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
+          console.error(`[SEAL-SYS] firstDiffAt=${at} prevLen=${prevSys.length} nextLen=${nextSys.length} prevHead=${prevSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
           console.error(`[SEAL-SYS] nextHead=${nextSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
+          console.error(`[SEAL-SYS] prevTail=${prevSys.slice(-160).replace(/\n/g, '\\n')}`);
+          console.error(`[SEAL-SYS] nextTail=${nextSys.slice(-160).replace(/\n/g, '\\n')}`);
+        } else {
+          console.error(`[SEAL-SYS] equal-content prevLen=${prevSys.length} nextLen=${nextSys.length} prevParts=${JSON.stringify(prevW[0]?.Parts)} nextParts=${JSON.stringify(nextW[0]?.Parts)}`);
         }
         console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
         console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
