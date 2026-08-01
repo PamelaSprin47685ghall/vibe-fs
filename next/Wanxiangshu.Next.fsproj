@@ -34,6 +34,7 @@
     <Compile Include="Domain/EnforcerThrottle.fs"/>
     <Compile Include="Domain/EnforcerNudge.fs"/>
     <Compile Include="Domain/EnforcerCycle.fs"/>
+    <Compile Include="Domain/StudentTeacher.fs"/>
     <Compile Include="Domain/RecoverySlot.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>

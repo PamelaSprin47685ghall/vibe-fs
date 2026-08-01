@@ -104,6 +104,7 @@ const [
   EnforcerThrottleModule,
   EnforcerNudgeModule,
   EnforcerCycleModule,
+  StudentTeacherModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -157,6 +158,7 @@ const [
   prod('Domain/EnforcerThrottle'),
   prod('Domain/EnforcerNudge'),
   prod('Domain/EnforcerCycle'),
+  prod('Domain/StudentTeacher'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -1054,8 +1056,12 @@ export const requestKind = (() => {
     bloggerMain: of('BloggerMain'),
     bloggerSquash: of('BloggerSquash'),
     interactionRepair: of('InteractionRepair'),
-    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair'].map(of),
+    // SSOT/16 LEARN-050: the Student's two request kinds.
+    studentLearn: of('StudentLearn'),
+    studentCompile: of('StudentCompile'),
+    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair', 'StudentLearn', 'StudentCompile'].map(of),
 
+    of,
     nameOf: (kind) => caseOf(kind),
     label: (kind) => m.label(kind),
     clearsFailureCountOnSuccess: (kind) => m.clearsFailureCountOnSuccess(kind),
@@ -2289,5 +2295,61 @@ export const enforcer = (() => {
       return cycle.mergeCalls(list)
     },
     isValidCycle: (merged) => cycle.isValidCycle(merged),
+  }
+})()
+
+// ── SSOT/16: Student & Teacher 纯领域内核 ────────────────────────────────────
+
+export const studentTeacher = (() => {
+  const m = bind(StudentTeacherModule, 'StudentTeacher', [
+    'StudentTeacherRole',
+    'StudentTool',
+    'studentToolsFor',
+    'isStudentRequest',
+    'teacherTierFor',
+    'studentAgentName',
+    'teacherAgentName',
+    'isIgnoredTmpPath',
+    'appendEntry',
+    'dedupeTail',
+    'QaAppendOrder',
+    'StudentRunConcurrency',
+    'mayStartTeacherCall',
+    'ReturnDeleteOutcome',
+    'returnMayProceed',
+  ])
+
+  const toolNames = (set) => [...set].map(caseOf).sort()
+  const toolOf = (name) => unionCase(StudentTeacherModule.StudentTool, 'StudentTool')(name, [])
+
+  return {
+    /** LEARN-050：Student 工具面按请求种类原子决定。 */
+    toolsFor: (kindName) => toolNames(m.studentToolsFor(requestKind.of(kindName))),
+    /** LEARN-051：非 Student 请求种类 → 空工具集。 */
+    toolsForKind: (kind) => toolNames(m.studentToolsFor(kind)),
+
+    /** LEARN-017：同 tier 映射。 */
+    teacherTier: (tierName) => caseOf(m.teacherTierFor(tier(tierName))),
+
+    /** LEARN-016：Agent 名。 */
+    studentAgent: (tierName) => m.studentAgentName(tier(tierName)),
+    teacherAgent: (tierName) => m.teacherAgentName(tier(tierName)),
+
+    /** LEARN-032/033/035/036：QA 内容拼接。 */
+    isIgnoredTmpPath: (p) => m.isIgnoredTmpPath(p),
+    append: (existing, entry) => m.appendEntry(existing, entry),
+    dedupeTail: (existing, entry) => m.dedupeTail(existing, entry),
+
+    /** LEARN-075：单飞并发门。 */
+    mayStartTeacherCall: (stateName) => {
+      const state = unionCase(StudentTeacherModule.StudentRunConcurrency, 'StudentRunConcurrency')(stateName, [])
+      return m.mayStartTeacherCall(state)
+    },
+
+    /** LEARN-024：最终 return 删除顺序。 */
+    returnMayProceed: (outcomeName) => {
+      const outcome = unionCase(StudentTeacherModule.ReturnDeleteOutcome, 'ReturnDeleteOutcome')(outcomeName, [])
+      return m.returnMayProceed(outcome)
+    },
   }
 })()
