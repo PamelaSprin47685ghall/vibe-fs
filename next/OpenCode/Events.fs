@@ -108,15 +108,18 @@ module Events =
         member private _.IsCompletedDuplicate(sessionId: SessionId, outcome: TerminalOutcome) =
             match outcome with
             | TerminalOutcome.Completed result ->
-                let key = SessionId.value sessionId
-                let runValue = ProviderRunIdentity.value result.ProviderRun
+                if isNull (box result.ProviderRun) then
+                    false
+                else
+                    let key = SessionId.value sessionId
+                    let runValue = ProviderRunIdentity.value result.ProviderRun
 
-                lock lockObj (fun () ->
-                    match lastCompletedRun.TryGetValue key with
-                    | true, last when last = runValue -> true
-                    | _ ->
-                        lastCompletedRun.[key] <- runValue
-                        false)
+                    lock lockObj (fun () ->
+                        match lastCompletedRun.TryGetValue key with
+                        | true, last when last = runValue -> true
+                        | _ ->
+                            lastCompletedRun.[key] <- runValue
+                            false)
             | _ -> false
 
         /// Terminal completions arrive through NotifyTerminal from the reconcile
