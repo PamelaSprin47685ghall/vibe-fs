@@ -60,7 +60,15 @@ test('LEARN_016_student_is_public_teacher_is_internal_agent_names', () => {
 
 test('LEARN_032_tmp_paths_are_recognized_as_git_ignored', () => {
   assert.equal(studentTeacher.isIgnoredTmpPath('.agent/.tmp/student/s1/run1/QA.md'), true)
+  assert.equal(studentTeacher.isIgnoredTmpPath('.agent/.tmp'), true)
   assert.equal(studentTeacher.isIgnoredTmpPath('src/QA.md'), false)
+})
+
+test('LEARN_032_neighbor_paths_do_not_false_positive', () => {
+  // The separator-bound match must not treat `.agent/.tmpx` (a sibling
+  // directory) as the QA tmp root.
+  assert.equal(studentTeacher.isIgnoredTmpPath('.agent/.tmpx/QA.md'), false)
+  assert.equal(studentTeacher.isIgnoredTmpPath('.agent/.tmpfoo/QA.md'), false)
 })
 
 test('LEARN_033_append_joins_with_minimal_separator_not_markup', () => {

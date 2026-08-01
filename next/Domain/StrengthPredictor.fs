@@ -144,13 +144,15 @@ module StrengthPredictor =
 
         // P_cont(next) = continuationCount(next) / continuationTotal
         //
-        // `updateCounts` builds continuation keys as `prefix @ [successor]`, so
-        // every key has length ≥ 2 and its value is always 1 (distinct-successor
-        // count). The unigram continuation for `next` is therefore the number of
-        // length-2 keys whose LAST element is `next`, over all length-2 keys —
-        // the standard KN unigram backoff, NOT `Map.tryFind [next]` (length 1,
-        // never present) and NOT `List.head = next` (that is the context, not
-        // the successor). Both mistakes silently zero the backoff.
+        // `updateCounts` builds continuation keys as `prefix @ [successor]` with
+        // `prefix = remaining |> take order`, so at order 1 the key is `[x; x]`
+        // (the successor doubled, not a distinct context). Length-2 keys whose
+        // LAST element is `next` therefore approximate the unigram frequency of
+        // `next` as a successor — not a strict KN continuation count (that would
+        // need a distinct context dimension). This is a pre-existing structural
+        // simplification; what this fix restores is that the backoff is actually
+        // alive: the old code queried `Map.tryFind [next]` (length 1, never
+        // present), which zeroed pCont unconditionally.
         let totalKeys =
             state.Continuations
             |> Map.toSeq
