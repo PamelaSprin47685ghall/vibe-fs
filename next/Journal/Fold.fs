@@ -366,6 +366,12 @@ module Fold =
             // previous version only did the second, so a confirmed dual-PERFECT
             // never became a `Confirmed` witness anywhere and the Guard could not
             // pass no matter how many PERFECT verdicts the reviewer submitted.
+            //
+            // The third update is the Guard's own mirror: `missingTree` reads the
+            // MANAGER session's ReviewGuard, and nothing else ever writes it — so
+            // without this mirror the guard stayed missing forever and the Manager
+            // was nudged on every completion even after its Reviewer confirmed
+            // (measured on Host 1.18.10: `guard.IsConfirmed` never true).
             let first =
                 { ProviderRun = payload.FirstProviderRun
                   ToolCallId = payload.FirstToolCallId
@@ -398,6 +404,30 @@ module Fold =
                     payload.ManagerSessionId
                     (ReviewRequirementProjection.clearOnConfirmation payload.SecondProviderRun)
             )
+            |> Result.map (fun updated ->
+                // REVIEW-007 mirror, non-blocking: the reviewer's witness is the
+                // durable fact; this copy only lets the Manager's guard answer
+                // "is the current tree confirmed" from its own projection. A
+                // refusal here must not fail the journal — the confirmation
+                // already happened on the reviewer side.
+                match
+                    AgentProjection.tryUpdate
+                        payload.ManagerSessionId
+                        (fun session ->
+                            ReviewProjection.applyConfirmedWitness
+                                payload.BarrierId
+                                payload.ChallengeResultDigest
+                                payload.SecondProviderInputDigest
+                                first
+                                second
+                                (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
+                            |> Result.map (fun mirrored ->
+                                { session with
+                                    ReviewGuard = Some mirrored }))
+                        updated
+                with
+                | Ok mirrored -> mirrored
+                | Error _ -> updated)
 
         // ── execution handles ───────────────────────────────────────────────
 

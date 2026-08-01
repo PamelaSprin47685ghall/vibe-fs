@@ -66,7 +66,22 @@ type ToolRuntimeScope
             parentWorkRecordFor = (fun parentId -> background (SessionId.value parentId)),
             childWorkRecordFor = (fun childId -> background (SessionId.value childId)),
             ?sessionSnapshot = snapshot,
-            cancelSignals = onCancelSignals
+            cancelSignals = onCancelSignals,
+            // REVIEW-007: this runtime is a Manager's own fork surface, so a
+            // Reviewer it forks gets its barrier opened here (see
+            // `HostForkRuntimeFork.Fork`). The Orchestrator's runtime keeps this
+            // off; ORCH-006 opens barriers at the reverify site.
+            openReviewBarrier = true,
+            treeHashFor =
+                (fun agentId ->
+                    directoryFor agentId
+                    |> Option.map (fun path ->
+                        let tree = GitTree.create path
+
+                        try
+                            GitTreeHash.create (tree.GetTreeHash())
+                        with _ ->
+                            GitTreeHash.create "NO_HEAD_TREE"))
         )
 
     /// AGENT-007: the single Role source, or `None`.

@@ -16,6 +16,12 @@ module HostReviewGuard =
         | ReviewGuardConfirmed
         | ReviewGuardUnavailable of reason: string
 
+    /// REVIEW-003's shared barrier writer lives in `ReviewBarrier.openBarrier`
+    /// (Journal layer, compiled before the fork paths). Both the Orchestrator's
+    /// review barrier (ORCH-006) and a Manager's own guard-path review fork
+    /// (REVIEW-007) emit the same fact through the same function.
+    let openBarrier = ReviewBarrier.openBarrier
+
     let missingTree (journal: AgentJournal option) (gitTreePort: GitTreePort option) sessionId =
         match journal, gitTreePort with
         | None, _ -> ReviewGuardUnavailable "Review guard requires an AgentJournal"

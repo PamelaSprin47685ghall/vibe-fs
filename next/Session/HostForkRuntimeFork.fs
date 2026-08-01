@@ -126,6 +126,8 @@ module HostForkRuntimeFork =
                             HostForkChildDispatch.sendToExistingChild
                                 this.Gate
                                 this.PendingRuns
+                                this.Journal
+                                this.ParentId
                                 this.Sessions
                                 this.ChildWorkRecordOf
                                 this.Runtime
@@ -174,36 +176,64 @@ module HostForkRuntimeFork =
                                 this.ChildCreated agentId role childId
                                 this.ChildCreatedDir agentId childId (this.DirectoryOf agentId)
 
-                                let result =
-                                    this.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
+                                // REVIEW-007: a Manager's own review fork opens the
+                                // barrier for the Reviewer BEFORE its first prompt is
+                                // sent, so the first verdict can confirm. Orchestrator
+                                // runtimes keep this off — ORCH-006 opens their
+                                // barriers at the reverify site, and a second writer
+                                // would fight the first over `CurrentBarrierId`.
+                                let barrierOutcome =
+                                    if this.OpenReviewBarrier && role = AgentRole.Reviewer then
+                                        match this.TreeHashFor agentId with
+                                        | None -> Ok()
+                                        | Some tree ->
+                                            let barrierId = ReviewBarrierId.create (System.Guid.NewGuid().ToString("N"))
 
-                                match result with
-                                | ForkResult.NotFound _ ->
-                                    this.FailRun(run, "Fork runtime is cancelled")
-                                    return Error "Fork runtime is cancelled"
-                                | _ ->
-                                    this.MarkReady(run)
+                                            ReviewBarrier.openBarrier this.Journal this.ParentId childId barrierId tree
+                                    else
+                                        Ok()
 
-                                    let enrichedPrompt =
-                                        ForkChildPayload.relay
-                                            prompt
-                                            (this.ParentWorkRecordOf this.ParentId)
-                                            requirements
+                                match barrierOutcome with
+                                | Error err ->
+                                    let! _ = this.Sessions.AbortSession childId
+                                    this.FailRun(run, err)
+                                    return Error err
+                                | Ok() ->
+                                    let result =
+                                        this.Runtime.Fork(
+                                            agentId,
+                                            role,
+                                            agentName,
+                                            runWork = (fun () -> run.Source.Task)
+                                        )
 
-                                    let! sent =
-                                        HostForkAgentOwner.sendFirstPrompt
-                                            this.Sessions
-                                            this.Journal
-                                            childId
-                                            agentName
-                                            (this.DirectoryOf agentId)
-                                            enrichedPrompt
+                                    match result with
+                                    | ForkResult.NotFound _ ->
+                                        this.FailRun(run, "Fork runtime is cancelled")
+                                        return Error "Fork runtime is cancelled"
+                                    | _ ->
+                                        this.MarkReady(run)
 
-                                    match sent with
-                                    | Ok _ -> return Ok result
-                                    | Error err ->
-                                        this.FailRun(run, err)
-                                        return Error err
+                                        let enrichedPrompt =
+                                            ForkChildPayload.relay
+                                                prompt
+                                                (this.ParentWorkRecordOf this.ParentId)
+                                                requirements
+
+                                        let! sent =
+                                            HostForkAgentOwner.sendFirstPrompt
+                                                this.Sessions
+                                                this.Journal
+                                                childId
+                                                agentName
+                                                (this.DirectoryOf agentId)
+                                                enrichedPrompt
+
+                                        match sent with
+                                        | Ok _ -> return Ok result
+                                        | Error err ->
+                                            this.FailRun(run, err)
+                                            return Error err
             }
 
         member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
@@ -245,6 +275,8 @@ module HostForkRuntimeFork =
                                 HostForkChildDispatch.sendToExistingChild
                                     this.Gate
                                     this.PendingRuns
+                                    this.Journal
+                                    this.ParentId
                                     this.Sessions
                                     this.ChildWorkRecordOf
                                     this.Runtime

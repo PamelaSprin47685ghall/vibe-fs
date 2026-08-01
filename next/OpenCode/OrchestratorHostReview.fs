@@ -26,26 +26,10 @@ module OrchestratorHostReview =
     /// a barrier opened before the fork has nothing to key. One reviewer session per
     /// barrier also makes REVIEW-008's "a fresh dual PERFECT" automatic: that session's
     /// guard starts empty, so no earlier witness can satisfy it.
-    let private startBarrier
-        (journal: AgentJournal option)
-        (managerSessionId: SessionId)
-        (reviewerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
-        (tree: GitTreeHash)
-        : Result<unit, string> =
-        match journal with
-        | None -> Error "Review barrier requires an AgentJournal"
-        | Some durable ->
-            let fact =
-                AgentFact.ReviewBarrierStarted
-                    {| ReviewerSessionId = reviewerSessionId
-                       ManagerSessionId = managerSessionId
-                       BarrierId = barrierId
-                       GitTreeHash = tree |}
-
-            match AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
-            | Ok _ -> Ok()
-            | Error failure -> Error(JournalAppendFailure.describe failure)
+    /// `HostReviewGuard.openBarrier` — REVIEW-003's shared barrier writer. Both the
+    /// Orchestrator's review barrier (ORCH-006, here) and a Manager's own guard-path
+    /// review fork (REVIEW-007) emit the same fact through the same function.
+    let private startBarrier = HostReviewGuard.openBarrier
 
     /// Fork a reviewer, open its barrier, and wait for a confirmed dual PERFECT.
     ///
