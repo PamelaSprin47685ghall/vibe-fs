@@ -69,16 +69,23 @@ module OrchestratorSweep =
             let isStale identity =
                 not (Set.contains (normalize identity) owned)
 
+            // Only manager-branch worktrees are ours to clean. The MAIN working tree
+            // carries `branch refs/heads/main` in `worktree list --porcelain`, so a
+            // stale test alone would classify the repository itself as stale and
+            // `git worktree remove` would fail with "is a main working tree" —
+            // measured on Host 1.18.9: every orchestrator canary died in init.
+            let isManagerBranch identity =
+                let value = WorktreeIdentity.value identity
+                value.StartsWith "refs/heads/manager/" || value.StartsWith "manager/"
+
             match! git.ListWorktrees() with
             | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)
             | Ok entries ->
                 let staleWorktrees =
                     entries
                     |> List.choose (fun (path, identity) ->
-                        // A worktree with no branch is not ours: every manager worktree is
-                        // created with `-b manager/<job>`.
                         match identity with
-                        | Some value when isStale value -> Some path
+                        | Some value when isManagerBranch value && isStale value -> Some path
                         | _ -> None)
 
                 match! removeWorktrees git staleWorktrees with
