@@ -128,3 +128,69 @@ tracked 调试插桩已全部还原：
    terminal verdict 未进入新 mailbox。
 3. 把诊断永久化为正式 mjs/Host 轨迹测试；禁止只留临时 print。
 4. 该 canary 绿后，依 VERIFY-002 继续单 canary → P0×3 → `test:release`。
+
+## 9. 未解困惑（2026-08-01 续查，退火三收尾）
+
+> 续查 `orchestrator-restart-publish` 修复链（提交 `783caf3b`、`3a2944f2`，证据
+> `evidence/orchestrator-restart-recovery-fixes.md`）后，canary 森林仍有三处红灯，
+> 根因机制已定位到环节但未闭环。以下每条都是「下一个调查者应从哪句开始」，
+> 不是结论。
+
+### 9.1 guard 轮循环：镜像树与 rebase 后当前树失配的完整语义未解
+
+实测（conflict canary，MOCK_TRACE）：manager-guard.0 attempt=1..4——guard 连续四轮，
+四个 fast-reviewer。机制链条：
+
+```text
+missingTree 判 manager 的 ReviewGuard：
+  IsConfirmed && LastGitTreeHash = 当前树
+镜像（ConfirmedReviewWitness fold → manager 会话）携带 witness 时刻的树
+REBASE 改变 worktree 树 → 镜像树 ≠ 当前树 → manager 每次 terminal 后 guard 重触发
+```
+
+未解点：
+
+- **为什么 post-rebase 的 fast-reviewer 确认没有让 guard 停轮？** 观察到的顺序：
+  `manager-guard.0 attempt=4` 早于 `reviewer-confirm.0 attempt=1`（fast-reviewer #1 的
+  challenge 答案）——guard 第 4 轮触发时 #1 尚未确认，时序纠缠。post-rebase 轮
+  （#3/#4）的确认（镜像带 post-rebase 树）应满足 guard——实测没有，需证明
+  post-rebase 轮是否真的 Confirmed（seal 链）还是 ChallengeUnproven。
+- **guard 的触发时机未建模完整**：manager 的哪些 terminal 触发 guard？manager.2
+  （assignment 文本）→ guard #1 无疑；manager-guard.2（guard 轮的文本）也触发？
+  每个 guard 轮的 fork+join 是否都产生一次 terminal 判定？
+- 修复方向：guard 确认应对 rebase 后的新树重新满足——「已确认 barrier」语义 vs
+  「树变化后 witness 失效」（REVIEW-008）的分界在哪，SSOT 未写清。
+
+### 9.2 家族 session seal：worktree 释放后 system prompt 丢 AGENTS.md 块
+
+实测：manager 家族（manager/reviewer/coder/blogger）全部 session 的目录 = manager
+worktree；worktree 在 publish 时按 ORCH-006 释放后，任何家族请求的 Host instruction
+加载（globUp 从 session 目录）随目录消失丢失 AGENTS.md → system prompt 变短 →
+ARCH-004 seal 断裂。blogger 已钉到 `SharedState.RootWorkspace`（`3a2944f2`），
+manager/reviewer/coder 未处理。
+
+未解点：
+
+- **家族 session 为什么在 job 已 publish（终态）后仍在发请求？** 9.1 的 guard 循环是
+  主因，但 manager 的 guard 轮在 job 终态后为何还继续——ORCH 程序已返回 Published，
+  谁还在驱动 manager 的 session？
+- **session 目录的真实决定机制未完全确认**：`handlers/session.ts:75` 读 body
+  `location ?? process.cwd()`，`session.ts:682` 读 `ctx.directory`；实测家族 session =
+  worktree（x-opencode-directory header 路由），orchestrator = workspace——两条代码
+  路径的矛盾未用运行证据收口。
+- **Instruction.systemPaths 的 ScopedCache**：按 directory 缓存指令文件；目录被释放后
+  缓存是否失效、globUp 对已消失 cwd 的行为——未验证。
+
+### 9.3 bindChild awaitEvent 偶发超时（orchestrator-publish）
+
+实测：`bindChild(fast-coder)` 偶发 20s 超时——coder 的 `session.created` 事件未命中
+谓词（`parentSessionID === manager && sessionAgent === 'fast-coder'`）。manager 的
+bindChild 稳定成功，coder 的偶发失败。
+
+未解点：
+
+- `session.created` 事件的 `sessionAgent` 字段在什么条件下缺失或不同（fork 路径的
+  agent 传递——manager 的 fork 工具 vs ORCH 的 forkChild）？
+- EventProbe 的 SSE 事件是否有丢失窗口（重连/心跳间隙），还是谓词本身偶发失配？
+  40 个请求都到了 mock，事件却不在 buffer——需要一次失败现场的 created 事件全量
+  dump 才能收口。
