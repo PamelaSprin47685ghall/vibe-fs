@@ -182,9 +182,9 @@ export const DEFAULT_NEVER_TIMEOUT_MS = 5000;
 export const GATE_PROBE_TIMEOUT_MS = 3000;
 
 /**
- * Window for `opencode serve` to start inside a gate case. An order of magnitude under
- * HOST_START_TIMEOUT_MS on purpose: that case asserts environment isolation, so a Host slow to
- * listen should fail it quickly rather than be waited out.
+ * Silence window for real `opencode serve` to print its listening marker inside a gate case.
+ * Missing this bound means the startup ladder lacks progress or does too much work; scheduler
+ * contention is not grounds for widening the criterion.
  */
 export const GATE_HOST_START_TIMEOUT_MS = 1000;
 

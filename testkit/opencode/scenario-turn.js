@@ -10,8 +10,6 @@
  * 100% Event-driven; ZERO polling loops.
  */
 
-import { WATCHDOG_TIMEOUT_MS } from './time-budget.js';
-
 function isIdleEvent(e) {
   // Quiescence signal only (transport-level), not the product-correctness oracle.
   if (e.type === 'session.idle') return true;
@@ -53,7 +51,7 @@ class Turn {
 
   async awaitTerminal(opts = {}) {
     const o = {
-      timeoutMs: opts.timeoutMs || WATCHDOG_TIMEOUT_MS,
+      timeoutMs: opts.timeoutMs ?? null,
       requireActivity: opts.requireActivity !== false,
       requireAssistantTerminal: opts.requireAssistantTerminal !== false,
       requireIdleAfterActivity: opts.requireIdleAfterActivity !== false,

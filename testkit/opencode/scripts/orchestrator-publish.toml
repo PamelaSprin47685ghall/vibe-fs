@@ -30,16 +30,16 @@ setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator pub
 session = { agent = "fast-orchestrator", bind = ["orch-title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
 
-must = ["orch.2", "reviewer-confirm.0"]
+must = ["orch.2"]
 
 flow = [
   { wait = "orch.0" },
-  # Nested forks: the Orchestrator forks the Manager, and the Manager forks the Coder
-  # and the Reviewer. `parent` names the bound session by agent, because `child` is
-  # overwritten by every later bindChild.
+  # Nested Host sessions are physically flattened under the family root. The
+  # project-wide Host session snapshot binds exact agents without re-deriving the
+  # plugin's logical HandleLinked parent from physical `parentID`.
   { bindChild = { agent = "fast-manager", bind = ["fast-manager"] } },
   { wait = "manager.0" },
-  { bindChild = { agent = "fast-coder", bind = ["fast-coder"], parent = "fast-manager" } },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
   { wait = "coder.0" },
   { wait = "coder.1" },
   { wait = "manager.2" },
@@ -49,14 +49,16 @@ flow = [
   # reviewers exist; the barrier one is forked by the Orchestrator directly.
   { wait = "manager-guard.0" },
   { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
-  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"], parent = "fast-manager" } },
+  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
   { wait = "reviewer.0" },
   # The reviewer's second request carries a grown `parent_work_record` (the parent
   # chain's work record advances as the Manager's Blogger submits), so its wire
   # prefix is not an append-only continuation of the first — a real ARCH-004 break
   # whose cost is one cache miss. Declared, because the turn text itself is stable.
   { wait = "barrier-reviewer.0" },
-  { wait = "reviewer-confirm.0" },
+  # Both reviewers submit their second PERFECT in the next provider run. The
+  # resulting durable witnesses—not a separate confirmation prompt—are the
+  # REVIEW-003 criterion.
   # Two witnesses exist by the time the pre-rebase barrier closes: the Manager
   # guard's fast-reviewer and the Orchestrator's deep-reviewer (ORCH-006). The
   # pre-0.5.0 `OrchestratorPreRebaseReviewConfirmed` fact no longer exists — the
@@ -72,6 +74,9 @@ flow = [
   { wait = "orch.2" },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
+  # The dirty tree needs one guard review; finalization may expose the committed tree
+  # to one later terminal (REVIEW-008). A third delivery is the old self-sustaining loop.
+  { assertDeliveries = { id = "manager-guard.0", gte = 1, lte = 2 } },
   { assertWorktreeClean = true },
   { expectSatisfied = true },
 ]
@@ -181,18 +186,6 @@ tools = ["glob", "grep", "inspector", "read", "verdict"]
 
   [[turn.step]]
   respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
-
-[[turn]]
-id = "reviewer-confirm"
-internal = true
-user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer confirmed the tree." }
 
 [[turn]]
 id = "blogger"

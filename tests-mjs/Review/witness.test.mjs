@@ -15,6 +15,9 @@ import test from 'node:test'
 import {
   authorityRoot,
   caseOf,
+  envelope,
+  fact,
+  fold,
   gitTreeHash,
   idValue,
   isSome,
@@ -30,6 +33,7 @@ import {
   reviewWitness,
   sealDigest,
   sessionId,
+  stream,
   verdict,
   verdictWitness,
 } from '../domain.mjs'
@@ -379,6 +383,23 @@ test('REVIEW_005_confirmedReviewer_is_derived_from_the_witness_not_stored_beside
   assert.equal(isSome(reviewWitness.confirmedReviewer(reviewWitness.noReview)), false)
 })
 
+test('REVIEW_007_a_started_barrier_is_mirrored_to_the_manager_guard', () => {
+  const reviewer = sessionId(REVIEWER)
+  const manager = sessionId('ses_manager')
+  const result = fold.one(fold.empty, envelope({
+    stream: stream.session(reviewer),
+    fact: fact('ReviewBarrierStarted', {
+      ReviewerSessionId: reviewer,
+      ManagerSessionId: manager,
+      BarrierId: BARRIER,
+      GitTreeHash: TREE,
+    }),
+  }))
+
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
+  assert.equal(reviewProjection.read(fold.sessions(result.value).ses_manager.ReviewGuard).barrier, 'bar_1')
+})
+
 // ── REVIEW-008: a tree change invalidates without deleting ──────────────────
 
 test('REVIEW_008_a_tree_change_makes_a_confirmed_witness_insufficient', () => {
@@ -411,6 +432,23 @@ test('REVIEW_008_a_new_barrier_clears_the_pending_challenge_but_keeps_the_witnes
   // The kept witness is for the OLD tree, so the new barrier is not satisfied by
   // it — which is the whole reason keeping it is safe.
   assert.equal(reviewProjection.satisfiesGuard(OTHER_TREE, next), false)
+})
+
+test('REVIEW_008_a_new_barrier_invalidates_a_witness_even_when_the_tree_hash_is_unchanged', () => {
+  const confirmed = confirmOn(afterChallengeAndSeal()).value
+  const next = reviewProjection.startBarrier(reviewBarrierId('bar_2'), TREE, confirmed)
+
+  assert.equal(reviewWitness.isConfirmed(next.Witness), true, 'the old witness remains auditable')
+  assert.equal(reviewProjection.satisfiesGuard(TREE, next), false, 'the new barrier requires two new PERFECT attempts')
+})
+
+test('REVIEW_008_a_late_confirmation_cannot_rewind_the_current_barrier', () => {
+  const newer = reviewProjection.startBarrier(reviewBarrierId('bar_2'), TREE, reviewProjection.empty)
+  const late = confirmOn(newer).value
+
+  assert.equal(reviewProjection.read(late).barrier, 'bar_2')
+  assert.equal(reviewWitness.isConfirmed(late.Witness), true, 'the late witness remains auditable')
+  assert.equal(reviewProjection.satisfiesGuard(TREE, late), false)
 })
 
 test('REVIEW_008_re_entering_the_same_barrier_changes_nothing', () => {

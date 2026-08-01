@@ -36,7 +36,7 @@
  * One-based because it counts deliveries, not array slots: "attempt 1" is a phrase
  * an operator reading a diagnostic already understands.
  */
-export const FAULT_KINDS = ['provider-error', 'disconnect', 'context-overflow'];
+export const FAULT_KINDS = ['provider-error', 'disconnect', 'context-overflow', 'never-end'];
 
 /**
  * Which declared fault governs this ENTRY, or `null`.

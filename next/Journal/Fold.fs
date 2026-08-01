@@ -326,12 +326,13 @@ module Fold =
         // ── review ──────────────────────────────────────────────────────────
 
         | AgentFact.ReviewBarrierStarted payload ->
-            Ok(
-                updateReviewGuard
-                    payload.ReviewerSessionId
-                    (ReviewProjection.startBarrier payload.BarrierId payload.GitTreeHash)
-                    projection
-            )
+            let startBarrier =
+                ReviewProjection.startBarrier payload.BarrierId payload.GitTreeHash
+
+            projection
+            |> updateReviewGuard payload.ReviewerSessionId startBarrier
+            |> updateReviewGuard payload.ManagerSessionId startBarrier
+            |> Ok
 
         | AgentFact.PerfectChallengeIssued payload ->
             let challenge =

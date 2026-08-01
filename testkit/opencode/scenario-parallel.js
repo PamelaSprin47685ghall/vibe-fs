@@ -8,7 +8,26 @@ import { resolvePluginPath } from './scenario-paths.js';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
+import { journalFactTail, readJournal } from './journal-observer.js';
 import { WATCHDOG_TIMEOUT_MS, DIAGNOSTIC_RACE_MS } from './time-budget.js';
+
+const JOURNAL_OBSERVE_SLICE_MS = 500;
+
+async function observeRestartJournal(workDir, watchdog, state) {
+  let observed = readJournal(workDir).total;
+  while (!state.done) {
+    await new Promise((resolve) => setTimeout(resolve, JOURNAL_OBSERVE_SLICE_MS));
+    const next = readJournal(workDir).total;
+    if (next > observed) {
+      watchdog?.advance({
+        reason: `restart-journal:${next}`,
+        lane: 'runtime',
+        blocking: true,
+      });
+      observed = next;
+    }
+  }
+}
 
 export class Scenario {
   constructor(ctx) {
@@ -31,14 +50,21 @@ export class Scenario {
     this.watchdog?.advance({ reason: 'restart-close-events', lane: 'runtime', blocking: true });
     await this.events.close();
     this.watchdog?.advance({ reason: 'restart-start-host', lane: 'runtime', blocking: true });
-    await this.host.start({
-      ...this.host._startOpts,
-      onProgress: (stage) => this.watchdog?.advance({
-        reason: `restart-host-${stage}`,
-        lane: 'runtime',
-        blocking: true,
-      }),
-    });
+    const journalMonitorState = { done: false };
+    const journalMonitor = observeRestartJournal(this.host.workDir, this.watchdog, journalMonitorState);
+    try {
+      await this.host.start({
+        ...this.host._startOpts,
+        onProgress: (stage) => this.watchdog?.advance({
+          reason: `restart-host-${stage}`,
+          lane: 'runtime',
+          blocking: true,
+        }),
+      });
+    } finally {
+      journalMonitorState.done = true;
+      await journalMonitor;
+    }
     this.client._baseUrl = this.host.baseUrl;
     this.events._baseUrl = this.host.baseUrl;
     // New host process: prior provider-visible seals are not comparable across restart.
@@ -152,6 +178,9 @@ export async function setupScenarioParallel(opts, tmpDir) {
       label: opts.watchdogLabel || "canary",
       onTimeout: async () => {
         console.error(`── watchdog event tail ──\n${events.dump(20)}`);
+        console.error(`── watchdog Host stdout tail ──\n${host.stdoutLog.split('\n').slice(-20).join('\n')}`);
+        console.error(`── watchdog Host stderr tail ──\n${host.stderrLog.split('\n').slice(-20).join('\n')}`);
+        console.error(`── watchdog Journal fact tail ──\n${journalFactTail(host.workDir, 20).join('\n')}`);
         console.error('── watchdog blocked expectations ──');
         for (const expectation of provider.blockedExpectations) {
           console.error(`  ${expectation.blocking ? 'blocking' : 'background'} ${expectation.id} ${expectation.lane}`);

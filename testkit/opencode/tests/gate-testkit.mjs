@@ -28,14 +28,13 @@ import { projectionCases } from './gate-projection-cases.mjs';
 import { runtimeKeyCases } from './gate-runtime-key-cases.mjs';
 import { timeoutCases } from './gate-timeout-cases.mjs';
 
-// 有界并发（ARCH-009）：worker pool 每次只放行 GATE_CASE_CONCURRENCY 条用例，失败概率
-// 不随机器负载漂移。用例隔离按构造成立——预算覆盖走逐 spawn 的 env（非 process.env 改写）、
-// 临时目录逐用例独立、端口 listen(0) 随机、watchdog 子进程各自成组。输出在全部结束后按
-// 声明序回放，故并行不改变报告形态，只改变墙钟。
+// The worker pool admits at most GATE_CASE_CONCURRENCY cases. Per-spawn environment
+// overrides, isolated temporary roots, listen(0), process groups, and ordered replay keep
+// parallel execution from changing semantics.
 //
-// 并发度 8 取 CANARY_MAX_PARALLEL 的实测先例：十五条 canary 各抱一个真实 Host 进程在单机
-// 并发 8 已验证可行；gate 用例里最重的 ProcessHost 三例与之同形。并发计数不是时长，不进
-// time-budget.js（W1 迁移先例：CANARY_MAX_PARALLEL 居 canary-manifest.js）。
+// Eight is measured for this suite, whose cases are mostly pure/local and never fan out one
+// OpenCode process per slot. It is intentionally independent from CANARY_MAX_PARALLEL.
+// Concurrency counts are not durations and therefore do not belong in time-budget.js.
 const GATE_CASE_CONCURRENCY = 8;
 
 async function runCase({ name, fn }) {

@@ -139,7 +139,7 @@ module TurnCompletionProgram =
                 record.TargetAgent
             |> ignore)
 
-        let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =
+        let cleanAbortAndAccumulate () =
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
@@ -147,6 +147,11 @@ module TurnCompletionProgram =
             // to everything the Session accumulated. An empty intermediate turn
             // does not wipe prior A.
             let sessionWide = TerminalSessionA.accumulateTurn eventPort turn
+
+            wasAborted, sessionWide
+
+        let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =
+            let wasAborted, sessionWide = cleanAbortAndAccumulate ()
 
             let sessionWideText =
                 if not (String.IsNullOrWhiteSpace sessionWide) then
@@ -242,7 +247,31 @@ module TurnCompletionProgram =
             AsyncSupport.completedTask ()
         | TurnFailed error -> continueAfterProviderFailure sessionPort eventPort journal turn error
         | TurnCompleted ->
-            let wasAborted, terminalValid = completeReviewerOrAssistant reviewerAlreadyConfirmed
+            // REVIEW-003/007 synchronize before completion: a reviewer awaiting
+            // PERFECT confirmation and a manager whose current tree lacks a witness
+            // are still running. Reporting Completed here lets join/AwaitManager return
+            // before confirmation, racing publish and worktree release.
+            let managerGuard =
+                match turn.AgentRole with
+                | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
+                    Some(HostReviewGuard.missingTree journal gitTreePort sessionKey)
+                | _ -> None
+
+            let completionDeferred =
+                match managerGuard with
+                | Some(HostReviewGuard.ReviewGuardMissing _)
+                | Some(HostReviewGuard.ReviewGuardUnavailable _) -> true
+                | _ ->
+                    turn.AgentRole = Some AgentRole.Reviewer
+                    && not reviewerAlreadyConfirmed
+                    && ReviewerGuardState.pendingConfirmation journal sessionKey
+
+            let wasAborted, terminalValid =
+                if completionDeferred then
+                    let aborted, _ = cleanAbortAndAccumulate ()
+                    aborted, false
+                else
+                    completeReviewerOrAssistant reviewerAlreadyConfirmed
 
             if terminalValid then
                 AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
@@ -258,39 +287,67 @@ module TurnCompletionProgram =
                 | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation journal sessionKey ->
                     verdictSessions.Remove sessionKey |> ignore
 
-                    HostReviewGuard.requestPerfectConfirmation
-                        sessionPort
-                        journal
-                        nudgeSent
-                        turn.SessionId
-                        turn.ProviderRun
+                    task {
+                        // Completion is deferred on this turn; with no confirmation
+                        // continuation in flight the run would wait forever — fail closed.
+                        let! outcome =
+                            HostReviewGuard.requestPerfectConfirmation
+                                sessionPort
+                                journal
+                                nudgeSent
+                                turn.SessionId
+                                turn.ProviderRun
+
+                        match outcome with
+                        | HostReviewGuard.GuardNudgeOutcome.Failed reason ->
+                            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                            |> ignore
+                        | _ -> ()
+                    }
                     :> Task
                 | Some AgentRole.Reviewer when
                     not (verdictSessions.Remove sessionKey)
                     && not (ReviewerGuardState.submitted journal sessionKey)
                     ->
-                    HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent turn.SessionId turn.ProviderRun :> Task
+                    task {
+                        let! _ =
+                            HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent turn.SessionId turn.ProviderRun
+
+                        ()
+                    }
+                    :> Task
                 | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
-                    match HostReviewGuard.missingTree journal gitTreePort sessionKey with
-                    | HostReviewGuard.ReviewGuardMissing treeHash ->
-                        HostReviewGuard.nudgeManager
-                            sessionPort
-                            journal
-                            managerGuardNudges
-                            turn.SessionId
-                            turn.ProviderRun
-                            treeHash
+                    match managerGuard with
+                    | Some(HostReviewGuard.ReviewGuardMissing treeHash) ->
+                        task {
+                            // Same deferred-completion fail closed as the reviewer branch.
+                            let! outcome =
+                                HostReviewGuard.nudgeManager
+                                    sessionPort
+                                    journal
+                                    managerGuardNudges
+                                    turn.SessionId
+                                    treeHash
+
+                            match outcome with
+                            | HostReviewGuard.GuardNudgeOutcome.NoLongerRequired ->
+                                completeReviewerOrAssistant false |> ignore
+                            | HostReviewGuard.GuardNudgeOutcome.Failed reason ->
+                                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                                |> ignore
+                            | _ -> ()
+                        }
                         :> Task
-                    | HostReviewGuard.ReviewGuardConfirmed -> AsyncSupport.completedTask ()
-                    // ORCH-008 / REVIEW-007 fail closed: an unavailable guard must not
-                    // let a Manager finish unreviewed. Reported as a terminal failure
-                    // rather than raised, because raising here escapes into whichever
-                    // Host callback happens to be on the stack.
-                    | HostReviewGuard.ReviewGuardUnavailable reason ->
+                    | Some(HostReviewGuard.ReviewGuardUnavailable reason) ->
+                        // ORCH-008 / REVIEW-007 fail closed: an unavailable guard must not
+                        // let a Manager finish unreviewed. Reported as a terminal failure
+                        // rather than raised, because raising here escapes into whichever
+                        // Host callback happens to be on the stack.
                         eventPort.NotifyTerminal
                             turn.SessionId
                             (TerminalOutcome.Failed(sprintf "Review guard unavailable: %s" reason))
                         |> ignore
 
                         AsyncSupport.completedTask ()
+                    | _ -> AsyncSupport.completedTask ()
                 | _ -> AsyncSupport.completedTask ()

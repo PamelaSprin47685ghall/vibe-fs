@@ -34,6 +34,8 @@ import {
   checkProcessTree,
 } from './process-host-checks.js';
 
+const BOOTSTRAP_SENTINEL = 'Warning: OPENCODE_SERVER_PASSWORD is not set';
+const PROJECT_EVENT_SENTINEL = 'OPENCODE-SIGNAL-SOURCE global.event';
 const READY_SENTINEL = 'opencode server listening on http://';
 const LISTEN_POLL_INTERVAL_MS = 50;
 const LISTEN_POLL_INITIAL_DELAY_MS = 100;
@@ -68,6 +70,8 @@ export class ProcessHost {
     if (this._started) throw new Error('ProcessHost already started');
     this._startOpts = { ...opts };
     this._started = true;
+    this._stdoutBuffer.length = 0;
+    this._stderrBuffer.length = 0;
     this._scenarioDir = opts.scenarioDir;
     this._workDir = ensureWorkspace(opts.scenarioDir);
     this._env = buildEnv(opts);
@@ -78,7 +82,12 @@ export class ProcessHost {
       onExit: this._onChildExit.bind(this),
     });
     const startTimeout = opts.startTimeoutMs || HOST_START_TIMEOUT_MS;
-    const listenLine = await this._waitForListening(startTimeout);
+    const listenLine = await this._waitForListening(startTimeout, () => {
+      if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+        console.log('[host.start] bootstrap observed');
+      }
+      opts.onProgress?.('bootstrapped');
+    });
     const ht1 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
       console.log(`[host.start] _waitForListening took ${ht1 - ht0}ms`);
@@ -95,24 +104,71 @@ export class ProcessHost {
     this._port = parseListenPort(listenLine);
     this._baseUrl = `http://127.0.0.1:${this._port}`;
     opts.onProgress?.('listening');
-    await this._waitForHealth(HOST_START_TIMEOUT_MS);
+    await this._waitForGlobalHealth(startTimeout);
     const ht2 = Date.now();
     if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
-      console.log(`[host.start] _waitForHealth took ${ht2 - ht1}ms`);
+      console.log(`[host.start] _waitForGlobalHealth took ${ht2 - ht1}ms`);
+    }
+    opts.onProgress?.('global-healthy');
+    const onProjectEvents = opts.pluginPaths?.length > 0
+      ? () => {
+          if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+            console.log('[host.start] project event source observed');
+          }
+          opts.onProgress?.('project-events');
+        }
+      : undefined;
+    await this._waitForHealth(startTimeout, onProjectEvents);
+    const ht3 = Date.now();
+    if (process.env.CANARY_VERBOSE || process.env.DEBUG) {
+      console.log(`[host.start] _waitForHealth took ${ht3 - ht2}ms`);
     }
     opts.onProgress?.('healthy');
   }
 
-  async _waitForHealth(timeoutMs = HOST_START_TIMEOUT_MS) {
+  async _waitForGlobalHealth(timeoutMs = HOST_START_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
+      try {
+        const res = await fetch(`${this._baseUrl}/global/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(Math.max(0, Math.min(READY_POLL_INTERVAL_MS, deadline - Date.now()))),
+        });
+        if (res.ok && (await res.json())?.healthy === true) return;
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
+    }
+    throw new Error(
+      'Global health-check failed: server not responding\n' +
+      `stdout tail:\n${this._stdoutBuffer.slice(-20).join('\n')}\n` +
+      `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
+    );
+  }
+
+  async _waitForHealth(timeoutMs = HOST_START_TIMEOUT_MS, onProjectEvents) {
+    let deadline = Date.now() + timeoutMs;
+    let projectEventsObserved = false;
+    const observeProjectEvents = () => {
+      if (projectEventsObserved || !this._stdoutBuffer.some((line) => line.includes(PROJECT_EVENT_SENTINEL))) return;
+      projectEventsObserved = true;
+      deadline = Date.now() + timeoutMs;
+      onProjectEvents?.();
+    };
+
+    while (Date.now() < deadline) {
+      observeProjectEvents();
       try {
         const res = await fetch(`${this._baseUrl}/path`, {
           method: 'GET',
           headers: { 'x-opencode-directory': this._workDir },
+          signal: AbortSignal.timeout(Math.max(0, Math.min(READY_POLL_INTERVAL_MS, deadline - Date.now()))),
         });
-        if (res && res.status > 0) return;
+        if (res && res.status > 0) {
+          observeProjectEvents();
+          if (onProjectEvents === undefined || projectEventsObserved) return;
+        }
       } catch (err) {}
+      observeProjectEvents();
       await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
     }
     throw new Error(
@@ -180,15 +236,16 @@ export class ProcessHost {
     }
   }
 
-  async _waitForListening(timeoutMs) {
+  async _waitForListening(timeoutMs, onBootstrap) {
     return new Promise((resolve) => {
       const child = this._child;
       if (!child || !child.stdout) {
         resolve(null);
         return;
       }
-      const deadline = Date.now() + timeoutMs;
+      let deadline = Date.now() + timeoutMs;
       let buf = '';
+      let bootstrapped = false;
       let settled = false;
       const finish = (value) => {
         if (settled) return;
@@ -199,6 +256,11 @@ export class ProcessHost {
       };
       const handler = (chunk) => {
         buf += chunk.toString();
+        if (!bootstrapped && buf.includes(BOOTSTRAP_SENTINEL)) {
+          bootstrapped = true;
+          deadline = Date.now() + timeoutMs;
+          onBootstrap?.();
+        }
         tryResolve();
       };
       const tryResolve = () => {

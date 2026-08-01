@@ -63,6 +63,7 @@ const FLOW_VERBS = new Set([
   'requireIdleAfterActivity',
   'assertFacts',
   'assertFile',
+  'assertDeliveries',
   'assertActiveRequests',
   'assertWorktreeClean',
   'assertPtyEcho',
@@ -77,6 +78,87 @@ const unknownFlowVerbs = (flow) =>
       .filter((verb) => !FLOW_VERBS.has(verb))
       .map((verb) => `flow[${index}]: unknown verb '${verb}'; a misspelled verb is silently ignored`),
   );
+
+const BIND_CHILD_KEYS = new Set(['agent', 'bind']);
+
+const bindChildProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const binding = flowStep?.bindChild;
+    if (binding === undefined) return [];
+    if (binding === null || typeof binding !== 'object' || Array.isArray(binding)) {
+      return [`flow[${index}] bindChild must be a table`];
+    }
+
+    const problems = [];
+    if (typeof binding.agent !== 'string' || binding.agent.trim() === '') {
+      problems.push(`flow[${index}] bindChild requires an exact agent`);
+    }
+    for (const field of Object.keys(binding)) {
+      if (!BIND_CHILD_KEYS.has(field)) {
+        problems.push(`flow[${index}] bindChild field '${field}' is unsupported`);
+      }
+    }
+    return problems;
+  });
+
+const AFTER_EXPECTATION_KEYS = new Set(['id', 'attempts', 'restart', 'gitConflictProof', 'file']);
+
+const afterExpectationProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const hook = flowStep?.afterExpectation;
+    if (hook === undefined) return [];
+    if (hook === null || typeof hook !== 'object' || Array.isArray(hook)) {
+      return [`flow[${index}] afterExpectation must be a table`];
+    }
+
+    const problems = [];
+    if (typeof hook.id !== 'string' || hook.id.trim() === '') {
+      problems.push(`flow[${index}] afterExpectation requires an exact id`);
+    }
+    if (hook.attempts !== undefined && (!Number.isInteger(hook.attempts) || hook.attempts < 1)) {
+      problems.push(`flow[${index}] afterExpectation attempts must be a positive integer`);
+    }
+    for (const field of Object.keys(hook)) {
+      if (!AFTER_EXPECTATION_KEYS.has(field)) {
+        problems.push(`flow[${index}] afterExpectation field '${field}' is unsupported`);
+      }
+    }
+    return problems;
+  });
+
+const ASSERT_DELIVERIES_KEYS = new Set(['id', 'eq', 'gte', 'lte']);
+
+const assertDeliveriesProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const claim = flowStep?.assertDeliveries;
+    if (claim === undefined) return [];
+    if (claim === null || typeof claim !== 'object' || Array.isArray(claim)) {
+      return [`flow[${index}] assertDeliveries must be a table`];
+    }
+
+    const problems = [];
+    if (typeof claim.id !== 'string' || claim.id.trim() === '') {
+      problems.push(`flow[${index}] assertDeliveries requires an exact id`);
+    }
+    if (claim.eq === undefined && claim.gte === undefined && claim.lte === undefined) {
+      problems.push(`flow[${index}] assertDeliveries requires eq, gte, or lte`);
+    }
+    for (const bound of ['eq', 'gte', 'lte']) {
+      const value = claim[bound];
+      if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+        problems.push(`flow[${index}] assertDeliveries ${bound} must be a non-negative integer`);
+      }
+    }
+    if (Number.isInteger(claim.gte) && Number.isInteger(claim.lte) && claim.gte > claim.lte) {
+      problems.push(`flow[${index}] assertDeliveries lower bound exceeds upper bound`);
+    }
+    for (const field of Object.keys(claim)) {
+      if (!ASSERT_DELIVERIES_KEYS.has(field)) {
+        problems.push(`flow[${index}] assertDeliveries field '${field}' is unsupported`);
+      }
+    }
+    return problems;
+  });
 
 /**
  * TOML assigns a root-level key to the LAST table header above it, silently.
@@ -398,6 +480,11 @@ const danglingReferences = (entries, scenario) => {
     if (typeof waited === 'string' && !entries.some((entry) => entry.id === waited || entry.turnId === waited)) {
       problems.push(`flow wait references '${waited}', which is not a declared step or turn`);
     }
+
+    const asserted = flowStep.assertDeliveries?.id;
+    if (typeof asserted === 'string' && !entries.some((entry) => entry.id === asserted)) {
+      problems.push(`assertDeliveries references '${asserted}', which is not a declared step`);
+    }
   }
 
   return problems;
@@ -494,6 +581,9 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
 
   const validationProblems = [
     ...unknownFlowVerbs(raw.flow),
+    ...bindChildProblems(raw.flow),
+    ...afterExpectationProblems(raw.flow),
+    ...assertDeliveriesProblems(raw.flow),
     ...malformedFaults(raw),
     ...providerErrorProblems(raw),
     ...conflictingFaults(entries, raw),

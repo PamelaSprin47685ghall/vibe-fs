@@ -30,7 +30,7 @@ const { initSpikePlugin } = await import('../../build/next/OpenCode/SpikePlugin.
 // widened for this (VERIFY-008); the same-import precedent is this file's own
 // `initSpikePlugin` line.
 const { forWorkspace } = await import('../../build/next/Journal/RuntimePath.js')
-const { acquire: acquireJournal } = await import('../../build/next/Journal/SharedAgentJournal.js')
+const { acquire: acquireJournal, release: releaseJournal } = await import('../../build/next/Journal/SharedAgentJournal.js')
 const { acquire: acquireTerminalBus } = await import('../../build/next/OpenCode/SharedTerminalBus.js')
 const { AgentJournalModule_runtimeId } = await import('../../build/next/Journal/AgentJournal.js')
 const { forJournal, Runtime__AcceptHumanRoot } = await import('../../build/next/OpenCode/PromptDispatcher.js')
@@ -106,13 +106,14 @@ export const withExecutablePlugin = async (body) => {
       directory,
       events: { listen: () => () => {} },
     })
+    let runtime
     try {
       const runtimePath = forWorkspace(directory)
       const journalResult = acquireJournal(runtimePath, process.pid, new Date())
       // Fable Result: tag 0 is Ok, and `fields` is the fields ARRAY — the
       // journal itself is fields[0].
       if (journalResult.tag !== 0) throw new Error(`journal acquire rejected: ${journalResult.fields?.[0]?.Reason}`)
-      const runtime = {
+      runtime = {
         journal: journalResult.fields[0],
         runtimeId: AgentJournalModule_runtimeId(journalResult.fields[0]).fields[0],
         terminalPort: acquireTerminalBus(runtimePath),
@@ -152,8 +153,9 @@ export const withExecutablePlugin = async (body) => {
       }
       await body(hooks, directory, createdIds, runtime)
     } finally {
-      // Dispose before removing the directory: the journal writer and the
-      // shared-bus refcount both release through scope.Dispose.
+      // Release the fixture's extra journal reference before the plugin releases
+      // its owning reference and closes the writer.
+      if (runtime !== undefined) releaseJournal(runtime.journal)
       await hooks.dispose()
     }
   } finally {

@@ -1,9 +1,9 @@
 /**
  * run-canary-staggered.mjs — Dynamic event-staggered full-parallel canary test runner.
  *
- * All canaries run concurrently in one full-parallel pool. Each canary N launches
- * canary N+1 as soon as canary N emits its first host-ready "bark" (host listening
- * or events.connect). No fixed sleep timers; pure causal event-driven launch stagger.
+ * A bounded worker pool runs the canaries. Each admitted canary N launches the next
+ * admitted canary as soon as N emits its first host-ready "bark" (host listening or
+ * events.connect). No fixed sleep timers; pure causal event-driven launch stagger.
  */
 
 import { spawn } from "node:child_process";
@@ -218,7 +218,7 @@ async function main() {
     throw new Error(`CANARY_REPEAT must be an integer from 1 through 3, got ${repeats}`);
   }
   console.log(
-    "Starting " + CANARY_TESTS.length + " canary tests in dynamic event-staggered full-parallel mode (" +
+    "Starting " + CANARY_TESTS.length + " canary tests in dynamic event-staggered bounded-parallel mode (" +
       repeats + " iteration(s), max=" + MAX_PARALLEL + ")...\n",
   );
 
@@ -235,34 +235,32 @@ async function main() {
     );
 
     const testsToRun = shuffle(CANARY_TESTS);
-    const canaryPromises = [];
+    const results = Array(testsToRun.length);
+    let nextIndex = 0;
     let previousBarkPromise = Promise.resolve();
 
-    for (let index = 0; index < testsToRun.length; index++) {
-      const file = testsToRun[index];
-      const currentPrevBark = previousBarkPromise;
+    const runWorker = async () => {
+      while (nextIndex < testsToRun.length) {
+        const index = nextIndex++;
+        const file = testsToRun[index];
+        const currentPrevBark = previousBarkPromise;
 
-      let triggerBark;
-      const currentBarkPromise = new Promise((resolve) => {
-        triggerBark = resolve;
-      });
+        let triggerBark;
+        const currentBarkPromise = new Promise((resolve) => {
+          triggerBark = resolve;
+        });
+        const onBark = () => triggerBark();
+        previousBarkPromise = currentBarkPromise;
 
-      const onBark = () => triggerBark();
-
-      previousBarkPromise = currentBarkPromise;
-
-      const p = (async () => {
         if (index > 0) {
           await currentPrevBark;
         }
         console.log("[Launch] " + path.basename(file));
-        return runCanary(file, onBark);
-      })();
+        results[index] = await runCanary(file, onBark);
+      }
+    };
 
-      canaryPromises.push(p);
-    }
-
-    const results = await Promise.all(canaryPromises);
+    await Promise.all(Array.from({ length: MAX_PARALLEL }, runWorker));
 
     let failed = false;
     for (const r of results) {

@@ -7,7 +7,6 @@ import {
   teardownScenario,
   getSessionId,
 } from '../index.js';
-import { WATCHDOG_TIMEOUT_MS } from '../time-budget.js';
 import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from '../scenario-schema.js';
 import { ScenarioRuntime } from '../scenario-runtime.js';
@@ -49,7 +48,7 @@ try {
     },
   });
   assert.ok(prompt.ok, `prompt failed: ${JSON.stringify(prompt.data)}`);
-  await turn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
+  await turn.awaitTerminal({ requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
 
   const managerRequest = scenario.provider.requests.find((request) => Array.isArray(request.tools) && request.tools.length > 0);
   assert.ok(managerRequest, 'manager provider request must be recorded');
@@ -57,16 +56,16 @@ try {
   assert.ok(managerTools.every((tool) => managerRequestTools.includes(tool)), 'manager tool schema must include manager tools');
   assert.ok(forbiddenManagerTools.every((tool) => !managerRequestTools.includes(tool)), 'manager tool schema must exclude forbidden tools');
 
-  // Verify that a session.created event was emitted for the blogger with parentSessionID = managerId
-  const bloggerCreatedEvent = scenario.events.allEvents.find(
-    (e) => e.type === 'session.created' && e.parentSessionID === managerId && e.sessionAgent === 'fast-blogger'
-  );
-  assert.ok(bloggerCreatedEvent, 'session.created event for fast-blogger with manager parentSessionID must be present');
+  const sessionsResponse = await scenario.client.request('GET', '/session', { query: { scope: 'project' } });
+  assert.equal(sessionsResponse.ok, true, JSON.stringify(sessionsResponse.data));
+  const sessions = sessionsResponse.data?.data?.data ?? sessionsResponse.data?.data ?? sessionsResponse.data;
+  assert.ok(Array.isArray(sessions), `session snapshot must be an array: ${JSON.stringify(sessions)}`);
+  const bloggers = sessions.filter((session) => session?.agent === 'fast-blogger');
+  assert.equal(bloggers.length, 1, 'the Host snapshot must contain exactly one fast-blogger');
 
-  const bloggerId = bloggerCreatedEvent.sessionID;
   await scenario.events.awaitEvent(
-    (event) => event.type === 'session.idle' && event.sessionID === bloggerId,
-    WATCHDOG_TIMEOUT_MS,
+    (event) => event.type === 'session.idle' && event.sessionID === bloggers[0].id,
+    null,
   );
   assert.deepEqual(runtime.unanswered().map((entry) => entry.id), [], 'all non-internal scenario steps must complete');
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
@@ -74,7 +73,11 @@ try {
   console.log('Manager companion canary passed.');
 } catch (error) {
   console.error('Manager companion canary failed:', error);
-  scenario?.dumpLogs();
+  if (scenario) {
+    console.error(`Host stdout:\n${scenario.host.stdoutLog}`);
+    console.error(`Host stderr:\n${scenario.host.stderrLog}`);
+    console.error(`Event tail:\n${scenario.events.dump(20)}`);
+  }
   process.exitCode = 1;
 } finally {
   if (scenario) await teardownScenario(scenario);

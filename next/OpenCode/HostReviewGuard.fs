@@ -14,7 +14,19 @@ module HostReviewGuard =
     type ReviewGuardAvailability =
         | ReviewGuardMissing of treeHash: string
         | ReviewGuardConfirmed
+        | ReviewGuardNotRequired
         | ReviewGuardUnavailable of reason: string
+
+    /// What a guard nudge send resolved to. `AlreadyOutstanding` is not a failure:
+    /// the in-flight claim still drives the next turn. `Failed` means nothing is
+    /// in flight, so a deferred completion must not be left waiting on a nudge
+    /// that never landed.
+    [<RequireQualifiedAccess>]
+    type GuardNudgeOutcome =
+        | Sent of PromptKey
+        | AlreadyOutstanding
+        | NoLongerRequired
+        | Failed of reason: string
 
     /// REVIEW-003's shared barrier writer lives in `ReviewBarrier.openBarrier`
     /// (Journal layer, compiled before the fork paths). Both the Orchestrator's
@@ -22,35 +34,46 @@ module HostReviewGuard =
     /// (REVIEW-007) emit the same fact through the same function.
     let openBarrier = ReviewBarrier.openBarrier
 
+    let private managerWorkRequiresGuard snapshot (sessionId: SessionId) =
+        match OrchestratorProjection.tryFindByManagerSession sessionId snapshot.AgentProjections.Orchestrator with
+        | None -> true
+        | Some job ->
+            match job.Progress with
+            | JobProgress.ManagerStarted
+            | JobProgress.ConflictPending _ -> true
+            | _ -> false
+
     let missingTree (journal: AgentJournal option) (gitTreePort: GitTreePort option) sessionId =
         match journal, gitTreePort with
         | None, _ -> ReviewGuardUnavailable "Review guard requires an AgentJournal"
         | _, None -> ReviewGuardUnavailable "Review guard requires a GitTreePort"
         | Some journal, Some port ->
             try
-                let treeHash = port.GetTreeHash()
+                let sessionId = SessionId.create sessionId
+                let snapshot = AgentJournal.snapshot journal
 
-                let emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-                let treeHash = treeHash.Trim()
-
-                let isEmpty =
-                    String.IsNullOrWhiteSpace treeHash
-                    || treeHash.Equals("NO_HEAD_TREE", StringComparison.Ordinal)
-                    || treeHash.Equals(emptyTree, StringComparison.Ordinal)
-
-                if isEmpty then
-                    ReviewGuardMissing treeHash
+                if not (managerWorkRequiresGuard snapshot sessionId) then
+                    ReviewGuardNotRequired
                 else
-                    let snapshot = AgentJournal.snapshot journal
+                    let treeHash = port.GetTreeHash()
 
-                    let sessionOpt =
-                        Map.tryFind (SessionId.create sessionId) snapshot.AgentProjections.Sessions
+                    let emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+                    let treeHash = treeHash.Trim()
 
-                    match sessionOpt with
-                    | None -> ReviewGuardMissing treeHash
-                    | Some session ->
-                        match session.ReviewGuard with
-                        | Some guard when guard.IsConfirmed && guard.LastGitTreeHash = Some(GitTreeHash.create treeHash) ->
+                    let isEmpty =
+                        String.IsNullOrWhiteSpace treeHash
+                        || treeHash.Equals("NO_HEAD_TREE", StringComparison.Ordinal)
+                        || treeHash.Equals(emptyTree, StringComparison.Ordinal)
+
+                    let guard =
+                        Map.tryFind sessionId snapshot.AgentProjections.Sessions
+                        |> Option.bind (fun session -> session.ReviewGuard)
+
+                    if isEmpty then
+                        ReviewGuardMissing treeHash
+                    else
+                        match guard with
+                        | Some state when ReviewProjection.satisfiesGuard (GitTreeHash.create treeHash) state ->
                             ReviewGuardConfirmed
                         | _ -> ReviewGuardMissing treeHash
             with ex ->
@@ -75,11 +98,22 @@ module HostReviewGuard =
             |> Map.exists (fun _ claim -> claim.Origin = PromptAuthority.PromptOrigin.Continuation kind))
         |> Option.defaultValue false
 
-    let private guardNudgeKey (targetSessionId: SessionId) (triggerProviderRun: ProviderRunIdentity) (reason: string) =
+    // OpenCode creates one plugin instance for the root and one for every manager
+    // worktree. This reservation is process-wide so two instances reconciling the
+    // same guard requirement cannot both pass the durable preflight before either claim lands.
+    let private processNudgeKeys = HashSet<string>()
+
+    let private guardNudgeKey
+        (runtimeId: RuntimeId)
+        (targetSessionId: SessionId)
+        (dedupeOccasion: string)
+        (reason: string)
+        =
         sprintf
-            "review-guard:%s:%s:%s"
+            "review-guard:%s:%s:%s:%s"
+            (RuntimeId.value runtimeId)
             (SessionId.value targetSessionId)
-            (ProviderRunIdentity.value triggerProviderRun)
+            dedupeOccasion
             reason
 
     let private sendGuardNudge
@@ -87,16 +121,17 @@ module HostReviewGuard =
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
         (targetSessionId: SessionId)
-        (triggerProviderRun: ProviderRunIdentity)
+        (dedupeOccasion: string)
         (reason: string)
         (prompt: string)
         (agent: string)
-        : Task<Result<PromptKey, string>> =
+        : Task<GuardNudgeOutcome> =
         task {
             match journal with
-            | None -> return Error "Review guard nudge requires an AgentJournal"
+            | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
             | Some durable ->
-                let nudgeKey = guardNudgeKey targetSessionId triggerProviderRun reason
+                let nudgeKey =
+                    guardNudgeKey (AgentJournal.runtimeId durable) targetSessionId dedupeOccasion reason
 
                 let continuationKind =
                     match agent, reason with
@@ -105,14 +140,24 @@ module HostReviewGuard =
                     | "reviewer", _ -> PromptAuthority.ContinuationKind.ReviewerGuard
                     | _ -> PromptAuthority.ContinuationKind.ManagerGuard
 
-                // Dedupe before sending, never after. Recording the key on success
-                // only is deliberate: a rejected send must stay retryable, because
-                // acceptance is the thing being deduplicated and a failure is not one.
-                if
-                    hasOutstandingGuardClaim durable targetSessionId continuationKind
-                    || nudgeKeys.Contains nudgeKey
-                then
-                    return Error(sprintf "Guard nudge already outstanding: %s" nudgeKey)
+                // The synchronous check+reservation is the atomic point. A rejected
+                // send releases it; an admitted/unknown send keeps it, because PROMPT-011
+                // forbids licensing a duplicate while physical acceptance is unresolved.
+                let reserved =
+                    lock processNudgeKeys (fun () ->
+                        if
+                            hasOutstandingGuardClaim durable targetSessionId continuationKind
+                            || nudgeKeys.Contains nudgeKey
+                            || processNudgeKeys.Contains nudgeKey
+                        then
+                            false
+                        else
+                            nudgeKeys.Add nudgeKey |> ignore
+                            processNudgeKeys.Add nudgeKey |> ignore
+                            true)
+
+                if not reserved then
+                    return GuardNudgeOutcome.AlreadyOutstanding
                 else
                     // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
                     // Authority Root's fallback cursor, so it is not passed here.
@@ -126,13 +171,14 @@ module HostReviewGuard =
                             (Some durable)
                             None
 
-                    // The claim is durable either way; the in-memory key only
-                    // suppresses a second send within this process lifetime.
                     match sent with
-                    | Ok _ -> nudgeKeys.Add nudgeKey |> ignore
-                    | Error _ -> ()
+                    | Ok key -> return GuardNudgeOutcome.Sent key
+                    | Error error ->
+                        lock processNudgeKeys (fun () ->
+                            nudgeKeys.Remove nudgeKey |> ignore
+                            processNudgeKeys.Remove nudgeKey |> ignore)
 
-                    return sent
+                        return GuardNudgeOutcome.Failed error
         }
 
     let nudgeManager
@@ -140,18 +186,21 @@ module HostReviewGuard =
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
         (sessionId: SessionId)
-        (triggerProviderRun: ProviderRunIdentity)
         (treeHash: string)
         =
-        sendGuardNudge
-            sessionPort
-            journal
-            nudgeKeys
-            sessionId
-            triggerProviderRun
-            (sprintf "missing-review:%s" treeHash)
-            RuntimeNudge.managerReviewGuard
-            "manager"
+        match journal with
+        | Some durable when not (managerWorkRequiresGuard (AgentJournal.snapshot durable) sessionId) ->
+            Task.FromResult GuardNudgeOutcome.NoLongerRequired
+        | _ ->
+            sendGuardNudge
+                sessionPort
+                journal
+                nudgeKeys
+                sessionId
+                treeHash
+                (sprintf "missing-review:%s" treeHash)
+                RuntimeNudge.managerReviewGuard
+                "manager"
 
     let nudgeReviewer
         (sessionPort: ISessionHostPort)
@@ -165,7 +214,7 @@ module HostReviewGuard =
             journal
             nudgeKeys
             sessionId
-            triggerProviderRun
+            (ProviderRunIdentity.value triggerProviderRun)
             "missing-verdict"
             RuntimeNudge.reviewerVerdictGuard
             "reviewer"
@@ -190,7 +239,7 @@ module HostReviewGuard =
             journal
             nudgeKeys
             sessionId
-            triggerProviderRun
+            (ProviderRunIdentity.value triggerProviderRun)
             "confirm-perfect"
             ReviewChallenge.Text
             "reviewer"

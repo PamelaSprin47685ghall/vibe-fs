@@ -109,10 +109,8 @@ export class StrictMockSignals {
 
   _wait(store, key, timeoutMs, label) {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        waiters.delete(entry);
-        reject(new Error(`Timed out waiting for ${label}`));
-      }, timeoutMs);
+      const waiters = store.get(key) || new Set();
+      let timeout;
       const entry = {
         resolve: () => {
           clearTimeout(timeout);
@@ -125,7 +123,12 @@ export class StrictMockSignals {
           reject(err);
         },
       };
-      const waiters = store.get(key) || new Set();
+      if (timeoutMs !== undefined) {
+        timeout = setTimeout(() => {
+          waiters.delete(entry);
+          reject(new Error(`Timed out waiting for ${label}`));
+        }, timeoutMs);
+      }
       waiters.add(entry);
       store.set(key, waiters);
     });

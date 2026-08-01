@@ -307,11 +307,12 @@ export const deliveryCases = [
   {
     name: 'VERIFY-003 only the declared fault kinds exist',
     fn: () => {
-      // A typo'd kind must not become a silently inert declaration. The three kinds
-      // are transport facts: a provider error, a dropped stream, a refused request.
+      // A typo'd kind must not become a silently inert declaration. Fault kinds are
+      // transport facts, independent from the content selected for the request.
       assertEq(validateFault(sourceFault()).length, 0);
       assertEq(validateFault(sourceFault({ kind: 'disconnect' })).length, 0);
       assertEq(validateFault(sourceFault({ kind: 'context-overflow' })).length, 0);
+      assertEq(validateFault(sourceFault({ kind: 'never-end' })).length, 0);
 
       const problems = validateFault(sourceFault({ kind: 'provider_error' }));
       assertEq(problems.length, 1);

@@ -31,15 +31,17 @@ prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the ta
 must = ["orch-continue.1", "reviewer-confirm.0"]
 
 flow = [
-  { afterExpectation = { id = "reviewer-confirm.0", restart = true } },
+  # The second physical delivery is the post-rebase reviewer. CandidateReady is
+  # already durable, while Published cannot exist until this review confirms.
+  { afterExpectation = { id = "barrier-reviewer.0", attempts = 2, restart = true } },
 
   { wait = "orch.0" },
   { wait = "manager.0" },
   { wait = "coder.0" },
-  { wait = "manager-guard.2" },
   { wait = "reviewer.0" },
   { wait = "barrier-reviewer.0" },
   { wait = "reviewer-confirm.0" },
+  { waitFact = { name = "CandidateReady", eq = 1 } },
 
   { awaitRestart = true },
 
@@ -56,6 +58,7 @@ flow = [
   { wait = "barrier-reviewer.0", timeoutMs = 20000 },
   { wait = "reviewer-confirm.0", timeoutMs = 20000 },
   { wait = "orch-continue.0", timeoutMs = 20000 },
+  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 20000 },
   { wait = "orch-continue.1", timeoutMs = 20000 },
 
   { awaitTerminal = true, requireAssistantTerminal = false, timeoutMs = 20000 },

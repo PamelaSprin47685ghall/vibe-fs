@@ -3,9 +3,8 @@
 # reconcile that dropped the reviewer's schema would leave it answering in prose, which
 # looks like a model choice rather than a harness defect.
 #
-# Only one PERFECT per turn here, so this scenario is deliberately NOT about REVIEW-003
-# confirmation; `reviewer-verdict` owns that. The second PERFECT lands on a different Git
-# tree state after the restart, and the text says so.
+# IMPERFECT exercises the verdict tool without opening REVIEW-003's confirmation round.
+# `reviewer-verdict` owns double-PERFECT confirmation; this scenario owns restart recovery.
 
 scenario = "reviewer-restart"
 description = "HOST-004 the verdict tool surface survives a restart on the same reviewer child"
@@ -19,14 +18,14 @@ must = ["reviewer-first.0", "reviewer-after-restart.0"]
 flow = [
   { createChild = { agent = "fast-reviewer", bind = ["reviewer-title", "fast-reviewer"], title = "reviewer restart canary" } },
 
-  { prompt = { agent = "fast-reviewer", text = "Review the tree and submit a PERFECT verdict." }, session = "child" },
+  { prompt = { agent = "fast-reviewer", text = "Review the tree and submit a verdict." }, session = "child" },
   { wait = "reviewer-first.0" },
   { wait = "reviewer-first.1" },
   { awaitTerminal = true, session = "child", requireAssistantTerminal = true, requireIdleAfterActivity = true },
 
   { restart = true },
 
-  { prompt = { agent = "fast-reviewer", text = "After restart, re-verify the tree with another PERFECT verdict." }, session = "child" },
+  { prompt = { agent = "fast-reviewer", text = "After restart, re-verify the tree with another verdict." }, session = "child" },
   { wait = "reviewer-after-restart.0" },
   { wait = "reviewer-after-restart.1" },
   { awaitTerminal = true, session = "child", requireAssistantTerminal = true, requireIdleAfterActivity = true },
@@ -43,11 +42,11 @@ flow = [
 [[turn]]
 id = "reviewer-first"
 lane = "fast-reviewer"
-user = "Review the tree and submit a PERFECT verdict."
+user = "Review the tree and submit a verdict."
 tools = ["verdict"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "IMPERFECT" } }
 
   [[turn.step]]
   respond = { type = "text", text = "The review requires another pass." }
@@ -55,13 +54,13 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-after-restart"
 lane = "fast-reviewer"
-user = "After restart, re-verify the tree with another PERFECT verdict."
+user = "After restart, re-verify the tree with another verdict."
 tools = ["verdict"]
 
   # If the reconcile lost the reviewer's schema this step cannot be produced at all, which
   # is the whole claim: `verdict` is still on the surface.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "IMPERFECT" } }
 
   [[turn.step]]
   respond = { type = "text", text = "The review is complete." }
@@ -70,7 +69,7 @@ tools = ["verdict"]
 id = "title"
 lane = "reviewer-title"
 kind = "title"
-user = "Review the tree and submit a PERFECT verdict."
+user = "Review the tree and submit a verdict."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }

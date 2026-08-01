@@ -236,10 +236,13 @@ module ReviewProjection =
         List.contains (ReviewAttemptIdentity.dedupeKey attempt) current.ObservedAttemptKeys
 
     /// REVIEW-007: the Guard asks only whether the CURRENT tree has a confirmed
-    /// PERFECT. A witness for another tree is auditable but not sufficient.
+    /// PERFECT. A witness for another barrier or tree is auditable but not sufficient.
     let satisfiesGuard (currentTree: GitTreeHash) (current: ReviewGuardProjection) =
-        ReviewWitness.isConfirmed current.Witness
-        && ReviewWitness.isValidForTree currentTree current.Witness
+        match current.CurrentBarrierId, current.Witness with
+        | Some barrierId, ReviewWitness.Confirmed confirmed ->
+            confirmed.BarrierId = barrierId
+            && ReviewWitness.isValidForTree currentTree current.Witness
+        | _ -> false
 
 module ReviewRequirementProjection =
 

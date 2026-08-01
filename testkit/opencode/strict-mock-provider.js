@@ -155,11 +155,14 @@ export class StrictMockProvider {
     return this._signals.waitForExpectation(id, timeoutMs);
   }
   waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
-  afterExpectation(id, callback) {
-    // Permanent one-shot only: already satisfied ⇒ run immediately.
-    if (this._signals.hasConsumed(id)) return callback();
+  matchCount(id) { return this._signals.matchCount(id); }
+  afterExpectation(id, callback, attempts = 1) {
+    if (!Number.isInteger(attempts) || attempts < 1) {
+      throw new Error(`afterExpectation attempts must be a positive integer: ${attempts}`);
+    }
+    if (this._signals.matchCount(id) >= attempts) return callback();
     const callbacks = this._afterExpectation.get(id) || [];
-    callbacks.push(callback);
+    callbacks.push({ attempts, callback });
     this._afterExpectation.set(id, callbacks);
   }
 
@@ -173,7 +176,7 @@ export class StrictMockProvider {
     return this._scenario.unanswered().map((entry) => ({
       id: entry.id,
       lane: `${entry.id}@${entry.lane ?? '(any)'}/${entry.kind}/step-${entry.step}`,
-      blocking: true,
+      blocking: entry.internal !== true,
     }));
   }
   get activeRequestCount() { return this._signals.activeRequestCount; }
@@ -313,10 +316,10 @@ export class StrictMockProvider {
     this._scenario.consume(parsed, selection, context);
     this._state.requests.push(requestRecordOf(parsed, context));
 
-    // A fault is a transport outcome, so it wakes NOTHING. `wait` is a causal barrier on
-    // content arriving; waking it on a refused delivery would let a flow proceed past a
-    // step the model never answered.
-    if (selection.fault !== undefined) {
+    // A refused delivery wakes nothing. `never-end` is different: its content arrives
+    // below, but the SSE transport deliberately withholds its terminal marker.
+    const neverEnds = selection.fault?.kind === 'never-end';
+    if (selection.fault !== undefined && !neverEnds) {
       const fault = selection.fault;
       if (fault.kind === 'disconnect') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
@@ -340,11 +343,14 @@ export class StrictMockProvider {
     this.onExpectationConsumed?.({
       id: entry.id,
       lane: { scenario: this._scenario.scenario.name, session: entry.lane, role: entry.turnId, requestKind: entry.kind },
-      blocking: true,
+      blocking: entry.internal !== true,
       requestKind: entry.kind,
     });
 
-    return respond(this._state, res, entry, parsed);
+    const responseEntry = neverEnds
+      ? { ...entry, respond: { ...entry.respond, neverEnd: true } }
+      : entry;
+    return respond(this._state, res, responseEntry, parsed);
   }
 
   _dispatchChat(res, parsed, context) {
@@ -426,8 +432,15 @@ export class StrictMockProvider {
   _runAfterExpectation(id) {
     const callbacks = this._afterExpectation.get(id);
     if (!callbacks) return;
-    this._afterExpectation.delete(id);
-    for (const callback of callbacks) callback();
+
+    const matchCount = this._signals.matchCount(id);
+    const waiting = callbacks.filter((hook) => hook.attempts > matchCount);
+    if (waiting.length === 0) this._afterExpectation.delete(id);
+    else this._afterExpectation.set(id, waiting);
+
+    for (const hook of callbacks) {
+      if (hook.attempts <= matchCount) hook.callback();
+    }
   }
 }
 

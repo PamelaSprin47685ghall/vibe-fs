@@ -35,7 +35,7 @@
  * because that is the order the two read naturally — prepare a workspace, then start a provider.
  * `scenario-parallel.js` prints them the other way (`provider.start took` at :88, `prepareWorkspace
  * took` at :94). Since `observe` only ever advances on the NEXT expected marker, that inversion
- * stalls the climb at 1/6 and fails every canary at the stage budget: a readiness gate that reports
+ * stalls the climb at 1/9 and fails every canary at the stage budget: a readiness gate that reports
  * 「stuck」 for a perfectly healthy startup. `gate-readiness-cases.mjs` pins the order against the
  * sources so the next reordering of production prints fails there instead.
  *
@@ -50,8 +50,11 @@
 export const READINESS_STAGES = Object.freeze([
   { name: 'provider', marker: '[setupScenario] provider.start took' },
   { name: 'workspace', marker: '[setupScenario] prepareWorkspace took' },
+  { name: 'host-bootstrap', marker: '[host.start] bootstrap observed' },
   { name: 'port-bound', marker: '[host.start] _waitForListening took' },
-  { name: 'host-healthy', marker: '[host.start] _waitForHealth took' },
+  { name: 'host-global', marker: '[host.start] _waitForGlobalHealth took' },
+  { name: 'host-project-events', marker: '[host.start] project event source observed' },
+  { name: 'host-project', marker: '[host.start] _waitForHealth took' },
   { name: 'events', marker: '[setupScenario] events.connect took' },
   { name: 'ready', marker: '[setupScenario] ready' },
 ]);

@@ -13,7 +13,7 @@
  * That failure is indistinguishable, from the launcher's diagnostic, from a genuinely wedged host.
  * It was measured here — the first draft listed `workspace` before `provider` because that is the
  * order the two read naturally, while `scenario-parallel.js` prints `provider.start took` at :88 and
- * `prepareWorkspace took` at :94. A readiness gate that reports 「stuck at 1/6」 for a healthy
+ * `prepareWorkspace took` at :94. A readiness gate that reports 「stuck at 1/9」 for a healthy
  * startup is worse than no readiness gate, because the reader stops looking at the host.
  *
  * So the order is not asserted against a copy of itself. It is derived from where the harness
@@ -120,7 +120,7 @@ export const readinessCases = [
       // Deliberately the guard that lets `readiness.js` NOT anchor to the exact log format. Matching
       // substrings means a reworded timing line still advances the ladder; it also means a DELETED
       // line silently never advances it. This case converts that second case into a gate failure, so
-      // the cost of the loose match is paid here rather than by a canary hanging at 3/6.
+      // the cost of the loose match is paid here rather than by a canary hanging at 3/9.
       const sites = printSites();
 
       for (const stage of READINESS_STAGES) {
@@ -140,7 +140,7 @@ export const readinessCases = [
   {
     name: 'VERIFY-004 the host stages are nested where the ladder places them',
     fn: () => {
-      // The cross-file half of the order check. `port-bound` and `host-healthy` are printed inside
+      // The cross-file half of the order check. All Host stages are printed inside
       // `process-host.js`, so within-file monotonicity cannot see that they belong between
       // `workspace` and `events`. The `host.start took` line is where that nesting is observable.
       const sites = printSites();
@@ -153,7 +153,7 @@ export const readinessCases = [
       assertTrue(
         lineIn('workspace') < nested && nested < lineIn('events'),
         `host.start is reported at :${nested}, outside workspace@${lineIn('workspace')}..` +
-          `events@${lineIn('events')}; the ladder places port-bound/host-healthy between them`,
+          `events@${lineIn('events')}; the ladder places all Host stages between them`,
       );
 
       const hostStages = READINESS_STAGES.map((stage, index) => ({ name: stage.name, index })).filter(
@@ -162,13 +162,13 @@ export const readinessCases = [
 
       assertEq(
         hostStages.map(({ name }) => name).join(','),
-        'port-bound,host-healthy',
+        'host-bootstrap,port-bound,host-global,host-project-events,host-project',
         'the stages owned by process-host.js changed; the nesting argument above no longer applies',
       );
       assertEq(
-        hostStages[1].index - hostStages[0].index,
-        1,
-        'the two host stages must be adjacent in the ladder, since nothing is printed between them',
+        hostStages.map(({ index }) => index).join(','),
+        `${hostStages[0].index},${hostStages[0].index + 1},${hostStages[0].index + 2},${hostStages[0].index + 3},${hostStages[0].index + 4}`,
+        'the five Host stages must be adjacent in the ladder, since nothing is printed between them',
       );
     },
   },
@@ -205,8 +205,8 @@ export const readinessCases = [
           .join('\n'),
       );
 
-      assertEq(advanced.join(','), 'provider,workspace,port-bound', 'a multi-stage buffer must drain');
-      assertTrue(!ladder.isReady, 'three of six stages is not ready');
+      assertEq(advanced.join(','), 'provider,workspace,host-bootstrap', 'a multi-stage buffer must drain');
+      assertTrue(!ladder.isReady, 'three of nine stages is not ready');
     },
   },
 
@@ -252,13 +252,13 @@ export const readinessCases = [
       // at module load. The launcher's old message — "failed to emit ready" — was true of the
       // symptom and silent about both.
       assertTrue(
-        /reached \(nothing\) \(0\/6\), awaiting provider/.test(new ReadinessLadder().describe()),
+        /reached \(nothing\) \(0\/9\), awaiting provider/.test(new ReadinessLadder().describe()),
         `a fresh ladder must say it reached nothing: ${new ReadinessLadder().describe()}`,
       );
 
       const stalled = climb(['provider', 'workspace']).describe();
       assertTrue(
-        /reached workspace \(2\/6\), awaiting port-bound/.test(stalled),
+        /reached workspace \(2\/9\), awaiting host-bootstrap/.test(stalled),
         `a stalled climb must name both sides: ${stalled}`,
       );
       assertTrue(/silent for \d+ms/.test(stalled), `the dump must state the silence: ${stalled}`);
@@ -316,7 +316,7 @@ export const readinessCases = [
           `(${CANARY_READY_MS}ms), or one stage may consume the whole startup and nothing inside ` +
           'the window is a criterion',
       );
-      assertEq(READINESS_STAGES.length, 6, 'the ladder is six stages; the diagnostics above pin that shape');
+      assertEq(READINESS_STAGES.length, 9, 'the ladder is nine stages; the diagnostics above pin that shape');
     },
   },
 ];

@@ -163,6 +163,72 @@ export const degradationCases = [
   },
 
   {
+    name: 'VERIFY-004 canary launch enforces its declared concurrency bound',
+    fn: () => {
+      const source = readSource(LAUNCHER);
+
+      assertTrue(
+        source.includes('await Promise.all(Array.from({ length: MAX_PARALLEL }, runWorker))'),
+        'the launcher must create exactly MAX_PARALLEL workers',
+      );
+      assertTrue(
+        source.includes('results[index] = await runCanary(file, onBark)'),
+        'each worker must finish its current canary before taking another slot',
+      );
+      assertTrue(
+        !source.includes('canaryPromises.push'),
+        'collecting one live promise per canary bypasses MAX_PARALLEL',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-004 internal expectations are background progress',
+    fn: () => {
+      const source = readSource('testkit/opencode/strict-mock-provider.js');
+
+      assertTrue(
+        source.includes('blocking: entry.internal !== true'),
+        'Blogger and other internal lanes must never renew the blocking watchdog',
+      );
+      assertTrue(
+        !source.includes('blocking: true'),
+        'an unconditional blocking classification lets background loops mask a dead path',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-004 flow waits do not start a competing total timeout',
+    fn: () => {
+      const source = readSource('testkit/opencode/canary-driver.mjs');
+
+      assertTrue(
+        !source.includes('waitForExpectation(step.wait, step.timeoutMs || WATCHDOG_TIMEOUT_MS)'),
+        'the fixed watchdog owns silence; a per-wait total window races healthy causal progress',
+      );
+      assertTrue(
+        !source.includes('awaitSessionsByAgent(scenario, agent, step.timeoutMs || WATCHDOG_TIMEOUT_MS)'),
+        'child discovery must use the same watchdog rather than a second total deadline',
+      );
+      assertTrue(
+        !source.includes('timeoutMs: step.timeoutMs || WATCHDOG_TIMEOUT_MS'),
+        'turn terminals must renew the same watchdog at each causal checkpoint',
+      );
+      assertTrue(
+        !source.includes('}, step.timeoutMs || WATCHDOG_TIMEOUT_MS)'),
+        'event waits must not race the fixed watchdog with a total deadline',
+      );
+
+      const turnSource = readSource('testkit/opencode/scenario-turn.js');
+      assertTrue(
+        !turnSource.includes('timeoutMs: opts.timeoutMs || WATCHDOG_TIMEOUT_MS'),
+        'Turn must leave its local timeout absent unless the scenario explicitly declares one',
+      );
+    },
+  },
+
+  {
     name: 'VERIFY-004 a canary that never reaches ready, or exits before it, is failed not passed',
     fn: () => {
       // Covers VERIFY_004_D_READY_TIMEOUT_OR_EARLY_EXIT_PASSES. The pass line is a conjunction, and

@@ -15,6 +15,7 @@ function removeCallback(probe, callback) {
 }
 
 function bindAwaitCallback(probe, predicate, timeoutMs, resolve, reject) {
+  let timer;
   const callback = (event) => {
     if (predicate(event)) {
       clearTimeout(timer);
@@ -22,10 +23,12 @@ function bindAwaitCallback(probe, predicate, timeoutMs, resolve, reject) {
       resolve(event);
     }
   };
-  const timer = setTimeout(() => {
-    removeCallback(probe, callback);
-    reject(new Error(`awaitEvent timed out after ${timeoutMs}ms`));
-  }, timeoutMs);
+  if (timeoutMs !== null) {
+    timer = setTimeout(() => {
+      removeCallback(probe, callback);
+      reject(new Error(`awaitEvent timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  }
   probe._onEventCallbacks.push(callback);
 }
 

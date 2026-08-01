@@ -82,6 +82,43 @@ async function runProcessHostEnvIsolation() {
   assertTrue(!host._started && !host._stopped, 'ProcessHost start/stop flags reset');
 }
 
+async function runProcessHostHealthDeadline() {
+  const sockets = new Set();
+  const server = net.createServer((socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  const address = server.address();
+  const host = new ProcessHost();
+  host._baseUrl = `http://127.0.0.1:${address.port}`;
+  let guardTimer;
+
+  try {
+    let failure;
+    try {
+      await Promise.race([
+        host._waitForHealth(200),
+        new Promise((_, reject) => {
+          guardTimer = setTimeout(() => reject(new Error('health request ignored its deadline')), 500);
+        }),
+      ]);
+    } catch (error) {
+      failure = error;
+    }
+
+    assertTrue(
+      failure?.message?.includes('Health-check failed'),
+      `a connected server that never answers must reach the health deadline: ${failure?.message}`,
+    );
+  } finally {
+    clearTimeout(guardTimer);
+    for (const socket of sockets) socket.destroy();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
 async function runProcessHostStderrCapture() {
   const host = new ProcessHost();
   host._onStderr('stderr-warning\n');
@@ -129,8 +166,17 @@ function runTitleHistoryIsolation() {
 
 function runSessionCreatedIsNotWatchdogHeartbeat() {
   const scenarioCode = fs.readFileSync(new URL('../scenario-parallel.js', import.meta.url), 'utf8');
+  const driverCode = fs.readFileSync(new URL('../canary-driver.mjs', import.meta.url), 'utf8');
   assertTrue(scenarioCode.includes('sessionCreatedDiagnostics'), 'session.created must remain diagnostic data');
   assertTrue(!scenarioCode.includes("reason: 'session-created'"), 'session.created must not be a global watchdog heartbeat');
+  assertTrue(
+    !driverCode.includes("e.type === 'session.created' && e.sessionAgent === agent"),
+    'bindChild must read the Host session snapshot instead of treating an event as identity data',
+  );
+  assertTrue(
+    driverCode.includes("query: { scope: 'project' }"),
+    'bindChild must query the project-wide session snapshot across flattened worktree instances',
+  );
 }
 
 function runWatchdogTimeoutIsCentralized() {
@@ -331,6 +377,7 @@ async function runScenarioStrictDefault() {
 export const cases = [
   { name: 'isolation hardening', fn: runIsolationHardening },
   { name: 'ProcessHost env isolation + dispose reset', fn: runProcessHostEnvIsolation },
+  { name: 'ProcessHost health request obeys its deadline', fn: runProcessHostHealthDeadline },
   { name: 'ProcessHost stderr/stdout ring buffer capture', fn: runProcessHostStderrCapture },
   ...laneCases,
   { name: 'stability repeat cap is three', fn: runStabilityRepeatCap },

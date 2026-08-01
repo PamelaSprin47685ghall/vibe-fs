@@ -673,6 +673,69 @@ user = "Ship the parser fix."
   },
 
   {
+    name: 'VERIFY-003 bindChild identifies the next child by exact Host agent only',
+    fn: () => {
+      const binding = (value) => `scenario = "p"
+flow = [
+  { prompt = { text = "go" } },
+  { bindChild = ${value} },
+]
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+`;
+
+      rejects(binding('{ bind = ["coder"] }'), 'bindChild requires an exact agent');
+      rejects(
+        binding('{ agent = "fast-coder", bind = ["coder"], parent = "manager" }'),
+        "bindChild field 'parent' is unsupported",
+      );
+      accepts(binding('{ agent = "fast-coder", bind = ["coder"] }'));
+    },
+  },
+
+  {
+    name: 'VERIFY-003 afterExpectation attempts is a one-based physical delivery count',
+    fn: () => {
+      const withAttempts = (attempts) => minimal().replace(
+        'flow = [ { prompt = { text = "go" } } ]',
+        `flow = [
+  { afterExpectation = { id = "a.0", attempts = ${attempts}, restart = true } },
+  { prompt = { text = "go" } },
+]`,
+      );
+
+      rejects(withAttempts(0), 'afterExpectation attempts must be a positive integer');
+      accepts(withAttempts(2));
+    },
+  },
+
+  {
+    name: 'VERIFY-003 assertDeliveries is a load-time bounded delivery claim',
+    fn: () => {
+      const withAssertion = (claim) => minimal().replace(
+        'flow = [ { prompt = { text = "go" } } ]',
+        `flow = [
+  { prompt = { text = "go" } },
+  { assertDeliveries = ${claim} },
+]`,
+      );
+
+      rejects(withAssertion('{ id = "a.0" }'), 'assertDeliveries requires eq, gte, or lte');
+      rejects(withAssertion('{ id = "", eq = 1 }'), 'assertDeliveries requires an exact id');
+      rejects(withAssertion('{ id = "a.0", eq = -1 }'), 'assertDeliveries eq must be a non-negative integer');
+      rejects(withAssertion('{ id = "a.0", gte = 2, lte = 1 }'), 'assertDeliveries lower bound exceeds upper bound');
+      rejects(withAssertion('{ id = "missing.0", eq = 0 }'), "assertDeliveries references 'missing.0'");
+      rejects(withAssertion('{ id = "a.0", eq = 1, parent = "manager" }'), "assertDeliveries field 'parent' is unsupported");
+      accepts(withAssertion('{ id = "a.0", gte = 1, lte = 2 }'));
+    },
+  },
+
+  {
     name: 'VERIFY-003 a scenario needs a name, and a turn needs user text and a step',
     fn: () => {
       rejects('[[turn]]\nid = "a"\nuser = "go"\n\n  [[turn.step]]\n  respond = { type = "text" }\n', 'scenario name');

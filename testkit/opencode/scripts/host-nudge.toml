@@ -14,7 +14,7 @@ setup = { strict = true }
 session = { agent = "fast-manager", bind = ["parent-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Fork a busy coder and nudge it while streaming." }
 
-must = ["coder-busy.0", "manager.1"]
+must = ["coder-busy.0", "manager.2"]
 
 flow = [
   { wait = "manager.0" },
@@ -22,6 +22,8 @@ flow = [
   { wait = "coder-busy.0" },
   { assertActiveRequests = { gte = 1 } },
   { wait = "manager.1" },
+  { assertActiveRequests = { gte = 1 } },
+  { wait = "manager.2" },
   { assertActiveRequests = { gte = 1 } },
   { custom = "proveNudge" },
   { abort = true },
@@ -40,6 +42,9 @@ tools = ["fork", "join", "list"]
   # step 0 created, which is why no third lane appears anywhere below.
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "nudge continue second run while first is busy" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Nudge sent while the coder remained busy." }
 
 [[turn]]
 id = "coder-busy"
@@ -64,6 +69,12 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "text", text = "Coder second run acknowledged the nudge." }
+
+[[fault]]
+turn = "coder-busy"
+step = 0
+delivery = "never-end"
+attempts = [1]
 
 [[turn]]
 id = "blogger"

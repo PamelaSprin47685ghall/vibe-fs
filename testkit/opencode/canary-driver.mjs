@@ -31,10 +31,11 @@ import {
   teardownScenario,
   getSessionId,
 } from './index.js';
-import { WATCHDOG_TIMEOUT_MS, WAIT_FACT_WINDOW_MS } from './time-budget.js';
+import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { bindLaneSession } from './tests/lane.mjs';
 import { compileScenario } from './scenario-schema.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
+import { readJournal } from './journal-observer.js';
 import { kindOf } from './runtime-key.js';
 
 const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'scripts');
@@ -47,6 +48,27 @@ const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'sc
 const FACT_POLL_SLICE_MS = 500;
 
 const pollSlice = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function awaitSessionsByAgent(scenario, agent, timeoutMs) {
+  const deadline = timeoutMs === undefined ? Number.POSITIVE_INFINITY : Date.now() + timeoutMs;
+  let observed = [];
+
+  while (Date.now() < deadline) {
+    const response = await scenario.client.request('GET', '/session', { query: { scope: 'project' } });
+    if (!response.ok) {
+      throw new Error(`bindChild session snapshot failed: ${JSON.stringify(response.data)}`);
+    }
+
+    const payload = response.data?.data?.data ?? response.data?.data ?? response.data;
+    const sessions = Array.isArray(payload) ? payload : [];
+    observed = sessions.filter((session) => session?.agent === agent && typeof session?.id === 'string');
+    if (observed.length > 0) return observed;
+
+    await pollSlice(Math.min(FACT_POLL_SLICE_MS, deadline - Date.now()));
+  }
+
+  throw new Error(`bindChild timed out waiting for Host agent ${agent}; observed=${JSON.stringify(observed)}`);
+}
 
 /**
  * Compile the named scenario, or fail with every problem at once.
@@ -62,33 +84,6 @@ function loadScenario(name) {
   const result = compileScenario(fs.readFileSync(file, 'utf8'), { name: path.basename(file) });
   if (!result.ok) throw new Error(`scenario did not compile:\n  ${result.problems.join('\n  ')}`);
   return result.scenario;
-}
-
-/**
- * Read the runtime journal once: how many lines name this fact, and how many facts exist at all.
- *
- * Both numbers come from one pass because the barrier below needs them together and reading the
- * directory twice would let them disagree about the same moment.
- */
-function readJournal(workDir, factName) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-  const runtimeDir = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(runtimeDir)) return { named: 0, total: 0 };
-  let named = 0;
-  let total = 0;
-  for (const file of fs.readdirSync(runtimeDir)) {
-    if (!file.endsWith('.ndjson')) continue;
-    for (const line of fs.readFileSync(path.join(runtimeDir, file), 'utf8').split('\n')) {
-      if (line.trim() === '') continue;
-      total += 1;
-      if (line.includes(factName)) named += 1;
-    }
-  }
-  return { named, total };
 }
 
 function countFact(workDir, factName) {
@@ -190,7 +185,7 @@ async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
   for (const step of flow) {
     if (step.wait) {
-      await scenario.provider.waitForExpectation(step.wait, step.timeoutMs || WATCHDOG_TIMEOUT_MS);
+      await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
       if (step.watchdog !== false) {
         scenario.watchdog?.advance({
           reason: step.wait,
@@ -227,7 +222,7 @@ async function runFlow(scenario, doc, ctx) {
         : (step.session && ctx.sessions?.[step.session]) || ctx.sessionId;
       const turn = ctx.turn || scenario.turn.start(sid);
       await turn.awaitTerminal({
-        timeoutMs: step.timeoutMs || WATCHDOG_TIMEOUT_MS,
+        timeoutMs: step.timeoutMs ?? null,
         requireActivity: step.requireActivity !== false,
         requireAssistantTerminal: step.requireAssistantTerminal === true,
         requireIdleAfterActivity: step.requireIdleAfterActivity !== false,
@@ -247,35 +242,17 @@ async function runFlow(scenario, doc, ctx) {
       continue;
     }
     if (step.bindChild) {
-      // `parent` names whose child to wait for:
-      //   `self` (default)      the scenario's top-level session
-      //   `child`               the session the previous bindChild found
-      //   an agent name         the session bound by an earlier bindChild for that
-      //                         agent — nested forks (orchestrator → manager →
-      //                         coder/reviewer) need this, because `child` is
-      //                         overwritten by every later bindChild
-      ctx.sessionsByAgent = ctx.sessionsByAgent || {};
-      const parentId = step.bindChild.parent === 'self' || step.bindChild.parent === undefined
-        ? ctx.sessionId
-        : step.bindChild.parent === 'child'
-          ? ctx.childId
-          : ctx.sessionsByAgent[step.bindChild.parent];
-      assert.ok(parentId, `bindChild requires a parent session for parent '${step.bindChild.parent ?? 'self'}'`);
-      const event = await scenario.events.awaitEvent(
-        (e) => e.type === 'session.created'
-          && e.parentSessionID === parentId
-          && (!step.bindChild.agent || e.sessionAgent === step.bindChild.agent),
-        step.timeoutMs || WATCHDOG_TIMEOUT_MS,
-      );
-      ctx.childId = event.sessionID;
-      if (step.bindChild.agent) ctx.sessionsByAgent[step.bindChild.agent] = ctx.childId;
-      assert.ok(ctx.childId, 'bindChild: missing child session');
-      scenario.sessionIds.push(ctx.childId);
-      // `bind` in TOML, `aliases` in the JSON scenarios K8 has not reached yet. The
-      // fallback goes away with the JSON path in K9; `aliases` is already rejected by
-      // `legacy-fields.js` at the TOML layer, so only the old files can reach it.
-      const bound = step.bindChild.bind || step.bindChild.aliases || [step.bindChild.agent || 'child'];
-      bindLaneSession(scenario.provider, ctx.childId, ...bound);
+      // Host physical parents are flattened to the family root. Read the project-wide
+      // session snapshot and bind every exact-agent session; `session.created` remains
+      // a signal/diagnostic and never becomes identity data.
+      const agent = step.bindChild.agent;
+      const sessions = await awaitSessionsByAgent(scenario, agent, step.timeoutMs);
+      ctx.childId = sessions[0].id;
+      const bound = step.bindChild.bind || [agent];
+      for (const session of sessions) {
+        if (!scenario.sessionIds.includes(session.id)) scenario.sessionIds.push(session.id);
+        bindLaneSession(scenario.provider, session.id, ...bound);
+      }
       scenario.watchdog?.advance({
         reason: 'child-created',
         lane: `session:${ctx.childId}`,
@@ -322,20 +299,34 @@ async function runFlow(scenario, doc, ctx) {
       continue;
     }
     if (step.afterExpectation) {
+      let resolveRestart;
+      let rejectRestart;
+      if (step.afterExpectation.restart) {
+        ctx.restartPromise = new Promise((resolve, reject) => {
+          resolveRestart = resolve;
+          rejectRestart = reject;
+        });
+      }
+
       scenario.provider.afterExpectation(step.afterExpectation.id, () => {
-        if (step.afterExpectation.gitConflictProof) {
-          const workDir = scenario.host.workDir;
-          const proof = step.afterExpectation.file || 'publish_proof.txt';
-          fs.writeFileSync(path.join(workDir, proof), 'Conflicting target edit\n');
-          execFileSync('git', ['-C', workDir, 'add', proof], { encoding: 'utf8' });
-          execFileSync('git', ['-C', workDir, 'commit', '-m', 'target: conflicting edit to proof file'], {
-            encoding: 'utf8',
-          });
+        try {
+          if (step.afterExpectation.gitConflictProof) {
+            const workDir = scenario.host.workDir;
+            const proof = step.afterExpectation.file || 'publish_proof.txt';
+            fs.writeFileSync(path.join(workDir, proof), 'Conflicting target edit\n');
+            execFileSync('git', ['-C', workDir, 'add', proof], { encoding: 'utf8' });
+            execFileSync('git', ['-C', workDir, 'commit', '-m', 'target: conflicting edit to proof file'], {
+              encoding: 'utf8',
+            });
+          }
+          if (step.afterExpectation.restart) {
+            scenario.restart().then(resolveRestart, rejectRestart);
+          }
+        } catch (error) {
+          rejectRestart?.(error);
+          throw error;
         }
-        if (step.afterExpectation.restart) {
-          ctx.restartPromise = scenario.restart();
-        }
-      });
+      }, step.afterExpectation.attempts ?? 1);
       continue;
     }
     if (step.awaitRestart) {
@@ -351,6 +342,18 @@ async function runFlow(scenario, doc, ctx) {
       if (step.assertFacts.gte !== undefined) {
         assert.ok(n >= step.assertFacts.gte, `${step.assertFacts.name} expected >= ${step.assertFacts.gte}, got ${n}`);
       }
+      continue;
+    }
+    if (step.assertDeliveries) {
+      const { id, eq, gte, lte } = step.assertDeliveries;
+      const n = scenario.provider.matchCount(id);
+      assert.ok(
+        eq !== undefined || gte !== undefined || lte !== undefined,
+        `assertDeliveries ${id} requires eq, gte, or lte`,
+      );
+      if (eq !== undefined) assert.equal(n, eq, `${id} delivery count`);
+      if (gte !== undefined) assert.ok(n >= gte, `${id} expected >= ${gte} deliveries, got ${n}`);
+      if (lte !== undefined) assert.ok(n <= lte, `${id} expected <= ${lte} deliveries, got ${n}`);
       continue;
     }
     if (step.assertActiveRequests) {
@@ -370,7 +373,7 @@ async function runFlow(scenario, doc, ctx) {
           return e.properties?.status?.type === step.awaitEvent.statusType;
         }
         return true;
-      }, step.timeoutMs || WATCHDOG_TIMEOUT_MS);
+      }, step.timeoutMs ?? null);
       scenario.watchdog?.advance({
         reason: step.awaitEvent.reason || step.awaitEvent.type || 'event',
         lane: `session:${ctx.sessionId}`,
