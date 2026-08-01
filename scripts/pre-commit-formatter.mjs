@@ -118,6 +118,11 @@ async function run() {
     const xmlFiles = [];
 
     for (const file of allFiles) {
+        // Generated artifacts are byte-for-byte owned by their generator
+        // (gate:generated compares them); formatting them here would break
+        // that sync. Applied to BOTH scan paths: the --all scan excludes them
+        // in scanFiles, and the staged-file path excludes them here.
+        if (file.endsWith('.gen.fs')) continue;
         const ext = path.extname(file).toLowerCase();
         if (ext === '.fs' || ext === '.fsi') {
             fsFiles.push(file);
