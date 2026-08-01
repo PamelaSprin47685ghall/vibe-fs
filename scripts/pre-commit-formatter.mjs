@@ -49,6 +49,10 @@ function scanFiles(dir) {
             result.push(...scanFiles(fullPath));
         } else if (entry.isFile()) {
             const ext = path.extname(entry.name).toLowerCase();
+            // Generated artifacts are byte-for-byte owned by their generator
+            // (gate:generated compares them); formatting them here would break
+            // that sync. See EnforcerCatalog.gen.fs.
+            if (entry.name.endsWith('.gen.fs')) continue;
             if (ext === '.fs' || ext === '.fsi' || ext === '.xml' || ext === '.fsproj') {
                 result.push(fullPath);
             }
