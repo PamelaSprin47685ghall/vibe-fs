@@ -29,7 +29,7 @@
     "gate:generated": "node scripts/enforcer-catalog-gen.mjs --check",
     "gate:static": "npm run gate:ssot && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface && npm run gate:generated",
 
-    "build": "node scripts/clean-fable-output.mjs build/next && dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next",
+    "build": "node scripts/clean-fable-output.mjs build && dotnet fable precompile next/Wanxiangshu.Next.fsproj -o build/next",
     "postbuild": "node scripts/postbuild.mjs",
 
     "test:mjs": "node tests-mjs/runner.mjs",
