@@ -45,13 +45,17 @@ module StrengthController =
         let digest = sha256 seed
 
         // SHA-256 摘要前 8 字节 → [0,1)。纯函数：同一 seed 永远同一结果。
+        // 低 53 位映射到 [0, 2^53)，除以 2^53 得 u ∈ [0,1)。不能掩 63 位除以
+        // 2^63：JS double 无法区分 2^63-1 与 2^63（double 精度只有 2^53），
+        // 商会被舍入为 1.0（实测），全 1 摘要得到 u=1，违反 [0,1)。
         let bytes =
             [ for i in 0..7 do
                   yield System.Int32.Parse(digest.Substring(i * 2, 2), System.Globalization.NumberStyles.HexNumber) ]
 
         let asInt64 = bytes |> List.mapi (fun i b -> int64 b <<< (8 * (7 - i))) |> List.sum
 
-        float (asInt64 &&& System.Int64.MaxValue) / float System.Int64.MaxValue
+        // 53 位掩码：2^53 - 1 = 0x1FFFFFFFFFFFFF
+        float (asInt64 &&& 9007199254740991L) / 9007199254740992.0
 
     /// STRENGTH-027：抽样标签。decisionId + requestOrdinal 决定相同结果。
     let includedInTraining

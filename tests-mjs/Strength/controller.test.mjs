@@ -35,6 +35,17 @@ test('STRENGTH_027_sampling_uses_decisionId_and_ordinal_not_time', () => {
   assert.ok(d1.u !== o2.u || d1.included !== o2.included, 'different ordinals should differ in at least one output')
 })
 
+test('STRENGTH_027_hash_lands_in_half_open_unit_interval', () => {
+  // u must be in [0,1): the all-ones digest must NOT map to exactly 1.0 (that
+  // would make the decision never included for any p < 1). Normalizing by 2^63
+  // instead of Int64.MaxValue guarantees it.
+  const allOnes = 'f'.repeat(64)
+  const u = strength.hashToUnitInterval(sha, 'whatever')
+  assert.ok(u >= 0 && u < 1, `u must be in [0,1), got ${u}`)
+  const extreme = strength.hashToUnitInterval(() => allOnes, 'seed')
+  assert.ok(extreme < 1, `all-ones digest must map below 1.0, got ${extreme}`)
+})
+
 test('STRENGTH_027_higher_frozen_probability_never_decreases_inclusion', () => {
   // For a fixed seed, u is fixed; inclusion is u < p, which is monotone in p.
   for (let round = 0; round < 20; round++) {
