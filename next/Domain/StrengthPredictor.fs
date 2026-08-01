@@ -146,10 +146,12 @@ module StrengthPredictor =
         //
         // `updateCounts` builds continuation keys as `prefix @ [successor]` with
         // `prefix = remaining |> take order`, so at order 1 the key is `[x; x]`
-        // (the successor doubled, not a distinct context). Length-2 keys whose
-        // LAST element is `next` therefore approximate the unigram frequency of
-        // `next` as a successor — not a strict KN continuation count (that would
-        // need a distinct context dimension). This is a pre-existing structural
+        // (the successor doubled, not a distinct context). Continuation keys are
+        // only written the first time a successor is seen, so each length-2 key
+        // has value 1; filtering by LAST element = `next` therefore yields an
+        // indicator of whether `next` ever appeared as its own successor — not a
+        // frequency and not a strict KN continuation count (that would need a
+        // distinct context dimension). This is a pre-existing structural
         // simplification; what this fix restores is that the backoff is actually
         // alive: the old code queried `Map.tryFind [next]` (length 1, never
         // present), which zeroed pCont unconditionally.
