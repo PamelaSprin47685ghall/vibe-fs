@@ -8,9 +8,9 @@ OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧�
 
 ## 当前边界
 
-本仓库正在进行 SSOT 休克-退火迁移。 生产代码与测试正在从旧语义整体迁移到 `SSOT/` 条款。迁移期间编译与测试反馈按阶段关闭与恢复；当前进度、每个工作包状态、旧符号灭绝表见 [`STATUS/shock-anneal.md`](STATUS/shock-anneal.md)。
+本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度、每个工作包状态、旧符号灭绝表见 [`STATUS/shock-anneal.md`](STATUS/shock-anneal.md)。
 
-休克开始前的最后一次完整机器反馈保存在 [`STATUS/evidence/pre-shock/`](STATUS/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 同时记录多个中心协议处于 `CONTRADICTS` 或 `NOT_IMPLEMENTED`。
+休克开始前的最后一次完整机器反馈保存在 [`STATUS/evidence/pre-shock/`](STATUS/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（含 SSOT/14-16 的 `PURE_CORE_ONLY` 纯领域内核）。
 
 TestKit 以 `ProviderSemanticProjection` 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容（VERIFY-003、VERIFY-007）。P0 保持并行，release gate 恰好 3 轮；每个场景使用 2 秒 causal-progress Watchdog（VERIFY-004）。
 

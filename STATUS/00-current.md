@@ -30,8 +30,12 @@ harness → P0×3）完整通过。
 
 ## 下一步
 
-退火三已完，进入新一轮工作包：合入 PENDING/14-16 方案为 SSOT 并实现（见
-`shock-anneal.md` 登记）。
+SSOT/14-16 已合入（`9b4e931d`），三个方案的纯领域内核已实现并测试
+（Strength 28 / Enforcer 39 / StudentTeacher 15 项第 1 层测试；`93c421b7`、
+`dd1c0553`、`e52cf2be`）。生产接线被各方案自设的 Host canary 门禁阻断
+（STRENGTH-078 / ENFORCER-180 / LEARN-082…088），属后续阶段——先建共享 Host
+capability canary 证明 transform 挂起/取消/身份绑定，再逐纵向接线（推荐顺序：
+SatelliteRuntime → Projection DSL → Strength shadow → Enforcer → Student/Teacher）。
 
 ## 阅读顺序
 

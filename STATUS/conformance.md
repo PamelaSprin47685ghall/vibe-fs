@@ -1,8 +1,10 @@
 # STATUS/conformance — SSOT 条款合规表
 
-状态允许值：`CONFORMANT` | `PARTIAL` | `CONTRADICTS` | `UNVERIFIED` | `NOT_IMPLEMENTED`
+状态允许值：`CONFORMANT` | `PARTIAL` | `CONTRADICTS` | `UNVERIFIED` | `NOT_IMPLEMENTED` | `PURE_CORE_ONLY`
 
-绑定源码 commit：`9fcaad24`（ORCH-006 durable worktree ownership 修复）。运行验证不属于
+`PURE_CORE_ONLY`：条款的纯领域内核已实现并测试（第 1 层），但生产接线被 Host canary 门禁阻断（如 SSOT/14-16 的 STRENGTH-078 / ENFORCER-180 / LEARN-082…088）——不是"零实现"，也不是"可发布"。
+
+绑定源码 commit：`c096866a`（release-evidence 归档 + build 全清理）。运行验证不属于
 commit 内容，命令与结果见 `evidence/manager-worktree-durable-ownership.md`。本表只记录截至该提交的源码状态。
 
 休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
@@ -350,16 +352,19 @@ X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.pla
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| STRENGTH-001…135（全部） | NOT_IMPLEMENTED | — | 规范已合入（2026-08-02），代码零实现；实现受 STRENGTH-078 Host canary（C-01…C-21）与阶段 A（Projection DSL 迁移）门禁 |
+| STRENGTH-006…025/079（类型/预测器/控制器/价值/策略） | PURE_CORE_ONLY | `Domain/StrengthTypes.fs` `StrengthPolicy.fs` `StrengthPredictor.fs` `StrengthController.fs` `StrengthValue.fs` + `tests-mjs/Strength/` | 纯领域内核已实现（28 测试）；生产接线（Replica session/transform 挂起/候选帧投影）受 STRENGTH-078 Host canary（C-01…C-21）与阶段 A（Projection DSL 迁移）门禁，未接线 |
+| STRENGTH-001…005/026…135（其余） | NOT_IMPLEMENTED | — | 依赖 Host canary 与生产接线，未实现 |
 
 ## SSOT/15 — Blogger as Enforcer（`ENFORCER-`）
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| ENFORCER-001…201（全部） | NOT_IMPLEMENTED | — | 规范已合入（2026-08-02），代码零实现；实现受 ENFORCER-180 第 0 步九条 Host canary 阻断门 |
+| ENFORCER-020…043/080…102/170…172（codec/throttle/nudge/cycle/catalog） | PURE_CORE_ONLY | `Domain/EnforcerCatalog.gen.fs` `EnforcerCodec.fs` `EnforcerThrottle.fs` `EnforcerNudge.fs` `EnforcerCycle.fs` + `tests-mjs/Enforcer/` | 纯领域内核已实现（39 测试，120 项规则目录生成）；生产接线（blog 工具注册/BlogEntryCommitted 扩展/Nudge 事实/transform 挂起）受 ENFORCER-180 第 0 步九条 Host canary 阻断门，未接线 |
+| ENFORCER-001…019/044…079/103…201（其余） | NOT_IMPLEMENTED | — | 依赖 Host canary 与生产接线，未实现 |
 
 ## SSOT/16 — Student & Teacher（`LEARN-`）
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| LEARN-001…114（全部） | NOT_IMPLEMENTED | — | 规范已合入（2026-08-02），代码零实现；实现受 Host canary（LEARN-082…088）门禁 |
+| LEARN-015…017/024/032…037/050/051/075（角色/tier/工具面/QA/单飞/return） | PURE_CORE_ONLY | `Domain/StudentTeacher.fs` `Domain/PrefixCandidate.fs` + `tests-mjs/StudentTeacher/` | 纯领域内核已实现（15 测试，ProviderRequestKind 扩展 StudentLearn/StudentCompile）；生产接线（teacher/return 工具/Teacher session/QA 落盘）受 Host canary（LEARN-082…088）门禁，未接线 |
+| LEARN-001…014/018…023/025…049/052…074/076…114（其余） | NOT_IMPLEMENTED | — | 依赖 Host canary 与生产接线，未实现 |
