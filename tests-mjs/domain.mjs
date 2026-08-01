@@ -95,6 +95,10 @@ const [
   FlowModule,
   OrchestratorRuntime,
   OrchestratorTypes,
+  StrengthTypesModule,
+  StrengthPredictorModule,
+  StrengthControllerModule,
+  StrengthValueModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -139,6 +143,10 @@ const [
   prod('Kernel/Flow'),
   prod('Orchestrator'),
   prod('Orchestrator.Types'),
+  prod('Domain/StrengthTypes'),
+  prod('Domain/StrengthPredictor'),
+  prod('Domain/StrengthController'),
+  prod('Domain/StrengthValue'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -2092,3 +2100,80 @@ export const diagnostic = (() => {
     emit: (operation, fields) => m.emit(operation, toList(fields)),
   }
 })()
+
+// ── SSOT/14: Strength 纯领域内核 ─────────────────────────────────────────────
+
+export const strength = (() => {
+  const types = bind(StrengthTypesModule, 'StrengthTypes', [
+    'satelliteInvariantsHold',
+  ])
+  const predictor = bind(StrengthPredictorModule, 'StrengthPredictor', [
+    'emptyRoleState',
+    'observeRequest',
+    'interpolatedProbability',
+    'predictRead',
+  ])
+  const controller = bind(StrengthControllerModule, 'StrengthController', [
+    'initialState',
+    'hashToUnitInterval',
+    'includedInTraining',
+    'updateProbability',
+    'ewmaAlpha',
+    'onEligibleDecision',
+  ])
+  const value = bind(StrengthValueModule, 'StrengthValue', [
+    'defaultCostModel',
+    'valueK1',
+    'valueK2',
+    'chooseBudget',
+    'batchWithinByteLimit',
+    'decisionWithinByteLimit',
+  ])
+
+  const budgetOf = (b) => caseOf(b)
+  const symbolOf = (s) => caseOf(s)
+  const requestSymbol = (name, payload) => unionCase(StrengthTypesModule.RequestSymbol, 'RequestSymbol')(name, payload ?? [])
+  const readBatch = (fields) => ({
+    Tools: fields.tools ?? [],
+    Parallelism: fields.parallelism ?? 1,
+    ResultBytes: fields.resultBytes ?? 0,
+  })
+
+  return {
+    budgetOf,
+    symbolOf,
+    requestSymbol,
+    readBatch,
+
+    emptyRoleState: () => predictor.emptyRoleState,
+    observeRequest: (state, symbols) => predictor.observeRequest(state, toList(symbols)),
+    predictRead: (state, history, features) => {
+      const [p1, p2] = predictor.predictRead(state, toList(history), features)
+      return { p1, p2 }
+    },
+
+    initialState: () => controller.initialState,
+    hashToUnitInterval: (sha, seed) => controller.hashToUnitInterval(sha, seed),
+    includedInTraining: (sha, decisionId, ordinal, p) => {
+      const [included, u] = controller.includedInTraining(sha, decisionId, ordinal, p)
+      return { included, u }
+    },
+    updateProbability: (alpha, minP, maxP, maxStep, prev, tendency) =>
+      controller.updateProbability(alpha, minP, maxP, maxStep, prev, tendency),
+    ewmaAlpha: (halfLife) => controller.ewmaAlpha(halfLife),
+    onEligibleDecision: (state, t1, t2) => controller.onEligibleDecision(state, t1, t2),
+
+    defaultCostModel: (tierName) => value.defaultCostModel(tier(tierName)),
+    valueK1: (cost, p1, bytes, delay) => value.valueK1(cost, p1, bytes, delay),
+    valueK2: (cost, p1, p2, b1, b2, d1, d2) => value.valueK2(cost, p1, p2, b1, b2, d1, d2),
+    chooseBudget: (v0, v1, v2) => budgetOf(value.chooseBudget(v0, v1, v2)),
+    batchWithinByteLimit: (bytes) => value.batchWithinByteLimit(bytes),
+    decisionWithinByteLimit: (bytes) => value.decisionWithinByteLimit(bytes),
+  }
+})()
+
+const tier = (name) => {
+  if (name === 'Fast') return RolesModule.AgentTier.Fast
+  if (name === 'Deep') return RolesModule.AgentTier.Deep
+  throw new Error(`unknown tier: ${name}`)
+}

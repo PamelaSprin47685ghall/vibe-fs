@@ -24,6 +24,11 @@
     <Compile Include="Domain/AgentPairCursor.fs"/>
     <Compile Include="Domain/TerminalValidity.fs"/>
     <Compile Include="Domain/PrefixCandidate.fs"/>
+    <Compile Include="Domain/StrengthTypes.fs"/>
+    <Compile Include="Domain/StrengthPolicy.fs"/>
+    <Compile Include="Domain/StrengthPredictor.fs"/>
+    <Compile Include="Domain/StrengthController.fs"/>
+    <Compile Include="Domain/StrengthValue.fs"/>
     <Compile Include="Domain/RecoverySlot.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
