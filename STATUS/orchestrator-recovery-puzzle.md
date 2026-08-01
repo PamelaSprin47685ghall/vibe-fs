@@ -1,9 +1,9 @@
-# PUZZLE.md — worktree 删除调查结案与 recovery blocker 续工入口
+# orchestrator-recovery-puzzle.md — worktree 删除调查结案与 recovery blocker 续工入口
 
 > 性质：调查归档。非规范、非状态文档。
 > 初始调查：2026-08-01。
 > 根因修复：`9fcaad24655c993ce2d1d845bbc0d9827d78db7c`。
-> 正式证据：`STATUS/evidence/manager-worktree-durable-ownership.md`。
+> 正式证据：`evidence/manager-worktree-durable-ownership.md`。
 
 ## 1. 结论
 
@@ -118,8 +118,7 @@ tracked 调试插桩已全部还原：
 - `testkit/opencode/canary-driver.mjs` 的全量 event/request/worktree dump；
 - `testkit/opencode/strict-mock-provider.js` 的 `[SEAL-DIR]` 探针。
 
-`.tmp-dbg/` 与 `.tmp-gitwrap/` 是未跟踪调查现场，不属于产品或正式测试。正式证据已迁入
-`STATUS/evidence/manager-worktree-durable-ownership.md`；确认无需本地复核后可人工删除。
+`.tmp-dbg/` 与 `.tmp-gitwrap/` 是未跟踪调查现场，不属于产品或正式测试。正式证据已迁入 `evidence/manager-worktree-durable-ownership.md`；确认无需本地复核后可人工删除。
 
 ## 8. 续工顺序
 

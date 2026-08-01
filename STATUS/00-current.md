@@ -56,7 +56,7 @@ orchestrator-publish 单 canary
 3. SSOT/06 + SSOT/07
 4. STATUS/conformance.md
 5. STATUS/shock-anneal.md
-6. PUZZLE.md
+6. STATUS/orchestrator-recovery-puzzle.md
 ```
 
 ## 退火三反馈纪律
