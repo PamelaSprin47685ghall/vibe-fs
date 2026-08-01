@@ -16,7 +16,7 @@ setup = { strict = true, project = { files = { "review_target.txt" = "review tar
 session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report." }
 
-must = ["reviewer.1", "guard-manager-nudged", "reviewer-nudged"]
+must = ["reviewer.2", "guard-manager-nudged", "reviewer-nudged"]
 
 flow = [
   { wait = "manager.0" },
@@ -81,6 +81,24 @@ tools = ["verdict"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
+# The first PERFECT issues the REVIEW-003 challenge as its tool result; the
+# second request (same envelope, tool result attached) submits the second
+# PERFECT and confirms via its seal (REVIEW-003). If that seal ever fails, the
+# guard nudges the challenge text as a NEW user message — `reviewer-challenge`
+# below covers that fallback (production-composed, internal).
+
+[[turn]]
+id = "reviewer-challenge"
+internal = true
+user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
