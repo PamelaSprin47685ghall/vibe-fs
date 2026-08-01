@@ -19,6 +19,7 @@ module CompanionTransform =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
+        (workspaceDirectory: string option)
         (inObj: obj)
         (rawOutObj: obj)
         =
@@ -135,7 +136,16 @@ module CompanionTransform =
                                             // complete the pending blog Submit.
                                             onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
                                     ?restoredBloggerId = restoredBloggerId,
-                                    ?journal = journal
+                                    ?journal = journal,
+                                    // The blogger is a companion, not a worktree
+                                    // worker: pin it to the stable workspace so its
+                                    // system prompt (Host instruction loading from
+                                    // the session directory) survives the
+                                    // manager worktree release at publish
+                                    // (measured: the post-release delta lost the
+                                    // AGENTS.md block and broke the ARCH-004
+                                    // prefix seal).
+                                    ?bloggerDirectory = workspaceDirectory
                                 )
 
                             companions.[sessionId] <- value

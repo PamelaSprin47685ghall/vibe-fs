@@ -36,3 +36,10 @@ module SharedState =
     /// parks a candidate and the tool that binds it may run under different
     /// plugin instances (orchestrator worktree).
     let PendingReviewSeals = Dictionary<string, PendingSeal>()
+
+    /// The ROOT workspace, set by whichever plugin instance boots first (the
+    /// main workspace loads before the manager worktrees). Worktree instances
+    /// pin their blogger companions here so the blogger's system prompt
+    /// (Host instruction loading from the session directory) survives the
+    /// manager worktree release at publish.
+    let mutable RootWorkspace: string option = None

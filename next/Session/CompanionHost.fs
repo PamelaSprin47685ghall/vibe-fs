@@ -18,7 +18,8 @@ type CompanionHost
         ?durable: ICompanionDurablePort,
         ?onBloggerCreated: SessionId -> unit,
         ?restoredBloggerId: string,
-        ?journal: AgentJournal
+        ?journal: AgentJournal,
+        ?bloggerDirectory: string
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
@@ -76,7 +77,7 @@ type CompanionHost
                                         primaryId,
                                         { Title = Some bloggerEffectiveAgent
                                           Agent = Some bloggerEffectiveAgent
-                                          Directory = None }
+                                          Directory = bloggerDirectory }
                                     )
 
                                 match created with

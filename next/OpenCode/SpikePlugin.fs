@@ -46,6 +46,16 @@ module SpikePlugin =
                     | Some port -> Some port
                     | None -> PluginHost.workspaceDirectory input |> Option.map GitTree.create
 
+                // The stable workspace, captured once at plugin init. The transform
+                // input carries no directory; the blogger must be pinned to this
+                // path (not the manager worktree) so its system prompt survives the
+                // worktree release at publish. First boot wins: the main workspace
+                // instance starts before the manager worktree instances.
+                let workspaceDirectory = PluginHost.workspaceDirectory input
+
+                if SharedState.RootWorkspace.IsNone then
+                    SharedState.RootWorkspace <- workspaceDirectory
+
                 let wired =
                     HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
@@ -74,6 +84,7 @@ module SpikePlugin =
                                     // emits TerminalOutcome.Completed for this child.
                                     wired.RegisterOwned(SessionId.value bloggerId)
                                     wired.BindActiveRun bloggerId AgentRole.Blogger None))
+                                SharedState.RootWorkspace
                                 inObj
                                 outObj
 
