@@ -14,10 +14,10 @@
 | 4 | 退火一：恢复生产编译 | dotnet build → npm run build | 完成（Build succeeded；Fable 157 产物新鲜） |
 | 5 | 失败驱动上下文恢复（包 X，X0–X9） | 编译 + 第 0–3 层 | X0–X9 的删除与领域实现完成；X-wire 探针链已接线（`SpikePlugin.transform → XWire.applyTransform`，`HostSignalBootstrap.onTurn → ArmRecovery + reconcileAttempt`，提交 `c6ac0eb1…5ff3c53a`）；BlogSquash 生产链已接线（d5c49125：`AppendSquash` 唯一构造点 + armed 槽触发 + SHOCK-UNMIGRATED[CTX-006] 清零），剩余缺口为第 1 层测试与 K8f 端到端剧本，见「包 K8f 摸底」 |
 | 6 | 休克三 + 退火二：按条款写 `tests-mjs`，删除 `tests-next`（包 T） | 关闭 → test:mjs | 完成（T-2…T-5e；386 测试三时区全绿，证据 `evidence/post-anneal2/`） |
-| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 核心静态森林已落地；K9 仅剩物理删除：canary 已全部走 `ScenarioRuntime`（14 条经 `canary-driver`，2 条直接 `attachScenario`），`strict-mock-forest/matches` 仅被 provider 内部旧 expect 路径引用。K8f 另因 BlogSquash 生产链未接线阻断，见「包 K8f 摸底」 |
+| 6.5 | 剧本森林重建（包 K） | 载入期校验 + 森林自检 | 完成：canary 全部走 `ScenarioRuntime`；旧 forest/satisfy 匹配入口已物理删除，`strict-mock-matches.js` 仅保留 request-kind 分类与诊断 extractor。退火三另发现 ORCH-006 durable worktree ownership 缺陷，已由 `9fcaad24` 修复 |
 | 6.6 | 因果推进门禁重建（包 W） | gate-testkit + test:mjs | W1–W7 完成（W7 为 13 项 VERIFY-004 禁止退化清单的双向覆盖与注册完整性门禁；休克期未运行编译或测试） |
 | 6.7 | 运行时合成文本 TOML 记法（包 N，SSOT/13 → ARCH-010） | gate:static + canary | N0–N5b 完成；N6 与退火三待办。canary 仍有行为债，X-wire 仍是 K8f 前置 |
-| 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 未开始 |
+| 7 | 退火三：恢复 Host / E2E / Release | gate-testkit → canary → P0×3 → release | 进行中：已进入单 canary 调查；`reviewer-restart` 绿，ORCH-006 durable worktree 删除已修复；`orchestrator-restart-publish` 仍因 restart 后 `OrchestratorPublished=0` 阻断，尚未进入 P0×3 / release |
 
 阶段 3.5 与退火一并行：SSOT/12 只改规范文件，不产生编译依赖，而它规定的三个新事实与 `ProviderRequestKind` 必须在写测试前定稿。
 
@@ -29,7 +29,7 @@
 
 包 K 排在包 T 之后、退火三之前：剧本的 lane 划分与 step 序列反映迁移后的生产行为，先重写会锁定旧语义；而它必须早于任何 canary 运行，因为旧剧本无法匹配新语义的请求。X-A 至 X-D 四条与包 K 的 22 条一起手工写成 TOML。
 
-休克期只允许第 0 层反馈：`ssot-lint.mjs`、`shock-audit.mjs`、`architecture-gate.mjs`、`git diff --check`、`git status --short`、`rg`。
+休克阶段只允许第 0 层反馈：`ssot-lint.mjs`、`shock-audit.mjs`、`architecture-gate.mjs`、`git diff --check`、`git status --short`、`rg`。该限制不适用于当前退火三。
 
 ### 测试语言迁移（VERIFY-008）
 
@@ -1334,7 +1334,7 @@ K5   TOML schema + 载入期编译器 + 六项载入期校验 + 根键顺序硬�
 K6   TOML formatter（幂等）
 K7   旧字段拒绝器：turn 编号 / reusable / pathless / blocking / loadScripts / specificity
 K8   19 个 scenario 手工重写为 TOML（含 X-A–X-D 四条新增），4 条内联轨迹只搬内容
-K9   删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径
+K9   删除 strict-mock-forest.js / strict-mock-satisfy.js；从 strict-mock-matches.js 删除旧匹配职责
 K10  森林结构自检：纯函数性、索引无冲突、fault 有限、无死边
 K11  森林变异自检：四类错误响应必须被拒绝（新增）
 ```
@@ -1343,7 +1343,7 @@ K1 提前到第一步的理由：它决定 K2 的前缀比较用哪个投影。�
 
 ##### K9 状态修正（b48e38bd 静态复核，后于本提交完成）
 
-K9 的「删除 strict-mock-forest.js / strict-mock-matches.js 旧匹配路径」已完成。
+K9 的「删除 strict-mock-forest.js / strict-mock-satisfy.js，并从 strict-mock-matches.js 删除旧匹配职责」已完成。
 旧路径判定为「明确淘汰」而非「迁入静态森林」：全仓 grep 确认无任何 canary /
 gate 仍调用 `provider.expect*`，旧 expect 路径无调用方可迁。已删除
 `strict-mock-forest.js`（selectExpectation / consumeExpectation / edgeLabel /
@@ -1875,7 +1875,11 @@ ReviewChallenge.Text     REVIEW-003 把其 digest 记入 PerfectChallengeIssued 
 
 standing↔代码校验必须读「合成」的文件，而两条 nudge surface 的合成不在 send site：`HostSessionNudge` 只负责发送，`TurnCompletionProgram` 与 `HostReviewGuard` 才决定文本。只读 send site 会把这两条永久报为未迁移，而顺手的反应是改标签而不是去看散文实际在哪。两条红证：删掉 `composerFiles` 判红；把生产改回散文字面量判红并指出是哪个 composer 文件。
 
-##### canary 未变绿，且这是预期的
+##### canary 历史快照（N5a 后；已被退火三实测 supersede）
+
+以下 6/16 与十条红是 N5a 完成时的历史测量，不代表当前 canary 总账。当前状态以顶部阶段表与
+`evidence/manager-worktree-durable-ownership.md` 为准：K9 物理删除已修复，
+`reviewer-restart` 已绿，`orchestrator-restart-publish` 的声明缺口已消失但 durable recovery 仍红。
 
 N5a 后仍 6/16 绿。四条 nudge 都在流程后段才到达，而余下十条红各自在更早处停住，故迁移不改变结局。唯一位移是 pty-stress：由 `no-declared-turn`（devops turn 文本失配）前进到 `expectation devops.5`（第二个 PTY 的 trap TERM 行为），即从「文本类」跨到「行为类」。
 
@@ -1999,7 +2003,15 @@ Companion 的 PERSIST-009 休克标记，未声称 X-wire 已接线。
 
 ##### 包 K8f 摸底：X10 被这个空洞阻断（实测）
 
-##### HOST-012 决策记录：多实例共享（2026-08-01 实测）
+##### HOST-012 决策记录：多实例共享（2026-08-01 实测；历史根因，已完成）
+
+> 状态：本节记录 HOST-012 的历史定位与已落地决策，不是当前 blocker。
+> 后续退火三发现的 worktree 物理删除是另一缺陷，见
+> `evidence/manager-worktree-durable-ownership.md`；不得把 per-instance state 与 durable
+> worktree disposal 混为同一根因。
+>
+> 当前另有一个显式 ORCH-006 barrier 与两个 REVIEW-007 随机 barrier 重叠的 `UNVERIFIED`
+> 调查项；它不是 durable worktree 删除根因，续工入口见 `STATUS/00-current.md`。
 
 orchestrator-publish canary 修复推进中，deep-reviewer 的 verdict 必拒
 （"manager session is unknown"）。DIAG 实测定位根因：Host `InstanceStore`

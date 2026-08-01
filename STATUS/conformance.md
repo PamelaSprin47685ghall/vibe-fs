@@ -2,7 +2,8 @@
 
 状态允许值：`CONFORMANT` | `PARTIAL` | `CONTRADICTS` | `UNVERIFIED` | `NOT_IMPLEMENTED`
 
-绑定 commit：`5b546450`（CTX-006 账目书：X-wire 探针链与 BlogSquash 生产链接线完成、K9 物理删除收尾。dotnet 0 错误、Fable 新鲜、436 测试三时区全绿、gate:static 6/6 绿、test:harness 273 绿）。本表只记录截至该提交的源码状态。
+绑定源码 commit：`9fcaad24`（ORCH-006 durable worktree ownership 修复）。运行验证不属于
+commit 内容，命令与结果见 `evidence/manager-worktree-durable-ownership.md`。本表只记录截至该提交的源码状态。
 
 休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
 
@@ -82,7 +83,7 @@ FALLBACK-010 「当前无 count 概念，故无从混淆」                 → 
 | REVIEW-004: ReviewAttemptIdentity | CONFORMANT | `Kernel/Identity.fs:348` | 五元组类型存在，`dedupeKey` 以 `\u001f` 连接；同一 provider run 内的额外 PERFECT 由 `PendingChallenge.FirstProviderRun` 比对拦下，不计数不写 journal；窗口上限 8（PERSIST-008） |
 | REVIEW-005: 因果单调状态 | CONFORMANT | `VerdictDecision` `PromptClaim` `ProviderInputSeal` | 第二次 PERFECT 只有三种答案（`Confirmed` / `ChallengeUnproven` / `AlreadyCounted`），无 `Confirmed of bool` 形态。两条链各归其主：链 A 在 `PromptClaim`（`Receipt` = Submitted，`acceptClaim` = PhysicalAccepted），链 B 在 seal。确认只读链 B——`provenSeal` 是唯一路径，admission ID 无从参与 |
 | REVIEW-006: 自包含 Witness | CONFORMANT | `Domain/ReviewWitness.fs` | `confirm` 接收两个摘要而非 bool，故 witness 自带证据；不依赖外围 Map。第 1 层测试直接断言生产 record 的键集合（而非 facade 投影），确保无 authority root / physical message 字段 |
-| REVIEW-007: Manager Guard | PARTIAL | `HostReviewGuard.fs` `TerminalPolicy.isTopLevelManager` | 纯侧已有判据：requirement 按 Authority Root 键入并去重、确认后清除且对同一 run 幂等（第 1 层测试）。Host 侧 terminal 钩子接线属第 3 层，退火三补 |
+| REVIEW-007: Manager Guard | PARTIAL | `HostReviewGuard.fs` `TerminalPolicy.isTopLevelManager` | 纯侧已有判据：requirement 按 Authority Root 键入并去重、确认后清除且对同一 run 幂等（第 1 层测试）。Host 侧 terminal 钩子接线属第 3 层；退火三进行中，尚待取得该轨迹证据 |
 | REVIEW-008: Git tree 变化使 witness 无效 | CONFORMANT | `ReviewWitness.isValidForTree` | 有效性是对当前 tree 的派生问题而非 mutation：witness 历史保留且仍报 `Confirmed`，但 `satisfiesGuard` 对新 tree 为 false。新 barrier 清 pending 而保留 witness；同 barrier 重入幂等。第 1 层测试 |
 | REVIEW-010: ProviderInputSeal | CONFORMANT | `OpenCode/ReviewSeal.fs` `Journal/ReviewProjection.fs` | `shock-audit` 实测单一写入口 ok (1)。seal 记录 `IncludedToolResultDigests`，Fold 由 list 转 `Set<string>`；窗口上限 8。可实现性见 `evidence/host-transform-run-binding.md` |
 
@@ -113,9 +114,9 @@ REVIEW-010 「transform 侧封装与因果校验属包 D」→ 同上
 | ORCH-002: Clean Gate | CONFORMANT | `OrchestratorGit.fs` | — |
 | ORCH-003: 一个 Job 一个 worktree 一个 Manager | CONFORMANT | `Journal/OrchestratorProjection.fs` | `ManagerAgent` 持久化为精确 agent 名（非裸角色）；创建后只有 `Progress` 会变；未知 job 的进展是 no-op 而非新建条目；第二次 create 不改 Manager 与 worktree。第 1 层测试 |
 | ORCH-004: 并行 Job | CONFORMANT | `OrchestratorProjection.activeJobs` | 多 job 同时 active，终态 job 退出 active 集合但留在 map 中。第 1 层测试 |
-| ORCH-005: 短 CAS Integration Gate | CONFORMANT | `OrchestratorProgram.publishUnderGate` | gate 只包住 `claimAndFf`，不再跨 rebase 与 LLM review；gate 内二次读 head 即 CAS 的 compare；`claimAndFf` 包在 try 内以免泄漏 publish 锁。第 3 层轨迹属退火三 |
-| ORCH-006: 持久事实 | CONFORMANT | `Journal/OrchestratorProjection.fs` `Kernel/Fact.fs` | `JobProgress` 是单值而非五个独立可选字段，故 ORCH-007 是一次 match 而非排序；`ManagerAgent` / `WorktreeIdentity` / `TargetBranchFrozen` / 两个 review barrier id 全部就位；终态 job 留在 map 中使重放的 `Published` 被识别为重复。第 1 层测试 |
-| ORCH-007: 恢复逻辑 | CONFORMANT | `OrchestratorProjection.recoveryAction` | 八个 progress 分支各产出恰好一个动作（第 1 层测试以表格断言全覆盖）；`PublishClaimed` 三分支按条款固定顺序——已发布优先于未变，反序会重试一次已成功的 ff |
+| ORCH-005: 短 CAS Integration Gate | CONFORMANT | `OrchestratorProgram.publishUnderGate` | gate 只包住 `claimAndFf`，不再跨 rebase 与 LLM review；gate 内二次读 head 即 CAS 的 compare；`claimAndFf` 包在 try 内以免泄漏 publish 锁。第 3 层轨迹尚待在进行中的退火三取得 |
+| ORCH-006: 持久事实 | CONFORMANT | `Journal/OrchestratorProjection.fs` `Kernel/Fact.fs` `Orchestrator.WorktreeResource.fs` | `JobProgress` 是单值而非五个独立可选字段；`ManagerAgent` / `WorktreeIdentity` / `TargetBranchFrozen` / 两个 review barrier id 全部就位；`ManagerJobCreated` append 成功后 worktree 转为 durable，`NeedsReview` 与普通作用域退出均不删除；终态 job 留在 map 中使重放的 `Published` 被识别为重复。第 1 层测试；生命周期证据 `evidence/manager-worktree-durable-ownership.md` |
+| ORCH-007: 恢复逻辑 | PARTIAL | `OrchestratorProjection.recoveryAction` `Orchestrator.RecoverManagerJob` | 八个 progress 分支各产出恰好一个动作，`PublishClaimed` 三分支顺序符合条款；`Adopt` 不再隐式释放 durable worktree。`orchestrator-restart-publish` 已越过 deep-reviewer/TOML 缺口，但 restart 后仍观测 `OrchestratorPublished=0`，恢复链尚未取得第 4 层绿证据 |
 | ORCH-008: target ref 安全 | CONFORMANT | `OrchestratorGit.fs` `OrchestratorProjection.recoveryAction` | `GetTargetHead` 失败时两个依赖 head 的分支均 `FailClosed`，理由文字点明禁止回落 HEAD |
 
 ### ORCH-006 的一处实测缺陷：`createJob` 无条件覆盖（包 T-4 修正）
@@ -183,7 +184,7 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 
 当前调用点覆盖 `list`、父取消和 fork 前置 tombstone；`join` 仍未消费 durable
 `joinable`，因此 `CompletedAwaitingJoin` 的 durable 消费链尚未闭合。
-该结论只绑定静态源码与 `shock-audit`；`EXEC-005` 可在退火三补 Host 轨迹后升格，
+该结论只绑定静态源码与 `shock-audit`；`EXEC-005` 可在退火三取得 Host 轨迹后升格，
 `EXEC-009` 还需先迁移 JoinTool 的 durable 读侧。
 
 ## Host 集成
@@ -196,7 +197,7 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | HOST-005: A 版分段 | PARTIAL | `TerminalSessionA.fs` | ARecord 未按 ProviderRun 分段 |
 | HOST-006: Compaction 预防与收容 | CONFORMANT | `OpenCode/HostCompactionGate.fs` `OpenCode/HostSignalBootstrap.fs` | 预防层四项（auto/overflow/autocontinue/prune）关闭，写不进配置则启动失败；收容层把任何观察到的 compaction 转成一次 `ContextReanchored`（永远 armed，幂等，不分类来源）。第 1 层测试 14 项（`Context/host-compaction-policy.test.mjs`） |
 | HOST-008: Session 关联 | CONFORMANT | `Journal/SessionAssociation.fs` `Domain/ManagedSessionKind.fs` | `ManagedSessionKind` 持久化，`isCompanion` O(1)；递归/重复 Y/自链/一 Y 两主均 fail closed；role 不影响关联。第 1 层测试 16 项（`Context/session-association.test.mjs`） |
-| HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。判据待退火三：host-restart / host-nudge canary 覆盖生命周期（HOST-012 已实测多实例加载——`initSpikePlugin` 每 project 一次） |
+| HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。判据在退火三进行中：host-restart / host-nudge canary 覆盖生命周期（HOST-012 已实测多实例加载——`initSpikePlugin` 每 project 一次） |
 | HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
 | HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
 | HOST-012: 多实例共享边界 | CONFORMANT | `OpenCode/SharedState.fs` `OpenCode/PluginRuntimeScope.fs` | Host `InstanceStore` 按 directory 实例化插件（worktree = 独立实例），fork→verdict 跨实例。SessionParents/VerdictSessions/SessionDirectories 为 `SharedState` 模块级单例（所有插件实例同一引用）；每实例独有 AgentJournal/Companions/OwnedSessions/订阅。实测 deep-reviewer 的 verdict 不再 "manager session is unknown" |
@@ -205,8 +206,8 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| VERIFY-001: 测试金字塔 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0 层静态检查器已齐备，本次 `gate:static` 六门通过；第 1–2 层在 `tests-mjs/`，第 3 层 Fake Host 轨迹与第 4–5 层 canary/发布门禁仍待退火三 |
-| VERIFY-003: Canary Mock 剧本 | PARTIAL | `testkit/opencode/scenario-runtime.js` `testkit/opencode/strict-mock-provider.js` | K9 已物理删除旧匹配路径（`strict-mock-forest.js` / `strict-mock-satisfy.js` 删除，`strict-mock-matches.js` 仅剩 request-kind 分类与诊断 extractor，provider 无 scenario 时一律记未匹配）。六项旧违规机制随删除消失；静态森林由 gate-testkit 的 VERIFY-003 系列守护。canary 运行期证据仍待退火三 |
+| VERIFY-001: 测试金字塔 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0 层静态检查器已齐备，本次 `gate:static` 六门通过；第 1–2 层在 `tests-mjs/`，第 3 层 Fake Host 轨迹与第 4–5 层 canary/发布门禁正在退火三逐级恢复，尚未全绿 |
+| VERIFY-003: Canary Mock 剧本 | PARTIAL | `testkit/opencode/scenario-runtime.js` `testkit/opencode/strict-mock-provider.js` | K9 已物理删除旧匹配路径（`strict-mock-forest.js` / `strict-mock-satisfy.js` 删除，`strict-mock-matches.js` 仅剩 request-kind 分类与诊断 extractor，provider 无 scenario 时一律记未匹配）。六项旧违规机制随删除消失；静态森林由 gate-testkit 的 VERIFY-003 系列守护。canary 运行期证据正在退火三逐条取得 |
 | VERIFY-004: Stability Gate | CONFORMANT | `run-canary-staggered.mjs` `stability-checker.js` | 三轮 + leak check 已实现。原理与实现的偏差（含「断言心跳从未接线」）记于 `shock-anneal.md` 包 W |
 | VERIFY-005: Architecture Gates | CONFORMANT | `scripts/architecture-gate.mjs` | 已是静态检查器而非测试，故不需先编译即可运行；单一写入口门禁实现为 `SINGLE_WRITER_FACTS`，八个事实实测 ok (1)；`single-constructor` 双向检查（无人绕过 + 有人调用）。行数门禁按条款保持删除 |
 | VERIFY-007: 两种 Provider Projection | CONFORMANT | `Domain/ProviderProjection.fs` `testkit/opencode/provider-wire.js` | 生产侧两投影分离；testkit 仅解码 OpenAI wire 再调生产 projection。判据：`gate-projection-cases.mjs` 的 `semanticallyEqual` / `isAppendOnlyPrefix` / `sealDigest` 用例，gate-testkit 278 全绿实测 |
