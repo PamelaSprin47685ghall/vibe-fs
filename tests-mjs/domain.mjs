@@ -93,6 +93,8 @@ const [
   DeadlineModule,
   ProcessRequest,
   FlowModule,
+  OrchestratorRuntime,
+  OrchestratorTypes,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -135,6 +137,8 @@ const [
   prod('Process/Deadline'),
   prod('Process/ProcessRequest'),
   prod('Kernel/Flow'),
+  prod('Orchestrator'),
+  prod('Orchestrator.Types'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -1848,6 +1852,79 @@ export const jobProgress = (() => {
   const build = unionCase(OrchestratorProj.JobProgress, 'JobProgress')
   return { of: (name, payload) => build(name, payload === undefined ? [] : [payload]) }
 })()
+
+const orchestratorVerdictOf = (verdict) => {
+  const name = caseOf(verdict)
+  const fields = verdict.fields ?? []
+
+  switch (name) {
+    case 'Published':
+      return { case: name, jobId: idValue.managerJob(fields[0]), head: idValue.commit(fields[1]) }
+    case 'RejectedDirty':
+      return { case: name, reason: fields[0] }
+    case 'NeedsReview':
+    case 'IntegrationFailed':
+      return { case: name, jobId: idValue.managerJob(fields[0]), details: fields[1] }
+    case 'Empty':
+      return { case: name }
+    default:
+      throw new Error(`unknown OrchestratorVerdict case: ${name}`)
+  }
+}
+
+export const orchestratorRuntime = {
+  ok: okResult,
+  error: errorResult,
+  create: ({ git, manager, repoPath, target = 'refs/heads/main', journal }) =>
+    OrchestratorRuntime.Orchestrator_$ctor_EE121F2(
+      new OrchestratorTypes.GitPort(
+        git.isDirty,
+        (jobId, path) => git.createWorktree(jobId, path),
+        git.freezeTargetBranch,
+        (path, targetRef) => git.rebase(path, targetRef),
+        (path, targetRef, expectedHead) => git.ffMerge(path, targetRef, expectedHead),
+        (path) => git.conflictedFiles(path).then((result) =>
+          resultOf(result).ok ? okResult(toList(resultOf(result).value)) : result),
+        git.removeWorktree,
+        git.hasRebaseHead,
+        () => git.listWorktrees(),
+        () => git.listManagerBranches(),
+        git.deleteBranch,
+        git.readHead,
+        git.getTargetHead,
+      ),
+      new OrchestratorTypes.ManagerPort(
+        manager.startManager,
+        manager.awaitManager,
+        (jobId, managerSessionId, worktree, barrierId) =>
+          manager.reverify(jobId, managerSessionId, worktree, barrierId),
+        (jobId, worktree, prompt) => manager.resumeManager(jobId, worktree, prompt),
+      ),
+      repoPath,
+      targetRef(target),
+      journal
+        ? new OrchestratorTypes.OrchestratorJournalPort(
+            journal.append,
+            journal.snapshot ?? (() => Folds.empty),
+          )
+        : undefined,
+      undefined,
+    ),
+  forkManager: async (runtime, { job, managerAgent, prompt, worktree }) => {
+    const result = resultOf(await OrchestratorRuntime.Orchestrator__ForkManager_Z259F4770(
+      runtime,
+      managerJobId(job),
+      managerAgent,
+      prompt,
+      worktreePath(worktree),
+    ))
+
+    return result.ok
+      ? { ok: true, value: { jobId: idValue.managerJob(result.value.JobId), worktreePath: idValue.worktreePath(result.value.WorktreePath) } }
+      : { ok: false, error: orchestratorVerdictOf(result.error) }
+  },
+  join: async (runtime) => orchestratorVerdictOf(await OrchestratorRuntime.Orchestrator__JoinPublished(runtime)),
+}
 
 // ── prompt authority (SSOT/03) ───────────────────────────────────────────────
 

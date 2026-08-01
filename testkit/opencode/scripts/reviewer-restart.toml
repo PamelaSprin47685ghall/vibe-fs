@@ -83,8 +83,9 @@ user = "Review the tree and submit a PERFECT verdict."
 # for exactly this reason. No lane, because the prompt is composed from the delta alone
 # (`../next/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
 #
-# The declared text is the sentence all three production shapes share — delta (:77),
-# post-restart re-anchor (:72) and condense (:118) — so one turn answers whichever fires.
+# The delta and post-restart re-anchor are distinct production prompt shapes, so both
+# must be declared. The block below handles the normal delta; `blogger-reanchor` handles
+# the full-context frame emitted after Host restart.
 
 [[turn]]
 id = "blogger"
@@ -93,3 +94,11 @@ user = ["# The next user message is the new session material in TOML.", "[[item]
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "blogger-reanchor"
+internal = true
+user = ["You are the blogger of a coding agent session.", "This session resumed after a restart", "FULL PROJECTION:"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session reanchor background." }

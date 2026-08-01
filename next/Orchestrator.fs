@@ -133,6 +133,9 @@ type Orchestrator
                                     )
                                 )
                         | Ok() ->
+                            if journalPort.IsSome then
+                                worktree.MarkDurable()
+
                             let job =
                                 { JobId = jobId
                                   ManagerSessionId = managerSessionId

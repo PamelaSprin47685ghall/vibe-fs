@@ -38,6 +38,7 @@ flow = [
   { wait = "coder.0" },
   { wait = "manager-guard.2" },
   { wait = "reviewer.0" },
+  { wait = "barrier-reviewer.0" },
   { wait = "reviewer-confirm.0" },
 
   { awaitRestart = true },
@@ -52,6 +53,7 @@ flow = [
   { wait = "manager.1", timeoutMs = 20000 },
   { wait = "manager.2", timeoutMs = 20000 },
   { wait = "reviewer.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
   { wait = "reviewer-confirm.0", timeoutMs = 20000 },
   { wait = "orch-continue.0", timeoutMs = 20000 },
   { wait = "orch-continue.1", timeoutMs = 20000 },
@@ -148,6 +150,21 @@ tools = ["verdict"]
   respond = { type = "text", text = "Reviewer intermediate text after verdict tool." }
 
 [[turn]]
+id = "barrier-reviewer"
+lane = "deep-reviewer"
+user = ["# Complete the assignment in `assignment`.", "Review the current worktree for correctness. Submit your verdict with the verdict tool."]
+tools = ["glob", "grep", "inspector", "read", "verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
+
+[[turn]]
 id = "reviewer-confirm"
 internal = true
 user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
@@ -174,7 +191,7 @@ user = ["# The next user message is the new session material in TOML.", "[[item]
 [[turn]]
 id = "blogger-reanchor"
 internal = true
-user = ["You are the blogger of a coding agent session.", "This session resumed after a restart", "[[item]]"]
+user = ["You are the blogger of a coding agent session.", "This session resumed after a restart", "FULL PROJECTION:"]
 
   [[turn.step]]
   respond = { type = "text", text = "Session reanchor background." }

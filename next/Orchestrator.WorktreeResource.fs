@@ -21,11 +21,14 @@ module private WorktreeDisposal =
 /// it currently lives. ORCH-006 keeps both for exactly this reason: recovery
 /// locates by identity, diagnostics show the path, and a moved worktree must not
 /// orphan its job.
-type WorktreeResource private (path: WorktreePath, identity: WorktreeIdentity, git: GitPort) =
+type WorktreeResource
+    private (path: WorktreePath, identity: WorktreeIdentity, git: GitPort, releaseOnDisposeInitially: bool) =
     let mutable released = false
+    let mutable releaseOnDispose = releaseOnDisposeInitially
 
     member _.Path = path
     member _.Identity = identity
+    member _.MarkDurable() = releaseOnDispose <- false
 
     member _.Release() =
         task {
@@ -46,28 +49,31 @@ type WorktreeResource private (path: WorktreePath, identity: WorktreeIdentity, g
 
     interface IAsyncDisposable with
         member this.DisposeAsync() =
-            WorktreeDisposal.asValueTask (
-                task {
-                    try
-                        let! _ = this.Release()
-                        ()
-                    with _ ->
-                        ()
-                }
-            )
+            if releaseOnDispose then
+                WorktreeDisposal.asValueTask (
+                    task {
+                        try
+                            let! _ = this.Release()
+                            ()
+                        with _ ->
+                            ()
+                    }
+                )
+            else
+                ValueTask()
 
     static member Create(git: GitPort, jobId: ManagerJobId, path: WorktreePath) =
         task {
             match! git.CreateWorktree jobId path with
             | Error error -> return Error error
-            | Ok identity -> return Ok(WorktreeResource(path, identity, git))
+            | Ok identity -> return Ok(WorktreeResource(path, identity, git, true))
         }
 
     /// Re-adopt an existing worktree during recovery (ORCH-007: never create a new
     /// one). The identity comes from the durable job record, not from re-deriving it
     /// from the id — a job whose branch was renamed must still be found.
     static member Adopt(git: GitPort, identity: WorktreeIdentity, path: WorktreePath) =
-        WorktreeResource(path, identity, git)
+        WorktreeResource(path, identity, git, false)
 
 /// Process-backed worktree verbs used by GitOperations.
 ///
