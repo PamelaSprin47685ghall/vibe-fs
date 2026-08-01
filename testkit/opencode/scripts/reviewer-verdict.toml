@@ -16,7 +16,7 @@ setup = { strict = true, project = { files = { "review_target.txt" = "review tar
 session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report." }
 
-must = ["reviewer.2", "guard-manager-nudged", "reviewer-nudged"]
+must = ["reviewer.2", "reviewer-nudged"]
 
 flow = [
   { wait = "manager.0" },
@@ -29,13 +29,14 @@ flow = [
   { assertFacts = { name = "ReviewVerdictRecorded", eq = 2 } },
   { custom = "oracle" },
 
-  # REVIEW-007. A fresh Manager, so the tree it would finish on has no verdicts.
+  # REVIEW-007: a fresh Manager whose tree ALREADY has a confirmed dual-PERFECT
+  # (the reviewer above confirmed the same workspace tree) must NOT be nudged:
+  # the review guard only fires on trees without confirmation.
   { createSession = { agent = "fast-manager", bind = ["guard-manager-title", "guard-manager"], as = "guard" } },
   { prompt = { agent = "fast-manager", text = "Attempt completion without review." }, session = "guard" },
   { wait = "guard-manager.0" },
-  { wait = "guard-manager-nudged" },
   { awaitTerminal = true, session = "guard", requireAssistantTerminal = true },
-  { assertFacts = { name = "GuardPromptAccepted", eq = 1 } },
+  { assertFacts = { name = "GuardPromptAccepted", eq = 0 } },
 
   # REVIEW-004. A Reviewer that reviews in prose and never calls the tool.
   { createSession = { agent = "fast-reviewer", bind = ["reviewer-nudge-title", "reviewer-nudge"], as = "nudge" } },

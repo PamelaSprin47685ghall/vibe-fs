@@ -158,6 +158,19 @@ user = ["# The next user message is the new session material in TOML.", "[[item]
   [[turn.step]]
   respond = { type = "text", text = "Session background." }
 
+# REVIEW-007: a Manager completing on a tree without a confirmed dual-PERFECT
+# is nudged with the production-composed guard text (HostReviewGuard.fs). The
+# reviewer above may or may not have confirmed before the restart; this turn
+# covers the nudge when it arrives (internal: no scenario text reaches it).
+[[turn]]
+id = "guard-nudged"
+internal = true
+user = "# Review is required before completion.\n# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager received the review guard." }
+
 [[turn]]
 id = "title"
 lane = "parent-title"
