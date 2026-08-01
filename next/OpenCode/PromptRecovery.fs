@@ -145,3 +145,45 @@ module PromptRecovery =
 
                 return results |> Seq.toList
         }
+
+    /// PROMPT-011 post-init gate: the recovery pass must not run inside the
+    /// plugin constructor.
+    ///
+    /// The plugin constructor is awaited by the Host before its project instance
+    /// is fully ready (`plugin/index.ts:112-123,222-224`), and `reconcile` reads
+    /// `session.messages` through the SDK — an in-process fetch that competes
+    /// with the Host's own startup for the same event loop. Under parallel
+    /// canary load that read can exceed the silence window, parking the
+    /// constructor and with it every hook dispatch: a restarted session then
+    /// never sends its next prompt (`reviewer-restart` red under 8-way
+    /// concurrency, green solo).
+    ///
+    /// So the pass is deferred to the first real Host event, when the instance
+    /// is ready, and made single-flight so every later caller awaits the same
+    /// pass. The latch is a task, not a stage: `Task.IsCompleted` is the whole
+    /// state, and there is no Stage/Phase counter to drift (ARCH-001).
+    type RecoveryGate(journal: AgentJournal option, snapshotOpt: ISessionSnapshotPort option) =
+
+        let gate = obj ()
+        let mutable pass: Task<Reconciled list> option = None
+
+        /// First caller starts the single pass; every later caller awaits the
+        /// same task. A completed (or even faulted) task is returned as-is —
+        /// there is no re-run, because PROMPT-011's budget makes a retried
+        /// reconcile a different logical act (each failed claim keeps its budget
+        /// until the next start).
+        member _.EnsureDone() : Task =
+            let active =
+                lock gate (fun () ->
+                    match pass with
+                    | Some t -> t
+                    | None ->
+                        let t = reconcile journal snapshotOpt
+                        pass <- Some t
+                        t)
+
+            task {
+                let! _ = active
+                ()
+            }
+            :> Task

@@ -59,12 +59,16 @@ module SpikePlugin =
                 let wired =
                     HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
-                // PROMPT-011: reconcile pending claims BEFORE any hook can dispatch a
-                // new prompt. Awaited rather than fired off: a new claim racing the
-                // recovery pass would be indistinguishable from a pending one, and the
-                // pass is bounded — every claim it sees is resolved or abandoned within
-                // RecoveryAttemptBudget starts.
-                let! _reconciled = PromptRecovery.reconcile journal snapshotOpt
+                // PROMPT-011: the pending-claim pass must NOT run here, inside the
+                // plugin constructor. The Host awaits the constructor before its
+                // project instance is ready (`plugin/index.ts:112-123,222-224`), and
+                // `reconcile` reads `session.messages` through the SDK — an
+                // in-process fetch that competes with Host startup. Under parallel
+                // canary load that read can exceed the silence window and park the
+                // constructor, so a restarted session never sends its next prompt.
+                // Attach the gate instead; the first real Host event starts the
+                // pass (single-flight), and every business entry point awaits it.
+                scope.AttachRecoveryGate(PromptRecovery.RecoveryGate(journal, snapshotOpt))
 
                 let transform inObj outObj : Task<unit> =
                     task {

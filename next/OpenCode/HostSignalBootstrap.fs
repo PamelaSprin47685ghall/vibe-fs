@@ -64,57 +64,65 @@ module HostSignalBootstrap =
         let pendingReviewSeals = SharedState.PendingReviewSeals
 
         let onTurn (turn: ReconciledTurn) : Task =
-            // Manager sessions run inside their own worktree, not the plugin's
-            // root workspace. The review-guard tree check must resolve that
-            // worktree's GitTreePort; otherwise it compares against a
-            // different Git object graph and can never see the confirmed tree.
-            let sessionKey = SessionId.value turn.SessionId
+            task {
+                // PROMPT-011: the recovery pass must complete before any business
+                // effect of a real turn. First turn starts the single pass; later
+                // turns await the same completed task (no-op).
+                do! scope.EnsureRecoveryDone()
 
-            // REVIEW-010 deferred binding: a challenge request parked its seal
-            // candidate (its assistant did not exist at transform time); this
-            // turn IS that assistant, so bind the run and persist. The append is
-            // synchronous up to its first await, so it is committed before the
-            // next provider request; a failure fails closed (no seal → the
-            // second PERFECT cannot confirm, REVIEW-003).
-            ReviewSeal.bindPendingSeal journal pendingReviewSeals turn |> ignore
+                // Manager sessions run inside their own worktree, not the plugin's
+                // root workspace. The review-guard tree check must resolve that
+                // worktree's GitTreePort; otherwise it compares against a
+                // different Git object graph and can never see the confirmed tree.
+                let sessionKey = SessionId.value turn.SessionId
 
-            let managerGitTreePort =
-                match scope.SessionDirectories.TryGetValue sessionKey with
-                | true, directory when not (String.IsNullOrWhiteSpace directory) -> Some(GitTree.create directory)
-                | _ -> gitTreePort
+                // REVIEW-010 deferred binding: a challenge request parked its seal
+                // candidate (its assistant did not exist at transform time); this
+                // turn IS that assistant, so bind the run and persist. The append is
+                // synchronous up to its first await, so it is committed before the
+                // next provider request; a failure fails closed (no seal → the
+                // second PERFECT cannot confirm, REVIEW-003).
+                ReviewSeal.bindPendingSeal journal pendingReviewSeals turn |> ignore
 
-            match turn.Outcome with
-            | TurnFailed _
-            | TurnAborted _ ->
-                scope.ArmRecovery turn.SessionId
+                let managerGitTreePort =
+                    match scope.SessionDirectories.TryGetValue sessionKey with
+                    | true, directory when not (String.IsNullOrWhiteSpace directory) -> Some(GitTree.create directory)
+                    | _ -> gitTreePort
 
-                // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
-                // slot of the Companion that owns it, through the same failure event.
-                // The Companion's single-flight gate serialises the slot sequence,
-                // so this flag cannot race a squash decision.
-                for KeyValue(_, companion) in scope.Companions do
-                    match companion.BloggerSession with
-                    | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
-                    | _ -> ()
-            | TurnCompleted
-            | TurnNeedsContinuation _
-            | TurnInProgress
-            | TurnUnknown -> ()
+                match turn.Outcome with
+                | TurnFailed _
+                | TurnAborted _ ->
+                    scope.ArmRecovery turn.SessionId
 
-            XWire.reconcileAttempt journal scope turn
+                    // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
+                    // slot of the Companion that owns it, through the same failure event.
+                    // The Companion's single-flight gate serialises the slot sequence,
+                    // so this flag cannot race a squash decision.
+                    for KeyValue(_, companion) in scope.Companions do
+                        match companion.BloggerSession with
+                        | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
+                        | _ -> ()
+                | TurnCompleted
+                | TurnNeedsContinuation _
+                | TurnInProgress
+                | TurnUnknown -> ()
 
-            TurnCompletionProgram.applyWithContinuation
-                sessionPort
-                eventPort
-                journal
-                managerGitTreePort
-                scope.VerdictSessions
-                scope.NudgeSent
-                scope.ManagerGuardNudges
-                scope.SessionParents
-                scope.DisposeExecutorRuntime
-                scope.AbortedSessions
-                turn
+                XWire.reconcileAttempt journal scope turn
+
+                do!
+                    TurnCompletionProgram.applyWithContinuation
+                        sessionPort
+                        eventPort
+                        journal
+                        managerGitTreePort
+                        scope.VerdictSessions
+                        scope.NudgeSent
+                        scope.ManagerGuardNudges
+                        scope.SessionParents
+                        scope.DisposeExecutorRuntime
+                        scope.AbortedSessions
+                        turn
+            }
 
         /// HOST-006 containment: observe every reconciled snapshot for compaction
         /// pseudo-runs and reanchor at most one per pass.
@@ -127,43 +135,51 @@ module HostSignalBootstrap =
         /// than an error: a journal-less run has no PrefixEpoch to retire, so there is
         /// no state that could drift.
         let onSnapshot (sessionId: SessionId) (messages: SessionMessage list) : Task =
-            // HOST-006 prevention layer's second half: the runtime probe.
-            //
-            // Judged before containment, and once per plugin instance. If the Host
-            // compacts outside the configuration the plugin can reach, the correct
-            // response is to refuse to run — not to reanchor and carry on, which would
-            // hide the condition behind behaviour that looks correct.
-            if scope.CompactionProbePending then
-                match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
-                | None -> () // Not a completed first turn yet; the probe stays armed.
-                | Some verdict ->
-                    if scope.TryClaimStartupProbe() then
-                        match verdict with
-                        | CompactionGateVerdict.Satisfied -> ()
-                        | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
+            task {
+                // PROMPT-011: the recovery pass must complete before the startup
+                // compaction probe judges the first turn — the probe is a business
+                // effect too (it can refuse to run).
+                do! scope.EnsureRecoveryDone()
 
-            match journal with
-            | None -> AsyncSupport.completedTask ()
-            | Some durable ->
-                let observed =
-                    messages
-                    |> List.filter (fun message -> HostCompactionPolicy.isContainableCompaction message.IsCompaction)
-                    |> List.map (fun message -> ProviderRunIdentity.create message.Id)
+                // HOST-006 prevention layer's second half: the runtime probe.
+                //
+                // Judged before containment, and once per plugin instance. If the Host
+                // compacts outside the configuration the plugin can reach, the correct
+                // response is to refuse to run — not to reanchor and carry on, which would
+                // hide the condition behind behaviour that looks correct.
+                if scope.CompactionProbePending then
+                    match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
+                    | None -> () // Not a completed first turn yet; the probe stays armed.
+                    | Some verdict ->
+                        if scope.TryClaimStartupProbe() then
+                            match verdict with
+                            | CompactionGateVerdict.Satisfied -> ()
+                            | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
 
-                if List.isEmpty observed then
-                    AsyncSupport.completedTask ()
-                else
-                    match HostCompactionGate.reanchorObserved durable sessionId observed with
-                    | Ok None
-                    | Ok(Some _) -> AsyncSupport.completedTask ()
-                    // A failed append here is not fatal to the turn that just
-                    // completed. PERSIST-003's fail-closed path already owns a poisoned
-                    // journal; what this must not do is throw inside the reconcile loop
-                    // and leave `Running` set, which would stop every later pass for
-                    // this session.
-                    | Error reason ->
-                        HostCompactionGate.logReanchorFailure sessionId reason
-                        AsyncSupport.completedTask ()
+                match journal with
+                | None -> ()
+                | Some durable ->
+                    let observed =
+                        messages
+                        |> List.filter (fun message ->
+                            HostCompactionPolicy.isContainableCompaction message.IsCompaction)
+                        |> List.map (fun message -> ProviderRunIdentity.create message.Id)
+
+                    if List.isEmpty observed then
+                        ()
+                    else
+                        match HostCompactionGate.reanchorObserved durable sessionId observed with
+                        | Ok None
+                        | Ok(Some _) -> ()
+                        // A failed append here is not fatal to the turn that just
+                        // completed. PERSIST-003's fail-closed path already owns a poisoned
+                        // journal; what this must not do is throw inside the reconcile loop
+                        // and leave `Running` set, which would stop every later pass for
+                        // this session.
+                        | Error reason ->
+                            HostCompactionGate.logReanchorFailure sessionId reason
+                            ()
+            }
 
         let reconciler =
             ReconcileSupervisor.Supervisor(

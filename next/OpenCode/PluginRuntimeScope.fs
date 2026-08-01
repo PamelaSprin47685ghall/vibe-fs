@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Journal
+open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
@@ -40,6 +41,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let startupProbeGate = obj ()
     let mutable startupProbeDone = false
 
+    /// PROMPT-011 post-init recovery gate.
+    ///
+    /// Created empty; `AttachRecoveryGate` seeds it with the journal and snapshot
+    /// port once both exist (after `createHost`). Attaching is pure bookkeeping —
+    /// no SDK call happens until the first real Host event calls `EnsureRecoveryDone`.
+    let mutable recoveryGate: PromptRecovery.RecoveryGate option = None
+    let recoveryGateLock = obj ()
+
     member _.Journal = journal
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
@@ -56,6 +65,19 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val AbortedSessions = HashSet<string>()
     member val RecoveryArming = Dictionary<string, SlotArming>()
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
+
+    member this.AttachRecoveryGate(gate: PromptRecovery.RecoveryGate) =
+        lock recoveryGateLock (fun () -> recoveryGate <- Some gate)
+
+    /// PROMPT-011: await the single recovery pass before any business effect.
+    ///
+    /// Safe to call from any event entry point: first caller starts the pass,
+    /// later callers await the same task. A journal-less or snapshot-less scope
+    /// has nothing to reconcile and completes immediately.
+    member this.EnsureRecoveryDone() : System.Threading.Tasks.Task =
+        lock recoveryGateLock (fun () -> recoveryGate)
+        |> Option.map (fun gate -> gate.EnsureDone())
+        |> Option.defaultValue (AsyncSupport.completedTask ())
 
     member this.ArmRecovery(sessionId: SessionId) =
         this.RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
