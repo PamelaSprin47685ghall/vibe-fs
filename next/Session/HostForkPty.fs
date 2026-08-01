@@ -10,7 +10,9 @@ open Wanxiangshu.Next.Kernel.Identity
 module HostForkRuntimePty =
     type HostForkRuntime with
         member this.TrackPtyRun(id: PtyId) =
-            lock this.Gate (fun () -> this.PtyRuns.Add id.Value |> ignore)
+            lock this.Gate (fun () ->
+                this.PtyRuns.Add id.Value |> ignore
+                this.LastPtyId <- Some id.Value)
 
         member this.RegisterPtySnapshot (id: PtyId) (command: string) =
             this.Runtime.RegisterPty
@@ -47,12 +49,20 @@ module HostForkRuntimePty =
             }
 
         member this.TryPty(id: string) =
-            let candidate = PtyId.Create id
-
-            if this.OwnsPty candidate && this.PtyPort.Known candidate then
-                Some candidate
+            if String.IsNullOrWhiteSpace id then
+                // 无 agent：作用于最近创建的 PTY（pty-stress 剧本的写/读/signal 语义）。
+                // `OwnsPty` 再查一次，防止 lastPtyId 指向已被 join 清掉的 PTY。
+                match this.LastPtyId with
+                | Some last when this.OwnsPty(PtyId.Create last) && this.PtyPort.Known(PtyId.Create last) ->
+                    Some(PtyId.Create last)
+                | _ -> None
             else
-                None
+                let candidate = PtyId.Create id
+
+                if this.OwnsPty candidate && this.PtyPort.Known candidate then
+                    Some candidate
+                else
+                    None
 
         member this.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyRead, string>> =
             task {

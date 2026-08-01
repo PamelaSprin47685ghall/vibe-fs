@@ -43,6 +43,7 @@ type HostForkRuntime
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
+    let mutable lastPtyId: string option = None
     let gate = obj ()
 
     let directoryOf = defaultArg directoryFor (fun _ -> None)
@@ -95,6 +96,13 @@ type HostForkRuntime
     member internal _.Children = children
     member internal _.PendingRuns = pendingRuns
     member internal _.PtyRuns = ptyRuns
+
+    /// 最近创建的 PTY id。fork-pty 写/读/signal 无 agent 时作用于它
+    /// （canary DSL 的「最近创建」语义；`TryPty ""` 的解析目标）。
+    member internal _.LastPtyId
+        with get () = lock gate (fun () -> lastPtyId)
+        and set value = lock gate (fun () -> lastPtyId <- value)
+
     member internal _.Gate = gate
     member internal _.Sessions = sessions
     member internal _.Journal = journal
