@@ -22,6 +22,8 @@ module HostForkChildDispatch =
     let sendToExistingChild
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
         (sessions: ISessionHostPort)
         (childWorkRecordFor: SessionId -> string option)
         (runtime: ForkRuntime)
@@ -53,7 +55,16 @@ module HostForkChildDispatch =
             | None ->
                 // Idle existing child: new AgentOwnerRoot work via ordinary send.
                 let run =
-                    HostForkRunLifecycle.installRun gate pendingRuns sessions childWorkRecordFor agentId childId role
+                    HostForkRunLifecycle.installRun
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        childWorkRecordFor
+                        agentId
+                        childId
+                        role
 
                 onRunStarted childId role
 
@@ -62,7 +73,15 @@ module HostForkChildDispatch =
 
                 match result with
                 | ForkResult.NotFound _ ->
-                    HostForkRunLifecycle.failRun gate pendingRuns sessions run "Fork runtime is cancelled"
+                    HostForkRunLifecycle.failRun
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        run
+                        "Fork runtime is cancelled"
+
                     return Error "Fork runtime is cancelled"
                 | _ ->
                     HostForkRunLifecycle.markReady gate run
@@ -74,22 +93,21 @@ module HostForkChildDispatch =
                         HostForkRunLifecycle.failRun
                             gate
                             pendingRuns
+                            journal
+                            parentId
                             sessions
                             run
                             "Existing agent did not accept a new run"
 
                         return Error "Existing agent did not accept a new run"
                     | Error err, _ ->
-                        HostForkRunLifecycle.failRun gate pendingRuns sessions run err
+                        HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run err
                         return Error err
         }
 
     /// Abort linked child sessions. Handle retirement has already been written
     /// synchronously by the caller before the async cleanup begins.
-    let teardownChildren
-        (sessions: ISessionHostPort)
-        (childIds: SessionId list)
-        : Task<Result<unit, string>> =
+    let teardownChildren (sessions: ISessionHostPort) (childIds: SessionId list) : Task<Result<unit, string>> =
         task {
             let mutable firstError: string option = None
 
@@ -148,8 +166,7 @@ module HostForkChildDispatch =
                     match HandleId.tryAgent record.Handle with
                     | Some handle -> Some(AgentHandleId.value handle, record.ChildSessionId)
                     | None -> None)
-            | None ->
-                lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+            | None -> lock gate (fun () -> children |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
 
         let childIds = owned |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIds)

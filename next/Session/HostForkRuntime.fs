@@ -28,7 +28,16 @@ type HostForkRuntime
         ?childWorkRecordFor: SessionId -> string option,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
-        ?publishToMailbox: bool
+        ?publishToMailbox: bool,
+        /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
+        /// Reviewer. The Orchestrator's runtime keeps this off — it opens barriers
+        /// itself (ORCH-006) — so exactly one writer owns each barrier.
+        ?openReviewBarrier: bool,
+        /// REVIEW-007: the Git tree hash of a forked Reviewer's directory, used to
+        /// open the barrier. `None` for a directory with no readable tree: the
+        /// Reviewer's verdict then fails closed under REVIEW-008, which is the
+        /// correct outcome for a review without a tree.
+        ?treeHashFor: string -> GitTreeHash option
     ) as this =
     let runtime = ForkRuntime(publishToMailbox = defaultArg publishToMailbox true)
     let children = Dictionary<string, SessionId>()
@@ -102,6 +111,8 @@ type HostForkRuntime
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
     member internal _.ParentAbortToken = parentAbortToken
+    member internal _.OpenReviewBarrier = defaultArg openReviewBarrier false
+    member internal _.TreeHashFor = defaultArg treeHashFor (fun _ -> None)
 
     member _.IsRetiredHandle(agentId: string) =
         journal
@@ -124,36 +135,31 @@ type HostForkRuntime
             | TerminalOutcome.Completed _ -> AgentCompletion.snapshotOption (childWorkRecordOf run.ChildId)
             | _ -> None
 
-        let completionKind =
-            match outcome with
-            | TerminalOutcome.Completed _ -> HandleCompletionKind.Terminal
-            | TerminalOutcome.Aborted _
-            | TerminalOutcome.Failed _ -> HandleCompletionKind.SendFailure
-
-        // Persist the single-assignment handle completion before consuming the
-        // pending run.  The Host lifecycle must still release its subscription
-        // and source when persistence reports an error, so surface the journal
-        // failure only after cleanup rather than silently claiming success.
-        let completionResult =
-            HandleController.recordCompletion journal parentId run.AgentId completionKind
-
-        HostForkRunLifecycle.complete gate pendingRuns sessions run outcome workRecord
-
-        match completionResult with
-        | Ok() -> ()
-        | Error error ->
-            failwith (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
+        // EXEC-009's durable completion is written by `HostForkRunLifecycle.complete`
+        // (which now takes the journal), so this path only delivers the mailbox
+        // result. The single-assignment fold absorbs the cancel-path completion
+        // that `HandleController.cancelChildren` writes first.
+        HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
 
     member this.InstallRun(agentId: string, childId: SessionId, role: AgentRole) =
         let run =
-            HostForkRunLifecycle.installRun gate pendingRuns sessions childWorkRecordOf agentId childId role
+            HostForkRunLifecycle.installRun
+                gate
+                pendingRuns
+                journal
+                parentId
+                sessions
+                childWorkRecordOf
+                agentId
+                childId
+                role
 
         runtime.BindChildSession(agentId, childId)
         runStarted childId role (directoryOf agentId)
         run
 
     member this.FailRun(run: PendingHostRun, error: string) =
-        HostForkRunLifecycle.failRun gate pendingRuns sessions run error
+        HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error
 
     member this.MarkReady(run: PendingHostRun) = HostForkRunLifecycle.markReady gate run
 
@@ -171,7 +177,8 @@ type HostForkRuntime
                 children
                 sessions
                 journal
-                (journal |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
+                (journal
+                 |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
                 parentId
                 (fun run outcome -> this.Complete(run, outcome))
         )

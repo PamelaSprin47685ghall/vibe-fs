@@ -58,6 +58,8 @@ module HostForkRunLifecycle =
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
         (sessions: ISessionHostPort)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
@@ -85,6 +87,26 @@ module HostForkRunLifecycle =
         if claimed then
             subscriptionToDispose
             |> Option.iter (fun subscription -> subscription.Dispose())
+
+            // EXEC-009: the durable completion precedes the mailbox delivery. The
+            // `join` that consumes the completion retires the handle, and the fold
+            // rejects that retirement unless `HandleCompleted` is already on disk —
+            // measured on Host 1.18.10: every agent `join` poisoned the journal
+            // with `join retired a handle that had no completion (EXEC-004)`, which
+            // permanently disabled every later durable effect. The previous code
+            // wrote the completion only on the cancel path.
+            let completionKind =
+                match outcome with
+                | Completed _ -> HandleCompletionKind.Terminal
+                | Aborted _
+                | Failed _ -> HandleCompletionKind.SendFailure
+
+            match journal with
+            | None -> ()
+            | Some _ ->
+                match HandleController.recordCompletion journal parentId run.AgentId completionKind with
+                | Ok() -> ()
+                | Error error -> failwith (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
 
             let runId = "run-" + run.AgentId
             let childId = run.ChildId
@@ -137,6 +159,8 @@ module HostForkRunLifecycle =
     let installRun
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
         (sessions: ISessionHostPort)
         (childWorkRecordFor: SessionId -> string option)
         (agentId: string)
@@ -163,7 +187,8 @@ module HostForkRunLifecycle =
         let subscription =
             sessions.SubscribeTerminal(
                 childId,
-                (fun _ outcome -> complete gate pendingRuns sessions run outcome (terminalWorkRecord outcome))
+                (fun _ outcome ->
+                    complete gate pendingRuns journal parentId sessions run outcome (terminalWorkRecord outcome))
             )
 
         let disposeImmediately =
@@ -179,11 +204,13 @@ module HostForkRunLifecycle =
     let failRun
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
         (sessions: ISessionHostPort)
         (run: PendingHostRun)
         (error: string)
         =
         lock gate (fun () -> run.Ready <- true)
-        complete gate pendingRuns sessions run (TerminalOutcome.Failed error) None
+        complete gate pendingRuns journal parentId sessions run (TerminalOutcome.Failed error) None
 
     let markReady (gate: obj) (run: PendingHostRun) = lock gate (fun () -> run.Ready <- true)
