@@ -20,7 +20,7 @@ open Wanxiangshu.Next.Journal
 /// source (`session/prompt.ts`) creates and PERSISTS the assistant message at
 /// :1186-1201, before triggering transform at :1255 — so the target run already
 /// exists in the transcript and is readable through the SDK. Evidence:
-/// `STATUS/evidence/host-transform-run-binding.md`.
+/// `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md`.
 module ReviewSeal =
 
     /// Why no seal was written. Every case forbids confirmation rather than

@@ -1,4 +1,4 @@
-# STATUS/changelog — 版本历史
+# Changelog — 版本历史
 
 ## 0.5.0-rc.1 — docs freeze / RC development
 
@@ -18,12 +18,3 @@ Breaking changes:
 - Structured Agent Program (Flow CE, no Stage/Phase/Lease platform)
 - Prompt Authority / Logical Run rules
 - Companion + ActivePrefixEpoch / FrozenB cache protection
-- Manager `fork-agent / join / list`; Orchestrator `fork-manager / join`
-- Static role matrix with full system prompts
-- Logical-Run Fallback A/A/B/B with durable retry writer
-- Dual PERFECT Review with ProviderRunIdentity binding
-- Process/Executor: 3× estimate, large gate, 200KB ripple-carry
-- PTY via DevOps `fork-pty` only; onExit-only completion; structured signals
-- Orchestrator: clean gate, worktree, serial publish lock, rebase, re-review, ff-only
-- OpenCode adapter: idle/retry/deleted signal + single-flight reconcile
-- Private distribution: `private: true`, provisional commercial LICENSE

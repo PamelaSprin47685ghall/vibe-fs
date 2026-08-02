@@ -199,7 +199,7 @@ test('FALLBACK_012_the_next_slot_is_armed_exactly_when_this_one_failed', () => {
 // ── the acceptance trace ───────────────────────────────────────────────────
 
 test('FALLBACK_012_parked_cursor_does_not_trigger_compression_acceptance_trace', () => {
-  // STATUS/shock-anneal's verification trace, as a decision sequence.
+  // The shock-anneal archive's verification trace, as a decision sequence.
   //
   // The Offset is threaded through because CTX-006 reads it as one of three
   // conjuncts. What the trace proves is that parity is not SUFFICIENT: turn 6 starts

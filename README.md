@@ -4,13 +4,13 @@ OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧�
 
 当前版本：`0.5.0-rc.1`（OpenCode Agent DSL） — 唯一产品语义见 [`SSOT/00.md`](SSOT/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
 
-产品语义：[`SSOT/00.md`](SSOT/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前迁移总账：[`STATUS/shock-anneal.md`](STATUS/shock-anneal.md)。
+产品语义：[`SSOT/00.md`](SSOT/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前状态：[`STATUS/README.md`](STATUS/README.md)。
 
 ## 当前边界
 
-本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度、每个工作包状态、旧符号灭绝表见 [`STATUS/shock-anneal.md`](STATUS/shock-anneal.md)。
+本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，迁移全过程归档见 [`docs/archive/shock-anneal-2026/FINAL-REPORT.md`](docs/archive/shock-anneal-2026/FINAL-REPORT.md)。
 
-休克开始前的最后一次完整机器反馈保存在 [`STATUS/evidence/pre-shock/`](STATUS/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（含 SSOT/14-16 的 `PURE_CORE_ONLY` 纯领域内核）。
+休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（含 SSOT/14-16 的 `PURE_CORE_ONLY` 纯领域内核）。
 
 TestKit 以 `ProviderSemanticProjection` 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容（VERIFY-003、VERIFY-007）。P0 保持并行，release gate 恰好 3 轮；每个场景使用 2 秒 causal-progress Watchdog（VERIFY-004）。
 
@@ -76,7 +76,7 @@ next/                 生产 Agent DSL
 tests-mjs/            第 1–3 层测试（mjs，import build/next）
 testkit/opencode/     独立 OpenCode harness
 SSOT/                 产品语义（唯一规范，条款 ID 寻址）
-STATUS/               实现状态、合规表、迁移总账
+STATUS/               当前状态（README、合规表、blockers）
 ```
 
 旧实现不作为生产依赖。历史代码仅可作逐符号行为证据；禁止整版本 checkout 或无审查覆盖。

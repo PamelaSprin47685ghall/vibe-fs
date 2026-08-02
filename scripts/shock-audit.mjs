@@ -84,7 +84,7 @@ const EXTINCTION = [
   { symbol: 'OrchestratorPreRebaseReviewConfirmed', clause: 'ORCH-006' },
   { symbol: 'OrchestratorPostRebaseReviewConfirmed', clause: 'ORCH-006' },
 
-  // Script forest (work package K). See STATUS/design-script-forest.md.
+  // Script forest (work package K). See FINAL-REPORT §6.8 (archive).
   // Content must be a pure function of (lane, turn, step); these are the
   // mechanisms that made it stateful, ambiguous, or identity-guessing.
   { symbol: 'specificity', clause: 'VERIFY-003' },

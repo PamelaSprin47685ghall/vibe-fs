@@ -52,7 +52,7 @@ type HostToolArguments internal (raw: obj) =
 /// No user-message field. HOST-011: the Host's `ToolContext` carries `sessionID`,
 /// `messageID` and `callID`, and never a user message id — verified against Host
 /// `tool/tool.ts` and the published `@opencode-ai/plugin` types
-/// (`STATUS/evidence/host-transform-run-binding.md`). The old optional field
+/// (`docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md`). The old optional field
 /// decoded a key that does not exist, so it was always `None`, and every
 /// `Option.orElse` fallback beside it was unreachable code that read as a working
 /// second source.
@@ -174,12 +174,8 @@ module ToolHostCodec =
     let decodeContext (raw: obj) =
         { SessionId = contextString raw "sessionID" |> Option.defaultValue ""
           Agent = contextString raw "agent"
-          ToolCallId =
-              contextString raw "callID"
-              |> Option.map ToolCallId.create
-          ProviderRunId =
-              contextString raw "messageID"
-              |> Option.map ProviderRunIdentity.create
+          ToolCallId = contextString raw "callID" |> Option.map ToolCallId.create
+          ProviderRunId = contextString raw "messageID" |> Option.map ProviderRunIdentity.create
           PromptText = promptText raw
           AttachAbort = attachAbort raw }
 

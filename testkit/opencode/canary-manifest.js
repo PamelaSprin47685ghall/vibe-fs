@@ -27,7 +27,7 @@
  *
  * 2. AN EMPTY OR MISSING DIRECTORY IS AN ERROR, NOT AN EMPTY SUITE. Returning `[]` would let the
  *    release gate run three iterations over zero canaries and report success — 「一个能对错误实现
- *    给出绿灯的验证装置，比没有验证装置更危险」(`STATUS/design-script-forest.md:630`). The refusal
+ *    给出绿灯的验证装置，比没有验证装置更危险」(`docs/archive/shock-anneal-2026/FINAL-REPORT.md` §6.8, from `design-script-forest.md`). The refusal
  *    names the absolute directory and the suffix it looked for, because the two ways this fails
  *    (the directory moved, the convention changed) need different fixes and the message is the
  *    only thing that tells them apart.
@@ -101,7 +101,7 @@ export const CANARY_TESTS = readCanaryTests();
  * How many canaries may be in flight at once (ARCH-009 by analogy).
  *
  * ARCH-009 scopes to the business layer, so `Promise.all` over the whole suite in a harness script
- * is not a violation of it — recorded as such in `STATUS/shock-anneal.md`. But the clause's REASON is
+ * is not a violation of it — recorded as such in the shock-anneal archive. But the clause's REASON is
  * attributed to VERIFY-004, and excessive OpenCode process fan-out manufactures precisely the
  * resource contention VERIFY-004 forbids masking with longer windows: failure then depends on
  * machine load rather than on logic, and slow becomes indistinguishable from dead.

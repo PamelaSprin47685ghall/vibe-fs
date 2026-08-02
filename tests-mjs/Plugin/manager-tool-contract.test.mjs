@@ -464,7 +464,7 @@ test('CTX_002_the_transform_injects_no_synthetic_marker', async () => {
 // ── the execute path (EXEC-002, EXEC-004, AGENT-007 layer two) ───────────────
 //
 // Everything above is layer 2: what the Host is OFFERED. The three tests below
-// are what STATUS/shock-anneal.md「四」recorded as never passing in the deleted
+// are what the shock-anneal archive (FINAL-REPORT §8) recorded as never passing in the deleted
 // `testkit/opencode/tests/manager-tool-contract.mjs`: actually invoking
 // `hooks.tool.*.execute`. Two independent defects kept them red:
 //
