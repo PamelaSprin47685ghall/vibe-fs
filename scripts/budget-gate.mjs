@@ -15,7 +15,7 @@
 // governed by an imported bound", which needs dataflow this repo has no business attempting.
 //
 // The provable version is magnitude. A slice must poll faster than the budget that bounds it,
-// or it races that budget: `canary-driver.mjs` slices at 500ms under a 2000ms silence budget,
+// or it races that budget: `canary-driver.mjs` slices at 500ms under a 3000ms silence budget,
 // the listen poll runs at 50ms, the socket retry at 30ms. So a legitimate slice is below
 // 1000ms by construction. A slice that genuinely needs 1000ms or more is not a slice — it is
 // itself a budget, and it costs one line in `time-budget.js` to say so.

@@ -177,7 +177,7 @@ export const budgetCases = [
     fn: () => {
       // The discriminator, stated as an acceptance. A slice must poll faster than the budget
       // bounding it or it races that budget, so a legitimate slice is sub-threshold by
-      // construction: `canary-driver.mjs` slices at 500 under a 2000 silence budget, the listen
+      // construction: `canary-driver.mjs` slices at 500 under a 3000 silence budget, the listen
       // poll at 50, the socket retry at 30. Without this case the gate could tighten to "no
       // numbers near timers" and nobody would notice it had stopped being a semantic rule.
       accepts(`await new Promise((r) => setTimeout(r, 500));\nconst POLL_INTERVAL_MS = 50;\n`);
@@ -264,13 +264,13 @@ export const budgetCases = [
       // of the case is the conversation it forces, not the change it blocks.
       //
       // The WHOLE object is compared, not field by field. AGENTS.md §6: mjs has no compile-time
-      // rename protection, so `assertEq(budget.WATCHDOG_TIMEOUT_MS, 2000)` on a renamed or
+      // rename protection, so `assertEq(budget.WATCHDOG_TIMEOUT_MS, 3000)` on a renamed or
       // deleted field reads `undefined` and reports a value mismatch — which looks like a
       // retuning to review, when it is a vanished budget. Comparing the object catches added,
       // removed and renamed constants in the same assertion.
       const expected = {
         LITERAL_BUDGET_THRESHOLD_MS: 1000,
-        WATCHDOG_TIMEOUT_MS: 2000,
+        WATCHDOG_TIMEOUT_MS: 3000,
         DIAGNOSTIC_RACE_MS: 3000,
         CANARY_READY_MS: 10000,
         READINESS_STAGE_MS: 4000,
