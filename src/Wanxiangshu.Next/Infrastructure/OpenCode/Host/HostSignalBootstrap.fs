@@ -60,9 +60,6 @@ module HostSignalBootstrap =
 
         let binding = TurnBinding.Store()
 
-        // HOST-012: shared across plugin instances (transform parks, tool binds).
-        let pendingReviewSeals = SharedState.PendingReviewSeals
-
         let onTurn (turn: ReconciledTurn) : Task =
             task {
                 // PROMPT-011: the recovery pass must complete before any business
@@ -75,14 +72,6 @@ module HostSignalBootstrap =
                 // worktree's GitTreePort; otherwise it compares against a
                 // different Git object graph and can never see the confirmed tree.
                 let sessionKey = SessionId.value turn.SessionId
-
-                // REVIEW-010 deferred binding: a challenge request parked its seal
-                // candidate (its assistant did not exist at transform time); this
-                // turn IS that assistant, so bind the run and persist. The append is
-                // synchronous up to its first await, so it is committed before the
-                // next provider request; a failure fails closed (no seal → the
-                // second PERFECT cannot confirm, REVIEW-003).
-                ReviewSeal.bindPendingSeal journal pendingReviewSeals turn |> ignore
 
                 let managerGitTreePort =
                     match scope.SessionDirectories.TryGetValue sessionKey with
@@ -305,4 +294,4 @@ module HostSignalBootstrap =
                 |> Option.map PhysicalUserMessageId.value)
           ChatMessageHook = chatMessageHook
           ObserveEvent = signalRouter.ObserveLocal
-          PendingReviewSeals = pendingReviewSeals }
+          PendingReviewSeals = SharedState.PendingReviewSeals }

@@ -151,66 +151,53 @@ module VerdictTool =
                     // PROMPT-002 identity from a PROMPT-001 one.
                     match ReviewController.submit journal HostDigest.sha256Hex submission with
                     | Ok VerdictDecision.ChallengeUnproven ->
-                        // REVIEW-010 fallback: the `onTurn` deferred binding keys
-                        // the seal by the reconcile run, but the tool executes
-                        // under `context.ProviderRunId` — measured on Host
-                        // 1.18.10 these disagree for challenge responses, so the
-                        // second PERFECT would always fail `ChallengeUnproven`.
-                        // If a parked candidate exists for this reviewer, bind it
-                        // to THIS run (the run the next PERFECT actually queries)
-                        // and retry once.
-                        match scope.PendingReviewSeals.TryGetValue reviewerId with
-                        | false, _ ->
+                        // REVIEW-010: bind the transform-parked seal to THIS run and
+                        // submit once more. The tool's `context.ProviderRunId` is the
+                        // only reliable binding key — the reconcile `onTurn` run
+                        // disagrees with it on Host 1.18.10 for challenge responses,
+                        // so the onTurn binding was removed (it wrote dead data) and
+                        // `ReviewSeal.bindToRun` is the sole writer (REVIEW-010).
+                        match
+                            ReviewSeal.bindToRun
+                                journal
+                                scope.PendingReviewSeals
+                                (SessionId.create reviewerId)
+                                providerRunId
+                        with
+                        | Error ReviewSeal.NoPendingSeal ->
                             return
                                 ToolHostCodec.tomlObject
                                     [ "error",
                                       tString
                                           "Verdict rejected: this provider run has no input seal proving it received the previous challenge." ]
-                        | true, pending ->
-                            let sealFact =
-                                AgentFact.ProviderInputSealed
-                                    {| SessionId = pending.SessionId
-                                       ProviderRun = providerRunId
-                                       PhysicalUserMessageId = pending.PhysicalUserMessageId
-                                       SealDigest = pending.SealDigest
-                                       CanonicalVersion = pending.CanonicalVersion
-                                       IncludedToolResultDigests = pending.IncludedToolResultDigests |}
-
-                            match
-                                AgentJournal.appendAgent
-                                    (StreamId.Session pending.SessionId)
-                                    (Some providerRunId)
-                                    sealFact
-                                    journal
-                            with
-                            | Error appendFailure ->
+                        | Error(ReviewSeal.AppendFailed bindFailure) ->
+                            return
+                                ToolHostCodec.tomlObject
+                                    [ "error",
+                                      tString (
+                                          sprintf
+                                              "Verdict rejected: challenge unproven (seal bind failed: %s)"
+                                              bindFailure
+                                      ) ]
+                        | Ok _ ->
+                            match ReviewController.submit journal HostDigest.sha256Hex submission with
+                            | Error retryError ->
                                 return
                                     ToolHostCodec.tomlObject
                                         [ "error",
                                           tString (
-                                              sprintf
-                                                  "Verdict rejected: challenge unproven (seal bind failed: %s)"
-                                                  (JournalAppendFailure.describe appendFailure)
+                                              sprintf "Verdict rejected: challenge unproven (retry: %s)" retryError
                                           ) ]
-                            | Ok _ ->
-                                match ReviewController.submit journal HostDigest.sha256Hex submission with
-                                | Error retryError ->
-                                    return
-                                        ToolHostCodec.tomlObject
-                                            [ "error",
-                                              tString (
-                                                  sprintf "Verdict rejected: challenge unproven (retry: %s)" retryError
-                                              ) ]
-                                | Ok VerdictDecision.ChallengeUnproven ->
-                                    return
-                                        ToolHostCodec.tomlObject
-                                            [ "error",
-                                              tString
-                                                  "Verdict rejected: this provider run has no input seal proving it received the previous challenge." ]
-                                | Ok decision ->
-                                    scope.PendingReviewSeals.Remove reviewerId |> ignore
-                                    scope.MarkVerdictSubmitted reviewerId
-                                    return report decision
+                            | Ok VerdictDecision.ChallengeUnproven ->
+                                return
+                                    ToolHostCodec.tomlObject
+                                        [ "error",
+                                          tString
+                                              "Verdict rejected: this provider run has no input seal proving it received the previous challenge." ]
+                            | Ok decision ->
+                                scope.PendingReviewSeals.Remove reviewerId |> ignore
+                                scope.MarkVerdictSubmitted reviewerId
+                                return report decision
                     | Ok decision ->
                         scope.MarkVerdictSubmitted reviewerId
                         return report decision

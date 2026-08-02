@@ -240,7 +240,17 @@ console.log('shock-audit: legacy symbol residue\n')
 console.log(`${pad('SYMBOL', 40)}${pad('CLAUSE', 14)}${scopeNames.map((s) => pad(s, 9)).join('')}`)
 
 for (const entry of EXTINCTION) {
-  const counts = scopeNames.map((scope) => countLiteral(filesFor(entry, scope), entry.symbol).length)
+  // A script-forest `assertFacts = { name = "X", eq = 0 }` line asserts that X
+  // is EXTINCT in the journal — it is a claim about the symbol, not a use of it.
+  // Counting it as residue would make every extinction audit permanently red
+  // the moment a scenario pins the extinction (measured: reviewer-verdict.toml
+  // `GuardPromptAccepted`). Only the scripts scope (TOML scenarios) can carry
+  // this shape.
+  const counts = scopeNames.map((scope) => {
+    const hits = countLiteral(filesFor(entry, scope), entry.symbol)
+    const used = scope === 'scripts' ? hits.filter((hit) => !hit.text.includes('assertFacts')) : hits
+    return used.length
+  })
   const cells = counts.map((count, index) => {
     const target = targetFor(entry, scopeNames[index])
     const flag = count > target ? '!' : ' '

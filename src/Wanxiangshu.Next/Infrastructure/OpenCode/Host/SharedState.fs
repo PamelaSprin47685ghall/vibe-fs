@@ -18,7 +18,7 @@ open Wanxiangshu.Next.Kernel.Identity
 module SharedState =
 
     /// REVIEW-010: a seal candidate before its provider run exists (see
-    /// `ReviewSeal.bindPendingSeal`). Defined here so the shared dictionary can
+    /// `ReviewSeal.bindToRun`). Defined here so the shared dictionary can
     /// be typed before `ReviewSeal` compiles.
     type PendingSeal =
         { SessionId: SessionId

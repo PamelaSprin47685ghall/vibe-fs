@@ -70,7 +70,7 @@ Fallback 段的每一行都绑定到一个第 1 层测试或一次 `shock-audit`
 | REVIEW-006: 自包含 Witness | CONFORMANT | `Domain/ReviewWitness.fs` | `confirm` 接收两个摘要而非 bool，故 witness 自带证据；不依赖外围 Map。第 1 层测试直接断言生产 record 的键集合（而非 facade 投影），确保无 authority root / physical message 字段 |
 | REVIEW-007: Manager Guard | PARTIAL | `HostReviewGuard.fs` `TerminalPolicy.isTopLevelManager` | 纯侧已有判据：requirement 按 Authority Root 键入并去重、确认后清除且对同一 run 幂等（第 1 层测试）。Host 侧 terminal 钩子接线属第 3 层；退火三进行中，尚待取得该轨迹证据 |
 | REVIEW-008: Git tree 变化使 witness 无效 | CONFORMANT | `ReviewWitness.isValidForTree` | 有效性是对当前 tree 的派生问题而非 mutation：witness 历史保留且仍报 `Confirmed`，但 `satisfiesGuard` 对新 tree 为 false。新 barrier 清 pending 而保留 witness；同 barrier 重入幂等。第 1 层测试 |
-| REVIEW-010: ProviderInputSeal | CONFORMANT | `OpenCode/ReviewSeal.fs` `Journal/ReviewProjection.fs` | `shock-audit` 实测单一写入口 ok (1)。seal 记录 `IncludedToolResultDigests`，Fold 由 list 转 `Set<string>`；窗口上限 8。可实现性见 `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
+| REVIEW-010: ProviderInputSeal | CONFORMANT | `Application/Reconciliation/ReviewSeal.fs` `Journal/ReviewProjection.fs` | `shock-audit` 实测单一写入口 ok (1)。seal 记录 `IncludedToolResultDigests`，Fold 由 list 转 `Set<string>`；窗口上限 8。绑定只发生在工具执行路径（`ReviewSeal.bindToRun`）：onTurn 绑定已删——Host 1.18.10 上 reconcile run 与 `context.ProviderRunId` 对 challenge response 不一致，onTurn 写的 seal 是死数据（曾逼出 VerdictTool 第二写者）。可实现性见 `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
 
 ### Review 段此前的记录同样失效（包 T-3 更正）
 
