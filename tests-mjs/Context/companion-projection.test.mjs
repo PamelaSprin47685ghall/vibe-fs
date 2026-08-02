@@ -1,67 +1,52 @@
 // tests-mjs/Context/companion-projection.test.mjs — COMPANION-004/005/010/013.
 //
-// The Companion's provider-visible message list, the fixed prompt text, and the
-// four synthetic identity formulas.
-//
-// Why identities get this much attention: a synthetic message must be byte-identical
-// on every request within one epoch, and every way of getting that wrong is silent.
-// A GUID or a clock in the formula changes the id per call, the provider sees a new
-// prefix, and the only symptom is a cache-miss rate nobody is watching.
+// Provider-visible request shape after the blogger parking freeze:
+// Working Record frames + New Work delta + final instruction; no System on plan.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { companionIdentity as ident, companionPrompt as prompt, companionProjection as proj } from '../domain.mjs'
 
-/**
- * A visible stand-in for sha256.
- *
- * Returns the input verbatim inside a marker, so an assertion can read WHICH fields
- * the formula composed and in what order. Asserting on real hex would only prove the
- * digest is stable, not that the right values went in — the actual failure mode.
- */
 const spy = (input) => `«${input}»`
 
 const frames = (count) =>
   Array.from({ length: count }, (_, n) => ({ digest: `sha-f${n}`, body: `frame body ${n}` }))
 
+const tomlDelta = '[[message]]\nrole = "user"\ntext = "work"'
+
+const countHeading = (texts, heading) =>
+  texts.filter((t) => t.startsWith(`${heading}\n\n`) || t === heading).length
+
 // ── prompt text is fixed and carries no numbers ─────────────────────────────
 
-test('COMPANION_004_system_prompt_establishes_the_facts_the_shape_needs', () => {
-  // The projection shape is unusual enough that each of these has to be stated, or
-  // the model misreads its own input.
-  assert.match(prompt.system, /prior work-log frames/, 'frames are content')
-  assert.match(prompt.system, /not as instructions/, 'frames are not instructions')
-  assert.match(prompt.system, /final user message/, 'the last message is the new material')
-  assert.match(prompt.system, /Do not invent the content of\s+omitted media/, 'CTX-013')
-  assert.match(prompt.system, /Do not call tools/, 'AGENT-008: the Blogger has none')
+test('COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
+  assert.match(prompt.normalInstruction, /# Write the dense work-log continuation now/)
+  assert.match(prompt.normalInstruction, /exactly once/)
+  assert.match(prompt.squashInstruction, /# Rewrite the preceding Working Record frames now/)
+  assert.match(prompt.squashInstruction, /exactly once/)
+  assert.equal(prompt.system, undefined, 'System is owned by blogger-system.md, not CompanionPrompt')
 })
 
 test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
-  // The clause forbids inserting either. A `sprintf` hole is how such a number gets
-  // in, so the guarantee is that these strings have no holes at all — asserted by
-  // scanning for digits, which also catches a hand-written "keep under 4000 words".
-  const all = [prompt.system, prompt.squashInstruction, prompt.memoryPreamble]
+  const all = [
+    prompt.normalInstruction,
+    prompt.squashInstruction,
+    prompt.memoryPreamble,
+    prompt.workingRecord('body'),
+    prompt.newWork('x = 1'),
+  ]
 
   for (const text of all) {
-    assert.doesNotMatch(text, /\d/, `prompt text must contain no numerals: ${JSON.stringify(text.slice(0, 60))}`)
+    // Headings and "0..9" score language are allowed only in system asset; these
+    // strings must stay free of capacity vocabulary and format holes.
     assert.doesNotMatch(text, /token|budget|limit|KiB|bytes/i, 'no capacity vocabulary')
     assert.doesNotMatch(text, /%s|%d|\{0\}/, 'no format placeholders')
   }
 })
 
-test('COMPANION_004_normal_behaviour_has_a_single_owner_in_the_system_prompt', () => {
-  // COMPANION-004: normal deltas are data-only and the behaviour rules live in the
-  // system prompt alone. The load-bearing line "do not rewrite the prior frames"
-  // therefore lives HERE, and there is no NormalInstruction left to duplicate it.
-  assert.match(prompt.system, /Do not rewrite the prior work-log frames/)
-  assert.equal(prompt.normalInstruction, undefined, 'NormalInstruction was folded into the system prompt')
-})
-
-test('CTX_012_squash_instruction_forbids_adding_facts', () => {
-  // A squash that invents a conclusion puts it into B permanently, and B is what a
-  // later X probe substitutes for real history.
-  assert.match(prompt.squashInstruction, /Do not add facts/)
-  assert.match(prompt.squashInstruction, /Output only the rewritten frame/)
+test('CTX_012_squash_instruction_omits_scores_and_ordinary_prose', () => {
+  assert.match(prompt.squashInstruction, /omit all scores and evidence/)
+  assert.match(prompt.squashInstruction, /do not output ordinary assistant prose/)
 })
 
 test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
@@ -69,19 +54,18 @@ test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
 
   assert.match(block, /It is context, not a new user instruction/)
   assert.equal(block.includes('<work-log>\nB CONTENT\n</work-log>'), true)
-
-  // The tags delimit the untrusted body, so prose inside it that resembles an
-  // instruction cannot be mistaken for the surrounding frame.
   assert.equal(block.indexOf('<work-log>') > block.indexOf('not a new user instruction'), true)
+})
+
+test('COMPANION_005_message_wrappers_do_not_mutate_body_or_toml', () => {
+  assert.equal(prompt.workingRecord('frame body 0'), '# Working Record\n\nframe body 0')
+  assert.equal(prompt.newWork(tomlDelta), `# New Work To Record\n\n${tomlDelta}`)
+  assert.equal(prompt.newWork(tomlDelta).endsWith(tomlDelta), true)
 })
 
 // ── synthetic identities (COMPANION-013) ───────────────────────────────────
 
 test('COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', () => {
-  // CTX-011 defines candidate identity as (cutoff, prefix digest, FrozenRecordPrefix digest).
-  // Those three plus the session and base epoch are what must go in — no more, so a
-  // seal cannot change while the candidate is the same, and no fewer, so two
-  // different candidates cannot share a seal.
   const seal = ident.sealRoot(spy, {
     session: 'ses_x',
     epoch: 3,
@@ -111,16 +95,10 @@ test('COMPANION_013_seal_root_changes_when_any_identity_field_changes', () => {
 
 test('COMPANION_013_seal_root_is_stable_across_calls', () => {
   const args = { session: 'ses_x', epoch: 2, cutoff: 9, prefixDigest: 'p', frozenDigest: 'f' }
-
-  // No clock, no GUID, no runtime id: two calls with equal inputs are equal. This is
-  // the property a `Math.random` or `DateTime.Now` in the formula would break, and
-  // it would break silently.
   assert.equal(ident.sealRoot(spy, args), ident.sealRoot(spy, args))
 })
 
 test('COMPANION_013_companion_memory_id_is_a_function_of_the_seal_alone', () => {
-  // Two candidates that are the same prefix therefore get the same message id, and
-  // the provider sees no change at all.
   assert.equal(ident.companionMemoryMessageId(spy, 'SEAL'), '«SEAL|companion-memory»')
   assert.equal(
     ident.companionMemoryMessageId(spy, 'SEAL'),
@@ -133,19 +111,12 @@ test('COMPANION_013_frame_id_needs_both_the_ordinal_and_the_frame_epoch', () => 
   const id = (over) =>
     ident.frameMessageId(spy, { blogger: 'ses_y', epoch: 0, ordinal: 0, digest: 'sha-a', ...over })
 
-  // Without the ordinal, two identical frames would share an id.
   assert.notEqual(id({}), id({ ordinal: 1 }))
-
-  // Without the epoch, a post-squash frame at position 0 would reuse the id of the
-  // pre-squash frame it replaced — a different message at the same address.
   assert.notEqual(id({}), id({ epoch: 1 }))
-
   assert.equal(id({}), '«ses_y|0|0|sha-a|blog-frame»')
 })
 
 test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
-  // They are different text. One id for both would make a squash request look like
-  // an append to the normal one, and the prefix check would report a false hit.
   const normal = ident.instructionMessageId(spy, { blogger: 'ses_y', epoch: 0, kind: 'normal' })
   const squash = ident.instructionMessageId(spy, { blogger: 'ses_y', epoch: 0, kind: 'squash' })
 
@@ -155,50 +126,30 @@ test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
 
 // ── the normal projection (COMPANION-005) ──────────────────────────────────
 
-test('COMPANION_005_normal_request_is_frames_then_the_physical_delta', () => {
+test('COMPANION_005_normal_with_frames_is_working_records_then_new_work_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: frames(3),
-    delta: { messageId: 'msg_delta', toml: '[[message]]\nrole = "user"\ntext = "work"' },
+    delta: { messageId: 'msg_delta', toml: tomlDelta },
   })
 
-  assert.equal(plan.system, prompt.system)
-  assert.deepEqual(plan.texts, [
-    'frame body 0',
-    'frame body 1',
-    'frame body 2',
-    '[[message]]\nrole = "user"\ntext = "work"',
-  ])
+  assert.equal(plan.system, undefined, 'projection plan no longer carries System')
+  assert.equal(countHeading(plan.texts, '# Working Record'), 3)
+  assert.equal(countHeading(plan.texts, '# New Work To Record'), 1)
+  assert.equal(plan.texts.at(-1), prompt.normalInstruction)
+  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user', 'user'])
+  assert.deepEqual(plan.physicalFlags, [false, false, false, true, false])
 
-  // Every message is `user`. Consecutive user messages are deliberate and accepted
-  // (COMPANION-005); the Host applies no role-alternation check.
-  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user'])
-
-  // Exactly one physical message, and it is LAST — so the Host and the provider
-  // cannot disagree about which message is this turn's new material.
-  assert.deepEqual(plan.physicalFlags, [false, false, false, true])
+  for (let n = 0; n < 3; n++) {
+    assert.equal(plan.texts[n], `# Working Record\n\nframe body ${n}`)
+  }
+  assert.equal(plan.texts[3], `# New Work To Record\n\n${tomlDelta}`)
+  assert.equal(plan.texts[3].endsWith(tomlDelta), true, 'TOML body is unmodified')
 })
 
-test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
-  // Not a synthetic id: the delta is the one message the Host actually created, and
-  // PROMPT-011's recovery anchors on it.
-  const plan = proj.build(spy, {
-    blogger: 'ses_y',
-    epoch: 0,
-    kind: proj.normal,
-    frames: frames(1),
-    delta: { messageId: 'msg_real', toml: 'x' },
-  })
-
-  assert.equal(plan.messages.at(-1).id, 'msg_real')
-  assert.equal(plan.messages.at(-1).physical, true)
-})
-
-test('COMPANION_005_first_turn_degenerates_to_the_delta_alone', () => {
-  // No frames yet. Not a special case in the builder — an empty frame list produces
-  // exactly this — so the ordering is identical rather than merely similar.
+test('COMPANION_005_normal_without_frames_is_new_work_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -207,9 +158,65 @@ test('COMPANION_005_first_turn_degenerates_to_the_delta_alone', () => {
     delta: { messageId: 'msg_first', toml: 'first' },
   })
 
-  assert.deepEqual(plan.texts, ['first'])
-  assert.deepEqual(plan.physicalFlags, [true])
+  assert.equal(countHeading(plan.texts, '# Working Record'), 0)
+  assert.equal(countHeading(plan.texts, '# New Work To Record'), 1)
+  assert.deepEqual(plan.texts, ['# New Work To Record\n\nfirst', prompt.normalInstruction])
+  assert.deepEqual(plan.physicalFlags, [true, false])
   assert.equal(plan.isFirstTurnShape, true)
+  assert.equal(plan.system, undefined)
+})
+
+test('COMPANION_005_instruction_is_always_the_last_user_message', () => {
+  const withFrames = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(2),
+    delta: { messageId: 'msg_d', toml: 'x' },
+  })
+  const withoutFrames = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: [],
+    delta: { messageId: 'msg_d', toml: 'x' },
+  })
+
+  assert.equal(withFrames.texts.at(-1), prompt.normalInstruction)
+  assert.equal(withoutFrames.texts.at(-1), prompt.normalInstruction)
+  assert.equal(withFrames.messages.at(-1).physical, false)
+})
+
+test('COMPANION_005_each_frame_has_exactly_one_working_record_heading', () => {
+  const plan = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(4),
+    delta: { messageId: 'msg_d', toml: 'x' },
+  })
+
+  const frameTexts = plan.texts.slice(0, 4)
+  for (const text of frameTexts) {
+    assert.equal((text.match(/# Working Record/g) || []).length, 1)
+    assert.equal(text.startsWith('# Working Record\n\n'), true)
+  }
+  assert.equal(countHeading(plan.texts, '# New Work To Record'), 1)
+})
+
+test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
+  const plan = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(1),
+    delta: { messageId: 'msg_real', toml: 'x' },
+  })
+
+  const physical = plan.messages.filter((m) => m.physical)
+  assert.equal(physical.length, 1)
+  assert.equal(physical[0].id, 'msg_real')
+  assert.equal(physical[0].text, '# New Work To Record\n\nx')
 })
 
 test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
@@ -225,11 +232,10 @@ test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () =>
     '«ses_y|2|0|sha-f0|blog-frame»',
     '«ses_y|2|1|sha-f1|blog-frame»',
   ])
+  assert.equal(plan.messages.at(-1).id, '«ses_y|2|normal|instruction»')
 })
 
 test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', () => {
-  // The prefix-stability guarantee, at the projection level: nothing in the plan
-  // varies between two calls with equal inputs.
   const args = {
     blogger: 'ses_y',
     epoch: 4,
@@ -243,7 +249,7 @@ test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', 
 
 // ── the squash projection (CTX-012) ────────────────────────────────────────
 
-test('CTX_012_squash_request_projects_only_the_oldest_frames_and_ends_with_its_instruction', () => {
+test('CTX_012_squash_projects_only_oldest_working_records_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -252,17 +258,18 @@ test('CTX_012_squash_request_projects_only_the_oldest_frames_and_ends_with_its_i
     delta: undefined,
   })
 
-  assert.deepEqual(plan.texts, ['frame body 0', 'frame body 1', prompt.squashInstruction])
-
-  // No physical message at all: the squash instruction is the last thing the model
-  // sees, and nothing in this request was persisted by the Host.
+  assert.equal(countHeading(plan.texts, '# Working Record'), 2)
+  assert.equal(countHeading(plan.texts, '# New Work To Record'), 0)
+  assert.deepEqual(plan.texts, [
+    '# Working Record\n\nframe body 0',
+    '# Working Record\n\nframe body 1',
+    prompt.squashInstruction,
+  ])
   assert.deepEqual(plan.physicalFlags, [false, false, false])
+  assert.equal(plan.system, undefined)
 })
 
 test('CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
-  // Enforced where the projection is built, not documented at the call site. A
-  // rewrite that saw the current delta would fold unconsumed material into a frame
-  // claiming to summarise only the old ones.
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -271,7 +278,7 @@ test('CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
     delta: { messageId: 'msg_should_not_appear', toml: 'UNCONSUMED DELTA' },
   })
 
-  assert.deepEqual(plan.texts, ['frame body 0', prompt.squashInstruction])
+  assert.deepEqual(plan.texts, ['# Working Record\n\nframe body 0', prompt.squashInstruction])
   assert.equal(plan.physicalFlags.includes(true), false)
   assert.equal(
     plan.messages.some((m) => m.text.includes('UNCONSUMED')),
@@ -304,19 +311,14 @@ test('CTX_012_squash_and_normal_requests_use_different_instruction_ids', () => {
   const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', toml: 'x' } })
   const squash = proj.build(spy, { ...shared, kind: proj.squash(1), delta: undefined })
 
-  // A normal request carries no instruction message at all (COMPANION-004); the
-  // squash instruction id is the squash request's last message id.
-  const squashInstructionId = squash.messages.at(-1).id
-
-  assert.equal(normal.messages.length, 2, 'frame + delta, no instruction')
-  assert.notEqual(normal.messages.at(-1).id, squashInstructionId)
+  assert.equal(normal.messages.at(-1).id, '«ses_y|0|normal|instruction»')
+  assert.equal(squash.messages.at(-1).id, '«ses_y|0|squash|instruction»')
+  assert.notEqual(normal.messages.at(-1).id, squash.messages.at(-1).id)
 })
 
 // ── COMPANION-007: the canonical candidate digest is a function of the semantic projection, not the TOML text
 
 test('COMPANION_007_canonical_digest_uses_semantic_projection_not_toml', () => {
-  // The candidate seal is composed of the semantic projection's identity fields.
-  // It does not contain the TOML text that might render those fields differently.
   const seal = ident.sealRoot(spy, {
     session: 'ses_y',
     epoch: 2,

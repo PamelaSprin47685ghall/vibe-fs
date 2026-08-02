@@ -1136,11 +1136,13 @@ export const xTraceCapture = (() => {
   }
 })()
 
-/** COMPANION-004 / COMPANION-010: the fixed prompt text, with no interpolation. */
+/** COMPANION-004/005 / ENFORCER-030: request strings; system lives in blogger-system.md. */
 export const companionPrompt = {
-  system: CompanionPromptModule.System,
+  normalInstruction: CompanionPromptModule.NormalInstruction,
   squashInstruction: CompanionPromptModule.SquashInstruction,
   memoryPreamble: CompanionPromptModule.CompanionMemoryPreamble,
+  workingRecord: (body) => CompanionPromptModule.workingRecordMessage(body),
+  newWork: (toml) => CompanionPromptModule.newWorkMessage(toml),
   memoryBlock: (frozenRecordPrefix) => CompanionPromptModule.companionMemoryBlock(frozenRecordPrefix),
 }
 
@@ -1204,6 +1206,7 @@ export const companionProjection = (() => {
       }))
 
       return {
+        // Plan no longer carries System (ENFORCER-030 / COMPANION-004).
         system: plan.System,
         messages,
         roles: messages.map((msg) => msg.role),

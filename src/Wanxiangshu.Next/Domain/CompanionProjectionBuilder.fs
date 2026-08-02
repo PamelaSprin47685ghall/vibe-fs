@@ -3,40 +3,27 @@ namespace Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
 /// Which physical request the Companion is about to make.
-///
-/// The two kinds differ in three ways at once — which frames are projected, which
-/// instruction is sent, and whether a delta follows — so a bool would leave the
-/// caller to keep three decisions consistent.
 [<RequireQualifiedAccess>]
 type CompanionRequestKind =
     | Normal
     | Squash of frameCount: int
 
 /// One message in the Companion's provider-visible projection.
-///
-/// `IsPhysical` marks the message the Host actually persisted. Everything else is
-/// synthetic and exists only for the duration of one request, which is what makes
-/// the frame history replayable without a physical transcript (PERSIST-010).
 type CompanionProjectedMessage =
     { MessageId: string
       Role: string
       Text: string
       IsPhysical: bool }
 
-/// COMPANION-005: the whole message list for one Companion request.
+/// COMPANION-005: message list for one Companion request.
+/// System is NOT here — managed-agent config owns blogger-system.md (ENFORCER-030).
 type CompanionProjectionPlan =
-    { System: string
-      Messages: CompanionProjectedMessage list }
+    { Messages: CompanionProjectedMessage list }
 
-/// COMPANION-005 / CTX-012: build the Companion's provider-visible message list.
-///
-/// Pure. Frame bodies arrive already resolved from blobs, because reading a
-/// `BlobRef` is a Host concern and this module must stay callable from a layer-1
-/// test (VERIFY-008).
+/// COMPANION-005 / CTX-012: build provider-visible messages from durable frames.
 [<RequireQualifiedAccess>]
 module CompanionProjectionBuilder =
 
-    /// The request-kind label that keys the instruction message id (COMPANION-013).
     let private kindLabel (kind: CompanionRequestKind) =
         match kind with
         | CompanionRequestKind.Normal -> "normal"
@@ -44,28 +31,11 @@ module CompanionProjectionBuilder =
 
     let private instructionFor (kind: CompanionRequestKind) =
         match kind with
-        // COMPANION-004: normal requests are data-only. The behaviour rules live
-        // in the system prompt; a per-request instruction user message would be
-        // the duplicated injection the migration removes.
-        | CompanionRequestKind.Normal -> None
-        | CompanionRequestKind.Squash _ -> Some CompanionPrompt.SquashInstruction
+        | CompanionRequestKind.Normal -> CompanionPrompt.NormalInstruction
+        | CompanionRequestKind.Squash _ -> CompanionPrompt.SquashInstruction
 
-    /// COMPANION-005 / CTX-012.
-    ///
-    /// Normal:  system, every frame, physical delta LAST (no instruction message).
-    /// Squash:  system, the oldest `frameCount` frames, squash instruction LAST.
-    ///
-    /// The delta is last on a normal request because that keeps the physical message
-    /// the provider sees last as well. HOST-010's binding does not require it — the
-    /// Host resolves `parentID` from the pre-transform message list — but any other
-    /// order would let the Host and the provider disagree about which message is this
-    /// turn's new material.
-    ///
-    /// A squash carries no delta at all: CTX-012 forbids showing it the current delta
-    /// or the later frames, because a rewrite that saw them would fold unconsumed
-    /// material into a frame claiming to summarise only the old ones.
-    ///
-    /// Consecutive user messages are deliberate and accepted (COMPANION-005).
+    /// Normal: Working Record frames + New Work delta + normal instruction LAST.
+    /// Squash: oldest k Working Record frames + squash instruction LAST (no delta).
     let build
         (sha256: string -> string)
         (bloggerSessionId: SessionId)
@@ -84,39 +54,32 @@ module CompanionProjectionBuilder =
             |> List.mapi (fun ordinal (digest, body) ->
                 { MessageId = CompanionIdentity.frameMessageId sha256 bloggerSessionId frameEpoch ordinal digest
                   Role = "user"
-                  Text = body
+                  Text = CompanionPrompt.workingRecordMessage body
                   IsPhysical = false })
 
-        let instruction =
-            instructionFor kind
-            |> Option.map (fun text ->
-                { MessageId =
-                    CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
-                  Role = "user"
-                  Text = text
-                  IsPhysical = false })
-
-        let tail =
+        let deltaMessages =
             match kind, physicalDelta with
             | CompanionRequestKind.Normal, Some(messageId, toml) ->
                 [ { MessageId = messageId
                     Role = "user"
-                    Text = toml
+                    Text = CompanionPrompt.newWorkMessage toml
                     IsPhysical = true } ]
-            // A squash ignores any delta it was handed rather than trusting the
-            // caller not to pass one: the exclusion is a clause, so it is enforced
-            // where the projection is built, not documented at the call site.
             | _ -> []
 
-        { System = CompanionPrompt.System
-          Messages = frameMessages @ (instruction |> Option.toList) @ tail }
+        let instruction =
+            { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
+              Role = "user"
+              Text = instructionFor kind
+              IsPhysical = false }
 
-    /// COMPANION-005 first-turn degeneration: no frames yet.
-    ///
-    /// Not a special case in `build` — an empty frame list produces exactly this — but
-    /// named so the clause has something to point at, and so a test can assert that
-    /// the ordering is identical rather than merely similar.
+        // Instruction is always last (HOST-010 parent binding).
+        { Messages = frameMessages @ deltaMessages @ [ instruction ] }
+
+    /// First-turn shape: New Work + instruction, no Working Record frames.
     let isFirstTurnShape (plan: CompanionProjectionPlan) =
         match plan.Messages with
-        | [ delta ] -> delta.IsPhysical
+        | [ delta; instruction ] ->
+            delta.IsPhysical
+            && not instruction.IsPhysical
+            && instruction.Text.StartsWith("# Write the dense work-log continuation now")
         | _ -> false
