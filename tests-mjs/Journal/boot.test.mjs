@@ -154,6 +154,32 @@ test('PERSIST_002_appending_to_a_disposed_writer_is_CommitUnknown_not_a_throw', 
   })
 })
 
+// ── PERSIST-003: CommitUnknown puts the writer into fail-closed reconcile ──────
+
+test('PERSIST_003_commit_unknown_triggers_fail_closed_reconcile', () => {
+  withStore((store) => {
+    const j = store.open()
+    j.dispose()
+
+    const first = j.append(stream.session(SESSION), CLOSED)
+    assert.equal(first.committed, false)
+    assert.equal(first.failure, 'WriteFailed')
+    assert.equal(typeof first.eventId, 'string')
+    assert.equal(first.eventId.length > 0, true)
+
+    const beforeSeq = j.seq()
+    const beforeLines = store.lines().length
+
+    // After the first CommitUnknown the writer stays closed: further appends are
+    // refused and the journal does not make progress without explicit recovery.
+    const second = j.append(stream.session(SESSION), CLOSED)
+    assert.equal(second.committed, false)
+    assert.equal(second.failure, 'WriteFailed')
+    assert.equal(j.seq(), beforeSeq)
+    assert.equal(store.lines().length, beforeLines)
+  })
+})
+
 test('PERSIST_002_a_second_writer_for_one_runtime_id_is_refused', () => {
   withStore((store) => {
     store.open({ runtime: 'rt_1' })

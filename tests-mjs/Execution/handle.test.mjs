@@ -14,15 +14,20 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   clockAt,
+  caseOf,
   completionKind,
   deadline,
   envelope,
   fact,
   fold,
+  forkChildPayload,
   handleId,
   handleProjection,
   isSome,
+  listItems,
+  payloadOf,
   processEstimate,
+  processRequest,
   roles,
   sessionId,
   stream,
@@ -429,4 +434,76 @@ test('EXEC_011_the_next_wait_is_clamped_to_what_a_timer_can_hold', () => {
   const distant = deadline.ofBudget('2026-01-01T00:00:00Z', 5_000_000_000)
   assert.equal(deadline.nextWaitMs(clockAt('2026-01-01T00:00:00Z'), distant), deadline.maxTimerWaitMs)
   assert.equal(deadline.maxTimerWaitMs, 2_147_483_647)
+})
+
+// ── EXEC-001: fork creates a child run and list / join show its lifecycle ─────
+
+test('EXEC_001_fork_creates_a_child_run', () => {
+  const active = linkOn(handleProjection.empty)
+
+  assert.deepEqual(views(active), { listable: ['agent:h1'], joinable: [], active: ['agent:h1'] })
+  assert.deepEqual(stateOf(active), {
+    handle: 'agent:h1',
+    child: 'ses_c',
+    targetAgent: 'fast-coder',
+    role: 'Coder',
+    lifecycle: 'Active',
+    completion: undefined,
+  })
+
+  const completed = completeOn(active, { kind: 'Terminal' })
+  assert.deepEqual(views(completed), { listable: ['agent:h1'], joinable: ['agent:h1'], active: [] })
+
+  const joined = retireOn(completed)
+  assert.deepEqual(views(joined), { listable: [], joinable: [], active: [] })
+  assert.equal(handleProjection.isRetired(HANDLE, joined), true)
+})
+
+// ── EXEC-007: a nudge to an active handle does not create a second run ─────────
+
+test('EXEC_007_nudge_is_fire_and_forget', () => {
+  const active = linkOn(handleProjection.empty)
+  const nudged = linkOn(active, { child: CHILD, agent: 'fast-coder', role: 'Coder' })
+
+  // A nudge re-uses the same handle; it does not add a new child, listener,
+  // or completion cell.
+  assert.deepEqual(views(nudged).active, ['agent:h1'])
+  assert.equal(handleProjection.linkedChildren(nudged).length, 1)
+  assert.deepEqual(stateOf(nudged).child, 'ses_c')
+})
+
+// ── EXEC-008: child background uses the latest durable B snapshot ─────────────
+
+test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
+  const latestB = 'LatestB snapshot at turn 9'
+  const rendered = forkChildPayload.render({
+    assignment: 'Summarize the output',
+    parentWorkRecord: latestB,
+    originalUserRequirements: [],
+    payload: undefined,
+  })
+
+  assert.equal(rendered.includes(latestB), true)
+  assert.equal(rendered.includes(forkChildPayload.parentWorkRecordInstruction), true)
+  assert.equal(rendered.includes('parent_work_record'), true)
+})
+
+// ── EXEC-010: a process request carries the full executor estimate ─────────────
+
+test('EXEC_010_process_request_carries_all_fields', () => {
+  const cmd = processRequest.command({
+    fileName: 'sh',
+    args: ['-lc', 'echo hi'],
+    workingDirectory: '/tmp/wx',
+    stdin: 'input',
+  })
+  const est = processRequest.estimate({ runtimeSeconds: 42, outputBytes: 65536, memory: 'Large' })
+
+  assert.equal(cmd.FileName, 'sh')
+  assert.deepEqual(listItems(cmd.Arguments), ['-lc', 'echo hi'])
+  assert.equal(cmd.WorkingDirectory, '/tmp/wx')
+  assert.equal(cmd.Stdin, 'input')
+  assert.equal(payloadOf(est.EstimatedRuntime), 42)
+  assert.equal(payloadOf(est.EstimatedOutput), 65536n)
+  assert.equal(caseOf(est.EstimatedMemory), 'Large')
 })

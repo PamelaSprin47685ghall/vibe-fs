@@ -308,3 +308,20 @@ test('CTX_012_squash_and_normal_requests_use_different_instruction_ids', () => {
 
   assert.notEqual(normalInstructionId, squashInstructionId)
 })
+
+// ── COMPANION-007: the canonical candidate digest is a function of the semantic projection, not the TOML text
+
+test('COMPANION_007_canonical_digest_uses_semantic_projection_not_toml', () => {
+  // The candidate seal is composed of the semantic projection's identity fields.
+  // It does not contain the TOML text that might render those fields differently.
+  const seal = ident.sealRoot(spy, {
+    session: 'ses_y',
+    epoch: 2,
+    cutoff: 5,
+    prefixDigest: 'prefix-5',
+    frozenDigest: 'frozen-5',
+  })
+
+  assert.equal(seal, '«ses_y|2|5|prefix-5|frozen-5»')
+  assert.doesNotMatch(seal, /toml|\[\[item\]\]/i)
+})

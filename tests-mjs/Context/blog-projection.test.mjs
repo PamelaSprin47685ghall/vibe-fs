@@ -372,6 +372,25 @@ test('HOST_006_reanchor_is_idempotent_on_the_frame_projection', () => {
   assert.deepEqual(blog.frameKinds(twice), blog.frameKinds(once))
 })
 
+// ── COMPANION-006: a squash rewrites the first half of the frames permanently ─
+
+test('COMPANION_006_squash_rewrites_first_half_of_frames_permanently', () => {
+  let state = blog.empty
+  for (let i = 1; i <= 4; i += 1) {
+    const result = commitEntry(state, { from: [i - 1, 0], to: [i, 0], cutoffFrom: i - 1, cutoffTo: i, n: i })
+    assert.equal(result.ok, true, result.ok ? '' : result.error)
+    state = result.value
+  }
+
+  const squashed = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: squashFrame(1) }, state).value
+  assert.deepEqual(blog.frameKinds(squashed), ['Squash', 'Entry', 'Entry'])
+
+  // The rewritten first half persists: a later entry does not restore the old frames.
+  const next = commitEntry(squashed, { epoch: 1, from: [4, 0], to: [5, 0], cutoffFrom: 4, cutoffTo: 5, n: 5 }).value
+  assert.deepEqual(blog.frameKinds(next), ['Squash', 'Entry', 'Entry', 'Entry'])
+  assert.equal(blog.coverage(next).cutoff, 5)
+})
+
 // ── helper that builds a realistic state ───────────────────────────────────
 
 /**

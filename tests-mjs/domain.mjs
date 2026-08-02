@@ -109,6 +109,7 @@ const [
   AgentJournalModule,
   PromptDispatcherModule,
   PromptDispatcherSendModule,
+  HostEventCodecModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -167,6 +168,7 @@ const [
   prod('Journal/AgentJournal'),
   prod('Application/Prompting/PromptDispatcher'),
   prod('Application/Prompting/PromptDispatcherSend'),
+  prod('Infrastructure/OpenCode/Codec/HostEventCodec'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -1818,6 +1820,17 @@ export const providerProjection = {
   decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
 }
 
+// ── host signals (SSOT/07) ───────────────────────────────────────────────────
+
+export const hostSignals = (() => {
+  const m = bind(HostEventCodecModule, 'HostEventCodec', ['isHostSignalEvent', 'tryDecode'])
+
+  return {
+    isHostSignalEvent: (raw) => m.isHostSignalEvent(raw),
+    tryDecode: (raw) => m.tryDecode(raw),
+  }
+})()
+
 // ── execution handles (SSOT/09) ──────────────────────────────────────────────
 
 export const handleProjection = (() => {
@@ -2176,6 +2189,18 @@ export const processEstimate = (() => {
     outputThreshold: (bytes) => m.outputThreshold(outputBytesOf('OutputBytes', [BigInt(bytes)])),
   }
 })()
+
+/** EXEC-010: the stable fields of one process request. */
+export const processRequest = {
+  command: ({ fileName, args = [], workingDirectory, stdin }) =>
+    new ProcessRequest.Command(fileName, toList(args), workingDirectory, undefined, stdin, undefined, undefined),
+  estimate: ({ runtimeSeconds, outputBytes, memory }) =>
+    new ProcessRequest.ProcessEstimate(
+      new ProcessRequest.EstimatedRuntime(runtimeSeconds),
+      new ProcessRequest.EstimatedOutput(BigInt(outputBytes)),
+      (memory === 'Large') ? ProcessRequest.EstimatedMemory.Large : ProcessRequest.EstimatedMemory.Medium,
+    ),
+}
 
 // ── bounded parallelism (ARCH-008, VERIFY-004) ───────────────────────────────
 
