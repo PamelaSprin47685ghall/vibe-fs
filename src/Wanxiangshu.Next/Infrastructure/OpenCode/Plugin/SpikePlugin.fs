@@ -227,21 +227,11 @@ module SpikePlugin =
 
                         // Child background SSOT (EXEC-008): the parent's frozen
                         // LifecycleWorkRecord at creation time — Opening + Y frames
-                        // + X gap + terminal, one algorithm for every state.
+                        // + X gap + terminal. One materialiser, no EffectiveFrames
+                        // or session-A fallback (COMPANION-003).
                         let backgroundBFor =
                             Some(fun sessionId ->
-                                let fromLwr = XTraceCapture.parentWorkRecord journal (SessionId.create sessionId)
-
-                                match fromLwr with
-                                | Some text -> Some text
-                                | None ->
-                                    // Pre-LWR fallback: EffectiveFrames is the compressed
-                                    // middle when no opening has been captured yet.
-                                    match scope.Companions.TryGetValue sessionId with
-                                    | true, host ->
-                                        host.Memory.EffectiveFrames
-                                        |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
-                                    | false, _ -> None)
+                                XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId))
 
                         let toolRegistration =
                             toolHooks

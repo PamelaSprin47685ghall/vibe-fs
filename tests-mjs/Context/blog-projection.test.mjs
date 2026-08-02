@@ -294,12 +294,14 @@ test('PERSIST_010_squash_written_against_a_stale_epoch_is_refused', () => {
   assert.deepEqual(replay, { ok: false, error: 'StaleFrameEpoch' })
 })
 
-// ── reanchor: coverage is voided, frames survive ────────────────────────────
+// ── reanchor: PrefixCoverage voided, RecordCoverage + frames survive ─────────
 
-test('HOST_006_reanchor_zeroes_coverage_and_keeps_every_frame', () => {
+test('HOST_006_reanchor_zeroes_prefix_coverage_and_keeps_record_coverage', () => {
   let state = threeEntries()
   const framesBefore = blog.frameKinds(state)
+  const ingestBefore = blog.coverage(state).ingestedThroughSequence
   assert.equal(blog.hasCoverage(state), true)
+  assert.equal(ingestBefore, 3)
 
   const reanchored = blog.applyReanchor(state)
 
@@ -308,18 +310,17 @@ test('HOST_006_reanchor_zeroes_coverage_and_keeps_every_frame', () => {
   assert.deepEqual(blog.frameKinds(reanchored), framesBefore)
   assert.equal(blog.frameCount(reanchored), blog.frameCount(state))
 
-  // Coverage returns to the origin: the numbering those positions referred to no
-  // longer exists. `coverableFrames` goes to 0 with it — the frames are still there,
-  // but none of them is coverable, because a frame is coverable only while the cutoff
-  // claims the X turns it describes.
+  // PrefixCoverage returns to the origin: Host numbering those positions referred
+  // to no longer exists. RecordCoverage (IngestedThrough) is an XTrace cursor and
+  // stays put — clearing it would re-feed already-compressed X into Y (COMPANION-008).
   assert.deepEqual(blog.coverage(reanchored), {
-    ingestedThroughSequence: 0,
+    ingestedThroughSequence: ingestBefore,
     cutoff: 0,
     digest: '',
     coverableFrames: 0,
   })
   assert.equal(blog.hasCoverage(reanchored), false)
-  assert.deepEqual(blog.coverableFrameKinds(reanchored), [], 'no probe may be built until coverage rebuilds')
+  assert.deepEqual(blog.coverableFrameKinds(reanchored), [], 'no probe may be built until prefix coverage rebuilds')
 })
 
 test('HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
@@ -335,12 +336,14 @@ test('HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
   assert.equal(squash.ok, true, squash.ok ? '' : squash.error)
 })
 
-test('HOST_006_coverage_rebuilds_from_the_origin_after_a_reanchor', () => {
-  // The point of the reanchor: probe capability recovers on its own. The first
-  // entry after it starts from sequence 0 in the NEW numbering and is accepted.
+test('HOST_006_prefix_coverage_rebuilds_after_a_reanchor_without_rewinding_ingest', () => {
+  // Probe capability recovers on its own once a new complete-turn boundary is
+  // crossed in the NEW Host numbering. RecordCoverage continues from where Y
+  // already was — the next entry must advance the XTrace sequence, not restart.
   const reanchored = blog.applyReanchor(threeEntries())
+  assert.equal(blog.coverage(reanchored).ingestedThroughSequence, 3)
 
-  const rebuilt = commitEntry(reanchored, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'new-d1' })
+  const rebuilt = commitEntry(reanchored, { from: 3, to: 4, cutoffFrom: 0, cutoffTo: 1, digest: 'new-d1' })
   assert.equal(rebuilt.ok, true, rebuilt.ok ? '' : rebuilt.error)
   assert.equal(blog.hasCoverage(rebuilt.value), true)
 
@@ -353,7 +356,7 @@ test('HOST_006_coverage_rebuilds_from_the_origin_after_a_reanchor', () => {
   // not about which turns B's text discusses. A FrozenRecordPrefix richer than the
   // cutoff is extra context; one poorer than it would be information loss.
   assert.deepEqual(blog.coverage(rebuilt.value), {
-    ingestedThroughSequence: 1,
+    ingestedThroughSequence: 4,
     cutoff: 1,
     digest: 'new-d1',
     coverableFrames: 4,

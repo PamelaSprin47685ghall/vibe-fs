@@ -62,6 +62,10 @@ function uniqueVerdictToolResults(requests) {
       const content = typeof message.content === 'string'
         ? message.content
         : JSON.stringify(message.content || '');
+      // EXEC-004/COMPANION-003: join returns an opaque LWR that may embed the
+      // challenge sentence in its uncompressed tail. That is not a verdict tool
+      // result — only count actual verdict wire shapes.
+      if (content.includes('work_record')) continue;
       if (!content.includes('Nope, let\'s re-evaluate:') && !content.includes('verdict = "PERFECT"')) continue;
       const key = message.tool_call_id || message.toolCallId || content;
       results.set(key, content);

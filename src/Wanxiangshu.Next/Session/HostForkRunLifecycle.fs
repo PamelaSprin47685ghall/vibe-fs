@@ -65,19 +65,12 @@ module HostForkRunLifecycle =
         (outcome: TerminalOutcome)
         (workRecord: string option)
         =
-        let suppliedWorkRecord = workRecord
-
-        // EXEC-008 / COMPANION-003: the completion's work record is the child's
-        // final LifecycleWorkRecord — opening, frames, gap, terminal. When the
-        // durable record is unavailable, the terminal text stands in: the same
-        // self-contained value, not a parallel final-text channel.
-        let completedWorkRecord (result: AgentRunResult) =
-            suppliedWorkRecord
-            |> Option.orElseWith (fun () ->
-                if String.IsNullOrWhiteSpace result.TerminalText then
-                    None
-                else
-                    Some result.TerminalText)
+        // EXEC-006 / COMPANION-003: the completion's work record is the child's
+        // final LifecycleWorkRecord only — Opening + frames + gap + terminal,
+        // materialised by the same port as parent background. No TerminalText
+        // or session-A fallback: a missing LWR is an empty work_record, not a
+        // second channel.
+        let completedWorkRecord = workRecord
 
         // Only the first matching terminal may claim the run. Duplicate idle/
         // abort from dual event streams must not SetResult twice.
@@ -120,8 +113,9 @@ module HostForkRunLifecycle =
             match outcome with
             | Completed result ->
                 // EXEC-006: `IsValid` is the one place that decides whether a
-                // completed run actually carries session-wide A. Re-testing the
-                // text here would be a second copy of that rule.
+                // completed run actually carries terminal output. Re-testing the
+                // text here would be a second copy of that rule. The join wire
+                // then carries the materialised LWR (not TerminalText alone).
                 if not result.IsValid then
                     run.Source.SetResult(
                         AgentCompletion.failed
@@ -130,7 +124,7 @@ module HostForkRunLifecycle =
                             (Some run.Role)
                             (Some childId)
                             "MISSING_FINAL_REPORT"
-                            "completed with empty session-wide text"
+                            "completed with empty terminal output"
                     )
                 else
                     run.Source.SetResult(
@@ -143,7 +137,7 @@ module HostForkRunLifecycle =
                             // HOST-010/HOST-011: the terminal provider run IS the
                             // assistant message, so there is no separate id to pass.
                             result.ProviderRun
-                            (completedWorkRecord result |> Option.defaultValue "")
+                            (completedWorkRecord |> Option.defaultValue "")
                             result.Directory
                     )
             | Aborted reason ->

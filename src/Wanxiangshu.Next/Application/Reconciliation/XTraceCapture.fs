@@ -114,18 +114,16 @@ module XTraceCapture =
                                ProviderRun = turn.ProviderRun |}
                         |> appendFact durable turn.SessionId (Some turn.ProviderRun)
 
-    /// HOST-005 replacement: the session's terminal output as optional text.
+    /// COMPANION-003 / EXEC-006 / EXEC-008: the session's LifecycleWorkRecord as
+    /// opaque text — one materialiser for parent background, child final join,
+    /// and any other cross-session hand-off.
     ///
-    /// Reads the durable XTrace's captured terminal blob. This replaces the old
-    /// in-memory session-wide A accumulation (`TerminalSessionA.fullText`): the
-    /// terminal is a durable lifecycle segment, not a parallel text channel.
-    /// COMPANION-003 / EXEC-008: the parent's LifecycleWorkRecord as opaque text.
-    ///
-    /// The single materialisation used for a child's initial context: Opening
-    /// verbatim, then the effective Y frames, then the X gap after the recorded
-    /// coverage, then the terminal. There is no "B else A" branch — this is the
-    /// same algorithm whether Y has produced zero frames or all of them.
-    let parentWorkRecord (journal: AgentJournal option) (sessionId: SessionId) : string option =
+    /// Opening verbatim + effective Y frames + X gap after RecordCoverage +
+    /// terminal. There is no "B else A" / EffectiveFrames / TerminalText branch:
+    /// the same algorithm covers zero frames, lagging Y, and terminal completion.
+    /// Returns `None` only when Opening has not been captured yet (LWR is not
+    /// defined without the opening task anchor).
+    let lifecycleWorkRecord (journal: AgentJournal option) (sessionId: SessionId) : string option =
         match journal with
         | None -> None
         | Some durable ->
@@ -159,6 +157,13 @@ module XTraceCapture =
                                 | "tool_call" ->
                                     part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
                                 | "tool_result" -> Some(SemanticToolResult body)
+                                // COMPANION-003: omission markers are semantic parts of
+                                // the XTrace; dropping them would make LWR gap/parent
+                                // background lose media presence the model already saw.
+                                | "media_omitted" ->
+                                    let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
+
+                                    Some(SemanticMedia(mediaType, ""))
                                 | _ -> None
 
                             semantic
@@ -248,7 +253,11 @@ module XTraceCapture =
                         let kind, toolName, body = partShape part
 
                         match durable.WriteBlob body with
-                        | Error _ -> ()
+                        | Error error ->
+                            // PERSIST-003: a part that cannot be proven stored must
+                            // fail closed. Swallowing here desyncs XTrace from the
+                            // provider projection and later rejects BlogEntryCommitted.
+                            raise (InvalidOperationException(sprintf "XTrace part blob write failed: %s" error))
                         | Ok blob ->
                             AgentFact.XTracePartAppended
                                 {| SessionId = sessionId

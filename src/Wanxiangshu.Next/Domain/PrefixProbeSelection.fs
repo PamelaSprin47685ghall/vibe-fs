@@ -73,8 +73,8 @@ module PrefixProbeSelection =
         (coverableCutoff: int)
         (coveredDigest: string)
         (requestStartCutoff: int)
-        (frozenBRef: BlobRef)
-        (frozenBDigest: BlobDigest)
+        (frozenRecordPrefixRef: BlobRef)
+        (frozenRecordPrefixDigest: BlobDigest)
         (recomputeDigest: int -> string)
         : Result<PrefixProbe, NoCandidateReason> =
         // Step 1. The candidate may cover no more than either side allows.
@@ -113,11 +113,11 @@ module PrefixProbeSelection =
                             committedEpoch
                             candidateCutoff
                             coveredDigest
-                            frozenBDigest
+                            frozenRecordPrefixDigest
 
                     let candidate =
-                        { FrozenRecordPrefixRef = frozenBRef
-                          FrozenRecordPrefixDigest = frozenBDigest
+                        { FrozenRecordPrefixRef = frozenRecordPrefixRef
+                          FrozenRecordPrefixDigest = frozenRecordPrefixDigest
                           CutoffExclusive = candidateCutoff
                           CoveredPrefixDigest = coveredDigest
                           SealRoot = sealRoot

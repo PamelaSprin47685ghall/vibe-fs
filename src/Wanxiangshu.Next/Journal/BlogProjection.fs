@@ -34,7 +34,8 @@ type BlogFrame =
 type BlogCoverage =
     {
         /// RecordCoverage: how much of the XTrace the Companion has consumed.
-        /// Zeroed by reanchor (HOST-006) but never by Host compaction alone.
+        /// Durable across Host compaction/reanchor (COMPANION-008); only
+        /// BlogEntryCommitted advances it.
         IngestedThroughSequence: int64
         /// PrefixCoverage: the complete-turn boundary the probe may replace up to.
         CoverableTurnCutoffExclusive: int
@@ -216,27 +217,25 @@ module BlogProjection =
                         { state.Coverage with
                             CoverableFrameCount = nextCoverable } }
 
-    /// HOST-006 containment: the numbering these positions refer to was voided by a
-    /// Host compaction, so coverage returns to the origin.
+    /// HOST-006 containment: Host compaction voided the Host turn numbering that
+    /// PrefixCoverage indexes. Only the prefix mapping returns to the origin.
     ///
-    /// Frames survive. B records work that really happened; what compaction voided
-    /// is the mapping from B to X turn indices, not the work log itself. The record
-    /// coverage is zeroed for the same reason: the XTrace cursor is independent of
-    /// Host numbering, but re-reading from the origin after a reanchor is what
-    /// COMPANION-008 prescribes (frames survive, coverage returns to origin).
+    /// Frames survive. `IngestedThroughSequence` (RecordCoverage) is a durable
+    /// XTrace cursor and MUST stay put (COMPANION-008 / LWR): zeroing it would
+    /// re-feed already-compressed X material into Y and duplicate lifecycle content.
     ///
     /// The frame epoch does NOT advance: no frame changed, so a squash written
     /// against the current epoch is still valid after a reanchor.
     let applyReanchor (state: BlogProjectionState) : BlogProjectionState =
         { state with
             Coverage =
-                { IngestedThroughSequence = 0L
-                  CoverableTurnCutoffExclusive = 0
-                  CoveredPrefixDigest = ""
-                  // Zero, not "all frames": the frames survive, but none of them is
-                  // coverable any more. A frame is coverable because the cutoff claims
-                  // the X turns it describes, and compaction voided every such claim.
-                  CoverableFrameCount = 0 } }
+                { state.Coverage with
+                    CoverableTurnCutoffExclusive = 0
+                    CoveredPrefixDigest = ""
+                    // Zero, not "all frames": the frames survive, but none of them is
+                    // coverable any more. A frame is coverable because the cutoff claims
+                    // the X turns it describes, and compaction voided every such claim.
+                    CoverableFrameCount = 0 } }
 
     /// CTX-011: is there a covered prefix a probe could be built from at all.
     ///

@@ -1049,7 +1049,7 @@ export const bloggerDelta = (() => {
  * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
  */
 export const xTraceCapture = (() => {
-  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureOpening', 'parentWorkRecord'])
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureOpening', 'lifecycleWorkRecord'])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
   const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
 
@@ -1102,9 +1102,9 @@ export const xTraceCapture = (() => {
     captureOpening: (journal, sessionIdValue, text, requirements = []) =>
       m.captureOpening(journal, sessionIdValue, text, toList(requirements)),
 
-    /** COMPANION-003 / EXEC-008: the parent's LifecycleWorkRecord as opaque text. */
-    parentWorkRecord: (journal, sessionIdValue) => {
-      const result = m.parentWorkRecord(journal, sessionIdValue)
+    /** COMPANION-003 / EXEC-006 / EXEC-008: LifecycleWorkRecord as opaque text. */
+    lifecycleWorkRecord: (journal, sessionIdValue) => {
+      const result = m.lifecycleWorkRecord(journal, sessionIdValue)
       return isNone(result) ? undefined : result
     },
   }

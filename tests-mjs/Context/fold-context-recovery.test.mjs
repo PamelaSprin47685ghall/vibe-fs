@@ -201,7 +201,7 @@ test('CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
 
 // ── reanchor: one fact, two projections, atomically ────────────────────────
 
-test('HOST_006_reanchor_retires_the_prefix_and_zeroes_coverage_in_one_fact', () => {
+test('HOST_006_reanchor_retires_the_prefix_and_zeroes_prefix_coverage_in_one_fact', () => {
   const before = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
@@ -218,13 +218,18 @@ test('HOST_006_reanchor_retires_the_prefix_and_zeroes_coverage_in_one_fact', () 
     reanchorFact({ previousEpoch: 1, nextEpoch: 2 }),
   ])
 
-  // Both halves moved. A retired prefix beside a live coverage claim in the voided
-  // numbering is exactly the state one fact exists to prevent.
+  // Prefix half moved. A retired prefix beside a live Host cutoff claim in the
+  // voided numbering is exactly the state one fact exists to prevent.
+  // RecordCoverage stays: it is an XTrace cursor, not a Host index (COMPANION-008).
   assert.equal(after.PrefixEpoch.Snapshot, undefined, 'prefix retired')
   assert.equal(idValue.prefixEpoch(after.PrefixEpoch.EpochId), 2n)
-  assert.deepEqual(coverageOf(after), { ingestedThroughSequence: 0, cutoff: 0, digest: '' }, 'coverage zeroed')
+  assert.deepEqual(
+    coverageOf(after),
+    { ingestedThroughSequence: 2, cutoff: 0, digest: '' },
+    'prefix coverage zeroed; record coverage kept',
+  )
 
-  // Frames survive: the work really happened, only the index mapping was voided.
+  // Frames survive: the work really happened, only the Host index mapping was voided.
   assert.deepEqual(blog.frameKinds(after.Blog), ['Entry', 'Entry'], 'both entries survived the reanchor')
   assert.equal(blog.frameCount(after.Blog), blog.frameCount(before.Blog))
   assert.equal(idValue.frameEpoch(after.Blog.FrameEpochId), 0n, 'no frame changed, so the frame epoch stands')
@@ -232,18 +237,19 @@ test('HOST_006_reanchor_retires_the_prefix_and_zeroes_coverage_in_one_fact', () 
 
 test('HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
   // The dangerous case. Two observations of one compaction, with real work between
-  // them: if the fold re-applied the second, it would wipe coverage the session
+  // them: if the fold re-applied the second, it would wipe PrefixCoverage the session
   // legitimately rebuilt, and the next probe would silently never be built.
+  // RecordCoverage continues across reanchor, so the next entry advances from 1.
   const s = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     reanchorFact({ previousEpoch: 0, nextEpoch: 1 }),
-    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'rebuilt', n: 2 }),
-    entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, digest: 'rebuilt-2', n: 3 }),
+    entryFact({ from: 1, to: 2, cutoffFrom: 0, cutoffTo: 1, digest: 'rebuilt', n: 2 }),
+    entryFact({ from: 2, to: 3, cutoffFrom: 1, cutoffTo: 2, digest: 'rebuilt-2', n: 3 }),
     reanchorFact({ previousEpoch: 0, nextEpoch: 1 }),
   ])
 
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 1n, 'one retirement, not two')
-  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 2, cutoff: 2, digest: 'rebuilt-2' }, 'rebuilt coverage survived')
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 3, cutoff: 2, digest: 'rebuilt-2' }, 'rebuilt coverage survived')
 })
 
 test('HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
@@ -253,13 +259,13 @@ test('HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1 }),
     reanchorFact({ previousEpoch: 1, nextEpoch: 2 }),
-    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'post', n: 2 }),
+    entryFact({ from: 1, to: 2, cutoffFrom: 0, cutoffTo: 1, digest: 'post', n: 2 }),
     rebaseFact({ previousEpoch: 2, nextEpoch: 3, cutoff: 1, seal: 'seal-after' }),
   ])
 
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 3n)
   assert.equal(s.PrefixEpoch.Snapshot.SealRoot, 'seal-after')
-  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 1, cutoff: 1, digest: 'post' })
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 2, cutoff: 1, digest: 'post' })
 })
 
 // ── the persisted shape survives the round trip ────────────────────────────
@@ -280,5 +286,6 @@ test('PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
   assert.equal(idValue.frameEpoch(s.Blog.FrameEpochId), 1n)
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 2n)
   assert.equal(s.PrefixEpoch.Snapshot, undefined)
-  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 0, cutoff: 0, digest: '' })
+  // RecordCoverage kept at the pre-reanchor ingest; only PrefixCoverage is zeroed.
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 1, cutoff: 0, digest: '' })
 })

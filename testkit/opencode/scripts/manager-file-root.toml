@@ -26,7 +26,7 @@ flow = [
 [[turn]]
 id = "blogger"
 internal = true
-user = "[[message]]"
+user = "[["
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }

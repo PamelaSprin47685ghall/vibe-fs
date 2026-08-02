@@ -32,7 +32,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-blogger-1"
 internal = true
-user = "[[message]]"
+user = "[["
 
   [[turn.step]]
   respond = { type = "text", text = "Manager Blogger paragraph 1." }

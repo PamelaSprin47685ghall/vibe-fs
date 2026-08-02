@@ -186,15 +186,15 @@ export const acceptAuthorityRoot = (runtime, sessionId, agent) => {
  * Deliver a real terminal completion for one child session, through the same
  * HostEventPort the plugin subscribed to.
  *
- * `SessionWideText` is what EXEC-006's `IsValid` checks and what join reports
- * as `finalText`; `TurnFormalText` is what a one-shot tool reports as `output`
- * (COMPANION-005). Distinct strings keep the two channels visible, and a
- * non-empty SessionWideText also keeps `AgentCompletion.snapshotOption` from
- * yielding a null `workRecord`.
+ * `sessionWideText` maps to AgentRunResult.TerminalText (EXEC-006 IsValid).
+ * Join's work_record is the materialised LifecycleWorkRecord from the durable
+ * XTrace (opening + frames + gap + terminal), not this string alone — fixture
+ * completions without an Opening capture therefore yield an empty work_record.
+ * `turnFormalText` is what a one-shot tool reports as output (COMPANION-005).
  *
- * AgentRunResult field order (Kernel/Outcome.fs:10-32): SessionId,
- * AuthorityRootUserMessageId, ProviderRun, Role, Directory, SessionWideText,
- * TurnFormalText. `Role.Coder` is Fable union case tag 2 (Kernel/Roles.fs:9-19);
+ * AgentRunResult field order (Kernel/Outcome.fs): SessionId,
+ * AuthorityRootUserMessageId, ProviderRun, Role, Directory, TerminalText,
+ * TurnFormalText. `Role.Coder` is Fable union case tag 2 (Kernel/Roles.fs);
  * the runner pins it so a Role-order edit fails loudly instead of mislabeling.
  */
 export const notifyCompleted = (runtime, childSessionId, sessionWideText, turnFormalText, roleCaseTag = 2) => {

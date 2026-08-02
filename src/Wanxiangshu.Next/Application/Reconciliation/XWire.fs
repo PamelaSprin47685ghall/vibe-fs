@@ -22,10 +22,10 @@ module XWire =
     let private isCompanionSession (journal: AgentJournal) (sessionId: SessionId) =
         SessionAssociationProjection.isCompanion sessionId (AgentJournal.snapshot journal).AgentProjections.Associations
 
-    let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Result<string, string> =
+    let private readFrameBodies (journal: AgentJournal) (frames: BlogFrame list) : Result<string list, string> =
         let rec loop remaining collected =
             match remaining with
-            | [] -> Ok(String.concat "\n\n" (List.rev collected))
+            | [] -> Ok(List.rev collected)
             | frame :: tail ->
                 journal.Writer.BlobWriter.Read frame.TextRef
                 |> Result.bind (fun text ->
@@ -35,6 +35,10 @@ module XWire =
                         Error(sprintf "Companion blob digest mismatch: %s" (BlobDigest.value frame.Digest)))
 
         loop frames []
+
+    let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Result<string, string> =
+        readFrameBodies journal frames
+        |> Result.map (fun bodies -> String.concat "\n\n" bodies)
 
     let private requestStartCutoff (physical: PhysicalUserMessageId) (rawMessages: obj list) =
         rawMessages
@@ -47,6 +51,33 @@ module XWire =
         | None -> rawMessages
         | Some(syntheticId, memory) -> Projection.prependCompanionMemory rawMessages syntheticId memory plan.DropLeading
 
+    /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
+    /// prefix. RawGap never participates — it has no Y coverage proof.
+    let private materializeFrozenRecordPrefix
+        (journal: AgentJournal)
+        (state: SessionAgentProjection)
+        (frames: BlogFrame list)
+        : Result<string, string> =
+        match readFrameBodies journal frames with
+        | Error reason -> Error reason
+        | Ok frameBodies ->
+            let opening =
+                state.XTrace
+                |> Option.bind (fun trace -> trace.Opening)
+                |> Option.defaultValue
+                    { AssignmentText = ""
+                      AuthoritativeRequirements = [] }
+
+            // Opening + frames only. Gap/terminal are live X material and must not
+            // enter a frozen replacement (COMPANION-009).
+            Ok(
+                LifecycleWorkRecord.render
+                    { Opening = opening
+                      Frames = frameBodies
+                      Gap = []
+                      Terminal = None }
+            )
+
     let private candidate
         (journal: AgentJournal)
         (sessionId: SessionId)
@@ -58,10 +89,10 @@ module XWire =
         let blog = state.Blog |> Option.defaultValue BlogProjection.empty
         let frames = BlogProjection.coverableFrames blog
 
-        match readFrames journal frames with
+        match materializeFrozenRecordPrefix journal state frames with
         | Error reason -> raise (InvalidOperationException reason)
-        | Ok frozenB ->
-            match journal.WriteBlob frozenB with
+        | Ok frozenRecordPrefix ->
+            match journal.WriteBlob frozenRecordPrefix with
             | Error reason -> raise (InvalidOperationException reason)
             | Ok blob ->
                 PrefixProbeSelection.select
@@ -159,7 +190,7 @@ module XWire =
 
                                     let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
-                                    let frozenBody =
+                                    let frozenRecordPrefixBody =
                                         match plan.Profile.ProjectionChoice with
                                         | XProjectionChoice.UseCommittedEpoch ->
                                             match prefix.Snapshot with
@@ -188,7 +219,7 @@ module XWire =
                                         XPrefixProjection.forChoice
                                             plan.Profile.ProjectionChoice
                                             prefix.Snapshot
-                                            frozenBody
+                                            frozenRecordPrefixBody
 
                                     let transformed = rawWithPrefix rawMessages prefixPlan
 

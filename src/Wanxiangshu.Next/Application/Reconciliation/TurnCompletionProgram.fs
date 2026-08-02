@@ -143,10 +143,10 @@ module TurnCompletionProgram =
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
-            // COMPANION-003: the terminal text is this turn's formal text — the
-            // XTrace's terminal segment, not a parallel session-wide A
-            // accumulation (HOST-005). The XTrace parts themselves are captured
-            // at the transform boundary (`XTraceCapture.captureProjection`).
+            // COMPANION-003: the terminal text is this turn's formal text + host-
+            // visible reasoning — the XTrace terminal segment, not a parallel
+            // accumulation channel (HOST-005). XTrace parts themselves are
+            // captured at the transform boundary (`XTraceCapture.captureProjection`).
             let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
 
             wasAborted, sessionWide
@@ -192,7 +192,7 @@ module TurnCompletionProgram =
                           TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
                     // EXEC-006: `IsValid` is the single place that decides whether a
-                    // completed run carries session-wide A. Re-testing the text here
+                    // completed run carries terminal output. Re-testing the text here
                     // would be a second copy of that rule.
                     if runResult.IsValid then
                         // COMPANION-003: the terminal output becomes the XTrace's
@@ -206,7 +206,7 @@ module TurnCompletionProgram =
                     else
                         eventPort.NotifyTerminal
                             turn.SessionId
-                            (TerminalOutcome.Failed "completed with empty session-wide text")
+                            (TerminalOutcome.Failed "completed with empty terminal output")
                         |> ignore
 
                         false

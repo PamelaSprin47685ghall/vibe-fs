@@ -143,7 +143,7 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
       }),
     )
 
-    const lwr = xTraceCapture.parentWorkRecord(journal, SEM)
+    const lwr = xTraceCapture.lifecycleWorkRecord(journal, SEM)
     assert.equal(typeof lwr, 'string')
     // Opening 段一次；gap 不得把同一文本当 user part 再渲染一次。
     assert.equal(lwr.split('first task').length - 1, 1, 'the opening text must appear exactly once in the LWR')

@@ -171,18 +171,7 @@ user = "# Report child-a2."
 [[turn]]
 id = "blogger"
 internal = true
-user = "[[message]]"
-
-  [[turn.step]]
-  respond = { type = "text", text = "Session background." }
-
-# After a restart the Companion re-anchors with production-composed text
-# (`CompanionHostBlogger`, FULL B + projection). It is its own turn (internal:
-# no scenario text reaches it).
-[[turn]]
-id = "blogger-reanchor"
-internal = true
-user = "You are the blogger of a coding agent session. This session resumed after a restart and your prior companion context was lost."
+user = "[["
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }

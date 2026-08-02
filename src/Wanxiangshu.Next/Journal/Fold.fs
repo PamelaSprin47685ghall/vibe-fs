@@ -727,15 +727,16 @@ module Fold =
 
         | AgentFact.ContextReanchored payload ->
             // HOST-006: one physical event, two projections. The prefix retires and
-            // the Companion's coverage returns to the origin, and both must land or
-            // neither — a retired prefix beside a coverage claim in the voided
-            // numbering is the state the single fact exists to prevent.
+            // PrefixCoverage returns to the origin; both must land or neither — a
+            // retired prefix beside a cutoff claim in the voided numbering is the
+            // state the single fact exists to prevent.
             //
             // Hence one session-level update rather than two chained ones: the
             // atomicity is structural, not something a reader has to verify by
             // tracing whether the second step was reached.
             //
-            // Frames survive. Only coverage is zeroed (BlogProjection.applyReanchor).
+            // Frames and RecordCoverage (IngestedThrough) survive. Only the Host
+            // prefix mapping is zeroed (BlogProjection.applyReanchor / COMPANION-008).
             AgentProjection.tryUpdate
                 payload.SessionId
                 (fun session ->

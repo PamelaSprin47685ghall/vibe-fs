@@ -511,14 +511,12 @@ user = "go on"
       // reviewer-restart) had no declaration and all four fail-stopped on the Blogger
       // request. A missing declaration is silent at load time and fatal at run time, which
       // is precisely the asymmetry a load-time gate should remove.
-      // `31d4958b` switched the blogger turns to the actual header production sends
-      // (`CompanionPrompt.fs:40`), so the probe must look for the same header — the stale
-      // literal below reported all 15 scenarios as missing while every one of them
-      // declared the turn. The LWR migration then made normal deltas data-only
-      // (COMPANION-004: behaviour rules live in the system prompt alone), so the header
-      // probe is now the sparse-schema delta production actually sends.
+      // LWR sparse schema: normal/reset deltas are data-only TOML whose first table
+      // is whatever the first semantic part is (`[[message]]`, `[[tool_result]]`,
+      // `[[media_omitted]]`, …). The production-stable prefix is therefore `[[`.
+      // Reset no longer has a separate English reanchor shape (same projector).
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('user = "[[message]]"'),
+        (file) => !readFileSync(file, 'utf8').includes('user = "[["'),
       );
 
       assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);

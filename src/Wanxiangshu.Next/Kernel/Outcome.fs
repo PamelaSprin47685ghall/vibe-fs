@@ -22,16 +22,16 @@ type AgentRunResult =
         /// did exactly that before passing it on, which means the sentinel was
         /// converted back into an option one layer later anyway.
         Directory: string option
-        /// Session-wide A (HOST-005): cumulative formal text plus host-visible
-        /// reasoning across the whole Session, not the last turn alone. Excludes
-        /// tool raw streams.
+        /// Terminal output for this run (HOST-005 / COMPANION-003): formal text
+        /// plus host-visible reasoning. Excludes tool raw streams. Becomes the
+        /// LWR Final output segment; not a parallel session-wide A channel.
         TerminalText: string
-        /// This turn's formal assistant text only, without reasoning. The
-        /// Companion B record is built from this (COMPANION-005).
+        /// This turn's formal assistant text only, without reasoning. Used for
+        /// blogger terminal-validity checks (COMPANION-005).
         TurnFormalText: string
     }
 
-    /// EXEC-006: a completed run must carry session-wide A. An empty A means the
+    /// EXEC-006: a completed run must carry terminal output. Empty means the
     /// turn was not actually reconciled, so consumers must not treat it as done.
     member this.IsValid = not (String.IsNullOrWhiteSpace this.TerminalText)
 

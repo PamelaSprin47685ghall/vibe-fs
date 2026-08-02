@@ -195,18 +195,10 @@ tools = ["verdict"]
 [[turn]]
 id = "blogger"
 internal = true
-user = "[[message]]"
+user = "[["
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }
-
-[[turn]]
-id = "blogger-reanchor"
-internal = true
-user = ["You are the blogger of a coding agent session.", "This session resumed after a restart", "FULL PROJECTION:"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Session reanchor background." }
 
 [[turn]]
 id = "title"

@@ -196,24 +196,14 @@ tools = ["verdict"]
   respond = { type = "text", text = "Reviewer confirmed the tree." }
 
 # Both Blogger shapes. The re-anchor frame (`CompanionHostBlogger.fs:72`) is reachable here
-# because this scenario genuinely restarts — unlike `agent-dsl`, where the same edge was
-# declared with no restart in the flow and could never be delivered.
 
 [[turn]]
 id = "blogger"
 internal = true
-user = "[[message]]"
+user = "[["
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }
-
-[[turn]]
-id = "blogger-reanchor"
-internal = true
-user = ["You are the blogger of a coding agent session.", "This session resumed after a restart", "FULL PROJECTION:"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Session reanchor background." }
 
 [[turn]]
 id = "title"

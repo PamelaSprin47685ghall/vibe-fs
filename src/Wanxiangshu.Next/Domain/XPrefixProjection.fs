@@ -22,7 +22,7 @@ module XPrefixProjection =
 
     /// COMPANION-009: the plan for one request.
     ///
-    /// `frozenBBody` is the FrozenRecordPrefix text, already read from the blob the snapshot
+    /// `frozenRecordPrefixBody` is the FrozenRecordPrefix text, already read from the blob the snapshot
     /// references. The snapshot carries a `BlobRef` plus digest and never the body —
     /// PERSIST-007 keeps large bodies out of the journal line — so resolving it is the
     /// adapter's job and this module takes the result.
@@ -35,13 +35,14 @@ module XPrefixProjection =
     /// id was fixed when the candidate was built and is what the provider has already
     /// seen for this epoch; deriving it again here would be a second construction site
     /// for one identity, and any drift becomes a cold boundary on every later request.
-    let forSnapshot (snapshot: PrefixSnapshot option) (frozenBBody: string) : XPrefixPlan =
+    let forSnapshot (snapshot: PrefixSnapshot option) (frozenRecordPrefixBody: string) : XPrefixPlan =
         match snapshot with
         | None ->
             { CompanionMemory = None
               DropLeading = 0 }
         | Some value ->
-            { CompanionMemory = Some(value.SyntheticMessageId, CompanionPrompt.companionMemoryBlock frozenBBody)
+            { CompanionMemory =
+                Some(value.SyntheticMessageId, CompanionPrompt.companionMemoryBlock frozenRecordPrefixBody)
               DropLeading = value.CutoffExclusive }
 
     /// CTX-010: the plan this attempt's profile calls for.
@@ -50,10 +51,14 @@ module XPrefixProjection =
     /// request — it is the same request with a candidate prefix — so building it through
     /// a separate path would let the two drift, and CTX-012 requires a promoted probe to
     /// be byte-identical to what the successful attempt sent.
-    let forChoice (choice: XProjectionChoice) (committed: PrefixSnapshot option) (frozenBBody: string) : XPrefixPlan =
+    let forChoice
+        (choice: XProjectionChoice)
+        (committed: PrefixSnapshot option)
+        (frozenRecordPrefixBody: string)
+        : XPrefixPlan =
         match choice with
-        | XProjectionChoice.UseCommittedEpoch -> forSnapshot committed frozenBBody
-        | XProjectionChoice.UsePrefixProbe probe -> forSnapshot (Some probe.Candidate) frozenBBody
+        | XProjectionChoice.UseCommittedEpoch -> forSnapshot committed frozenRecordPrefixBody
+        | XProjectionChoice.UsePrefixProbe probe -> forSnapshot (Some probe.Candidate) frozenRecordPrefixBody
 
     /// Which blob this attempt needs read before its plan can be built.
     ///
