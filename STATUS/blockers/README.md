@@ -1,5 +1,18 @@
 # Active Blockers
 
+## Enforcer 接线 security_review 观察项（2026-08，f854c092 + 0255a6b4）
+
+状态：观察项，不阻塞。security_review（sa_..._8de306a069d9）对 SSOT/15 Enforcer 纵向
+第一段（blog 工具/cycle 提交/挂起链）的结论为 verdict=warn，无 blocking；四项观察的
+评估如下。
+
+| 级别 | 观察 | 评估 | 处置 |
+|------|------|------|------|
+| MEDIUM | 跨进程幂等竞态：两个插件实例对同一 ProviderRun 并发提交 cycle 可致 journal 重复 | 不可达：`EnforcementCycleCommitted` 按 `StreamId.Session mainSessionId` 写，同一 session 只归属一个插件实例管理（同 stream 单写者）；already 检查 + fold 按 ProviderRun 拒绝兜底 | 记录；若未来出现跨实例共享 session 的接线（如 V2 runner），重验 |
+| MEDIUM | synthetic user 消息（ENFORCER-051 delta 注入）正文无来源标记 | 注入消息 id 携带确定性 `enforcer-delta` 前缀；Blogger system prompt 声明 delta 为低信任内容（COMPANION-010 语义）；不进入主模型投影 | 不改；如需审计区分，读 id 前缀即可 |
+| LOW | cycle blob（text/score/evidence）无大小上限 | 文本来源为 Blogger 输出与 delta（上游受 `BloggerDelta.DeltaLimitBytes` 约束）；无 STRENGTH-079 式 `MaxDelegatedBatchBytes` | 记录；接 nudge overlay 时补上限 |
+| LOW | 诊断（`enforcer-cycle-*`）的 result 字段可能含内部错误字符串 | 字段白名单（CTX-014）不含路径类字段；错误串为固定文案 | 不改 |
+
 ## HOST-006 次生风险：Host 第二个 compaction 实现的运行时探测（已闭合）
 
 状态：已闭合。预防层已入 SSOT/07 HOST-006（CONFORMANT，`HostCompactionGate.fs` 14 项

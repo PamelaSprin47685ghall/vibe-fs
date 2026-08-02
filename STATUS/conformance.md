@@ -345,7 +345,7 @@ REVIEW-002、REVIEW-008、ORCH-004 在主表中已有 CONFORMANT 行，本段不
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| STRENGTH-006…025/079（类型/预测器/控制器/价值/策略） | PURE_CORE_ONLY | `Domain/StrengthTypes.fs` `StrengthPolicy.fs` `StrengthPredictor.fs` `StrengthController.fs` `StrengthValue.fs` + `tests-mjs/Strength/` | 纯领域内核已实现（28 测试）；生产接线（Replica session/transform 挂起/候选帧投影）受 STRENGTH-078 Host canary（C-01…C-21）与阶段 A（Projection DSL 迁移）门禁，未接线 |
+| STRENGTH-006…025/079（类型/预测器/控制器/价值/策略） | PURE_CORE_ONLY | `Domain/StrengthTypes.fs` `StrengthPolicy.fs` `StrengthPredictor.fs` `StrengthController.fs` `StrengthValue.fs` + `tests-mjs/Strength/` | 纯领域内核已实现（28 测试）；生产接线（Replica session/transform 挂起/候选帧投影）仍受 STRENGTH-078 门禁——其中 C-01…C-10（transform 顺序/挂起/恢复/取消/跨 session 并行/身份绑定）已由共享 canary `host-transform-capability` 证明（`Session/ParkedTransform.fs` + `Session/EnforcerHost.fs`），C-11…C-21（候选帧投影/权限过滤/ruleset/Agent 面）与阶段 A（Projection DSL 迁移）未接线 |
 | STRENGTH-001…005/026…135（其余） | NOT_IMPLEMENTED | — | 依赖 Host canary 与生产接线，未实现 |
 
 ## SSOT/15 — Blogger as Enforcer（`ENFORCER-`）

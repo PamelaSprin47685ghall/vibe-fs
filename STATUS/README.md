@@ -75,7 +75,10 @@ src/Wanxiangshu.Next/
    （cycle 原子提交 + offer/恢复/synthetic delta 注入，ENFORCER-044/047/050/051）、
    `Infrastructure/OpenCode/Tools/BlogTool.fs`（blog 工具，ENFORCER-010/020/040/041）、
    `Journal/EnforcementProjection.fs`（`EnforcementCycleCommitted` 独立事实，
-   ENFORCER-150 第二种形态；`BlogEntryCommitted` 扩展与 clean break 未做）
+   ENFORCER-150 第二种形态；`BlogEntryCommitted` 扩展与 clean break 未做）。接线经普通
+   review + security_review 双审查（无 blocking）；security_review 四项观察（跨进程幂等
+   竞态——不可达论证、合成消息来源标记、blob 大小上限、诊断内部路径）记于
+   `STATUS/blockers/README.md`
 2. 逐纵向接线（推荐顺序不变）：Strength shadow（Replica session/ruleset/候选帧，解锁
    STRENGTH-078 C-11…C-21）→ Enforcer nudge overlay（ENFORCER-080…115，第 0 步 7–9
    补完）→ Student&Teacher（teacher/return 工具、QA 落盘，LEARN-082…088）
