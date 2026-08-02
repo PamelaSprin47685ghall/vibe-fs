@@ -33,29 +33,29 @@ prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the ta
 must = ["orch.2"]
 
 flow = [
-  { wait = "orch.0" },
+  { wait = "orch.0", timeoutMs = 20000 },
   # Nested Host sessions are physically flattened under the family root. The
   # project-wide Host session snapshot binds exact agents without re-deriving the
   # plugin's logical HandleLinked parent from physical `parentID`.
   { bindChild = { agent = "fast-manager", bind = ["fast-manager"] } },
-  { wait = "manager.0" },
+  { wait = "manager.0", timeoutMs = 20000 },
   { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
-  { wait = "coder.0" },
-  { wait = "coder.1" },
-  { wait = "manager.2" },
+  { wait = "coder.0", timeoutMs = 20000 },
+  { wait = "coder.1", timeoutMs = 20000 },
+  { wait = "manager.2", timeoutMs = 20000 },
 
   # Pre-rebase review: the guard nudges the Manager (fast-reviewer path) and the
   # Orchestrator raises its own review barrier (deep-reviewer path, ORCH-006). Both
   # reviewers exist; the barrier one is forked by the Orchestrator directly.
-  { wait = "manager-guard.0" },
+  { wait = "manager-guard.0", timeoutMs = 20000 },
   { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
   { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
-  { wait = "reviewer.0" },
+  { wait = "reviewer.0", timeoutMs = 20000 },
   # The reviewer's second request carries a grown `parent_work_record` (the parent
   # chain's work record advances as the Manager's Blogger submits), so its wire
   # prefix is not an append-only continuation of the first — a real ARCH-004 break
   # whose cost is one cache miss. Declared, because the turn text itself is stable.
-  { wait = "barrier-reviewer.0" },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
   # Both reviewers submit their second PERFECT in the next provider run. The
   # resulting durable witnesses—not a separate confirmation prompt—are the
   # REVIEW-003 criterion.

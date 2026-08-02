@@ -35,12 +35,12 @@ flow = [
   # already durable, while Published cannot exist until this review confirms.
   { afterExpectation = { id = "barrier-reviewer.0", attempts = 2, restart = true } },
 
-  { wait = "orch.0" },
-  { wait = "manager.0" },
-  { wait = "coder.0" },
-  { wait = "reviewer.0" },
-  { wait = "barrier-reviewer.0" },
-  { wait = "reviewer-confirm.0" },
+  { wait = "orch.0", timeoutMs = 20000 },
+  { wait = "manager.0", timeoutMs = 20000 },
+  { wait = "coder.0", timeoutMs = 20000 },
+  { wait = "reviewer.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
+  { wait = "reviewer-confirm.0", timeoutMs = 20000 },
   { waitFact = { name = "CandidateReady", eq = 1 } },
 
   { awaitRestart = true },

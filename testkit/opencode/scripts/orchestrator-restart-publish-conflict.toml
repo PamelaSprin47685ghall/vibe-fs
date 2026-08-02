@@ -27,20 +27,20 @@ flow = [
   { afterExpectation = { id = "manager.0", gitConflictProof = true } },
   { afterExpectation = { id = "conflict-resume.0", restart = true } },
 
-  { wait = "orch.0" },
-  { wait = "manager.0" },
-  { wait = "coder.0" },
-  { wait = "manager-guard.0" },
-  { wait = "reviewer.0" },
-  { wait = "barrier-reviewer.0" },
-  { wait = "reviewer.1" },
+  { wait = "orch.0", timeoutMs = 20000 },
+  { wait = "manager.0", timeoutMs = 20000 },
+  { wait = "coder.0", timeoutMs = 20000 },
+  { wait = "manager-guard.0", timeoutMs = 20000 },
+  { wait = "reviewer.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
+  { wait = "reviewer.1", timeoutMs = 20000 },
   # The guard round's challenge answer (`reviewer-confirm.0`) is NOT awaited
   # before the restart: the rebase conflict interrupts the manager's guard round
   # (the conflict resume busy-nudges the manager mid-join), so the fast
   # reviewer's answer races the restart and legitimately never lands
   # pre-restart. The guard round resumes and confirms on the recovered run.
-  { wait = "barrier-reviewer.2" },
-  { wait = "conflict-resume.0" },
+  { wait = "barrier-reviewer.2", timeoutMs = 20000 },
+  { wait = "conflict-resume.0", timeoutMs = 20000 },
 
   { awaitRestart = true },
 
