@@ -110,6 +110,8 @@ const [
   EnforcerNudgeModule,
   EnforcerCycleModule,
   StudentTeacherModule,
+  ParkedTransformModule,
+  PluginRuntimeScopeModule,
   AgentJournalModule,
   PromptDispatcherModule,
   PromptDispatcherSendModule,
@@ -173,6 +175,8 @@ const [
   prod('Domain/EnforcerNudge'),
   prod('Domain/EnforcerCycle'),
   prod('Domain/StudentTeacher'),
+  prod('Session/ParkedTransform'),
+  prod('Infrastructure/OpenCode/Host/PluginRuntimeScope'),
   prod('Journal/AgentJournal'),
   prod('Application/Prompting/PromptDispatcher'),
   prod('Application/Prompting/PromptDispatcherSend'),
@@ -2586,6 +2590,34 @@ export const enforcer = (() => {
       return cycle.mergeCalls(list)
     },
     isValidCycle: (merged) => cycle.isValidCycle(merged),
+  }
+})()
+
+// ── SSOT/15 ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
+
+export const parkedTransform = (() => {
+  const ParkedTransform = ParkedTransformModule.ParkedTransform
+  const PluginRuntimeScope = PluginRuntimeScopeModule.PluginRuntimeScope
+
+  const entry = (value) => ({
+    sessionId: value.SessionId,
+    injection: value.Injection,
+    completed: value.Completion,
+  })
+
+  return {
+    /** `lifetimeMs` — Fable represents TimeSpan as a number of ms. */
+    create: (sessionId, lifetimeMs) => entry(new ParkedTransform(sessionId, lifetimeMs)),
+    resume: (value) => value.TryResume(),
+    cancel: (value) => value.TryCancel(),
+    scope: () => new PluginRuntimeScope(null),
+    park: (scope, sessionId, lifetimeMs) => scope.ParkTransform(sessionId, lifetimeMs),
+    resumeParked: (scope, sessionId) => scope.ResumeParked(sessionId),
+    cancelParked: (scope, sessionId) => scope.CancelParked(sessionId),
+    offerParked: (scope, sessionId, deltaText) => scope.OfferParked(sessionId, deltaText),
+    hasParked: (scope, sessionId) => scope.HasParked(sessionId),
+    consumeStaged: (scope, sessionId) => scope.TryConsumeStagedOffer(sessionId),
+    dispose: (scope) => scope.Dispose(),
   }
 })()
 

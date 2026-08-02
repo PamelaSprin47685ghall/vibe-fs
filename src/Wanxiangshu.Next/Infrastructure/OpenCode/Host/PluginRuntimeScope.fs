@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel
@@ -24,6 +25,15 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable sharedTerminalKey: string option = None
     let mutable sharedTerminalPort: Events.HostEventPort option = None
     let mutable disposed = false
+
+    /// ENFORCER-160/162: parked continuation transforms, keyed by session id.
+    ///
+    /// At most one parked transform per session (a session's step loop is
+    /// serial, so two parks for one session cannot race in practice — the
+    /// dictionary entry is the guard that makes the invariant structural).
+    let parkedGate = obj ()
+    let parked = Dictionary<string, ParkedTransform>()
+    let parkedInjection = Dictionary<string, string>()
 
     /// HOST-006: the first compaction setting the config hook could not establish.
     ///
@@ -105,6 +115,92 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun)
         |> ignore
 
+    interface IParkedTransformHost with
+        member this.ParkTransform(sessionId: string, lifetime: TimeSpan) : Task<bool> =
+            task {
+                let (entry, staged) =
+                    lock parkedGate (fun () ->
+                        match parked.TryGetValue sessionId with
+                        | true, existing -> existing, false
+                        | false, _ ->
+                            let created = ParkedTransform(sessionId, lifetime)
+                            parked.[sessionId] <- created
+
+                            // ENFORCER-050 offer-first merge: an offer that
+                            // raced ahead (staged while no transform was parked)
+                            // makes this park return immediately with `true`.
+                            let staged = parkedInjection.ContainsKey sessionId
+
+                            if staged then
+                                created.TryResume()
+
+                            created, staged)
+
+                let! resumed = entry.Completion
+
+                lock parkedGate (fun () ->
+                    match parked.TryGetValue sessionId with
+                    | true, current when obj.ReferenceEquals(current, entry) -> parked.Remove sessionId |> ignore
+                    | _ -> ())
+
+                return resumed
+            }
+
+        /// ENFORCER-050: fresh material arrived for a parked Blogger transform.
+        ///
+        /// The delta text is staged in `parkedInjection` BEFORE the resume, so a
+        /// racing transform (park after this call) consumes it from the staged slot
+        /// instead of parking forever. This is the "offer first, park later" merge.
+        /// Returns true when a parked transform was resumed, false when the offer
+        /// was only staged (Blogger provider request in flight, or no transform
+        /// parked yet — ENFORCER-050's skip branch).
+        member this.OfferParked(sessionId: string, deltaText: string) : bool =
+            lock parkedGate (fun () ->
+                parkedInjection.[sessionId] <- deltaText
+
+                match parked.TryGetValue sessionId with
+                | true, entry ->
+                    entry.TryResume()
+                    parked.Remove sessionId |> ignore
+                    true
+                | false, _ -> false)
+
+        /// Resume a parked transform without staging new material. Used when the
+        /// waiter's resume carries no injection (e.g. a Replica completion whose
+        /// frames were dropped). `OfferParked` is the injection-carrying path.
+        member this.ResumeParked(sessionId: string) : bool =
+            lock parkedGate (fun () ->
+                match parked.TryGetValue sessionId with
+                | true, entry ->
+                    entry.TryResume()
+                    parked.Remove sessionId |> ignore
+                    true
+                | false, _ -> false)
+
+        /// ENFORCER-162: cancel a parked transform and release its waiter.
+        member this.CancelParked(sessionId: string) : unit =
+            lock parkedGate (fun () ->
+                match parked.TryGetValue sessionId with
+                | true, entry ->
+                    entry.TryCancel()
+                    parked.Remove sessionId |> ignore
+                    parkedInjection.Remove sessionId |> ignore
+                | false, _ -> ())
+
+        /// Whether a session currently has a parked continuation transform.
+        member this.HasParked(sessionId: string) : bool =
+            lock parkedGate (fun () -> parked.ContainsKey sessionId)
+
+        /// Consume a staged offer. Returns the delta text when one raced ahead of
+        /// the park, None otherwise.
+        member this.TryConsumeStagedOffer(sessionId: string) : string option =
+            lock parkedGate (fun () ->
+                match parkedInjection.TryGetValue sessionId with
+                | true, text ->
+                    parkedInjection.Remove sessionId |> ignore
+                    Some text
+                | false, _ -> None)
+
     /// HOST-006 prevention layer: the config hook's finding.
     ///
     /// Written once at config time, read once by the startup probe. Not a collection
@@ -169,6 +265,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
 
+        // ENFORCER-162: a deleted session must not keep a waiter parked.
+        (this :> IParkedTransformHost).CancelParked sessionId
+
         this.AttemptPlans.Keys
         |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))
         |> Seq.toList
@@ -179,6 +278,16 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             disposed <- true
             subscription |> Option.iter (fun active -> active.Dispose())
             subscription <- None
+
+            // ENFORCER-162: plugin dispose cancels every parked waiter. The
+            // resolved `false` releases each suspended transform so the Host's
+            // step loop can finish its current request cycle.
+            lock parkedGate (fun () ->
+                for entry in parked.Values |> Seq.toList do
+                    entry.TryCancel()
+
+                parked.Clear()
+                parkedInjection.Clear())
 
             lock toolRuntimeGate (fun () ->
                 toolRuntime |> Option.iter (fun owner -> owner.Dispose())

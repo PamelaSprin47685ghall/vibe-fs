@@ -47,6 +47,7 @@ module StaticTools =
         | ToolPermission.Pty -> "fork-pty"
         | ToolPermission.Network -> "network"
         | ToolPermission.Verdict -> "verdict"
+        | ToolPermission.Blog -> "blog"
 
     /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
@@ -69,7 +70,8 @@ module StaticTools =
               "coder"
               "executor"
               "network"
-              "verdict" ]
+              "verdict"
+              "blog" ]
 
         let pairs =
             [ yield "*", box "deny"

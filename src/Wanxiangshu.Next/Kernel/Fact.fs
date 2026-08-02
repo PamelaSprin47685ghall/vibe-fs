@@ -434,6 +434,25 @@ module Fact =
                ProbeId: string
                SolvingProviderRun: ProviderRunIdentity |}
 
+        /// ENFORCER-044/045: one Blogger provider step's merged `blog` calls,
+        /// committed atomically at the continuation transform. The work-log
+        /// text still travels through `BlogEntryCommitted` (unchanged shape);
+        /// this fact carries the enforcement half — scores and evidence — plus
+        /// the merged cycle text so the fold can replay the merge (ENFORCER-154).
+        ///
+        /// ENFORCER-150 second option: a fact following BlogEntryCommitted
+        /// rather than a field extension of it (schema clean break deferred).
+        | EnforcementCycleCommitted of
+            {| MainSessionId: SessionId
+               BloggerSessionId: SessionId
+               ProviderRun: ProviderRunIdentity
+               ToolCallIds: ToolCallId list
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               ScoreVectorRef: BlobRef option
+               EvidenceRef: BlobRef option
+               ObservedPrefixEpochId: PrefixEpochId |}
+
         /// HOST-006 containment: a Host compaction was observed, so the prefix
         /// epoch is retired and Companion coverage is zeroed.
         ///

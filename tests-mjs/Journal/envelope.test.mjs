@@ -283,6 +283,7 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
     'Blog',
     'Companion',
     'Effects',
+    'Enforcement',
     'Fallback',
     'Handles',
     'PrefixEpoch',

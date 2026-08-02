@@ -94,6 +94,9 @@ module ToolHostCodec =
     [<Emit("$0.schema.string().optional()")>]
     let private rawOptionalStringSchema (tool: obj) : obj = jsNative
 
+    [<Emit("$0.schema.number().optional()")>]
+    let private rawOptionalNumberSchema (tool: obj) : obj = jsNative
+
     [<Emit("$0.schema.array($0.schema.string()).optional()")>]
     let private rawOptionalStringArraySchema (tool: obj) : obj = jsNative
 
@@ -195,6 +198,9 @@ module ToolHostCodec =
 
     let optionalStringSchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringSchema factory)
+
+    let optionalNumberSchema (HostToolFactory factory) =
+        HostSchema(rawOptionalNumberSchema factory)
 
     let optionalStringArraySchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringArraySchema factory)

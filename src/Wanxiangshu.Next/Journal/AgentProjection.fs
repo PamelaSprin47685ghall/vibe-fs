@@ -31,6 +31,10 @@ type SessionAgentProjection =
         Fallback: FallbackProjection option
         PromptAuthority: PromptAuthority.PromptAuthorityProjection option
         Effects: DurableEffectProjection option
+        /// ENFORCER-044/045/154: committed Blogger enforcement cycles for this
+        /// session's Companion. Per-session because a cycle belongs to one
+        /// main session's Companion, keyed by the Blogger provider run.
+        Enforcement: EnforcementProjectionState option
     }
 
 type AgentProjectionSet =
@@ -67,7 +71,8 @@ module AgentProjection =
           ReviewRequirements = None
           Fallback = None
           PromptAuthority = None
-          Effects = None }
+          Effects = None
+          Enforcement = None }
 
     let empty =
         { Sessions = Map.empty

@@ -58,7 +58,9 @@ module ToolRegistry =
               VerdictTool.spec factory runtime
               ExecutorTool.spec factory runtime
               InspectorTool.spec factory runtime
-              CoderTool.spec factory runtime ]
+              CoderTool.spec factory runtime
+              // ENFORCER-010: Blogger's tool set is exactly { blog }.
+              BlogTool.spec factory runtime ]
 
         let rolePredicate spec =
             match spec.Name with
@@ -71,6 +73,7 @@ module ToolRegistry =
             | "executor" -> fun r -> Roles.isAllowed r ToolPermission.Exec
             | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
             | "coder" -> fun r -> r = Role.DevOps
+            | "blog" -> fun r -> r = Role.Blogger
             | _ -> fun _ -> false
 
         // AGENT-007 layer two. Both layers read the same CanonicalRole, so a tool

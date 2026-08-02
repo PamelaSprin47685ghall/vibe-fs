@@ -130,6 +130,13 @@ export const FORK_COMPLETION_WINDOW_MS = 10000;
  */
 export const FORK_RECONCILE_SLICE_MS = 2000;
 
+/**
+ * ENFORCER-160 polling slice for the parked-transform canary. Must be faster
+ * than the window it sits inside (WATCHDOG_TIMEOUT_MS) — a slice that is not
+ * strictly smaller than its bound is the bound, not a probe.
+ */
+export const ENFORCER_POLL_SLICE_MS = 500;
+
 // ── unit suite (layers 1-3) ─────────────────────────────────────────────────
 
 /**

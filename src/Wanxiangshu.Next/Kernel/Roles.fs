@@ -34,6 +34,7 @@ type ToolPermission =
     | Pty
     | Network
     | Verdict
+    | Blog
 
 module Roles =
 
@@ -85,8 +86,9 @@ module Roles =
                   ToolPermission.Grep
                   ToolPermission.Inspector
                   ToolPermission.Coder ]
-        | Role.Executor
-        | Role.Blogger -> Set.empty
+        | Role.Executor -> Set.empty
+        // ENFORCER-010: Blogger's tool set is exactly { blog }.
+        | Role.Blogger -> set [ ToolPermission.Blog ]
 
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
         permissions role |> Set.contains permission

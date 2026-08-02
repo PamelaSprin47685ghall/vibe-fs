@@ -353,6 +353,7 @@ REVIEW-002、REVIEW-008、ORCH-004 在主表中已有 CONFORMANT 行，本段不
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
 | ENFORCER-020…043/080…102/170…172（codec/throttle/nudge/cycle/catalog） | PURE_CORE_ONLY | `Domain/EnforcerCatalog.gen.fs` `EnforcerCodec.fs` `EnforcerThrottle.fs` `EnforcerNudge.fs` `EnforcerCycle.fs` + `tests-mjs/Enforcer/` | 纯领域内核已实现（39 测试，120 项规则目录生成）；生产接线（blog 工具注册/BlogEntryCommitted 扩展/Nudge 事实/transform 挂起）受 ENFORCER-180 第 0 步九条 Host canary 阻断门，未接线 |
+| ENFORCER-010/040…047/150/160…163（blog 工具与挂起链 Host 接线） | PARTIAL | `Infrastructure/OpenCode/Tools/BlogTool.fs` `Session/EnforcerHost.fs` `Session/ParkedTransform.fs` `Journal/EnforcementProjection.fs` `Kernel/Roles.fs`（`ToolPermission.Blog`）+ `tests-mjs/Enforcer/parked-transform.test.mjs` + canary `host-transform-capability` | 第 0 步 1–6 已接线并证明：blog 工具（固定 "OK" 立即返回，120 规则字段 schema 经 ENFORCER-170 单一目录生成）、Blogger 工具面 {blog}（执行门 role=Blogger）、cycle 在 continuation transform 原子提交（`EnforcementCycleCommitted` 独立事实，ENFORCER-150 第二种形态；`BlogEntryCommitted` 扩展与 clean break 未做）、continuation 挂起/offer 恢复/synthetic delta 注入（ENFORCER-051）、cancel 释放 waiter（ENFORCER-162，第 1 层 8 测试 + 第 4 层 canary 证明 STRENGTH-078 C-01…C-10）。第 0 步 7–9（拼写容错经 codec 提交、fake user 绑定 seal、Y compaction 恢复）与 nudge overlay/throttle 持久化未接线 |
 | ENFORCER-001…019/044…079/103…201（其余） | NOT_IMPLEMENTED | — | 依赖 Host canary 与生产接线，未实现 |
 
 ## SSOT/16 — Student & Teacher（`LEARN-`）

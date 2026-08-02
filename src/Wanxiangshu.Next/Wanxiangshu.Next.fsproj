@@ -69,6 +69,7 @@
     <Compile Include="Journal/SessionAssociation.fs"/>
     <Compile Include="Journal/EffectProjection.fs"/>
     <Compile Include="Journal/ReviewProjection.fs"/>
+    <Compile Include="Journal/EnforcementProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
     <Compile Include="Journal/Boot.fs"/>
@@ -160,9 +161,12 @@
     <Compile Include="Session/CompanionJournalPort.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="Session/CompanionProjection.fs"/>
+    <Compile Include="Session/ParkedTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
+    <Compile Include="Session/EnforcerHost.fs"/>
     <Compile Include="Application/Reconciliation/TurnBinding.fs"/>
     <Compile Include="Application/Reconciliation/CompanionTransform.fs"/>
     <Compile Include="Application/Reconciliation/ReviewSeal.fs"/>
@@ -173,7 +177,6 @@
     <Compile Include="Infrastructure/OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="Application/Reconciliation/TurnCompletionProgram.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/GitTree.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostCompactionGate.fs"/>
     <Compile Include="Application/Reconciliation/XWire.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSignalBootstrap.fs"/>
@@ -197,6 +200,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/ExecutorTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/InspectorTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CoderTool.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/BlogTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/VerdictTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

@@ -1,0 +1,89 @@
+# host-transform-capability — STRENGTH-078 C-01..C-10 / ENFORCER-180 step 0.
+#
+# The Blogger chain is the real production carrier for the Host capability
+# proof: the blog tool returns "OK" without suspending (step 0.1), the Host's
+# tool-loop continuation re-enters the transform (step 0.2), the continuation
+# commits one EnforcementCycleCommitted and parks (step 0.3), the main session's
+# next turn offers fresh material which resumes the parked transform (step 0.4),
+# and the resumed transform injects the delta as a synthetic user message
+# (ENFORCER-051) before the provider request goes out.
+#
+# The temporal assertions live in the driver: the second Blogger request must
+# happen AFTER the second main turn (a failed park would send it immediately,
+# consuming step 1 early), and a parallel coder session must complete while the
+# Blogger transform is parked (STRENGTH-078 C-04, ENFORCER-161).
+
+scenario = "host-transform-capability"
+description = "STRENGTH-078 C-01..C-10 / ENFORCER-180 step 0: blog OK, continuation transform, park/resume, cross-session isolation"
+session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
+prompt = { agent = "fast-coder", text = "First coder turn." }
+must = ["coder.0", "inspector.0", "blogger.0", "coder2.0", "coder-title", "inspector-title"]
+
+flow = [
+  { prompt = { text = "First coder turn." } },
+  { prompt = { text = "Parallel inspector turn while the Blogger transform is parked." } },
+  { prompt = { text = "Second coder turn." } },
+]
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = "First coder turn."
+tools = ["read", "glob", "grep"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "coder turn one complete." }
+
+[[turn]]
+id = "coder2"
+lane = "fast-coder"
+user = "Second coder turn."
+tools = ["read", "glob", "grep"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "coder turn two complete." }
+
+[[turn]]
+id = "inspector"
+lane = "fast-inspector"
+user = "Parallel inspector turn while the Blogger transform is parked."
+tools = ["read", "glob", "grep"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "inspector parallel turn complete." }
+
+[[turn]]
+id = "inspector-title"
+lane = "inspector-title"
+kind = "title"
+user = "Parallel inspector turn while the Blogger transform is parked."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+# Production composes the Blogger prompt itself, so no scenario text reaches
+# this lane — hence `internal`. The delta TOML always starts with `[[message]]`.
+#
+# Every Blogger request (the main session's and the parallel session's) matches
+# this one entry: step 0 answers with a completed blog call (ENFORCER-024's
+# misspelled `enf-primitive-obsessin` → `primitive-obsession`). The continuation
+# transform then commits the cycle and parks; the offer from the main session's
+# second turn resumes it with the cumulative delta, which reaches the mock as
+# another `[[message]]` user and gets the same step-0 answer — one more cycle,
+# then the transform parks again until teardown cancels it (ENFORCER-162).
+[[turn]]
+id = "blogger"
+internal = true
+user = "[["
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "cycle one text", "enf-primitive-obsessin" = 7 } }
+
+[[turn]]
+id = "coder-title"
+lane = "coder-title"
+kind = "title"
+user = "First coder turn."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

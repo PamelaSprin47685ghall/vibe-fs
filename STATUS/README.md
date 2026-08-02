@@ -20,10 +20,11 @@ join 最小 wire（status/agent/work_record）。
 
 ## 当前开发阶段
 
-SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并测试，生产接线被
-各方案自设的 Host canary 门禁阻断（STRENGTH-078 / ENFORCER-180 / LEARN-082…088）。下一步
-是建共享 Host capability canary 证明 transform 挂起/取消/身份绑定，再逐纵向接线（推荐
-顺序：SatelliteRuntime → Projection DSL → Strength shadow → Enforcer → Student/Teacher）。
+SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并测试；共享
+Host capability canary（`host-transform-capability`，STRENGTH-078 C-01…C-10 /
+ENFORCER-180 第 0 步 1–6）已建并全绿，Enforcer 的 blog 工具与挂起链已接线
+（PARTIAL）。下一步是逐纵向接线（推荐顺序：Strength shadow → Enforcer nudge
+overlay → Student/Teacher）。
 
 ## 活跃阻塞
 
@@ -67,10 +68,18 @@ src/Wanxiangshu.Next/
 
 ## 下一步
 
-1. 建共享 Host capability canary（transform 挂起/取消/身份绑定），解锁 SSOT/14-16 接线
-2. 包 K8f：X-A–X-D 剧本（X 恢复链生产接线已闭合；剧本未建，第 4 层证据未产出）
-3. （已闭合）HOST-006 次生风险运行时探测——见 blockers/README.md；上游观察项：V2 runner
-   的 `compactAfterOverflow` 未遵守 `compaction.auto=false`（ARCH-003，不可在本仓修）
+1. （已闭合）共享 Host capability canary——`host-transform-capability` 已建并全绿：证明
+   STRENGTH-078 C-01…C-10（每请求一次 transform、挂起/恢复、跨 session 并行、取消、
+   tool-loop continuation、blog 工具立即返回 "OK"）与 ENFORCER-180 第 0 步 1–6。支撑构件：
+   `Session/ParkedTransform.fs`（挂起原语，ENFORCER-160/162）、`Session/EnforcerHost.fs`
+   （cycle 原子提交 + offer/恢复/synthetic delta 注入，ENFORCER-044/047/050/051）、
+   `Infrastructure/OpenCode/Tools/BlogTool.fs`（blog 工具，ENFORCER-010/020/040/041）、
+   `Journal/EnforcementProjection.fs`（`EnforcementCycleCommitted` 独立事实，
+   ENFORCER-150 第二种形态；`BlogEntryCommitted` 扩展与 clean break 未做）
+2. 逐纵向接线（推荐顺序不变）：Strength shadow（Replica session/ruleset/候选帧，解锁
+   STRENGTH-078 C-11…C-21）→ Enforcer nudge overlay（ENFORCER-080…115，第 0 步 7–9
+   补完）→ Student&Teacher（teacher/return 工具、QA 落盘，LEARN-082…088）
+3. 包 K8f：X-A–X-D 剧本（X 恢复链生产接线已闭合；剧本未建，第 4 层证据未产出）
 4. `HandleProjection.joinable` 零生产调用点：`join` 仍走运行期 mailbox，
    `CompletedAwaitingJoin` 的 durable 消费链未闭合（EXEC-009）
 5. `CompanionDelta.jsonDelta` 替换为包 X3 的 TOML delta（当前仍在 Submit 路径）

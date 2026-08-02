@@ -22,7 +22,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { roles } from '../domain.mjs'
+import { roles, enforcer } from '../domain.mjs'
 import { withPlugin, withExecutablePlugin, acceptAuthorityRoot, notifyCompleted, awaitPrompted } from './plugin-fixture.mjs'
 
 /** AGENT-002: the twenty managed agents, exactly as the Host-final config names them. */
@@ -53,6 +53,12 @@ const hostFinalConfig = () => {
 
 /** Every argument of every tool, so a new or renamed argument fails here first. */
 const EXPECTED_ARGUMENTS = {
+  blog: {
+    text: 'required',
+    evidence: 'optional',
+    // ENFORCER-170: the 120 rule fields come from the one catalog.
+    ...Object.fromEntries(enforcer.fieldNames().map((name) => [name, 'optional'])),
+  },
   coder: { agent: 'required', prompt: 'optional', prompts: 'optional' },
   executor: {
     command: 'required',
@@ -143,6 +149,7 @@ const KNOWN_TOOL_KEYS = [
   'executor',
   'network',
   'verdict',
+  'blog',
 ]
 
 /** AGENT-006/011/013/014/015: the allowed tools per role. Everything else denies. */
@@ -155,7 +162,8 @@ const ALLOWED_TOOLS = {
   browser: ['read', 'glob', 'grep', 'network'],
   meditator: ['read', 'glob', 'grep', 'inspector'],
   reviewer: ['read', 'glob', 'grep', 'inspector', 'verdict'],
-  blogger: [],
+  // ENFORCER-010: Blogger's tool set is exactly { blog }.
+  blogger: ['blog'],
   executor: [],
 }
 

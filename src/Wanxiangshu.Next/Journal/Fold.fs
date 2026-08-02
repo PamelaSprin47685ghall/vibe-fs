@@ -612,6 +612,35 @@ module Fold =
                         Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
             )
 
+        | AgentFact.EnforcementCycleCommitted payload ->
+            // ENFORCER-045/154: at most one committed cycle per Blogger provider
+            // run. A duplicate append is a corrupted journal — no correct writer
+            // produces it — so it stops the replay rather than being absorbed.
+            AgentProjection.tryUpdate
+                payload.MainSessionId
+                (fun session ->
+                    let enforcement =
+                        Option.defaultValue EnforcementProjection.empty session.Enforcement
+
+                    EnforcementProjection.applyCycle
+                        enforcement
+                        { MainSessionId = payload.MainSessionId
+                          BloggerSessionId = payload.BloggerSessionId
+                          ProviderRun = payload.ProviderRun
+                          ToolCallIds = payload.ToolCallIds
+                          CycleTextRef = payload.TextRef
+                          CycleTextDigest = payload.TextDigest
+                          CycleScoreRef = payload.ScoreVectorRef
+                          CycleEvidenceRef = payload.EvidenceRef
+                          ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
+                    |> Result.map (fun updated ->
+                        { session with
+                            Enforcement = Some updated }))
+                projection
+            |> function
+                | Ok updated -> Ok updated
+                | Error reason -> reject "EnforcementCycleCommitted" reason
+
         // ── lifecycle work record (SSOT/08, HOST-005) ──────────────────────
 
         | AgentFact.OpeningPromptCaptured payload ->
