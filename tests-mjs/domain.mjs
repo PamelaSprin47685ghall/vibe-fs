@@ -110,6 +110,8 @@ const [
   EnforcerNudgeModule,
   EnforcerCycleModule,
   StudentTeacherModule,
+  BloggerRequestContextModule,
+  BloggerRuntimeModule,
   ParkedTransformModule,
   PluginRuntimeScopeModule,
   AgentJournalModule,
@@ -175,6 +177,8 @@ const [
   prod('Domain/EnforcerNudge'),
   prod('Domain/EnforcerCycle'),
   prod('Domain/StudentTeacher'),
+  prod('Domain/BloggerRequestContext'),
+  prod('Session/BloggerRuntimeState'),
   prod('Session/ParkedTransform'),
   prod('Infrastructure/OpenCode/Host/PluginRuntimeScope'),
   prod('Journal/AgentJournal'),
@@ -2598,15 +2602,133 @@ export const enforcer = (() => {
 
 // ── SSOT/15 ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
 
+export const bloggerRequestContext = (() => {
+  const build = unionCase(BloggerRequestContextModule.BloggerRequestContext, 'BloggerRequestContext')
+  const m = bind(BloggerRequestContextModule, 'BloggerRequestContext', ['toml', 'isMain'])
+
+  const main = ({
+    toml,
+    previousIngested = 0,
+    nextIngested = 1,
+    previousCutoff = 0,
+    nextCutoff = 0,
+    nextDigest = '',
+    frameEpoch = 0,
+    deltaDigest = 'sha-delta',
+  } = {}) =>
+    build('Main', [
+      {
+        Toml: toml ?? '[[message]]\nrole = "user"\ntext = "work"',
+        PreviousIngestedThroughSequence: previousIngested,
+        NextIngestedThroughSequence: nextIngested,
+        PreviousCoverableTurnCutoffExclusive: previousCutoff,
+        NextCoverableTurnCutoffExclusive: nextCutoff,
+        NextCoveredPrefixDigest: nextDigest,
+        FrameEpochId: frameEpochId(frameEpoch),
+        DeltaDigest: blobDigest(deltaDigest),
+      },
+    ])
+
+  const squash = ({ frameEpoch = 0, coveredFrameCount = 1, digests = ['sha-f0'] } = {}) =>
+    build('Squash', [
+      {
+        FrameEpochId: frameEpochId(frameEpoch),
+        CoveredFrameCount: coveredFrameCount,
+        FrameDigests: toList(digests.map(blobDigest)),
+      },
+    ])
+
+  return {
+    main,
+    squash,
+    toml: (ctx) => unwrapOption(m.toml(ctx)),
+    isMain: (ctx) => m.isMain(ctx),
+    kindOf: (ctx) => caseOf(ctx),
+  }
+})()
+
+export const bloggerRuntime = (() => {
+  const stateCase = unionCase(BloggerRuntimeModule.BloggerRuntimeState, 'BloggerRuntimeState')
+  const m = bind(BloggerRuntimeModule, 'BloggerRuntime', [
+    'onMaterial',
+    'onCycleCommitted',
+    'onSquashCommitted',
+    'onDispose',
+    'inFlightContext',
+    'tryTakeInFlight',
+  ])
+
+  return {
+    idle: stateCase('Idle', []),
+    parked: stateCase('Parked', []),
+    disposed: stateCase('Disposed', []),
+    inFlight: (ctx) => stateCase('InFlight', [ctx]),
+    onMaterial: (state, ctx) => {
+      const r = resultOf(m.onMaterial(state, ctx))
+      if (!r.ok) return { ok: false, error: caseOf(r.error) }
+      const fields = r.value?.fields ?? r.value
+      const next = Array.isArray(fields) ? fields[0] : fields[0]
+      const decision = Array.isArray(fields) ? fields[1] : fields[1]
+      // F# tuple becomes JS array under Fable.
+      const pair = r.value
+      return {
+        ok: true,
+        state: pair[0],
+        decision: caseOf(pair[1]),
+      }
+    },
+    onCycleCommitted: (state) => {
+      const r = resultOf(m.onCycleCommitted(state))
+      return r.ok ? { ok: true, state: r.value } : { ok: false, error: caseOf(r.error) }
+    },
+    onSquashCommitted: (state, pendingMain) => {
+      const r = resultOf(m.onSquashCommitted(state, pendingMain === undefined ? undefined : pendingMain))
+      if (!r.ok) return { ok: false, error: caseOf(r.error) }
+      const pair = r.value
+      return { ok: true, state: pair[0], decision: caseOf(pair[1]) }
+    },
+    onDispose: (state) => m.onDispose(state),
+    inFlightContext: (state) => unwrapOption(m.inFlightContext(state)),
+    tryTakeInFlight: (state) => {
+      const r = resultOf(m.tryTakeInFlight(state))
+      if (!r.ok) return { ok: false, error: caseOf(r.error) }
+      const pair = r.value
+      return { ok: true, context: pair[0], state: pair[1] }
+    },
+    stateOf: (state) => caseOf(state),
+  }
+})()
+
 export const parkedTransform = (() => {
   const ParkedTransform = ParkedTransformModule.ParkedTransform
   const PluginRuntimeScope = PluginRuntimeScopeModule.PluginRuntimeScope
 
   const entry = (value) => ({
     sessionId: value.SessionId,
-    injection: value.Injection,
     completed: value.Completion,
   })
+
+  const projectContext = (ctx) => {
+    if (ctx === undefined || ctx === null) return undefined
+    const tag = caseOf(ctx)
+    if (tag === 'Main') {
+      const main = ctx.fields[0]
+      return {
+        kind: 'Main',
+        toml: main.Toml,
+        previousIngested: main.PreviousIngestedThroughSequence,
+        nextIngested: main.NextIngestedThroughSequence,
+      }
+    }
+    if (tag === 'Squash') {
+      const squash = ctx.fields[0]
+      return {
+        kind: 'Squash',
+        coveredFrameCount: squash.CoveredFrameCount,
+      }
+    }
+    return { kind: tag }
+  }
 
   return {
     /** `lifetimeMs` — Fable represents TimeSpan as a number of ms. */
@@ -2617,9 +2739,9 @@ export const parkedTransform = (() => {
     park: (scope, sessionId, lifetimeMs) => scope.ParkTransform(sessionId, lifetimeMs),
     resumeParked: (scope, sessionId) => scope.ResumeParked(sessionId),
     cancelParked: (scope, sessionId) => scope.CancelParked(sessionId),
-    offerParked: (scope, sessionId, deltaText) => scope.OfferParked(sessionId, deltaText),
+    offerParked: (scope, sessionId, context) => scope.OfferParked(sessionId, context),
     hasParked: (scope, sessionId) => scope.HasParked(sessionId),
-    consumeStaged: (scope, sessionId) => scope.TryConsumeStagedOffer(sessionId),
+    consumeStaged: (scope, sessionId) => projectContext(scope.TryConsumeStagedOffer(sessionId)),
     dispose: (scope) => scope.Dispose(),
   }
 })()

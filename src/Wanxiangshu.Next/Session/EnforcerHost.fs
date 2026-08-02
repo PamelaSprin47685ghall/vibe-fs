@@ -268,14 +268,49 @@ module EnforcerHost =
                     | Error failure -> Error(JournalAppendFailure.describe failure)
                     | Ok _ -> Ok record
 
-    /// ENFORCER-051: the synthetic user message carrying cycle-2+ delta.
+    /// ENFORCER-051: synthetic user message for cycle-2+ (temporary bridge until
+    /// Commit 4 rebuilds full Working Record projection from context).
     let private syntheticDeltaMessage (bloggerSessionId: SessionId) (deltaText: string) : obj =
+        let text = CompanionPrompt.newWorkMessage deltaText
+
         let syntheticId =
-            HostDigest.sha256Hex (String.concat "|" [ SessionId.value bloggerSessionId; "enforcer-delta"; deltaText ])
+            HostDigest.sha256Hex (String.concat "|" [ SessionId.value bloggerSessionId; "enforcer-delta"; text ])
 
         createObj
             [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
-              "parts", box [| createObj [ "type", box "text"; "text", box deltaText ] |] ]
+              "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
+
+    let private injectFromContext (bloggerSessionId: SessionId) (rawMessages: obj list) (ctx: BloggerRequestContext) =
+        match BloggerRequestContext.toml ctx with
+        | Some toml -> rawMessages @ [ syntheticDeltaMessage bloggerSessionId toml ]
+        | None -> rawMessages
+
+    /// Map chunk NextCursor (semantic) → XTrace sequence for typed context.
+    let private nextIngestSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) =
+        xTrace.Parts
+        |> List.tryFind (fun part ->
+            part.Turn > nextCursor.TurnIndex
+            || (part.Turn = nextCursor.TurnIndex && part.PartIndex >= nextCursor.PartIndex))
+        |> Option.map (fun part -> part.Cursor.Sequence)
+        |> Option.defaultValue (XTraceProjection.headSequence xTrace)
+
+    let private mainContextFromChunk
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (chunk: BloggerDeltaChunk)
+        : BloggerRequestContext =
+        let nextSeq = nextIngestSequence xTrace chunk.NextCursor
+        let digest = HostDigest.sha256Hex chunk.Toml
+
+        BloggerRequestContext.Main
+            { Toml = chunk.Toml
+              PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
+              NextIngestedThroughSequence = nextSeq
+              PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
+              NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
+              NextCoveredPrefixDigest = blog.Coverage.CoveredPrefixDigest
+              FrameEpochId = blog.FrameEpochId
+              DeltaDigest = BlobDigest.create digest }
 
     /// The Blogger continuation-transform handler.
     ///
@@ -332,7 +367,7 @@ module EnforcerHost =
                 // for the next offer. An offer that raced ahead (staged while this
                 // transform was still running) is consumed instead of parking.
                 match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                | Some deltaText -> return rawMessages @ [ syntheticDeltaMessage bloggerSessionId deltaText ]
+                | Some ctx -> return injectFromContext bloggerSessionId rawMessages ctx
                 | None ->
                     let! resumed = scope.ParkTransform(SessionId.value bloggerSessionId, ParkedTransformLifetime)
 
@@ -343,7 +378,7 @@ module EnforcerHost =
                         return rawMessages
                     else
                         match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                        | Some deltaText -> return rawMessages @ [ syntheticDeltaMessage bloggerSessionId deltaText ]
+                        | Some ctx -> return injectFromContext bloggerSessionId rawMessages ctx
                         | None -> return rawMessages
             | _ ->
                 // Not a blog-bearing continuation: a fresh turn's first request
@@ -389,7 +424,8 @@ module EnforcerHost =
                 match delta with
                 | None -> false
                 | Some chunk when scope.HasParked(SessionId.value bloggerSessionId) ->
-                    scope.OfferParked(SessionId.value bloggerSessionId, chunk.Toml)
+                    let ctx = mainContextFromChunk blog xTrace chunk
+                    scope.OfferParked(SessionId.value bloggerSessionId, ctx)
                 | Some _ ->
                     // ENFORCER-050 skip branch: no suspended transform. The
                     // Blogger is either mid-request (in flight) or idle (the

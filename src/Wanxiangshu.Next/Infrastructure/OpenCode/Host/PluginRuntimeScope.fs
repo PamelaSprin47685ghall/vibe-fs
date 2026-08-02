@@ -33,7 +33,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// dictionary entry is the guard that makes the invariant structural).
     let parkedGate = obj ()
     let parked = Dictionary<string, ParkedTransform>()
-    let parkedInjection = Dictionary<string, string>()
+    // ENFORCER-050/051: stage full typed request context, never bare string.
+    let parkedOffer = Dictionary<string, BloggerRequestContext>()
 
     /// HOST-006: the first compaction setting the config hook could not establish.
     ///
@@ -129,7 +130,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                             // ENFORCER-050 offer-first merge: an offer that
                             // raced ahead (staged while no transform was parked)
                             // makes this park return immediately with `true`.
-                            let staged = parkedInjection.ContainsKey sessionId
+                            let staged = parkedOffer.ContainsKey sessionId
 
                             if staged then
                                 created.TryResume()
@@ -148,15 +149,15 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
         /// ENFORCER-050: fresh material arrived for a parked Blogger transform.
         ///
-        /// The delta text is staged in `parkedInjection` BEFORE the resume, so a
+        /// The typed context is staged in `parkedOffer` BEFORE the resume, so a
         /// racing transform (park after this call) consumes it from the staged slot
         /// instead of parking forever. This is the "offer first, park later" merge.
         /// Returns true when a parked transform was resumed, false when the offer
         /// was only staged (Blogger provider request in flight, or no transform
         /// parked yet — ENFORCER-050's skip branch).
-        member this.OfferParked(sessionId: string, deltaText: string) : bool =
+        member this.OfferParked(sessionId: string, context: BloggerRequestContext) : bool =
             lock parkedGate (fun () ->
-                parkedInjection.[sessionId] <- deltaText
+                parkedOffer.[sessionId] <- context
 
                 match parked.TryGetValue sessionId with
                 | true, entry ->
@@ -178,27 +179,29 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 | false, _ -> false)
 
         /// ENFORCER-162: cancel a parked transform and release its waiter.
+        /// Always clears any staged offer for the session — dispose/abort must
+        /// not leave a half-consumed context for a later park to pick up.
         member this.CancelParked(sessionId: string) : unit =
             lock parkedGate (fun () ->
                 match parked.TryGetValue sessionId with
                 | true, entry ->
                     entry.TryCancel()
                     parked.Remove sessionId |> ignore
-                    parkedInjection.Remove sessionId |> ignore
-                | false, _ -> ())
+                | false, _ -> ()
+
+                parkedOffer.Remove sessionId |> ignore)
 
         /// Whether a session currently has a parked continuation transform.
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)
 
-        /// Consume a staged offer. Returns the delta text when one raced ahead of
-        /// the park, None otherwise.
-        member this.TryConsumeStagedOffer(sessionId: string) : string option =
+        /// Consume a staged offer once. Missing context → None (fail closed upstream).
+        member this.TryConsumeStagedOffer(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () ->
-                match parkedInjection.TryGetValue sessionId with
-                | true, text ->
-                    parkedInjection.Remove sessionId |> ignore
-                    Some text
+                match parkedOffer.TryGetValue sessionId with
+                | true, context ->
+                    parkedOffer.Remove sessionId |> ignore
+                    Some context
                 | false, _ -> None)
 
     /// HOST-006 prevention layer: the config hook's finding.
@@ -287,7 +290,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     entry.TryCancel()
 
                 parked.Clear()
-                parkedInjection.Clear())
+                parkedOffer.Clear())
 
             lock toolRuntimeGate (fun () ->
                 toolRuntime |> Option.iter (fun owner -> owner.Dispose())

@@ -48,6 +48,7 @@
     <Compile Include="Domain/BloggerDelta.fs"/>
     <Compile Include="Domain/CompanionIdentity.fs"/>
     <Compile Include="Domain/CompanionProjectionBuilder.fs"/>
+    <Compile Include="Domain/BloggerRequestContext.fs"/>
     <Compile Include="Domain/PrefixProbeSelection.fs"/>
     <Compile Include="Domain/XPrefixProjection.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
@@ -161,6 +162,7 @@
     <Compile Include="Session/CompanionJournalPort.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="Session/CompanionProjection.fs"/>
+    <Compile Include="Session/BloggerRuntimeState.fs"/>
     <Compile Include="Session/ParkedTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
