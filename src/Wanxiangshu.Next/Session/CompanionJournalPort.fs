@@ -79,7 +79,13 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                             || (part.Turn = completion.NextCursor.TurnIndex
                                 && part.PartIndex >= completion.NextCursor.PartIndex))
                         |> Option.map (fun part -> part.Cursor.Sequence)
-                        |> Option.defaultValue (XTraceProjection.headSequence xTrace + 1L)
+                        // COMPANION-003: no recorded part sits at/after the chunk's
+                        // next cursor — everything recorded so far was consumed, so
+                        // the advance is the current head. NOT head+1: claiming one
+                        // past the last part would make the next semanticCursorFor
+                        // skip the whole final turn (the delta would start at a later
+                        // part instead of the declared [[message]]).
+                        |> Option.defaultValue (XTraceProjection.headSequence xTrace)
 
                     match blobWriter.Write completion.Text with
                     | Error error -> Error error

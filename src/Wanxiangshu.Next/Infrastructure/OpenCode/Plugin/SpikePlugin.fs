@@ -78,6 +78,32 @@ module SpikePlugin =
 
                         projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
+                        // COMPANION-003/007: keep the XTrace in step with the
+                        // provider-visible semantic projection at the transform
+                        // boundary — BEFORE the Companion rewrite and X-wire run,
+                        // so `Companion.Submit` maps the ingest cursor against the
+                        // trace that now exists (not the previous round's mirror)
+                        // and the XTrace never absorbs synthetic heads (Companion
+                        // memory / prefix replacement) as raw parts.
+                        // Idempotent by (turn, part) provenance; a lagging trace
+                        // would stall BlogEntryCommitted.
+                        match projectionSessionIdOpt with
+                        | Some sessionId ->
+                            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+                            let semantic =
+                                Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+
+                            XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
+                            |> Option.iter (fun updated ->
+                                // COMPANION-007: refresh the in-memory mirror so the
+                                // chunker maps the ingest cursor against the trace
+                                // that now exists, not the empty one from bootstrap.
+                                match scope.Companions.TryGetValue sessionId with
+                                | true, host -> host.RefreshXTrace updated
+                                | false, _ -> ())
+                        | None -> ()
+
                         do
                             CompanionTransform.handleCompanionTransform
                                 scope.Companions
@@ -95,28 +121,6 @@ module SpikePlugin =
                                 outObj
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
-
-                        // COMPANION-003/007: keep the XTrace in step with the
-                        // provider-visible semantic projection at the transform
-                        // boundary. Idempotent by (turn, part) provenance; the
-                        // Blogger chunker's ingest cursor maps back through this
-                        // trace, so a lagging trace would stall BlogEntryCommitted.
-                        match projectionSessionIdOpt with
-                        | Some sessionId ->
-                            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                            let semantic =
-                                Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
-
-                            XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
-                            |> Option.iter (fun updated ->
-                                // COMPANION-007: refresh the in-memory mirror so the
-                                // chunker maps the ingest cursor against the trace
-                                // that now exists, not the empty one from bootstrap.
-                                match scope.Companions.TryGetValue sessionId with
-                                | true, host -> host.RefreshXTrace updated
-                                | false, _ -> ())
-                        | None -> ()
 
                         // REVIEW-010: seal LAST, and only after the Companion rewrite has
                         // mutated `outObj`. The seal must digest the message view the

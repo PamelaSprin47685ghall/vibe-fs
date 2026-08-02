@@ -132,7 +132,10 @@ module PromptIngressCodec =
             | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
             | _ -> None)
         |> Array.filter (String.IsNullOrWhiteSpace >> not)
-        |> Array.tryHead
+        |> Array.toList
+        |> function
+            | [] -> None
+            | texts -> Some(String.concat "\n" texts)
 
     let decode (input: obj) (output: obj) : DecodedMessage =
         { SessionId = sessionIdOf input
