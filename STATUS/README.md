@@ -21,8 +21,9 @@ SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并
 
 ## 活跃阻塞
 
-见 `STATUS/blockers/README.md`。当前仅一项：HOST-006 次生风险——Host 第二个 compaction
-实现的运行时探测尚未完成。
+见 `STATUS/blockers/README.md`。HOST-006 次生风险（运行时探测）已闭合：探测已实现并
+接线（`HostCompactionGate.judgeStartup` → `HostSignalBootstrap.onSnapshot` →
+`PluginRuntimeScope.TryClaimStartupProbe`）。无未闭合 blocker。
 
 ## 源码地图
 
@@ -64,7 +65,8 @@ src/Wanxiangshu.Next/
 2. 包 X10：`XPrefixProjection` / `AttemptPlanner` / `PrefixProbeSelection` 生产接线
    （当前 X 恢复链零生产调用点）
 3. 包 K8f：X-A–X-D 剧本（依赖 X10 接线，否则剧本只能证明 mock 自己）
-4. HOST-006 次生风险运行时探测（见 blockers/README.md）
+4. （已闭合）HOST-006 次生风险运行时探测——见 blockers/README.md；上游观察项：V2 runner
+   的 `compactAfterOverflow` 未遵守 `compaction.auto=false`（ARCH-003，不可在本仓修）
 5. `CompanionDelta.jsonDelta` 替换为包 X3 的 TOML delta（当前仍在 Submit 路径）
 
 ## 事实入口
