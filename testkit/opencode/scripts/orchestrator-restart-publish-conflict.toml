@@ -27,20 +27,24 @@ flow = [
   { afterExpectation = { id = "manager.0", gitConflictProof = true } },
   { afterExpectation = { id = "conflict-resume.0", restart = true } },
 
-  { wait = "orch.0", timeoutMs = 20000 },
-  { wait = "manager.0", timeoutMs = 20000 },
-  { wait = "coder.0", timeoutMs = 20000 },
-  { wait = "manager-guard.0", timeoutMs = 20000 },
-  { wait = "reviewer.0", timeoutMs = 20000 },
-  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
-  { wait = "reviewer.1", timeoutMs = 20000 },
+  { wait = "orch.0" },
+  { wait = "manager.0" },
+  { wait = "coder.0" },
+  { wait = "coder.1" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+  { wait = "manager-guard.0" },
+  { wait = "reviewer.0" },
+  { wait = "reviewer.1" },
+  { wait = "barrier-reviewer.0" },
+  { wait = "barrier-reviewer.1" },
   # The guard round's challenge answer (`reviewer-confirm.0`) is NOT awaited
   # before the restart: the rebase conflict interrupts the manager's guard round
   # (the conflict resume busy-nudges the manager mid-join), so the fast
   # reviewer's answer races the restart and legitimately never lands
   # pre-restart. The guard round resumes and confirms on the recovered run.
-  { wait = "barrier-reviewer.2", timeoutMs = 20000 },
-  { wait = "conflict-resume.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.2" },
+  { wait = "conflict-resume.0" },
 
   { awaitRestart = true },
 
@@ -51,16 +55,17 @@ flow = [
   # against the first edge's `"Resuming rebase resolution."` — two different responses for
   # one key, which content-as-a-pure-function forbids. The two texts existed only so the old
   # flow could `wait` on distinct ids; nothing asserted which one arrived.
-  { wait = "conflict-resume.0", timeoutMs = 20000 },
-  { wait = "reviewer.0", timeoutMs = 20000 },
-  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
-  { wait = "barrier-reviewer.1", timeoutMs = 20000 },
-  { wait = "barrier-reviewer.2", timeoutMs = 20000 },
-  { wait = "reviewer-confirm.0", timeoutMs = 20000 },
-  { wait = "orch-continue.0", timeoutMs = 20000 },
-  { wait = "orch-continue.1", timeoutMs = 20000 },
+  { wait = "conflict-resume.0" },
+  { wait = "reviewer.0" },
+  { wait = "reviewer.1" },
+  { wait = "barrier-reviewer.0" },
+  { wait = "barrier-reviewer.1" },
+  { wait = "barrier-reviewer.2" },
+  { wait = "reviewer-confirm.0" },
+  { wait = "orch-continue.0" },
+  { wait = "orch-continue.1" },
 
-  { awaitTerminal = true, requireAssistantTerminal = false, timeoutMs = 20000 },
+  { awaitTerminal = true, requireAssistantTerminal = false },
   { assertFacts = { name = "Published", eq = 1 } },
   { assertWorktreeClean = true },
   { expectSatisfied = true },
