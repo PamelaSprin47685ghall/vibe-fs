@@ -59,9 +59,12 @@ module BlogTool =
                         // the continuation transform's job (ENFORCER-044).
                         return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
                     | _ ->
-                        // ENFORCER-041: identity missing — the call cannot enter
-                        // the domain merge. Still resolve, or the tool loop
-                        // stalls; the merge side re-checks identity.
+                        // ENFORCER-041: identity comes from ToolContext; the
+                        // merge side re-derives it from the transcript (the
+                        // part's callID + assistant message id), so a call with
+                        // missing identity here is filtered out of the merge
+                        // there, not committed. Execute still resolves with
+                        // "OK" so the tool loop cannot stall.
                         Diagnostic.emit
                             "blog-execute"
                             [ "session_id", ctx.SessionId

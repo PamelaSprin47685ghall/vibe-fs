@@ -293,19 +293,24 @@ module EnforcerHost =
         (rawMessages: obj list)
         : Task<obj list> =
         task {
+            // ENFORCER-010: the execute gate proves the Blogger association;
+            // the commit side re-proves it. An unprovable owner is fail-closed:
+            // no cycle is committed under a guessed session (a fallback to the
+            // blogger's own id would write to the wrong stream and escape the
+            // per-session exactly-once index).
             let mainSessionId =
                 journal
                 |> Option.bind (fun j ->
                     SessionAssociationProjection.tryMainSessionOf
                         bloggerSessionId
                         (AgentJournal.snapshot j).AgentProjections.Associations)
-                |> Option.defaultValue bloggerSessionId
 
-            match journal, extractCalls rawMessages with
-            | Some durable, Some(messageId, calls) when not (List.isEmpty calls) ->
+            match journal, mainSessionId, extractCalls rawMessages with
+            | Some durable, Some owner, Some(messageId, calls) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and
                 // commit one cycle, then park (ENFORCER-047).
+                let mainSessionId = owner
                 let providerRun = ProviderRunIdentity.create messageId
 
                 match validateCycle messageId calls with

@@ -56,9 +56,3 @@ module EnforcementProjection =
 
     let tryFindByProviderRun (run: ProviderRunIdentity) (state: EnforcementProjectionState) =
         Map.tryFind run state.ByProviderRun
-
-    /// ENFORCER-155/160: the pending nudge pipeline will read anchored cycles
-    /// from here. For now the projection's job is the exactly-once commit
-    /// index; nudge state is the throttle fold's business (stage ENFORCER-080+).
-    let records (state: EnforcementProjectionState) : EnforcementCycleRecord list =
-        state.ByProviderRun |> Map.toList |> List.map snd
