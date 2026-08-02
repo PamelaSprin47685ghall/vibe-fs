@@ -275,7 +275,7 @@ export const runtimeKeyCases = [
     name: 'REVIEW-002 a fragment declaration reaches text production put after the anchor',
     fn: () => {
       // Measured in K9, and the reason ordered fragments exist. When a Manager forks a child,
-      // production composes the prompt (`../next/Domain/ForkChildPayload.fs`): unconditional
+      // production composes the prompt (`src/Wanxiangshu.Next/Domain/ForkChildPayload.fs`): unconditional
       // instruction comments first, then `assignment`, with optional fields in between.
       //
       // So the text a scenario knows is neither a prefix nor a suffix — it sits at a position that

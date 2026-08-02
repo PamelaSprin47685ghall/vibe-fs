@@ -61,7 +61,7 @@ user = "Run the command and report if it timed out."
 #
 # Measured in K9: four scenarios were missing this, and all four were red before the rewrite
 # for exactly this reason. No lane, because the prompt is composed from the delta alone
-# (`../next/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
+# (`src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
 #
 # The declared text is the sentence all three production shapes share — delta (:77),
 # post-restart re-anchor (:72) and condense (:118) — so one turn answers whichever fires.

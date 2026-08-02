@@ -64,7 +64,7 @@ Journal 位于 Git common directory 的私有 `wanxiangshu-next/runtimes` 路径
 
 ```text
 wanxiangshu
-→ build/next/OpenCode/Plugin.js
+→ build/next/Infrastructure/OpenCode/Plugin/Plugin.js
 ```
 
 `package.json` 的 `main` 与 `exports["."]` 指向该入口。
@@ -72,11 +72,11 @@ wanxiangshu
 ## 开发布局
 
 ```text
-next/                 生产 Agent DSL
-tests-mjs/            第 1–3 层测试（mjs，import build/next）
-testkit/opencode/     独立 OpenCode harness
-SSOT/                 产品语义（唯一规范，条款 ID 寻址）
-STATUS/               当前状态（README、合规表、blockers）
+src/Wanxiangshu.Next/     生产 Agent DSL（唯一源码根）
+tests-mjs/                第 1–3 层测试（mjs，import build/next）
+testkit/opencode/         独立 OpenCode harness
+SSOT/                     产品语义（唯一规范，条款 ID 寻址）
+STATUS/                   当前状态（README、合规表、blockers）
 ```
 
 旧实现不作为生产依赖。历史代码仅可作逐符号行为证据；禁止整版本 checkout 或无审查覆盖。

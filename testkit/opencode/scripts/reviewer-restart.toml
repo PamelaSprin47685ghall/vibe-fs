@@ -80,7 +80,7 @@ user = "Review the tree and submit a verdict."
 #
 # Measured in K9: four scenarios were missing this, and all four were red before the rewrite
 # for exactly this reason. No lane, because the prompt is composed from the delta alone
-# (`../next/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
+# (`src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
 #
 # The delta and post-restart re-anchor are distinct production prompt shapes, so both
 # must be declared. The block below handles the normal delta; `blogger-reanchor` handles

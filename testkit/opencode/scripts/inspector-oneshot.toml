@@ -43,7 +43,7 @@ tools = ["inspector"]
 # Each Companion submit appends a fresh delta as a new user message in the Blogger
 # session, so every Blogger request has that delta as its LAST user message and no
 # assistant after it — step 0, every time. The three production prompts
-# (../next/Session/CompanionHostBlogger.fs:72,77,118) all begin with the sentence
+# (src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs:72,77,118) all begin with the sentence
 # below, so one prefix at step 0 covers appends, squashes and re-anchors alike.
 #
 # That is what `neverEnd = true` was for. It falls out of prefix matching instead of

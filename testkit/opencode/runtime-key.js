@@ -226,7 +226,7 @@ export function runtimeKeyOf(body, bindings, context) {
  *
  * Measured in K9 against REVIEW-002. When a Manager forks a Reviewer, production does not
  * send the Manager's assignment as the prompt — it WRAPS it
- * (`../next/Session/HostForkRuntimeFork.fs:98`):
+ * (`src/Wanxiangshu.Next/Session/HostForkRuntimeFork.fs:98`):
  *
  *   [Original user requirements — authoritative review scope]
  *   …verified HumanRoot prompts since the prior review…

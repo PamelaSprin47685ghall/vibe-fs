@@ -5,11 +5,11 @@
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
-  "main": "build/next/OpenCode/Plugin.js",
+  "main": "build/next/Infrastructure/OpenCode/Plugin/Plugin.js",
   "exports": {
     ".": {
-      "import": "./build/next/OpenCode/Plugin.js",
-      "default": "./build/next/OpenCode/Plugin.js"
+      "import": "./build/next/Infrastructure/OpenCode/Plugin/Plugin.js",
+      "default": "./build/next/Infrastructure/OpenCode/Plugin/Plugin.js"
     }
   },
   "files": [

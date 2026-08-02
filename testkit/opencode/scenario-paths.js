@@ -25,5 +25,5 @@ export function resolvePluginPath(variant) {
     const candidate = path.join(make(cwd), file);
     if (fs.existsSync(candidate)) return candidate;
   }
-  return path.resolve(cwd, path.join('build', 'next', 'OpenCode', file));
+  return path.resolve(cwd, path.join('build', 'next', 'Infrastructure', 'OpenCode', 'Plugin', file));
 }

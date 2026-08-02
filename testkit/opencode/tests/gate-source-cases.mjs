@@ -476,7 +476,7 @@ user = "go on"
       //
       // The honest declaration omits the lane. A Companion prompt is IDENTICAL across
       // sessions because production composes it from the delta alone
-      // (`../next/Session/CompanionHostBlogger.fs:77`): nothing in the request distinguishes
+      // (`src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs:77`): nothing in the request distinguishes
       // one Blogger from another, and inventing a distinction would be the mock re-deriving
       // identity that §5 forbids. An omitted lane says exactly that — this content is a pure
       // function of the prompt and claims nothing about who asked.
