@@ -106,6 +106,9 @@ const [
   EnforcerNudgeModule,
   EnforcerCycleModule,
   StudentTeacherModule,
+  AgentJournalModule,
+  PromptDispatcherModule,
+  PromptDispatcherSendModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -161,6 +164,9 @@ const [
   prod('Domain/EnforcerNudge'),
   prod('Domain/EnforcerCycle'),
   prod('Domain/StudentTeacher'),
+  prod('Journal/AgentJournal'),
+  prod('Application/Prompting/PromptDispatcher'),
+  prod('Application/Prompting/PromptDispatcherSend'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -2031,6 +2037,89 @@ export const authorityRun = {
   abandonClaim: (key, projection) => AuthorityRun.abandonClaim(key, projection),
   resolveKnownOrigin: (physical, key, hostCompact, projection) =>
     caseOf(AuthorityRun.resolveKnownOrigin(physical, key, hostCompact, projection)),
+}
+
+/**
+ * PROMPT-006: the send-time `SessionPromptOptions` construction, as the Host
+ * sees it.
+ *
+ * `SendAgentOwnerRoot` and `SendContinuation` build `{ Agent = Some …;
+ * Model = None; … }` inside the send body, so the only way to observe them is
+ * to run a send against a port and read the `options` argument `SendPrompt`
+ * receives. The Fable extension-member names carry the whole
+ * `Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_` prefix, so
+ * they are absorbed here rather than at the call site (VERIFY-008).
+ */
+export const promptDispatcher = (() => {
+  const sendAgentOwnerRoot = PromptDispatcherSendModule
+    .Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_SendAgentOwnerRoot
+  const sendContinuation = PromptDispatcherSendModule
+    .Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_SendContinuation
+  const buildSendOutcome = unionCase(Outcome.Outcome_SendOutcome, 'Outcome.SendOutcome')
+
+  const decode = (result) => {
+    const value = resultOf(result)
+    return value.ok ? { ok: true, key: idValue.promptKey(value.value) } : value
+  }
+
+  return {
+    forJournal: (journal) => PromptDispatcherModule.forJournal(journal),
+
+    /** PROMPT-006: an `AdmittedWithReceipt` outcome for a stub port to return. */
+    admittedWithReceipt: (receipt) => buildSendOutcome('AdmittedWithReceipt', [receipt]),
+
+    sendAgentOwnerRoot: async (runtime, port, { session, text, agent, directory, onAccepted }) =>
+      decode(
+        await sendAgentOwnerRoot(
+          runtime,
+          port,
+          sessionId(session),
+          text,
+          agent,
+          directory,
+          onAccepted,
+        ),
+      ),
+
+    sendContinuation: async (runtime, port, { session, text, continuation, profile, effectiveAgent, directory, onAccepted }) =>
+      decode(
+        await sendContinuation(
+          runtime,
+          port,
+          sessionId(session),
+          text,
+          continuation,
+          profile,
+          effectiveAgent,
+          directory,
+          onAccepted,
+        ),
+      ),
+  }
+})()
+
+/**
+ * PROMPT-006: an `AgentJournal` instance, for driving a real send.
+ *
+ * `journalStore.open` hands back the bare `JournalWriter`; `PromptDispatcher`
+ * needs the full `AgentJournal` (writer + folded projection). This is the
+ * `AgentJournal.create` entry (PERSIST-004), which owns the mandatory first
+ * envelope exactly like `journalStore.open` does.
+ *
+ * `AgentJournal` is a type AND a module in the same file, so Fable emits its
+ * members with the `Module` suffix (`AgentJournalModule_create`, registered
+ * in guide-contract.test.mjs); `bind` resolves that spelling and throws if
+ * the member disappears.
+ */
+const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', ['create'])
+
+export const agentJournal = {
+  create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
+    const result = resultOf(AgentJournalCreate.create(directory, runtimeId(runtime), pid, utcOffset(startedAt)))
+    return result.ok
+      ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
+      : result
+  },
 }
 
 export const rootKind = {

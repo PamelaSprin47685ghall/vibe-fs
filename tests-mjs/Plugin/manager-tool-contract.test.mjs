@@ -482,6 +482,28 @@ test('CTX_002_the_transform_injects_no_synthetic_marker', async () => {
 //      real durable HumanRoot through `PromptDispatcher.AcceptHumanRoot`
 //      (PROMPT-002) — the production authority fact, not a test backdoor.
 
+test('AGENT_007_unresolved_role_denies_all_tools', async () => {
+  // AGENT-007 layer two, fail-closed branch: with no accepted Authority Root
+  // for the calling session, `RoleFor` is None and the tool set must be empty —
+  // every tool, read-only or not, returns the structured rejection. `inspector`
+  // is the tool the old code exempted while the role was unresolved, so it is
+  // the one the clause names as the thing to delete (SSOT/02).
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, _runtime) => {
+    // Deliberately NO acceptAuthorityRoot: this session has no root at all.
+    const context = { sessionID: 'unresolved-role', agent: 'fast-manager' }
+
+    for (const [toolName, args] of [
+      ['list', {}],
+      ['inspector', { agent: 'fast-inspector', prompts: ['git status'] }],
+      ['fork', { agent: 'fast-coder', prompt: 'work' }],
+    ]) {
+      const result = parseToml(await hooks.tool[toolName].execute(args, context))
+      assert.deepEqual(Object.keys(result), ['error'], `${toolName} must reject, not run`)
+      assert.match(result.error, /no Authority Root fixes this session's role/)
+    }
+  })
+})
+
 test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     // Reviewer (AGENT-014) may hold inspector; DevOps (AGENT-015) may hold coder.
