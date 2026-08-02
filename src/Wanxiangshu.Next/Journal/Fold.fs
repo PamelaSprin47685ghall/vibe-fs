@@ -636,15 +636,15 @@ module Fold =
 
         | AgentFact.XTracePartAppended payload ->
             // COMPANION-003 / PERSIST-010: append-only, strictly monotonic cursor.
+            // The provenance is stored VERBATIM from the writer, so the recorded
+            // set and the writer's dedupe check share one namespace.
             AgentProjection.tryUpdate
                 payload.SessionId
                 (fun session ->
                     XTraceProjection.applyPart
                         payload.CursorSequence
                         payload.Role
-                        (match payload.ProviderRun with
-                         | Some run -> sprintf "run:%s" (ProviderRunIdentity.value run)
-                         | None -> "transform")
+                        payload.Provenance
                         payload.Turn
                         payload.PartIndex
                         payload.Kind

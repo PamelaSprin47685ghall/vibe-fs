@@ -171,6 +171,10 @@ type CompanionHost
 
     member _.Memory = companion.Memory
 
+    /// COMPANION-007: forward the transform-boundary XTrace refresh to the
+    /// companion's in-memory mirror.
+    member _.RefreshXTrace(state: XTraceProjectionState) = companion.RefreshXTrace(state)
+
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
 
     /// COMPANION-005: hand the raw history to the Y as a projection and give the

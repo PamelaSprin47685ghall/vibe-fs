@@ -50,14 +50,25 @@ module XTraceCapture =
         (run: ProviderRunIdentity option)
         (fact: AgentFact)
         =
+        // PERSIST-003: an append that cannot be proven committed is a fail-closed
+        // condition, not something to swallow — the caller would keep running
+        // against a journal that no longer agrees with its own view.
         AgentJournal.appendAgent (StreamId.Session sessionId) run fact journal
-        |> Result.mapError JournalAppendFailure.describe
+        |> Result.mapError (fun failure ->
+            raise (
+                InvalidOperationException(sprintf "XTrace append failed: %s" (JournalAppendFailure.describe failure))
+            ))
         |> ignore
 
     /// COMPANION-003: capture the opening task verbatim. Idempotent — a session
     /// with an opening already captured is left alone (PERSIST-010), which makes
     /// a replayed chat.message harmless.
-    let captureOpening (journal: AgentJournal option) (sessionId: SessionId) (assignmentText: string) =
+    let captureOpening
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (assignmentText: string)
+        (authoritativeRequirements: string list)
+        =
         match journal with
         | None -> ()
         | Some durable ->
@@ -67,7 +78,7 @@ module XTraceCapture =
                 AgentFact.OpeningPromptCaptured
                     {| SessionId = sessionId
                        AssignmentText = assignmentText
-                       AuthoritativeRequirements = []
+                       AuthoritativeRequirements = authoritativeRequirements
                        ProviderRun = None |}
                 |> appendFact durable sessionId None
 
@@ -98,20 +109,6 @@ module XTraceCapture =
     /// Reads the durable XTrace's captured terminal blob. This replaces the old
     /// in-memory session-wide A accumulation (`TerminalSessionA.fullText`): the
     /// terminal is a durable lifecycle segment, not a parallel text channel.
-    let terminalText (journal: AgentJournal option) (sessionId: SessionId) : string option =
-        match journal with
-        | None -> None
-        | Some durable ->
-            let existing = xTraceOf durable sessionId
-
-            match existing.Terminal with
-            | None -> None
-            | Some(textRef, textDigest) ->
-                match durable.Writer.BlobWriter.Read textRef with
-                | Ok text when HostDigest.sha256Hex text = BlobDigest.value textDigest -> Some text
-                | Ok _ -> None
-                | Error _ -> None
-
     /// COMPANION-003 / EXEC-008: the parent's LifecycleWorkRecord as opaque text.
     ///
     /// The single materialisation used for a child's initial context: Opening
@@ -196,13 +193,18 @@ module XTraceCapture =
     ///
     /// Idempotent by (turn, part) provenance: the same turn is re-observed on
     /// every later request, and re-observing must not duplicate the trace.
+    ///
+    /// Returns the updated XTrace state (or `None` without a journal), so the
+    /// caller can refresh the in-memory Companion mirror — otherwise the chunker
+    /// keeps mapping against the stale trace captured at construction and re-reads
+    /// the projection head every round.
     let captureProjection
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (projection: ProviderSemanticProjection)
-        =
+        : XTraceProjectionState option =
         match journal with
-        | None -> ()
+        | None -> None
         | Some durable ->
             let existing = xTraceOf durable sessionId
 
@@ -234,5 +236,8 @@ module XTraceCapture =
                                    ToolName = toolName
                                    TextRef = blob.BlobRef
                                    TextDigest = blob.BlobDigest
+                                   Provenance = provenance
                                    ProviderRun = None |}
                             |> appendFact durable sessionId None))
+
+            Some(xTraceOf durable sessionId)

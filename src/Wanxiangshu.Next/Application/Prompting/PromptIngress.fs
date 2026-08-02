@@ -60,17 +60,24 @@ module PromptIngress =
             let acceptedRoot () =
                 bindUserMessage sessionKey messageKey
                 registerOwned sessionKey
-                // COMPANION-003: the first task prompt is captured verbatim as the
-                // session's OpeningPromptRaw at the physical acceptance point.
-                // Idempotent — a session with an opening already captured is
-                // untouched (PERSIST-010).
+
+            // COMPANION-003: ONLY a HumanRoot's first prompt is captured as the
+            // OpeningPromptRaw here. An AgentOwnerRoot (a forked child's first
+            // prompt) carries the rendered transport envelope — assignment,
+            // parent_work_record and instruction comments — so capturing it would
+            // nest the parent LWR inside the child's opening and grow recursively
+            // with every generation (EXEC-006). The fork path captures the child's
+            // opening from the ORIGINAL assignment before rendering.
+            let captureOpeningIfHumanRoot () =
                 message.Text
-                |> Option.iter (fun text -> XTraceCapture.captureOpening journal sessionId text)
+                |> Option.iter (fun text -> XTraceCapture.captureOpening journal sessionId text [])
 
             match resolveOrigin runtime sessionId message physicalMessageId with
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot ->
                 match runtime.AcceptHumanRoot sessionId physicalMessageId message.ExplicitAgent with
-                | Ok _ -> acceptedRoot ()
+                | Ok _ ->
+                    acceptedRoot ()
+                    captureOpeningIfHumanRoot ()
                 | Error _ -> ()
 
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->

@@ -1049,7 +1049,7 @@ export const bloggerDelta = (() => {
  * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
  */
 export const xTraceCapture = (() => {
-  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart'])
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureOpening'])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
   const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
 
@@ -1066,6 +1066,33 @@ export const xTraceCapture = (() => {
       const mapped = m.semanticPart(messagePartValue)
       return isNone(mapped) ? undefined : { tag: caseOf(mapped), part: mapped }
     },
+
+    /** `semantic({ messages: [{ role, parts }] })` → ProviderSemanticProjection. */
+    semantic: ({ messages = [] } = {}) => ({
+      ProviderId: undefined,
+      ModelId: undefined,
+      Variant: undefined,
+      Tools: toList([]),
+      System: toList([]),
+      Messages: toList(
+        messages.map((turn) => ({ Role: turn.role, Parts: toList(turn.parts) })),
+      ),
+    }),
+
+    /**
+     * COMPANION-007: synchronise the XTrace with the semantic projection.
+     * `journal` is the `{ journal }` from `agentJournal.create`.
+     * Returns the updated XTrace projection state (or `undefined` without a
+     * journal).
+     */
+    captureProjection: (journal, sessionIdValue, semanticProjection) => {
+      const result = m.captureProjection(journal, sessionIdValue, semanticProjection)
+      return isNone(result) ? undefined : result
+    },
+
+    /** COMPANION-003: capture the opening; requirements are a JS array. */
+    captureOpening: (journal, sessionIdValue, text, requirements = []) =>
+      m.captureOpening(journal, sessionIdValue, text, toList(requirements)),
   }
 })()
 

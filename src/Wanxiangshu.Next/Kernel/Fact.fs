@@ -360,6 +360,7 @@ module Fact =
                ToolName: string option
                TextRef: BlobRef
                TextDigest: BlobDigest
+               Provenance: string
                ProviderRun: ProviderRunIdentity option |}
 
         /// COMPANION-003: the Session's terminal output, captured verbatim at

@@ -146,6 +146,7 @@ module HostForkRuntimeFork =
                             return
                                 requirementsResult
                                 |> Result.map (fun requirements ->
+                                    requirements,
                                     ForkChildPayload.relay
                                         prompt
                                         (this.ParentWorkRecordOf this.ParentId)
@@ -153,11 +154,11 @@ module HostForkRuntimeFork =
                                         payload)
                         }
                     else
-                        Task.FromResult(Ok prompt)
+                        Task.FromResult(Ok([], prompt))
 
                 match enrichedResult with
                 | Error err -> return Error err
-                | Ok enrichedPrompt ->
+                | Ok(requirements, enrichedPrompt) ->
                     match retired, existing with
                     | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                     | _, Some childId ->
@@ -247,6 +248,16 @@ module HostForkRuntimeFork =
                                         return Error "Fork runtime is cancelled"
                                     | _ ->
                                         this.MarkReady(run)
+
+                                        // COMPANION-003 / EXEC-006: the child's
+                                        // OpeningPromptRaw is the ORIGINAL fork
+                                        // assignment and authoritative requirements,
+                                        // NOT the rendered envelope (which carries
+                                        // parent_work_record and would nest the
+                                        // parent LWR recursively). Captured before
+                                        // the first prompt is sent; idempotent.
+                                        if isFirstPrompt then
+                                            XTraceCapture.captureOpening this.Journal childId prompt requirements
 
                                         let! sent =
                                             HostForkAgentOwner.sendFirstPrompt

@@ -102,6 +102,13 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.RecordBloggerClosed() : unit =
         lock lockObj (fun () -> bloggerSessionId <- None)
 
+    /// COMPANION-007: refresh the in-memory XTrace mirror after the transform
+    /// boundary captured new parts. Without this the chunker keeps mapping the
+    /// ingest cursor against the trace captured at construction, which is empty
+    /// at first and re-reads the projection head every round.
+    member _.RefreshXTrace(state: XTraceProjectionState) : unit =
+        lock lockObj (fun () -> xTraceProjection <- state)
+
     /// FALLBACK-012 / CTX-006: arm the recovery slot after a real failure.
     ///
     /// One writer, one scope: this is the Y half of `PluginRuntimeScope.ArmRecovery`.

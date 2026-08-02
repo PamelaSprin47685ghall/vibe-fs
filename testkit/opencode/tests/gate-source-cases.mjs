@@ -514,9 +514,11 @@ user = "go on"
       // `31d4958b` switched the blogger turns to the actual header production sends
       // (`CompanionPrompt.fs:40`), so the probe must look for the same header — the stale
       // literal below reported all 15 scenarios as missing while every one of them
-      // declared the turn.
+      // declared the turn. The LWR migration then made normal deltas data-only
+      // (COMPANION-004: behaviour rules live in the system prompt alone), so the header
+      // probe is now the sparse-schema delta production actually sends.
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('The next user message is the new session material in TOML.'),
+        (file) => !readFileSync(file, 'utf8').includes('user = "[[message]]"'),
       );
 
       assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);

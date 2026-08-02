@@ -37,6 +37,7 @@ const partFact = ({ sequence, role = 'user', turn = 0, partIndex = 0, kind = 'te
       ToolName: toolName,
       TextRef: blobRef(ref),
       TextDigest: blobDigest(digest),
+      Provenance: `turn:${turn}/part:${partIndex}`,
       ProviderRun: providerRun(run),
     }),
     run,

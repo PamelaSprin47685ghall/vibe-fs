@@ -109,6 +109,13 @@ module SpikePlugin =
                                 Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
 
                             XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
+                            |> Option.iter (fun updated ->
+                                // COMPANION-007: refresh the in-memory mirror so the
+                                // chunker maps the ingest cursor against the trace
+                                // that now exists, not the empty one from bootstrap.
+                                match scope.Companions.TryGetValue sessionId with
+                                | true, host -> host.RefreshXTrace updated
+                                | false, _ -> ())
                         | None -> ()
 
                         // REVIEW-010: seal LAST, and only after the Companion rewrite has
