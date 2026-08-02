@@ -1,5 +1,18 @@
 # Changelog — 版本历史
 
+## 0.5.0 — 正式版
+
+- 正式发布：0.5.0（从 rc.1 收口；breaking changes 见 `0.5.0-rc.1` 条目）
+- 生产可用：canary 森林 17 驱动（18 剧本）× 3 轮全绿，`test:release`（gate:static →
+  build → unit → harness → P0×3）完整通过
+- Review 双 PERFECT 见证（REVIEW-006/007）
+- Orchestrator 恢复链（ORCH-005/006/007）：restart 后 exactly-once publish、rebase
+  冲突恢复
+- guard nudge seal 稳定性修复（ORCH-006/ARCH-004）：session worktree 目录绑定
+- 来源解析顺序（PROMPT-004/009）、发送格式（PROMPT-006）、fire-and-forget（PROMPT-007）
+- 工具权限双层 fail-closed（AGENT-007）
+- conformance 表 UNVERIFIED 清零（8 条批量段条款补第 1 层判据）
+
 ## 0.5.0-rc.1 — docs freeze / RC development
 
 Breaking changes:

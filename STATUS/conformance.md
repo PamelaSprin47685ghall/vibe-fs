@@ -4,7 +4,7 @@
 
 `PURE_CORE_ONLY`：条款的纯领域内核已实现并测试（第 1 层），但生产接线被 Host canary 门禁阻断（如 SSOT/14-16 的 STRENGTH-078 / ENFORCER-180 / LEARN-082…088）——不是"零实现"，也不是"可发布"。
 
-绑定源码 commit：`38cc1882`（休克—退火迁移收口）。运行验证不属于 commit 内容，命令与结果见 `docs/evidence/`；历史机器证据见 `docs/archive/shock-anneal-2026/evidence/`。本表只记录截至该提交的源码状态。
+绑定源码 commit：`66afcb24`（0.5.0 发布前全链路验证收口）。运行验证不属于 commit 内容，命令与结果见 `docs/evidence/`；历史机器证据见 `docs/archive/shock-anneal-2026/evidence/`。本表只记录截至该提交的源码状态。
 
 ## 架构 DNA
 
@@ -25,12 +25,12 @@
 |------|------|-------------|------|
 | PROMPT-002: Authority Root 固定执行画像 | CONFORMANT | `PromptAuthorityRun.createAuthorityRoot` | 唯一构造入口；`AuthorityExecutionProfile` 无 model 字段，故「root 覆盖 model」不可表达。第 1 层测试：`PROMPT_002_authority_root_profile_cannot_express_a_model`、`PROMPT_002_root_derives_peer_role_and_tier_from_the_selected_agent_alone`、`PROMPT_002_a_new_root_replaces_the_profile_and_clears_everything_run_scoped`（`tests-mjs/Prompt/authority.test.mjs`） |
 | PROMPT-003: Continuation | CONFORMANT | `PromptDispatcherSend.SendContinuation` | 继承 run 与 root，EffectiveAgent 参与 PromptKey。第 1 层测试：`PROMPT_003_a_continuation_never_replaces_the_authority_root`、`PROMPT_003_every_continuation_kind_is_representable_and_none_is_a_root`（`tests-mjs/Prompt/authority.test.mjs`） |
-| PROMPT-004: 来源类型 | UNVERIFIED | `PromptIngress.fs` `Fact.AuthorityRootAccepted` | 包 A/0b：`HumanPromptAccepted` 已替换；解析顺序为「journal 已知 → 显式 managed agent」，已知来源不得被 agent 字段改判。判据待补：无直接第 1 层测试，来源解析路径需 canary 全绿后补断言 |
+| PROMPT-004: 来源类型 | CONFORMANT | `PromptIngress.fs` `Fact.AuthorityRootAccepted` | 判据：`tests-mjs/Prompt/authority.test.mjs` 的 `PROMPT_004_009_an_accepted_id_outranks_host_compaction`、`PROMPT_004_a_human_root_is_never_inferred_by_a_pure_function` |
 | PROMPT-005: 四阶段协议 | CONFORMANT | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生。第 1 层测试：`PROMPT_005_submit_records_the_receipt_without_resolving_the_claim`、`PROMPT_005_abandon_removes_the_claim_and_leaves_the_active_run_alone`；fallback canary 实测 journal 四事实（PluginPromptClaimed/Submitted/PhysicalAccepted） |
-| PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定。判据待补：需第 1 层测试断言发送 payload 的 model/agent 字段 |
-| PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 src/Wanxiangshu.Next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删。判据待补：architecture-gate 的直发分支检查 + canary 覆盖 |
+| PROMPT-006: 发送格式 | CONFORMANT | `PromptDispatcherSend.fs` | 判据：`tests-mjs/Prompt/send-format.test.mjs` 的 `PROMPT_006_send_payload_carries_agent_and_no_model` |
+| PROMPT-007: Fire-and-forget 定义 | CONFORMANT | `HostSessionNudge.sendContinuation` | 判据：`architecture-gate` 直发分支检查（`PromptDispatcherSend.fs` 中 `prompt_async` 唯一路径）+ `host-nudge` canary |
 | PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.fs` `OpenCode/XWire.fs` `OpenCode/CompanionTransform.fs` | `buildAttemptExecutionProfile` 唯一调用点 `AttemptPlanner.plan`（`AttemptPlanner.fs:65`），被 `XWire.applyTransform` 与 `CompanionTransform` 真实调用；`RequestKind` / `ProjectionChoice` 作为 profile 不可变字段进入 transform 边界，`XWire.reconcileAttempt` 从同一 profile 判 promote。`single-constructor` 双向检查（无旁路 + 有调用）由 `architecture-gate` 守护。第 1 层测试 18 项（`Context/attempt-plan.test.mjs`） |
-| PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed。判据待补：PERSIST-008 索引已落地，来源解析顺序需第 1 层测试补断言 |
+| PROMPT-009: 来源解析顺序 | CONFORMANT | `PromptAuthorityRun.resolveKnownOrigin` | 判据：`tests-mjs/Prompt/authority.test.mjs` 的 `PROMPT_009_resolution_order_is_accepted_then_claimed_then_compaction_then_root`、`PROMPT_009_accepting_an_authority_root_claim_does_not_enter_the_continuation_map` |
 | PROMPT-011: 未决发送恢复 | CONFORMANT | `OpenCode/PromptRecovery.fs` `OpenCode/SpikePlugin.fs` | `PromptRecovery.reconcile` 在插件启动时（`SpikePlugin.fs:57`，早于任何 hook 派发）扫描 tail window（`RecoveryTailWindow = 50`）找物理消息；`RecoveryAttemptBudget = 3` 由 fold 记账（`recoveryBudgetSpent`），耗尽即 `Abandoned(UnresolvedAfterRecovery)`；只证明接受或放弃，绝不重发 |
 
 ## Fallback
@@ -116,7 +116,7 @@ target ref 的工作再拉起一个 Manager。
 
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
-| AGENT-007: 工具权限双层 fail-closed | UNVERIFIED | `ToolRuntimeScope.RoleFor` `ToolRegistry.fs` | 包 B：Role 唯一来源为 `ActiveLogicalRun.CanonicalRole`；`sessionRoles` 三来源链与 Role 未解析时放行 `inspector` 的豁免均已删除。判据待补：manager-tool-contract 的权限矩阵用例覆盖声明层，`RoleFor` 的 fail-closed 分支需第 1 层测试 |
+| AGENT-007: 工具权限双层 fail-closed | CONFORMANT | `ToolRuntimeScope.RoleFor` `ToolRegistry.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `AGENT_007_unresolved_role_denies_all_tools`、`AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume` |
 
 ## Companion
 
@@ -173,7 +173,7 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 | HOST-005: A 版分段 | PARTIAL | `TerminalSessionA.fs` | ARecord 未按 ProviderRun 分段 |
 | HOST-006: Compaction 预防与收容 | CONFORMANT | `OpenCode/HostCompactionGate.fs` `OpenCode/HostSignalBootstrap.fs` | 预防层四项（auto/overflow/autocontinue/prune）关闭，写不进配置则启动失败；收容层把任何观察到的 compaction 转成一次 `ContextReanchored`（永远 armed，幂等，不分类来源）。第 1 层测试 14 项（`Context/host-compaction-policy.test.mjs`） |
 | HOST-008: Session 关联 | CONFORMANT | `Journal/SessionAssociation.fs` `Domain/ManagedSessionKind.fs` | `ManagedSessionKind` 持久化，`isCompanion` O(1)；递归/重复 Y/自链/一 Y 两主均 fail closed；role 不影响关联。第 1 层测试 16 项（`Context/session-association.test.mjs`） |
-| HOST-009: Host 生命周期 | UNVERIFIED | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 当前仅注册 `experimental.chat.messages.transform` 一次；dispose 通过 `PluginRuntimeScope` 收束资源。判据在退火三进行中：host-restart / host-nudge canary 覆盖生命周期（HOST-012 已实测多实例加载——`initSpikePlugin` 每 project 一次） |
+| HOST-009: Host 生命周期 | CONFORMANT | `SpikePlugin.fs` `PluginRuntimeScope.fs` | 判据：`tests-mjs/Plugin/host-hooks.test.mjs` 的 `HOST_009_*` + `host-restart` / `host-nudge` canary（P0×3 三轮） |
 | HOST-010: Transform → ProviderRunIdentity 绑定 | PARTIAL | `OpenCode/ReviewSeal.fs` `OpenCode/SessionSnapshotPort.fs` | transform 已通过 session snapshot 绑定唯一最新未完成 assistant；缺 snapshot、user、候选或最新性时 fail closed。仍缺 HOST 版本升级 canary 对 transform id 与同 run `ToolContext.messageID` 的直接断言 |
 | HOST-011: Tool 身份两个半边 | PARTIAL | `OpenCode/ToolHostCodec.fs` | `messageID` / `callID` 在 adapter 边界直接构造 typed identities，缺失时 VerdictTool fail closed；`userMessageID` 不存在且不读取。仍缺 HOST 版本升级 canary |
 | HOST-012: 多实例共享边界 | CONFORMANT | `OpenCode/SharedState.fs` `OpenCode/PluginRuntimeScope.fs` | Host `InstanceStore` 按 directory 实例化插件（worktree = 独立实例），fork→verdict 跨实例。SessionParents/VerdictSessions/SessionDirectories 为 `SharedState` 模块级单例（所有插件实例同一引用）；每实例独有 AgentJournal/Companions/OwnedSessions/订阅。实测 deep-reviewer 的 verdict 不再 "manager session is unknown" |
@@ -265,19 +265,47 @@ X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.pla
 | CTX-013: BloggerDeltaProjection 与 TOML 编码 | CONFORMANT | `Session/BloggerDelta.fs` `Session/BloggerToml.fs` `Session/SyntheticToml.fs` | 三级切块 + 硬截断 + 图片 omitted marker + 确定性 TOML（固定键序、`'''` 字面量、closing 独占一行、无时间/随机/Host ID）；instruction header 计入 200 KiB。第 1 层测试 55 项跨 3 文件 |
 | CTX-014: 诊断可观测性边界 | CONFORMANT | `OpenCode/Diagnostic.fs` `OpenCode/HostCompactionGate.fs` | 统一 schema：`Diagnostic.emit` 校验字段白名单（CTX-014 清单），白名单外字段 fail closed；禁止字段名在 src/Wanxiangshu.Next/**/*.fs` 的负向扫描 + 白名单外字段拒绝测试（`tests-mjs/Context/ctx014.test.mjs`） |
 
-## 未列入本表的条款
+## 未列入主表的条款（已核验）
 
-`AGENT-*` 中除 AGENT-007 外的条款（20 个 Agent、能力矩阵、内部 Agent 不可见）与 `REVIEW-001` `REVIEW-002`
-`REVIEW-008` `REVIEW-009`、`ORCH-004`、`EXEC-001` ~ `EXEC-003`
-`EXEC-006` ~ `EXEC-008` `EXEC-010` `EXEC-012` ~ `EXEC-014`、`COMPANION-006`
-`COMPANION-007` `COMPANION-012`、`HOST-001` `HOST-007`
-`ARCH-005` `ARCH-006` `ARCH-008`、`VERIFY-002` `VERIFY-006`、
-`PERSIST-003` `PERSIST-007` 当前未逐条核验，
-状态为 `UNVERIFIED`。
+| 条款 | 状态 | 当前代码位置 | 差距 |
+|------|------|-------------|------|
+| AGENT-001: 单一结构化 Role | PARTIAL | `Domain/PromptAuthority.fs` `Session/AgentRoleIdentity.fs` | `fast-ROLE`/`deep-ROLE` 共享同一 system prompt 与 Role 结构化已实现；缺少以 AGENT-001 命名的第 1 层测试 |
+| AGENT-002: A/B peer 别名 fast-* | PARTIAL | `Domain/PromptAuthority.fs` | `fast-ROLE` 解析为 (A, peer=B) 已实现；缺少以 AGENT-002 命名的第 1 层测试 |
+| AGENT-003: A/B peer 别名 deep-* | PARTIAL | `Domain/PromptAuthority.fs` | `deep-ROLE` 解析为 (B, peer=A) 已实现；缺少以 AGENT-003 命名的第 1 层测试 |
+| AGENT-004: 非法 agent 名拒绝 | CONFORMANT | `Domain/PromptAuthority.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `AGENT_004_005_bare_legacy_agent_names_are_refused`、`tests-mjs/Prompt/authority.test.mjs` 的 `AGENT_004_005_bare_legacy_agent_names_are_refused` |
+| AGENT-005: 旧角色名无补全 | CONFORMANT | `Domain/PromptAuthority.fs` | 判据：同 AGENT-004，`AGENT_004_005_bare_legacy_agent_names_are_refused` |
+| AGENT-006: agent config 增益 prompt | CONFORMANT | `Domain/PromptAuthority.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix` |
+| AGENT-008: Executor 内部名固定 | CONFORMANT | `Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `AGENT_008_009_every_agent_argument_offers_exactly_its_declared_agents` |
+| AGENT-009: 工具注册表精确暴露参数 | CONFORMANT | `ToolRegistry.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `AGENT_009_the_tool_registry_exposes_exactly_the_declared_arguments` |
+| AGENT-010: tier 不进入 system prompt / tool set | CONFORMANT | `Domain/AttemptPlanner.fs` `Domain/CompanionIdentity.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix`、`tests-mjs/Context/attempt-plan.test.mjs` 的 `AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set` |
+| REVIEW-001: Verdict 工具 | PARTIAL | `Kernel/Fact.fs` `Infrastructure/OpenCode/Tools/VerdictTool.fs` | `Confirm`/`Revise` 两值且拒绝其它已固化；缺少以 REVIEW-001 命名的第 1 层测试 |
+| REVIEW-009: Orchestrator 复审 barrier | PARTIAL | `Infrastructure/OpenCode/Host/OrchestratorHostReview.fs` | review barrier 已接线；`orchestrator-restart-publish` canary 部分覆盖，但缺少以 REVIEW-009 命名的第 1 层测试 |
+| EXEC-001: fork 创建子运行 | CONFORMANT | `OpenCode/HostForkRuntime.fs` `OpenCode/HostForkChildDispatch.fs` | 判据：`tests-mjs/Execution/handle.test.mjs` 的 `EXEC_001_fork_creates_a_child_run` |
+| EXEC-002: 已存在 agent nudge | CONFORMANT | `Infrastructure/OpenCode/Host/HostForkBusyNudge.fs` `Session/HostForkRunLifecycle.fs` | 判据：`tests-mjs/Plugin/manager-tool-contract.test.mjs` 的 `EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text`、`EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity`、`EXEC_002_the_fixture_delivers_the_real_journal_and_terminal_port` |
+| EXEC-003: 发送前 terminal listener 必须存在 | PARTIAL | `Application/Prompting/PromptDispatcher.fs` `PromptDispatcherSend.fs` | `terminalListener` 前置检查已实现；缺少以 EXEC-003 命名的第 1 层测试 |
+| EXEC-006: 完成运行携带 session-wide A | PARTIAL | `Session/HostForkRunLifecycle.fs` `Application/Reconciliation/TurnCompletionProgram.fs` `Kernel/Outcome.fs` | `IsValid` 单一检查点已实现；缺少以 EXEC-006 命名的第 1 层测试 |
+| EXEC-007: nudge fire-and-forget | CONFORMANT | `Session/HostForkRunLifecycle.fs` `Infrastructure/OpenCode/Host/HostForkBusyNudge.fs` | 判据：`tests-mjs/Execution/handle.test.mjs` 的 `EXEC_007_nudge_is_fire_and_forget` |
+| EXEC-008: child background 取最新 durable 快照 | CONFORMANT | `OpenCode/HostForkChildDispatch.fs` `OpenCode/HostForkRuntime.fs` | 判据：`tests-mjs/Execution/handle.test.mjs` 的 `EXEC_008_child_background_uses_latest_durable_snapshot` |
+| EXEC-010: ProcessRequest 全字段 | CONFORMANT | `Process/ProcessRequest.fs` `Process/Deadline.fs` | 判据：`tests-mjs/Execution/handle.test.mjs` 的 `EXEC_010_process_request_carries_all_fields` |
+| EXEC-012: 输出阈值三倍饱和 | CONFORMANT | `Domain/TerminalValidity.fs` `Process/ProcessRequest.fs` | 判据：`tests-mjs/Execution/handle.test.mjs` 的 `EXEC_012_the_output_threshold_is_tripled_and_saturates_instead_of_overflowing` |
+| EXEC-013: LargeGate 串行化 | PARTIAL | `Process/Pty*.fs` `Kernel/Flow.fs` | `LargeGate`/`SemaphoreSlim(1,1)` 已实现；缺少以 EXEC-013 命名的第 1 层测试 |
+| EXEC-014: executor map 完成不进 Manager mailbox | PARTIAL | `Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs` | `executor` canary 与 `agent-dsl` canary 覆盖真实路径，但缺少以 EXEC-014 命名的第 1 层测试 |
+| COMPANION-006: squash 永久重写前半帧 | CONFORMANT | `Domain/BloggerDelta.fs` `Journal/BlogProjection.fs` | 判据：`tests-mjs/Context/blog-projection.test.mjs` 的 `COMPANION_006_squash_rewrites_first_half_of_frames_permanently` |
+| COMPANION-007: canonical digest 用 Semantic 投影 | CONFORMANT | `Domain/CompanionProjection.fs` `Domain/ProviderSemanticProjection.fs` | 判据：`tests-mjs/Context/companion-projection.test.mjs` 的 `COMPANION_007_canonical_digest_uses_semantic_projection_not_toml` |
+| COMPANION-012: 投影情形覆盖 | CONFORMANT | `Domain/CompanionProjection.fs` | 判据：`testkit/opencode/scripts/gate-projection-cases.mjs` 第 153–163 行用例 |
+| HOST-001: 碎片事件最早边界丢弃 | CONFORMANT | `HostSignalAdapter.fs` `HostEventCodec.fs` | 判据：`tests-mjs/Verify/host001-fragment-events.test.mjs` 的 `HOST_001_fragment_events_die_at_earliest_boundary`、`HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary` |
+| HOST-007: 诊断可观测性 | PARTIAL | `Infrastructure/OpenCode/Host/Diagnostic.fs` | `Diagnostic.emit` 为唯一诊断出口；缺少以 HOST-007 命名的第 1 层测试 |
+| ARCH-005: 恢复哲学（纯 fold/判定函数） | PARTIAL | `Kernel/Fact.fs` `Journal/Fold.fs` | 纯 fold 与纯判定函数已分离；缺少以 ARCH-005 命名的第 1 层测试 |
+| ARCH-006: 命名原则 | PARTIAL | `Kernel/Identity.fs` `Kernel/Fact.fs` `scripts/architecture-gate.mjs` | `ProviderRunIdentity` 等命名统一已实现；`architecture-gate` 部分覆盖，但缺少以 ARCH-006 命名的第 1 层测试 |
+| ARCH-008: 禁止词 | PARTIAL | `scripts/architecture-gate.mjs` `Kernel/Flow.fs` | 已由 ARCH-009 取代，禁止词与无界并发原语检查合并于 `ARCH_009_*` 测试与 `architecture-gate`；缺少以 ARCH-008 命名的独立判据 |
+| VERIFY-002: 五级晋级阶梯 | PARTIAL | `scripts/` `tests-mjs/` `testkit/` | 第 0–5 级流程由 `gate:static`/`test:mjs`/`test:harness`/`test:e2e:p0:three` 实践，但缺少以 VERIFY-002 命名的机器断言 |
+| VERIFY-006: No-Go 清单 | PARTIAL | `tests-mjs/Verify/degradation-list.test.mjs` `Domain/AgentPairCursor.fs` `Journal/FactCodec.fs` | No-Go 清单已落地为 `degradation-list` 与源码注释；但缺少以 VERIFY-006 命名的独立断言 |
+| PERSIST-003: CommitUnknown 后 fail-closed reconcile | CONFORMANT | `Journal/AgentJournal.fs` `Infrastructure/OpenCode/Host/HostSignalBootstrap.fs` | 判据：`tests-mjs/Journal/boot.test.mjs` 的 `PERSIST_003_commit_unknown_triggers_fail_closed_reconcile` |
+| PERSIST-007: 大体外存 blob | PARTIAL | `Kernel/Identity.fs` `Domain/XPrefixProjection.fs` `Journal/BlogProjection.fs` | blob + TextDigest 机制已实现；缺少以 PERSIST-007 命名的第 1 层测试，由博客投影与 canary 部分覆盖 |
 
-这不是「大概符合」——是尚未产生判据。休克—退火迁移收口时未逐条补齐，属已知未闭合项
-（记入 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §15）；发布前本表不得存在
-`UNVERIFIED`。
+REVIEW-002、REVIEW-008、ORCH-004 在主表中已有 CONFORMANT 行，本段不再重复。
+
+发布前本表不得存在 `UNVERIFIED`。
 
 ## 反向缺口：有生产契约但无条款（包 T-5e 发现，已由 ARCH-009 补齐）
 

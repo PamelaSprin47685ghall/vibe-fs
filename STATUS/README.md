@@ -3,14 +3,15 @@
 ## 当前基线
 
 - 分支：`refactor/ssot-shock-anneal`
-- 最后验证 commit：`0d7be9d2`（Repository Layout Reset 完成：源码根迁至 `src/`）
+- 最后验证 commit：`66afcb24`（0.5.0 发布前全链路验证收口）
 - 工作区干净
 
 ## 当前产品状态
 
-生产可用。canary 森林 16/16 全绿，`test:release`（gate:static → build → unit → harness →
-P0×3）完整通过。生产代码与测试整体迁移到 `SSOT/` 条款；测试体系为直接消费 `build/next`
-发布产物的 `tests-mjs`。
+0.5.0 已发布（正式版，从 rc.1 收口）。canary 森林 17 驱动（18 剧本）× 3 轮全绿，
+`test:release`（gate:static → build → unit → harness → P0×3）完整通过。生产代码与测试
+整体迁移到 `SSOT/` 条款；测试体系为直接消费 `build/next` 发布产物的 `tests-mjs`。
+conformance 表 `UNVERIFIED` 已清零（绑定 commit `66afcb24`）。
 
 SSOT/13（ARCH-010）：工具返回面与 fork 信封已完成 TOML 迁移，conformance 已记账。
 
@@ -64,11 +65,11 @@ src/Wanxiangshu.Next/
 ## 下一步
 
 1. 建共享 Host capability canary（transform 挂起/取消/身份绑定），解锁 SSOT/14-16 接线
-2. 包 X10：`XPrefixProjection` / `AttemptPlanner` / `PrefixProbeSelection` 生产接线
-   （当前 X 恢复链零生产调用点）
-3. 包 K8f：X-A–X-D 剧本（依赖 X10 接线，否则剧本只能证明 mock 自己）
-4. （已闭合）HOST-006 次生风险运行时探测——见 blockers/README.md；上游观察项：V2 runner
+2. 包 K8f：X-A–X-D 剧本（X 恢复链生产接线已闭合；剧本未建，第 4 层证据未产出）
+3. （已闭合）HOST-006 次生风险运行时探测——见 blockers/README.md；上游观察项：V2 runner
    的 `compactAfterOverflow` 未遵守 `compaction.auto=false`（ARCH-003，不可在本仓修）
+4. `HandleProjection.joinable` 零生产调用点：`join` 仍走运行期 mailbox，
+   `CompletedAwaitingJoin` 的 durable 消费链未闭合（EXEC-009）
 5. `CompanionDelta.jsonDelta` 替换为包 X3 的 TOML delta（当前仍在 Submit 路径）
 
 ## 事实入口
