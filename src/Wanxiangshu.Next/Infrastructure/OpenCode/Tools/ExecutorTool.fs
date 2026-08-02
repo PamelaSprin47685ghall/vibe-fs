@@ -2,7 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Threading
-open Thoth.Json
+open ToolHostCodec
 open Wanxiangshu.Next.Process
 
 /// Non-interactive command execution with the request's sole 3x deadline and
@@ -66,8 +66,7 @@ module ExecutorTool =
             | _, Error error, _
             | _, _, Error error -> Error error
 
-    let private error (message: string) =
-        ToolHostCodec.jsonObject [ "error", Encode.string message ]
+    let private error (message: string) = tomlObject [ "error", TString message ]
 
     let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
@@ -111,10 +110,10 @@ module ExecutorTool =
                 | Error processError -> return error (processError.ToString())
                 | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
                     return
-                        ToolHostCodec.jsonObject
-                            [ "exitCode", Encode.int exitCode
-                              "stdout", Encode.string stdout
-                              "stderr", Encode.string stderr ]
+                        tomlObject
+                            [ "exit_code", TInt exitCode
+                              "stdout", TString stdout
+                              "stderr", TString stderr ]
                 | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                     try
                         let runtime = scope.ExecutorRuntimeFor context
@@ -122,13 +121,19 @@ module ExecutorTool =
                         let! summary =
                             ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
 
+                        let instructions =
+                            if System.String.IsNullOrWhiteSpace summary then
+                                []
+                            else
+                                [ summary ]
+
                         return
-                            ToolHostCodec.jsonObject
-                                [ "exitCode", Encode.int exitCode
-                                  "summary", Encode.string summary
-                                  "spoolPath", Encode.string spoolPath
-                                  "totalBytes", Encode.int64 totalBytes
-                                  "chunkCount", Encode.int chunkCount ]
+                            tomlObjectWithInstructions
+                                instructions
+                                [ "exit_code", TInt exitCode
+                                  "spool_path", TString spoolPath
+                                  "total_bytes", TInt64 totalBytes
+                                  "chunk_count", TInt chunkCount ]
                     finally
                         Spool.delete spoolPath
         }

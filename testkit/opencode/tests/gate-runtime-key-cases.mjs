@@ -40,6 +40,11 @@ const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, tu
 /**
  * The anchor a forked-child declaration uses, taken from production rather than copied.
  *
+ * It is the one unconditional instruction every forked child receives — the report-format line
+ * (`ForkChildPayload.BaseInstructions`). It is NOT the first line of the wire: the header leads
+ * with the `Assignment` comment block and this line follows it (`ForkChildPayload.render`), so a
+ * declaration names the assignment comment first and this anchor second.
+ *
  * It used to be a literal copy of `HostForkRuntimeFork.fs:98`'s first envelope line. That copy was a
  * mirror: N3 deleted the envelope and the constant would have kept describing text no longer sent,
  * while these cases stayed green — proving the matcher against a shape production had stopped
@@ -275,17 +280,19 @@ export const runtimeKeyCases = [
     name: 'REVIEW-002 a fragment declaration reaches text production put after the anchor',
     fn: () => {
       // Measured in K9, and the reason ordered fragments exist. When a Manager forks a child,
-      // production composes the prompt (`src/Wanxiangshu.Next/Domain/ForkChildPayload.fs`): unconditional
-      // instruction comments first, then `assignment`, with optional fields in between.
+      // production composes the prompt (`src/Wanxiangshu.Next/Domain/ForkChildPayload.fs`): the
+      // `Assignment` comment block leads the header, then the unconditional report-format line,
+      // then the optional interpretive lines when present.
       //
-      // So the text a scenario knows is neither a prefix nor a suffix — it sits at a position that
-      // moves with runtime state. Every forked-child turn in the forest failed to match before this.
+      // So the text a scenario knows IS the prefix of what arrives — the `# ` comment marker
+      // included — and the report-format line sits after it. Every forked-child turn in the forest
+      // failed to match before this, because the old envelope's first line was conditional.
       //
       // Driven through production's own renderer rather than a hand-built string: a local template
       // would keep passing after the real one changed shape.
       const entries = [
-        entry({ id: 'revise', lane: 'fast-manager', turn: [ANCHOR, 'Review current worktree'] }),
-        entry({ id: 'perfect', lane: 'fast-manager', turn: [ANCHOR, 'Re-review the fixed tree'] }),
+        entry({ id: 'revise', lane: 'fast-manager', turn: ['# Review current worktree', ANCHOR] }),
+        entry({ id: 'perfect', lane: 'fast-manager', turn: ['# Re-review the fixed tree', ANCHOR] }),
       ];
 
       const revise = forkPrompt('Review current worktree', ['Ship it.']);
@@ -302,7 +309,7 @@ export const runtimeKeyCases = [
       // The property N3 bought, and the one the four-shape envelope made impossible. A scenario
       // author knows a child was forked and what the assignment said; they do not know whether the
       // parent had produced a work record yet, and must not have to.
-      const entries = [entry({ id: 'child', lane: 'fast-manager', turn: [ANCHOR, 'Write proof.txt'] })];
+      const entries = [entry({ id: 'child', lane: 'fast-manager', turn: ['# Write proof.txt', ANCHOR] })];
 
       const shapes = [
         forkRelay('Write proof.txt', undefined, []),
@@ -324,7 +331,7 @@ export const runtimeKeyCases = [
       // Anchoring is the first of the three properties that separate this from the retired
       // `containsText`. Without it a fragment list would be a bag of substrings free to match
       // anywhere, which is what needed `specificity` scoring to disambiguate.
-      const entries = [entry({ id: 'a', turn: [ANCHOR, 'Review current worktree'] })];
+      const entries = [entry({ id: 'a', turn: ['# Review current worktree', ANCHOR] })];
 
       const noWrapper = resolveEntry(request([user('Review current worktree now')]), entries, BINDINGS, { sessionId: SESSION });
       assertTrue(noWrapper.unmatched !== undefined, 'the anchor must be a true prefix');

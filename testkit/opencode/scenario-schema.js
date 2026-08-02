@@ -292,8 +292,17 @@ export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
   // wrapper would make every such turn trivially unreachable.
   const declaredText = (turn) => turnFragments(turn.user).at(-1);
 
-  const reachedBy = (texts, turn) =>
-    texts.some((text) => text.startsWith(declaredText(turn)) || declaredText(turn).startsWith(text));
+  const reachedBy = (texts, turn) => {
+    // fork child sessions declare the wire form ("# <assignment>"), but the matching tool prompt
+    // is the naked form ("<assignment>"); normalize the leading comment marker away before comparing.
+    let declared = declaredText(turn);
+    if (declared.startsWith('# ')) {
+      declared = declared.slice(2);
+    } else if (declared.startsWith('#')) {
+      declared = declared.slice(1);
+    }
+    return texts.some((text) => text.startsWith(declared) || declared.startsWith(text));
+  };
 
   const reachableTurns = new Set(
     turns.filter((turn) => turn.internal === true || reachedBy(scenarioPrompts, turn)),

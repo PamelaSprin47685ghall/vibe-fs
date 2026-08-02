@@ -49,7 +49,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Report the attached-file authority canary is reachable."]
+user = "# Report the attached-file authority canary is reachable."
 
   [[turn.step]]
   respond = { type = "text", text = "Coder report: attached-file authority canary is reachable." }

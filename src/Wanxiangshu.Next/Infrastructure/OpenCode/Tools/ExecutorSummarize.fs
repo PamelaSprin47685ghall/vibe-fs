@@ -8,6 +8,7 @@ open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Domain
 
 /// Bounded hierarchical map/reduce for spooled Executor output.
 module ExecutorSummarize =
@@ -19,6 +20,16 @@ module ExecutorSummarize =
 
     let asExecutorRuntime = ExecutorSummarizeRuntime.asExecutorRuntime
     let ofForkRuntime = ExecutorSummarizeRuntime.ofForkRuntime
+
+    let summarizeChunkPrompt (index: int) : string =
+        sprintf
+            "Summarize command output chunk %d. Preserve errors, decisions, paths, and exact numbers; omit raw code."
+            index
+
+    let reduceBatchPrompt (level: int) : string =
+        sprintf
+            "Reduce level-%d command-output summaries into one dense report. Preserve failures and exact facts; do not include raw code."
+            level
 
     let private agentId (processId: string) (level: int) (startChunk: int) (endChunk: int) =
         sprintf "exec-%s" (HostDigest.sha256Hex (sprintf "%s|%d|%d|%d" processId level startChunk endChunk))
@@ -69,10 +80,11 @@ module ExecutorSummarize =
         (startChunk: int)
         (endChunk: int)
         (prompt: string)
+        (payload: string option)
         =
         task {
             let id = agentId processId level startChunk endChunk
-            let! fork = runtime.Fork(id, AgentRole.Executor, prompt)
+            let! fork = runtime.Fork(id, AgentRole.Executor, prompt, payload)
 
             match fork with
             | Error error -> return raise (InvalidOperationException error)
@@ -90,15 +102,11 @@ module ExecutorSummarize =
         =
         let content = Encoding.UTF8.GetString chunk
 
-        let prompt =
-            sprintf
-                "Summarize command output chunk %d. Preserve errors, decisions, paths, and exact numbers; omit raw code.\n%s"
-                index
-                content
+        let prompt = summarizeChunkPrompt index
 
         let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
-        runExecutorPrompt runtime stash rootDigest 0 index index prompt
+        runExecutorPrompt runtime stash rootDigest 0 index index prompt (Some content)
 
     let reduceBatch
         (runtime: IExecutorRuntime)
@@ -108,15 +116,11 @@ module ExecutorSummarize =
         =
         let combined = String.concat "\n" batch
 
-        let prompt =
-            sprintf
-                "Reduce level-%d command-output summaries into one dense report. Preserve failures and exact facts; do not include raw code.\n%s"
-                level
-                combined
+        let prompt = reduceBatchPrompt level
 
         let batchDigest = HostDigest.sha256Hex (String.concat "\n" batch)
 
-        runExecutorPrompt runtime stash batchDigest level 0 (List.length batch - 1) prompt
+        runExecutorPrompt runtime stash batchDigest level 0 (List.length batch - 1) prompt (Some combined)
 
     let private rippleInsert
         (reduceBatch: int -> string list -> Task<string>)

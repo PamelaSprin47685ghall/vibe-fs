@@ -12,6 +12,8 @@
 P0×3）完整通过。生产代码与测试整体迁移到 `SSOT/` 条款；测试体系为直接消费 `build/next`
 发布产物的 `tests-mjs`。
 
+SSOT/13（ARCH-010）：工具返回面与 fork 信封已完成 TOML 迁移，conformance 已记账。
+
 ## 当前开发阶段
 
 SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并测试，生产接线被

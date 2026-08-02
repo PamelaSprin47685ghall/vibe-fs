@@ -89,7 +89,10 @@ test('REVIEW_003_the_challenge_digest_is_the_digest_of_that_exact_text', () => {
   // a tool result, so sealing it necessarily produces this value; a second hash
   // spelled elsewhere would agree only by coincidence, and any drift would refuse
   // every confirmation while looking like correct fail-closed behaviour.
-  assert.equal(CHALLENGE_DIGEST_TEXT, `H(${reviewChallenge.text})`)
+  //
+  // `ReviewChallenge.Prompt` renders `Text` as an ARCH-010 instruction comment;
+  // the digest is of those exact bytes (`# ...\n`), matching `ReviewChallenge.Prompt`.
+  assert.equal(CHALLENGE_DIGEST_TEXT, `H(# ${reviewChallenge.text}\n)`)
 
   // Deterministic: the same text digests the same way on any process.
   assert.equal(idValue.sealDigest(reviewChallenge.contentDigest(H)), CHALLENGE_DIGEST_TEXT)

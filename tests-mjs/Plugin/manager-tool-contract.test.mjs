@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
 import { roles } from '../domain.mjs'
 import { withPlugin, withExecutablePlugin, acceptAuthorityRoot, notifyCompleted, awaitPrompted } from './plugin-fixture.mjs'
 import { AgentCompletion_snapshotFromText } from '../../build/next/Session/AgentCompletion.js'
@@ -496,22 +497,21 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     // 永远等不到结局（实测 1000ms 判据线）。
     await awaitPrompted(createdIds[0])
     notifyCompleted(runtime, createdIds[0], 'inspector session-wide A', 'inspector turn formal report')
-    const inspectorResult = JSON.parse(await inspectorResultP)
+    const inspectorText = await inspectorResultP
+    const inspectorResult = parseToml(inspectorText)
 
-    // Whole-shape comparison (InspectorTool.fs:9-21): every field the production
-    // encode emits, no more and no less. parentBDigest has no background B here,
-    // so it is the production fallback "".
+    // Data-only fields of the TOML result. The natural-language output is carried
+    // as the leading instruction comment (SSOT/13), so it is asserted on the raw
+    // text rather than as a parsed field.
     assert.deepEqual(inspectorResult, {
-      inspectorId: createdIds[0],
+      inspector_id: createdIds[0],
       agent: 'fast-inspector',
       tier: 'fast',
-      fallbackPeer: 'deep-inspector',
-      parentBDigest: '',
-      // EXEC-002: output is the delivered TurnFormalText, never a fabricated
-      // literal; the two text channels must not be conflated (COMPANION-005).
-      output: 'inspector turn formal report',
+      fallback_peer: 'deep-inspector',
+      parent_b_digest: '',
     })
-    assert.notEqual(inspectorResult.output, 'inspector session-wide A')
+    assert.ok(inspectorText.includes('inspector turn formal report'))
+    assert.ok(!inspectorText.includes('inspector session-wide A'))
 
     const coderResultP = hooks.tool.coder.execute(
       { agent: 'fast-coder', prompts: ['apply the requested edit'] },
@@ -519,18 +519,20 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     )
     await awaitPrompted(createdIds[1])
     notifyCompleted(runtime, createdIds[1], 'coder session-wide A', 'coder turn formal report')
-    const coderResult = JSON.parse(await coderResultP)
+    const coderText = await coderResultP
+    const coderResult = parseToml(coderText)
 
-    // CoderTool.fs:9-21: same shape, with the tool-specific id key `coderId`.
+    // CoderTool.fs:9-21: data-only fields, with the natural-language output as a
+    // leading comment (SSOT/13).
     assert.deepEqual(coderResult, {
-      coderId: createdIds[1],
+      coder_id: createdIds[1],
       agent: 'fast-coder',
       tier: 'fast',
-      fallbackPeer: 'deep-coder',
-      parentBDigest: '',
-      output: 'coder turn formal report',
+      fallback_peer: 'deep-coder',
+      parent_b_digest: '',
     })
-    assert.notEqual(coderResult.output, 'coder session-wide A')
+    assert.ok(coderText.includes('coder turn formal report'))
+    assert.ok(!coderText.includes('coder session-wide A'))
   })
 })
 
@@ -543,66 +545,63 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     // An unknown agent is rejected inside execute, not by the schema — the
     // fork.agent schema is a union with string() (AGENT-009 note above). The
     // near-miss suggestion is matched, not pinned whole (ManagedAgent.fs:140-143).
-    const unknown = JSON.parse(await hooks.tool.fork.execute({ agent: 'deep-inspecter', prompt: 'work' }, context))
+    const unknown = parseToml(await hooks.tool.fork.execute({ agent: 'deep-inspecter', prompt: 'work' }, context))
     assert.deepEqual(Object.keys(unknown), ['error'])
     assert.match(unknown.error, /Legacy agent name|Unknown managed agent 'deep-inspecter'/)
     assert.match(unknown.error, /fast-inspector|deep-inspector/)
 
-    const fork = JSON.parse(await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'work' }, context))
+    const fork = parseToml(await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'work' }, context))
     // ForkTool.fs:22-37: the whole fork payload.
-    assert.deepEqual(Object.keys(fork).sort(), ['agent', 'agentId', 'fallbackPeer', 'role', 'tier'])
-    assert.match(fork.agentId, /^[a-z0-9]{6}$/)
+    assert.deepEqual(Object.keys(fork).sort(), ['agent', 'agent_id', 'fallback_peer', 'role', 'tier'])
+    assert.match(fork.agent_id, /^[a-z0-9]{6}$/)
     assert.equal(fork.agent, 'fast-coder')
     assert.equal(fork.role, 'coder')
     assert.equal(fork.tier, 'fast')
-    assert.equal(fork.fallbackPeer, 'deep-coder')
+    assert.equal(fork.fallback_peer, 'deep-coder')
 
     // EXEC-004: register the forked handle so the terminal delivery below also
     // claims the durable completion cell before join retires it (fixture docs).
-    runtime.recordFork('manager-contract', fork.agentId, createdIds[0])
+    runtime.recordFork('manager-contract', fork.agent_id, createdIds[0])
 
     const joinResultP = hooks.tool.join.execute({}, context)
     notifyCompleted(runtime, createdIds[0], 'forked coder session-wide A', 'forked coder turn formal report')
-    const join = JSON.parse(await joinResultP)
+    const joinText = await joinResultP
+    const join = parseToml(joinText)
 
-    // JoinTool.fs:48-60 + identity fields: the complete AgentCompleted object.
-    // runId is `run-<agentId>` (HostForkRunLifecycle.complete), childSessionId is
-    // the stub-minted Host session, and the optional authorityRoot/providerRun/
-    // directory are absent so they serialize as null.
+    // JoinTool.fs:48-60 + identity fields: the data-only TOML body. The natural-
+    // language final_text is the leading instruction comment (SSOT/13), so it is
+    // asserted on the raw text; authority_root/provider_run/directory are omitted
+    // when absent and do not appear in the parsed result.
     // 期望 digest 由生产 snapshotFromText 计算（build/next 导出，VERIFY-008 同 import 先例）。
     // 曾在此重写 FNV-1a：正确实现的 JS Math.imul 版本与 Fable 的 uint32 编译结果不同，
     // 本地重推导断言的是算法而非生产行为——正是 parentSession 式的双重死代码温床。
     const expectedWorkRecord = AgentCompletion_snapshotFromText('forked coder session-wide A')
-    assert.match(join.runId, /^run-[0-9a-f]{8}$/)
+    assert.match(join.run_id, /^run-[0-9a-f]{8}$/)
     assert.deepEqual(join, {
       kind: 'agent',
       status: 'completed',
-      agentId: fork.agentId,
-      childSessionId: createdIds[0],
-      runId: join.runId, // minted per run ('run-' + 8 hex); pinned separately below
-      authorityRoot: null,
-      providerRun: null,
-      finalText: 'forked coder session-wide A',
-      workRecord: {
+      agent_id: fork.agent_id,
+      child_session_id: createdIds[0],
+      run_id: join.run_id, // minted per run ('run-' + 8 hex); pinned separately below
+      work_record: {
         text: 'forked coder session-wide A',
         digest: expectedWorkRecord.Digest,
         freshness: expectedWorkRecord.Freshness,
-        coveredThrough: null,
       },
-      directory: null,
       agent: 'fast-coder',
       role: 'coder',
       tier: 'fast',
-      fallbackPeer: 'deep-coder',
+      fallback_peer: 'deep-coder',
     })
-    // COMPANION-005/HOST-005: finalText is session-wide A, not the turn text.
-    assert.notEqual(join.finalText, 'forked coder turn formal report')
+    // COMPANION-005/HOST-005: final_text is session-wide A, not the turn text.
+    assert.ok(joinText.includes('forked coder session-wide A'))
+    assert.ok(!joinText.includes('forked coder turn formal report'))
 
-    const list = JSON.parse(await hooks.tool.list.execute({}, context))
+    const list = parseToml(await hooks.tool.list.execute({}, context))
     // EXEC-005 明文「不包含 Retired」：join 已退休该 handle，派生视图为空。
     // 此断言曾按「runtime record 保留完成记录」的假设期望一条 idle 条目——实测生产
     // 返回 []，该假设是测试想象而非契约。
-    assert.deepEqual(list, [])
+    assert.deepEqual(list, {})
   })
 })
 

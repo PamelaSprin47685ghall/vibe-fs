@@ -85,6 +85,7 @@ const [
   ProbeSelectionModule,
   XPrefixModule,
   AttemptPlannerModule,
+  ExecutorSummarize,
   Authority,
   AuthorityRun,
   Witness,
@@ -139,6 +140,7 @@ const [
   prod('Domain/PrefixProbeSelection'),
   prod('Domain/XPrefixProjection'),
   prod('Domain/AttemptPlanner'),
+  prod('Infrastructure/OpenCode/Tools/ExecutorSummarize'),
   prod('Domain/PromptAuthority'),
   prod('Domain/PromptAuthorityRun'),
   prod('Domain/ReviewWitness'),
@@ -817,17 +819,18 @@ export const forkChildPayload = (() => {
     parentWorkRecordInstruction: m.ParentWorkRecordInstruction,
     requirementsInstruction: m.RequirementsInstruction,
 
-    render: ({ assignment, parentWorkRecord, originalUserRequirements = [] }) =>
+    render: ({ assignment, parentWorkRecord, originalUserRequirements = [], payload }) =>
       m.render(
         new ForkChildPayloadModule.ForkChildAssignment(
           assignment,
           parentWorkRecord,
           toList(originalUserRequirements),
+          payload,
         ),
       ),
 
-    relay: (assignment, parentWorkRecord, requirements = []) =>
-      m.relay(assignment, parentWorkRecord, toList(requirements)),
+    relay: (assignment, parentWorkRecord, requirements = [], payload) =>
+      m.relay(assignment, parentWorkRecord, toList(requirements), payload),
   }
 })()
 
@@ -863,6 +866,25 @@ export const syntheticToml = (() => {
     tableArrayEntry: (name, fields) => m.tableArrayEntry(name, toList(fields)),
     document: (instructions, body) => m.document(toList(instructions), toList(body)),
     byteCount: (text) => m.byteCount(text),
+  }
+})()
+
+/**
+ * EXECUTOR-001: the plain-intent prompt composers for the Executor map/reduce path.
+ *
+ * `summarizeChunkPrompt` and `reduceBatchPrompt` are pure string → string functions: they
+ * take an index/level and a content body and return the intent instruction only. The
+ * actual chunk/combined content is carried by the fork envelope's `content` field.
+ */
+export const executorSummarize = (() => {
+  const m = bind(ExecutorSummarize, 'ExecutorSummarize', [
+    'summarizeChunkPrompt',
+    'reduceBatchPrompt',
+  ])
+
+  return {
+    summarizeChunkPrompt: (index) => m.summarizeChunkPrompt(index),
+    reduceBatchPrompt: (level) => m.reduceBatchPrompt(level),
   }
 })()
 

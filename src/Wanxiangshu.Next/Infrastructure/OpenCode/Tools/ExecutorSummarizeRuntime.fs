@@ -9,7 +9,7 @@ open Wanxiangshu.Next.Session
 module ExecutorSummarizeRuntime =
 
     type IExecutorRuntime =
-        abstract Fork: string * AgentRole * string -> Task<Result<ForkResult, string>>
+        abstract Fork: string * AgentRole * string * string option -> Task<Result<ForkResult, string>>
         abstract Join: unit -> Task<Result<RunCompletion, ForkError>>
 
     /// AGENT-008: the Executor is internal, so its managed name is fixed here
@@ -19,14 +19,19 @@ module ExecutorSummarizeRuntime =
 
     let asExecutorRuntime (runtime: HostForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
-            member _.Fork(agentId, role, prompt) =
-                runtime.Fork(agentId, role, executorAgent, prompt)
+            member _.Fork(agentId, role, prompt, payload) =
+                runtime.Fork(agentId, role, executorAgent, prompt, payload)
 
             member _.Join() = runtime.Join() }
 
     let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
-            member _.Fork(agentId, role, prompt) =
-                task { return Ok(runtime.Fork(agentId, role, executorAgent, prompt = prompt)) }
+            member _.Fork(agentId, role, prompt, payload) =
+                let effectivePrompt =
+                    match payload with
+                    | None -> prompt
+                    | Some p -> prompt + "\n\n" + p
+
+                task { return Ok(runtime.Fork(agentId, role, executorAgent, prompt = effectivePrompt)) }
 
             member _.Join() = runtime.Join() }

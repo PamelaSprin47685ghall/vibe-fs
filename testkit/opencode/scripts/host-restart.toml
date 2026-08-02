@@ -104,7 +104,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review and PERFECT twice."]
+user = "# Review and PERFECT twice."
 tools = ["verdict"]
 
   [[turn.step]]
@@ -119,10 +119,27 @@ tools = ["verdict"]
   [[turn.step]]
   respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
 
+# The challenge may also arrive as a guard NUDGE — a NEW user message composed by
+# production (`HostReviewGuard.requestPerfectConfirmation`, REVIEW-003) when the Host
+# goes idle instead of continuing. `reviewer-challenge` below covers that fallback
+# (production-composed, internal).
+
+[[turn]]
+id = "reviewer-challenge"
+internal = true
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
 [[turn]]
 id = "child-a1"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Write host_restart_proof.txt with OK."]
+user = "# Write host_restart_proof.txt with OK."
 
   [[turn.step]]
   respond = { type = "text", text = "child-a1 done." }
@@ -145,7 +162,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "child-a2"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Report child-a2."]
+user = "# Report child-a2."
 
   [[turn.step]]
   respond = { type = "text", text = "child-a2 done." }

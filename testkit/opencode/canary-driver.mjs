@@ -37,6 +37,7 @@ import { compileScenario } from './scenario-schema.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
 import { readJournal } from './journal-observer.js';
 import { kindOf } from './runtime-key.js';
+import { parse as parseToml } from 'smol-toml';
 
 const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'scripts');
 
@@ -452,21 +453,18 @@ async function runFlow(scenario, doc, ctx) {
         for (const message of request.messages || []) {
           if (message.role === 'tool' || message.role === 'toolResult') {
             const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content || '');
-            try { results.push(JSON.parse(content)); } catch { results.push({ raw: content }); }
+            try { results.push(parseToml(content)); } catch { results.push({ raw: content }); }
           }
         }
       }
       const readResult = results.find((r) => typeof r.output === 'string' && r.output.includes('ECHO_TEST'));
       assert.ok(readResult, `read must return ECHO_TEST: ${JSON.stringify(results)}`);
       assert.ok(readResult.output.includes('CWD='), `read must surface cwd: ${readResult.output}`);
-      const isClosed = (outcome) =>
-        outcome === 'closed'
-        || (typeof outcome === 'string' && outcome.includes('closed'))
-        || (Array.isArray(outcome) && outcome.includes('closed'));
-      assert.ok(results.some((r) => isClosed(r.outcome)), `join must deliver closed: ${JSON.stringify(results)}`);
-      const listResult = results.find((r) => Array.isArray(r));
-      assert.ok(listResult, `list must return array: ${JSON.stringify(results)}`);
-      assert.ok(!listResult.some((e) => e && e.kind === 'pty'), `leaked pty: ${JSON.stringify(listResult)}`);
+      const joinResult = results.find((r) => r?.kind === 'pty' && r.closed === true);
+      assert.ok(joinResult, `join must deliver closed: ${JSON.stringify(results)}`);
+      const listResult = results.find((r) => Array.isArray(r?.item) || (r && typeof r === 'object' && Object.keys(r).length === 0));
+      assert.ok(listResult, `list must return item table: ${JSON.stringify(results)}`);
+      assert.ok(!listResult.item || !listResult.item.some((e) => e && e.kind === 'pty'), `leaked pty: ${JSON.stringify(listResult)}`);
       continue;
     }
     if (step.custom) {

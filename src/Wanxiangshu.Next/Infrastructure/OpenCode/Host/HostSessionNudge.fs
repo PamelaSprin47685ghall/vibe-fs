@@ -66,15 +66,15 @@ module HostSessionNudge =
                     agent
                 |> Result.bind rt.RegisterAuthority
 
-    /// The continuation target directory, or the root workspace when the
-    /// recorded directory no longer exists.
+    /// The continuation target directory.
     ///
-    /// ORCH-006: a manager-family session's directory is the worktree, which is
-    /// removed at publish. A residual guard-round continuation would otherwise
-    /// load Host instructions from the deleted path, truncating the system
-    /// prompt and breaking the ARCH-004 seal (measured: seal-undeclared in
-    /// orchestrator-publish under concurrency). The manager has no worktree work
-    /// left once its job landed, so the root workspace is the correct fallback.
+    /// ORCH-006: guard nudges now pass the root workspace explicitly. The
+    /// manager worktree is removed at publish, so a residual guard-round
+    /// continuation would otherwise load Host instructions from a deleted path,
+    /// truncating the system prompt and breaking the ARCH-004 seal. Using the
+    /// root workspace gives a stable, deterministic set of root instructions,
+    /// which differs from the previous worktree version by design; the
+    /// scenario's prefix-probe boundary carries that transition.
     let private liveDirectory (directory: string option) =
         directory |> Option.filter (fun path -> System.IO.Directory.Exists path)
 

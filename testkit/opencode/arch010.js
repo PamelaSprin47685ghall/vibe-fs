@@ -193,9 +193,14 @@ export function auditPayload(document, { origin = 'payload' } = {}) {
   for (const line of syntax) {
     // A closing delimiter must be alone. `x = '''` opening a block is the only other legal position,
     // so anything else carrying `'''` outside a value is a delimiter sharing a line with data.
+    // A comment line is exempt by construction: a closing delimiter is a bare `'''` line and an
+    // opening is `x = '''`, neither of which starts with `#`. So `# '''` is an instruction
+    // referencing the notation, which ARCH-010 permits — the same principle as the header-reference
+    // case — not a delimiter sharing a line.
     const bare = withoutStringValues(line.text);
 
     if (!bare.includes("'''")) continue;
+    if (line.text.startsWith('#')) continue;
     if (line.text === "'''") continue;
     if (/=\s*'''$/.test(bare)) continue;
 

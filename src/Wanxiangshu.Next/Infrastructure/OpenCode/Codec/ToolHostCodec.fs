@@ -6,7 +6,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Thoth.Json
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
 /// Opaque Host arguments. Dynamic property access is confined to this codec.
@@ -224,16 +224,38 @@ module ToolHostCodec =
     let hide (registry: obj) name callback =
         defineHidden registry name (box callback)
 
-    let jsonObject fields =
-        Encode.object fields |> Encode.toString 0
 
-    let jsonArray values = Encode.list values |> Encode.toString 0
-    let jsonString value = Encode.string value
-    let jsonBool value = Encode.bool value
-    let jsonInt value = Encode.int value
-    let jsonInt64 value = Encode.int64 value
-    let jsonFloat value = Encode.float value
-    let jsonNull = Encode.nil
+
+    /// ARCH-010 data-only TOML value algebra for tool result bodies.
+    type TomlValue =
+        | TString of string
+        | TInt of int
+        | TInt64 of int64
+        | TBool of bool
+        | TTable of (string * TomlValue) list
+
+    let rec private renderTomlField (name: string) (value: TomlValue) =
+        match value with
+        | TString text -> SyntheticToml.field name (SyntheticToml.renderString text)
+        | TInt number -> SyntheticToml.field name (string number)
+        | TInt64 number -> SyntheticToml.field name (string number)
+        | TBool flag -> SyntheticToml.field name (if flag then "true" else "false")
+        | TTable entries ->
+            String.concat "\n" (("[" + name + "]") :: (entries |> List.map (fun (n, v) -> renderTomlField n v)))
+
+    let tomlObject (fields: (string * TomlValue) list) : string =
+        SyntheticToml.document [] (fields |> List.map (fun (name, value) -> renderTomlField name value))
+
+    let tomlObjectWithInstructions (instructions: string list) (fields: (string * TomlValue) list) : string =
+        SyntheticToml.document instructions (fields |> List.map (fun (name, value) -> renderTomlField name value))
+
+    let tomlTable (name: string) (entries: (string * TomlValue) list list) : string =
+        let blocks =
+            entries
+            |> List.map (fun entry ->
+                SyntheticToml.tableArrayEntry name (entry |> List.map (fun (n, v) -> renderTomlField n v)))
+
+        SyntheticToml.document [] blocks
 
     let looksLikeHandleId (value: string) =
         if String.IsNullOrWhiteSpace value then

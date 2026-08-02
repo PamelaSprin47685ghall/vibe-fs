@@ -62,7 +62,7 @@ function uniqueVerdictToolResults(requests) {
       const content = typeof message.content === 'string'
         ? message.content
         : JSON.stringify(message.content || '');
-      if (!content.includes('Nope, let\'s re-evaluate:') && !content.includes('PERFECT recorded for the current tree.')) continue;
+      if (!content.includes('Nope, let\'s re-evaluate:') && !content.includes('verdict = "PERFECT"')) continue;
       const key = message.tool_call_id || message.toolCallId || content;
       results.set(key, content);
     }
@@ -99,11 +99,11 @@ async function oracleCheck(scenario, ctx, step) {
   assert.equal(factsIn(scenario.host.workDir, 'ConfirmedReviewWitness').length, 1, 'dual PERFECT must produce one durable confirmed witness');
 
   const verdictResults = uniqueVerdictToolResults(scenario.provider.requests);
-  assert.equal(verdictResults.filter(x => x.includes('Nope, let\'s re-evaluate:')).length, 1, 'only the first PERFECT may request re-evaluation');
-  // The confirmation's report ("PERFECT recorded for the current tree.") may
+  assert.equal(verdictResults.filter(x => x.includes('# Nope, let\'s re-evaluate:')).length, 1, 'only the first PERFECT may request re-evaluation');
+  // The confirmation's report (`verdict = "PERFECT"`) may
   // land on a later request when the REVIEW-010 seal fallback re-submits; the
   // durable proof is the ConfirmedReviewWitness asserted above.
-  assert.ok(verdictResults.filter(x => x.includes('PERFECT recorded for the current tree.')).length <= 1, 'second PERFECT must be accepted at most once');
+  assert.ok(verdictResults.filter(x => x.includes('verdict = "PERFECT"')).length <= 1, 'second PERFECT must be accepted at most once');
 }
 
 if (!runStaticGate([__filename]).passed) process.exit(1);

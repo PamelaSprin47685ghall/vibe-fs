@@ -101,8 +101,13 @@ module HostForkRuntimeFork =
         /// it is required. Defaulting it to `fast-ROLE` invented a tier, and the
         /// invented name then travelled to the Host send boundary as if chosen.
         member this.Fork
-            (agentId: string, role: AgentRole, agent: string, prompt: string, ?firstPrompt: bool)
-            : Task<Result<ForkResult, string>> =
+            (agentId: string, role: AgentRole, agent: string, prompt: string, payload: string option, ?firstPrompt: bool) : Task<
+                                                                                                                                Result<
+                                                                                                                                    ForkResult,
+                                                                                                                                    string
+                                                                                                                                 >
+                                                                                                                             >
+            =
             let agentName = agent.Trim()
             let isFirstPrompt = defaultArg firstPrompt true
 
@@ -136,7 +141,11 @@ module HostForkRuntimeFork =
                             return
                                 requirementsResult
                                 |> Result.map (fun requirements ->
-                                    ForkChildPayload.relay prompt (this.ParentWorkRecordOf this.ParentId) requirements)
+                                    ForkChildPayload.relay
+                                        prompt
+                                        (this.ParentWorkRecordOf this.ParentId)
+                                        requirements
+                                        payload)
                         }
                     else
                         Task.FromResult(Ok prompt)

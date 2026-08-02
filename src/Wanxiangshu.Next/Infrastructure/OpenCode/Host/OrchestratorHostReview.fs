@@ -38,7 +38,7 @@ module OrchestratorHostReview =
     /// written between them — after the session exists, before any verdict arrives.
     ///
     /// A first PERFECT is answered by nudging the SAME reviewer session with
-    /// `ReviewChallenge.Text`, whose digest REVIEW-003's seal is searched for. Re-forking
+    /// `ReviewChallenge.Prompt`, whose digest REVIEW-003's seal is searched for. Re-forking
     /// would open a new barrier and throw the first PERFECT away.
     ///
     /// Exactly one confirmation round. The previous version had two nearly identical
@@ -76,7 +76,7 @@ module OrchestratorHostReview =
                         | OrchestratorReviewRead.RevisionRequired -> return Error "Reviewer requested revision"
                         | OrchestratorReviewRead.NeedsReview -> return Error "Reviewer produced no verdict"
                         | OrchestratorReviewRead.PendingConfirmation ->
-                            match! nudgeReviewer jobId ReviewChallenge.Text with
+                            match! nudgeReviewer jobId ReviewChallenge.Prompt with
                             | Error error -> return Error error
                             | Ok() ->
                                 match! awaitReviewer jobId with

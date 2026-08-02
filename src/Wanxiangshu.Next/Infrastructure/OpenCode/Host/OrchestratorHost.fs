@@ -71,7 +71,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         task {
             worktrees.[agentId] <- WorktreePath.value worktree
 
-            match! runtime.Fork(agentId, role, agent, prompt) with
+            match! runtime.Fork(agentId, role, agent, prompt, None) with
             | Error error -> return Error error
             | Ok _ ->
                 match runtime.TryChildSession agentId with
@@ -120,7 +120,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 let agentId = managerAgentId jobId
                 worktrees.[agentId] <- WorktreePath.value worktree
 
-                match! runtime.Fork(agentId, AgentRole.Manager, record.ManagerAgent, prompt, firstPrompt = false) with
+                match!
+                    runtime.Fork(agentId, AgentRole.Manager, record.ManagerAgent, prompt, None, firstPrompt = false)
+                with
                 | Error error -> return Error error
                 | Ok _ -> return! awaitManager jobId
         }
@@ -149,6 +151,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                             AgentRole.Reviewer,
                             OrchestratorHostReview.DeepReviewerAgent,
                             prompt,
+                            None,
                             firstPrompt = false
                         )
                     with

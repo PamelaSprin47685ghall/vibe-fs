@@ -12,10 +12,12 @@ namespace Wanxiangshu.Next.Domain
 ///
 /// ── two texts deliberately NOT here ─────────────────────────────────────────
 ///
-/// `ReviewChallenge.Text` stays raw. REVIEW-003 records its digest in `PerfectChallengeIssued` and
-/// searches the second run's input seal for that same value, so the bytes are a domain fact rather
-/// than a rendering. Wrapping it would change the digest and refuse every confirmation while looking
-/// like correct fail-closed behaviour — the failure mode `ReviewChallenge`'s own comment warns about.
+/// `ReviewChallenge.Text` now carries a `# ` prefix before it is sent. The prefix does not break
+/// REVIEW-003: `PerfectChallengeIssued` records the digest of the final sent bytes
+/// (`ReviewChallenge.Prompt`) and the second run's input seal is searched for those same bytes, so
+/// the record, the `verdict` tool result, and the nudge stay identical. A mismatch would still refuse
+/// every confirmation while looking like correct fail-closed behaviour — the failure mode
+/// `ReviewChallenge`'s own comment warns about.
 ///
 /// The zero-width continuation (`"\u200B"`, `TurnCompletionProgram.fs:215`) stays raw because its
 /// emptiness IS its meaning. It is transport rather than semantic delta; a `# ` prefix would make it

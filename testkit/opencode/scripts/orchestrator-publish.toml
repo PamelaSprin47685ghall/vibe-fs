@@ -99,7 +99,7 @@ tools = ["fork-manager", "join"]
 [[turn]]
 id = "manager"
 lane = "fast-manager"
-user = ["# Complete the assignment in `assignment`.", "Ship publish_proof.txt to the target branch."]
+user = "# Ship publish_proof.txt to the target branch."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
@@ -113,12 +113,14 @@ tools = ["fork", "join", "list"]
   [[turn.step]]
   respond = { type = "text", text = "Manager finished." }
 
-# `HostReviewGuard.fs:147`. Production composes it, so `internal`.
+# `HostReviewGuard.fs:202`. Production composes the full two-line message
+# (`RuntimeNudge.ManagerReviewGuardInstructions`); the ordered fragments declare
+# both lines as they arrive on the wire, so `internal`.
 
 [[turn]]
 id = "manager-guard"
 internal = true
-user = "# Review is required before completion."
+user = ["# Review is required before completion.", "# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."]
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
@@ -133,7 +135,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Write publish_proof.txt."]
+user = "# Write publish_proof.txt."
 tools = ["write"]
 
   [[turn.step]]
@@ -152,7 +154,7 @@ tools = ["write"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review the current worktree for correctness"]
+user = "# Review the current worktree for correctness"
 tools = ["verdict"]
 
   # REVIEW-003 dual PERFECT: the first verdict's tool result IS the challenge
@@ -168,6 +170,23 @@ tools = ["verdict"]
   [[turn.step]]
   respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
 
+# The challenge may also arrive as a guard NUDGE — a NEW user message composed by
+# production (`HostReviewGuard.requestPerfectConfirmation`), e.g. when the Host goes
+# idle instead of continuing after the tool result. `reviewer-challenge` below covers
+# that fallback (production-composed, internal).
+
+[[turn]]
+id = "reviewer-challenge"
+internal = true
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
 # ORCH-006: the Orchestrator raises its own review barrier with a deep Reviewer
 # (`OrchestratorHostReview.DeepReviewerAgent`), independent of the Manager's guard
 # path. Its assignment is the barrier's review request, and its verdict tool call
@@ -175,7 +194,7 @@ tools = ["verdict"]
 [[turn]]
 id = "barrier-reviewer"
 lane = "deep-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review the current worktree for correctness. Submit your verdict with the verdict tool."]
+user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
 tools = ["glob", "grep", "inspector", "read", "verdict"]
 
   [[turn.step]]

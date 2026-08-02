@@ -396,13 +396,100 @@ export function auditSurfaces(files = productionFiles()) {
   return violations;
 }
 
+/**
+ * ── tool return bodies: runtime synthetic text beyond the prompt sinks ────────
+ *
+ * The four sinks cover what the plugin SENDS as prompts. Tool Execute paths return a body the
+ * model reads as text through the native tool result channel; SSOT/13 §3.1 and §11 put that body
+ * in ARCH-010's scope like any other synthetic text, so it must be TOML, never JSON.
+ *
+ * `ToolRegistry.fs` lives inside the tools directory (confirmed: `Infrastructure/OpenCode/Tools/`),
+ * so one walk covers both it and the individual tool files.
+ */
+const TOOLS_DIR = `${REPO_ROOT}src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools`;
+
+const TOOL_RETURN_FILES = () => walk(TOOLS_DIR, ['.fs']);
+
+const JSON_RETURN_MARKERS = Object.freeze(['jsonObject', 'jsonArray']);
+const TOML_RETURN_MARKERS = Object.freeze(['tomlObject', 'SyntheticToml']);
+
+/**
+ * Tool files and their return-text dialect, in CODE.
+ *
+ * Same comment skipping as `scanSurfaces`: a doc comment explaining the migration must not be
+ * punished, and a `member` definition line is not a use. A file defining a `ToolSpec` but naming
+ * no TOML writer is a tool whose return body still speaks JSON — the exact gap this audit keeps
+ * visible until the migration lands.
+ */
+export function scanToolReturns(files = TOOL_RETURN_FILES()) {
+  const json = [];
+  const toolSpecs = [];
+
+  for (const file of files) {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    let firstToolSpecLine = 0;
+    let hasTomlWriter = false;
+
+    lines.forEach((text, index) => {
+      const trimmed = text.trim();
+      if (trimmed.startsWith('///') || trimmed.startsWith('//') || trimmed.startsWith('member ')) return;
+
+      if (firstToolSpecLine === 0 && /\bToolSpec\b/.test(text)) firstToolSpecLine = index + 1;
+      if (TOML_RETURN_MARKERS.some((marker) => text.includes(marker))) hasTomlWriter = true;
+
+      for (const marker of JSON_RETURN_MARKERS) {
+        if (text.includes(marker)) json.push({ file: relative(file), line: index + 1, marker });
+      }
+    });
+
+    if (firstToolSpecLine > 0) toolSpecs.push({ file: relative(file), line: firstToolSpecLine, hasTomlWriter });
+  }
+
+  return { json, toolSpecs };
+}
+
+/**
+ * Audit the tool return bodies. Returns violation strings; empty means every tool return is TOML.
+ */
+export function auditToolReturns(files = TOOL_RETURN_FILES()) {
+  const violations = [];
+
+  if (files.length === 0) {
+    violations.push(
+      'no tool file found at all — the tools directory has changed, and an empty scan would make ' +
+        'every tool-return check below vacuously green',
+    );
+    return violations;
+  }
+
+  const { json, toolSpecs } = scanToolReturns(files);
+
+  for (const hit of json) {
+    violations.push(
+      `${hit.file}:${hit.line} tool return uses ${hit.marker}; tool return must be TOML, not JSON (ARCH-010)`,
+    );
+  }
+
+  for (const spec of toolSpecs) {
+    if (!spec.hasTomlWriter) {
+      violations.push(
+        `${spec.file}:${spec.line} defines a ToolSpec without referencing ` +
+          `${TOML_RETURN_MARKERS.join(' or ')}; tool return must use the canonical TOML writer (ARCH-010)`,
+      );
+    }
+  }
+
+  return violations;
+}
+
 /** The inventory, for a reader or a report. */
 export function inventory() {
   return [...SURFACES].map(([key, entry]) => ({ key, ...entry }));
 }
 
 const main = () => {
-  const violations = auditSurfaces();
+  const toolFiles = TOOL_RETURN_FILES();
+  const violations = [...auditSurfaces(), ...auditToolReturns(toolFiles)];
 
   if (violations.length > 0) {
     console.error('surface-inventory: FAIL');
@@ -417,7 +504,8 @@ const main = () => {
       `${byStanding('CanonicalPayload')} canonical, ` +
       `${byStanding('VerbatimForward')} verbatim-forward, ` +
       `${byStanding('RuntimeInstruction')} awaiting N5; ` +
-      'system prompt and human raw structurally excluded',
+      `system prompt and human raw structurally excluded; ` +
+      `${toolFiles.length} tool file(s) audited for TOML returns`,
   );
 };
 

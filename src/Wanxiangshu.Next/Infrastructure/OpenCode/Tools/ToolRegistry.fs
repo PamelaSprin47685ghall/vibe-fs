@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System.Collections.Generic
-open Thoth.Json
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
@@ -78,6 +77,7 @@ module ToolRegistry =
         // the schema admitted is exactly a tool the gate admits.
         let gateExecute spec allowed =
             let original = spec.Execute
+            let tString = ToolHostCodec.TString
 
             fun args ctx ->
                 task {
@@ -85,17 +85,16 @@ module ToolRegistry =
                     | Some role when allowed role -> return! original args ctx
                     | Some role ->
                         return
-                            ToolHostCodec.jsonObject
-                                [ "error",
-                                  Encode.string (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+                            ToolHostCodec.tomlObject
+                                [ "error", tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
                     | None ->
                         match! runtime.EnsureRoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
                         | Some role ->
                             return
-                                ToolHostCodec.jsonObject
+                                ToolHostCodec.tomlObject
                                     [ "error",
-                                      Encode.string (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+                                      tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
                         | None ->
                             // AGENT-007: an unresolved Role means an empty tool set. The
                             // previous version exempted `inspector` here on the grounds
@@ -103,9 +102,9 @@ module ToolRegistry =
                             // the clause names explicitly. Read-only or not, executing
                             // under an unknown role is an unauthorised execution.
                             return
-                                ToolHostCodec.jsonObject
+                                ToolHostCodec.tomlObject
                                     [ "error",
-                                      Encode.string (
+                                      tString (
                                           sprintf
                                               "Tool '%s' rejected: no Authority Root fixes this session's role"
                                               spec.Name

@@ -77,7 +77,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review review_target.txt and submit two PERFECT verdicts."]
+user = "# Review review_target.txt and submit two PERFECT verdicts."
 tools = ["verdict"]
 
   [[turn.step]]
@@ -98,7 +98,7 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-challenge"
 internal = true
-user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 tools = ["verdict"]
 
   [[turn.step]]

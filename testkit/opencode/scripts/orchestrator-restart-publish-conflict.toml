@@ -93,7 +93,7 @@ tools = ["fork-manager", "join"]
 [[turn]]
 id = "manager"
 lane = "fast-manager"
-user = ["# Complete the assignment in `assignment`.", "Ship publish_proof.txt to the target branch."]
+user = "# Ship publish_proof.txt to the target branch."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
@@ -138,7 +138,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Write publish_proof.txt."]
+user = "# Write publish_proof.txt."
 tools = ["write"]
 
   [[turn.step]]
@@ -150,7 +150,7 @@ tools = ["write"]
 [[turn]]
 id = "reviewer"
 lane = "fast-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review the current worktree for correctness"]
+user = "# Review the current worktree for correctness"
 tools = ["verdict"]
 
   [[turn.step]]
@@ -162,7 +162,7 @@ tools = ["verdict"]
 [[turn]]
 id = "barrier-reviewer"
 lane = "deep-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review the current worktree for correctness. Submit your verdict with the verdict tool."]
+user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
 tools = ["glob", "grep", "inspector", "read", "verdict"]
 
   [[turn.step]]
@@ -177,7 +177,7 @@ tools = ["glob", "grep", "inspector", "read", "verdict"]
 [[turn]]
 id = "reviewer-confirm"
 internal = true
-user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 tools = ["verdict"]
 
   [[turn.step]]

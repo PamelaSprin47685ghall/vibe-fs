@@ -58,17 +58,29 @@ module VerdictTool =
             |> Option.bind (fun session -> session.ReviewGuard)
             |> Option.bind (fun guard -> guard.CurrentBarrierId)
 
+    let private tString = ToolHostCodec.TString
+
     let private report (decision: VerdictDecision) =
         match decision with
-        | VerdictDecision.Revised -> "REVISE recorded for the current tree."
+        | VerdictDecision.Revised -> ToolHostCodec.tomlObject [ "verdict", tString "REVISE" ]
         // The challenge text IS the tool result the second run must consume
         // (REVIEW-003). Returning it here is what puts it into that run's input
         // seal, so the string comes from the domain rather than being written again.
-        | VerdictDecision.ChallengeIssued challenge -> challenge
-        | VerdictDecision.Confirmed -> "PERFECT recorded for the current tree."
+        | VerdictDecision.ChallengeIssued challenge ->
+            let instructions =
+                if System.String.IsNullOrWhiteSpace challenge then
+                    []
+                else
+                    [ challenge ]
+
+            ToolHostCodec.tomlObjectWithInstructions instructions []
+        | VerdictDecision.Confirmed -> ToolHostCodec.tomlObject [ "verdict", tString "PERFECT" ]
         | VerdictDecision.ChallengeUnproven ->
-            "Verdict rejected: this provider run has no input seal proving it received the previous challenge."
-        | VerdictDecision.AlreadyCounted -> "Verdict already recorded for this provider run."
+            ToolHostCodec.tomlObject
+                [ "error",
+                  tString
+                      "Verdict rejected: this provider run has no input seal proving it received the previous challenge." ]
+        | VerdictDecision.AlreadyCounted -> ToolHostCodec.tomlObject [ "status", tString "already_recorded" ]
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
@@ -87,7 +99,8 @@ module VerdictTool =
                     | Ok value, Some toolCallId, Some providerRunId -> Ok(value, toolCallId, providerRunId)
 
             match validated with
-            | Error error -> return sprintf "Verdict rejected: %s." error
+            | Error error ->
+                return ToolHostCodec.tomlObject [ "error", tString (sprintf "Verdict rejected: %s." error) ]
             | Ok(value, toolCallId, providerRunId) ->
                 let reviewerId = context.SessionId
 
@@ -97,13 +110,25 @@ module VerdictTool =
                     scope.TreePortFor reviewerId,
                     currentBarrier scope reviewerId
                 with
-                | None, _, _, _ -> return "Verdict rejected because the reviewer journal is unavailable."
-                | _, None, _, _ -> return "Verdict rejected because the manager session is unknown."
-                | _, _, None, _ -> return "Verdict rejected because the Git tree is unavailable."
+                | None, _, _, _ ->
+                    return
+                        ToolHostCodec.tomlObject
+                            [ "error", tString "Verdict rejected because the reviewer journal is unavailable." ]
+                | _, None, _, _ ->
+                    return
+                        ToolHostCodec.tomlObject
+                            [ "error", tString "Verdict rejected because the manager session is unknown." ]
+                | _, _, None, _ ->
+                    return
+                        ToolHostCodec.tomlObject
+                            [ "error", tString "Verdict rejected because the Git tree is unavailable." ]
                 // REVIEW-008 fail closed: without an open barrier there is nothing
                 // this verdict could confirm, and inventing one would let a
                 // post-rebase review reuse a pre-rebase confirmation.
-                | _, _, _, None -> return "Verdict rejected because no review barrier is open for this tree."
+                | _, _, _, None ->
+                    return
+                        ToolHostCodec.tomlObject
+                            [ "error", tString "Verdict rejected because no review barrier is open for this tree." ]
                 | Some journal, Some managerSessionId, Some gitTree, Some barrierId ->
                     let managerJobId, worktreeIdentity = jobIdentity scope managerSessionId
 
@@ -137,7 +162,10 @@ module VerdictTool =
                         match scope.PendingReviewSeals.TryGetValue reviewerId with
                         | false, _ ->
                             return
-                                "Verdict rejected: this provider run has no input seal proving it received the previous challenge."
+                                ToolHostCodec.tomlObject
+                                    [ "error",
+                                      tString
+                                          "Verdict rejected: this provider run has no input seal proving it received the previous challenge." ]
                         | true, pending ->
                             let sealFact =
                                 AgentFact.ProviderInputSealed
@@ -157,16 +185,28 @@ module VerdictTool =
                             with
                             | Error appendFailure ->
                                 return
-                                    sprintf
-                                        "Verdict rejected: challenge unproven (seal bind failed: %s)"
-                                        (JournalAppendFailure.describe appendFailure)
+                                    ToolHostCodec.tomlObject
+                                        [ "error",
+                                          tString (
+                                              sprintf
+                                                  "Verdict rejected: challenge unproven (seal bind failed: %s)"
+                                                  (JournalAppendFailure.describe appendFailure)
+                                          ) ]
                             | Ok _ ->
                                 match ReviewController.submit journal HostDigest.sha256Hex submission with
                                 | Error retryError ->
-                                    return sprintf "Verdict rejected: challenge unproven (retry: %s)" retryError
+                                    return
+                                        ToolHostCodec.tomlObject
+                                            [ "error",
+                                              tString (
+                                                  sprintf "Verdict rejected: challenge unproven (retry: %s)" retryError
+                                              ) ]
                                 | Ok VerdictDecision.ChallengeUnproven ->
                                     return
-                                        "Verdict rejected: this provider run has no input seal proving it received the previous challenge."
+                                        ToolHostCodec.tomlObject
+                                            [ "error",
+                                              tString
+                                                  "Verdict rejected: this provider run has no input seal proving it received the previous challenge." ]
                                 | Ok decision ->
                                     scope.PendingReviewSeals.Remove reviewerId |> ignore
                                     scope.MarkVerdictSubmitted reviewerId
@@ -174,7 +214,8 @@ module VerdictTool =
                     | Ok decision ->
                         scope.MarkVerdictSubmitted reviewerId
                         return report decision
-                    | Error error -> return sprintf "Verdict rejected: %s." error
+                    | Error error ->
+                        return ToolHostCodec.tomlObject [ "error", tString (sprintf "Verdict rejected: %s." error) ]
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

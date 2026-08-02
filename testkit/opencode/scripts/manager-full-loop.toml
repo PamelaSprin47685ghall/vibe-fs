@@ -130,7 +130,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "inspector"
 lane = "fast-inspector"
-user = ["# Complete the assignment in `assignment`.", "Run executor investigation and return a formal report."]
+user = "# Run executor investigation and return a formal report."
 tools = ["executor"]
 
   [[turn.step]]
@@ -142,7 +142,7 @@ tools = ["executor"]
 [[turn]]
 id = "browser"
 lane = "fast-browser"
-user = ["# Complete the assignment in `assignment`.", "Read AGENTS.md and report architecture constraints."]
+user = "# Read AGENTS.md and report architecture constraints."
 tools = ["read"]
 
   [[turn.step]]
@@ -154,7 +154,7 @@ tools = ["read"]
 [[turn]]
 id = "meditator"
 lane = "fast-meditator"
-user = ["# Complete the assignment in `assignment`.", "Propose a plan without changing the worktree."]
+user = "# Propose a plan without changing the worktree."
 tools = ["read"]
 
   [[turn.step]]
@@ -170,7 +170,7 @@ tools = ["read"]
 [[turn]]
 id = "coder-edit"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Edit src/main.txt to 'patched'."]
+user = "# Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file summary."
 tools = ["write"]
 
   [[turn.step]]
@@ -182,7 +182,7 @@ tools = ["write"]
 [[turn]]
 id = "coder-fix"
 lane = "fast-coder"
-user = ["# Complete the assignment in `assignment`.", "Apply reviewer REVISE: write CHANGELOG.md with fixed."]
+user = "# Apply reviewer REVISE: write CHANGELOG.md with fixed."
 tools = ["write"]
 
   [[turn.step]]
@@ -194,7 +194,7 @@ tools = ["write"]
 [[turn]]
 id = "review-revise"
 lane = "fast-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Review current worktree and submit structured verdicts."]
+user = "# Review current worktree and submit structured verdicts."
 tools = ["verdict"]
 
   [[turn.step]]
@@ -206,7 +206,7 @@ tools = ["verdict"]
 [[turn]]
 id = "review-perfect"
 lane = "fast-reviewer"
-user = ["# Complete the assignment in `assignment`.", "Re-review the fixed tree and submit dual PERFECT."]
+user = "# Re-review the fixed tree and submit dual PERFECT."
 tools = ["verdict"]
 
   [[turn.step]]
@@ -221,7 +221,7 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-confirm"
 internal = true
-user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 tools = ["verdict"]
 
   [[turn.step]]

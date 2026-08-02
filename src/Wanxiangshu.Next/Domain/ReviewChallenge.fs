@@ -21,13 +21,18 @@ module ReviewChallenge =
     let Text =
         "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 
+    /// The final ARCH-010 form of the challenge as both a `verdict` tool result
+    /// and a reviewer nudge prompt: an instruction-only TOML comment, exactly the
+    /// bytes the second run's input seal will be searched for.
+    let Prompt = SyntheticToml.document [ Text ] []
+
     /// The digest recorded in `PerfectChallengeIssued` and searched for in the
     /// second run's seal.
     ///
     /// Delegates to `ProviderProjection.toolResultDigest` rather than hashing
-    /// here. The challenge IS a tool result, so sealing it necessarily produces
-    /// this value; a second hash spelled locally would agree only by coincidence,
-    /// and any drift would silently refuse every confirmation while looking like
-    /// correct fail-closed behaviour.
+    /// here. The recorded digest must be the hash of the exact final TOML bytes
+    /// (`Prompt`), because the second run's seal is built from those same bytes.
+    /// A second hash or the old raw text would silently refuse every confirmation
+    /// while looking like correct fail-closed behaviour.
     let contentDigest (sha256: string -> string) : SealDigest =
-        ProviderProjection.toolResultDigest sha256 Text
+        ProviderProjection.toolResultDigest sha256 Prompt

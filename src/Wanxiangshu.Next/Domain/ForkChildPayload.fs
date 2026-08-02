@@ -14,6 +14,8 @@ type ForkChildAssignment =
         /// REVIEW-002 authoritative scope: the HumanRoot prompts received since the previous review
         /// reached its double-PERFECT barrier. Empty for every non-Reviewer fork.
         OriginalUserRequirements: string list
+        /// ARCH-010: machine-readable data that the child may read but must not mistake for the task.
+        Payload: string option
     }
 
 /// The first prompt of a forked child, as one ARCH-010 payload.
@@ -32,11 +34,10 @@ type ForkChildAssignment =
 /// prefix that is sometimes absent. It is the shared root cause of the currently red canaries, and
 /// the reason the reviewer half already needed ordered-fragment declarations in seven scenarios.
 ///
-/// ARCH-010 fixes it structurally, not by picking one of the four. Instruction comments come FIRST
-/// and the first two are unconditional, so every shape now begins with the same bytes. The optional
-/// parts became optional FIELDS, which 「省略不存在的可选字段」 permits and which a fragment
-/// declaration can skip over — the varying part sits between two stable anchors instead of in front
-/// of them.
+/// ARCH-010 fixes it structurally, not by picking one of the four. Instruction comments come FIRST:
+/// the `Assignment` block leads the header, then the unconditional report format, then the
+/// interpretive context lines when present. The optional parts became optional FIELDS, which
+/// 「省略不存在的可选字段」 permits and which a fragment declaration can skip over.
 ///
 /// ── one payload, not two nested ones ────────────────────────────────────────
 ///
@@ -48,18 +49,14 @@ type ForkChildAssignment =
 [<RequireQualifiedAccess>]
 module ForkChildPayload =
 
-    /// The two instructions every forked child receives, in order.
+    /// The one unconditional instruction every forked child receives: the report shape.
     ///
     /// Unconditional, and that is the whole fix. The previous envelope carried the report format only
     /// when a parent work record happened to exist, so whether a child owed a structured report
-    /// depended on unrelated state. Both facts — do the work, report in this shape — are true of
-    /// every fork.
-    ///
-    /// The first line is what every declaration anchors on, so it must not be reworded casually:
-    /// `gate-runtime-key-cases.mjs` pins it for that reason.
+    /// depended on unrelated state. The task itself is the `Assignment` comment block, which precedes
+    /// this line in the header; the report shape is true of every fork.
     let BaseInstructions =
-        [ "Complete the assignment in `assignment`."
-          "Report back with exactly these fields: result, files changed, tests run, evidence, remaining risks, blockers." ]
+        [ "Report back with exactly these fields: result, files changed, tests run, evidence, remaining risks, blockers." ]
 
     /// Emitted only alongside a `parent_work_record` field, because an instruction about absent data
     /// is an instruction the model cannot act on.
@@ -75,27 +72,14 @@ module ForkChildPayload =
 
     /// Render the payload.
     ///
-    /// Field order is `assignment` first, then `parent_work_record`, then the requirement entries.
-    /// Deliberate: the assignment is what the child must act on, and putting it immediately after the
-    /// header gives declarations a stable position to match rather than one that shifts with context.
+    /// Instructions are emitted as the leading `#` comment block; data is emitted as bare fields and
+    /// table arrays. `Assignment` is the instruction text and is always rendered as comments, so the
+    /// model cannot mistake the task for a field value. `Payload` is runtime data and is rendered as a
+    /// `content` field when present.
     ///
-    /// `SyntheticToml.document` emits bare fields before table arrays regardless of the order given
-    /// here, which is what keeps `[[original_user_requirement]]` from swallowing a field written after
-    /// it. That rule lives there because it is a property of TOML, not of forks.
-    ///
-    /// ── every fork-composed prompt arrives here, including the runtime's own ──
-    ///
-    /// `Assignment` is data to this renderer, whatever it means to the caller. A runtime that forks an
-    /// Executor to summarise a spool chunk composes "summarise this, preserve exact numbers" as part
-    /// of the assignment, and that is correct rather than a compromise: `HostForkRuntime.Fork` is the
-    /// single entry, so the composite payload reads coherently — the base header says complete the
-    /// assignment, and the assignment says what to do.
-    ///
-    /// Measured while migrating the Executor path: having that caller render its own ARCH-010 document
-    /// and pass it as `Assignment` produces one payload nested inside another's value — the notation
-    /// appears twice, the model must unwrap it, and the inner instructions sit below the outer data.
-    /// Threading typed caller instructions through instead would mean changing the fork signature
-    /// chain, which buys nothing here and is why there is no `TaskInstructions` field.
+    /// Field order is `content` first (if any), then `parent_work_record`, then the requirement
+    /// entries. `SyntheticToml.document` emits bare fields before table arrays regardless of the order
+    /// given here, which keeps `[[original_user_requirement]]` from swallowing a field written after it.
     let render (input: ForkChildAssignment) : string =
         let requirements =
             input.OriginalUserRequirements
@@ -106,8 +90,14 @@ module ForkChildPayload =
             |> Option.map (fun record -> record.Trim())
             |> Option.filter (fun record -> record <> "")
 
+        let assignmentText = input.Assignment.Trim()
+
         let instructions =
-            BaseInstructions
+            (if System.String.IsNullOrWhiteSpace assignmentText then
+                 []
+             else
+                 [ assignmentText ])
+            @ BaseInstructions
             @ (match parentRecord with
                | Some _ -> [ ParentWorkRecordInstruction ]
                | None -> [])
@@ -117,7 +107,10 @@ module ForkChildPayload =
                    [ RequirementsInstruction ])
 
         let body =
-            [ SyntheticToml.field "assignment" (SyntheticToml.renderString input.Assignment) ]
+            (match input.Payload with
+             | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
+                 [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
+             | _ -> [])
             @ (match parentRecord with
                | Some record -> [ SyntheticToml.field "parent_work_record" (SyntheticToml.renderString record) ]
                | None -> [])
@@ -131,8 +124,14 @@ module ForkChildPayload =
         SyntheticToml.document instructions body
 
     /// The positional form, for a call site that reads better without a record literal.
-    let relay (assignment: string) (parentWorkRecord: string option) (requirements: string list) : string =
+    let relay
+        (assignment: string)
+        (parentWorkRecord: string option)
+        (requirements: string list)
+        (payload: string option)
+        : string =
         render
             { Assignment = assignment
               ParentWorkRecord = parentWorkRecord
-              OriginalUserRequirements = requirements }
+              OriginalUserRequirements = requirements
+              Payload = payload }

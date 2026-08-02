@@ -369,7 +369,8 @@ test('member resolution prefers a real export over the escaped spelling', () => 
   assert.equal(domain.reviewChallenge.textVersion, 1)
   assert.match(domain.reviewChallenge.text, /^Nope, let's re-evaluate: /)
 
-  // And the digest is derived from that same text, not spelled separately.
+  // And the digest is derived from `ReviewChallenge.Prompt` (the instruction
+  // comment bytes), not from the bare `Text`.
   const digest = idValue.sealDigest(domain.reviewChallenge.contentDigest((input) => `H(${input})`))
-  assert.equal(digest, `H(${domain.reviewChallenge.text})`)
+  assert.equal(digest, `H(# ${domain.reviewChallenge.text}\n)`)
 })

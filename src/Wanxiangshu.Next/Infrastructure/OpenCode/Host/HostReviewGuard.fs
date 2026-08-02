@@ -167,7 +167,7 @@ module HostReviewGuard =
                             targetSessionId
                             prompt
                             continuationKind
-                            None
+                            SharedState.RootWorkspace
                             (Some durable)
                             None
 
@@ -223,8 +223,8 @@ module HostReviewGuard =
     /// makes the Host start the next provider request; the confirmation itself comes
     /// from the second run's input seal proving it consumed the challenge.
     ///
-    /// The prompt text IS `ReviewChallenge.Text`. It is not spelled again here
-    /// because the digest of that exact string is what the seal is searched for —
+    /// The prompt text IS `ReviewChallenge.Prompt`. It is not spelled again here
+    /// because the digest of that exact TOML string is what the seal is searched for —
     /// a second copy that drifted by one character would fail every confirmation
     /// while looking like correct fail-closed behaviour.
     let requestPerfectConfirmation
@@ -241,5 +241,5 @@ module HostReviewGuard =
             sessionId
             (ProviderRunIdentity.value triggerProviderRun)
             "confirm-perfect"
-            ReviewChallenge.Text
+            ReviewChallenge.Prompt
             "reviewer"

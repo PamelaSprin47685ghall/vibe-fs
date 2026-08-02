@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open Thoth.Json
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
@@ -10,18 +9,26 @@ open Wanxiangshu.Next.Session
 /// join is routed to its ManagerJob publication mailbox by authority role.
 module JoinTool =
 
-    let private optionalString value =
-        value |> Option.map Encode.string |> Option.defaultValue Encode.nil
+    let private tString = ToolHostCodec.TString
+    let private tBool = ToolHostCodec.TBool
+    let private tTable = ToolHostCodec.TTable
 
-    let private workRecord (value: WorkRecordSnapshot option) =
-        value
-        |> Option.map (fun record ->
-            Encode.object
-                [ "text", Encode.string record.Text
-                  "digest", Encode.string record.Digest
-                  "freshness", Encode.string record.Freshness
-                  "coveredThrough", optionalString record.CoveredThrough ])
-        |> Option.defaultValue Encode.nil
+    let private optionalField (name: string) (value: string option) : (string * ToolHostCodec.TomlValue) list =
+        match value with
+        | Some v when not (String.IsNullOrWhiteSpace v) -> [ name, tString v ]
+        | _ -> []
+
+    let private workRecordField (value: WorkRecordSnapshot option) : (string * ToolHostCodec.TomlValue) list =
+        match value with
+        | Some record ->
+            [ "work_record",
+              tTable (
+                  [ "text", tString record.Text
+                    "digest", tString record.Digest
+                    "freshness", tString record.Freshness ]
+                  @ optionalField "covered_through" record.CoveredThrough
+              ) ]
+        | None -> []
 
     let private errorCode =
         function
@@ -33,88 +40,91 @@ module JoinTool =
     let private encodeCompletion (runtime: HostForkRuntime) (completion: RunCompletion) =
         let isPty = runtime.IsPtyCompletion completion.RunId
 
-        let value =
-            match completion.Outcome with
-            | AgentCompleted payload when isPty ->
-                Encode.object
-                    [ "kind", Encode.string "pty"
-                      "status", Encode.string "completed"
-                      "agentId", Encode.string payload.AgentId
-                      "runId", Encode.string payload.RunId
-                      "finalText", Encode.string payload.FinalText
-                      "outcome", Encode.string payload.FinalText
-                      "closed", Encode.bool true
-                      "ptyId", Encode.string completion.RunId ]
-            | AgentCompleted payload ->
-                let baseFields =
-                    [ "kind", Encode.string "agent"
-                      "status", Encode.string "completed"
-                      "agentId", Encode.string payload.AgentId
-                      "childSessionId", optionalString (payload.ChildSessionId |> Option.map SessionId.value)
-                      "runId", Encode.string payload.RunId
-                      "authorityRoot",
-                      optionalString (payload.AuthorityRoot |> Option.map AuthorityRootUserMessageId.value)
-                      "providerRun", optionalString (payload.ProviderRun |> Option.map ProviderRunIdentity.value)
-                      "finalText", Encode.string payload.FinalText
-                      "workRecord", workRecord payload.WorkRecord
-                      "directory", optionalString payload.Directory ]
+        match completion.Outcome with
+        | AgentCompleted payload when isPty ->
+            ToolHostCodec.tomlObject
+                [ "kind", tString "pty"
+                  "status", tString "completed"
+                  "agent_id", tString payload.AgentId
+                  "run_id", tString payload.RunId
+                  "final_text", tString payload.FinalText
+                  "outcome", tString payload.FinalText
+                  "closed", tBool true
+                  "pty_id", tString completion.RunId ]
+        | AgentCompleted payload ->
+            let instructions =
+                if System.String.IsNullOrWhiteSpace payload.FinalText then
+                    []
+                else
+                    [ payload.FinalText ]
 
-                let managed =
-                    runtime.TryFindAgent payload.AgentId
-                    |> Option.bind (fun record -> ManagedAgent.tryParse record.Agent)
+            let baseFields =
+                [ "kind", tString "agent"
+                  "status", tString "completed"
+                  "agent_id", tString payload.AgentId
+                  "run_id", tString payload.RunId ]
 
-                let identityFields =
-                    match managed with
-                    | Some agent ->
-                        [ "agent", Encode.string agent.Name
-                          "role", Encode.string (ManagedAgent.roleName agent.Role)
-                          "tier", Encode.string (ManagedAgent.tierName agent.Tier)
-                          "fallbackPeer", Encode.string (ManagedAgent.peer agent).Name ]
-                    | None -> [ "role", Encode.string (payload.Role.ToString().ToLowerInvariant()) ]
+            let optionalFields =
+                workRecordField payload.WorkRecord
+                @ optionalField "child_session_id" (payload.ChildSessionId |> Option.map SessionId.value)
+                @ optionalField "authority_root" (payload.AuthorityRoot |> Option.map AuthorityRootUserMessageId.value)
+                @ optionalField "provider_run" (payload.ProviderRun |> Option.map ProviderRunIdentity.value)
+                @ optionalField "directory" payload.Directory
 
-                Encode.object (baseFields @ identityFields)
-            | AgentFailed payload
-            | AgentAborted payload when isPty ->
-                Encode.object
-                    [ "kind", Encode.string "pty"
-                      "status", Encode.string "failed"
-                      "agentId", Encode.string payload.AgentId
-                      "runId", Encode.string payload.RunId
-                      "outcome", Encode.string payload.Message
-                      "closed", Encode.bool true
-                      "error",
-                      Encode.object [ "code", Encode.string payload.Code; "message", Encode.string payload.Message ]
-                      "ptyId", Encode.string completion.RunId ]
-            | AgentFailed payload
-            | AgentAborted payload ->
-                let status =
-                    match completion.Outcome with
-                    | AgentAborted _ -> "aborted"
-                    | _ -> "failed"
+            let managed =
+                runtime.TryFindAgent payload.AgentId
+                |> Option.bind (fun record -> ManagedAgent.tryParse record.Agent)
 
-                Encode.object
-                    [ "kind", Encode.string "agent"
-                      "status", Encode.string status
-                      "agentId", Encode.string payload.AgentId
-                      "childSessionId", optionalString (payload.ChildSessionId |> Option.map SessionId.value)
-                      "runId", Encode.string payload.RunId
-                      "role",
-                      payload.Role
-                      |> Option.map (fun role -> Encode.string (role.ToString().ToLowerInvariant()))
-                      |> Option.defaultValue Encode.nil
-                      "error",
-                      Encode.object [ "code", Encode.string payload.Code; "message", Encode.string payload.Message ] ]
+            let identityFields =
+                match managed with
+                | Some agent ->
+                    [ "agent", tString agent.Name
+                      "role", tString (ManagedAgent.roleName agent.Role)
+                      "tier", tString (ManagedAgent.tierName agent.Tier)
+                      "fallback_peer", tString (ManagedAgent.peer agent).Name ]
+                | None -> [ "role", tString (payload.Role.ToString().ToLowerInvariant()) ]
 
-        Encode.toString 0 value
+            ToolHostCodec.tomlObjectWithInstructions instructions (baseFields @ optionalFields @ identityFields)
+        | AgentFailed payload
+        | AgentAborted payload when isPty ->
+            ToolHostCodec.tomlObject
+                [ "kind", tString "pty"
+                  "status", tString "failed"
+                  "agent_id", tString payload.AgentId
+                  "run_id", tString payload.RunId
+                  "outcome", tString payload.Message
+                  "closed", tBool true
+                  "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ]
+                  "pty_id", tString completion.RunId ]
+        | AgentFailed payload
+        | AgentAborted payload ->
+            let status =
+                match completion.Outcome with
+                | AgentAborted _ -> "aborted"
+                | _ -> "failed"
+
+            let optionalFields =
+                optionalField "child_session_id" (payload.ChildSessionId |> Option.map SessionId.value)
+                @ optionalField "role" (payload.Role |> Option.map (fun role -> role.ToString().ToLowerInvariant()))
+
+            let fields =
+                [ "kind", tString "agent"
+                  "status", tString status
+                  "agent_id", tString payload.AgentId
+                  "run_id", tString payload.RunId
+                  "outcome", tString payload.Message
+                  "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ] ]
+
+            ToolHostCodec.tomlObject (fields @ optionalFields)
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
         task {
             if scope.IsRole(context, Role.Orchestrator) then
                 let! verdict = scope.OrchestratorHostFor(context.SessionId).JoinPublished()
-                return ToolHostCodec.jsonObject [ "outcome", Encode.string verdict ]
+                return ToolHostCodec.tomlObject [ "outcome", tString verdict ]
             else
                 match scope.RuntimeFor context with
-                | Error runtimeError -> return ToolHostCodec.jsonObject [ "error", Encode.string runtimeError ]
+                | Error runtimeError -> return ToolHostCodec.tomlObject [ "error", tString runtimeError ]
                 | Ok runtime ->
                     let detachAbort = context.AttachAbort(fun () -> runtime.Cancel())
 
@@ -126,11 +136,11 @@ module JoinTool =
                     | Ok completion -> return encodeCompletion runtime completion
                     | Error joinError ->
                         return
-                            ToolHostCodec.jsonObject
+                            ToolHostCodec.tomlObject
                                 [ "error",
-                                  Encode.object
-                                      [ "code", Encode.string (errorCode joinError)
-                                        "message", Encode.string (joinError.ToString()) ] ]
+                                  tTable
+                                      [ "code", tString (errorCode joinError)
+                                        "message", tString (joinError.ToString()) ] ]
         }
 
     let spec scope =

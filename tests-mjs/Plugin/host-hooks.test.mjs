@@ -32,6 +32,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
 import { withPlugin, withPluginClient } from './plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
@@ -143,7 +144,9 @@ test('PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
       },
     )
 
-    assert.deepEqual(JSON.parse(await hooks.tool.list.execute({}, toolContext(SESSION))), [])
+    const listResult = parseToml(await hooks.tool.list.execute({}, toolContext(SESSION)))
+    assert.deepEqual(listResult, {})
+    assert.equal('item' in listResult, false)
   })
 })
 
@@ -163,7 +166,9 @@ test('AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', asy
   }
 
   await withPluginClient(client, async (hooks) => {
-    assert.deepEqual(JSON.parse(await hooks.tool.list.execute({}, toolContext(sessionID, assistantID))), [])
+    const listResult = parseToml(await hooks.tool.list.execute({}, toolContext(sessionID, assistantID)))
+    assert.deepEqual(listResult, {})
+    assert.equal('item' in listResult, false)
   })
 })
 

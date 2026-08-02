@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open Thoth.Json
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
@@ -17,17 +16,17 @@ module ForkTool =
           Prompt = args.Text "prompt" }
 
     let private error (message: string) =
-        ToolHostCodec.jsonObject [ "error", Encode.string message ]
+        ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString message ]
 
-    let private forkPayload (agentId: string) (managed: ManagedAgent) extra =
+    let private forkPayload (agentId: string) (managed: ManagedAgent) (extra: (string * ToolHostCodec.TomlValue) list) =
         let peer = ManagedAgent.peer managed
 
-        ToolHostCodec.jsonObject (
-            [ "agentId", Encode.string agentId
-              "agent", Encode.string managed.Name
-              "role", Encode.string (ManagedAgent.roleName managed.Role)
-              "tier", Encode.string (ManagedAgent.tierName managed.Tier)
-              "fallbackPeer", Encode.string peer.Name ]
+        ToolHostCodec.tomlObject (
+            [ "agent_id", ToolHostCodec.TString agentId
+              "agent", ToolHostCodec.TString managed.Name
+              "role", ToolHostCodec.TString(ManagedAgent.roleName managed.Role)
+              "tier", ToolHostCodec.TString(ManagedAgent.tierName managed.Tier)
+              "fallback_peer", ToolHostCodec.TString peer.Name ]
             @ extra
         )
 
@@ -80,10 +79,10 @@ module ForkTool =
                                 | Some managed -> return forkPayload result.AgentId managed []
                                 | None ->
                                     return
-                                        ToolHostCodec.jsonObject
-                                            [ "agentId", Encode.string result.AgentId
-                                              "agent", Encode.string record.Agent
-                                              "role", Encode.string (record.Role.ToString().ToLowerInvariant()) ]
+                                        ToolHostCodec.tomlObject
+                                            [ "agent_id", ToolHostCodec.TString result.AgentId
+                                              "agent", ToolHostCodec.TString record.Agent
+                                              "role", ToolHostCodec.TString(record.Role.ToString().ToLowerInvariant()) ]
                         | None ->
                             match ManagedAgent.tryParse request.Agent with
                             | Some managed when forbiddenManagerRole managed ->
@@ -98,7 +97,7 @@ module ForkTool =
                                 let role = AgentRoleIdentity.ofManaged managed
 
                                 match!
-                                    runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, request.Prompt)
+                                    runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, request.Prompt, None)
                                 with
                                 | Ok result -> return forkPayload result.AgentId managed []
                                 | Error forkError -> return error forkError
@@ -122,7 +121,11 @@ module ForkTool =
 
                     match! host.ForkManagerJob(managerId, managed.Name, request.Prompt) with
                     | Ok worktree ->
-                        return forkPayload (ManagerJobId.value managerId) managed [ "worktree", Encode.string worktree ]
+                        return
+                            forkPayload
+                                (ManagerJobId.value managerId)
+                                managed
+                                [ "worktree", ToolHostCodec.TString worktree ]
                     | Error forkError -> return error forkError
                 | Some _ -> return error "Orchestrator may only fork fast-manager or deep-manager"
                 | None -> return error (unknownAgentError request.Agent)

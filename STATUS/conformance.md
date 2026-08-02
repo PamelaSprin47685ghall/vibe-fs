@@ -16,6 +16,8 @@
 | ARCH-004: LLM 前缀缓存保护 | PARTIAL | `CompanionProjection.fs` | FrozenB/LatestB 已分离；冷边界靠 mock 嗅探而非显式声明（见 VERIFY-003） |
 | ARCH-007: 不同语义不同工具名 | CONFORMANT | `ForkTool.fs` | `fork-agent` / `fork-manager` / `fork-pty` 已分离 |
 | ARCH-009: 有界并发与共享原语契约 | CONFORMANT | `Kernel/Flow.fs` 的 `Parallel.mapBounded` | 唯一并发原语；上限为正且拒绝非正值、结果按输入位置排列、取消在获取许可处观察且 token 传达到 action、许可在 action 失败时归还。`guide-contract.test.mjs` 断言不存在无界的 `Parallel.map*` 兄弟。第 1 层测试 12 项 |
+| ARCH-010: 运行时 LLM 可见合成 prompt 的 TOML 形态 | CONFORMANT | `Domain/SyntheticToml.fs` | 指令只写为最前方顶层 `#` comment、数据只写为字段/表/value；三种合法形态、无统一 envelope、单向表示不反向解析；subagent 自然语言全文按 instruction 处理。证据：`scripts/surface-inventory.mjs`（工具返回审计）、`tests-mjs/Context/synthetic-toml.test.mjs`、`tests-mjs/Execution/fork-child-payload.test.mjs`、`tests-mjs/Execution/executor-summarize.test.mjs`、`src/Wanxiangshu.Next/Domain/SyntheticToml.fs` |
+| ARCH-010: 插件工具返回体 TOML（无 JSON） | CONFORMANT | `Infrastructure/OpenCode/Codec/ToolHostCodec.fs` | 全部插件工具返回体经 `tomlObject`/`tomlTable` 渲染为 data-only TOML（snake_case 字段），LLM 可见 JSON 工具返回禁止，工具返回体已纳入 inventory。证据：`src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs`、`tests-mjs/Plugin/manager-tool-contract.test.mjs`、`testkit/opencode/tests/reviewer-verdict-canary.mjs` |
 
 ## Prompt Authority 与 Dispatcher
 

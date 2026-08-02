@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Next.OpenCode
 
 open System
-open Thoth.Json
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Process
 open Wanxiangshu.Next.Session
@@ -20,14 +19,14 @@ module PtyTool =
           Prompt = args.Text "prompt"
           Signal = args.OptionalText "signal" }
 
+    let private tString = ToolHostCodec.TString
+    let private tBool = ToolHostCodec.TBool
+
     let private error (message: string) =
-        ToolHostCodec.jsonObject [ "error", Encode.string message ]
+        ToolHostCodec.tomlObject [ "error", tString message ]
 
     let private success (id: string) (output: string) (closed: bool) =
-        ToolHostCodec.jsonObject
-            [ "ptyId", Encode.string id
-              "output", Encode.string output
-              "closed", Encode.bool closed ]
+        ToolHostCodec.tomlObject [ "pty_id", tString id; "output", tString output; "closed", tBool closed ]
 
     let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
