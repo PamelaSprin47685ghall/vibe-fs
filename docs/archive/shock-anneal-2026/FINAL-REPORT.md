@@ -471,7 +471,7 @@ LEARN-082…088），属后续阶段。
 
 | 原文件 | 最终报告位置 | 处理 |
 |--------|-------------|------|
-| `STATUS/00-current.md` | §16、`STATUS/README.md` | 归并：当前基线/阶段/已确立关键决定入 §16；「下一步」与「阅读顺序/反馈纪律」为当前状态职责，由重建的 `STATUS/README.md` 承接，未复制入报告 |
+| `STATUS/00-current.md` | §7、§16、`STATUS/README.md` | 归并：当前基线/阶段入 §16，已确立关键决定入 §7 常规裁决；「下一步」由重建的 `STATUS/README.md` 承接，未复制入报告 |
 | `STATUS/shock-anneal.md` | §2–16 | 全量归并（阶段/工作包/熔断/SSOT 例外协议/封炉期记录）；旧符号灭绝明细（原 2277–2398 行）未保留全文——§12 只记要点，明细随原文删除 |
 | `STATUS/design-context-recovery.md` | §7、§8、§9 | 推理与裁决归并 |
 | `STATUS/design-script-forest.md` | §7、§11 | 归并（剧本森林设计裁决 + 验证体系变化） |
