@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const { initSpikePlugin } = await import('../../build/next/OpenCode/SpikePlugin.js')
+const { initSpikePlugin } = await import('../../build/next/Infrastructure/OpenCode/Plugin/SpikePlugin.js')
 
 // ── the layer-3 executable fixture (EXEC-002, AGENT-007 layer two) ───────────
 //
@@ -31,13 +31,13 @@ const { initSpikePlugin } = await import('../../build/next/OpenCode/SpikePlugin.
 // `initSpikePlugin` line.
 const { forWorkspace } = await import('../../build/next/Journal/RuntimePath.js')
 const { acquire: acquireJournal, release: releaseJournal } = await import('../../build/next/Journal/SharedAgentJournal.js')
-const { acquire: acquireTerminalBus } = await import('../../build/next/OpenCode/SharedTerminalBus.js')
+const { acquire: acquireTerminalBus } = await import('../../build/next/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
 const { AgentJournalModule_runtimeId } = await import('../../build/next/Journal/AgentJournal.js')
-const { forJournal, Runtime__AcceptHumanRoot } = await import('../../build/next/OpenCode/PromptDispatcher.js')
+const { forJournal, Runtime__AcceptHumanRoot } = await import('../../build/next/Application/Prompting/PromptDispatcher.js')
 const { SessionIdModule_create, PhysicalUserMessageIdModule_create } = await import(
   '../../build/next/Kernel/Identity.js'
 )
-const { TerminalOutcome } = await import('../../build/next/OpenCode/Events.js')
+const { TerminalOutcome } = await import('../../build/next/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../build/next/Kernel/Outcome.js')
 const { recordCompletion } = await import('../../build/next/Session/HandleController.js')
 

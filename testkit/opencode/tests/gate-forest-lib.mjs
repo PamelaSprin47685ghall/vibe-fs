@@ -115,7 +115,7 @@ import { fileURLToPath } from 'node:url';
 import { relative } from 'node:path';
 
 import { walk } from '../../../scripts/repo-scan.mjs';
-import { canonicalJson } from '../../../build/next/OpenCode/CanonicalJson.js';
+import { canonicalJson } from '../../../build/next/Infrastructure/OpenCode/Codec/CanonicalJson.js';
 import { sha256Hex } from '../../../build/next/Host/HostDigest.js';
 import { compileScenario } from '../scenario-schema.js';
 import { faultBody } from '../delivery-plan.js';

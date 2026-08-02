@@ -437,7 +437,7 @@ user = "nobody ever sends this"
       // The Blogger and the Executor map child cannot be reached by any scenario text:
       // production composes their prompts itself
       // (`../next/Session/CompanionHostBlogger.fs:72,77,118`,
-      // `../next/OpenCode/ExecutorSummarize.fs:95`). Without an opt-out the dead-edge
+      // `src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ExecutorSummarize.fs:95`). Without an opt-out the dead-edge
       // check has no evidence either way and rejects a correct scenario.
       accepts(`scenario = "p"
 prompt = { text = "go" }

@@ -75,10 +75,9 @@ const FORBIDDEN_SSE_TOKENS = [
 ]
 
 const SESSION_STATUS_ALLOWLIST = [
-  'src/Wanxiangshu.Next/OpenCode/HostEventCodec.fs',
-  'src/Wanxiangshu.Next/OpenCode/HostSignalAdapter.fs',
-  'src/Wanxiangshu.Next/OpenCode/RetrySignalHandler.fs',
-  'src/Wanxiangshu.Next/OpenCode/HostSignalSubscribe.fs',
+  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/HostEventCodec.fs',
+  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Signals/HostSignalAdapter.fs',
+  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs',
 ]
 
 const SLEEP_TOKENS = ['sleepJs', 'sleep']
@@ -89,8 +88,8 @@ const MECHANICAL_SUFFIXES = ['Helpers', 'Primitives', 'Fields', 'Emit', 'Service
 
 const MECHANICAL_ALLOWLIST = new Map([
   ['src/Wanxiangshu.Next/Session/AgentRoleIdentity.fs', 'semantic boundary pending deeper split'],
-  ['src/Wanxiangshu.Next/OpenCode/PluginHostInterop.fs', 'semantic boundary pending deeper split'],
-  ['src/Wanxiangshu.Next/OpenCode/TerminalPolicy.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginHostInterop.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/TerminalPolicy.fs', 'semantic boundary pending deeper split'],
 ])
 
 // ── Host boundary ───────────────────────────────────────────────────────────
@@ -104,9 +103,9 @@ const HOST_INTEROP_ALLOWLIST = new Map([
   ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
   ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
   ['src/Wanxiangshu.Next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
-  ['src/Wanxiangshu.Next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
-  ['src/Wanxiangshu.Next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
-  ['src/Wanxiangshu.Next/OpenCode/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
+  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagerConfig.fs', 'Host configuration adapter'],
+  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
+  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
   [
     'src/Wanxiangshu.Next/Kernel/Flow.fs',
     'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',
@@ -143,8 +142,8 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'PluginPromptClaimed',
     allowed: [
-      'OpenCode/PromptDispatcherSend.fs',
-      'OpenCode/PromptDispatcher.fs',
+      'Application/Prompting/PromptDispatcherSend.fs',
+      'Application/Prompting/PromptDispatcher.fs',
       'Journal/PromptAuthorityLedger.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
@@ -154,8 +153,8 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'PluginPromptSubmitted',
     allowed: [
-      'OpenCode/PromptDispatcherSend.fs',
-      'OpenCode/PromptDispatcher.fs',
+      'Application/Prompting/PromptDispatcherSend.fs',
+      'Application/Prompting/PromptDispatcher.fs',
       'Journal/PromptAuthorityLedger.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
@@ -165,8 +164,8 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'PluginPromptPhysicalAccepted',
     allowed: [
-      'OpenCode/PromptDispatcher.fs',
-      'OpenCode/PromptDispatcherSend.fs',
+      'Application/Prompting/PromptDispatcher.fs',
+      'Application/Prompting/PromptDispatcherSend.fs',
       'Journal/PromptAuthorityLedger.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
@@ -176,7 +175,7 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'PluginPromptAbandoned',
     allowed: [
-      'OpenCode/PromptDispatcher.fs',
+      'Application/Prompting/PromptDispatcher.fs',
       'Journal/PromptAuthorityLedger.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
@@ -746,7 +745,7 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
 const SCANNER_WITNESSES = [
   'src/Wanxiangshu.Next/Kernel/Flow.fs',
   'src/Wanxiangshu.Next/Journal/Writer.fs',
-  'src/Wanxiangshu.Next/OpenCode/Plugin.fs',
+  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/Plugin.fs',
   'src/Wanxiangshu.Next/Tools/StaticTools.fs',
 ]
 

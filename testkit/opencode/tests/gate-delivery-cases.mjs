@@ -368,7 +368,7 @@ export const deliveryCases = [
     name: 'FALLBACK-009 a non-retryable fault renders a body the Host gives up on',
     fn: () => {
       // `invalid_prompt` yields `isRetryable: false`, so the Host stops and the plugin must
-      // continue the Logical Run itself (`../next/OpenCode/TurnCompletionProgram.fs:92`).
+      // continue the Logical Run itself (`src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs:92`).
       // That is the mechanism `fallback-aabb-trace` depends on to observe four attempts.
       const body = faultBody({ kind: 'provider-error', status: 400, retryable: false });
 

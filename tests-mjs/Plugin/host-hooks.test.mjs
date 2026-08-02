@@ -27,7 +27,7 @@
 //
 // `prompt.ts:1255` triggers the transform on every provider step, so the plugin
 // threw on every turn of every session. The F# compiler cannot see inside an emit
-// template, and `domain.mjs` never imports `OpenCode/*` — neither side had a reason
+// template, and `domain.mjs` never imports `Infrastructure/OpenCode/*` — neither side had a reason
 // to call a hook.
 
 import assert from 'node:assert/strict'

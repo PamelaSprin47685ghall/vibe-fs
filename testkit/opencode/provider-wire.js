@@ -28,7 +28,7 @@
  * questions (there really is one meaning).
  */
 
-import { canonicalJson } from '../../build/next/OpenCode/CanonicalJson.js';
+import { canonicalJson } from '../../build/next/Infrastructure/OpenCode/Codec/CanonicalJson.js';
 import { sha256Hex } from '../../build/next/Host/HostDigest.js';
 import { ToolCallIdModule_create as toolCallId } from '../../build/next/Kernel/Identity.js';
 import {

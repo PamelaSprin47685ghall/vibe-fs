@@ -1,5 +1,5 @@
 # EXEC-012: output larger than the estimate is map/reduced in 200KB chunks, and the
-# map children are real Executor sessions (../next/OpenCode/ExecutorSummarize.fs:95).
+# map children are real Executor sessions (src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ExecutorSummarize.fs:95).
 #
 # The command writes 10000 bytes against a 2000-byte estimate, so exactly one map
 # chunk is produced — enough to prove the path without making the fixture depend on

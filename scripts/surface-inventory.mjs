@@ -124,7 +124,7 @@ const SYSTEM_PROMPT_MARKERS = Object.freeze(['PromptAssets', 'systemPromptOf', '
  */
 const SURFACES = new Map([
   [
-    'src/Wanxiangshu.Next/OpenCode/OneShotAgentTool.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -173,13 +173,13 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/OpenCode/HostSessionNudge.fs#SendContinuation',
+    'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSessionNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
       surface: 'continuation nudge (provider retry, manager and reviewer review guards)',
       composer: 'RuntimeNudge.providerRetry / managerReviewGuard / reviewerVerdictGuard',
-      composerFiles: ['src/Wanxiangshu.Next/OpenCode/TurnCompletionProgram.fs', 'src/Wanxiangshu.Next/OpenCode/HostReviewGuard.fs'],
+      composerFiles: ['src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs', 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostReviewGuard.fs'],
     },
   ],
   [
@@ -192,13 +192,13 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/OpenCode/HostSessionNudge.fs#SendInteractionRepair',
+    'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSessionNudge.fs#SendInteractionRepair',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
       surface: 'interaction repair (missing final report)',
       composer: 'RuntimeNudge.missingFinalReport',
-      composerFiles: ['src/Wanxiangshu.Next/OpenCode/TurnCompletionProgram.fs'],
+      composerFiles: ['src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs'],
     },
   ],
 ]);

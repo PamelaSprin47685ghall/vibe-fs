@@ -154,9 +154,9 @@ test('VERIFY_008_the_published_plugin_entrypoint_loads', async () => {
   // `package.json` `main` / `exports["."]` resolve here. A build that emits every
   // domain module but not this one produces an installable package that does
   // nothing, and no other test would notice.
-  const mod = await load('OpenCode/Plugin')
+  const mod = await load('Infrastructure/OpenCode/Plugin/Plugin')
 
-  assert.ok(surfaceOf(mod).length > 0, 'OpenCode/Plugin must publish at least one export')
+  assert.ok(surfaceOf(mod).length > 0, 'Infrastructure/OpenCode/Plugin/Plugin must publish at least one export')
 })
 
 test('VERIFY_008_every_emitted_module_actually_loads', async () => {

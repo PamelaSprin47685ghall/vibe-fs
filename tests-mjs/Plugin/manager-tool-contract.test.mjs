@@ -6,8 +6,8 @@
 // HOME/XDG isolation; a `git init` into a `mkdtemp` dir is the whole world, because
 // the journal is addressed through the Git common directory (PERSIST-006).
 //
-// `build/next/OpenCode/SpikePlugin.js` is imported directly rather than through
-// `tests-mjs/domain.mjs`. That facade deliberately exports zero `OpenCode/*` modules,
+// The plugin entry (`Infrastructure/OpenCode/Plugin/SpikePlugin.js`) is imported directly rather than through
+// `tests-mjs/domain.mjs`. That facade deliberately exports zero `Infrastructure/OpenCode/*` modules,
 // and the schemas here are not F# values at all: `ToolHostCodec.fs:78-96` emits
 // `$0.schema.string()` / `$0.schema.union([...])` against the Host's own zod builder,
 // so only a real `initSpikePlugin({ client: {} , ... })` produces them. A direct
@@ -470,7 +470,7 @@ test('CTX_002_the_transform_injects_no_synthetic_marker', async () => {
 //
 //   1. No session transport under `client: {}` — production had briefly
 //      FABRICATED a completed AgentRunResult carrying "test output"
-//      (src/Wanxiangshu.Next/OpenCode/Sessions.fs:149-153 records its removal), so the old
+//      (src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/Sessions.fs:149-153 records its removal), so the old
 //      expectations were written against a fake. The fixture now supplies a
 //      real minimal SDK client and completions arrive as real
 //      `TerminalOutcome.Completed` payloads with distinct SessionWide/TurnFormal

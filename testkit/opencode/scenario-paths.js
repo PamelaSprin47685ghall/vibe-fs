@@ -14,8 +14,8 @@ const PLUGIN_FILE_BY_VARIANT = {
 };
 
 const PLUGIN_SEARCH_ROOTS = [
-  (root) => path.resolve(root, path.join('build', 'next', 'OpenCode')),
-  (root) => path.resolve(root, path.join('..', 'build', 'next', 'OpenCode')),
+  (root) => path.resolve(root, path.join('build', 'next', 'Infrastructure', 'OpenCode', 'Plugin')),
+  (root) => path.resolve(root, path.join('..', 'build', 'next', 'Infrastructure', 'OpenCode', 'Plugin')),
 ];
 
 export function resolvePluginPath(variant) {
