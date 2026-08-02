@@ -19,6 +19,7 @@ flow = [
   { createChild = { agent = "fast-reviewer", bind = ["reviewer-title", "fast-reviewer"], title = "reviewer restart canary" } },
 
   { prompt = { agent = "fast-reviewer", text = "Review the tree and submit a verdict." }, session = "child" },
+  { wait = "title" },
   { wait = "reviewer-first.0" },
   { wait = "reviewer-first.1" },
   { awaitTerminal = true, session = "child", requireAssistantTerminal = true, requireIdleAfterActivity = true },
@@ -26,7 +27,7 @@ flow = [
   { restart = true },
 
   { prompt = { agent = "fast-reviewer", text = "After restart, re-verify the tree with another verdict." }, session = "child" },
-  { wait = "reviewer-after-restart.0" },
+  { wait = "reviewer-after-restart.0", timeoutMs = 20000 },
   { wait = "reviewer-after-restart.1" },
   { awaitTerminal = true, session = "child", requireAssistantTerminal = true, requireIdleAfterActivity = true },
 

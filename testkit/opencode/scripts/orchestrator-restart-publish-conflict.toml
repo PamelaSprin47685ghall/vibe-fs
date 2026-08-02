@@ -63,6 +63,7 @@ flow = [
   { wait = "barrier-reviewer.2" },
   { wait = "reviewer-confirm.0" },
   { wait = "orch-continue.0" },
+  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 20000 },
   { wait = "orch-continue.1" },
 
   { awaitTerminal = true, requireAssistantTerminal = false },

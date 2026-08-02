@@ -80,7 +80,7 @@ function runCanary(file, onBarkSignal) {
     const name = path.basename(file);
     const child = spawn(process.execPath, [file], {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, CANARY_REPEAT: "1", WANXIANG_RUN_ID: RUN_ID },
+      env: { ...process.env, CANARY_REPEAT: "1", WANXIANG_RUN_ID: RUN_ID, CANARY_VERBOSE: "1" },
       detached: process.platform !== "win32",
     });
 
