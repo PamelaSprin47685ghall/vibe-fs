@@ -3,8 +3,8 @@
 ## 当前基线
 
 - 分支：`refactor/ssot-shock-anneal`
-- 最后验证 commit：`38cc1882`（SSOT/14-16 纯领域内核合入后，退火三完成）
-- 工作区干净；归档时退火分支无未提交内容
+- 最后验证 commit：`0d7be9d2`（Repository Layout Reset 完成：源码根迁至 `src/`）
+- 工作区干净
 
 ## 当前产品状态
 
@@ -23,6 +23,40 @@ SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并
 
 见 `STATUS/blockers/README.md`。当前仅一项：HOST-006 次生风险——Host 第二个 compaction
 实现的运行时探测尚未完成。
+
+## 源码地图
+
+生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部 190 个 `.fs`）。
+
+```text
+src/Wanxiangshu.Next/
+├── Kernel/                       领域内核：身份、角色、Flow、事实、结果
+├── Domain/                       纯领域：PromptAuthority/Review/Recovery/Projection/Strength/Enforcer/StudentTeacher
+├── Journal/                      持久化：Envelope/Writer/Fold/各 Projection
+├── Session/                      会话运行时：Companion/Fork/Fallback/Review 控制器
+├── Process/                      进程与 PTY：Runner/Deadline/LargeGate/Pty*
+├── Agent/                        代理程序
+├── Application/
+│   ├── Orchestration/            Orchestrator 应用流程
+│   ├── Reconciliation/           turn 恢复/协调/重放（XWire、TurnReconcile 等）
+│   └── Prompting/                prompt 派发/ingress（Dispatcher、Ingress、Authority）
+├── Infrastructure/
+│   ├── OpenCode/Host/            Host 适配：插件生命周期、session 管理、Orchestrator Host
+│   ├── OpenCode/Codec/           Host 事件/消息/tool/prompt 编解码 + wire 类型
+│   ├── OpenCode/Plugin/          插件入口（Plugin/SpikePlugin）
+│   ├── OpenCode/Signals/         信号类型与订阅
+│   ├── OpenCode/Tools/           工具定义与工具运行时
+│   └── Git/                      Git 设施（Orchestrator 的 git/worktree/lockfile 适配）
+├── Host/                         HostDigest
+├── Tools/                        文件/静态工具与 prompt 资产
+├── prompts/                      Agent system prompts
+└── Wanxiangshu.Next.fsproj
+```
+
+布局纪律由 `scripts/repository-layout-gate.mjs`（gate:static 第一段）机器验证：
+根目录白名单、生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约
+不变：Fable 输出 `build/next/`，npm 包 main 指向 `next/Infrastructure/OpenCode/Plugin/Plugin.js`
+（模板 `packaging/npm-package.template.json`）。
 
 ## 下一步
 
