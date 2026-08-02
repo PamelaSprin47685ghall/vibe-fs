@@ -67,12 +67,12 @@ test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
 })
 
 test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async () => {
-  const mod = await load('Orchestrator/OrchestratorProgram')
+  const mod = await load('Application/Orchestration/OrchestratorProgram')
 
   // One public `run`. Everything the publish loop does is private, which is what
   // keeps ORCH-005's short CAS window from acquiring a second caller.
   assert.deepEqual(surfaceOf(mod).sort(), ['run'])
-  assertCallable(mod, 'Orchestrator/OrchestratorProgram', ['run'])
+  assertCallable(mod, 'Application/Orchestration/OrchestratorProgram', ['run'])
 })
 
 test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {

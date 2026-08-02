@@ -101,8 +101,8 @@ const HOST_INTEROP_NAME =
   /(Host|Port|Codec|Adapter|Boot|Runtime|Writer|Node|Plugin|Supervisor|Backend|Projection|Transform|Signal|Json|Git|Flow|Pty|Tool|Subscribe|Canonical|Process)/i
 
 const HOST_INTEROP_ALLOWLIST = new Map([
-  ['src/Wanxiangshu.Next/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
-  ['src/Wanxiangshu.Next/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
+  ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
+  ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
   ['src/Wanxiangshu.Next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
   ['src/Wanxiangshu.Next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
   ['src/Wanxiangshu.Next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
@@ -194,7 +194,7 @@ const DSL_PROGRAMS = [
     file: 'Session/CompanionProgram.fs',
     names: ['buildDelta', 'runCompanionFlow'],
   },
-  { builder: 'orchestrator', file: 'Orchestrator/OrchestratorProgram.fs', names: ['run'] },
+  { builder: 'orchestrator', file: 'Application/Orchestration/OrchestratorProgram.fs', names: ['run'] },
   { builder: 'process', file: 'Process/ProcessRunner.fs', names: ['run', 'runWithHost'] },
 ]
 
