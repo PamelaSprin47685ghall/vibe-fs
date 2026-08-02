@@ -13,7 +13,7 @@
  * The magnitude threshold IS the semantic line, which is what makes this file mechanically
  * enforceable. A polling slice must poll faster than the budget that bounds it, so a
  * legitimate slice is below 1000ms by construction — the fact loop in `canary-driver.mjs`
- * slices at 500ms under the 2000ms silence budget, the listen poll runs at 50ms, the socket
+ * slices at 500ms under the 3000ms silence budget, the listen poll runs at 50ms, the socket
  * retry at 30ms. Anything at or above 1000ms is therefore a budget rather than a slice, and a
  * budget belongs here, where raising it is one visible diff instead of a quiet edit at a call
  * site. `scripts/budget-gate.mjs` enforces exactly that, and deliberately offers no exemption
@@ -34,7 +34,7 @@
  * so it is the last one that should be a literal in a script.
  *
  * Not arbitrary. A slice must poll faster than the budget bounding it, and the tightest budget
- * here is WATCHDOG_TIMEOUT_MS at 2000, against which the real slices measure 500, 100, 50, 30.
+ * here is WATCHDOG_TIMEOUT_MS at 3000, against which the real slices measure 500, 100, 50, 30.
  */
 export const LITERAL_BUDGET_THRESHOLD_MS = 1000;
 
@@ -59,10 +59,13 @@ const budgetFromEnv = (name, fallback) => {
 
 /**
  * Silence budget of a scenario-local watchdog: how long without causal progress before the
- * canary is declared hung. Short on purpose — VERIFY-004 asks 「距上次因果进展过了多久」, and 2s
- * means the diagnostic is taken at the causal scene instead of minutes downstream.
+ * canary is declared hung. Short on purpose — VERIFY-004 asks 「距上次因果进展过了多久」, and 3s
+ * means the diagnostic is taken at the causal scene instead of minutes downstream. Also the
+ * default budget for a canary `wait` expectation (`strict-mock-provider.js:154`), so a single
+ * fork→worktree bootstrap or join mailbox gate (~2.3-2.4s) fits inside it without a per-step
+ * override.
  */
-export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 2000);
+export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 3000);
 
 /**
  * Ceiling on the watchdog's own teardown once it has already decided to fire. `watchdog.js`
@@ -119,10 +122,11 @@ export const FORK_COMPLETION_WINDOW_MS = 10000;
 
 /**
  * One slice of that reconcile loop: how long it waits for the next session event before
- * re-reading the API. Note for W6 — this sits exactly AT the silence budget, and the loop feeds
- * the watchdog only when a fork completes, so a slice that runs to its full length can race the
- * watchdog. Centralizing it is what makes that visible; changing it is a semantic decision W6
- * owns, not a migration.
+ * re-reading the API. Note for W6 — this sits below the silence budget (2000 < 3000), and the
+ * loop feeds the watchdog only when a fork completes, so a slice that runs to its full length
+ * cannot outlast the watchdog's window; it would have at the old 2000/2000 equality.
+ * Centralizing it is what makes that visible; changing it is a semantic decision W6 owns, not a
+ * migration.
  */
 export const FORK_RECONCILE_SLICE_MS = 2000;
 
