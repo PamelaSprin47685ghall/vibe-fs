@@ -536,6 +536,46 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
   })
 })
 
+test('REVIEW_007_reverted_human_root_is_not_required_by_reviewer', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-reverted-root', 'fast-manager')
+
+    const result = parseToml(
+      await hooks.tool.fork.execute(
+        { agent: 'fast-reviewer', prompt: 'Review the current tree.' },
+        { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
+      ),
+    )
+
+    assert.equal(result.error, undefined)
+    assert.equal(runtime.prompts.length, 1)
+    assert.doesNotMatch(runtime.prompts[0].body.parts[0].text, /\[\[original_user_requirement\]\]/)
+
+    runtime.messages.push({
+      info: { id: 'root-manager-reverted-root', role: 'user' },
+      parts: [{ type: 'text', text: 'Requirement that survived compaction.' }],
+    })
+    const liveResult = parseToml(
+      await hooks.tool.fork.execute(
+        { agent: 'deep-reviewer', prompt: 'Review the same current tree.' },
+        { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
+      ),
+    )
+    assert.equal(liveResult.error, undefined)
+    assert.match(runtime.prompts[1].body.parts[0].text, /Requirement that survived compaction\./)
+
+    for (const [resultToJoin, childSessionId] of [
+      [result, createdIds[0]],
+      [liveResult, createdIds[1]],
+    ]) {
+      runtime.recordFork('manager-reverted-root', resultToJoin.agent_id, childSessionId)
+      const joined = hooks.tool.join.execute({}, { sessionID: 'manager-reverted-root', agent: 'fast-manager' })
+      notifyCompleted(runtime, childSessionId, 'review completed', 'review completed', 5)
+      await joined
+    }
+  })
+})
+
 test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     // AGENT-013: fork/join/list belong to the Manager alone.

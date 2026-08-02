@@ -52,7 +52,7 @@ module HostForkRuntimeFork =
                 | Some messages ->
                     match consume messages with
                     | Some text -> return! resolveReviewRequirementInputs port remaining cached (text :: resolved)
-                    | None -> return missingReviewRequirement input
+                    | None -> return! resolveReviewRequirementInputs port remaining cached resolved
                 | None ->
                     let! messagesResult = port.GetMessages input.SourceSessionId
 
@@ -63,7 +63,12 @@ module HostForkRuntimeFork =
 
                         match consume messages with
                         | Some text -> return! resolveReviewRequirementInputs port remaining updated (text :: resolved)
-                        | None -> return missingReviewRequirement input
+                        // Host revert cleanup permanently removes the reverted user
+                        // message. Its HumanRoot requirement is therefore withdrawn,
+                        // not unavailable: continue with the still-live roots. A
+                        // snapshot Error above remains fail-closed and cannot be
+                        // mistaken for a withdrawal.
+                        | None -> return! resolveReviewRequirementInputs port remaining updated resolved
         }
 
     /// REVIEW-002's authoritative review scope, as the texts themselves.

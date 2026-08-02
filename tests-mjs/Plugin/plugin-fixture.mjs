@@ -47,7 +47,7 @@ const { recordCompletion } = await import('../../build/next/Session/HandleContro
  */
 const promptedWaiters = new Map()
 
-const stubClient = (createdIds) => {
+const stubClient = (createdIds, prompts, messages) => {
   let counter = 0
   return {
     session: {
@@ -57,7 +57,9 @@ const stubClient = (createdIds) => {
         createdIds.push(id)
         return { data: { id } }
       },
+      messages: async () => ({ data: messages }),
       promptAsync: async (args) => {
+        prompts.push(args)
         // 生产在 terminal 订阅安装之后才发 prompt（OneShotAgentTool.fs:115 → send），
         // 故此调用即「可以安全 NotifyTerminal」的就绪信号。
         const sessionId = args?.sessionID ?? args?.sessionId ?? createdIds[createdIds.length - 1]
@@ -101,8 +103,10 @@ export const withExecutablePlugin = async (body) => {
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const createdIds = []
+    const prompts = []
+    const messages = []
     const hooks = await initSpikePlugin({
-      client: stubClient(createdIds),
+      client: stubClient(createdIds, prompts, messages),
       directory,
       events: { listen: () => () => {} },
     })
@@ -120,6 +124,8 @@ export const withExecutablePlugin = async (body) => {
         // Filled in by forkHandle below; the recorder needs the parent session's
         // handle ids, which only a fork return value reveals.
         handles: new Map(),
+        prompts,
+        messages,
       }
       // EXEC-004's completion cell is claimed by `HostForkRuntime.Complete`
       // (Session/HostForkRuntime.fs:121-145), which lives behind the private
