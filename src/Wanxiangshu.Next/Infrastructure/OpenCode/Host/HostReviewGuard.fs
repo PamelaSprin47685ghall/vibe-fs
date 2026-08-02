@@ -2,6 +2,7 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Collections.Generic
+open System.IO
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Fact
@@ -164,26 +165,62 @@ module HostReviewGuard =
                 if not reserved then
                     return GuardNudgeOutcome.AlreadyOutstanding
                 else
-                    // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
-                    // Authority Root's fallback cursor, so it is not passed here.
-                    let! sent =
-                        HostSessionNudge.sendContinuation
-                            sessionPort
-                            targetSessionId
-                            prompt
-                            continuationKind
-                            (sessionDirectory targetSessionId)
-                            (Some durable)
-                            None
-
-                    match sent with
-                    | Ok key -> return GuardNudgeOutcome.Sent key
-                    | Error error ->
+                    let releaseKey () =
                         lock processNudgeKeys (fun () ->
                             nudgeKeys.Remove nudgeKey |> ignore
                             processNudgeKeys.Remove nudgeKey |> ignore)
 
-                        return GuardNudgeOutcome.Failed error
+                    // (b) Send-time job-state recheck. A manager guard nudge is only
+                    // legitimate while the durable job still requires it. Computed as a
+                    // plain bool so the `return` sits in an if/else branch rather than
+                    // a match arm that would unify against the unit arm.
+                    let noLongerRequired =
+                        match continuationKind with
+                        | PromptAuthority.ContinuationKind.ManagerGuard when
+                            not (managerWorkRequiresGuard (AgentJournal.snapshot durable) targetSessionId)
+                            ->
+                            true
+                        | _ -> false
+
+                    if noLongerRequired then
+                        releaseKey ()
+                        return GuardNudgeOutcome.NoLongerRequired
+                    else
+                        // (a) Send-time directory guard. The recorded worktree may still
+                        // exist while its AGENTS.md has already been unlinked, so a prompt
+                        // built from it would drop the 102-byte instruction block. Only a
+                        // *recorded* directory that is gone or missing AGENTS.md is a real
+                        // seal-break condition: `None` (manager-forked children are never
+                        // registered in SessionDirectories) is the normal root-fallback
+                        // path and must keep sending.
+                        let recordedDir = sessionDirectory targetSessionId
+
+                        let worktreeIsAlive =
+                            match recordedDir with
+                            | None -> true
+                            | Some dir -> Directory.Exists dir && File.Exists(Path.Combine(dir, "AGENTS.md"))
+
+                        if not worktreeIsAlive then
+                            releaseKey ()
+                            return GuardNudgeOutcome.NoLongerRequired
+                        else
+                            // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
+                            // Authority Root's fallback cursor, so it is not passed here.
+                            let! sent =
+                                HostSessionNudge.sendContinuation
+                                    sessionPort
+                                    targetSessionId
+                                    prompt
+                                    continuationKind
+                                    recordedDir
+                                    (Some durable)
+                                    None
+
+                            match sent with
+                            | Ok key -> return GuardNudgeOutcome.Sent key
+                            | Error error ->
+                                releaseKey ()
+                                return GuardNudgeOutcome.Failed error
         }
 
     let nudgeManager

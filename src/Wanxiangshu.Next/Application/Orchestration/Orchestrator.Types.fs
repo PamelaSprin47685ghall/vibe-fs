@@ -96,6 +96,12 @@ type ManagerPort =
         /// Hand a rebase conflict back to the SAME Manager in the SAME worktree
         /// (ORCH-003/ORCH-007).
         ResumeManager: ManagerJobId -> WorktreePath -> string -> Task<Result<unit, string>>
+
+        /// ORCH-006: abort the Manager's Host session and every reviewer child
+        /// session before the worktree is released.  This prevents residual guard
+        /// nudges and continuations from building a system prompt against the
+        /// deleted worktree after `Published` has been appended.
+        TerminateChildren: ManagerJobId -> Task<unit>
     }
 
 type OrchestratorJournalPort =

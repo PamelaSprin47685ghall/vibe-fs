@@ -19,9 +19,9 @@ must = ["coder.0", "coder.1"]
 
 flow = [
   { wait = "title" },
-  { wait = "blogger.0" },
   { wait = "coder.0" },
   { wait = "coder.1" },
+  { wait = "blogger.0" },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { expectSatisfied = true },
 ]

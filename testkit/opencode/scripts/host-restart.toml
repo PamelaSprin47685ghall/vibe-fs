@@ -26,6 +26,7 @@ must = ["guard-nudged.2", "reviewer.1", "manager-after-restart.1", "child-a2"]
 flow = [
   { afterExpectation = { id = "guard-nudged.2", restart = true } },
 
+  { wait = "title" },
   { wait = "manager.0" },
   { wait = "child-a1" },
   { wait = "manager.2" },
