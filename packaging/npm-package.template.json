@@ -3,11 +3,11 @@
   "version": "0.5.0-rc.1",
   "description": "Wanxiangshu.Next Structured Flow runtime (Fable build output)",
   "type": "module",
-  "main": "next/OpenCode/Plugin.js",
+  "main": "next/Infrastructure/OpenCode/Plugin/Plugin.js",
   "exports": {
     ".": {
-      "import": "./next/OpenCode/Plugin.js",
-      "default": "./next/OpenCode/Plugin.js"
+      "import": "./next/Infrastructure/OpenCode/Plugin/Plugin.js",
+      "default": "./next/Infrastructure/OpenCode/Plugin/Plugin.js"
     }
   },
   "files": [

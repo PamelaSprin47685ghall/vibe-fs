@@ -14,14 +14,14 @@ if (!fs.existsSync(buildDir)) {
   process.exit(1);
 }
 
-// 2. Copy build-package.json to build/package.json
-const pkgSrc = path.join(root, 'build-package.json');
+// 2. Copy the distribution template to build/package.json
+const pkgSrc = path.join(root, 'packaging', 'npm-package.template.json');
 const pkgDst = path.join(buildDir, 'package.json');
 if (fs.existsSync(pkgSrc)) {
   fs.copyFileSync(pkgSrc, pkgDst);
   log('✓ Copied package.json');
 } else {
-  warn('Warning: build-package.json not found');
+  warn('Warning: packaging/npm-package.template.json not found');
 }
 
 // 3. Copy the package license so `SEE LICENSE IN LICENSE` resolves inside a tarball.
