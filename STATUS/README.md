@@ -3,7 +3,7 @@
 ## 当前基线
 
 - 分支：`refactor/ssot-shock-anneal`
-- 最后验证 commit：`66afcb24`（0.5.0 发布前全链路验证收口）
+- 最后验证 commit：`24bda4f5`（0.5.0 发布前全链路验证收口）
 - 工作区干净
 
 ## 当前产品状态
@@ -11,7 +11,7 @@
 0.5.0 已发布（正式版，从 rc.1 收口）。canary 森林 17 驱动（18 剧本）× 3 轮全绿，
 `test:release`（gate:static → build → unit → harness → P0×3）完整通过。生产代码与测试
 整体迁移到 `SSOT/` 条款；测试体系为直接消费 `build/next` 发布产物的 `tests-mjs`。
-conformance 表 `UNVERIFIED` 已清零（绑定 commit `66afcb24`）。
+conformance 表 `UNVERIFIED` 已清零（绑定 commit `24bda4f5`）。
 
 LifecycleWorkRecord 迁移已完成（方案 `STATUS/lifecycle-work-record.md`）：父→子与子→父统一为
 LWR（Opening + Y frames + X gap + Terminal）；A/B 双轨、FinalText、Seed、TerminalSessionA、

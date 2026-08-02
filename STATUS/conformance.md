@@ -4,7 +4,7 @@
 
 `PURE_CORE_ONLY`：条款的纯领域内核已实现并测试（第 1 层），但生产接线被 Host canary 门禁阻断（如 SSOT/14-16 的 STRENGTH-078 / ENFORCER-180 / LEARN-082…088）——不是"零实现"，也不是"可发布"。
 
-绑定源码 commit：`66afcb24`（0.5.0 发布前全链路验证收口）。运行验证不属于 commit 内容，命令与结果见 `docs/evidence/`；历史机器证据见 `docs/archive/shock-anneal-2026/evidence/`。本表只记录截至该提交的源码状态。
+绑定源码 commit：`24bda4f5`（0.5.0 发布前全链路验证收口）。运行验证不属于 commit 内容，命令与结果见 `docs/evidence/`；历史机器证据见 `docs/archive/shock-anneal-2026/evidence/`。本表只记录截至该提交的源码状态。
 
 ## 架构 DNA
 
