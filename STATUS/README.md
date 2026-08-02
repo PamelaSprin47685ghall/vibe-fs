@@ -22,7 +22,7 @@ SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并
 ## 活跃阻塞
 
 见 `STATUS/blockers/README.md`。HOST-006 次生风险（运行时探测）已闭合：探测已实现并
-接线（`HostCompactionGate.judgeStartup` → `HostSignalBootstrap.onSnapshot` →
+接线（`HostSignalBootstrap.onSnapshot` → `HostCompactionGate.judgeStartup` →
 `PluginRuntimeScope.TryClaimStartupProbe`）。无未闭合 blocker。
 
 ## 源码地图
