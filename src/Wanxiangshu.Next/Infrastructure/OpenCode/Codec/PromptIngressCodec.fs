@@ -41,25 +41,35 @@ module PromptIngressCodec =
         else
             unbox<obj array> source?parts
 
-    let private isSynthetic (part: obj) =
-        not (isNull part) && (unbox<bool> part?synthetic)
+    let private readString (source: obj) (name: string) : string option =
+        if isNull source || isNull (source?(name)) then
+            None
+        else
+            let value = unbox<string> (source?(name))
+            if String.IsNullOrWhiteSpace value then None else Some value
+
+    let private isTrue (value: obj) =
+        if isNull value then
+            false
+        else
+            try
+                unbox<bool> value = true
+            with _ ->
+                false
 
     let private isHostCompaction (output: obj) =
         let outputParts = parts output
+        let message = if isNull output then null else output?message
 
         outputParts
         |> Array.exists (fun part ->
-            (not (isNull part)
-             && not (isNull part?``type``)
-             && unbox<string> part?``type`` = "compaction")
-            || isSynthetic part)
-        || (outputParts.Length > 0 && outputParts |> Array.forall isSynthetic)
-        || (not (isNull output)
-            && not (isNull output?message)
-            && not (isNull output?message?summary)
-            && unbox<bool> output?message?summary)
+            readString part "type"
+            |> Option.exists (fun kind -> kind.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
+        || isTrue (if isNull message then null else message?summary)
         || (agentOf output
             |> Option.exists (fun agent -> agent.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
+        || (readString message "mode"
+            |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
 
     let private sessionIdOf (input: obj) =
         if isNull input then

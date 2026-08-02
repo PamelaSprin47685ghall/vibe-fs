@@ -32,7 +32,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { withPlugin } from './plugin-fixture.mjs'
+import { withPlugin, withPluginClient } from './plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
 
@@ -120,6 +120,52 @@ const HOOK_FIXTURES = {
     },
   },
 }
+
+const toolContext = (sessionID, messageID = 'msg_tool_probe') => ({
+  sessionID,
+  agent: 'fast-manager',
+  messageID,
+  callID: `call_${messageID}`,
+  abort: new AbortController().signal,
+})
+
+test('PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
+  await withPlugin(async (hooks) => {
+    await hooks['chat.message'](
+      { sessionID: SESSION, agent: 'fast-manager' },
+      {
+        message: { id: 'msg_file_root', role: 'user', sessionID: SESSION, agent: 'fast-manager' },
+        parts: [
+          { type: 'text', synthetic: true, text: 'Called the Read tool with the following input: {"filePath":"SSOT/13.md"}' },
+          { type: 'text', synthetic: true, text: '# document body' },
+          { type: 'file', mime: 'text/plain', filename: 'SSOT/13.md', url: 'file:///repo/SSOT/13.md' },
+        ],
+      },
+    )
+
+    assert.deepEqual(JSON.parse(await hooks.tool.list.execute({}, toolContext(SESSION))), [])
+  })
+})
+
+test('AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', async () => {
+  const sessionID = 'ses_resume_probe'
+  const rootID = 'msg_resume_root'
+  const assistantID = 'msg_resume_assistant'
+  const client = {
+    session: {
+      messages: async () => ({
+        data: [
+          { info: { id: rootID, role: 'user', sessionID, agent: 'fast-manager' }, parts: [{ type: 'text', text: 'fork a coder' }] },
+          { info: { id: assistantID, role: 'assistant', sessionID, parentID: rootID, agent: 'fast-manager' }, parts: [] },
+        ],
+      }),
+    },
+  }
+
+  await withPluginClient(client, async (hooks) => {
+    assert.deepEqual(JSON.parse(await hooks.tool.list.execute({}, toolContext(sessionID, assistantID))), [])
+  })
+})
 
 /** Hooks the Host triggers. `tool` is a registry; `event`/`dispose` are lifecycle. */
 const triggeredHooks = (hooks) =>

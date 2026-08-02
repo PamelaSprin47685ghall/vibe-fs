@@ -1,0 +1,64 @@
+# Manager first turn with an attached text file. The Host expands that file into
+# synthetic read-output parts on the same physical user message; Prompt Authority
+# must still accept the human root and allow manager tools.
+
+scenario = "manager-file-root"
+description = "Manager HumanRoot with Host-expanded file parts can still fork a coder"
+pass = "Manager file-root canary passed."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "manager file-root canary\n", "src/main.txt" = "seed\n" } } }
+session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "fork a coder with attached file" }
+
+must = ["manager.2", "coder.0"]
+
+flow = [
+  { wait = "blogger" },
+  { wait = "manager.0" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  { wait = "coder.0" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+  { custom = "assertSyntheticHumanRoot" },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "blogger"
+internal = true
+user = ["# The next user message is the new session material in TOML.", "[[item]]"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Session background." }
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "fork a coder with attached file"
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Report the attached-file authority canary is reachable." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager file-root canary finished." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = ["# Complete the assignment in `assignment`.", "Report the attached-file authority canary is reachable."]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder report: attached-file authority canary is reachable." }
+
+[[turn]]
+id = "title"
+lane = "manager-title"
+kind = "title"
+user = "fork a coder with attached file"
+
+  [[turn.step]]
+  respond = { type = "title", text = "Manager File Root" }

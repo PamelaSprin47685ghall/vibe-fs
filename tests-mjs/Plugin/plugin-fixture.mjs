@@ -224,17 +224,23 @@ export const notifyCompleted = (runtime, childSessionId, sessionWideText, turnFo
  * `initSpikePlugin`. Callers under the 1000ms per-test bound (`runner.mjs:27`) must
  * count calls, not assertions.
  */
-export const withPlugin = async (body) => {
+export const withPluginClient = async (client, body) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-'))
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const hooks = await initSpikePlugin({
-      client: {},
+      client,
       directory,
       events: { listen: () => () => {} },
     })
-    await body(hooks, directory)
+    try {
+      await body(hooks, directory)
+    } finally {
+      await hooks.dispose()
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
 }
+
+export const withPlugin = async (body) => withPluginClient({}, body)

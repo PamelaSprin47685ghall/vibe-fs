@@ -95,6 +95,17 @@ type ToolRuntimeScope
                             GitTreeHash.create "NO_HEAD_TREE"))
         )
 
+    let sessionIdOf (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            None
+        else
+            Some(SessionId.create ctx.SessionId)
+
+    let activeProfileFor sessionId =
+        match journal with
+        | Some durable -> PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot durable).AgentProjections
+        | None -> None
+
     /// AGENT-007: the single Role source, or `None`.
     ///
     /// `None` means the tool set is empty — the clause says so explicitly, and
@@ -102,13 +113,55 @@ type ToolRuntimeScope
     /// code had as the thing to delete. A read-only tool executed under an
     /// unknown role is still an unauthorised execution.
     let roleFor (ctx: HostToolContext) =
-        match journal with
-        | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
-            PromptAuthorityLedger.activeProfile
-                (SessionId.create ctx.SessionId)
-                (AgentJournal.snapshot durable).AgentProjections
-            |> Option.map (fun profile -> profile.CanonicalRole)
-        | _ -> None
+        sessionIdOf ctx
+        |> Option.bind activeProfileFor
+        |> Option.map (fun profile -> profile.CanonicalRole)
+
+    let recoverHumanRootFromSnapshot (ctx: HostToolContext) =
+        task {
+            match journal, snapshot, sessionIdOf ctx, ctx.ProviderRunId with
+            | Some durable, Some snapshotPort, Some sessionId, Some providerRun ->
+                match activeProfileFor sessionId with
+                | Some profile -> return Some profile.CanonicalRole
+                | None ->
+                    match! snapshotPort.GetMessages sessionId with
+                    | Error _ -> return None
+                    | Ok messages ->
+                        let providerRunId = ProviderRunIdentity.value providerRun
+
+                        let parentUser =
+                            messages
+                            |> List.tryFind (fun message -> message.Id = providerRunId)
+                            |> Option.bind (fun assistant -> assistant.ParentId)
+                            |> Option.bind (fun parentId ->
+                                messages
+                                |> List.tryFind (fun message -> message.Id = parentId && message.Role = "user"))
+
+                        match parentUser with
+                        | Some user when user.PromptKey.IsNone ->
+                            match user.Agent with
+                            | Some agent ->
+                                let runtime = PromptDispatcher.forJournal durable
+
+                                match
+                                    runtime.AcceptHumanRoot
+                                        sessionId
+                                        (PhysicalUserMessageId.create user.Id)
+                                        (Some agent)
+                                with
+                                | Ok profile -> return Some profile.CanonicalRole
+                                | Error _ -> return None
+                            | None -> return None
+                        | _ -> return None
+            | _ -> return None
+        }
+
+    let ensureRoleFor ctx =
+        task {
+            match roleFor ctx with
+            | Some role -> return Some role
+            | None -> return! recoverHumanRootFromSnapshot ctx
+        }
 
     /// The managed agent the Authority Root selected for this session.
     ///
@@ -117,13 +170,9 @@ type ToolRuntimeScope
     /// moves EffectiveAgent per attempt. A PTY labelled with whichever side the
     /// cursor happened to be on would change identity mid-run.
     let managedAgentFor (ctx: HostToolContext) =
-        match journal with
-        | Some durable when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
-            PromptAuthorityLedger.activeProfile
-                (SessionId.create ctx.SessionId)
-                (AgentJournal.snapshot durable).AgentProjections
-            |> Option.bind (fun profile -> ManagedAgent.tryParse profile.SelectedAgent)
-        | _ -> None
+        sessionIdOf ctx
+        |> Option.bind activeProfileFor
+        |> Option.bind (fun profile -> ManagedAgent.tryParse profile.SelectedAgent)
 
     member _.Sessions = sessions
     member _.Journal = journal
@@ -156,6 +205,7 @@ type ToolRuntimeScope
     member _.RegisterDirectory(sessionId, path) = sessionDirectories.[sessionId] <- path
 
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
+    member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
 
     /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
     member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx

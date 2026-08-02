@@ -89,19 +89,27 @@ module ToolRegistry =
                                 [ "error",
                                   Encode.string (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
                     | None ->
-                        // AGENT-007: an unresolved Role means an empty tool set. The
-                        // previous version exempted `inspector` here on the grounds
-                        // that it is read-only and broadly permitted — the exemption
-                        // the clause names explicitly. Read-only or not, executing
-                        // under an unknown role is an unauthorised execution.
-                        return
-                            ToolHostCodec.jsonObject
-                                [ "error",
-                                  Encode.string (
-                                      sprintf
-                                          "Tool '%s' rejected: no Authority Root fixes this session's role"
-                                          spec.Name
-                                  ) ]
+                        match! runtime.EnsureRoleFor ctx with
+                        | Some role when allowed role -> return! original args ctx
+                        | Some role ->
+                            return
+                                ToolHostCodec.jsonObject
+                                    [ "error",
+                                      Encode.string (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+                        | None ->
+                            // AGENT-007: an unresolved Role means an empty tool set. The
+                            // previous version exempted `inspector` here on the grounds
+                            // that it is read-only and broadly permitted — the exemption
+                            // the clause names explicitly. Read-only or not, executing
+                            // under an unknown role is an unauthorised execution.
+                            return
+                                ToolHostCodec.jsonObject
+                                    [ "error",
+                                      Encode.string (
+                                          sprintf
+                                              "Tool '%s' rejected: no Authority Root fixes this session's role"
+                                              spec.Name
+                                      ) ]
                 }
 
         let specs =
