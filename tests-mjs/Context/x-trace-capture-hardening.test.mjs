@@ -87,7 +87,7 @@ test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', () => {
       xTraceCapture.semantic({
         messages: [
           { role: 'user', parts: [xTraceCapture.text('task')] },
-          { role: 'assistant', parts: [xTraceCapture.toolCall('read', '{}')] },
+          { role: 'assistant', parts: [xTraceCapture.toolCall('call-1', 'read', '{}')] },
         ],
       }),
     )
@@ -124,5 +124,30 @@ test('COMPANION_003_opening_capture_is_idempotent_for_the_same_text', () => {
     xTraceCapture.captureOpening(journal, SEM, 'first task', [])
     // 同文本重放无害（PERSIST-010 幂等语义）。
     xTraceCapture.captureOpening(journal, SEM, 'first task', [])
+  })
+})
+
+test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => {
+  withJournal((journal) => {
+    // A human session: the opening is captured at ingress, and the first
+    // transform captures the SAME text again as XTrace part turn:0/part:0.
+    xTraceCapture.captureOpening(journal, SEM, 'first task', [])
+    xTraceCapture.captureProjection(
+      journal,
+      SEM,
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text('first task')] },
+          { role: 'assistant', parts: [xTraceCapture.text('work a')] },
+        ],
+      }),
+    )
+
+    const lwr = xTraceCapture.parentWorkRecord(journal, SEM)
+    assert.equal(typeof lwr, 'string')
+    // Opening 段一次；gap 不得把同一文本当 user part 再渲染一次。
+    assert.equal(lwr.split('first task').length - 1, 1, 'the opening text must appear exactly once in the LWR')
+    assert.ok(lwr.includes('# Opening task'), 'the opening section must be present')
+    assert.ok(lwr.includes('assistant: work a'), 'the tail must carry the work after the opening')
   })
 })

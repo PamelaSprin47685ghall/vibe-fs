@@ -95,7 +95,12 @@ module XTraceCapture =
 
                 if not (String.IsNullOrWhiteSpace text) then
                     match durable.WriteBlob text with
-                    | Error _ -> ()
+                    | Error error ->
+                        // PERSIST-003: the terminal segment is non-retryable (the
+                        // final output never passes a transform again), so a blob
+                        // it cannot prove committed must fail closed rather than
+                        // silently produce an LWR missing its Final output.
+                        raise (InvalidOperationException(sprintf "XTrace terminal blob write failed: %s" error))
                     | Ok blob ->
                         AgentFact.TerminalOutputCaptured
                             {| SessionId = turn.SessionId
@@ -169,18 +174,32 @@ module XTraceCapture =
                 match xTrace.Opening with
                 | None -> None
                 | Some opening ->
-                    // Opening lives outside the trace parts, so the gap starts at
-                    // the recorded coverage (max with origin is identity).
                     let coverage =
                         { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
-                    Some(
-                        LifecycleWorkRecord.render
-                            { Opening = opening
-                              Frames = frames
-                              Gap = XTrace.sliceFrom coverage.IngestedThrough trace
-                              Terminal = terminal }
-                    )
+                    // The opening is the first XTrace part (turn:0/part:0, captured
+                    // at the first transform), so the gap must start AFTER it —
+                    // otherwise the opening renders twice: once in the Opening
+                    // section and again as the gap's first item (COMPANION-003).
+                    let openingEnd =
+                        match trace with
+                        | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
+                        | [] -> XTrace.originCursor
+
+                    // Terminal lives outside the trace parts; a head cursor keeps
+                    // materialize's terminal-exclusion filter from touching any gap
+                    // item while still carrying the text into the Final output
+                    // section.
+                    let terminalItems =
+                        terminal
+                        |> Option.map (fun text ->
+                            [ { Cursor = XTrace.head trace
+                                Provenance = "terminal"
+                                Role = "assistant"
+                                Part = SemanticText text } ])
+                        |> Option.defaultValue []
+
+                    Some(LifecycleWorkRecord.materialize opening frames trace coverage openingEnd terminalItems)
 
     /// COMPANION-003 / COMPANION-007: synchronise the XTrace with the provider's
     /// semantic projection at the transform boundary.
