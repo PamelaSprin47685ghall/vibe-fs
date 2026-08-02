@@ -37,10 +37,8 @@ const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cu
       SessionId: session,
       BloggerSessionId: blogger,
       FrameEpochId: frameEpochId(epoch),
-      PreviousIngestTurn: from[0],
-      PreviousIngestPart: from[1],
-      NextIngestTurn: to[0],
-      NextIngestPart: to[1],
+      PreviousIngestedThroughSequence: BigInt(from),
+      NextIngestedThroughSequence: BigInt(to),
       PreviousCoverableTurnCutoffExclusive: cutoffFrom,
       NextCoverableTurnCutoffExclusive: cutoffTo,
       NextCoveredPrefixDigest: digest,
@@ -72,8 +70,8 @@ const rebaseFact = ({ previousEpoch, nextEpoch, cutoff, seal = `seal-${cutoff}`,
       SessionId: session,
       PreviousEpochId: prefixEpochId(previousEpoch),
       NextEpochId: prefixEpochId(nextEpoch),
-      FrozenBRef: blobRef(`blob-frozen-${cutoff}`),
-      FrozenBDigest: blobDigest(`frozen-${cutoff}`),
+      FrozenRecordPrefixRef: blobRef(`blob-frozen-${cutoff}`),
+      FrozenRecordPrefixDigest: blobDigest(`frozen-${cutoff}`),
       CutoffExclusive: cutoff,
       CoveredPrefixDigest: `prefix-${cutoff}`,
       SealRoot: seal,
@@ -103,7 +101,7 @@ const foldOk = (envelopes) => {
 }
 
 const coverageOf = (s) => ({
-  ingestTurn: s.Blog.Coverage.IngestCursor.TurnIndex,
+  ingestedThroughSequence: Number(s.Blog.Coverage.IngestedThroughSequence),
   cutoff: s.Blog.Coverage.CoverableTurnCutoffExclusive,
   digest: s.Blog.Coverage.CoveredPrefixDigest,
 })
@@ -112,13 +110,13 @@ const coverageOf = (s) => ({
 
 test('PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
   const s = foldOk([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    entryFact({ from: [1, 0], to: [2, 0], cutoffFrom: 1, cutoffTo: 2, n: 2 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
     squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
   ])
 
   assert.equal(idValue.frameEpoch(s.Blog.FrameEpochId), 1n)
-  assert.deepEqual(coverageOf(s), { ingestTurn: 2, cutoff: 2, digest: 'd-2' })
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 2, cutoff: 2, digest: 'd-2' })
 
   // The prefix projection is untouched by frame facts: a session may have frames
   // long before any probe is promoted.
@@ -127,7 +125,7 @@ test('PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
 
 test('CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
   const s = foldOk([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1 }),
   ])
 
@@ -135,7 +133,7 @@ test('CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
   assert.equal(s.PrefixEpoch.Snapshot.CutoffExclusive, 1)
 
   // A promotion changes what X sends, not what Y has covered.
-  assert.deepEqual(coverageOf(s), { ingestTurn: 1, cutoff: 1, digest: 'd-1' })
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 1, cutoff: 1, digest: 'd-1' })
   assert.equal(idValue.frameEpoch(s.Blog.FrameEpochId), 0n)
 })
 
@@ -145,9 +143,9 @@ test('PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
   // A squash moved the frame sequence to epoch 1; an entry still carrying epoch 0
   // describes frames that no longer exist. PERSIST-004: refuse the journal.
   const result = fold.apply(fold.empty, [
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
-    entryFact({ epoch: 0, from: [1, 0], to: [2, 0], cutoffFrom: 1, cutoffTo: 2, n: 2 }),
+    entryFact({ epoch: 0, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
   ])
 
   assert.equal(result.ok, false, 'a stale frame epoch must not be absorbed')
@@ -205,17 +203,17 @@ test('CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
 
 test('HOST_006_reanchor_retires_the_prefix_and_zeroes_coverage_in_one_fact', () => {
   const before = foldOk([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    entryFact({ from: [1, 0], to: [2, 0], cutoffFrom: 1, cutoffTo: 2, n: 2 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 2 }),
   ])
 
   assert.equal(before.PrefixEpoch.Snapshot.CutoffExclusive, 2)
-  assert.deepEqual(coverageOf(before), { ingestTurn: 2, cutoff: 2, digest: 'd-2' })
+  assert.deepEqual(coverageOf(before), { ingestedThroughSequence: 2, cutoff: 2, digest: 'd-2' })
 
   const after = foldOk([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    entryFact({ from: [1, 0], to: [2, 0], cutoffFrom: 1, cutoffTo: 2, n: 2 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 2 }),
     reanchorFact({ previousEpoch: 1, nextEpoch: 2 }),
   ])
@@ -224,7 +222,7 @@ test('HOST_006_reanchor_retires_the_prefix_and_zeroes_coverage_in_one_fact', () 
   // numbering is exactly the state one fact exists to prevent.
   assert.equal(after.PrefixEpoch.Snapshot, undefined, 'prefix retired')
   assert.equal(idValue.prefixEpoch(after.PrefixEpoch.EpochId), 2n)
-  assert.deepEqual(coverageOf(after), { ingestTurn: 0, cutoff: 0, digest: '' }, 'coverage zeroed')
+  assert.deepEqual(coverageOf(after), { ingestedThroughSequence: 0, cutoff: 0, digest: '' }, 'coverage zeroed')
 
   // Frames survive: the work really happened, only the index mapping was voided.
   assert.deepEqual(blog.frameKinds(after.Blog), ['Entry', 'Entry'], 'both entries survived the reanchor')
@@ -237,31 +235,31 @@ test('HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
   // them: if the fold re-applied the second, it would wipe coverage the session
   // legitimately rebuilt, and the next probe would silently never be built.
   const s = foldOk([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     reanchorFact({ previousEpoch: 0, nextEpoch: 1 }),
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, digest: 'rebuilt', n: 2 }),
-    entryFact({ from: [1, 0], to: [2, 0], cutoffFrom: 1, cutoffTo: 2, digest: 'rebuilt-2', n: 3 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'rebuilt', n: 2 }),
+    entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, digest: 'rebuilt-2', n: 3 }),
     reanchorFact({ previousEpoch: 0, nextEpoch: 1 }),
   ])
 
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 1n, 'one retirement, not two')
-  assert.deepEqual(coverageOf(s), { ingestTurn: 2, cutoff: 2, digest: 'rebuilt-2' }, 'rebuilt coverage survived')
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 2, cutoff: 2, digest: 'rebuilt-2' }, 'rebuilt coverage survived')
 })
 
 test('HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
   // End to end: manual /compact, then normal work, then a probe promotes again.
   // This is the "best effort" promise in HOST-006 made concrete.
   const s = foldOk([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1 }),
     reanchorFact({ previousEpoch: 1, nextEpoch: 2 }),
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, digest: 'post', n: 2 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'post', n: 2 }),
     rebaseFact({ previousEpoch: 2, nextEpoch: 3, cutoff: 1, seal: 'seal-after' }),
   ])
 
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 3n)
   assert.equal(s.PrefixEpoch.Snapshot.SealRoot, 'seal-after')
-  assert.deepEqual(coverageOf(s), { ingestTurn: 1, cutoff: 1, digest: 'post' })
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 1, cutoff: 1, digest: 'post' })
 })
 
 // ── the persisted shape survives the round trip ────────────────────────────
@@ -270,7 +268,7 @@ test('PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
   // The journal is the contract surface. A fact that folds in memory but loses a
   // typed field through serialisation would only fail after a restart.
   const result = fold.replay([
-    entryFact({ from: [0, 0], to: [1, 0], cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1, seal: 'seal-rt' }),
     reanchorFact({ previousEpoch: 1, nextEpoch: 2 }),
@@ -282,5 +280,5 @@ test('PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
   assert.equal(idValue.frameEpoch(s.Blog.FrameEpochId), 1n)
   assert.equal(idValue.prefixEpoch(s.PrefixEpoch.EpochId), 2n)
   assert.equal(s.PrefixEpoch.Snapshot, undefined)
-  assert.deepEqual(coverageOf(s), { ingestTurn: 0, cutoff: 0, digest: '' })
+  assert.deepEqual(coverageOf(s), { ingestedThroughSequence: 0, cutoff: 0, digest: '' })
 })

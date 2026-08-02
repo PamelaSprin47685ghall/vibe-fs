@@ -72,7 +72,6 @@ module HostForkRestart =
                                     (ProviderRunIdentity.create assistant.Id)
                                     (textOfParts assistant.Parts)
                                     None
-                                    None
 
                             runtime.PublishCompletion
                                 { RunId = "run-restored-" + agentId

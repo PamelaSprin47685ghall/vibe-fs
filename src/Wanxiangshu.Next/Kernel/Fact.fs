@@ -322,6 +322,54 @@ module Fact =
         /// fresh one rather than reviving this session.
         | CompanionBloggerClosed of {| SessionId: SessionId |}
 
+        // ── lifecycle work record (SSOT/08, HOST-005) ───────────────────────
+
+        /// COMPANION-003: the Session's opening task prompt, captured verbatim at
+        /// the physical acceptance point. Idempotent and never overwritten
+        /// (PERSIST-010): replaying the same capture changes nothing, and a second
+        /// different capture is a line no correct writer produces.
+        ///
+        /// Inline rather than blob: the opening is the first task prompt, bounded
+        /// and human-sized, and the fold needs the text to materialise the LWR
+        /// without a second read step.
+        ///
+        /// `ProviderRun` is `None` because the capture happens at the physical
+        /// acceptance point (chat.message), before any provider run exists.
+        | OpeningPromptCaptured of
+            {| SessionId: SessionId
+               AssignmentText: string
+               AuthoritativeRequirements: string list
+               ProviderRun: ProviderRunIdentity option |}
+
+        /// COMPANION-003 / HOST-005: one semantic part appended to the XTrace.
+        /// Strictly ordered, append-only; the body goes to a blob (PERSIST-007)
+        /// and the line carries cursor/digest/provenance.
+        ///
+        /// `CursorSequence` is the XTraceCursor sequence — strictly monotonic,
+        /// independent of Host transcript numbering, so a Host compaction voids
+        /// no cursor (COMPANION-008). `Kind` is one of
+        /// text / reasoning / tool_call / tool_result / media, matching
+        /// `SemanticPart`; `ToolName` exists only for tool_call.
+        | XTracePartAppended of
+            {| SessionId: SessionId
+               CursorSequence: int64
+               Role: string
+               Turn: int
+               PartIndex: int
+               Kind: string
+               ToolName: string option
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity option |}
+
+        /// COMPANION-003: the Session's terminal output, captured verbatim at
+        /// reconcile. Idempotent and never overwritten. The body goes to a blob.
+        | TerminalOutputCaptured of
+            {| SessionId: SessionId
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity |}
+
         // ── failure-driven context recovery (SSOT/12) ───────────────────────
 
         /// COMPANION-008: one Blogger entry landed, and the coverage it proves
@@ -331,14 +379,18 @@ module Fact =
         ///
         /// Both cursors are recorded so the fold can verify monotonicity without
         /// trusting the writer (PERSIST-010).
+        ///
+        /// `IngestedThroughSequence` is the RecordCoverage advance in XTraceCursor
+        /// coordinates (COMPANION-003); it may sit mid-turn. The cutoff/digest pair
+        /// is the PrefixCoverage advance and only ever sits on a complete turn
+        /// boundary (COMPANION-011). The two prove different claims and neither
+        /// may be derived from the other.
         | BlogEntryCommitted of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
                FrameEpochId: FrameEpochId
-               PreviousIngestTurn: int
-               PreviousIngestPart: int
-               NextIngestTurn: int
-               NextIngestPart: int
+               PreviousIngestedThroughSequence: int64
+               NextIngestedThroughSequence: int64
                PreviousCoverableTurnCutoffExclusive: int
                NextCoverableTurnCutoffExclusive: int
                NextCoveredPrefixDigest: string
@@ -372,8 +424,8 @@ module Fact =
             {| SessionId: SessionId
                PreviousEpochId: PrefixEpochId
                NextEpochId: PrefixEpochId
-               FrozenBRef: BlobRef
-               FrozenBDigest: BlobDigest
+               FrozenRecordPrefixRef: BlobRef
+               FrozenRecordPrefixDigest: BlobDigest
                CutoffExclusive: int
                CoveredPrefixDigest: string
                SealRoot: string
@@ -398,7 +450,7 @@ module Fact =
         // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
         // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
         // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
-        // FrozenB text inline and was written from a token-budget comparison, which
+        // FrozenRecordPrefix text inline and was written from a token-budget comparison, which
         // CTX-001 and CTX-002 both forbid. Its replacements carry a `BlobRef` instead
         // (PERSIST-007) and are driven by a real attempt outcome.
 

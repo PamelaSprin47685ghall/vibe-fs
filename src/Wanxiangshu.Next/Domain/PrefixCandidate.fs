@@ -16,8 +16,8 @@ open Wanxiangshu.Next.Kernel.Identity
 /// and the committed copy comparable — CTX-012 requires the promoted snapshot to be
 /// byte-identical to the one the successful request used.
 type PrefixSnapshot =
-    { FrozenBRef: BlobRef
-      FrozenBDigest: BlobDigest
+    { FrozenRecordPrefixRef: BlobRef
+      FrozenRecordPrefixDigest: BlobDigest
       CutoffExclusive: int
       CoveredPrefixDigest: string
       SealRoot: string

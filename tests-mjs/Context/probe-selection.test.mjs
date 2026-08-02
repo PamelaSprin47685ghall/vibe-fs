@@ -11,7 +11,7 @@
 // itself recorded; step 5 compares the Companion's recorded digest against a fresh
 // hash of X's CURRENT prefix. That is the only check that can notice the numbering
 // moved underneath — a Host compaction, a pruned message — and without it the probe
-// would build a FrozenB describing turns the prefix no longer has.
+// would build a FrozenRecordPrefix describing turns the prefix no longer has.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -101,7 +101,7 @@ test('CTX_011_a_retreating_candidate_is_refused', () => {
 })
 
 test('CTX_011_an_identical_candidate_is_refused_before_an_epoch_is_spent', () => {
-  // Same cutoff, same prefix digest, same FrozenB digest. Promoting it would spend an
+  // Same cutoff, same prefix digest, same FrozenRecordPrefix digest. Promoting it would spend an
   // epoch and a cold boundary on a prefix the model has already seen.
   const result = selection.select({
     committedEpoch: 1,
@@ -140,7 +140,7 @@ test('CTX_011_the_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
 test('COMPANION_011_a_digest_mismatch_fails_closed', () => {
   // The Companion recorded a digest for cutoff 5, but X's prefix now hashes to
   // something else. The numbering moved — a Host compaction, a pruned message — and
-  // building a FrozenB here would describe turns the prefix no longer has.
+  // building a FrozenRecordPrefix here would describe turns the prefix no longer has.
   const result = selection.select({
     committedEpoch: 0,
     committedSnapshot: undefined,

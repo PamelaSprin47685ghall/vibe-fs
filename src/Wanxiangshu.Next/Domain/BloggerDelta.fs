@@ -31,7 +31,11 @@ type BloggerDeltaChunk =
 module BloggerDelta =
 
     let private renderChunk (items: BloggerDeltaItem list) =
-        BloggerToml.renderWith [ CompanionPrompt.NormalInstruction ] items
+        // COMPANION-004: normal deltas are data-only. The behaviour rules live in
+        // the system prompt alone; a per-chunk instruction would be the duplicated
+        // injection the migration removes. Squash carries its own instruction-only
+        // request (CTX-012).
+        BloggerToml.render items
 
     /// CTX-003: the input contract. Not an estimate and not compared to any model's
     /// window — it only bounds one rendered TOML chunk.
@@ -65,7 +69,7 @@ module BloggerDelta =
         // call id and the name travels on the CALL part. Attributing one here would
         // require pairing results back to calls by position, which is exactly the
         // positional guessing VERIFY-007 removed elsewhere.
-        | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart("", result)
+        | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart result
         | SemanticMedia(mediaType, _digest) -> omissionFor mediaType
 
     /// Flatten to addressable parts, so a cursor can point at one.
@@ -77,8 +81,7 @@ module BloggerDelta =
                 {| Turn = turnIndex
                    Part = partIndex
                    Item =
-                    { Turn = turnIndex
-                      Role = message.Role
+                    { Role = message.Role
                       Part = deltaPart part
                       Truncated = false } |}))
         |> List.concat
@@ -106,7 +109,7 @@ module BloggerDelta =
             | BloggerDeltaPart.TextPart text
             | BloggerDeltaPart.ReasoningPart text -> Some text
             | BloggerDeltaPart.ToolCallPart(_, args) -> Some args
-            | BloggerDeltaPart.ToolResultPart(_, text) -> Some text
+            | BloggerDeltaPart.ToolResultPart text -> Some text
             | BloggerDeltaPart.ImageOmitted _
             | BloggerDeltaPart.MediaOmitted _ -> None
 
@@ -124,7 +127,7 @@ module BloggerDelta =
                 | BloggerDeltaPart.TextPart _ -> BloggerDeltaPart.TextPart replacement
                 | BloggerDeltaPart.ReasoningPart _ -> BloggerDeltaPart.ReasoningPart replacement
                 | BloggerDeltaPart.ToolCallPart(tool, _) -> BloggerDeltaPart.ToolCallPart(tool, replacement)
-                | BloggerDeltaPart.ToolResultPart(tool, _) -> BloggerDeltaPart.ToolResultPart(tool, replacement)
+                | BloggerDeltaPart.ToolResultPart _ -> BloggerDeltaPart.ToolResultPart replacement
                 | other -> other
 
             let rendered length =
@@ -134,7 +137,8 @@ module BloggerDelta =
                     Part = withBody (kept + "\n" + BloggerToml.TruncationMarker)
                     Truncated = true }
 
-            let documentBytes candidate = SyntheticToml.byteCount (renderChunk [ candidate ])
+            let documentBytes candidate =
+                SyntheticToml.byteCount (renderChunk [ candidate ])
 
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both

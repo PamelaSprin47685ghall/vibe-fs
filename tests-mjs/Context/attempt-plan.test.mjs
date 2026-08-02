@@ -228,7 +228,7 @@ test('CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
 
 test('CTX_010_the_required_blob_follows_the_choice_not_the_committed_state', () => {
   // The failure this prevents: reading the COMMITTED snapshot's blob for a probe
-  // attempt injects the old FrozenB under the candidate's synthetic id. The provider
+  // attempt injects the old FrozenRecordPrefix under the candidate's synthetic id. The provider
   // sees a changed prefix, and no fold can detect it — both halves are individually
   // well-formed.
   const committed = snapshotAt(4)

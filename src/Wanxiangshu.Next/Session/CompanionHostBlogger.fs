@@ -183,17 +183,38 @@ module internal CompanionHostBlogger =
             use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
             let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
-            let projectionText = ProviderProjection.renderSemantic projection
 
             deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
             deps.SquashFrameCount.Value <- None
 
+            // COMPANION-004: restart/reset goes through the SAME delta projector as
+            // a normal request. The prior bare-English splice (`sprintf` + EffectiveFrames +
+            // JSON semantic dump) is gone: the reset sends the full current
+            // projection as a data-only TOML delta, exactly like a normal chunk but
+            // without the ingest-cursor gap — the Companion re-anchors on the whole
+            // history because its prior context was lost.
             let prompt =
                 if reset then
-                    sprintf
-                        "You are the blogger of a coding agent session. This session resumed after a restart and your prior companion context was lost. Re-anchor on the FULL current companion context B and the FULL CURRENT projection, then continue. FULL B:\n%s\nFULL PROJECTION:\n%s"
-                        (deps.Companion.Memory.LatestB |> Option.defaultValue "")
-                        projectionText
+                    let fullDelta =
+                        BloggerToml.render (
+                            XTrace.flatten projection.Messages
+                            |> List.map (fun entry ->
+                                { Role = entry.Role
+                                  Part =
+                                    match entry.Part with
+                                    | SemanticText text -> BloggerDeltaPart.TextPart text
+                                    | SemanticReasoning text -> BloggerDeltaPart.ReasoningPart text
+                                    | SemanticToolCall(name, args) -> BloggerDeltaPart.ToolCallPart(name, args)
+                                    | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart result
+                                    | SemanticMedia(mediaType, _digest) ->
+                                        if mediaType |> Option.exists (fun value -> value.StartsWith "image/") then
+                                            BloggerDeltaPart.ImageOmitted mediaType
+                                        else
+                                            BloggerDeltaPart.MediaOmitted mediaType
+                                  Truncated = false })
+                        )
+
+                    fullDelta
                 else
                     chunk.Toml
 

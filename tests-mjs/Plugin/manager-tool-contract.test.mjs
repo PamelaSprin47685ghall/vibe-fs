@@ -24,7 +24,6 @@ import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { roles } from '../domain.mjs'
 import { withPlugin, withExecutablePlugin, acceptAuthorityRoot, notifyCompleted, awaitPrompted } from './plugin-fixture.mjs'
-import { AgentCompletion_snapshotFromText } from '../../build/next/Session/AgentCompletion.js'
 
 /** AGENT-002: the twenty managed agents, exactly as the Host-final config names them. */
 const ROLE_NAMES = [
@@ -630,34 +629,19 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     const joinText = await joinResultP
     const join = parseToml(joinText)
 
-    // JoinTool.fs:48-60 + identity fields: the data-only TOML body. The natural-
-    // language final_text is the leading instruction comment (SSOT/13), so it is
-    // asserted on the raw text; authority_root/provider_run/directory are omitted
-    // when absent and do not appear in the parsed result.
-    // 期望 digest 由生产 snapshotFromText 计算（build/next 导出，VERIFY-008 同 import 先例）。
-    // 曾在此重写 FNV-1a：正确实现的 JS Math.imul 版本与 Fable 的 uint32 编译结果不同，
-    // 本地重推导断言的是算法而非生产行为——正是 parentSession 式的双重死代码温床。
-    const expectedWorkRecord = AgentCompletion_snapshotFromText('forked coder session-wide A')
-    assert.match(join.run_id, /^run-[0-9a-f]{8}$/)
+    // EXEC-004: the success wire is exactly status + agent + work_record. The
+    // work record is the child's LWR text (here: the terminal text, since the
+    // fixture delivers a plain text completion); runtime-only identities
+    // (agent_id/run_id/child_session_id/...) never reach the LLM.
     assert.deepEqual(join, {
-      kind: 'agent',
       status: 'completed',
-      agent_id: fork.agent_id,
-      child_session_id: createdIds[0],
-      run_id: join.run_id, // minted per run ('run-' + 8 hex); pinned separately below
-      work_record: {
-        text: 'forked coder session-wide A',
-        digest: expectedWorkRecord.Digest,
-        freshness: expectedWorkRecord.Freshness,
-      },
       agent: 'fast-coder',
-      role: 'coder',
-      tier: 'fast',
-      fallback_peer: 'deep-coder',
+      work_record: 'forked coder session-wide A',
     })
-    // COMPANION-005/HOST-005: final_text is session-wide A, not the turn text.
     assert.ok(joinText.includes('forked coder session-wide A'))
     assert.ok(!joinText.includes('forked coder turn formal report'))
+    assert.ok(!joinText.includes('run-'), 'no run id on the LLM-visible wire')
+    assert.ok(!joinText.includes('child_session_id'), 'no child session id on the wire')
 
     const list = parseToml(await hooks.tool.list.execute({}, context))
     // EXEC-005 明文「不包含 Retired」：join 已退休该 handle，派生视图为空。

@@ -140,7 +140,7 @@ type HostForkRuntime
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
         let workRecord =
             match outcome with
-            | TerminalOutcome.Completed _ -> AgentCompletion.snapshotOption (childWorkRecordOf run.ChildId)
+            | TerminalOutcome.Completed _ -> childWorkRecordOf run.ChildId
             | _ -> None
 
         // EXEC-009's durable completion is written by `HostForkRunLifecycle.complete`

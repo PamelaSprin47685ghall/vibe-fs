@@ -32,7 +32,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-blogger-1"
 internal = true
-user = ["# The next user message is the new session material in TOML.", "[[item]]"]
+user = "[[message]]"
 
   [[turn.step]]
   respond = { type = "text", text = "Manager Blogger paragraph 1." }

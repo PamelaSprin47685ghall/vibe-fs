@@ -107,12 +107,12 @@ const part = (caseName, fields) => {
 export const bloggerText = (text) => part('TextPart', [text]);
 export const bloggerReasoning = (text) => part('ReasoningPart', [text]);
 export const bloggerToolCall = (tool, args) => part('ToolCallPart', [tool, args]);
-export const bloggerToolResult = (tool, text) => part('ToolResultPart', [tool, text]);
+export const bloggerToolResult = (text) => part('ToolResultPart', [text]);
 export const bloggerImageOmitted = (mediaType) => part('ImageOmitted', [mediaType]);
 export const bloggerMediaOmitted = (mediaType) => part('MediaOmitted', [mediaType]);
 
-export const bloggerItem = ({ turn, role, part: itemPart, truncated = false }) =>
-  new BloggerModule.BloggerDeltaItem(turn, role, itemPart, truncated);
+export const bloggerItem = ({ role, part: itemPart, truncated = false }) =>
+  new BloggerModule.BloggerDeltaItem(role, itemPart, truncated);
 
 export const bloggerDocument = (items) => BloggerModule.BloggerToml_render(toList(items));
 

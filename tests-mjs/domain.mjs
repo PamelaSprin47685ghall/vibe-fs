@@ -91,6 +91,10 @@ const [
   Witness,
   Challenge,
   ProviderProj,
+  XTraceModule,
+  LifecycleWorkRecordModule,
+  XTraceCaptureModule,
+  HostMessageCodecModule,
   DeadlineModule,
   ProcessRequest,
   FlowModule,
@@ -150,6 +154,10 @@ const [
   prod('Domain/ReviewWitness'),
   prod('Domain/ReviewChallenge'),
   prod('Domain/ProviderProjection'),
+  prod('Domain/XTrace'),
+  prod('Domain/LifecycleWorkRecord'),
+  prod('Application/Reconciliation/XTraceCapture'),
+  prod('Infrastructure/OpenCode/Codec/HostMessageCodec'),
   prod('Process/Deadline'),
   prod('Process/ProcessRequest'),
   prod('Kernel/Flow'),
@@ -924,12 +932,11 @@ export const bloggerToml = (() => {
     text: (value) => part('TextPart', value),
     reasoning: (value) => part('ReasoningPart', value),
     toolCall: (tool, args) => part('ToolCallPart', tool, args),
-    toolResult: (tool, value) => part('ToolResultPart', tool, value),
+    toolResult: (value) => part('ToolResultPart', value),
     imageOmitted: (mediaType) => part('ImageOmitted', mediaType),
     mediaOmitted: (mediaType) => part('MediaOmitted', mediaType),
 
-    item: ({ turn, role, part: p, truncated = false }) => ({
-      Turn: turn,
+    item: ({ role = 'user', part: p, truncated = false }) => ({
       Role: role,
       Part: p,
       Truncated: truncated,
@@ -984,13 +991,112 @@ export const bloggerDelta = (() => {
   }
 })()
 
+/**
+ * COMPANION-003 / HOST-005: XTrace — X 的唯一原始语义轨迹。
+ *
+ * Cursor 是独立单调序列（不随 Host compaction 作废）；part 复用 SemanticPart
+ * 语义；renderer 永不输出 provenance。
+ *
+ * Fable 把 int64 编译为 BigInt，facade 在此吸收（VERIFY-008：Fable 约定只允许
+ * 出现在 domain.mjs）。
+ */export const xTrace = (() => {
+  const m = bind(XTraceModule, 'XTrace', ['originCursor', 'nextCursor', 'isAfter', 'sliceBetween', 'sliceFrom', 'head', 'flatten', 'renderItem', 'render'])
+  const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
+
+  const part = (kind, ...fields) => semanticPart(kind, fields)
+
+  const cursorOf = ({ Sequence }) => ({ Sequence: Number(Sequence) })
+  const toCursor = (sequence) => ({ Sequence: BigInt(sequence) })
+  const toCursorList = (items) => toList(items.map((item) => ({ ...item, Cursor: toCursor(item.Cursor.Sequence) })))
+  const fromCursorList = (list) => listItems(list).map((item) => ({ ...item, Cursor: cursorOf(item.Cursor) }))
+
+  return {
+    originCursor: cursorOf(m.originCursor),
+    next: (cursor) => cursorOf(m.nextCursor(toCursor(cursor.Sequence))),
+    isAfter: (next, previous) => m.isAfter(toCursor(next.Sequence), toCursor(previous.Sequence)),
+    sliceBetween: (start, end, items) => fromCursorList(m.sliceBetween(toCursor(start.Sequence), toCursor(end.Sequence), toCursorList(items))),
+    sliceFrom: (start, items) => fromCursorList(m.sliceFrom(toCursor(start.Sequence), toCursorList(items))),
+    head: (items) => cursorOf(m.head(toCursorList(items))),
+    text: (value) => part('SemanticText', value),
+    reasoning: (value) => part('SemanticReasoning', value),
+    toolCall: (name, args) => part('SemanticToolCall', name, args),
+    toolResult: (value) => part('SemanticToolResult', value),
+    media: (mediaType, digest) => part('SemanticMedia', mediaType, digest),
+
+    /** 一个 XTraceItem。`part` 必须是本 facade 的 part 构造器产物。 */
+    item: ({ sequence, role = 'user', part: partValue, provenance = '' } = {}) => ({
+      Cursor: { Sequence: sequence },
+      Provenance: provenance,
+      Role: role,
+      Part: partValue,
+    }),
+
+    /** `[{ role, parts }]` → 平铺的 `{ role, part }` F# list。 */
+    flatten: (turns) => {
+      const result = m.flatten(toList(turns.map((turn) => ({ Role: turn.role, Parts: toList(turn.parts) }))))
+      return listItems(result).map((entry) => ({ role: entry.Role, part: entry.Part }))
+    },
+
+    renderItem: m.renderItem,
+    render: m.render,
+    toItems: (items) => toList(items),
+  }
+})()
+
+/**
+ * COMPANION-003 / COMPANION-012: 唯一 semantic capture mapper。
+ *
+ * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
+ */
+export const xTraceCapture = (() => {
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart'])
+  const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
+  const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
+
+  const part = (kind, ...fields) => messagePart(kind, fields)
+
+  return {
+    text: (value) => part('Text', value),
+    reasoning: (value) => part('Reasoning', value),
+    toolCall: (callId, name, args) => part('ToolCall', callId, name, args),
+    toolResult: (callId, result) => part('ToolResult', callId, result),
+    activity: (kind) => part('Activity', kind),
+
+    map: (messagePartValue) => {
+      const mapped = m.semanticPart(messagePartValue)
+      return isNone(mapped) ? undefined : { tag: caseOf(mapped), part: mapped }
+    },
+  }
+})()
+
+/** COMPANION-003: LWR — 唯一跨 Session 工作记录。 */export const lifecycleWorkRecord = (() => {
+  const m = bind(LifecycleWorkRecordModule, 'LifecycleWorkRecord', ['render', 'materialize'])
+  const opening = ({ assignment = '', requirements = [] } = {}) => ({
+    AssignmentText: assignment,
+    AuthoritativeRequirements: toList(requirements),
+  })
+
+  return {
+    opening,
+    render: m.render,
+    materialize: (openingValue, frames, traceItems, ingestedThrough, terminalItems, openingEnd = { Sequence: 0 }) =>
+      m.materialize(
+        openingValue,
+        toList(frames),
+        toList(traceItems),
+        { IngestedThrough: { Sequence: BigInt(ingestedThrough.Sequence) } },
+        { Sequence: BigInt(openingEnd.Sequence) },
+        toList(terminalItems),
+      ),
+  }
+})()
+
 /** COMPANION-004 / COMPANION-010: the fixed prompt text, with no interpolation. */
 export const companionPrompt = {
   system: CompanionPromptModule.System,
-  normalInstruction: CompanionPromptModule.NormalInstruction,
   squashInstruction: CompanionPromptModule.SquashInstruction,
   memoryPreamble: CompanionPromptModule.CompanionMemoryPreamble,
-  memoryBlock: (frozenB) => CompanionPromptModule.companionMemoryBlock(frozenB),
+  memoryBlock: (frozenRecordPrefix) => CompanionPromptModule.companionMemoryBlock(frozenRecordPrefix),
 }
 
 /**
@@ -1542,7 +1648,6 @@ export const terminalValidity = {
 export const blogProjection = (() => {
   const m = bind(BlogProj, 'BlogProjection', [
     'empty',
-    'withSeed',
     'frameCount',
     'coverableFrames',
     'squashWidth',
@@ -1555,7 +1660,6 @@ export const blogProjection = (() => {
 
   return {
     empty: m.empty,
-    withSeed: (seed, state) => m.withSeed(seed, state),
     frameCount: (state) => m.frameCount(state),
     squashWidth: (state) => m.squashWidth(state),
     hasCoverage: (state) => m.hasCoverage(state),
@@ -1572,20 +1676,30 @@ export const blogProjection = (() => {
     cursor: (turn, part) => ({ TurnIndex: turn, PartIndex: part }),
 
     coverage: (state) => ({
-      ingestTurn: state.Coverage.IngestCursor.TurnIndex,
-      ingestPart: state.Coverage.IngestCursor.PartIndex,
+      ingestedThroughSequence: Number(state.Coverage.IngestedThroughSequence),
       cutoff: state.Coverage.CoverableTurnCutoffExclusive,
       digest: state.Coverage.CoveredPrefixDigest,
       coverableFrames: state.Coverage.CoverableFrameCount,
     }),
 
-    /** CTX-011: the frames a probe may build FrozenB from, by kind. */
+    /** CTX-011: the frames a probe may build FrozenRecordPrefix from, by kind. */
     coverableFrameKinds: (state) => listItems(m.coverableFrames(state)).map((f) => caseOf(f.Kind)),
 
     /** Rejections carry payloads; the name alone is what a test asserts on. */
     applyEntry: ({ epoch, previous, next, previousCutoff, nextCutoff, digest, frame }, state) => {
+      // The record coverage is an XTrace cursor sequence: Fable compiles int64 to
+      // BigInt, so the facade converts before crossing (VERIFY-008).
       const result = resultOf(
-        m.applyEntry(frameEpochId(epoch), previous, next, previousCutoff, nextCutoff, digest, frame, state),
+        m.applyEntry(
+          frameEpochId(epoch),
+          BigInt(previous),
+          BigInt(next),
+          previousCutoff,
+          nextCutoff,
+          digest,
+          frame,
+          state,
+        ),
       )
       return result.ok ? result : { ok: false, error: caseOf(result.error) }
     },
@@ -1615,8 +1729,8 @@ export const prefixEpochProjection = (() => {
     epochOf: (state) => idValue.prefixEpoch(state.EpochId),
 
     snapshot: ({ ref, digest, cutoff, prefixDigest, sealRoot, syntheticId }) => ({
-      FrozenBRef: blobRef(ref),
-      FrozenBDigest: blobDigest(digest),
+      FrozenRecordPrefixRef: blobRef(ref),
+      FrozenRecordPrefixDigest: blobDigest(digest),
       CutoffExclusive: cutoff,
       CoveredPrefixDigest: prefixDigest,
       SealRoot: sealRoot,

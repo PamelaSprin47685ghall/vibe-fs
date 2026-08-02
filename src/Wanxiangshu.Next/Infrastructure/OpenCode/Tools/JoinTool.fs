@@ -13,23 +13,6 @@ module JoinTool =
     let private tBool = ToolHostCodec.TBool
     let private tTable = ToolHostCodec.TTable
 
-    let private optionalField (name: string) (value: string option) : (string * ToolHostCodec.TomlValue) list =
-        match value with
-        | Some v when not (String.IsNullOrWhiteSpace v) -> [ name, tString v ]
-        | _ -> []
-
-    let private workRecordField (value: WorkRecordSnapshot option) : (string * ToolHostCodec.TomlValue) list =
-        match value with
-        | Some record ->
-            [ "work_record",
-              tTable (
-                  [ "text", tString record.Text
-                    "digest", tString record.Digest
-                    "freshness", tString record.Freshness ]
-                  @ optionalField "covered_through" record.CoveredThrough
-              ) ]
-        | None -> []
-
     let private errorCode =
         function
         | ForkError.NothingToJoin -> "NOTHING_TO_JOIN"
@@ -42,56 +25,36 @@ module JoinTool =
 
         match completion.Outcome with
         | AgentCompleted payload when isPty ->
+            // EXEC-004: a PTY completion is not an LWR; it keeps its own minimal
+            // schema (kind/status/outcome/closed/pty_id).
             ToolHostCodec.tomlObject
                 [ "kind", tString "pty"
                   "status", tString "completed"
-                  "agent_id", tString payload.AgentId
-                  "run_id", tString payload.RunId
-                  "final_text", tString payload.FinalText
-                  "outcome", tString payload.FinalText
+                  "outcome", tString payload.WorkRecord
                   "closed", tBool true
                   "pty_id", tString completion.RunId ]
         | AgentCompleted payload ->
-            let instructions =
-                if System.String.IsNullOrWhiteSpace payload.FinalText then
-                    []
-                else
-                    [ payload.FinalText ]
-
-            let baseFields =
-                [ "kind", tString "agent"
-                  "status", tString "completed"
-                  "agent_id", tString payload.AgentId
-                  "run_id", tString payload.RunId ]
-
-            let optionalFields =
-                workRecordField payload.WorkRecord
-                @ optionalField "child_session_id" (payload.ChildSessionId |> Option.map SessionId.value)
-                @ optionalField "authority_root" (payload.AuthorityRoot |> Option.map AuthorityRootUserMessageId.value)
-                @ optionalField "provider_run" (payload.ProviderRun |> Option.map ProviderRunIdentity.value)
-                @ optionalField "directory" payload.Directory
-
+            // EXEC-004: the success wire is status + agent + work_record. The
+            // work record is the opaque final LWR — one value, no digest /
+            // freshness / coverage metadata, no runtime-only identities.
             let managed =
                 runtime.TryFindAgent payload.AgentId
                 |> Option.bind (fun record -> ManagedAgent.tryParse record.Agent)
 
-            let identityFields =
+            let agentName =
                 match managed with
-                | Some agent ->
-                    [ "agent", tString agent.Name
-                      "role", tString (ManagedAgent.roleName agent.Role)
-                      "tier", tString (ManagedAgent.tierName agent.Tier)
-                      "fallback_peer", tString (ManagedAgent.peer agent).Name ]
-                | None -> [ "role", tString (payload.Role.ToString().ToLowerInvariant()) ]
+                | Some agent -> agent.Name
+                | None -> payload.AgentId
 
-            ToolHostCodec.tomlObjectWithInstructions instructions (baseFields @ optionalFields @ identityFields)
+            ToolHostCodec.tomlObject
+                [ "status", tString "completed"
+                  "agent", tString agentName
+                  "work_record", tString payload.WorkRecord ]
         | AgentFailed payload
         | AgentAborted payload when isPty ->
             ToolHostCodec.tomlObject
                 [ "kind", tString "pty"
                   "status", tString "failed"
-                  "agent_id", tString payload.AgentId
-                  "run_id", tString payload.RunId
                   "outcome", tString payload.Message
                   "closed", tBool true
                   "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ]
@@ -103,19 +66,21 @@ module JoinTool =
                 | AgentAborted _ -> "aborted"
                 | _ -> "failed"
 
-            let optionalFields =
-                optionalField "child_session_id" (payload.ChildSessionId |> Option.map SessionId.value)
-                @ optionalField "role" (payload.Role |> Option.map (fun role -> role.ToString().ToLowerInvariant()))
+            // EXEC-004: the failure wire is status + agent + error. No runtime
+            // identity fields reach the LLM.
+            let managed =
+                runtime.TryFindAgent payload.AgentId
+                |> Option.bind (fun record -> ManagedAgent.tryParse record.Agent)
 
-            let fields =
-                [ "kind", tString "agent"
-                  "status", tString status
-                  "agent_id", tString payload.AgentId
-                  "run_id", tString payload.RunId
-                  "outcome", tString payload.Message
+            let agentName =
+                match managed with
+                | Some agent -> agent.Name
+                | None -> payload.AgentId
+
+            ToolHostCodec.tomlObject
+                [ "status", tString status
+                  "agent", tString agentName
                   "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ] ]
-
-            ToolHostCodec.tomlObject (fields @ optionalFields)
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
         task {

@@ -27,7 +27,7 @@ module CompanionIdentity =
         (basedOnEpoch: PrefixEpochId)
         (candidateCutoff: int)
         (candidateCoveredPrefixDigest: string)
-        (candidateFrozenBDigest: BlobDigest)
+        (candidateFrozenRecordPrefixDigest: BlobDigest)
         : string =
         sha256 (
             String.concat
@@ -36,7 +36,7 @@ module CompanionIdentity =
                   string (PrefixEpochId.value basedOnEpoch)
                   string candidateCutoff
                   candidateCoveredPrefixDigest
-                  BlobDigest.value candidateFrozenBDigest ]
+                  BlobDigest.value candidateFrozenRecordPrefixDigest ]
         )
 
     /// COMPANION-013: the id of the synthetic companion-memory message in X.

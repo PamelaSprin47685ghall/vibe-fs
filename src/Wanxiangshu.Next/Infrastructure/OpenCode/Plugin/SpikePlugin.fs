@@ -7,6 +7,8 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Domain
+open Wanxiangshu.Next.Domain.ProviderProjection
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
@@ -93,6 +95,21 @@ module SpikePlugin =
                                 outObj
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
+
+                        // COMPANION-003/007: keep the XTrace in step with the
+                        // provider-visible semantic projection at the transform
+                        // boundary. Idempotent by (turn, part) provenance; the
+                        // Blogger chunker's ingest cursor maps back through this
+                        // trace, so a lagging trace would stall BlogEntryCommitted.
+                        match projectionSessionIdOpt with
+                        | Some sessionId ->
+                            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+                            let semantic =
+                                Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+
+                            XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
+                        | None -> ()
 
                         // REVIEW-010: seal LAST, and only after the Companion rewrite has
                         // mutated `outObj`. The seal must digest the message view the
@@ -197,24 +214,23 @@ module SpikePlugin =
                         let onRunStarted =
                             Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                        // Child background SSOT: parent B first; if no B, whole session A.
+                        // Child background SSOT (EXEC-008): the parent's frozen
+                        // LifecycleWorkRecord at creation time — Opening + Y frames
+                        // + X gap + terminal, one algorithm for every state.
                         let backgroundBFor =
                             Some(fun sessionId ->
-                                // Was: prefer the frozen epoch B, fall back to LatestB.
-                                // The epoch existed only as the context-estimate
-                                // mechanism's output (CTX-001), and a child's background
-                                // brief wants the CURRENT memory regardless — the older
-                                // frozen copy was never the better answer here.
-                                let fromB =
+                                let fromLwr = XTraceCapture.parentWorkRecord journal (SessionId.create sessionId)
+
+                                match fromLwr with
+                                | Some text -> Some text
+                                | None ->
+                                    // Pre-LWR fallback: EffectiveFrames is the compressed
+                                    // middle when no opening has been captured yet.
                                     match scope.Companions.TryGetValue sessionId with
                                     | true, host ->
-                                        host.Memory.LatestB
+                                        host.Memory.EffectiveFrames
                                         |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
-                                    | false, _ -> None
-
-                                match fromB with
-                                | Some text -> Some text
-                                | None -> TerminalSessionA.fullText eventPort (SessionId.create sessionId))
+                                    | false, _ -> None)
 
                         let toolRegistration =
                             toolHooks

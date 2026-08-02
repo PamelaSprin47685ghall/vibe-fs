@@ -35,8 +35,13 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         |> Option.map (fun m -> m.Blog)
         |> Option.defaultValue BlogProjection.empty
 
+    let mutable xTraceProjection: XTraceProjectionState =
+        restoredMemory
+        |> Option.map (fun m -> m.XTrace)
+        |> Option.defaultValue XTraceProjection.empty
+
     let mutable latestB: BlogText option =
-        restoredMemory |> Option.bind (fun m -> m.LatestB)
+        restoredMemory |> Option.bind (fun m -> m.EffectiveFrames)
 
     /// COMPANION-002: the companion Blogger Session Y for this X.
     ///
@@ -84,8 +89,9 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.Memory: CompanionMemory =
         lock lockObj (fun () ->
             { Blog = blogProjection
-              LatestB = latestB
-              BloggerSessionId = bloggerSessionId })
+              EffectiveFrames = latestB
+              BloggerSessionId = bloggerSessionId
+              XTrace = xTraceProjection })
 
     /// Mirror a durable Blogger link that `CompanionHost` already recorded.
     member _.RecordBloggerLinked(bloggerId: SessionId) : unit =
@@ -136,10 +142,16 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             if isBusyUnlocked () then
                 SkippedBusy
             else
+                // COMPANION-003: the chunker works in semantic coordinates; the
+                // RecordCoverage is an XTrace cursor sequence, so it is mapped back
+                // through the XTrace projection's turn/part coordinates.
+                let ingestCursor =
+                    XTraceProjection.semanticCursorFor blogProjection.Coverage.IngestedThroughSequence xTraceProjection
+
                 match
                     BloggerDelta.nextChunk
                         BloggerDelta.DeltaLimitBytes
-                        blogProjection.Coverage.IngestCursor
+                        ingestCursor
                         blogProjection.Coverage.CoverableTurnCutoffExclusive
                         currentProjection.Messages
                 with

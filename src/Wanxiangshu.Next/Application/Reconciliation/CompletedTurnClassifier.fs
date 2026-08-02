@@ -36,9 +36,10 @@ module CompletedTurnClassifier =
                 | _ -> None)
             |> String.concat ""
 
-    /// Session A material: formal text + host-visible reasoning/thinking.
-    /// Still excludes tool raw streams / tool results.
-    let partsSessionA (parts: MessagePart array) : string =
+    /// Session terminal material: formal text + host-visible reasoning/thinking.
+    /// Still excludes tool raw streams / tool results. This is the XTrace
+    /// terminal segment's text (COMPANION-003), not a parallel A channel.
+    let partsSessionText (parts: MessagePart array) : string =
         if isNull parts then
             ""
         else
@@ -131,7 +132,9 @@ module CompletedTurnClassifier =
         (directory: string option)
         : ReconciledTurn =
         let role = roleOfAgent assistant.Agent roleFallback
-        let outcome = classifyOutcome assistant.Completed assistant.Finish assistant.ErrorName assistant.Parts
+
+        let outcome =
+            classifyOutcome assistant.Completed assistant.Finish assistant.ErrorName assistant.Parts
 
         { SessionId = sessionId
           PhysicalUserMessageId = physicalUserMessageId

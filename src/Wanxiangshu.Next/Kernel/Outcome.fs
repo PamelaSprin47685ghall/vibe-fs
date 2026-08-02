@@ -25,7 +25,7 @@ type AgentRunResult =
         /// Session-wide A (HOST-005): cumulative formal text plus host-visible
         /// reasoning across the whole Session, not the last turn alone. Excludes
         /// tool raw streams.
-        SessionWideText: string
+        TerminalText: string
         /// This turn's formal assistant text only, without reasoning. The
         /// Companion B record is built from this (COMPANION-005).
         TurnFormalText: string
@@ -33,7 +33,7 @@ type AgentRunResult =
 
     /// EXEC-006: a completed run must carry session-wide A. An empty A means the
     /// turn was not actually reconciled, so consumers must not treat it as done.
-    member this.IsValid = not (String.IsNullOrWhiteSpace this.SessionWideText)
+    member this.IsValid = not (String.IsNullOrWhiteSpace this.TerminalText)
 
 type AgentRunFailure =
     { SessionId: SessionId; Reason: string }

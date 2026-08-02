@@ -61,12 +61,12 @@ type CompanionHost
                     bloggerCreated sid
                     // One-shot: clear the restore opt so a failure creates new.
                     restoredBloggerIdOpt <- None
-                    bloggerNeedsReset.Value <- companion.Memory.LatestB.IsSome
+                    bloggerNeedsReset.Value <- companion.Memory.EffectiveFrames.IsSome
                     let t = Task.FromResult(sid)
                     bloggerTask <- Some t
                     t
                 | _ ->
-                    if companion.Memory.LatestB.IsSome then
+                    if companion.Memory.EffectiveFrames.IsSome then
                         bloggerNeedsReset.Value <- true
 
                     let task =
@@ -159,12 +159,14 @@ type CompanionHost
     /// Exposes the canonical CompanionFlow calculation for adapters and tests;
     /// SubmitProjection remains the non-blocking side-effecting operation.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =
+        let memory = companion.Memory
+
         CompanionProgram.runCompanionFlow
             { SessionId = SessionId.value primaryId }
             System.Threading.CancellationToken.None
             (CompanionProgram.buildDelta
-                companion.Memory.Blog.Coverage.IngestCursor
-                companion.Memory.Blog.Coverage.CoverableTurnCutoffExclusive
+                (XTraceProjection.semanticCursorFor memory.Blog.Coverage.IngestedThroughSequence memory.XTrace)
+                memory.Blog.Coverage.CoverableTurnCutoffExclusive
                 projection)
 
     member _.Memory = companion.Memory

@@ -60,6 +60,12 @@ module PromptIngress =
             let acceptedRoot () =
                 bindUserMessage sessionKey messageKey
                 registerOwned sessionKey
+                // COMPANION-003: the first task prompt is captured verbatim as the
+                // session's OpeningPromptRaw at the physical acceptance point.
+                // Idempotent — a session with an opening already captured is
+                // untouched (PERSIST-010).
+                message.Text
+                |> Option.iter (fun text -> XTraceCapture.captureOpening journal sessionId text)
 
             match resolveOrigin runtime sessionId message physicalMessageId with
             | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot ->

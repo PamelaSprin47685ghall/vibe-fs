@@ -289,6 +289,7 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
     'PromptAuthority',
     'ReviewGuard',
     'ReviewRequirements',
+    'XTrace',
   ])
 
   // An unknown session is absent, not an empty scan result.

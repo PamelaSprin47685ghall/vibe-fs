@@ -120,27 +120,26 @@ test('CTX_003_no_chunk_exceeds_the_limit', () => {
   }
 })
 
-test('CTX_013_normal_chunk_counts_instruction_header_and_keeps_delta_as_toml_data', () => {
+test('CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () => {
+  // COMPANION-004: normal deltas are data-only. The behaviour rules live in the
+  // system prompt alone, so a normal chunk carries no instruction header and pays
+  // nothing for one.
   const body = 'observed work ' + 'x'.repeat(500)
   const messages = delta.messages([{ role: 'user', parts: [delta.text(body)] }])
-  const item = toml.item({ turn: 0, role: 'user', part: toml.text(body) })
+  const item = toml.item({ role: 'user', part: toml.text(body) })
   const dataOnlyBytes = syn.byteCount(toml.render([item]))
-  const normalBytes = syn.byteCount(toml.renderWith([prompt.normalInstruction], [item]))
-  const limit = normalBytes - 1
-
-  assert.equal(normalBytes > dataOnlyBytes, true, 'the instruction header must add real bytes')
-  assert.equal(dataOnlyBytes <= limit, true, 'the data-only rendering must fit the distinguishing limit')
+  const limit = dataOnlyBytes + 100
 
   const chunk = delta.nextChunk({ limit, cursor: origin, messages })
-  assert.equal(chunk.bytes <= limit, true, 'the final sent bytes must include the instruction header')
+  assert.equal(chunk.bytes <= limit, true, 'the final sent bytes must fit the limit')
   assert.equal(chunk.bytes, syn.byteCount(chunk.toml))
-  assert.equal(chunk.toml.startsWith('# '), true, 'normal delta begins with the instruction header')
-  assert.equal(chunk.toml.includes('\n\n[[item]]'), true, 'the typed delta remains the data body')
+  assert.equal(chunk.toml.startsWith('# '), false, 'a normal delta carries no instruction header')
+  assert.equal(chunk.toml.includes('\n\n'), false, 'data body has no decorative blank lines')
 
   const parsed = parseToml(chunk.toml)
-  assert.equal(parsed.item.length, 1)
-  assert.equal(parsed.item[0].role, 'user')
-  assert.equal(parsed.item[0].truncated, true)
+  assert.equal(parsed.message.length, 1)
+  assert.equal(parsed.message[0].role, 'user')
+  assert.equal(parsed.message[0].truncated, undefined, 'the whole part fits, so no truncation flag')
   assert.equal('messages' in parsed, false, 'the payload is Blogger TOML data, not a JSON envelope')
 })
 
@@ -270,9 +269,9 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   // line, which moved the arithmetic by one byte — precisely the kind of change a
   // `bytes <= limit` assertion passes through silently.
   const parsed = parseToml(chunk.toml)
-  assert.equal(parsed.item.length, 1)
-  assert.equal(parsed.item[0].truncated, true)
-  assert.equal(parsed.item[0].text.includes(toml.truncationMarker), true, 'the marker survives parsing as data')
+  assert.equal(parsed.message.length, 1)
+  assert.equal(parsed.message[0].truncated, true)
+  assert.equal(parsed.message[0].text.includes(toml.truncationMarker), true, 'the marker survives parsing as data')
 
   // Every retained CJK character is whole: the count of them is an integer number
   // of 3-byte sequences, which a byte-level cut could not guarantee.
@@ -307,7 +306,7 @@ test('CTX_013_images_become_markers_carrying_no_content', () => {
   const chunk = delta.nextChunk({ limit: 8192, cursor: origin, messages })
 
   assert.deepEqual(chunk.kinds, ['TextPart', 'ImageOmitted'])
-  assert.equal(chunk.toml.includes('kind = "image_omitted"'), true)
+  assert.equal(chunk.toml.includes('[[media_omitted]]'), true)
   assert.equal(chunk.toml.includes('media_type = "image/png"'), true)
 
   // The digest exists in the semantic projection for CTX-011's cutoff proof. It
@@ -373,7 +372,7 @@ test('CTX_013_canonical_args_pass_through_without_re_sorting', () => {
 
   const chunk = delta.nextChunk({ limit: 4096, cursor: origin, messages })
 
-  assert.equal(chunk.toml.includes('args = "{\\"zebra\\":1,\\"alpha\\":2}"'), true, 'order preserved as supplied')
+  assert.equal(chunk.toml.includes('arguments = "{\\"zebra\\":1,\\"alpha\\":2}"'), true, 'order preserved as supplied')
 
   // A multi-line body takes the literal form, where the bytes appear verbatim —
   // the same guarantee without the escaping.

@@ -38,6 +38,8 @@
     <Compile Include="Domain/RecoverySlot.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
+    <Compile Include="Domain/XTrace.fs"/>
+    <Compile Include="Domain/LifecycleWorkRecord.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Domain/ForkChildPayload.fs"/>
@@ -58,6 +60,7 @@
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/CompanionProjection.fs"/>
+    <Compile Include="Journal/XTraceProjection.fs"/>
     <Compile Include="Journal/BlogProjection.fs"/>
     <Compile Include="Journal/PrefixEpochProjection.fs"/>
     <Compile Include="Journal/FallbackProjection.fs"/>
@@ -139,6 +142,9 @@
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptIngressCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/HostSessionContext.fs"/>
+    <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>
+    <Compile Include="Application/Reconciliation/XTraceCapture.fs"/>
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
     <Compile Include="Application/Reconciliation/PromptRecovery.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
@@ -156,17 +162,14 @@
     <Compile Include="Session/CompanionProjection.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/HostSessionContext.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>
     <Compile Include="Application/Reconciliation/TurnBinding.fs"/>
     <Compile Include="Application/Reconciliation/CompanionTransform.fs"/>
     <Compile Include="Application/Reconciliation/ReviewSeal.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostReviewGuard.fs"/>
-    <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
     <Compile Include="Application/Reconciliation/ReviewerGuardState.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/TerminalSessionA.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="Application/Reconciliation/TurnCompletionProgram.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/GitTree.fs"/>

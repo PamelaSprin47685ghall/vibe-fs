@@ -20,9 +20,7 @@ module XWire =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
 
     let private isCompanionSession (journal: AgentJournal) (sessionId: SessionId) =
-        SessionAssociationProjection.isCompanion
-            sessionId
-            (AgentJournal.snapshot journal).AgentProjections.Associations
+        SessionAssociationProjection.isCompanion sessionId (AgentJournal.snapshot journal).AgentProjections.Associations
 
     let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Result<string, string> =
         let rec loop remaining collected =
@@ -40,15 +38,14 @@ module XWire =
 
     let private requestStartCutoff (physical: PhysicalUserMessageId) (rawMessages: obj list) =
         rawMessages
-        |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some (PhysicalUserMessageId.value physical))
+        |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some(PhysicalUserMessageId.value physical))
         |> Option.defaultWith (fun () ->
             raise (InvalidOperationException "X-wire cannot bind the physical user message to the transform snapshot"))
 
     let private rawWithPrefix (rawMessages: obj list) (plan: XPrefixPlan) =
         match plan.CompanionMemory with
         | None -> rawMessages
-        | Some(syntheticId, memory) ->
-            Projection.prependCompanionMemory rawMessages syntheticId memory plan.DropLeading
+        | Some(syntheticId, memory) -> Projection.prependCompanionMemory rawMessages syntheticId memory plan.DropLeading
 
     let private candidate
         (journal: AgentJournal)
@@ -102,7 +99,9 @@ module XWire =
                     | None, _ ->
                         raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
                     | _, None ->
-                        raise (InvalidOperationException "X-wire cannot plan a retry without the public session snapshot")
+                        raise (
+                            InvalidOperationException "X-wire cannot plan a retry without the public session snapshot"
+                        )
                     | Some physical, Some snapshotPort ->
                         let! snapshotResult = snapshotPort.GetMessages sessionId
 
@@ -110,7 +109,8 @@ module XWire =
                         | Error reason -> raise (InvalidOperationException reason)
                         | Ok messages ->
                             match ReviewSeal.bindableRun (PhysicalUserMessageId.value physical) messages with
-                            | Error rejection -> raise (InvalidOperationException(sprintf "X-wire run binding failed: %A" rejection))
+                            | Error rejection ->
+                                raise (InvalidOperationException(sprintf "X-wire run binding failed: %A" rejection))
                             | Ok assistant ->
                                 let providerRun = ProviderRunIdentity.create assistant.Id
                                 let projections = AgentJournal.snapshot durable
@@ -122,21 +122,23 @@ module XWire =
                                 with
                                 | Some authority, Some fallback, Some state ->
                                     let current =
-                                        Projection.decodeMessageView rawMessages
-                                        |> ProviderProjection.toSemantic
+                                        Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
 
                                     let cutoff = requestStartCutoff physical rawMessages
                                     let blog = state.Blog |> Option.defaultValue BlogProjection.empty
                                     let arming = scope.TryRecoveryArming sessionId |> Option.get
+
                                     let mayRecover =
                                         RecoverySlot.mayRecover
                                             arming
                                             fallback.Cursor.Offset
                                             (BlogProjection.hasCoverage blog)
+
                                     let selectedProbe = ref None
 
                                     let selectProbe () =
                                         let selected = candidate durable sessionId current state cutoff
+
                                         match selected with
                                         | Ok probe ->
                                             selectedProbe.Value <- Some probe
@@ -149,14 +151,13 @@ module XWire =
                                             fallback.Cursor
                                             physical
                                             providerRun
-                                            (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+                                            (PromptAuthority.PromptOrigin.Continuation
+                                                PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                                             ProviderRequestKind.WorkMain
                                             mayRecover
                                             selectProbe
 
-                                    let prefix =
-                                        state.PrefixEpoch
-                                        |> Option.defaultValue PrefixEpochProjection.empty
+                                    let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
                                     let frozenBody =
                                         match plan.Profile.ProjectionChoice with
@@ -164,17 +165,24 @@ module XWire =
                                             match prefix.Snapshot with
                                             | None -> ""
                                             | Some committed ->
-                                                match durable.Writer.BlobWriter.Read committed.FrozenBRef with
+                                                match
+                                                    durable.Writer.BlobWriter.Read committed.FrozenRecordPrefixRef
+                                                with
                                                 | Ok body -> body
                                                 | Error reason -> raise (InvalidOperationException reason)
                                         | XProjectionChoice.UsePrefixProbe _ ->
                                             match selectedProbe.Value with
                                             | Some probe ->
-                                                match durable.Writer.BlobWriter.Read probe.Candidate.FrozenBRef with
+                                                match
+                                                    durable.Writer.BlobWriter.Read probe.Candidate.FrozenRecordPrefixRef
+                                                with
                                                 | Ok body -> body
                                                 | Error reason -> raise (InvalidOperationException reason)
                                             | None ->
-                                                raise (InvalidOperationException "X-wire planner selected a probe without a materialised candidate")
+                                                raise (
+                                                    InvalidOperationException
+                                                        "X-wire planner selected a probe without a materialised candidate"
+                                                )
 
                                     let prefixPlan =
                                         XPrefixProjection.forChoice
@@ -183,19 +191,22 @@ module XWire =
                                             frozenBody
 
                                     let transformed = rawWithPrefix rawMessages prefixPlan
-                                    Wanxiangshu.Next.Session.CompanionProjection.replaceMessagesInPlace output transformed
+
+                                    Wanxiangshu.Next.Session.CompanionProjection.replaceMessagesInPlace
+                                        output
+                                        transformed
+
                                     scope.RecordAttemptPlan sessionId providerRun plan
                                     scope.ClearRecovery sessionId
                                 | _ ->
-                                    raise (InvalidOperationException "X-wire cannot plan a retry without authority, fallback, and session projections")
+                                    raise (
+                                        InvalidOperationException
+                                            "X-wire cannot plan a retry without authority, fallback, and session projections"
+                                    )
             | _ -> return ()
         }
 
-    let reconcileAttempt
-        (journal: AgentJournal option)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        : unit =
+    let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : unit =
         match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
         | Some durable, Some plan ->
             let outcome =
@@ -210,6 +221,7 @@ module XWire =
             match AttemptPlanner.promotableProbe plan outcome with
             | Some probe ->
                 let projections = AgentJournal.snapshot durable
+
                 let epoch =
                     AgentProjection.tryFind turn.SessionId projections.AgentProjections
                     |> Option.bind (fun state -> state.PrefixEpoch)
@@ -220,8 +232,8 @@ module XWire =
                         {| SessionId = turn.SessionId
                            PreviousEpochId = probe.BasedOnEpochId
                            NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
-                           FrozenBRef = probe.Candidate.FrozenBRef
-                           FrozenBDigest = probe.Candidate.FrozenBDigest
+                           FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
+                           FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
                            CutoffExclusive = probe.Candidate.CutoffExclusive
                            CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
                            SealRoot = probe.Candidate.SealRoot
@@ -230,11 +242,7 @@ module XWire =
                            SolvingProviderRun = turn.ProviderRun |}
 
                 if epoch.EpochId = probe.BasedOnEpochId then
-                    AgentJournal.appendAgent
-                        (StreamId.Session turn.SessionId)
-                        (Some turn.ProviderRun)
-                        fact
-                        durable
+                    AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact durable
                     |> ignore
             | None -> ()
 

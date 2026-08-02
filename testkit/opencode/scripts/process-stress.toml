@@ -69,7 +69,7 @@ user = "Run the command and report if it timed out."
 [[turn]]
 id = "blogger"
 internal = true
-user = ["# The next user message is the new session material in TOML.", "[[item]]"]
+user = "[[message]]"
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }

@@ -65,7 +65,7 @@ test('CTX_011_promoted_cutoff_may_not_retreat', () => {
 
 test('CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
   // A Y squash makes B more compact without covering more X turns. Equal cutoff
-  // plus a different FrozenB digest is therefore a legitimate promotion — this is
+  // plus a different FrozenRecordPrefix digest is therefore a legitimate promotion — this is
   // the case a naive "cutoff must increase" rule would wrongly reject.
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 5, digest: 'frozen-wide' }).value
 
@@ -82,7 +82,7 @@ test('CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
 })
 
 test('CTX_011_an_identical_candidate_is_reported_as_not_new', () => {
-  // Identity is (cutoff, prefix digest, FrozenB digest). CTX-011 already refuses
+  // Identity is (cutoff, prefix digest, FrozenRecordPrefix digest). CTX-011 already refuses
   // to BUILD such a probe, so a line carrying one is a replay. The projection
   // reports it rather than silently applying: promoting would spend an epoch and
   // a cold boundary for no change in what the model sees.

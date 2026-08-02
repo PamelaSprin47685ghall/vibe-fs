@@ -22,7 +22,7 @@ module XPrefixProjection =
 
     /// COMPANION-009: the plan for one request.
     ///
-    /// `frozenBBody` is the FrozenB text, already read from the blob the snapshot
+    /// `frozenBBody` is the FrozenRecordPrefix text, already read from the blob the snapshot
     /// references. The snapshot carries a `BlobRef` plus digest and never the body —
     /// PERSIST-007 keeps large bodies out of the journal line — so resolving it is the
     /// adapter's job and this module takes the result.
@@ -58,13 +58,14 @@ module XPrefixProjection =
     /// Which blob this attempt needs read before its plan can be built.
     ///
     /// Exposed so the adapter cannot guess. Reading the COMMITTED snapshot's blob for a
-    /// probe attempt would inject the old FrozenB under the candidate's synthetic id —
+    /// probe attempt would inject the old FrozenRecordPrefix under the candidate's synthetic id —
     /// a pairing the provider sees as a changed prefix and no fold can detect, because
     /// both halves are individually well-formed.
     let requiredBlob (choice: XProjectionChoice) (committed: PrefixSnapshot option) : BlobRef option =
         match choice with
-        | XProjectionChoice.UseCommittedEpoch -> committed |> Option.map (fun snapshot -> snapshot.FrozenBRef)
-        | XProjectionChoice.UsePrefixProbe probe -> Some probe.Candidate.FrozenBRef
+        | XProjectionChoice.UseCommittedEpoch ->
+            committed |> Option.map (fun snapshot -> snapshot.FrozenRecordPrefixRef)
+        | XProjectionChoice.UsePrefixProbe probe -> Some probe.Candidate.FrozenRecordPrefixRef
 
     /// Does this plan replace anything.
     let replacesPrefix (plan: XPrefixPlan) = Option.isSome plan.CompanionMemory

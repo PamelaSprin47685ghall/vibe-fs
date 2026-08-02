@@ -86,7 +86,7 @@ reason = "prefix-probe"
 [[turn]]
 id = "blogger"
 internal = true
-user = ["# The next user message is the new session material in TOML.", "[[item]]"]
+user = "[[message]]"
 
   [[turn.step]]
   respond = { type = "text", text = "Coder background." }

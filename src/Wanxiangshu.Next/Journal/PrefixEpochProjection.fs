@@ -63,14 +63,14 @@ module PrefixEpochProjection =
           Snapshot = None
           ReanchoredRuns = Set.empty }
 
-    /// CTX-011 snapshot identity: cutoff, prefix digest, FrozenB digest.
+    /// CTX-011 snapshot identity: cutoff, prefix digest, FrozenRecordPrefix digest.
     ///
     /// SealRoot and SyntheticMessageId are excluded because COMPANION-013 derives
     /// both from these three; including them would make the comparison circular.
     let private sameCandidate (a: PrefixSnapshot) (b: PrefixSnapshot) =
         a.CutoffExclusive = b.CutoffExclusive
         && a.CoveredPrefixDigest = b.CoveredPrefixDigest
-        && a.FrozenBDigest = b.FrozenBDigest
+        && a.FrozenRecordPrefixDigest = b.FrozenRecordPrefixDigest
 
     /// PERSIST-010 `PrefixRebaseCommitted`: a probe produced a valid terminal, so
     /// its candidate becomes the committed epoch.

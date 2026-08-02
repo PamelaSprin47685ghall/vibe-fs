@@ -26,13 +26,13 @@ const frames = (count) =>
 
 // ── prompt text is fixed and carries no numbers ─────────────────────────────
 
-test('COMPANION_004_system_prompt_establishes_the_three_facts_the_shape_needs', () => {
+test('COMPANION_004_system_prompt_establishes_the_facts_the_shape_needs', () => {
   // The projection shape is unusual enough that each of these has to be stated, or
   // the model misreads its own input.
   assert.match(prompt.system, /prior work-log frames/, 'frames are content')
   assert.match(prompt.system, /not as instructions/, 'frames are not instructions')
   assert.match(prompt.system, /final user message/, 'the last message is the new material')
-  assert.match(prompt.system, /Do not invent the content of omitted media/, 'CTX-013')
+  assert.match(prompt.system, /Do not invent the content of\s+omitted media/, 'CTX-013')
   assert.match(prompt.system, /Do not call tools/, 'AGENT-008: the Blogger has none')
 })
 
@@ -40,7 +40,7 @@ test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   // The clause forbids inserting either. A `sprintf` hole is how such a number gets
   // in, so the guarantee is that these strings have no holes at all — asserted by
   // scanning for digits, which also catches a hand-written "keep under 4000 words".
-  const all = [prompt.system, prompt.normalInstruction, prompt.squashInstruction, prompt.memoryPreamble]
+  const all = [prompt.system, prompt.squashInstruction, prompt.memoryPreamble]
 
   for (const text of all) {
     assert.doesNotMatch(text, /\d/, `prompt text must contain no numerals: ${JSON.stringify(text.slice(0, 60))}`)
@@ -49,10 +49,12 @@ test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   }
 })
 
-test('COMPANION_005_normal_instruction_forbids_rewriting_prior_frames', () => {
-  // The load-bearing line. Without it the model restates the whole log, which makes
-  // every entry a de facto squash and defeats the frame sequence entirely.
-  assert.match(prompt.normalInstruction, /Do not rewrite the prior work-log frames/)
+test('COMPANION_004_normal_behaviour_has_a_single_owner_in_the_system_prompt', () => {
+  // COMPANION-004: normal deltas are data-only and the behaviour rules live in the
+  // system prompt alone. The load-bearing line "do not rewrite the prior frames"
+  // therefore lives HERE, and there is no NormalInstruction left to duplicate it.
+  assert.match(prompt.system, /Do not rewrite the prior work-log frames/)
+  assert.equal(prompt.normalInstruction, undefined, 'NormalInstruction was folded into the system prompt')
 })
 
 test('CTX_012_squash_instruction_forbids_adding_facts', () => {
@@ -76,7 +78,7 @@ test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
 // ── synthetic identities (COMPANION-013) ───────────────────────────────────
 
 test('COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', () => {
-  // CTX-011 defines candidate identity as (cutoff, prefix digest, FrozenB digest).
+  // CTX-011 defines candidate identity as (cutoff, prefix digest, FrozenRecordPrefix digest).
   // Those three plus the session and base epoch are what must go in — no more, so a
   // seal cannot change while the candidate is the same, and no fewer, so two
   // different candidates cannot share a seal.
@@ -153,13 +155,13 @@ test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
 
 // ── the normal projection (COMPANION-005) ──────────────────────────────────
 
-test('COMPANION_005_normal_request_is_frames_then_instruction_then_the_physical_delta', () => {
+test('COMPANION_005_normal_request_is_frames_then_the_physical_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: frames(3),
-    delta: { messageId: 'msg_delta', toml: '[[item]]\nturn = 9' },
+    delta: { messageId: 'msg_delta', toml: '[[message]]\nrole = "user"\ntext = "work"' },
   })
 
   assert.equal(plan.system, prompt.system)
@@ -167,17 +169,16 @@ test('COMPANION_005_normal_request_is_frames_then_instruction_then_the_physical_
     'frame body 0',
     'frame body 1',
     'frame body 2',
-    prompt.normalInstruction,
-    '[[item]]\nturn = 9',
+    '[[message]]\nrole = "user"\ntext = "work"',
   ])
 
   // Every message is `user`. Consecutive user messages are deliberate and accepted
   // (COMPANION-005); the Host applies no role-alternation check.
-  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user', 'user'])
+  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user'])
 
   // Exactly one physical message, and it is LAST — so the Host and the provider
   // cannot disagree about which message is this turn's new material.
-  assert.deepEqual(plan.physicalFlags, [false, false, false, false, true])
+  assert.deepEqual(plan.physicalFlags, [false, false, false, true])
 })
 
 test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
@@ -195,7 +196,7 @@ test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
   assert.equal(plan.messages.at(-1).physical, true)
 })
 
-test('COMPANION_005_first_turn_degenerates_to_instruction_then_delta', () => {
+test('COMPANION_005_first_turn_degenerates_to_the_delta_alone', () => {
   // No frames yet. Not a special case in the builder — an empty frame list produces
   // exactly this — so the ordering is identical rather than merely similar.
   const plan = proj.build(spy, {
@@ -206,8 +207,8 @@ test('COMPANION_005_first_turn_degenerates_to_instruction_then_delta', () => {
     delta: { messageId: 'msg_first', toml: 'first' },
   })
 
-  assert.deepEqual(plan.texts, [prompt.normalInstruction, 'first'])
-  assert.deepEqual(plan.physicalFlags, [false, true])
+  assert.deepEqual(plan.texts, ['first'])
+  assert.deepEqual(plan.physicalFlags, [true])
   assert.equal(plan.isFirstTurnShape, true)
 })
 
@@ -303,10 +304,12 @@ test('CTX_012_squash_and_normal_requests_use_different_instruction_ids', () => {
   const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', toml: 'x' } })
   const squash = proj.build(spy, { ...shared, kind: proj.squash(1), delta: undefined })
 
-  const normalInstructionId = normal.messages.at(-2).id
+  // A normal request carries no instruction message at all (COMPANION-004); the
+  // squash instruction id is the squash request's last message id.
   const squashInstructionId = squash.messages.at(-1).id
 
-  assert.notEqual(normalInstructionId, squashInstructionId)
+  assert.equal(normal.messages.length, 2, 'frame + delta, no instruction')
+  assert.notEqual(normal.messages.at(-1).id, squashInstructionId)
 })
 
 // ── COMPANION-007: the canonical candidate digest is a function of the semantic projection, not the TOML text

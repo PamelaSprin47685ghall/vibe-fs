@@ -612,6 +612,73 @@ module Fold =
                         Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
             )
 
+        // ── lifecycle work record (SSOT/08, HOST-005) ──────────────────────
+
+        | AgentFact.OpeningPromptCaptured payload ->
+            // COMPANION-003 / PERSIST-010: idempotent capture. Replaying the same
+            // text is the crash-recovery path; a DIFFERENT text is a line no
+            // correct writer produces, so it fails the fold closed.
+            AgentProjection.tryUpdate
+                payload.SessionId
+                (fun session ->
+                    XTraceProjection.applyOpening
+                        payload.AssignmentText
+                        payload.AuthoritativeRequirements
+                        (Option.defaultValue XTraceProjection.empty session.XTrace)
+                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
+                projection
+            |> function
+                | Ok updated -> Ok updated
+                | Error XTraceFoldRejection.OpeningAlreadyCaptured ->
+                    reject "OpeningPromptCaptured" "opening was already captured with different text (PERSIST-010)"
+                | Error rejection ->
+                    reject "OpeningPromptCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
+
+        | AgentFact.XTracePartAppended payload ->
+            // COMPANION-003 / PERSIST-010: append-only, strictly monotonic cursor.
+            AgentProjection.tryUpdate
+                payload.SessionId
+                (fun session ->
+                    XTraceProjection.applyPart
+                        payload.CursorSequence
+                        payload.Role
+                        (match payload.ProviderRun with
+                         | Some run -> sprintf "run:%s" (ProviderRunIdentity.value run)
+                         | None -> "transform")
+                        payload.Turn
+                        payload.PartIndex
+                        payload.Kind
+                        payload.ToolName
+                        payload.TextRef
+                        payload.TextDigest
+                        (Option.defaultValue XTraceProjection.empty session.XTrace)
+                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
+                projection
+            |> function
+                | Ok updated -> Ok updated
+                | Error(XTraceFoldRejection.CursorNotAfterHead(expected, actual)) ->
+                    reject
+                        "XTracePartAppended"
+                        (sprintf "cursor %d is not after the head %d (PERSIST-010)" actual expected)
+                | Error rejection -> reject "XTracePartAppended" (sprintf "unexpected XTrace rejection: %A" rejection)
+
+        | AgentFact.TerminalOutputCaptured payload ->
+            AgentProjection.tryUpdate
+                payload.SessionId
+                (fun session ->
+                    XTraceProjection.applyTerminal
+                        payload.TextRef
+                        payload.TextDigest
+                        (Option.defaultValue XTraceProjection.empty session.XTrace)
+                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
+                projection
+            |> function
+                | Ok updated -> Ok updated
+                | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
+                    reject "TerminalOutputCaptured" "terminal was already captured with a different blob (PERSIST-010)"
+                | Error rejection ->
+                    reject "TerminalOutputCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
+
         // ── failure-driven context recovery (SSOT/12) ───────────────────────
 
         | AgentFact.BlogEntryCommitted payload ->
@@ -619,10 +686,8 @@ module Fold =
                 payload.SessionId
                 (BlogProjection.applyEntry
                     payload.FrameEpochId
-                    { TurnIndex = payload.PreviousIngestTurn
-                      PartIndex = payload.PreviousIngestPart }
-                    { TurnIndex = payload.NextIngestTurn
-                      PartIndex = payload.NextIngestPart }
+                    payload.PreviousIngestedThroughSequence
+                    payload.NextIngestedThroughSequence
                     payload.PreviousCoverableTurnCutoffExclusive
                     payload.NextCoverableTurnCutoffExclusive
                     payload.NextCoveredPrefixDigest
@@ -651,8 +716,8 @@ module Fold =
                 (PrefixEpochProjection.applyRebase
                     payload.PreviousEpochId
                     payload.NextEpochId
-                    { FrozenBRef = payload.FrozenBRef
-                      FrozenBDigest = payload.FrozenBDigest
+                    { FrozenRecordPrefixRef = payload.FrozenRecordPrefixRef
+                      FrozenRecordPrefixDigest = payload.FrozenRecordPrefixDigest
                       CutoffExclusive = payload.CutoffExclusive
                       CoveredPrefixDigest = payload.CoveredPrefixDigest
                       SealRoot = payload.SealRoot

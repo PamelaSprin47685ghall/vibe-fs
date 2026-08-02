@@ -53,7 +53,7 @@ user = "Produce the second projection for Orchestrator X."
 [[turn]]
 id = "primary-blogger"
 internal = true
-user = ["# The next user message is the new session material in TOML.", "[[item]]"]
+user = "[[message]]"
 
   [[turn.step]]
   respond = { type = "text", text = "Blogger paragraph." }

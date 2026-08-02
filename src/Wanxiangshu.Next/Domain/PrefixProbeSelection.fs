@@ -17,7 +17,7 @@ type NoCandidateReason =
     | CoverageNotAheadOfRequest
     /// CTX-011: the candidate would not move the covered range forward.
     | WouldRetreat of committed: int * proposed: int
-    /// CTX-011: same cutoff, same prefix digest, same FrozenB digest as what is
+    /// CTX-011: same cutoff, same prefix digest, same FrozenRecordPrefix digest as what is
     /// already committed. Promoting it would spend an epoch and a cold boundary for a
     /// prefix the model has already seen.
     | NotNewerThanCommitted
@@ -27,13 +27,13 @@ type NoCandidateReason =
 
 /// CTX-011 candidate selection: build the probe for one armed slot, or say why not.
 ///
-/// Pure. `sha256` is a parameter (VERIFY-008), and the FrozenB body is already
+/// Pure. `sha256` is a parameter (VERIFY-008), and the FrozenRecordPrefix body is already
 /// materialised by the caller — reading a blob is a Host concern (PERSIST-007), and
 /// this module must stay callable from a layer-1 test.
 [<RequireQualifiedAccess>]
 module PrefixProbeSelection =
 
-    /// CTX-011 snapshot identity: cutoff, covered-prefix digest, FrozenB digest.
+    /// CTX-011 snapshot identity: cutoff, covered-prefix digest, FrozenRecordPrefix digest.
     ///
     /// Same three fields `PrefixEpochProjection` compares. Spelled once here and
     /// consumed there would be better still, but the projection cannot depend on this
@@ -42,7 +42,7 @@ module PrefixProbeSelection =
     let private sameAsCommitted (candidate: PrefixSnapshot) (committed: PrefixSnapshot) =
         candidate.CutoffExclusive = committed.CutoffExclusive
         && candidate.CoveredPrefixDigest = committed.CoveredPrefixDigest
-        && candidate.FrozenBDigest = committed.FrozenBDigest
+        && candidate.FrozenRecordPrefixDigest = committed.FrozenRecordPrefixDigest
 
     /// CTX-011, steps 1 through 9.
     ///
@@ -63,7 +63,7 @@ module PrefixProbeSelection =
     /// The proof in step 5 is the load-bearing check. Everything else compares numbers
     /// the plugin itself recorded; this one compares the Companion's claim against X's
     /// actual current prefix, and it is what makes a Host compaction or any other
-    /// renumbering fail closed instead of producing a FrozenB that describes turns the
+    /// renumbering fail closed instead of producing a FrozenRecordPrefix that describes turns the
     /// prefix no longer has.
     let select
         (sha256: string -> string)
@@ -116,14 +116,14 @@ module PrefixProbeSelection =
                             frozenBDigest
 
                     let candidate =
-                        { FrozenBRef = frozenBRef
-                          FrozenBDigest = frozenBDigest
+                        { FrozenRecordPrefixRef = frozenBRef
+                          FrozenRecordPrefixDigest = frozenBDigest
                           CutoffExclusive = candidateCutoff
                           CoveredPrefixDigest = coveredDigest
                           SealRoot = sealRoot
                           SyntheticMessageId = CompanionIdentity.companionMemoryMessageId sha256 sealRoot }
 
-                    // Step 2b. Equal cutoff with a tighter FrozenB is a legitimate new
+                    // Step 2b. Equal cutoff with a tighter FrozenRecordPrefix is a legitimate new
                     // candidate — a Y squash makes B more compact without covering more
                     // X turns — so identity is the test, not the cutoff alone.
                     match committedSnapshot with

@@ -4,17 +4,16 @@ open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
 /// COMPANION-005: what a frame is. Entry and Squash are interchangeable inputs to
-/// a later squash (CTX-012 cascade), and Seed is the parent work record inherited
-/// at creation (COMPANION-004).
+/// a later squash (CTX-012 cascade). There is no Seed: the parent LWR is a child's
+/// input context, never a frame of the child's own work log (COMPANION-003).
 ///
-/// The kind is recorded rather than derived because a squash of `[Seed; Entry]` is
-/// indistinguishable from a squash of `[Entry; Entry]` once written, and
+/// The kind is recorded rather than derived because a squash of `[Entry; Entry]`
+/// is indistinguishable from a squash of `[Entry; Entry]` once written, and
 /// diagnostics need to say which history a frame came from.
 [<RequireQualifiedAccess>]
 type BlogFrameKind =
     | Entry
     | Squash
-    | Seed
 
 type BlogFrame =
     { Kind: BlogFrameKind
@@ -23,16 +22,21 @@ type BlogFrame =
 
 /// CTX-011: the two positions plus the proof that ties the second one to X.
 ///
-/// `IngestCursor` may sit mid-turn; `CoverableTurnCutoffExclusive` never does.
-/// A probe may only use the latter (COMPANION-011), which is why they are separate
-/// fields rather than one "progress" number.
+/// `IngestedThroughSequence` is the RecordCoverage advance in XTraceCursor
+/// coordinates (COMPANION-003): it may sit mid-turn, and it decides where the LWR
+/// gap starts. `CoverableTurnCutoffExclusive` never does — a probe may only use
+/// the latter (COMPANION-011), which is why they are separate fields rather than
+/// one "progress" number.
 ///
-/// `SemanticCursor` comes from `Domain.BloggerDelta`: the chunker produces the
-/// value this projection folds, and one type keeps the producer and the validator
-/// talking about the same position.
+/// `IngestedThroughSequence` comes from `Domain.BloggerDelta`: the chunker
+/// produces the value this projection folds, and one type keeps the producer and
+/// the validator talking about the same position.
 type BlogCoverage =
     {
-        IngestCursor: SemanticCursor
+        /// RecordCoverage: how much of the XTrace the Companion has consumed.
+        /// Zeroed by reanchor (HOST-006) but never by Host compaction alone.
+        IngestedThroughSequence: int64
+        /// PrefixCoverage: the complete-turn boundary the probe may replace up to.
         CoverableTurnCutoffExclusive: int
         CoveredPrefixDigest: string
         /// CTX-011: how many frames existed when the cutoff last advanced.
@@ -41,19 +45,20 @@ type BlogCoverage =
         /// appends a frame and leaves the cutoff alone (CTX-013 level two), so the frame
         /// list runs ahead of what the cutoff claims.
         ///
-        /// A probe must use only these frames. Using all of them would build a FrozenB
-        /// describing turns at or beyond the cutoff — which are still present as raw
-        /// messages after it — so the model would see the same turn twice, once
-        /// summarised and once verbatim. Not a correctness loss, but the design says
-        /// "probe uses CoverableB, not the possibly-ahead LatestB", and this count is
-        /// what makes CoverableB derivable rather than a second stored copy.
+        /// A probe must use only these frames. Using all of them would build a
+        /// FrozenRecordPrefix describing turns at or beyond the cutoff — which are still
+        /// present as raw messages after it — so the model would see the same turn twice,
+        /// once summarised and once verbatim. Not a correctness loss, but the design says
+        /// "probe uses CoverableRecordPrefix, not the possibly-ahead full frame list",
+        /// and this count is what makes the prefix derivable rather than a second stored
+        /// copy.
         CoverableFrameCount: int
     }
 
 /// The Companion's durable state: the frame sequence and what it covers.
 ///
 /// `Frames` is oldest-first. PERSIST-008: every question this answers
-/// (`frame count`, `current coverage`, `LatestB`) reads this record, never the
+/// (`frame count`, `current coverage`, `EffectiveFrames`) reads this record, never the
 /// journal history, and never the Blogger's physical transcript (PERSIST-010).
 type BlogProjectionState =
     { FrameEpochId: FrameEpochId
@@ -87,20 +92,18 @@ type BlogFoldRejection =
 
 module BlogProjection =
 
-    let private originCursor = { TurnIndex = 0; PartIndex = 0 }
-
     let empty =
         { FrameEpochId = FrameEpochId.initial
           Frames = []
           Coverage =
-            { IngestCursor = originCursor
+            { IngestedThroughSequence = 0L
               CoverableTurnCutoffExclusive = 0
               CoveredPrefixDigest = ""
               CoverableFrameCount = 0 } }
 
     let frameCount (state: BlogProjectionState) = List.length state.Frames
 
-    /// CTX-011: the frames a probe may build FrozenB from.
+    /// CTX-011: the frames a probe may build FrozenRecordPrefix from.
     ///
     /// Derived from `CoverableFrameCount` rather than stored as a second blob. The
     /// design draft carried a `CoverableBRef`/`CoverableBDigest` pair; a count is
@@ -108,29 +111,6 @@ module BlogProjection =
     /// drift from the frames the way a separate materialised copy can.
     let coverableFrames (state: BlogProjectionState) =
         state.Frames |> List.truncate state.Coverage.CoverableFrameCount
-
-    /// COMPANION-004: a new Y inherits the parent's work record as a `Seed` frame.
-    ///
-    /// A seed covers no X turn of its own — it describes the PARENT's history, not
-    /// this session's — so coverage stays at the origin. That is why the first real
-    /// entry still starts from cursor 0 despite a frame already being present.
-    ///
-    /// Only valid on a fresh projection. Seeding a session that already has frames
-    /// would insert parent history in the middle of its own, which no clause
-    /// describes and `applySquash` would then fold into a frame claiming to
-    /// summarise both.
-    let withSeed (seed: BlogFrame) (state: BlogProjectionState) : BlogProjectionState =
-        if List.isEmpty state.Frames then
-            { state with Frames = [ seed ] }
-        else
-            state
-
-    /// Lexicographic on (turn, part). The part index is only meaningful within a
-    /// turn, so comparing it across turns would let a later turn's early part look
-    /// like a retreat.
-    let private isAfter (next: SemanticCursor) (previous: SemanticCursor) =
-        next.TurnIndex > previous.TurnIndex
-        || (next.TurnIndex = previous.TurnIndex && next.PartIndex > previous.PartIndex)
 
     /// CTX-012: how many of the oldest frames the next squash takes.
     ///
@@ -142,10 +122,15 @@ module BlogProjection =
 
     /// PERSIST-010 `BlogEntryCommitted`. Frame append and coverage advance are one
     /// commit, so one function applies both or neither.
+    ///
+    /// `IngestedThroughSequence` advances in XTraceCursor coordinates; the turn/part
+    /// pair is only used for the coverable-turn cutoff, which moves exclusively on
+    /// complete turn boundaries. The record coverage may advance without the cutoff
+    /// (mid-turn chunk) but never backwards.
     let applyEntry
         (frameEpoch: FrameEpochId)
-        (previousIngest: SemanticCursor)
-        (nextIngest: SemanticCursor)
+        (previousIngestSequence: int64)
+        (nextIngestSequence: int64)
         (previousCutoff: int)
         (nextCutoff: int)
         (nextDigest: string)
@@ -154,9 +139,9 @@ module BlogProjection =
         : Result<BlogProjectionState, BlogFoldRejection> =
         if frameEpoch <> state.FrameEpochId then
             Error(BlogFoldRejection.StaleFrameEpoch(state.FrameEpochId, frameEpoch))
-        elif previousIngest <> state.Coverage.IngestCursor then
+        elif previousIngestSequence <> state.Coverage.IngestedThroughSequence then
             Error BlogFoldRejection.IngestCursorMismatch
-        elif not (isAfter nextIngest previousIngest) then
+        elif nextIngestSequence <= previousIngestSequence then
             Error BlogFoldRejection.IngestCursorNotAdvanced
         elif previousCutoff <> state.Coverage.CoverableTurnCutoffExclusive then
             Error BlogFoldRejection.CoverageRetreated
@@ -169,7 +154,7 @@ module BlogProjection =
                 { state with
                     Frames = frames
                     Coverage =
-                        { IngestCursor = nextIngest
+                        { IngestedThroughSequence = nextIngestSequence
                           CoverableTurnCutoffExclusive = nextCutoff
                           CoveredPrefixDigest = nextDigest
                           // The coverable boundary moves only when the cutoff does. A
@@ -235,14 +220,17 @@ module BlogProjection =
     /// Host compaction, so coverage returns to the origin.
     ///
     /// Frames survive. B records work that really happened; what compaction voided
-    /// is the mapping from B to X turn indices, not the work log itself.
+    /// is the mapping from B to X turn indices, not the work log itself. The record
+    /// coverage is zeroed for the same reason: the XTrace cursor is independent of
+    /// Host numbering, but re-reading from the origin after a reanchor is what
+    /// COMPANION-008 prescribes (frames survive, coverage returns to origin).
     ///
     /// The frame epoch does NOT advance: no frame changed, so a squash written
     /// against the current epoch is still valid after a reanchor.
     let applyReanchor (state: BlogProjectionState) : BlogProjectionState =
         { state with
             Coverage =
-                { IngestCursor = originCursor
+                { IngestedThroughSequence = 0L
                   CoverableTurnCutoffExclusive = 0
                   CoveredPrefixDigest = ""
                   // Zero, not "all frames": the frames survive, but none of them is

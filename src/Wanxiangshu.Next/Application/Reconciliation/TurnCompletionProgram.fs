@@ -143,10 +143,11 @@ module TurnCompletionProgram =
             let wasAborted = abortedSessions.Contains sessionKey
             abortedSessions.Remove sessionKey |> ignore
 
-            // HOST-005: session-wide A is this turn's text plus reasoning appended
-            // to everything the Session accumulated. An empty intermediate turn
-            // does not wipe prior A.
-            let sessionWide = TerminalSessionA.accumulateTurn eventPort turn
+            // COMPANION-003: the terminal text is this turn's formal text — the
+            // XTrace's terminal segment, not a parallel session-wide A
+            // accumulation (HOST-005). The XTrace parts themselves are captured
+            // at the transform boundary (`XTraceCapture.captureProjection`).
+            let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
 
             wasAborted, sessionWide
 
@@ -187,13 +188,17 @@ module TurnCompletionProgram =
                           ProviderRun = turn.ProviderRun
                           Role = AgentRoleIdentity.toRole role
                           Directory = turn.Directory
-                          SessionWideText = sessionWideText
+                          TerminalText = sessionWideText
                           TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
                     // EXEC-006: `IsValid` is the single place that decides whether a
                     // completed run carries session-wide A. Re-testing the text here
                     // would be a second copy of that rule.
                     if runResult.IsValid then
+                        // COMPANION-003: the terminal output becomes the XTrace's
+                        // final segment. Idempotent (PERSIST-010).
+                        XTraceCapture.captureTerminal journal turn
+
                         eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                         |> ignore
 
@@ -266,10 +271,9 @@ module TurnCompletionProgram =
             completeReviewerOrAssistant true |> ignore
             AsyncSupport.completedTask ()
         | TurnNeedsContinuation _ ->
-            // Absorb text and reasoning into session-wide A even though this turn is
+            // Absorb text and reasoning into the XTrace even though this turn is
             // not completable, then ask for the missing report. Still not fallback.
-            TerminalSessionA.accumulateTurn eventPort turn |> ignore
-
+            // (The XTrace parts are captured at the transform boundary.)
             sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
         | TurnAborted reason ->
             abortedSessions.Add sessionKey |> ignore

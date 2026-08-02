@@ -69,7 +69,9 @@ const expectedBytes = (assignment, { payload, parentWorkRecord, requirements = [
     return `${header}\n`
   }
 
-  return `${header}\n\n${body.join('\n\n')}\n`
+  // ARCH-010: header and body are separated by exactly one blank line; the data
+  // body itself renders with single LF (no decorative blank lines).
+  return `${header}\n\n${body.join('\n')}\n`
 }
 
 test('FORK_CHILD_PAYLOAD_assignment_promoted_to_instruction_header', () => {

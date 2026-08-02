@@ -63,15 +63,21 @@ module HostForkRunLifecycle =
         (sessions: ISessionHostPort)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
-        (workRecord: WorkRecordSnapshot option)
+        (workRecord: string option)
         =
         let suppliedWorkRecord = workRecord
 
-        // Completion always exposes a work record: companion B when available,
-        // otherwise the completed Session's full A output (HOST-005).
+        // EXEC-008 / COMPANION-003: the completion's work record is the child's
+        // final LifecycleWorkRecord — opening, frames, gap, terminal. When the
+        // durable record is unavailable, the terminal text stands in: the same
+        // self-contained value, not a parallel final-text channel.
         let completedWorkRecord (result: AgentRunResult) =
             suppliedWorkRecord
-            |> Option.orElseWith (fun () -> AgentCompletion.snapshotOption (Some result.SessionWideText))
+            |> Option.orElseWith (fun () ->
+                if String.IsNullOrWhiteSpace result.TerminalText then
+                    None
+                else
+                    Some result.TerminalText)
 
         // Only the first matching terminal may claim the run. Duplicate idle/
         // abort from dual event streams must not SetResult twice.
@@ -137,8 +143,7 @@ module HostForkRunLifecycle =
                             // HOST-010/HOST-011: the terminal provider run IS the
                             // assistant message, so there is no separate id to pass.
                             result.ProviderRun
-                            result.SessionWideText
-                            (completedWorkRecord result)
+                            (completedWorkRecord result |> Option.defaultValue "")
                             result.Directory
                     )
             | Aborted reason ->
@@ -181,7 +186,7 @@ module HostForkRunLifecycle =
 
         let terminalWorkRecord outcome =
             match outcome with
-            | Completed _ -> AgentCompletion.snapshotOption (childWorkRecordFor childId)
+            | Completed _ -> childWorkRecordFor childId
             | _ -> None
 
         let subscription =

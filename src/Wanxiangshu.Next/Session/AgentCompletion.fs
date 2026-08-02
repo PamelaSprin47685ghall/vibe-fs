@@ -4,13 +4,6 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Companion work log snapshot (session-wide B / LatestB), not a single turn.
-type WorkRecordSnapshot =
-    { Text: string
-      Digest: string
-      Freshness: string
-      CoveredThrough: string option }
-
 type AgentFailurePayload =
     {
         AgentId: string
@@ -35,6 +28,12 @@ type AgentFailurePayload =
 /// Typed, not `string option`: HOST-010 makes the terminal provider run the
 /// assistant message id, and PROMPT-002 makes the root a promoted physical
 /// message. `AssistantMessageId` was a second name for the former.
+///
+/// COMPANION-003: `WorkRecord` IS the final LifecycleWorkRecord — Opening + Y
+/// frames + X gap + terminal. The old `FinalText` (session-wide A) and
+/// `WorkRecordSnapshot` (B with digest/freshness/coverage metadata) are both gone:
+/// one self-contained record replaces the pair, and runtime-only metadata never
+/// reaches the LLM-visible wire (EXEC-004).
 type AgentCompletionPayload =
     {
         AgentId: string
@@ -43,10 +42,8 @@ type AgentCompletionPayload =
         Role: AgentRole
         AuthorityRoot: AuthorityRootUserMessageId option
         ProviderRun: ProviderRunIdentity option
-        /// Session-wide A for the child Session: formal text + reasoning/thinking.
-        FinalText: string
-        /// Session-wide companion work log (B / LatestB) when available.
-        WorkRecord: WorkRecordSnapshot option
+        /// The final LifecycleWorkRecord, materialised at terminal.
+        WorkRecord: string
         /// The worktree this child ran in, when it has one.
         Directory: string option
     }
@@ -59,7 +56,7 @@ type AgentCompletionOutcome =
 module AgentCompletion =
     let text (outcome: AgentCompletionOutcome) =
         match outcome with
-        | AgentCompleted payload -> payload.FinalText
+        | AgentCompleted payload -> payload.WorkRecord
         | AgentFailed payload
         | AgentAborted payload -> payload.Message
 
@@ -71,7 +68,7 @@ module AgentCompletion =
 
     let isCompleted (outcome: AgentCompletionOutcome) =
         match outcome with
-        | AgentCompleted payload -> not (String.IsNullOrWhiteSpace payload.FinalText)
+        | AgentCompleted payload -> not (String.IsNullOrWhiteSpace payload.WorkRecord)
         | _ -> false
 
     let completed
@@ -81,8 +78,7 @@ module AgentCompletion =
         (role: AgentRole)
         (authorityRoot: AuthorityRootUserMessageId)
         (providerRun: ProviderRunIdentity)
-        (finalText: string)
-        (workRecord: WorkRecordSnapshot option)
+        (workRecord: string)
         (directory: string option)
         =
         AgentCompleted
@@ -92,7 +88,6 @@ module AgentCompletion =
               Role = role
               AuthorityRoot = Some authorityRoot
               ProviderRun = Some providerRun
-              FinalText = finalText
               WorkRecord = workRecord
               Directory = directory }
 
@@ -134,6 +129,9 @@ module AgentCompletion =
     /// be called here with `"" "" ""` for ChildSessionId, root and directory, which
     /// made "this run has no child session" and "its session id is the empty string"
     /// the same value — the sentinel pattern PROMPT-001 exists to remove.
+    ///
+    /// The work record is the run's plain text: a PTY has no LWR, and its completion
+    /// schema stays deliberately minimal (EXEC-004).
     let ofSimpleText (agentId: string) (runId: string) (role: AgentRole) (text: string) =
         AgentCompleted
             { AgentId = agentId
@@ -142,8 +140,7 @@ module AgentCompletion =
               Role = role
               AuthorityRoot = None
               ProviderRun = None
-              FinalText = text
-              WorkRecord = None
+              WorkRecord = text
               Directory = None }
 
     let ofSimpleError (agentId: string) (runId: string) (role: AgentRole) (message: string) =
@@ -169,23 +166,6 @@ module AgentCompletion =
                     RunId = runId
                     AgentId = agentId
                     Role = Some role }
-
-    let snapshotFromText (text: string) : WorkRecordSnapshot =
-        let bytes = System.Text.Encoding.UTF8.GetBytes text
-        let mutable hash = 2166136261u
-
-        for b in bytes do
-            hash <- (hash ^^^ uint32 b) * 16777619u
-
-        { Text = text
-          Digest = sprintf "fnv1a:%08x" hash
-          Freshness = "current"
-          CoveredThrough = None }
-
-    let snapshotOption (text: string option) : WorkRecordSnapshot option =
-        match text with
-        | Some value when not (System.String.IsNullOrWhiteSpace value) -> Some(snapshotFromText value)
-        | _ -> None
 
 /// A completed (or failed/aborted) agent run.
 ///

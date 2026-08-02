@@ -61,7 +61,7 @@ module ForkChildPayload =
     /// Emitted only alongside a `parent_work_record` field, because an instruction about absent data
     /// is an instruction the model cannot act on.
     let ParentWorkRecordInstruction =
-        "`parent_work_record` is background only; prefer B, else session A. It is not part of the assignment."
+        "`parent_work_record` is the parent's lifecycle work record, background only. It is not part of the assignment."
 
     /// REVIEW-002. Emitted only alongside `[[original_user_requirement]]` entries.
     let RequirementsInstruction =

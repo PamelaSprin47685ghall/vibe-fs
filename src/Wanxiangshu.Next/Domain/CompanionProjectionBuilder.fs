@@ -44,12 +44,15 @@ module CompanionProjectionBuilder =
 
     let private instructionFor (kind: CompanionRequestKind) =
         match kind with
-        | CompanionRequestKind.Normal -> CompanionPrompt.NormalInstruction
-        | CompanionRequestKind.Squash _ -> CompanionPrompt.SquashInstruction
+        // COMPANION-004: normal requests are data-only. The behaviour rules live
+        // in the system prompt; a per-request instruction user message would be
+        // the duplicated injection the migration removes.
+        | CompanionRequestKind.Normal -> None
+        | CompanionRequestKind.Squash _ -> Some CompanionPrompt.SquashInstruction
 
     /// COMPANION-005 / CTX-012.
     ///
-    /// Normal:  system, every frame, normal instruction, physical delta LAST.
+    /// Normal:  system, every frame, physical delta LAST (no instruction message).
     /// Squash:  system, the oldest `frameCount` frames, squash instruction LAST.
     ///
     /// The delta is last on a normal request because that keeps the physical message
@@ -85,10 +88,13 @@ module CompanionProjectionBuilder =
                   IsPhysical = false })
 
         let instruction =
-            { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
-              Role = "user"
-              Text = instructionFor kind
-              IsPhysical = false }
+            instructionFor kind
+            |> Option.map (fun text ->
+                { MessageId =
+                    CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
+                  Role = "user"
+                  Text = text
+                  IsPhysical = false })
 
         let tail =
             match kind, physicalDelta with
@@ -103,7 +109,7 @@ module CompanionProjectionBuilder =
             | _ -> []
 
         { System = CompanionPrompt.System
-          Messages = frameMessages @ [ instruction ] @ tail }
+          Messages = frameMessages @ (instruction |> Option.toList) @ tail }
 
     /// COMPANION-005 first-turn degeneration: no frames yet.
     ///
@@ -112,5 +118,5 @@ module CompanionProjectionBuilder =
     /// the ordering is identical rather than merely similar.
     let isFirstTurnShape (plan: CompanionProjectionPlan) =
         match plan.Messages with
-        | [ instruction; delta ] -> not instruction.IsPhysical && delta.IsPhysical
+        | [ delta ] -> delta.IsPhysical
         | _ -> false

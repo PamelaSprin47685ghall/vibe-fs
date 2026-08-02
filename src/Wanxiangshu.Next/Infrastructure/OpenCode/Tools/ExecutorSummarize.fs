@@ -36,8 +36,8 @@ module ExecutorSummarize =
 
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
-        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.FinalText) -> payload.FinalText
-        | AgentCompleted _ -> raise (InvalidOperationException "completed with empty final text")
+        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) -> payload.WorkRecord
+        | AgentCompleted _ -> raise (InvalidOperationException "completed with empty work record")
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAborted payload -> raise (InvalidOperationException payload.Message)
 

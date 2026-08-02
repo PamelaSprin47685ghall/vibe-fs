@@ -50,9 +50,10 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                         Ok(
                             Some
                                 { Blog = blog
-                                  LatestB = latestB
+                                  EffectiveFrames = latestB
                                   BloggerSessionId =
-                                    session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId) }
+                                    session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId)
+                                  XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }
                         )
 
         member _.AppendSuccessful(sessionId, completion) =
@@ -65,6 +66,21 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                 | Some bloggerSessionId when bloggerSessionId = completion.BloggerSessionId ->
                     let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
+                    // COMPANION-003: the RecordCoverage advance is expressed in
+                    // XTraceCursor coordinates. The chunker works in semantic
+                    // (turn/part) coordinates; map the chunk's next cursor to the
+                    // XTrace cursor of the first part at or after that position.
+                    let ingestedThrough =
+                        let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+
+                        xTrace.Parts
+                        |> List.tryFind (fun part ->
+                            part.Turn > completion.NextCursor.TurnIndex
+                            || (part.Turn = completion.NextCursor.TurnIndex
+                                && part.PartIndex >= completion.NextCursor.PartIndex))
+                        |> Option.map (fun part -> part.Cursor.Sequence)
+                        |> Option.defaultValue (XTraceProjection.headSequence xTrace + 1L)
+
                     match blobWriter.Write completion.Text with
                     | Error error -> Error error
                     | Ok blob ->
@@ -73,10 +89,8 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                                 {| SessionId = sessionId
                                    BloggerSessionId = completion.BloggerSessionId
                                    FrameEpochId = blog.FrameEpochId
-                                   PreviousIngestTurn = blog.Coverage.IngestCursor.TurnIndex
-                                   PreviousIngestPart = blog.Coverage.IngestCursor.PartIndex
-                                   NextIngestTurn = completion.NextCursor.TurnIndex
-                                   NextIngestPart = completion.NextCursor.PartIndex
+                                   PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
+                                   NextIngestedThroughSequence = ingestedThrough
                                    PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
                                    NextCoverableTurnCutoffExclusive = completion.NextCoverableTurnCutoffExclusive
                                    NextCoveredPrefixDigest = completion.NextCoveredPrefixDigest

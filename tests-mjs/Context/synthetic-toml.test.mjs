@@ -179,15 +179,16 @@ test('ARCH_010_instruction_and_data_are_separated_by_exactly_one_blank_line', ()
     toml.field('exit_code', '1'),
   ])
 
-  assert.equal(
-    document,
-    ['# Diagnose the first causal failure.', '', 'tool = "dotnet"', '', 'exit_code = 1', ''].join('\n'),
-  )
+  // ARCH-010: header and body are separated by exactly one blank line; the data
+  // body itself is rendered with single LF — no decorative blank lines between
+  // fields or tables.
+  assert.equal(document, ['# Diagnose the first causal failure.', '', 'tool = "dotnet"', 'exit_code = 1', ''].join('\n'))
 
   const lines = syntaxLines(document)
   assert.equal(lines[0].startsWith('#'), true, 'instruction-first: the first line is a comment')
   assert.equal(lines[1], '', 'exactly one blank line follows the header')
   assert.equal(lines[2].startsWith('#'), false, 'the body begins immediately after it')
+  assert.equal(document.includes('\n\n\n'), false, 'only the one header/body separator exists')
 })
 
 test('ARCH_010_a_data_only_document_carries_no_instruction', () => {
@@ -251,7 +252,7 @@ test('ARCH_010_bare_fields_are_emitted_before_table_arrays', () => {
     toml.tableArrayEntry('t', [toml.field('x', '1')]),
     toml.field('a', '1'),
   ])
-  assert.equal(twoFields.startsWith('b = 2\n\na = 1\n\n[[t]]'), true, `stable order: ${twoFields}`)
+  assert.equal(twoFields.startsWith('b = 2\na = 1\n[[t]]'), true, `stable order: ${twoFields}`)
 })
 
 test('ARCH_010_a_multiline_value_starting_with_a_bracket_is_still_a_field', () => {

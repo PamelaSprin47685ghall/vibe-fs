@@ -16,6 +16,9 @@ module PromptIngressCodec =
             ExplicitAgent: string option
             PromptKey: PromptKey option
             IsHostCompaction: bool
+            /// COMPANION-003: the message's text, for the OpeningPromptRaw capture
+            /// at the physical acceptance point. User text parts only.
+            Text: string option
         }
 
     let private agentOf (source: obj) : string option =
@@ -119,9 +122,22 @@ module PromptIngressCodec =
             |> Option.filter (String.IsNullOrWhiteSpace >> not)
             |> Option.map PromptKey.create
 
+    /// COMPANION-003: the user message's text, for the opening capture. Only the
+    /// physical user message's own text parts count — the opening is the first
+    /// task prompt, and a synthetic part (tool result, metadata) is not it.
+    let private textOf (output: obj) : string option =
+        parts output
+        |> Array.choose (fun part ->
+            match readString part "type" with
+            | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
+            | _ -> None)
+        |> Array.filter (String.IsNullOrWhiteSpace >> not)
+        |> Array.tryHead
+
     let decode (input: obj) (output: obj) : DecodedMessage =
         { SessionId = sessionIdOf input
           PhysicalUserMessageId = messageIdOf input output
           ExplicitAgent = [ input; output ] |> List.tryPick agentOf
           PromptKey = promptKeyOf input output
-          IsHostCompaction = isHostCompaction output }
+          IsHostCompaction = isHostCompaction output
+          Text = textOf output }

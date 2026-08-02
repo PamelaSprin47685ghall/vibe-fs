@@ -25,15 +25,20 @@ type CompanionOutcome =
 type CompanionMemory =
     {
         Blog: BlogProjectionState
-        LatestB: BlogText option
+        EffectiveFrames: BlogText option
         /// COMPANION-003: the durable companion Blogger Session Y.
         BloggerSessionId: SessionId option
+        /// COMPANION-003: the session's XTrace projection. The chunker maps the
+        /// RecordCoverage (XTrace cursor sequence) back to semantic coordinates
+        /// through it, so the Blog projection and the XTrace stay in step without
+        /// a second copy of either.
+        XTrace: XTraceProjectionState
     }
 
 /// The durable Companion writes this runtime cache mirrors.
 ///
 /// Two members are gone with the old prefix mechanism: `AppendEpochSwitched`, which
-/// wrote the FrozenB text inline from a token-budget comparison, and
+/// wrote the FrozenRecordPrefix text inline from a token-budget comparison, and
 /// `EnableReplacement`, which flipped a per-session opt-in flag. COMPANION-009's epoch
 /// now has exactly two movers — `PrefixRebaseCommitted` (CTX-012) and
 /// `ContextReanchored` (HOST-006) — and neither goes through this port: they are

@@ -13,7 +13,10 @@
 整体迁移到 `SSOT/` 条款；测试体系为直接消费 `build/next` 发布产物的 `tests-mjs`。
 conformance 表 `UNVERIFIED` 已清零（绑定 commit `66afcb24`）。
 
-SSOT/13（ARCH-010）：工具返回面与 fork 信封已完成 TOML 迁移，conformance 已记账。
+LifecycleWorkRecord 迁移已完成（方案 `STATUS/lifecycle-work-record.md`）：父→子与子→父统一为
+LWR（Opening + Y frames + X gap + Terminal）；A/B 双轨、FinalText、Seed、TerminalSessionA、
+FrozenB 全部废止；Y normal delta data-only、Blogger delta 稀疏 schema、TOML data body 单 LF、
+join 最小 wire（status/agent/work_record）。
 
 ## 当前开发阶段
 

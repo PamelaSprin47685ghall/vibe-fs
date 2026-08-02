@@ -153,6 +153,10 @@ module SyntheticToml =
     ///   no comment in the body   unexpressible: body blocks come from `field` and `tableArrayEntry`
     ///   three legal shapes       an empty header gives data-only, an empty body instruction-only,
     ///                            and neither adds the separator it would otherwise need
+    ///   no body blank lines      the data body renders with single LF between blocks; only the
+    ///                            header/body boundary carries the one blank line (ARCH-010).
+    ///                            Multi-line TOML string values are content and keep their own
+    ///                            newlines untouched.
     ///
     /// ── bare fields are emitted before tables, and that is load-bearing ─────
     ///
@@ -175,8 +179,8 @@ module SyntheticToml =
         match header, ordered with
         | [], [] -> ""
         | _, [] -> String.concat "\n" header + "\n"
-        | [], _ -> String.concat "\n\n" ordered + "\n"
-        | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n\n" ordered + "\n"
+        | [], _ -> String.concat "\n" ordered + "\n"
+        | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n" ordered + "\n"
 
     /// UTF-8 byte count of rendered text.
     ///
