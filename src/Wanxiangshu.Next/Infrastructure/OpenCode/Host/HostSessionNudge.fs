@@ -76,7 +76,9 @@ module HostSessionNudge =
     /// which differs from the previous worktree version by design; the
     /// scenario's prefix-probe boundary carries that transition.
     let private liveDirectory (directory: string option) =
-        directory |> Option.filter (fun path -> System.IO.Directory.Exists path)
+        directory
+        |> Option.filter (fun path -> System.IO.Directory.Exists path)
+        |> Option.orElse SharedState.RootWorkspace
 
     let sendContinuationResult
         (sessionPort: ISessionHostPort)

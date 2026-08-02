@@ -116,6 +116,11 @@ module HostReviewGuard =
             dedupeOccasion
             reason
 
+    let private sessionDirectory (sessionId: SessionId) =
+        match SharedState.SessionDirectories.TryGetValue(SessionId.value sessionId) with
+        | true, dir -> Some dir
+        | false, _ -> None
+
     let private sendGuardNudge
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -167,7 +172,7 @@ module HostReviewGuard =
                             targetSessionId
                             prompt
                             continuationKind
-                            SharedState.RootWorkspace
+                            (sessionDirectory targetSessionId)
                             (Some durable)
                             None
 
