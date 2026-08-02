@@ -4,10 +4,7 @@
 
 `PURE_CORE_ONLY`：条款的纯领域内核已实现并测试（第 1 层），但生产接线被 Host canary 门禁阻断（如 SSOT/14-16 的 STRENGTH-078 / ENFORCER-180 / LEARN-082…088）——不是"零实现"，也不是"可发布"。
 
-绑定源码 commit：`c096866a`（release-evidence 归档 + build 全清理）。运行验证不属于
-commit 内容，命令与结果见 `evidence/manager-worktree-durable-ownership.md`。本表只记录截至该提交的源码状态。
-
-休克期内已迁移的条款一律记 `UNVERIFIED`，不记 `CONFORMANT`：编译与测试关闭，代码符合条款只是静态阅读的结论，尚未产生判据。判据在退火一/二恢复后补齐。
+绑定源码 commit：`38cc1882`（休克—退火迁移收口）。运行验证不属于 commit 内容，命令与结果见 `docs/evidence/`；历史机器证据见 `docs/archive/shock-anneal-2026/evidence/`。本表只记录截至该提交的源码状态。
 
 ## 架构 DNA
 
@@ -52,29 +49,13 @@ commit 内容，命令与结果见 `evidence/manager-worktree-durable-ownership.
 
 ### Fallback 段此前的记录全部失效（包 T-3 更正）
 
-本段在包 T-3 之前的内容描述的是迁移前状态，七行里没有一行仍然成立：
-
-```text
-FALLBACK-002 「无 ConsecutiveFailureCount 字段（当前是 LastProviderAttempt）」
-             → 字段自包 0b 起就存在，LastProviderAttempt 已不在仓库中
-FALLBACK-003 「两个 writer 经 recordFallbackFailure 写同一事实，实测 3 writers」
-             → 包 C 已合一，recordFallbackFailure 全仓 0 处，shock-audit ok (1)
-FALLBACK-004 「成功清零 count 未实现（无 count）」            → 已实现
-FALLBACK-005 「无 AutoRecoveryBudget；无 FallbackExhausted 事实」→ 两者都有
-FALLBACK-007 「缺三个字段；无 Fold 验证」                     → 六字段齐备，Fold 验证在
-FALLBACK-010 「当前无 count 概念，故无从混淆」                 → 有 count，且已有结构性保证
-```
-
-失效的原因值得记档。 这些行是包 C 完成时该更新而没更新的。休克期关闭了测试反馈，而
-`conformance.md` 的更新一直依赖手工，于是「代码前进、状态表留在原地」这个方向的偏移没有
-任何机器会发现——`ssot-lint` 只检查条款 ID 与实现状态词的分离，不检查状态词是否真实。
-
-这正是 AGENTS.md 第 1 节警告的第二种失败形态的镜像：那条讲的是「写完才看文档」，这里是
-「改完没回写状态」。两者的共同后果一样——`conformance.md` 与代码的偏离多一处，而且偏在
-乐观方向时更危险：一个标着 `CONTRADICTS` 的合规项只是噪音，一个标着 `CONFORMANT` 的
-违规项会让人跳过检查。
-
-本次更正后 Fallback 段的每一行都绑定到一个第 1 层测试或一次 `shock-audit` 实测输出。
+本段在包 T-3 之前的内容描述的是迁移前状态，七行里没有一行仍然成立（详细对照见
+`docs/archive/shock-anneal-2026/FINAL-REPORT.md` §8）。失效的根因值得记档：这些行是包 C
+完成时该更新而没更新的。休克期关闭了测试反馈，而 `conformance.md` 的更新一直依赖手工，
+于是「代码前进、状态表留在原地」这个方向的偏移没有任何机器会发现——`ssot-lint` 只检查
+条款 ID 与实现状态词的分离，不检查状态词是否真实。状态往乐观方向偏移更危险：一个标着
+`CONTRADICTS` 的合规项只是噪音，一个标着 `CONFORMANT` 的违规项会让人跳过检查。本次更正后
+Fallback 段的每一行都绑定到一个第 1 层测试或一次 `shock-audit` 实测输出。
 
 ## Review
 
@@ -87,21 +68,12 @@ FALLBACK-010 「当前无 count 概念，故无从混淆」                 → 
 | REVIEW-006: 自包含 Witness | CONFORMANT | `Domain/ReviewWitness.fs` | `confirm` 接收两个摘要而非 bool，故 witness 自带证据；不依赖外围 Map。第 1 层测试直接断言生产 record 的键集合（而非 facade 投影），确保无 authority root / physical message 字段 |
 | REVIEW-007: Manager Guard | PARTIAL | `HostReviewGuard.fs` `TerminalPolicy.isTopLevelManager` | 纯侧已有判据：requirement 按 Authority Root 键入并去重、确认后清除且对同一 run 幂等（第 1 层测试）。Host 侧 terminal 钩子接线属第 3 层；退火三进行中，尚待取得该轨迹证据 |
 | REVIEW-008: Git tree 变化使 witness 无效 | CONFORMANT | `ReviewWitness.isValidForTree` | 有效性是对当前 tree 的派生问题而非 mutation：witness 历史保留且仍报 `Confirmed`，但 `satisfiesGuard` 对新 tree 为 false。新 barrier 清 pending 而保留 witness；同 barrier 重入幂等。第 1 层测试 |
-| REVIEW-010: ProviderInputSeal | CONFORMANT | `OpenCode/ReviewSeal.fs` `Journal/ReviewProjection.fs` | `shock-audit` 实测单一写入口 ok (1)。seal 记录 `IncludedToolResultDigests`，Fold 由 list 转 `Set<string>`；窗口上限 8。可实现性见 `evidence/host-transform-run-binding.md` |
+| REVIEW-010: ProviderInputSeal | CONFORMANT | `OpenCode/ReviewSeal.fs` `Journal/ReviewProjection.fs` | `shock-audit` 实测单一写入口 ok (1)。seal 记录 `IncludedToolResultDigests`，Fold 由 list 转 `Set<string>`；窗口上限 8。可实现性见 `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
 
 ### Review 段此前的记录同样失效（包 T-3 更正）
 
-与 Fallback 段同一成因，六行里五行描述迁移前状态：
-
-```text
-REVIEW-004 「类型不存在；去重只靠 RecentProviderRunIds 列表」
-           → 类型在 Kernel/Identity.fs:348，RecentProviderRunIds 在 next/ 为 0
-REVIEW-005 「无链 A / 链 B 分离；admission ID 仍可参与确认」
-           → VerdictDecision 三答案已就位；provenSeal 是确认的唯一路径
-REVIEW-006 「Witness 依赖外围 Map 补齐身份」→ confirm 接收摘要，witness 自带证据
-REVIEW-003 「seal 因果判定本体属包 D」    → 包 D 已完成，判定在 provenSeal
-REVIEW-010 「transform 侧封装与因果校验属包 D」→ 同上
-```
+与 Fallback 段同一成因，六行里五行描述迁移前状态（详细对照见
+`docs/archive/shock-anneal-2026/FINAL-REPORT.md` §8）。
 
 `GuardPromptAccepted` 在 `next/` 仍有 1 处，但那是 `FactCodec` 的 pre-0.5.0 标记名单——
 它必须留着，否则旧 journal 会以晦涩的 union 错误失败而不是给出迁移提示。这类「旧符号
@@ -117,7 +89,7 @@ REVIEW-010 「transform 侧封装与因果校验属包 D」→ 同上
 | ORCH-003: 一个 Job 一个 worktree 一个 Manager | CONFORMANT | `Journal/OrchestratorProjection.fs` | `ManagerAgent` 持久化为精确 agent 名（非裸角色）；创建后只有 `Progress` 会变；未知 job 的进展是 no-op 而非新建条目；第二次 create 不改 Manager 与 worktree。第 1 层测试 |
 | ORCH-004: 并行 Job | CONFORMANT | `OrchestratorProjection.activeJobs` | 多 job 同时 active，终态 job 退出 active 集合但留在 map 中。第 1 层测试 |
 | ORCH-005: 短 CAS Integration Gate | CONFORMANT | `OrchestratorProgram.publishUnderGate` | gate 只包住 `claimAndFf`，不再跨 rebase 与 LLM review；gate 内二次读 head 即 CAS 的 compare；`claimAndFf` 包在 try 内以免泄漏 publish 锁。第 3 层轨迹尚待在进行中的退火三取得 |
-| ORCH-006: 持久事实 | CONFORMANT | `Journal/OrchestratorProjection.fs` `Kernel/Fact.fs` `Orchestrator.WorktreeResource.fs` | `JobProgress` 是单值而非五个独立可选字段；`ManagerAgent` / `WorktreeIdentity` / `TargetBranchFrozen` / 两个 review barrier id 全部就位；`ManagerJobCreated` append 成功后 worktree 转为 durable，`NeedsReview` 与普通作用域退出均不删除；终态 job 留在 map 中使重放的 `Published` 被识别为重复。第 1 层测试；生命周期证据 `evidence/manager-worktree-durable-ownership.md` |
+| ORCH-006: 持久事实 | CONFORMANT | `Journal/OrchestratorProjection.fs` `Kernel/Fact.fs` `Orchestrator.WorktreeResource.fs` | `JobProgress` 是单值而非五个独立可选字段；`ManagerAgent` / `WorktreeIdentity` / `TargetBranchFrozen` / 两个 review barrier id 全部就位；`ManagerJobCreated` append 成功后 worktree 转为 durable，`NeedsReview` 与普通作用域退出均不删除；终态 job 留在 map 中使重放的 `Published` 被识别为重复。第 1 层测试；生命周期证据 `docs/archive/shock-anneal-2026/evidence/manager-worktree-durable-ownership.md` |
 | ORCH-007: 恢复逻辑 | PARTIAL | `OrchestratorProjection.recoveryAction` `Orchestrator.RecoverManagerJob` | 八个 progress 分支各产出恰好一个动作，`PublishClaimed` 三分支顺序符合条款；`Adopt` 不再隐式释放 durable worktree。`orchestrator-restart-publish` 已越过 deep-reviewer/TOML 缺口，但 restart 后仍观测 `OrchestratorPublished=0`，恢复链尚未取得第 4 层绿证据 |
 | ORCH-008: target ref 安全 | CONFORMANT | `OrchestratorGit.fs` `OrchestratorProjection.recoveryAction` | `GetTargetHead` 失败时两个依赖 head 的分支均 `FailClosed`，理由文字点明禁止回落 HEAD |
 
@@ -217,18 +189,8 @@ HandleProjection.isRetired       OpenCode/HostForkRuntime.fs
 
 ### VERIFY 段此前四行失效（包 T-5 更正）
 
-与 Fallback / Review 两段同一成因。四行里三行仍指向已删除的 `tests-next/`：
-
-```text
-VERIFY-001 「architecture-gate.mjs 未建，Gates 仍是测试」
-           → 门禁早已在 scripts/ 下，本次更正前就是第 0 层
-VERIFY-005 「单一写入口门禁未实现（FALLBACK-003 双写未被拦住）」
-           → SINGLE_WRITER_FACTS 已实现，FALLBACK-003 实测 ok (1)
-VERIFY-008 「测试仍是 .fs + Fable 编译 + 手写 Assert shim」
-           → 本包删完 tests-next，test:unit 收缩为 test:mjs
-VERIFY-007 「只有一个投影」
-           → 生产侧已拆两个类型；未完成的是 testkit 侧，归包 K
-```
+与 Fallback / Review 两段同一成因，四行里三行仍指向已删除的 `tests-next/`（详细对照见
+`docs/archive/shock-anneal-2026/FINAL-REPORT.md` §8）。
 
 VERIFY-005 这一行尤其值得记档。 它声称「单一写入口门禁未实现」，而门禁不仅实现了、
 还在包 X8 抓出了 `buildAttemptExecutionProfile` 零调用点。一个标着「未实现」的门禁
@@ -311,7 +273,8 @@ X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.pla
 `PERSIST-003` `PERSIST-007` 当前未逐条核验，
 状态为 `UNVERIFIED`。
 
-这不是「大概符合」——是尚未产生判据。退火三之后逐条补齐；发布前本表不得存在
+这不是「大概符合」——是尚未产生判据。休克—退火迁移收口时未逐条补齐，属已知未闭合项
+（记入 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §15）；发布前本表不得存在
 `UNVERIFIED`。
 
 ## 反向缺口：有生产契约但无条款（包 T-5e 发现，已由 ARCH-009 补齐）
