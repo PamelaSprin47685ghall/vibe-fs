@@ -470,7 +470,7 @@ test('CTX_002_the_transform_injects_no_synthetic_marker', async () => {
 //
 //   1. No session transport under `client: {}` — production had briefly
 //      FABRICATED a completed AgentRunResult carrying "test output"
-//      (next/OpenCode/Sessions.fs:149-153 records its removal), so the old
+//      (src/Wanxiangshu.Next/OpenCode/Sessions.fs:149-153 records its removal), so the old
 //      expectations were written against a fake. The fixture now supplies a
 //      real minimal SDK client and completions arrive as real
 //      `TerminalOutcome.Completed` payloads with distinct SessionWide/TurnFormal

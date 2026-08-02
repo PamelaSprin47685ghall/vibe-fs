@@ -120,7 +120,7 @@ tools = ["fork", "join", "list"]
   [[turn.step]]
   respond = { type = "text", text = "Manager finished." }
 
-# `next/Orchestrator.Prompts.fs:23`. The prompt embeds the conflicted file list, so the
+# `src/Wanxiangshu.Next/Orchestrator.Prompts.fs:23`. The prompt embeds the conflicted file list, so the
 # declaration is a prefix of it — and production composes the whole thing, hence `internal`.
 #
 # The clause it carries is the load-bearing part: "You are RESUMING an in-progress rebase in

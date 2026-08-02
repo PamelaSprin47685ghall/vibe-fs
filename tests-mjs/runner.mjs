@@ -56,7 +56,7 @@ import { walk } from '../scripts/repo-scan.mjs'
 import { classifyVerdict } from './verdict-feed.mjs'
 
 const TESTS_ROOT = 'tests-mjs'
-const PRODUCTION_ROOT = 'next'
+const PRODUCTION_ROOT = 'src/Wanxiangshu.Next'
 const BUILD_ROOT = 'build/next'
 const INNER = fileURLToPath(new URL('./run-inner.mjs', import.meta.url))
 

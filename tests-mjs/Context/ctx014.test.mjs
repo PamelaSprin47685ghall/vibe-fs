@@ -18,7 +18,7 @@ import test from 'node:test'
 import { diagnostic as diag } from '../domain.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const NEXT_DIR = path.join(ROOT, 'next')
+const NEXT_DIR = path.join(ROOT, 'src', 'Wanxiangshu.Next')
 
 function sourceFiles(dir) {
   const out = []

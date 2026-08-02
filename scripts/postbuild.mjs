@@ -61,7 +61,7 @@ syncAssets(
 );
 // Role system prompts (AgentConfig.prompt) — loaded at runtime next to Tools/*.js
 syncAssets(
-  path.join(root, 'next', 'prompts'),
+  path.join(root, 'src', 'Wanxiangshu.Next', 'prompts'),
   path.join(buildDir, 'next', 'prompts')
 );
 log('✓ Assets synced');

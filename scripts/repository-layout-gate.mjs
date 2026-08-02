@@ -2,7 +2,7 @@
 // Repository layout gate. Layer 0 static check, first segment of `gate:static`.
 //
 // Enforces invariants that architecture-gate.mjs cannot: architecture-gate
-// scans only its PRODUCTION_ROOT (`next/`), so a source file dropped anywhere
+// scans only its PRODUCTION_ROOT (`src/Wanxiangshu.Next/`), so a source file dropped anywhere
 // else — the repository root, a stale copy directory — is invisible to every
 // gate that lives in that scan. This gate owns the boundary of the boundary:
 // where sources may live at all, what the root may contain, and how a file's
@@ -42,9 +42,9 @@ const ROOT_FORBIDDEN_EXTENSIONS = new Set(['.fs', '.fsx', '.fsproj', '.js', '.mj
 
 // ── gate 2: production source root ──────────────────────────────────────────
 // All production `.fs` / `.fsproj` must live under exactly one root. The root
-// itself is a named constant so the migration `next/` → `src/Wanxiangshu.Next/`
-// is a one-line change that the gate then verifies.
-const PRODUCTION_SOURCE_ROOT = 'next'
+// itself is a named constant so any future relocation is a one-line change that
+// the gate then verifies.
+const PRODUCTION_SOURCE_ROOT = 'src/Wanxiangshu.Next'
 const SOURCE_EXTENSIONS = ['.fs', '.fsproj']
 
 // ── gate 4: file/module name agreement ─────────────────────────────────────

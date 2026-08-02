@@ -179,7 +179,7 @@ export function loadForest({ sources } = {}) {
  * `matchWeight` requires fragment 0 to be a true prefix and each later fragment to occur
  * after the previous one ends, so any separator works. A blank line is used because it is
  * what production's Reviewer wrapper puts between its sections
- * (`next/Session/HostForkRuntimeFork.fs:98`), which keeps the derived text readable in a
+ * (`src/Wanxiangshu.Next/Session/HostForkRuntimeFork.fs:98`), which keeps the derived text readable in a
  * diff without pretending to be the real wrapper.
  */
 const FRAGMENT_GAP = '\n\n';

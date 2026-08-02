@@ -8,7 +8,7 @@
 import { walk, countLiteral, readLines } from './repo-scan.mjs'
 
 const SCOPES = {
-  next: { root: 'next', extensions: ['.fs'] },
+  src: { root: 'src/Wanxiangshu.Next', extensions: ['.fs'] },
   // VERIFY-008: layers 1-3 are `.mjs`. Left pointing at the deleted `tests-next`
   // this scope would return 0 for every symbol, which reads as "extinct" — the
   // most dangerous possible failure for an extinction audit.
@@ -40,11 +40,11 @@ const SCOPES = {
 // The tradeoff is that a genuine violation inside these two files goes unseen
 // here. Acceptable because each holds nothing but the codec and its rejection
 // list, or the test over it; the architecture and ssot gates still read both.
-const LEGACY_NAME_SENTINELS = ['next/Journal/FactCodec.fs', 'tests-mjs/Journal/envelope.test.mjs']
+const LEGACY_NAME_SENTINELS = ['src/Wanxiangshu.Next/Journal/FactCodec.fs', 'tests-mjs/Journal/envelope.test.mjs']
 
 const EXTINCTION = [
   { symbol: 'PostPromptFireAndForget', clause: 'PROMPT-007' },
-  { symbol: 'prompt_async', clause: 'PROMPT-005', target: { next: 1, testkit: Infinity } },
+  { symbol: 'prompt_async', clause: 'PROMPT-005', target: { src: 1, testkit: Infinity } },
   { symbol: 'PluginPromptAccepted', clause: 'PROMPT-005' },
   { symbol: 'recordDurableAdvance', clause: 'FALLBACK-003' },
   { symbol: 'ProviderFailureContinuation', clause: 'FALLBACK-003' },
@@ -121,11 +121,11 @@ const SINGLE_WRITER = [
     fact: 'FallbackCursorAdvanced',
     clause: 'FALLBACK-003',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/FallbackProjection.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/FallbackProjection.fs',
     ],
     appendHelpers: ['recordFallbackFailure'],
   },
@@ -133,11 +133,11 @@ const SINGLE_WRITER = [
     fact: 'FallbackExhausted',
     clause: 'FALLBACK-005',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/FallbackProjection.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/FallbackProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -145,11 +145,11 @@ const SINGLE_WRITER = [
     fact: 'ConfirmedReviewWitness',
     clause: 'REVIEW-006',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/ReviewProjection.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/ReviewProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -157,11 +157,11 @@ const SINGLE_WRITER = [
     fact: 'ProviderInputSealed',
     clause: 'REVIEW-010',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/ReviewProjection.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/ReviewProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -169,11 +169,11 @@ const SINGLE_WRITER = [
     fact: 'PluginPromptClaimed',
     clause: 'PROMPT-005',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/PromptAuthorityLedger.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/PromptAuthorityLedger.fs',
     ],
     appendHelpers: [],
   },
@@ -181,11 +181,11 @@ const SINGLE_WRITER = [
     fact: 'PluginPromptPhysicalAccepted',
     clause: 'PROMPT-005',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/PromptAuthorityLedger.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/PromptAuthorityLedger.fs',
     ],
     appendHelpers: [],
   },
@@ -193,11 +193,11 @@ const SINGLE_WRITER = [
     fact: 'HandleRetired',
     clause: 'EXEC-009',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/LinkageProjection.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/LinkageProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -205,11 +205,11 @@ const SINGLE_WRITER = [
     fact: 'PublishClaimed',
     clause: 'ORCH-005',
     declarationFiles: [
-      'next/Kernel/Fact.fs',
-      'next/Journal/FactCodec.fs',
-      'next/Journal/Fold.fs',
-      'next/Journal/AgentJournal.fs',
-      'next/Journal/OrchestratorProjection.fs',
+      'src/Wanxiangshu.Next/Kernel/Fact.fs',
+      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
+      'src/Wanxiangshu.Next/Journal/Fold.fs',
+      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
+      'src/Wanxiangshu.Next/Journal/OrchestratorProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -277,17 +277,17 @@ for (const entry of SINGLE_WRITER) {
   // writer cannot detect the transition it exists to protect.
   const constructorPattern = `AgentFact.${fact}`
 
-  const declared = files.next.some(
+  const declared = files.src.some(
     (file) => endsWithAny(file, declarationFiles) && countLiteral([file], fact).length > 0,
   )
 
   const directWriters = [
-    ...new Set(countLiteral(files.next, constructorPattern).map((hit) => hit.file)),
+    ...new Set(countLiteral(files.src, constructorPattern).map((hit) => hit.file)),
   ].filter((file) => !endsWithAny(file, declarationFiles))
 
   const indirectWriters = new Set()
   for (const helper of appendHelpers) {
-    const hits = countLiteral(files.next, helper)
+    const hits = countLiteral(files.src, helper)
     const definingFiles = new Set(hits.filter((hit) => /^let\s/.test(hit.text)).map((hit) => hit.file))
     for (const hit of hits) {
       if (!definingFiles.has(hit.file)) indirectWriters.add(`${hit.file}:${hit.line} (via ${helper})`)

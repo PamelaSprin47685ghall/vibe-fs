@@ -2,7 +2,7 @@
  * provider-wire.js — OpenAI HTTP wire body → production `ProviderWireProjection`.
  *
  * VERIFY-007 has exactly two projections and they live in
- * `next/Domain/ProviderProjection.fs`. This file is NOT a third one: it decodes a
+ * `src/Wanxiangshu.Next/Domain/ProviderProjection.fs`. This file is NOT a third one: it decodes a
  * wire format and then asks the production projection every question. Nothing here
  * compares, normalises or digests — those all come from `build/next`.
  *

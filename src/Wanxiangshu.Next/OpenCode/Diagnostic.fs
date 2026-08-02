@@ -37,7 +37,7 @@ module Diagnostic =
               "provider_error"
               "duration" ]
 
-    /// CTX-014 禁止字段。出现在 `next/**/*.fs` 即负向测试红灯（与灭绝表同机制）。
+    /// CTX-014 禁止字段。出现在 `src/Wanxiangshu.Next/**/*.fs` 即负向测试红灯（与灭绝表同机制）。
     let ForbiddenFields =
         set
             [ "overflow"

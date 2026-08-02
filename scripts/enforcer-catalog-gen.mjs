@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const SSOT = resolve('SSOT/15.md')
-const OUT = resolve('next/Domain/EnforcerCatalog.gen.fs')
+const OUT = resolve('src/Wanxiangshu.Next/Domain/EnforcerCatalog.gen.fs')
 
 const text = readFileSync(SSOT, 'utf8')
 const lines = text.split('\n')

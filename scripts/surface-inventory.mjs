@@ -124,7 +124,7 @@ const SYSTEM_PROMPT_MARKERS = Object.freeze(['PromptAssets', 'systemPromptOf', '
  */
 const SURFACES = new Map([
   [
-    'next/OpenCode/OneShotAgentTool.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu.Next/OpenCode/OneShotAgentTool.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -133,7 +133,7 @@ const SURFACES = new Map([
     },
   ],
   [
-    'next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
@@ -141,12 +141,12 @@ const SURFACES = new Map([
       composer:
         'BloggerDelta.fs:33-34 renders CompanionPrompt.NormalInstruction plus typed ' +
         'BloggerDeltaChunk.Toml; CompanionHostBlogger.fs:69-76 forwards chunk.Toml on the normal path',
-      composerFiles: ['next/Domain/BloggerDelta.fs', 'next/Session/CompanionHostBlogger.fs'],
+      composerFiles: ['src/Wanxiangshu.Next/Domain/BloggerDelta.fs', 'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs'],
       typedPayload: 'BloggerDeltaChunk.Toml',
     },
   ],
   [
-    'next/Session/HostForkRunLifecycle.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu.Next/Session/HostForkRunLifecycle.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -155,7 +155,7 @@ const SURFACES = new Map([
     },
   ],
   [
-    'next/Session/HostForkAgentOwner.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu.Next/Session/HostForkAgentOwner.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -164,7 +164,7 @@ const SURFACES = new Map([
     },
   ],
   [
-    'next/Session/HostForkRuntimeFork.fs#sendFirstPrompt',
+    'src/Wanxiangshu.Next/Session/HostForkRuntimeFork.fs#sendFirstPrompt',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
@@ -173,17 +173,17 @@ const SURFACES = new Map([
     },
   ],
   [
-    'next/OpenCode/HostSessionNudge.fs#SendContinuation',
+    'src/Wanxiangshu.Next/OpenCode/HostSessionNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
       surface: 'continuation nudge (provider retry, manager and reviewer review guards)',
       composer: 'RuntimeNudge.providerRetry / managerReviewGuard / reviewerVerdictGuard',
-      composerFiles: ['next/OpenCode/TurnCompletionProgram.fs', 'next/OpenCode/HostReviewGuard.fs'],
+      composerFiles: ['src/Wanxiangshu.Next/OpenCode/TurnCompletionProgram.fs', 'src/Wanxiangshu.Next/OpenCode/HostReviewGuard.fs'],
     },
   ],
   [
-    'next/Session/HostForkBusyNudge.fs#SendContinuation',
+    'src/Wanxiangshu.Next/Session/HostForkBusyNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -192,19 +192,19 @@ const SURFACES = new Map([
     },
   ],
   [
-    'next/OpenCode/HostSessionNudge.fs#SendInteractionRepair',
+    'src/Wanxiangshu.Next/OpenCode/HostSessionNudge.fs#SendInteractionRepair',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
       surface: 'interaction repair (missing final report)',
       composer: 'RuntimeNudge.missingFinalReport',
-      composerFiles: ['next/OpenCode/TurnCompletionProgram.fs'],
+      composerFiles: ['src/Wanxiangshu.Next/OpenCode/TurnCompletionProgram.fs'],
     },
   ],
 ]);
 
 /** Production `.fs` files, absolute paths. */
-const productionFiles = () => walk(`${REPO_ROOT}next`, ['.fs']);
+const productionFiles = () => walk(`${REPO_ROOT}src/Wanxiangshu.Next`, ['.fs']);
 
 const relative = (file) => file.slice(REPO_ROOT.length);
 

@@ -26,7 +26,7 @@
 | PROMPT-004: 来源类型 | UNVERIFIED | `PromptIngress.fs` `Fact.AuthorityRootAccepted` | 包 A/0b：`HumanPromptAccepted` 已替换；解析顺序为「journal 已知 → 显式 managed agent」，已知来源不得被 agent 字段改判。判据待补：无直接第 1 层测试，来源解析路径需 canary 全绿后补断言 |
 | PROMPT-005: 四阶段协议 | CONFORMANT | `PromptDispatcher.fs` `PromptDispatcherSend.fs` | 四事实齐备；`AdmittedWithReceipt` 止于 Submitted，物理受理仅由 `chat.message` 产生。第 1 层测试：`PROMPT_005_submit_records_the_receipt_without_resolving_the_claim`、`PROMPT_005_abandon_removes_the_claim_and_leaves_the_active_run_alone`；fallback canary 实测 journal 四事实（PluginPromptClaimed/Submitted/PhysicalAccepted） |
 | PROMPT-006: 发送格式 | UNVERIFIED | `PromptDispatcherSend.fs` | 包 A：两处发送点均 `Model = None`，Agent 由 EffectiveAgent 绑定。判据待补：需第 1 层测试断言发送 payload 的 model/agent 字段 |
-| PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 `next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删。判据待补：architecture-gate 的直发分支检查 + canary 覆盖 |
+| PROMPT-007: Fire-and-forget 定义 | UNVERIFIED | `HostSessionNudge.sendContinuation` | 包 A：`prompt_async` 在 src/Wanxiangshu.Next/` 仅 1 处（唯一 Host adapter）；五条绕过 Dispatcher 的直发分支已删。判据待补：architecture-gate 的直发分支检查 + canary 覆盖 |
 | PROMPT-008: 原子 AttemptExecutionProfile | CONFORMANT | `Domain/AttemptPlanner.fs` `OpenCode/XWire.fs` `OpenCode/CompanionTransform.fs` | `buildAttemptExecutionProfile` 唯一调用点 `AttemptPlanner.plan`（`AttemptPlanner.fs:65`），被 `XWire.applyTransform` 与 `CompanionTransform` 真实调用；`RequestKind` / `ProjectionChoice` 作为 profile 不可变字段进入 transform 边界，`XWire.reconcileAttempt` 从同一 profile 判 promote。`single-constructor` 双向检查（无旁路 + 有调用）由 `architecture-gate` 守护。第 1 层测试 18 项（`Context/attempt-plan.test.mjs`） |
 | PROMPT-009: 来源解析顺序 | UNVERIFIED | `PromptAuthorityRun.resolveKnownOrigin` | 包 A：按 session 读投影（PERSIST-008），未知来源 fail closed。判据待补：PERSIST-008 索引已落地，来源解析顺序需第 1 层测试补断言 |
 | PROMPT-011: 未决发送恢复 | CONFORMANT | `OpenCode/PromptRecovery.fs` `OpenCode/SpikePlugin.fs` | `PromptRecovery.reconcile` 在插件启动时（`SpikePlugin.fs:57`，早于任何 hook 派发）扫描 tail window（`RecoveryTailWindow = 50`）找物理消息；`RecoveryAttemptBudget = 3` 由 fold 记账（`recoveryBudgetSpent`），耗尽即 `Abandoned(UnresolvedAfterRecovery)`；只证明接受或放弃，绝不重发 |
@@ -62,7 +62,7 @@ Fallback 段的每一行都绑定到一个第 1 层测试或一次 `shock-audit`
 | 条款 | 状态 | 当前代码位置 | 差距 |
 |------|------|-------------|------|
 | REVIEW-002: REVISE | CONFORMANT | `ReviewProjection.applyVerdict` | 任何 REVISE 清除未完成的 PERFECT（`PendingChallenge` 置空、witness 转 `RevisionWitness`）。第 1 层测试 |
-| REVIEW-003: 因果证明 | CONFORMANT | `ReviewController.provenSeal` `ReviewWitness.isDistinctAttempt` | 条件 1–5 为两个 witness 的纯比较；条件 6 由 seal 判定——`Set.contains ChallengeContentDigest seal.IncludedToolResultDigests`，无 seal 即 fail closed。四种弱代理在 `next/` 全为 0（`AcceptedContinuationRoots`、`samePhysicalRootReevaluation`、`GuardPromptAccepted`、`RecentProviderRunIds`）。第 1 层测试逐条移除证据成分并断言确认消失 |
+| REVIEW-003: 因果证明 | CONFORMANT | `ReviewController.provenSeal` `ReviewWitness.isDistinctAttempt` | 条件 1–5 为两个 witness 的纯比较；条件 6 由 seal 判定——`Set.contains ChallengeContentDigest seal.IncludedToolResultDigests`，无 seal 即 fail closed。四种弱代理在 src/Wanxiangshu.Next/` 全为 0（`AcceptedContinuationRoots`、`samePhysicalRootReevaluation`、`GuardPromptAccepted`、`RecentProviderRunIds`）。第 1 层测试逐条移除证据成分并断言确认消失 |
 | REVIEW-004: ReviewAttemptIdentity | CONFORMANT | `Kernel/Identity.fs:348` | 五元组类型存在，`dedupeKey` 以 `\u001f` 连接；同一 provider run 内的额外 PERFECT 由 `PendingChallenge.FirstProviderRun` 比对拦下，不计数不写 journal；窗口上限 8（PERSIST-008） |
 | REVIEW-005: 因果单调状态 | CONFORMANT | `VerdictDecision` `PromptClaim` `ProviderInputSeal` | 第二次 PERFECT 只有三种答案（`Confirmed` / `ChallengeUnproven` / `AlreadyCounted`），无 `Confirmed of bool` 形态。两条链各归其主：链 A 在 `PromptClaim`（`Receipt` = Submitted，`acceptClaim` = PhysicalAccepted），链 B 在 seal。确认只读链 B——`provenSeal` 是唯一路径，admission ID 无从参与 |
 | REVIEW-006: 自包含 Witness | CONFORMANT | `Domain/ReviewWitness.fs` | `confirm` 接收两个摘要而非 bool，故 witness 自带证据；不依赖外围 Map。第 1 层测试直接断言生产 record 的键集合（而非 facade 投影），确保无 authority root / physical message 字段 |
@@ -75,7 +75,7 @@ Fallback 段的每一行都绑定到一个第 1 层测试或一次 `shock-audit`
 与 Fallback 段同一成因，六行里五行描述迁移前状态（详细对照见
 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §8）。
 
-`GuardPromptAccepted` 在 `next/` 仍有 1 处，但那是 `FactCodec` 的 pre-0.5.0 标记名单——
+`GuardPromptAccepted` 在 src/Wanxiangshu.Next/` 仍有 1 处，但那是 `FactCodec` 的 pre-0.5.0 标记名单——
 它必须留着，否则旧 journal 会以晦涩的 union 错误失败而不是给出迁移提示。这类「旧符号
 作为拒绝清单条目」的残留与真正的旧调用点不同，`shock-audit` 的计数看不出区别，故在此
 记名。
@@ -261,7 +261,7 @@ X-wire 接线后（`c6ac0eb1…5ff3c53a`）该缺口闭合：`AttemptPlanner.pla
 | CTX-011: 覆盖游标与候选选择 | CONFORMANT | `Domain/PrefixProbeSelection.fs` `Domain/BloggerDelta.fs` | `SemanticCursor` / `Coverage` 两量分离；候选选择 9 步含 cutoff proof、digest fail-closed、squash 让 B 更紧凑仍为新候选。第 1 层测试 14 项 |
 | CTX-012: 提交语义 | CONFORMANT | `OpenCode/XWire.fs` `Journal/BlogProjection.fs` | `PrefixRebaseCommitted` 唯一 writer 是 `XWire.reconcileAttempt`；probe SealRoot 被 promote 原样继承；squash 永久提交不回滚、级联成立、宽度 ceil(m/2)。第 1 层测试跨 4 文件 |
 | CTX-013: BloggerDeltaProjection 与 TOML 编码 | CONFORMANT | `Session/BloggerDelta.fs` `Session/BloggerToml.fs` `Session/SyntheticToml.fs` | 三级切块 + 硬截断 + 图片 omitted marker + 确定性 TOML（固定键序、`'''` 字面量、closing 独占一行、无时间/随机/Host ID）；instruction header 计入 200 KiB。第 1 层测试 55 项跨 3 文件 |
-| CTX-014: 诊断可观测性边界 | CONFORMANT | `OpenCode/Diagnostic.fs` `OpenCode/HostCompactionGate.fs` | 统一 schema：`Diagnostic.emit` 校验字段白名单（CTX-014 清单），白名单外字段 fail closed；禁止字段名在 `next/**/*.fs` 的负向扫描 + 白名单外字段拒绝测试（`tests-mjs/Context/ctx014.test.mjs`） |
+| CTX-014: 诊断可观测性边界 | CONFORMANT | `OpenCode/Diagnostic.fs` `OpenCode/HostCompactionGate.fs` | 统一 schema：`Diagnostic.emit` 校验字段白名单（CTX-014 清单），白名单外字段 fail closed；禁止字段名在 src/Wanxiangshu.Next/**/*.fs` 的负向扫描 + 白名单外字段拒绝测试（`tests-mjs/Context/ctx014.test.mjs`） |
 
 ## 未列入本表的条款
 

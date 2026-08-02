@@ -21,7 +21,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname } from 'node:path'
 import { walk } from './repo-scan.mjs'
 
-const PRODUCTION_ROOT = 'next'
+const PRODUCTION_ROOT = 'src/Wanxiangshu.Next'
 const TESTS_ROOT = 'tests-mjs'
 const SOURCE_EXTENSIONS = ['.fs', '.fsproj']
 
@@ -75,10 +75,10 @@ const FORBIDDEN_SSE_TOKENS = [
 ]
 
 const SESSION_STATUS_ALLOWLIST = [
-  'next/OpenCode/HostEventCodec.fs',
-  'next/OpenCode/HostSignalAdapter.fs',
-  'next/OpenCode/RetrySignalHandler.fs',
-  'next/OpenCode/HostSignalSubscribe.fs',
+  'src/Wanxiangshu.Next/OpenCode/HostEventCodec.fs',
+  'src/Wanxiangshu.Next/OpenCode/HostSignalAdapter.fs',
+  'src/Wanxiangshu.Next/OpenCode/RetrySignalHandler.fs',
+  'src/Wanxiangshu.Next/OpenCode/HostSignalSubscribe.fs',
 ]
 
 const SLEEP_TOKENS = ['sleepJs', 'sleep']
@@ -88,9 +88,9 @@ const SLEEP_TOKENS = ['sleepJs', 'sleep']
 const MECHANICAL_SUFFIXES = ['Helpers', 'Primitives', 'Fields', 'Emit', 'Service', 'Core']
 
 const MECHANICAL_ALLOWLIST = new Map([
-  ['next/Session/AgentRoleIdentity.fs', 'semantic boundary pending deeper split'],
-  ['next/OpenCode/PluginHostInterop.fs', 'semantic boundary pending deeper split'],
-  ['next/OpenCode/TerminalPolicy.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu.Next/Session/AgentRoleIdentity.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu.Next/OpenCode/PluginHostInterop.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu.Next/OpenCode/TerminalPolicy.fs', 'semantic boundary pending deeper split'],
 ])
 
 // ── Host boundary ───────────────────────────────────────────────────────────
@@ -101,14 +101,14 @@ const HOST_INTEROP_NAME =
   /(Host|Port|Codec|Adapter|Boot|Runtime|Writer|Node|Plugin|Supervisor|Backend|Projection|Transform|Signal|Json|Git|Flow|Pty|Tool|Subscribe|Canonical|Process)/i
 
 const HOST_INTEROP_ALLOWLIST = new Map([
-  ['next/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
-  ['next/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
-  ['next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
-  ['next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
-  ['next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
-  ['next/OpenCode/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
+  ['src/Wanxiangshu.Next/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
+  ['src/Wanxiangshu.Next/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
+  ['src/Wanxiangshu.Next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
+  ['src/Wanxiangshu.Next/OpenCode/ManagerConfig.fs', 'Host configuration adapter'],
+  ['src/Wanxiangshu.Next/OpenCode/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
+  ['src/Wanxiangshu.Next/OpenCode/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
   [
-    'next/Kernel/Flow.fs',
+    'src/Wanxiangshu.Next/Kernel/Flow.fs',
     'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',
   ],
 ])
@@ -117,7 +117,7 @@ const HOST_INTEROP_ALLOWLIST = new Map([
 // raw obj", so these directories never earn the filename-pattern excuse — an
 // entry must be explicit and reasoned. Without this, next/Kernel/Flow.fs passed
 // only because "Flow" happens to appear in HOST_INTEROP_NAME.
-const PURE_CORE_DIRS = ['next/Kernel/', 'next/Domain/']
+const PURE_CORE_DIRS = ['src/Wanxiangshu.Next/Kernel/', 'src/Wanxiangshu.Next/Domain/']
 
 // ── single writer ───────────────────────────────────────────────────────────
 //
@@ -207,7 +207,7 @@ const GUIDE_CONTRACT_PATH = 'tests-mjs/guide-contract.test.mjs'
 
 // ── layering ────────────────────────────────────────────────────────────────
 
-const LOWER_LAYER_DIRS = ['next/Kernel/', 'next/Domain/']
+const LOWER_LAYER_DIRS = ['src/Wanxiangshu.Next/Kernel/', 'src/Wanxiangshu.Next/Domain/']
 
 const UPPER_LAYER_NAMESPACES = [
   'Wanxiangshu.Next.OpenCode',
@@ -269,7 +269,7 @@ const SINGLE_CONSTRUCTOR_TYPES = [
   {
     type: 'AttemptExecutionProfile',
     clause: 'PROMPT-008',
-    owner: 'next/Domain/PromptAuthority.fs',
+    owner: 'src/Wanxiangshu.Next/Domain/PromptAuthority.fs',
     fields: ['SystemPromptId =', 'ToolCapabilitySet ='],
     builder: 'buildAttemptExecutionProfile',
   },
@@ -303,7 +303,7 @@ const RUNNER_TIERS = [
 // would flag the implementation of the very thing it mandates.
 const UNBOUNDED_FANOUT = {
   clause: 'ARCH-009',
-  owner: 'next/Kernel/Flow.fs',
+  owner: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
   patterns: ['Promise.all', 'Task.WhenAll', 'Task.WaitAll'],
 }
 
@@ -380,7 +380,7 @@ for (const file of allFiles) {
 
 // ── gate: project references ────────────────────────────────────────────────
 
-const PRODUCTION_FSPROJ = 'next/Wanxiangshu.Next.fsproj'
+const PRODUCTION_FSPROJ = 'src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj'
 
 if (!existsSync(PRODUCTION_FSPROJ)) {
   fail('project-reference', `${PRODUCTION_FSPROJ} does not exist`)
@@ -578,7 +578,7 @@ for (const { builder, file, names } of DSL_PROGRAMS) {
   if (builder === 'process') {
     const hasCallsite = productionFiles.some(
       (candidate) =>
-        norm(candidate).startsWith('next/Process/') &&
+        norm(candidate).startsWith('src/Wanxiangshu.Next/Process/') &&
         (read(candidate).includes('process {') || read(candidate).includes('``process`` {')),
     )
     if (!hasCallsite) {
@@ -744,10 +744,10 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
 // A silently empty scan would make every gate above vacuously pass.
 
 const SCANNER_WITNESSES = [
-  'next/Kernel/Flow.fs',
-  'next/Journal/Writer.fs',
-  'next/OpenCode/Plugin.fs',
-  'next/Tools/StaticTools.fs',
+  'src/Wanxiangshu.Next/Kernel/Flow.fs',
+  'src/Wanxiangshu.Next/Journal/Writer.fs',
+  'src/Wanxiangshu.Next/OpenCode/Plugin.fs',
+  'src/Wanxiangshu.Next/Tools/StaticTools.fs',
 ]
 
 // The test side needs its own witnesses now that it is scanned with a different
