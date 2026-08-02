@@ -211,7 +211,9 @@ module OrchestratorProgram =
 
                         match append deps job published with
                         | Error verdict -> return Error verdict
-                        | Ok() -> return Ok(Landed landed)
+                        | Ok() ->
+                            do! deps.Manager.TerminateChildren job.JobId
+                            return Ok(Landed landed)
         }
 
     /// Hold the gate for exactly the CAS window.
@@ -315,6 +317,8 @@ module OrchestratorProgram =
                 with
                 | Error verdict -> return verdict
                 | Ok() ->
+                    do! deps.Manager.TerminateChildren job.JobId
+
                     match! job.Worktree.Release() with
                     | Ok() -> return OrchestratorVerdict.Published(job.JobId, landed.ResultingTargetHead)
                     | Error error -> return failed job (sprintf "Backfilled Published but cleanup failed: %s" error)

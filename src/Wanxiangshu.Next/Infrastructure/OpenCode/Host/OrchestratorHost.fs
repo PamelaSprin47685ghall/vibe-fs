@@ -127,6 +127,33 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | Ok _ -> return! awaitManager jobId
         }
 
+    /// ORCH-006: abort the manager and every reviewer child session for a job
+    /// before the worktree is released. This is a non-failing cleanup step.
+    let terminateChildren (jobId: ManagerJobId) : Task<unit> =
+        task {
+            let managerId = managerAgentId jobId
+            let reviewerPrefix = OrchestratorManagerJob.reviewerAgentId jobId + "-"
+
+            let entries =
+                lock runtime.Gate (fun () ->
+                    runtime.Children
+                    |> Seq.choose (fun kv ->
+                        let id = kv.Key
+
+                        if id = managerId || id.StartsWith(reviewerPrefix) then
+                            Some(kv.Value, id)
+                        else
+                            None)
+                    |> Seq.toList)
+
+            let sessions, ids = List.unzip entries
+            let! _ = HostForkChildDispatch.teardownChildren runtime.Sessions sessions
+
+            lock runtime.Gate (fun () ->
+                for id in ids do
+                    runtime.Children.Remove id |> ignore)
+        }
+
     /// One review barrier. A fresh reviewer agent id per barrier, so REVIEW-008's
     /// "fresh dual PERFECT" is structural: a new session's guard starts empty.
     let reverify
@@ -167,7 +194,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         { StartManager = startManager
           AwaitManager = awaitManager
           Reverify = reverify
-          ResumeManager = resumeManager }
+          ResumeManager = resumeManager
+          TerminateChildren = terminateChildren }
 
     // ── engine ──────────────────────────────────────────────────────────────
 
