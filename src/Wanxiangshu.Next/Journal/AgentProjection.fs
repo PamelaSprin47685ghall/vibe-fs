@@ -16,7 +16,7 @@ type SessionAgentProjection =
         /// semantic trajectory. Separate from `Blog` because the frame sequence
         /// is Y's compressed view while this is the raw record LWR is built from.
         XTrace: XTraceProjectionState option
-        /// SSOT/12: the Companion frame sequence and what it covers. Separate from
+        /// spec/12: the Companion frame sequence and what it covers. Separate from
         /// `Companion` because that record is the runtime cache's durable mirror,
         /// while this one is the frame history CTX-011 builds probe candidates from.
         Blog: BlogProjectionState option

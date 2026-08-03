@@ -1,4 +1,4 @@
-# STATUS/conformance — SSOT 条款合规表
+# STATUS/conformance — 条款合规表
 
 > 本文件由 `scripts/conformance-gate.mjs` 从 `STATUS/conformance.toml` 生成，请勿手动编辑。
 

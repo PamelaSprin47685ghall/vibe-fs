@@ -13,7 +13,7 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
 
-/// SSOT/15 — Blogger as Enforcer: the Blogger continuation-transform host.
+/// spec/15 — Blogger as Enforcer: the Blogger continuation-transform host.
 ///
 /// ENFORCER-044: when the Host has collected a provider step's tool results and
 /// enters the continuation transform, this module re-reads the full assistant
@@ -32,7 +32,7 @@ open Wanxiangshu.Next.Session
 module EnforcerHost =
 
     /// ENFORCER-160: the parking lifetime for a continuation transform.
-    /// Shared constant: SSOT/14 STRENGTH-079 `ParkedTransformLifetime` is the
+    /// Shared constant: spec/14 STRENGTH-079 `ParkedTransformLifetime` is the
     /// one code constant for how long a transform may stay suspended.
     let ParkedTransformLifetime = StrengthPolicy.Strength.ParkedTransformLifetime
 

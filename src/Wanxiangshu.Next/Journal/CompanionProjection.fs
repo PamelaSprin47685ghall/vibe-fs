@@ -12,7 +12,7 @@ open Wanxiangshu.Next.Kernel.Identity
 /// (CTX-012) and a reanchor (HOST-006).
 ///
 /// The flag went with it. It existed because compression was opt-in per session; under
-/// SSOT/12 a recovery slot either has a candidate or does not, so there is no state to
+/// spec/12 a recovery slot either has a candidate or does not, so there is no state to
 /// enable.
 type CompanionProjection =
     {

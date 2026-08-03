@@ -2,15 +2,15 @@
 
 OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
 
-当前版本：`0.5.2`（0.5.2 全 SSOT 收敛） — 唯一产品语义见 [`SSOT/00.md`](SSOT/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
+当前版本：`0.5.2`（0.5.2 全 SSOT 收敛） — 唯一产品语义见 [`spec/00.md`](spec/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
 
-产品语义：[`SSOT/00.md`](SSOT/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前状态：[`STATUS/README.md`](STATUS/README.md)。
+产品语义：[`spec/00.md`](spec/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前状态：[`STATUS/README.md`](STATUS/README.md)。
 
 ## 当前边界
 
-本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，合规表由 [`STATUS/conformance.md`](STATUS/conformance.md) 从 `STATUS/conformance.toml` 生成。
+本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `spec/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，合规表由 [`STATUS/conformance.md`](STATUS/conformance.md) 从 `STATUS/conformance.toml` 生成。
 
-休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（Active SSOT 192/192 CONFORMANT，零 `PURE_CORE_ONLY`；SSOT/14 Strength 与 SSOT/16 Student&Teacher 已迁入 [`docs/rfcs/strength.md`](docs/rfcs/strength.md) / [`docs/rfcs/student-teacher.md`](docs/rfcs/student-teacher.md)，不再是 Active 规范）。
+休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（Active SSOT 192/192 CONFORMANT，零 `PURE_CORE_ONLY`；spec/14 Strength 与 spec/16 Student&Teacher 已迁入 [`docs/rfcs/strength.md`](docs/rfcs/strength.md) / [`docs/rfcs/student-teacher.md`](docs/rfcs/student-teacher.md)，不再是 Active 规范）。
 
 TestKit 以 `ProviderSemanticProjection` 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容（VERIFY-003、VERIFY-007）。P0 保持并行，release gate 恰好 3 轮；每个场景使用 2 秒 causal-progress Watchdog（VERIFY-004）。
 
@@ -35,7 +35,7 @@ Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git �
 
 ## 核心不变量
 
-条款 ID 为规范位置；此处只是索引，冲突时以 `SSOT/` 为准。
+条款 ID 为规范位置；此处只是索引，冲突时以 `spec/` 为准。
 
 1. Busy existing agent 的 `fork` 是同 child fire-and-forget nudge；不得创建 prompt queue（EXEC-002）。
 2. completion 先写 mailbox；`join()` 消费任意可用 completion，消费后写 `HandleRetired` tombstone（EXEC-004、EXEC-009）。
@@ -75,7 +75,7 @@ wanxiangshu
 src/Wanxiangshu.Next/     生产 Agent DSL（唯一源码根）
 tests-mjs/                第 1–3 层测试（mjs，import build/next）
 testkit/opencode/         独立 OpenCode harness
-SSOT/                     产品语义（唯一规范，条款 ID 寻址）
+spec/                     产品语义（唯一规范，条款 ID 寻址）
 STATUS/                   当前状态（README、合规表、blockers）
 ```
 

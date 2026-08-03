@@ -3,7 +3,7 @@ namespace Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Domain.StrengthTypes
 
-/// SSOT/14 STRENGTH-024/025：价值函数与决策规则。
+/// spec/14 STRENGTH-024/025：价值函数与决策规则。
 ///
 /// V0 = 0；V1/V2 按净价值选择。K 由候选集 + MinimumPositiveDecisionValue 门槛决定。
 /// Z_X 无恢复成本项（STRENGTH-014：恢复即丢弃决策）；无独立 Companion。

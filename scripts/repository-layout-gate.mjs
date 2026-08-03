@@ -83,7 +83,13 @@ for (const entry of rootEntries) {
 const productionRootAbs = join(ROOT, PRODUCTION_SOURCE_ROOT)
 const allSourceFiles = walk(ROOT, SOURCE_EXTENSIONS).filter((file) => {
   const norm = normalize(file)
-  return !norm.startsWith(`${ROOT}/node_modules/`) && !norm.startsWith(`${ROOT}/build/`) && !norm.startsWith(`${ROOT}/.git/`)
+  return (
+    !norm.startsWith(`${ROOT}/node_modules/`) &&
+    !norm.startsWith(`${ROOT}/build/`) &&
+    !norm.startsWith(`${ROOT}/dist/`) &&
+    !norm.startsWith(`${ROOT}/artifacts/`) &&
+    !norm.startsWith(`${ROOT}/.git/`)
+  )
 })
 
 const sourceOutsideRoot = allSourceFiles.filter((file) => {

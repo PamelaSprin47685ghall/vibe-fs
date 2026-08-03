@@ -3,7 +3,7 @@ namespace Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Domain.StrengthTypes
 
-/// SSOT/14 STRENGTH-022：插值 Kneser-Ney 请求级 n-gram 预测器。
+/// spec/14 STRENGTH-022：插值 Kneser-Ney 请求级 n-gram 预测器。
 ///
 /// 训练状态只按 X 的 CanonicalRole 分桶（STRENGTH-022），禁止按模型组合/版本/
 /// Session/仓库细分。模型切换的非平稳性只通过统一的计数衰减处理。

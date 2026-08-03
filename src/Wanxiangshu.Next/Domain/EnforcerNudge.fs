@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Next.Domain
 
-/// SSOT/15 ENFORCER-100/101/102：Enforcement Nudge 渲染。
+/// spec/15 ENFORCER-100/101/102：Enforcement Nudge 渲染。
 ///
 /// 一个触发批次产生一个 fake user message。每条规则按 NudgeKey 去重后渲染
 /// 一行 `# [<NudgeKey>] <CanonicalNudgeText>`；有 evidence 时追加最后一行

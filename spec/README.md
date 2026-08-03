@@ -1,14 +1,13 @@
 # Spec
 
-Transitional layout for 0.5.3 repository normalization.
-
-- **Authoritative clause text** still lives under `SSOT/` until the full SSOT → `spec/clauses/` rename.
-- **Clause → test ownership** still lives in `STATUS/conformance.toml` (machine ledger) until replaced by `spec/coverage.toml`.
-- This directory is the target home for both; do not add a second product contract here.
-
-## Files
+Authoritative product contracts for Wanxiangshu.
 
 | Path | Role |
 |------|------|
-| `README.md` | This note |
-| `coverage.toml` | Optional partial mapping; full truth remains `STATUS/conformance.toml` until rename |
+| `00.md` | Navigation index |
+| `01.md`–`13.md`, `15.md`, `17.md` | Active clause documents |
+| `99.md` | Glossary |
+| `coverage.toml` | 0.5.3 transitional clause→test map (skeleton) |
+
+Clause status ledger remains `STATUS/conformance.toml` until STATUS retirement.
+Implementation status words never appear in clause docs (`npm run gate:ssot`).

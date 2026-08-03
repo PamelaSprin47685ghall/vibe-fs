@@ -38,7 +38,7 @@
  * Measured on the tree this file was written against: of 166 string arguments to those three
  * methods, 9 contained a `/`, 5 were repo-relative, and exactly one of those 5 named nothing —
  * the criterion deleted alongside this file. The other 4 left the domain by shape: `/custom/bin`
- * and `/src/` are absolute, `../src` escapes the root, `SSOT/${file}` interpolates. Those three
+ * and `/src/` are absolute, `../src` escapes the root, `spec/${file}` interpolates. Those three
  * are content substring tests rather than locators, so the shape rule and the intent agree
  * there; the rule cannot tell a repo-relative path from a media type such as
  * `application/json`, and if one ever appears as an argument here it will be reported.
@@ -240,14 +240,14 @@ export const pathCriterionCases = [
         absolute: '/custom/bin',
         parentEscape: '../src/gone',
         scheme: 'http://127.0.0.1:9999/v1',
-        interpolated: 'SSOT/${file}',
+        interpolated: 'spec/${file}',
         glob: 'testkit/**/*.mjs',
       };
       const inside = {
         absolute: 'custom/bin',
         parentEscape: 'src/gone',
         scheme: '127.0.0.1/v1',
-        interpolated: 'SSOT/file',
+        interpolated: 'spec/file',
         glob: 'testkit/gone.mjs',
       };
 

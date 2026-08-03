@@ -3,7 +3,7 @@ namespace Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Identity
 
-/// SSOT/14 — Predict & Reduce Strength：纯领域类型（STRENGTH-006…025）。
+/// spec/14 — Predict & Reduce Strength：纯领域类型（STRENGTH-006…025）。
 ///
 /// 本文件只承载类型与纯函数。预测器、控制器、价值函数分别见
 /// `StrengthPredictor.fs`、`StrengthController.fs`、`StrengthValue.fs`。

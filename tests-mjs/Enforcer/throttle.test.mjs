@@ -1,4 +1,4 @@
-// tests-mjs/Enforcer/throttle.test.mjs — SSOT/15 ENFORCER-080…090.
+// tests-mjs/Enforcer/throttle.test.mjs — spec/15 ENFORCER-080…090.
 //
 // The leaky-integrator throttle. ENFORCER-190 pure tests 8-13:
 //   8. throttle is monotone in each s_i;

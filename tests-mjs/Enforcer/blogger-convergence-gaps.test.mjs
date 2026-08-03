@@ -1,5 +1,5 @@
 /**
- * C0 red inventory for the Blogger vertical-slice convergence (SSOT/15).
+ * C0 red inventory for the Blogger vertical-slice convergence (spec/15).
  *
  * These tests assert the Definition of Done for the current slice — not the
  * present implementation. They MUST fail until C1–C7 close each gap. Do not

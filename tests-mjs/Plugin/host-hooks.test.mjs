@@ -137,9 +137,9 @@ test('PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
       {
         message: { id: 'msg_file_root', role: 'user', sessionID: SESSION, agent: 'fast-manager' },
         parts: [
-          { type: 'text', synthetic: true, text: 'Called the Read tool with the following input: {"filePath":"SSOT/13.md"}' },
+          { type: 'text', synthetic: true, text: 'Called the Read tool with the following input: {"filePath":"spec/13.md"}' },
           { type: 'text', synthetic: true, text: '# document body' },
-          { type: 'file', mime: 'text/plain', filename: 'SSOT/13.md', url: 'file:///repo/SSOT/13.md' },
+          { type: 'file', mime: 'text/plain', filename: 'spec/13.md', url: 'file:///repo/spec/13.md' },
         ],
       },
     )

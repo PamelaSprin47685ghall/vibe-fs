@@ -87,10 +87,10 @@ const SESSION_STATUS_ALLOWLIST = [
   'src/Wanxiangshu.Next/Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs',
 ]
 
-// SSOT/17 LOOP-002 (17.md:34-59): the loop sensor is the single sanctioned
+// spec/17 LOOP-002 (17.md:34-59): the loop sensor is the single sanctioned
 // exception to ARCH-002 — a pure transport-edge observer that decodes
 // `message.part.delta` (field=text) and never lets it reach the business layer
-// (LOOP-002 invariant 4). SSOT/17 LOOP-009 (17.md:329-341) requires the delta to
+// (LOOP-002 invariant 4). spec/17 LOOP-009 (17.md:329-341) requires the delta to
 // be decoded independently by LoopEventCodec, as a second codec channel beside
 // HostEventCodec. No other production file may touch the token.
 const LOOP_SSE_ALLOWLIST = [
@@ -820,7 +820,7 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
   }
 }
 
-// ── gate: blogger vertical-slice anti-regression (SSOT/15 convergence) ──────
+// ── gate: blogger vertical-slice anti-regression (spec/15 convergence) ──────
 //
 // Pins the Definition of Done items that static analysis can prove without Host
 // canaries. Fail closed if production reintroduces deleted bypasses.

@@ -35,7 +35,7 @@
 
 - C0：建立 0.5.2 baseline，跑通 `test:release` 并记录证据。
 - C1：把 Strength / StudentTeacher / Enforcer nudge throttle 迁出 Active SSOT 到 `RFC/`，
-  `SSOT/00.md` 拆分 Active 与 RFC 索引，`SSOT/15.md` 明确为 Blogger 工具化 Active 子集。
+  `spec/00.md` 拆分 Active 与 RFC 索引，`spec/15.md` 明确为 Blogger 工具化 Active 子集。
 - C2：建立 `STATUS/conformance.toml` 与 `scripts/conformance-gen.mjs` / `conformance-gate.mjs`，
   生成 Active 条款机器账本。
 - C3：版本与状态真值对齐到 `0.5.2`（package.json、packaging template、README、CHANGELOG）。
@@ -56,7 +56,7 @@
   ARCH-010 harness 字段名等 RC 阻塞已闭合。
 - C15：tag `v0.5.2` 创建；evidence 与 tag/commit 对齐；工作树 clean。
 
-0.5.1 已发布（tag `v0.5.1`）：闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链。
+0.5.1 已发布（tag `v0.5.1`）：闭合 spec/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链。
 发布证据目录 `docs/evidence/0.5.1/`。
 
 LifecycleWorkRecord 迁移已完成（方案 `STATUS/lifecycle-work-record.md`）：父→子与子→父统一为
@@ -71,8 +71,8 @@ Seed、TerminalSessionA、FrozenB 全部废止。
 
 ## 当前开发阶段
 
-0.5.2 已发布。Active 子集为 SSOT/01–13 + SSOT/15 Blogger 工具化 + SSOT/17 LOOP
-（退化循环检测与强杀）。SSOT/14 Strength、SSOT/16 Student&Teacher 与 ENFORCER
+0.5.2 已发布。Active 子集为 spec/01–13 + spec/15 Blogger 工具化 + spec/17 LOOP
+（退化循环检测与强杀）。spec/14 Strength、spec/16 Student&Teacher 与 ENFORCER
 nudge/throttle 在 `docs/rfcs/`，不属于当前产品合同。
 
 ### PrefixCoverage 与 prefix-probe（已闭合）
@@ -140,7 +140,7 @@ Fable 输出 `build/next/`；根 `package.json` 为唯一 manifest（`main` →
 
 ## 事实入口
 
-- 正式规范：`SSOT/`
+- 正式规范：`spec/`
 - 当前合规：`STATUS/conformance.md`
 - 历史归档：`docs/archive/shock-anneal-2026/`（FINAL-REPORT.md + 原始证据）
 - 发布证据：`docs/evidence/`

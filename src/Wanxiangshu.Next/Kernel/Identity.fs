@@ -34,7 +34,7 @@ module Identity =
     type LocalEpoch = int64
     type ObservedAt = DateTimeOffset
 
-    // ── prompt authority (SSOT/03) ──────────────────────────────────────────
+    // ── prompt authority (spec/03) ──────────────────────────────────────────
 
     /// A complete conversation sequence caused by one Authority Root
     /// (PROMPT-002). Continuations extend it; they never create a new one.
@@ -67,7 +67,7 @@ module Identity =
     /// there is no function from a receipt to any message identity.
     type TransportReceipt = private TransportReceipt of string
 
-    // ── provider runs (SSOT/07) ─────────────────────────────────────────────
+    // ── provider runs (spec/07) ─────────────────────────────────────────────
 
     /// One provider request and the assistant message it produces.
     ///
@@ -100,7 +100,7 @@ module Identity =
     /// mentions an attempt.
     type SystemPromptId = private SystemPromptId of string
 
-    // ── review (SSOT/05) ────────────────────────────────────────────────────
+    // ── review (spec/05) ────────────────────────────────────────────────────
 
     /// One review barrier: the question "is this tree good?" asked once.
     type ReviewBarrierId = private ReviewBarrierId of string
@@ -136,7 +136,7 @@ module Identity =
     /// type would let a fold validate an X rebase against a Y squash's number.
     type PrefixEpochId = private PrefixEpochId of int64
 
-    // ── execution handles (SSOT/09) ─────────────────────────────────────────
+    // ── execution handles (spec/09) ─────────────────────────────────────────
 
     /// A forked agent child, persisted across restart (EXEC-009).
     type AgentHandleId = private AgentHandleId of string
@@ -156,7 +156,7 @@ module Identity =
         | Pty of PtyHandleId
         | ManagerJob of ManagerJobId
 
-    // ── git and worktrees (SSOT/06) ─────────────────────────────────────────
+    // ── git and worktrees (spec/06) ─────────────────────────────────────────
 
     /// Stable identity of a worktree, independent of where it currently lives.
     /// ORCH-006 records both: recovery locates by identity, diagnostics show the

@@ -93,7 +93,7 @@ async function oracleCheck(scenario, ctx, step) {
   assert.equal(new Set(valuesOf(rvFacts, 'ToolCallId')).size, 2, 'two verdict facts require distinct tool call IDs');
   const verdictRuns = [...new Set(valuesOf(rvFacts, 'ProviderRun'))];
   assert.equal(verdictRuns.length, 2, 'two verdict facts require distinct provider runs');
-  // HOST-010 observable proxy (SSOT/07 transform id ≡ ToolContext.messageID is
+  // HOST-010 observable proxy (spec/07 transform id ≡ ToolContext.messageID is
   // not co-present on the wire). Both sides land in journal for the seal-bound run:
   //   ReviewVerdictRecorded.ProviderRun = ToolContext.messageID (VerdictTool)
   //   ProviderInputSealed.ProviderRun   = same messageID via ReviewSeal.bindToRun

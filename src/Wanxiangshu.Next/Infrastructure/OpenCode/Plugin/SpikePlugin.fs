@@ -126,7 +126,7 @@ module SpikePlugin =
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
 
-                        // SSOT/15 ENFORCER-044/047/050: Blogger continuation only.
+                        // spec/15 ENFORCER-044/047/050: Blogger continuation only.
                         // Main-session material is decided once in
                         // CompanionTransform → BloggerCoordinator.onMainMaterial.
                         match projectionSessionIdOpt with

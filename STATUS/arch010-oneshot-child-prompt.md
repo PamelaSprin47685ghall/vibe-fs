@@ -3,7 +3,7 @@
 状态：已实施（commit `892bbcd7`）
 验证：`OneShotAgentTool` 首 prompt 已改走 `ForkChildPayload.relay`（assignment + optional parent LWR + requirements=[] + payload=None）；surface inventory `OneShotAgentTool.fs#SendAgentOwnerRoot` 已标 `CanonicalPayload` 并引用 canonical writer。§3 计划清单的对应项已落地；§4 裁决 4.1（复用 ForkChildPayload）与 4.4（无 LWR 时 instruction-only TOML）已按计划执行。门禁验证由发布流程执行。
 范围：Inspector / Coder one-shot 子会话首 prompt；顺带盘点其他 subagent 合成面
-条款：`ARCH-010` / `SSOT/13`、`EXEC-006`、`COMPANION-003`、`AGENT-012`
+条款：`ARCH-010` / `spec/13`、`EXEC-006`、`COMPANION-003`、`AGENT-012`
 关联：`STATUS/lifecycle-work-record.md`（LWR 已收口）；本项是 LWR wire 的漏网生产点
 
 ---
@@ -30,7 +30,7 @@ src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs
     "Parent work record (background only):\n%s\n\n%s request:\n%s"
 ```
 
-Inspector 与 Coder 共用 `OneShotAgentTool.run`。用户感知的「inspector prompt 不遵 SSOT/13」= 这条路径；不是 system prompt，也不是 tool result。
+Inspector 与 Coder 共用 `OneShotAgentTool.run`。用户感知的「inspector prompt 不遵 spec/13」= 这条路径；不是 system prompt，也不是 tool result。
 
 用户补充（本计划必须遵守）：
 
@@ -54,7 +54,7 @@ Inspector request:
 Inspect the workspace and …
 ```
 
-对照 ARCH-010 / SSOT/13：
+对照 ARCH-010 / spec/13：
 
 | 判据 | 要求 | 现状 |
 |---|---|---|
@@ -116,7 +116,7 @@ OneShotAgentTool.fs#SendAgentOwnerRoot
 
 ## 2. 目标形态
 
-与 fork 父→子 同一 renderer、同一局部 schema（SSOT/13 §9.6）：
+与 fork 父→子 同一 renderer、同一局部 schema（spec/13 §9.6）：
 
 ```toml
 # <caller assignment 原文>
@@ -255,7 +255,7 @@ uncompressed_tail = "…"   # 非法拆分
 
 ### 4.5 `parent_b_digest` 是否保留在 tool result？
 
-SSOT/13 §9.6 / ARCH-010：runtime identity、digest 不得进普通 tool result，除非用户语义需要。今日 `inspector_id` / `tier` / `fallback_peer` / `parent_b_digest` 仍在 result 里——属 既有 join/one-shot result 肥胖问题，本计划不清扫（避免与信封修复绑死）。若要收，另开「one-shot result 最小 wire」项，对齐 join 的 status/agent/work_record 精神。
+spec/13 §9.6 / ARCH-010：runtime identity、digest 不得进普通 tool result，除非用户语义需要。今日 `inspector_id` / `tier` / `fallback_peer` / `parent_b_digest` 仍在 result 里——属 既有 join/one-shot result 肥胖问题，本计划不清扫（避免与信封修复绑死）。若要收，另开「one-shot result 最小 wire」项，对齐 join 的 status/agent/work_record 精神。
 
 ---
 
@@ -301,7 +301,7 @@ SSOT/13 §9.6 / ARCH-010：runtime identity、digest 不得进普通 tool result
 ### A.1 Orchestrator conflict resume
 
 `Application/Orchestration/Orchestrator.Prompts.fs`：`[CONFLICT RESUMPTION]…` 裸英语。  
-属 continuation / repair 类 RuntimeSyntheticToml。应迁 `RuntimeNudge` 风格：instruction comments + `[[conflict]]` data（SSOT/13 §8 已给示例）。另项。
+属 continuation / repair 类 RuntimeSyntheticToml。应迁 `RuntimeNudge` 风格：instruction comments + `[[conflict]]` data（spec/13 §8 已给示例）。另项。
 
 ### A.2 Companion memory 注入 X
 

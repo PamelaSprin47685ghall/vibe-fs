@@ -177,7 +177,7 @@ const ALLOWED_TOOLS = {
  * checking stays green when the table is wrong, which is the false green
  * `design-script-forest.md:630` calls more dangerous than no verification at all.
  *
- * So the matrix is pinned literally against SSOT/02 AGENT-006, and the facade is used
+ * So the matrix is pinned literally against spec/02 AGENT-006, and the facade is used
  * below only for what it can say independently: how many tools a role may hold.
  */
 const expectedPermission = (role) =>
@@ -494,7 +494,7 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
   // for the calling session, `RoleFor` is None and the tool set must be empty —
   // every tool, read-only or not, returns the structured rejection. `inspector`
   // is the tool the old code exempted while the role was unresolved, so it is
-  // the one the clause names as the thing to delete (SSOT/02).
+  // the one the clause names as the thing to delete (spec/02).
   await withExecutablePlugin(async (hooks, _directory, _createdIds, _runtime) => {
     // Deliberately NO acceptAuthorityRoot: this session has no root at all.
     const context = { sessionID: 'unresolved-role', agent: 'fast-manager' }
@@ -530,7 +530,7 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     const inspectorResult = parseToml(inspectorText)
 
     // Data-only fields of the TOML result. The natural-language output is carried
-    // as the leading instruction comment (SSOT/13), so it is asserted on the raw
+    // as the leading instruction comment (spec/13), so it is asserted on the raw
     // text rather than as a parsed field.
     assert.deepEqual(inspectorResult, {
       inspector_id: createdIds[0],
@@ -552,7 +552,7 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     const coderResult = parseToml(coderText)
 
     // CoderTool.fs:9-21: data-only fields, with the natural-language output as a
-    // leading comment (SSOT/13).
+    // leading comment (spec/13).
     assert.deepEqual(coderResult, {
       coder_id: createdIds[1],
       agent: 'fast-coder',

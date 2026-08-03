@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Next.Domain
 
-/// SSOT/15 ENFORCER-080…090：Enforcement Throttle。
+/// spec/15 ENFORCER-080…090：Enforcement Throttle。
 ///
 /// 对每个 (MainSessionId, PrefixEpochId, NudgeKey) 独立计算。唯一时间尺度
 /// 参数 τ = ThrottleTauObservations = 4.0（EnforcementObservationOrdinal 单位）。

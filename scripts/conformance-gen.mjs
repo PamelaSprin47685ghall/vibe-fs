@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from '
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
 
-const SSOT_DIR = 'SSOT'
+const SSOT_DIR = 'spec'
 const STATUS_DIR = 'STATUS'
 const TOML_OUT = join(STATUS_DIR, 'conformance.toml')
 const MD_IN = join(STATUS_DIR, 'conformance.md')
@@ -165,7 +165,7 @@ function main () {
     lines.push('[[clause]]')
     lines.push(`id = "${id}"`)
     lines.push(`title = "${c.title.replace(/"/g, '\\"')}"`)
-    lines.push(`ssot = "SSOT/${c.file}"`)
+    lines.push(`ssot = "spec/${c.file}"`)
     lines.push(`lifecycle = "active"`)
     lines.push(`status = "${status}"`)
     lines.push(`required_layer = ${layer}`)

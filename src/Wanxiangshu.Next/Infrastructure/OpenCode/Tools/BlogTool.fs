@@ -6,7 +6,7 @@ open Wanxiangshu.Next.Infrastructure.Resources
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Session
 
-/// SSOT/15 — the `blog` tool (ENFORCER-010/020/040/041/061).
+/// spec/15 — the `blog` tool (ENFORCER-010/020/040/041/061).
 ///
 /// Provider schema: `text` (required), `evidence` (optional), plus the 120
 /// canonical rule fields (optional 0..9 integers) from resources/enforcer/catalog.json

@@ -60,23 +60,23 @@ assistant message 在 transform 之前已经创建并持久化。
 
 | 任务涉及 | 必读条款 | 必读状态 |
 |---------|---------|---------|
-| Prompt 发送、Authority、Dispatcher | SSOT/03 | conformance Prompt 段 |
-| Fallback、cursor、circuit breaker | SSOT/04 | conformance Fallback 段 |
-| Review、verdict、witness、seal | SSOT/05 + HOST-010/011 | conformance Review 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
-| Orchestrator、publish、rebase、恢复 | SSOT/06 | conformance Orchestrator 段 |
-| Host hook、事件、reconcile | SSOT/07 | conformance Host 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
-| Companion、Blogger、projection、epoch | SSOT/08 + SSOT/12 | conformance Companion 段 |
-| 上下文恢复、Blogger delta、X prefix probe、Y squash | SSOT/12（`CTX-`） | conformance CTX 段 |
-| compaction、`/compact`、reanchor | SSOT/07 + SSOT/12 | `STATUS/blockers/README.md` + `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md` |
-| fork/join/list、PTY、进程 | SSOT/09 | conformance Execution 段 |
-| 测试、门禁、canary 剧本 | SSOT/10 | conformance Verify 段 |
-| Journal、事实、持久化 | SSOT/11 | — |
-| 运行时合成 TOML 记法 | SSOT/13（`ARCH-010`） | conformance ARCH-010 行 + `tests-mjs/Context/synthetic-toml.test.mjs` |
+| Prompt 发送、Authority、Dispatcher | spec/03 | conformance Prompt 段 |
+| Fallback、cursor、circuit breaker | spec/04 | conformance Fallback 段 |
+| Review、verdict、witness、seal | spec/05 + HOST-010/011 | conformance Review 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
+| Orchestrator、publish、rebase、恢复 | spec/06 | conformance Orchestrator 段 |
+| Host hook、事件、reconcile | spec/07 | conformance Host 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
+| Companion、Blogger、projection、epoch | spec/08 + spec/12 | conformance Companion 段 |
+| 上下文恢复、Blogger delta、X prefix probe、Y squash | spec/12（`CTX-`） | conformance CTX 段 |
+| compaction、`/compact`、reanchor | spec/07 + spec/12 | `STATUS/blockers/README.md` + `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md` |
+| fork/join/list、PTY、进程 | spec/09 | conformance Execution 段 |
+| 测试、门禁、canary 剧本 | spec/10 | conformance Verify 段 |
+| Journal、事实、持久化 | spec/11 | — |
+| 运行时合成 TOML 记法 | spec/13（`ARCH-010`） | conformance ARCH-010 行 + `tests-mjs/Context/synthetic-toml.test.mjs` |
 | Strength / Enforcer nudge / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `STATUS/README.md`「已知说明」段 |
-| 任何生产代码改动 | SSOT/01（架构 DNA） | `STATUS/conformance.md`（由 `STATUS/conformance.toml` 生成） |
+| 任何生产代码改动 | spec/01（架构 DNA） | `STATUS/conformance.md`（由 `STATUS/conformance.toml` 生成） |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
 
-`SSOT/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
+`spec/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
 
 ### 提交前运行 lint
 
@@ -110,7 +110,7 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 
 | 位置 | 性质 |
 |------|------|
-| `SSOT/` | 唯一产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以此为准。`SSOT/00.md` 导航，`SSOT/99.md` 词汇表 |
+| `spec/` | 唯一产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以此为准。`spec/00.md` 导航，`spec/99.md` 词汇表 |
 | `STATUS/conformance.md` | 条款 vs 代码合规表，由 `scripts/conformance-gate.mjs` 从 `STATUS/conformance.toml` 生成（勿手改）。当前 Active 192/192 CONFORMANT |
 | `STATUS/README.md` | 当前基线：分支、最后验证 commit、产品状态、源码地图、下一步 |
 | `STATUS/blockers/README.md` | 活跃 blocker 账本。HOST-006 已闭合（运行时探测已接线）；V2 runner `compactAfterOverflow` 观察项留给上游（ARCH-003） |
@@ -119,11 +119,11 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 | `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
 | `docs/rfcs/` | 未来设计 RFC（strength / student-teacher / enforcer-nudge）；非产品合同 |
 | `resources/` | 运行时静态资源：prompts/ + enforcer/catalog.json（随 npm pack 发布） |
-| `spec/` | 0.5.3 过渡：coverage.toml 骨架；条款正文仍在 SSOT/ |
+| `spec/` | 0.5.3 过渡：coverage.toml 骨架；条款正文仍在 spec/ |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
-`SSOT/` 只描述应该如何，不描述当前如何。实现状态词
+`spec/` 只描述应该如何，不描述当前如何。实现状态词
 （`CONFORMANT` / `PARTIAL` / `CONTRADICTS` / `UNVERIFIED` / `NOT_IMPLEMENTED` / `PURE_CORE_ONLY`）
 只出现在 `STATUS/`。
 `node scripts/ssot-lint.mjs` 强制这一分离，并检查条款 ID 唯一性与悬空引用。
@@ -150,8 +150,8 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 ### 当前开发阶段
 
 0.5.2 全 SSOT 收敛已发布：Active 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
-0 PURE_CORE_ONLY / 0 NOT_IMPLEMENTED。Active 子集 = SSOT/01–13 + SSOT/15 Blogger
-工具化 + SSOT/17 LOOP。SSOT/14 Strength 与 SSOT/16 Student&Teacher 已迁
+0 PURE_CORE_ONLY / 0 NOT_IMPLEMENTED。Active 子集 = spec/01–13 + spec/15 Blogger
+工具化 + spec/17 LOOP。spec/14 Strength 与 spec/16 Student&Teacher 已迁
 `docs/rfcs/strength.md` / `docs/rfcs/student-teacher.md`，ENFORCER nudge/throttle 在
 `docs/rfcs/enforcer-nudge.md`——均为已批准但未交付的未来设计，不属于当前产品合同。
 
@@ -168,7 +168,7 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 
 ## 3. 三条不可违反的架构 DNA
 
-完整规范 `SSOT/01.md`。
+完整规范 `spec/01.md`。
 
 1. 结构化程序替代状态机（ARCH-001）。控制流只用 `let!/do!/use!/match/尾递归`。
    禁止 `Stage`、`Phase`、`Lease`、`Owner`、`Generation` 作为程序计数器。
@@ -181,7 +181,7 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 
 ### 第四条：上下文恢复必须由失败驱动（CTX-001 / CTX-002）
 
-与上面三条同级的硬禁止，来自 SSOT/12。
+与上面三条同级的硬禁止，来自 spec/12。
 
 禁止观察或估算上下文容量（CTX-001）：不读 provider 的 context/input/output limit，
 不做 token 估算，不拿估算值与任何阈值比较。禁止在失败发生前压缩（CTX-002）：
@@ -199,7 +199,7 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 | `CompanionProgram.shouldReplacePrefix` | CTX-001 | `PrefixProbeSelection` |
 
 推论：`transform` hook 里做不了恢复决策，因为它看不到 attempt 结局。
-没有已提交的探针时，X 看到的就是原始历史——这是 SSOT/12 的正确行为，不是降级。
+没有已提交的探针时，X 看到的就是原始历史——这是 spec/12 的正确行为，不是降级。
 
 手工 `/compact` 无法阻断（SSOT 例外 1，见 `STATUS/blockers/README.md`）。
 解法是两层：预防层关掉 `auto`/`prune`/`autocontinue` 并在首轮启动探测，
@@ -407,7 +407,7 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 
 ## 7. Canary 剧本与 fixture
 
-森林设计已定稿并合入 `SSOT/10`（VERIFY-003）与 conformance Verify 段，历史记档在
+森林设计已定稿并合入 `spec/10`（VERIFY-003）与 conformance Verify 段，历史记档在
 `docs/archive/shock-anneal-2026/FINAL-REPORT.md`。剧本位于 `testkit/opencode/scripts/*.toml`
 （18 个），canary 清单由 `canary-manifest.js` 从文件系统派生。
 

@@ -1,6 +1,6 @@
 // tests-mjs/Prompt/send-format.test.mjs — PROMPT-006.
 //
-// SSOT/03 PROMPT-006 fixes the send-time options at every dispatch:
+// spec/03 PROMPT-006 fixes the send-time options at every dispatch:
 //
 //   { Agent = Some effectiveAgent
 //     Model = None

@@ -1,7 +1,7 @@
 // tests-mjs/Review/witness.test.mjs — REVIEW-002/003/004/005/006/007/008/010.
 //
 // One question: what proves that a second PERFECT actually saw the first
-// challenge. Everything else in SSOT/05 exists to stop that question being
+// challenge. Everything else in spec/05 exists to stop that question being
 // answered by a cheaper substitute — a shared authority root, a matching
 // physical message id, or a stored boolean.
 //

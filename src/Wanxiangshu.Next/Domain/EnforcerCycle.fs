@@ -2,7 +2,7 @@ namespace Wanxiangshu.Next.Domain
 
 open Wanxiangshu.Next.Domain.EnforcerCodec
 
-/// SSOT/15 ENFORCER-041/042/043：多调用 Cycle 合并。
+/// spec/15 ENFORCER-041/042/043：多调用 Cycle 合并。
 ///
 /// 同一 ProviderRunIdentity 的所有成功 blog 调用组成一个 Blogger Cycle。
 /// 排序键 = assistant message 中 tool-call part 的 provider-visible ordinal

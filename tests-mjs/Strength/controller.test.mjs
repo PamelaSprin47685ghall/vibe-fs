@@ -1,4 +1,4 @@
-// tests-mjs/Strength/controller.test.mjs — SSOT/14 STRENGTH-027/028/030/031/093.
+// tests-mjs/Strength/controller.test.mjs — spec/14 STRENGTH-027/028/030/031/093.
 //
 // The negative-feedback controller: ρ moves opposite to the smoothed tendency,
 // updates slowly, and never saturates at 0 or 1. STRENGTH-093 demands:

@@ -1,4 +1,4 @@
-// tests-mjs/Enforcer/cycle-nudge.test.mjs — SSOT/15 ENFORCER-041/042/043, 100/101/102.
+// tests-mjs/Enforcer/cycle-nudge.test.mjs — spec/15 ENFORCER-041/042/043, 100/101/102.
 //
 // Multi-call cycle merge and nudge rendering. ENFORCER-190 pure tests 5-7:
 //   5. any parallel completion order does not change the cycle merge;

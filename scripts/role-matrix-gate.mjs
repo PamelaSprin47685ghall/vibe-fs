@@ -21,7 +21,7 @@ const PROMPT_AUTH_FS = 'src/Wanxiangshu.Next/Domain/PromptAuthority.fs'
 const MANAGED_AGENT_FS = 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs'
 const MANAGED_CONFIG_FS = 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs'
 
-// AGENT-002 fixed matrix (SSOT/02). Order is presentation only; membership is the check.
+// AGENT-002 fixed matrix (spec/02). Order is presentation only; membership is the check.
 const EXPECTED_ROLES = [
   'Manager',
   'Orchestrator',

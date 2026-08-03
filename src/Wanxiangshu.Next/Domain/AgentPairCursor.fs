@@ -2,7 +2,7 @@ namespace Wanxiangshu.Next.Domain
 
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Pure A/A/B/B fallback cursor (SSOT/04). No Host, Journal or Fable dependency.
+/// Pure A/A/B/B fallback cursor (spec/04). No Host, Journal or Fable dependency.
 ///
 /// The whole point of this module is that two independent quantities were
 /// previously conflated:

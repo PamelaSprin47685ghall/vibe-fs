@@ -157,7 +157,7 @@ module Fold =
                     Companion = Some(apply (Option.defaultValue CompanionProjection.empty session.Companion)) })
             projection
 
-    /// SSOT/12 frame facts. `tryUpdate` rather than `update`: every one of them can
+    /// spec/12 frame facts. `tryUpdate` rather than `update`: every one of them can
     /// be refused, and PERSIST-010 requires the refusal to reach the caller.
     let private tryUpdateBlog sessionId apply projection =
         AgentProjection.tryUpdate
@@ -614,7 +614,7 @@ module Fold =
                         Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
             )
 
-        // ── lifecycle work record (SSOT/08, HOST-005) ──────────────────────
+        // ── lifecycle work record (spec/08, HOST-005) ──────────────────────
 
         | AgentFact.OpeningPromptCaptured payload ->
             // COMPANION-003 / PERSIST-010: idempotent capture. Replaying the same
@@ -681,7 +681,7 @@ module Fold =
                 | Error rejection ->
                     reject "TerminalOutputCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
 
-        // ── failure-driven context recovery (SSOT/12) ───────────────────────
+        // ── failure-driven context recovery (spec/12) ───────────────────────
 
         | AgentFact.BloggerRequestMaterialized payload ->
             let apply session =

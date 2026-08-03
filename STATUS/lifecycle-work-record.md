@@ -363,11 +363,11 @@ let materialize snapshot =
 
 ## 3. SSOT 修改清单
 
-下面分“规范语义必须改”和“术语/验证机械同步”。不应只改 SSOT/08、09，否则 01/07/12/13 仍会反向要求旧 wire。
+下面分“规范语义必须改”和“术语/验证机械同步”。不应只改 spec/08、09，否则 01/07/12/13 仍会反向要求旧 wire。
 
 ## 3.1 一级：必须重写的规范 SSOT
 
-### SSOT/01.md — ARCH-010 synthetic TOML
+### spec/01.md — ARCH-010 synthetic TOML
 
 修改点：
 
@@ -384,7 +384,7 @@ ARCH-010-LWR：LWR 是 opaque semantic value。TOML renderer 只负责安全承�
 不得读取、重排、摘要或补充 LWR 内容。
 ```
 
-### SSOT/07.md — HOST-005 / Session 生命周期记录
+### spec/07.md — HOST-005 / Session 生命周期记录
 
 修改点：
 
@@ -397,7 +397,7 @@ ARCH-010-LWR：LWR 是 opaque semantic value。TOML renderer 只负责安全承�
 
 HOST-005 可重命名为“XTrace 分段与 durable cursor”，保留 clause ID 以减少引用震荡，或新增 HOST-005A 后废止旧义。推荐直接重写并在迁移注记中声明旧 A 术语废止。
 
-### SSOT/08.md — COMPANION 核心
+### spec/08.md — COMPANION 核心
 
 需要重写：
 
@@ -413,7 +413,7 @@ HOST-005 可重命名为“XTrace 分段与 durable cursor”，保留 clause ID
 - COMPANION-012：统一 XTrace provider-semantic projection 和 metadata 排除表。
 - 其余 synthetic ID 条款把 FrozenB 命名同步为 FrozenRecordPrefix。
 
-### SSOT/09.md — fork/join/child lifecycle
+### spec/09.md — fork/join/child lifecycle
 
 修改点：
 
@@ -423,7 +423,7 @@ HOST-005 可重命名为“XTrace 分段与 durable cursor”，保留 clause ID
 - 明确 child OpeningPrompt 是原始 assignment，而不是带 `parent_work_record` 的 synthetic envelope。
 - 明确成功 join 不输出 runtime-only identity；失败结果只输出 parent LLM 能采取行动所需的 status、agent、error code/message。
 
-### SSOT/11.md — persistence
+### spec/11.md — persistence
 
 修改点：
 
@@ -444,7 +444,7 @@ TerminalOutputCaptured
 - schema version bump；旧 A/Seed journal 不能被新 fold 静默解释。
 - LWR 是 projection/materialization，不需要每次重复持久化整份大字符串；terminal completion 可保存最终 LWR BlobRef 作为 immutable completion artifact。
 
-### SSOT/12.md — recovery、probe、Blogger delta
+### spec/12.md — recovery、probe、Blogger delta
 
 修改点：
 
@@ -488,7 +488,7 @@ historic_frame = "..."
 
 删除：`turn`、`kind`、独立 `[[message]]`/`[[tool_call]]` 表、markdown `# Working Record` / `# New Work To Record` 包装。顺序由 table 出现顺序表达；text 的 role 作为字段名。
 
-### SSOT/13.md — ARCH-010 详细合同和工具面
+### spec/13.md — ARCH-010 详细合同和工具面
 
 修改点：
 
@@ -500,11 +500,11 @@ historic_frame = "..."
 
 ## 3.2 二级：必须机械同步的 SSOT
 
-### SSOT/00.md
+### spec/00.md
 
 更新系统地图和概念入口：删除 A/B 作为跨模块产品概念，新增 XTrace、Y frame、LWR、RecordCoverage、PrefixCoverage。
 
-### SSOT/10.md
+### spec/10.md
 
 验证投影谱系改为：
 
@@ -518,11 +518,11 @@ Host/provider event
 
 新增“相同 XTrace segment 不能由两套独立 parser/renderer 生成”的 verification gate。
 
-### SSOT/14.md、SSOT/15.md
+### spec/14.md、spec/15.md
 
 搜索并替换所有 `A(X)`、`B(X)`、`LatestB`、`CoverableB`、`FrozenB`、`Seed`、`formalRecord`、`workRecord` 旧义引用。Strength/Enforcer/StudentTeacher 若只需要 context，应依赖 LWR 或 FrozenRecordPrefix，不得重新发明 fallback。
 
-### SSOT/99.md
+### spec/99.md
 
 术语表：
 
@@ -531,11 +531,11 @@ Host/provider event
 
 ## 3.3 可能只需交叉引用的 SSOT
 
-### SSOT/03.md
+### spec/03.md
 
 若 OpeningPrompt capture 绑定 PromptAuthority 的物理接受点，则补充“只在已证明 Host 接受后提交 OpeningPromptCaptured”；PromptAuthority 的单写者原则本身无需改。
 
-### SSOT/16.md
+### spec/16.md
 
 当前未发现直接依赖 A/B wire 的主规范。实施时跑全仓术语扫描；只有出现旧名或假设 join 有 formalRecord 时才机械同步，不要无意义改文档。
 
@@ -636,18 +636,18 @@ Y frame coverage + current Host epoch mapping
 修改：
 
 ```text
-SSOT/00.md
-SSOT/01.md
-SSOT/07.md
-SSOT/08.md
-SSOT/09.md
-SSOT/10.md
-SSOT/11.md
-SSOT/12.md
-SSOT/13.md
-SSOT/14.md
-SSOT/15.md
-SSOT/99.md
+spec/00.md
+spec/01.md
+spec/07.md
+spec/08.md
+spec/09.md
+spec/10.md
+spec/11.md
+spec/12.md
+spec/13.md
+spec/14.md
+spec/15.md
+spec/99.md
 STATUS/README.md
 STATUS/conformance.md
 ```
@@ -1158,7 +1158,7 @@ tier
 
 ### ssot-lint.mjs
 
-- 新术语必须有 SSOT/99 定义；
+- 新术语必须有 spec/99 定义；
 - 除迁移/历史段外禁止 A(X)/B(X)/Seed；
 - conformance 的 clause 名和新 SSOT 一致。
 

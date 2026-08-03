@@ -2339,7 +2339,7 @@ Student compile nudge 次数
 
 # 二十六、对现有 SSOT 的修订
 
-## LEARN-100：SSOT/00
+## LEARN-100：spec/00
 
 新增角色说明：
 
@@ -2348,7 +2348,7 @@ Student：公开主动学习 Agent；学习阶段只调用 Teacher，最终编�
 Teacher：内部调查与教学 Agent；完整工具；只通过 return 回传 Student。
 ```
 
-## LEARN-101：SSOT/02
+## LEARN-101：spec/02
 
 修改：
 
@@ -2363,7 +2363,7 @@ Role 新增 Student / Teacher
 
 不得把该能力泛化成任意 Role × Surface 权限代数，除非其他功能已形成真实复用需求。
 
-## LEARN-102：SSOT/03
+## LEARN-102：spec/03
 
 新增 PromptOrigin/ContinuationKind：
 
@@ -2376,7 +2376,7 @@ StudentCompilationNudge
 
 所有发送统一经过 PromptDispatcher。
 
-## LEARN-103：SSOT/07
+## LEARN-103：spec/07
 
 新增 reconcile 规则：
 
@@ -2389,7 +2389,7 @@ Student final return
 
 保持 idle 仅为信号，完整状态从 SDK 消息读取。
 
-## LEARN-104：SSOT/09
+## LEARN-104：spec/09
 
 补充内部 Teacher Session 不进入普通 fork/join/list。
 
@@ -2397,7 +2397,7 @@ Teacher 工具不是 Manager `fork-agent` 的别名。
 
 它有专用持续 Session、同步 return 与 QA 写入语义。
 
-## LEARN-105：SSOT/11
+## LEARN-105：spec/11
 
 不新增 Student 知识 Journal 事件。
 
@@ -2411,7 +2411,7 @@ QA 临时文件原子写入
 
 明确 QA.md 是 Student 功能自己的唯一权威状态。
 
-## LEARN-106：SSOT/99
+## LEARN-106：spec/99
 
 新增术语：
 

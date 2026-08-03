@@ -2,7 +2,7 @@ namespace Wanxiangshu.Next.Domain
 
 open System
 
-/// SSOT/15 ENFORCER-020…025：`blog` 工具参数的 canonical codec。
+/// spec/15 ENFORCER-020…025：`blog` 工具参数的 canonical codec。
 ///
 /// 纯函数：raw JSON object → CanonicalBlogCall。字段名拼写容错
 /// （ENFORCER-024：NFKC → lowercase → 连字符 → 精确匹配 → DL 最近邻），

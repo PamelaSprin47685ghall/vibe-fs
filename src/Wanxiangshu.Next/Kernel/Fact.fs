@@ -3,7 +3,7 @@ namespace Wanxiangshu.Next.Kernel
 open System
 open Wanxiangshu.Next.Kernel.Identity
 
-/// Durable domain facts (SSOT/11).
+/// Durable domain facts (spec/11).
 ///
 /// ARCH-005: only what still holds across process boundaries lives here. The
 /// Host transcript owns the conversation, Git owns the code, and this journal
@@ -310,7 +310,7 @@ module Fact =
 
         | JobAbandoned of {| ManagerJobId: ManagerJobId |}
 
-        // ── Companion (SSOT/08) ─────────────────────────────────────────────
+        // ── Companion (spec/08) ─────────────────────────────────────────────
 
         /// COMPANION-003: Y is X's long-lived companion Blogger Session, so which
         /// session that is must survive a restart.
@@ -328,7 +328,7 @@ module Fact =
         /// fresh one rather than reviving this session.
         | CompanionBloggerClosed of {| SessionId: SessionId |}
 
-        // ── lifecycle work record (SSOT/08, HOST-005) ───────────────────────
+        // ── lifecycle work record (spec/08, HOST-005) ───────────────────────
 
         /// COMPANION-003: the Session's opening task prompt, captured verbatim at
         /// the physical acceptance point. Idempotent and never overwritten
@@ -377,7 +377,7 @@ module Fact =
                TextDigest: BlobDigest
                ProviderRun: ProviderRunIdentity |}
 
-        // ── failure-driven context recovery (SSOT/12) ───────────────────────
+        // ── failure-driven context recovery (spec/12) ───────────────────────
 
         /// COMPANION-008: one Blogger entry landed, and the coverage it proves
         /// advanced. ONE fact, not two: the clause makes frame append and

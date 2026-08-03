@@ -1,4 +1,4 @@
-// tests-mjs/Enforcer/codec.test.mjs — SSOT/15 ENFORCER-020…025.
+// tests-mjs/Enforcer/codec.test.mjs — spec/15 ENFORCER-020…025.
 //
 // The blog-argument codec. ENFORCER-190 pure tests 2-4:
 //   2. any omitted field is zero;

@@ -65,9 +65,9 @@ type ProviderRequestKind =
     | BloggerSquash
     /// FALLBACK-008's one repair for an unusable terminal.
     | InteractionRepair
-    /// SSOT/16 LEARN-050: the Student's learning phase request (only `teacher`).
+    /// spec/16 LEARN-050: the Student's learning phase request (only `teacher`).
     | StudentLearn
-    /// SSOT/16 LEARN-050: the Student's compile phase request (read/write/return).
+    /// spec/16 LEARN-050: the Student's compile phase request (read/write/return).
     | StudentCompile
 
 [<RequireQualifiedAccess>]

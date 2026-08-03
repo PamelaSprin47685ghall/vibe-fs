@@ -328,7 +328,7 @@ export const listItems = (list) => FsList.toArray(list)
 // F# `Set<string>` needs a comparer object; Fable does not infer one from the
 // element type. `REVIEW-010`'s `IncludedToolResultDigests` is such a set, and it
 // is the causal evidence a confirmation rests on — so a test that built it wrong
-// would be proving the wrong thing about the most load-bearing check in SSOT/05.
+// would be proving the wrong thing about the most load-bearing check in spec/05.
 const ordinalComparer = { Compare: (left, right) => (left < right ? -1 : left > right ? 1 : 0) }
 
 /**
@@ -781,7 +781,7 @@ export const journalStore = () => {
 /** PERSIST-004 merge order across runtime streams, without touching disk. */
 export const kWayMerge = (streams) => listItems(Boots.kWayMerge(toList(streams.map((s) => toList(s)))))
 
-// ── fallback (SSOT/04) ───────────────────────────────────────────────────────
+// ── fallback (spec/04) ───────────────────────────────────────────────────────
 
 export const cursor = {
   initial: Cursor.initial,
@@ -848,7 +848,7 @@ export const fallbackProjection = (() => {
   }
 })()
 
-// ── failure-driven context recovery (SSOT/12) ────────────────────────────────
+// ── failure-driven context recovery (spec/12) ────────────────────────────────
 
 /**
  * ARCH-010 / REVIEW-002: what a newly forked child is told, as one payload.
@@ -1331,7 +1331,7 @@ export const requestKind = (() => {
     bloggerMain: of('BloggerMain'),
     bloggerSquash: of('BloggerSquash'),
     interactionRepair: of('InteractionRepair'),
-    // SSOT/16 LEARN-050: the Student's two request kinds.
+    // spec/16 LEARN-050: the Student's two request kinds.
     studentLearn: of('StudentLearn'),
     studentCompile: of('StudentCompile'),
     all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair', 'StudentLearn', 'StudentCompile'].map(of),
@@ -1971,7 +1971,7 @@ export const prefixEpochProjection = (() => {
   }
 })()
 
-// ── review (SSOT/05) ─────────────────────────────────────────────────────────
+// ── review (spec/05) ─────────────────────────────────────────────────────────
 
 /**
  * REVIEW-006: one witnessed PERFECT verdict.
@@ -2143,7 +2143,7 @@ export const providerProjection = {
   decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
 }
 
-// ── host signals (SSOT/07) ───────────────────────────────────────────────────
+// ── host signals (spec/07) ───────────────────────────────────────────────────
 
 export const hostSignals = (() => {
   const m = bind(HostEventCodecModule, 'HostEventCodec', ['isHostSignalEvent', 'tryDecode'])
@@ -2154,7 +2154,7 @@ export const hostSignals = (() => {
   }
 })()
 
-// ── execution handles (SSOT/09) ──────────────────────────────────────────────
+// ── execution handles (spec/09) ──────────────────────────────────────────────
 
 export const handleProjection = (() => {
   const m = bind(LinkageProj, 'HandleProjection', [
@@ -2239,7 +2239,7 @@ export const handleProjection = (() => {
   }
 })()
 
-// ── EXEC-009 consume path (SSOT/09) ──────────────────────────────────────────
+// ── EXEC-009 consume path (spec/09) ──────────────────────────────────────────
 
 /** `HostForkRuntime.Join` reads `HandleProjection.joinable` (above) as the fact
  *  source, then CAS-retires via `HandleController.consume` and materialises the
@@ -2274,7 +2274,7 @@ export const handleCompletionCodec = (() => {
   }
 })()
 
-// ── orchestrator (SSOT/06) ───────────────────────────────────────────────────
+// ── orchestrator (spec/06) ───────────────────────────────────────────────────
 
 export const orchestratorProjection = (() => {
   const m = bind(OrchestratorProj, 'OrchestratorProjection', [
@@ -2391,7 +2391,7 @@ export const orchestratorRuntime = {
   join: async (runtime) => orchestratorVerdictOf(await OrchestratorRuntime.Orchestrator__JoinPublished(runtime)),
 }
 
-// ── prompt authority (SSOT/03) ───────────────────────────────────────────────
+// ── prompt authority (spec/03) ───────────────────────────────────────────────
 
 export const authority = {
   empty: Authority.empty,
@@ -2684,7 +2684,7 @@ export const promptOrigin = (() => {
   }
 })()
 
-// ── process (SSOT/09) ────────────────────────────────────────────────────────
+// ── process (spec/09) ────────────────────────────────────────────────────────
 
 /** A frozen clock. Deadline takes `unit -> DateTimeOffset`, i.e. a thunk. */
 export const clockAt = (iso) => () => utcOffset(iso)
@@ -2786,7 +2786,7 @@ export const diagnostic = (() => {
   }
 })()
 
-// ── SSOT/17: LOOP detector + text-delta codec ────────────────────────────────
+// ── spec/17: LOOP detector + text-delta codec ────────────────────────────────
 
 /**
  * LOOP-003…005: pure O(1) exponential-mixture character diversity detector.
@@ -2965,7 +2965,7 @@ export const fallbackController = (() => {
 })()
 
 
-// ── SSOT/14: Strength 纯领域内核 ─────────────────────────────────────────────
+// ── spec/14: Strength 纯领域内核 ─────────────────────────────────────────────
 
 export const strength = (() => {
   const types = bind(StrengthTypesModule, 'StrengthTypes', [
@@ -3042,7 +3042,7 @@ const tier = (name) => {
   throw new Error(`unknown tier: ${name}`)
 }
 
-// ── SSOT/15: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
+// ── spec/15: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
 
 export const enforcer = (() => {
   const catalog = bind(EnforcerCatalogModule, 'EnforcerCatalogResource', ['rules'])
@@ -3142,7 +3142,7 @@ export const enforcer = (() => {
   }
 })()
 
-// ── SSOT/15 ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
+// ── spec/15 ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
 
 export const bloggerRequestContext = (() => {
   const build = unionCase(BloggerRequestContextModule.BloggerRequestContext, 'BloggerRequestContext')
@@ -3376,7 +3376,7 @@ export const parkedTransform = (() => {
   }
 })()
 
-// ── SSOT/16: Student & Teacher 纯领域内核 ────────────────────────────────────
+// ── spec/16: Student & Teacher 纯领域内核 ────────────────────────────────────
 
 export const studentTeacher = (() => {
   const m = bind(StudentTeacherModule, 'StudentTeacher', [

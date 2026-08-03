@@ -7,7 +7,7 @@
 // The clause was written BECAUSE of this file. Writing these tests surfaced a
 // shared primitive with a real behavioural contract and no clause backing any of
 // it, so the tests briefly carried a `mapBounded_` prefix — a name asserting
-// nothing, since `ssot-lint` only reads `SSOT/` and would never catch a fabricated
+// nothing, since `ssot-lint` only reads `spec/` and would never catch a fabricated
 // clause id in a test name. Rather than leave that gap, ARCH-009 now states the
 // contract and every test here names it (supersedes record #2).
 //

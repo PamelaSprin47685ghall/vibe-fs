@@ -1,5 +1,5 @@
 /**
- * x-recovery-canary — C10 layer-4 evidence for SSOT/12 (X-A…X-D).
+ * x-recovery-canary — C10 layer-4 evidence for spec/12 (X-A…X-D).
  *
  * Four static scenarios, one driver (orchestrator-restart-publish pattern):
  *   x-a-probe-before-crash        arming lost; no probe send; no promote

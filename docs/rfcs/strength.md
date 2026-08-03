@@ -2,11 +2,11 @@
 
 Status: proposed
 
-> 本文件为已批准但尚未启用的未来设计，不属于 0.5.x 产品合同。编号原 `SSOT/14.md`。
+> 本文件为已批准但尚未启用的未来设计，不属于 0.5.x 产品合同。编号原 `spec/14.md`。
 > 原稿「状态：最终修订稿（已通过审阅，待 Host canary 和灰度验证）」随合入更新为「已合入规范」；
 > 实现仍受 Host canary（STRENGTH-078 C-01…C-21）与阶段 A（Projection DSL 迁移）门禁。
-> `SSOT/13.md` 已恢复为运行时 LLM 可见合成内容的 TOML Instruction/Data 记法规范；
-> 正文中「SSOT/13 — Projection Algebra」的引用保持历史语义，其完整代数语义由本文档 STRENGTH-066…074 自洽承载。
+> `spec/13.md` 已恢复为运行时 LLM 可见合成内容的 TOML Instruction/Data 记法规范；
+> 正文中「spec/13 — Projection Algebra」的引用保持历史语义，其完整代数语义由本文档 STRENGTH-066…074 自洽承载。
 
 ---
 
@@ -14,12 +14,12 @@ Status: proposed
 
 状态：未来设计（已批准但未启用）
 条款前缀：`STRENGTH-`
-关联文档：`docs/rfcs/strength.md` 为历史设计；`SSOT/13.md` 为运行时 LLM 可见合成内容的 TOML 记法
+关联文档：`docs/rfcs/strength.md` 为历史设计；`spec/13.md` 为运行时 LLM 可见合成内容的 TOML 记法
 目标版本：未来生产版本
 默认状态：关闭；通过 Host canary 和灰度门禁后启用
 
-> 说明：`SSOT/14` 编号保持不变，Projection DSL 语义由本文档 STRENGTH-066…074 自洽承载。
-> `SSOT/13.md` 现承载运行时 LLM 可见合成内容的 TOML Instruction/Data 记法规范。
+> 说明：`spec/14` 编号保持不变，Projection DSL 语义由本文档 STRENGTH-066…074 自洽承载。
+> `spec/13.md` 现承载运行时 LLM 可见合成内容的 TOML Instruction/Data 记法规范。
 
 ---
 
@@ -48,7 +48,7 @@ Predict & Reduce Strength 用于识别主模型即将进行的机械性只读调
 13. 已提交的旁路工具批次在主模型投影中与普通历史工具调用字节一致。
 14. 训练流按受控概率纳入旁路请求符号；该概率由预测倾向的负反馈控制。
 15. 系统追求稳定、成本合理的闭环工作点，不声称识别反事实最优策略。
-16. 投影功能必须通过 typed DSL/组合子编写（SSOT/13 Projection Algebra）；领域事实和生命周期仍由 Journal Fold 与普通程序控制。
+16. 投影功能必须通过 typed DSL/组合子编写（spec/13 Projection Algebra）；领域事实和生命周期仍由 Journal Fold 与普通程序控制。
 17. 候选帧（Candidate Frame）采用「候选-消费-提升」两阶段语义：候选只对首次目标 attempt 可见，主 provider 确认消费后才 promote 为活动历史。
 18. Replica 使用 fast-replica/deep-replica 内部 Agent，只提供模型绑定，不决定 CanonicalRole。
 19. 训练状态只按 X 的 CanonicalRole 分桶，不按模型组合或版本细分。
@@ -957,7 +957,7 @@ Replica 已经替主模型读取
 
 本功能追求的是内部稳定工作点，不声称该工作点等于反事实全局最优值。
 
-### 最终简化原则（适用于整个 SSOT/14）
+### 最终简化原则（适用于整个 spec/14）
 
 ```text
 模型身份只影响本次请求路由，不影响训练分桶。
@@ -970,7 +970,7 @@ ExecutionSurface 决定 Replica 的只读权限。
 
 所有策略参数都是集中式代码常量（PolicyConstants）。
 
-所有 provider-visible 历史都由同一个 Projection DSL（SSOT/13）家族产生。
+所有 provider-visible 历史都由同一个 Projection DSL（spec/13）家族产生。
 
 不为统计纯洁性增加模型对、版本、仓库或 Session 分桶。
 
@@ -2001,8 +2001,8 @@ Strength 不测量上下文窗口，不预测是否接近上限。
 
 # 十九、投影 DSL（全局架构，不属于 Strength 子模块）
 
-> 根据最终审阅裁决，Projection DSL 提升为全局基础设施 SSOT/13 — Projection Algebra（条款前缀 `PROJ-`）。
-> 以下条款是 STRENGTH 对 DSL 的使用规范。完整 DSL 定义见 SSOT/13。
+> 根据最终审阅裁决，Projection DSL 提升为全局基础设施 spec/13 — Projection Algebra（条款前缀 `PROJ-`）。
+> 以下条款是 STRENGTH 对 DSL 的使用规范。完整 DSL 定义见 spec/13。
 
 ## STRENGTH-066：采用 DSL/组合子
 
@@ -2669,7 +2669,7 @@ StrengthPropertyTests.fs                            DSL 与 Fold 性质测试
 先于 Projection DSL 迁移。记号与结构不先稳定，后续工作会在旧记号上定型后再改一次。
 
 ```text
-SSOT/99 规范符号表落地
+spec/99 规范符号表落地
 [机械] 类改动批量执行，与 [语义] 类分离提交
 ssot-lint 扩展退役符号检测
 SatelliteTypes / SatelliteRuntime / SatelliteFold
@@ -2678,9 +2678,9 @@ SatelliteTypes / SatelliteRuntime / SatelliteFold
 
 判据：退役符号残留数为零；Companion 行为无回归。
 
-## STRENGTH-086：阶段 A——SSOT/13 Projection DSL 迁移
+## STRENGTH-086：阶段 A——spec/13 Projection DSL 迁移
 
-先完成 SSOT/13（Projection Algebra）的 DSL 实现与迁移：
+先完成 spec/13（Projection Algebra）的 DSL 实现与迁移：
 
 ```text
 SemanticEvent
@@ -2693,7 +2693,7 @@ property tests
 追溯迁移所有旧投影（按 PROJ-008 顺序）
 ```
 
-在 SSOT/13 迁移完成前，不实现生产 Strength transform。
+在 spec/13 迁移完成前，不实现生产 Strength transform。
 
 ### PROJ-008 迁移顺序
 
@@ -3078,7 +3078,7 @@ provider 请求数才代表判断深度
 9. 跨 Session 的 identity 由确定性合成 ID 映射生成。
 10. 训练状态只按 X 的 CanonicalRole 分桶（Z_X 自身的角色不是分桶键），旁路标签按负反馈概率纳入。
 11. 所有策略参数是集中式代码常量。
-12. 投影 DSL（SSOT/13）是所有 provider-visible projection 的唯一生产路径。
+12. 投影 DSL（spec/13）是所有 provider-visible projection 的唯一生产路径。
 13. 目标是稳定合理，不是反事实最优。
 14. Z_X 无自身 epoch，按 ε(X) 渲染（STRENGTH-010）。
 15. Z_X 无恢复路径，失败即丢弃决策（STRENGTH-014）。
@@ -3127,10 +3127,10 @@ K ∈ {0,1,2}，按 provider 请求计数
 候选-消费-提升两阶段语义（候选只对首次 attempt 可见）
 统一 SemanticEventCursor（替代 TurnIndex+PartIndex）
 控制论负反馈（只按 X 的 CanonicalRole 分桶，两个独立控制环）
-typed projection DSL（SSOT/13，全局架构，所有投影的唯一生产路径）
+typed projection DSL（spec/13，全局架构，所有投影的唯一生产路径）
 所有策略参数集中在 PolicyConstants 中
 卫星结构层泛化（SatelliteContract + SatelliteRuntime，策略层不泛化）
-全局记号统一（规范位置 SSOT/99）
+全局记号统一（规范位置 spec/99）
 不追求反事实最优
 ```
 
@@ -3185,21 +3185,21 @@ IMPLEMENT ONLY AFTER PROJECTION DSL MIGRATION AND HOST CANARIES
 
 # 三十一、对其他 SSOT 文件的修订清单
 
-本节列出对 SSOT/00–12、99 的全部改动。[语义] 类改变规范内容；[机械] 类仅记号替换。
+本节列出对 spec/00–12、99 的全部改动。[语义] 类改变规范内容；[机械] 类仅记号替换。
 
 | 文件 | 性质 | 改动 |
 |------|------|------|
-| SSOT/00 | 语义 | Agent 角色一览新增 Replica 行；术语速查表指向 SSOT/99 |
-| SSOT/02 | 语义 | AGENT-001 Role 新增 Replica；AGENT-002 20→22；AGENT-006 矩阵加 Replica 行；AGENT-008 不可见清单加 Replica |
-| SSOT/04 | 语义 | FALLBACK-002 side 构造子 Selected \| Peer（原 SideA/SideB），Offset 原名不变 |
-| SSOT/05 | 语义 | REVIEW-010 ProviderInputSeal 新增 IncludedCandidateFrameDigests |
-| SSOT/07 | 语义 | HOST-005 ProseRecord（原 ARecord）；HOST-008 引入 SatelliteKind；HOST-010 补充卫星 transform 绑定判据 |
-| SSOT/08 | 语义 | COMPANION-003 整条重写（P(X)/L(X)/切点记号）；COMPANION-005 BlogFrame→LogSegment（事实名不改）；COMPANION-009 加 attempt-local 候选帧豁免；COMPANION-010 包裹文本保持逐字节不变 |
-| SSOT/09 | 机械 | EXEC-004 join 字段重命名；EXEC-006/008 父背景记号更新 |
-| SSOT/11 | 语义 | PERSIST-010 新增 SatelliteLinked/Retired fold 规则；单调性条件改用切点 |
-| SSOT/12 | 机械 | CTX-011 probe 规则改为序关系；CTX-003 记号更新 |
-| SSOT/99 | 语义 | 新增规范符号表一节 |
-| SSOT/13 | 语义 | 阶段顺序按 Writeback 类分组；冲突规则泛化 |
+| spec/00 | 语义 | Agent 角色一览新增 Replica 行；术语速查表指向 spec/99 |
+| spec/02 | 语义 | AGENT-001 Role 新增 Replica；AGENT-002 20→22；AGENT-006 矩阵加 Replica 行；AGENT-008 不可见清单加 Replica |
+| spec/04 | 语义 | FALLBACK-002 side 构造子 Selected \| Peer（原 SideA/SideB），Offset 原名不变 |
+| spec/05 | 语义 | REVIEW-010 ProviderInputSeal 新增 IncludedCandidateFrameDigests |
+| spec/07 | 语义 | HOST-005 ProseRecord（原 ARecord）；HOST-008 引入 SatelliteKind；HOST-010 补充卫星 transform 绑定判据 |
+| spec/08 | 语义 | COMPANION-003 整条重写（P(X)/L(X)/切点记号）；COMPANION-005 BlogFrame→LogSegment（事实名不改）；COMPANION-009 加 attempt-local 候选帧豁免；COMPANION-010 包裹文本保持逐字节不变 |
+| spec/09 | 机械 | EXEC-004 join 字段重命名；EXEC-006/008 父背景记号更新 |
+| spec/11 | 语义 | PERSIST-010 新增 SatelliteLinked/Retired fold 规则；单调性条件改用切点 |
+| spec/12 | 机械 | CTX-011 probe 规则改为序关系；CTX-003 记号更新 |
+| spec/99 | 语义 | 新增规范符号表一节 |
+| spec/13 | 语义 | 阶段顺序按 Writeback 类分组；冲突规则泛化 |
 
 ## 纪律
 
@@ -3211,7 +3211,7 @@ IMPLEMENT ONLY AFTER PROJECTION DSL MIGRATION AND HOST CANARIES
 # 三十二、调研结论
 
 ```text
-SSOT/14 成立。
+spec/14 成立。
 ```
 
 三条支撑：
@@ -3258,7 +3258,7 @@ IMPLEMENTATION          APPROVED AFTER C-04 & C-05
 ```text
 生产启用前置条件
     阶段 0（记号改革 + 卫星结构层）完成，退役符号残留数为零
-    阶段 A（SSOT/13 投影 DSL 迁移）完成，PROJ-008 六步全过
+    阶段 A（spec/13 投影 DSL 迁移）完成，PROJ-008 六步全过
     C-01 至 C-21 全部通过
     K1 灰度稳定
     K2 独立门禁通过

@@ -410,7 +410,7 @@ export function auditSurfaces(files = productionFiles()) {
  * ── tool return bodies: runtime synthetic text beyond the prompt sinks ────────
  *
  * The four sinks cover what the plugin SENDS as prompts. Tool Execute paths return a body the
- * model reads as text through the native tool result channel; SSOT/13 §3.1 and §11 put that body
+ * model reads as text through the native tool result channel; spec/13 §3.1 and §11 put that body
  * in ARCH-010's scope like any other synthetic text, so it must be TOML, never JSON.
  *
  * `ToolRegistry.fs` lives inside the tools directory (confirmed: `Infrastructure/OpenCode/Tools/`),

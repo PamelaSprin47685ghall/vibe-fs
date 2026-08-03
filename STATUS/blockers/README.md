@@ -15,7 +15,7 @@
   - `packages/plugin/src/tool.ts:5` — `ToolContext.messageID` 仅 ctx 内字段，不在 provider wire
   - 两侧同一 run 内不共存于 journal → canary 无法共时比较
 - 处置：
-  - `SSOT/07.md` HOST-010「脆弱性与门禁」修订为 journal 侧可观测代理等式（rev.2）
+  - `spec/07.md` HOST-010「脆弱性与门禁」修订为 journal 侧可观测代理等式（rev.2）
   - rev.2 supersedes rev.1 的不可观测直接断言要求
   - 绑定语义保留：seal-bind、唯一未完成 assistant、同一 run
 - 层 4 代理 canary（方案 B，已接线）：
