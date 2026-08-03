@@ -2650,52 +2650,74 @@ export const bloggerRequestContext = (() => {
 export const bloggerRuntime = (() => {
   const stateCase = unionCase(BloggerRuntimeModule.BloggerRuntimeState, 'BloggerRuntimeState')
   const m = bind(BloggerRuntimeModule, 'BloggerRuntime', [
+    'empty',
+    'ofState',
     'onMaterial',
+    'beginRequest',
     'onCycleCommitted',
     'onSquashCommitted',
+    'onFail',
     'onDispose',
     'inFlightContext',
+    'tryPeekInFlight',
     'tryTakeInFlight',
+    'tryTakePending',
+    'adoptPendingAsCurrent',
   ])
 
+  const cellOf = (state, pending = undefined) => m.ofState(state)
+  const projectCell = (cell) => ({
+    state: cell,
+    stateTag: caseOf(cell.State),
+    pending: unwrapOption(cell.PendingOffer),
+  })
+
   return {
-    idle: stateCase('Idle', []),
-    parked: stateCase('Parked', []),
-    disposed: stateCase('Disposed', []),
-    inFlight: (ctx) => stateCase('InFlight', [ctx]),
-    onMaterial: (state, ctx) => {
-      const r = resultOf(m.onMaterial(state, ctx))
+    idle: m.ofState(stateCase('Idle', [])),
+    parked: m.ofState(stateCase('Parked', [])),
+    disposed: m.ofState(stateCase('Disposed', [])),
+    empty: m.empty,
+    inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
+    onMaterial: (cell, ctx) => {
+      const r = resultOf(m.onMaterial(cell, ctx))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const fields = r.value?.fields ?? r.value
-      const next = Array.isArray(fields) ? fields[0] : fields[0]
-      const decision = Array.isArray(fields) ? fields[1] : fields[1]
-      // F# tuple becomes JS array under Fable.
       const pair = r.value
       return {
         ok: true,
         state: pair[0],
         decision: caseOf(pair[1]),
+        pending: unwrapOption(pair[0].PendingOffer),
       }
     },
-    onCycleCommitted: (state) => {
-      const r = resultOf(m.onCycleCommitted(state))
+    onCycleCommitted: (cell) => {
+      const r = resultOf(m.onCycleCommitted(cell))
       return r.ok ? { ok: true, state: r.value } : { ok: false, error: caseOf(r.error) }
     },
-    onSquashCommitted: (state, pendingMain) => {
-      const r = resultOf(m.onSquashCommitted(state, pendingMain === undefined ? undefined : pendingMain))
+    onSquashCommitted: (cell, pendingMain) => {
+      const r = resultOf(m.onSquashCommitted(cell, pendingMain === undefined ? undefined : pendingMain))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
       return { ok: true, state: pair[0], decision: caseOf(pair[1]) }
     },
-    onDispose: (state) => m.onDispose(state),
-    inFlightContext: (state) => unwrapOption(m.inFlightContext(state)),
-    tryTakeInFlight: (state) => {
-      const r = resultOf(m.tryTakeInFlight(state))
+    onFail: (cell) => {
+      const r = resultOf(m.onFail(cell))
+      return r.ok ? { ok: true, state: r.value } : { ok: false, error: caseOf(r.error) }
+    },
+    onDispose: (cell) => m.onDispose(cell),
+    inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
+    tryTakeInFlight: (cell) => {
+      const r = resultOf(m.tryTakeInFlight(cell))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
       return { ok: true, context: pair[0], state: pair[1] }
     },
-    stateOf: (state) => caseOf(state),
+    tryTakePending: (cell) => {
+      const r = resultOf(m.tryTakePending(cell))
+      if (!r.ok) return { ok: false, error: caseOf(r.error) }
+      const pair = r.value
+      return { ok: true, pending: unwrapOption(pair[0]), state: pair[1] }
+    },
+    stateOf: (cell) => caseOf(cell.State),
   }
 })()
 
@@ -2739,9 +2761,16 @@ export const parkedTransform = (() => {
     park: (scope, sessionId, lifetimeMs) => scope.ParkTransform(sessionId, lifetimeMs),
     resumeParked: (scope, sessionId) => scope.ResumeParked(sessionId),
     cancelParked: (scope, sessionId) => scope.CancelParked(sessionId),
-    offerParked: (scope, sessionId, context) => scope.OfferParked(sessionId, context),
+    setPendingOffer: (scope, sessionId, context) => scope.SetPendingOffer(sessionId, context),
+    // Back-compat alias used by parked-transform tests (PendingOffer path).
+    offerParked: (scope, sessionId, context) => scope.SetPendingOffer(sessionId, context),
     hasParked: (scope, sessionId) => scope.HasParked(sessionId),
-    consumeStaged: (scope, sessionId) => projectContext(scope.TryConsumeStagedOffer(sessionId)),
+    consumeStaged: (scope, sessionId) => projectContext(scope.TryTakePendingOffer(sessionId)),
+    setCurrentRequest: (scope, sessionId, context) => scope.SetCurrentRequest(sessionId, context),
+    peekCurrentRequest: (scope, sessionId) => projectContext(scope.TryPeekCurrentRequest(sessionId)),
+    clearCurrentRequest: (scope, sessionId) => scope.ClearCurrentRequest(sessionId),
+    getRuntime: (scope, sessionId) => scope.GetBloggerRuntime(sessionId),
+    setRuntime: (scope, sessionId, cell) => scope.SetBloggerRuntime(sessionId, cell),
     dispose: (scope) => scope.Dispose(),
   }
 })()

@@ -158,6 +158,7 @@
     <Compile Include="Session/HostForkRuntime.fs"/>
     <Compile Include="Session/HostForkRuntimeFork.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
+    <Compile Include="Session/BloggerRuntimeState.fs"/>
     <Compile Include="Session/ParkedTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Session/EnforcerHost.fs"/>
@@ -165,7 +166,7 @@
     <Compile Include="Session/CompanionJournalPort.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="Session/CompanionProjection.fs"/>
-    <Compile Include="Session/BloggerRuntimeState.fs"/>
+    <Compile Include="Session/BloggerCoordinator.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>

@@ -4,8 +4,9 @@ open Wanxiangshu.Next.Domain
 
 /// ENFORCER-047: single Blogger coordinator state.
 ///
-/// InFlight = provider still working on an uncommitted request.
+/// InFlight = provider still working on an uncommitted request (the only busy definition).
 /// Parked = last cycle committed; waiting for future material (not busy).
+/// PendingOffer is NOT part of the state tag — it is a separate physical slot on the cell.
 [<RequireQualifiedAccess>]
 type BloggerRuntimeState =
     | Idle
@@ -13,7 +14,11 @@ type BloggerRuntimeState =
     | Parked
     | Disposed
 
-/// Pure transitions for the coordinator. Host wiring lives elsewhere.
+/// Host-owned cell: state + pending offer. CurrentRequest lives in InFlight payload.
+type BloggerRuntimeCell =
+    { State: BloggerRuntimeState
+      PendingOffer: BloggerRequestContext option }
+
 [<RequireQualifiedAccess>]
 module BloggerRuntime =
 
@@ -23,6 +28,7 @@ module BloggerRuntime =
         | NotParked
         | Disposed
         | NoContext
+        | PendingWhileInFlight
 
     type Decision =
         | Start of BloggerRequestContext
@@ -30,46 +36,144 @@ module BloggerRuntime =
         | Offer of BloggerRequestContext
         | Ignore
 
+    let empty: BloggerRuntimeCell =
+        { State = BloggerRuntimeState.Idle
+          PendingOffer = None }
+
+    let ofState (state: BloggerRuntimeState) : BloggerRuntimeCell =
+        { State = state
+          PendingOffer = None }
+
+    /// Main-session material arrived. InFlight never writes PendingOffer (XTrace keeps it).
+    /// Parked writes PendingOffer and stays Parked until the continuation takes it.
     let onMaterial
-        (state: BloggerRuntimeState)
+        (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
-        : Result<BloggerRuntimeState * Decision, TransitionError> =
-        match state with
-        | BloggerRuntimeState.Idle -> Ok(BloggerRuntimeState.InFlight ctx, Decision.Start ctx)
-        | BloggerRuntimeState.InFlight _ -> Ok(state, Decision.Skip)
-        | BloggerRuntimeState.Parked -> Ok(BloggerRuntimeState.InFlight ctx, Decision.Offer ctx)
+        : Result<BloggerRuntimeCell * Decision, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.Idle ->
+            Ok(
+                { State = BloggerRuntimeState.InFlight ctx
+                  PendingOffer = None },
+                Decision.Start ctx
+            )
+        | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
+        | BloggerRuntimeState.Parked ->
+            Ok(
+                { State = BloggerRuntimeState.Parked
+                  PendingOffer = Some ctx },
+                Decision.Offer ctx
+            )
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
 
-    let onCycleCommitted (state: BloggerRuntimeState) : Result<BloggerRuntimeState, TransitionError> =
-        match state with
-        | BloggerRuntimeState.InFlight _ -> Ok BloggerRuntimeState.Parked
+    /// Physical send is about to leave: freeze CurrentRequest (InFlight payload).
+    let beginRequest
+        (cell: BloggerRuntimeCell)
+        (ctx: BloggerRequestContext)
+        : Result<BloggerRuntimeCell, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
+        | BloggerRuntimeState.Idle
+        | BloggerRuntimeState.Parked ->
+            Ok
+                { State = BloggerRuntimeState.InFlight ctx
+                  PendingOffer = None }
+
+    let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.InFlight _ ->
+            Ok
+                { State = BloggerRuntimeState.Parked
+                  PendingOffer = cell.PendingOffer }
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NotInFlight
 
     let onSquashCommitted
-        (state: BloggerRuntimeState)
+        (cell: BloggerRuntimeCell)
         (pendingMain: BloggerRequestContext option)
-        : Result<BloggerRuntimeState * Decision, TransitionError> =
-        match state with
+        : Result<BloggerRuntimeCell * Decision, TransitionError> =
+        match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.InFlight _ ->
             match pendingMain with
-            | Some ctx -> Ok(BloggerRuntimeState.InFlight ctx, Decision.Start ctx)
-            | None -> Ok(BloggerRuntimeState.Parked, Decision.Ignore)
+            | Some ctx ->
+                Ok(
+                    { State = BloggerRuntimeState.InFlight ctx
+                      PendingOffer = None },
+                    Decision.Start ctx
+                )
+            | None ->
+                Ok(
+                    { State = BloggerRuntimeState.Parked
+                      PendingOffer = None },
+                    Decision.Ignore
+                )
         | _ -> Error TransitionError.NotInFlight
 
-    let onDispose (_state: BloggerRuntimeState) : BloggerRuntimeState = BloggerRuntimeState.Disposed
+    let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.InFlight _ ->
+            Ok
+                { State = BloggerRuntimeState.Idle
+                  PendingOffer = None }
+        | _ -> Error TransitionError.NotInFlight
 
-    let inFlightContext (state: BloggerRuntimeState) : BloggerRequestContext option =
-        match state with
+    let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        { State = BloggerRuntimeState.Disposed
+          PendingOffer = None }
+
+    let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
+        match cell.State with
         | BloggerRuntimeState.InFlight ctx -> Some ctx
         | _ -> None
 
-    /// Consume the InFlight context for cycle commit. Missing context = fail closed.
-    let tryTakeInFlight
-        (state: BloggerRuntimeState)
-        : Result<BloggerRequestContext * BloggerRuntimeState, TransitionError> =
-        match state with
-        | BloggerRuntimeState.InFlight ctx -> Ok(ctx, BloggerRuntimeState.Parked)
+    /// Peek CurrentRequest without leaving InFlight (commit path).
+    let tryPeekInFlight (cell: BloggerRuntimeCell) : Result<BloggerRequestContext, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.InFlight ctx -> Ok ctx
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NoContext
+
+    /// Consume InFlight for a successful cycle commit → Parked. PendingOffer untouched.
+    let tryTakeInFlight
+        (cell: BloggerRuntimeCell)
+        : Result<BloggerRequestContext * BloggerRuntimeCell, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.InFlight ctx ->
+            Ok(
+                ctx,
+                { State = BloggerRuntimeState.Parked
+                  PendingOffer = cell.PendingOffer }
+            )
+        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | _ -> Error TransitionError.NoContext
+
+    /// Consume PendingOffer once (parked resume). Fail closed if InFlight.
+    let tryTakePending
+        (cell: BloggerRuntimeCell)
+        : Result<BloggerRequestContext option * BloggerRuntimeCell, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.InFlight _ when cell.PendingOffer.IsSome -> Error TransitionError.PendingWhileInFlight
+        | _ ->
+            Ok(
+                cell.PendingOffer,
+                { cell with
+                    PendingOffer = None }
+            )
+
+    /// After taking a pending offer, move to InFlight as the next CurrentRequest.
+    let adoptPendingAsCurrent
+        (cell: BloggerRuntimeCell)
+        (ctx: BloggerRequestContext)
+        : Result<BloggerRuntimeCell, TransitionError> =
+        match cell.State with
+        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
+        | BloggerRuntimeState.Idle
+        | BloggerRuntimeState.Parked ->
+            Ok
+                { State = BloggerRuntimeState.InFlight ctx
+                  PendingOffer = None }

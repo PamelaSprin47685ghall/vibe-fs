@@ -190,59 +190,36 @@ module internal CompanionHostBlogger =
             | decision -> return Error(sprintf "squash slot decision %A is not a squash outcome" decision)
         }
 
-    /// ENFORCER-047: send the prompt and return. No terminal wait — the Blogger
-    /// does not terminal; the continuation transform commits and parks.
+    /// ENFORCER-047 / C1: physical send from a frozen typed Main context.
+    /// CurrentRequest was already written by BloggerCoordinator before this call.
+    /// No raw TOML extraction, no BloggerNeedsReset full-X replay, no post-send stage.
+    let startMainFromContext
+        (deps: BloggerDeps)
+        (ctx: BloggerRequestContext)
+        : Task<Result<PromptKey, string>> =
+        task {
+            match ctx with
+            | BloggerRequestContext.Squash _ ->
+                return Error "startMainFromContext requires BloggerRequestContext.Main"
+            | BloggerRequestContext.Main main ->
+                let! childId = deps.EnsureBlogger()
+                deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
+                deps.SquashFrameCount.Value <- None
+                // Clear obsolete reset flag; restart uses durable frames + X gap only.
+                lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
+                return! sendBloggerPrompt deps childId main.Toml
+        }
+
+    /// Legacy chunk entry — only used by tests that still call Companion.Submit.
+    /// Production main material goes through BloggerCoordinator + startMainFromContext.
     let blog
         (deps: BloggerDeps)
         (projection: ProviderSemanticProjection)
         (chunk: BloggerDeltaChunk)
         : Task<Result<PromptKey, string>> =
         task {
-            let! childId = deps.EnsureBlogger()
-
-            let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
-
-            deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
-            deps.SquashFrameCount.Value <- None
-
-            // COMPANION-004: restart/reset goes through the SAME delta projector as
-            // a normal request.
-            let prompt =
-                if reset then
-                    BloggerToml.render (
-                        XTrace.flatten projection.Messages
-                        |> List.map (fun entry ->
-                            { Role = entry.Role
-                              Part =
-                                match entry.Part with
-                                | SemanticText text -> BloggerDeltaPart.TextPart text
-                                | SemanticReasoning text -> BloggerDeltaPart.ReasoningPart text
-                                | SemanticToolCall(name, args) -> BloggerDeltaPart.ToolCallPart(name, args)
-                                | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart result
-                                | SemanticMedia(mediaType, _digest) ->
-                                    if mediaType |> Option.exists (fun value -> value.StartsWith "image/") then
-                                        BloggerDeltaPart.ImageOmitted mediaType
-                                    else
-                                        BloggerDeltaPart.MediaOmitted mediaType
-                              Truncated = false })
-                    )
-                else
-                    chunk.Toml
-
-            let! sent = sendBloggerPrompt deps childId prompt
-
-            match sent with
-            | Ok _ ->
-                lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
-
-                // ENFORCER-045: stage the typed request context so the
-                // continuation transform's commitCycle consumes the declared
-                // coverage advance (RecordCoverage + PrefixCoverage).
-                let blog = deps.Companion.Memory.Blog
-                let xTrace = deps.Companion.Memory.XTrace
-                let ctx = EnforcerHost.mainContextFromChunk blog xTrace projection chunk
-                deps.StageBloggerContext childId ctx
-            | Error _ -> ()
-
-            return sent
+            let blog = deps.Companion.Memory.Blog
+            let xTrace = deps.Companion.Memory.XTrace
+            let ctx = EnforcerHost.mainContextFromChunk blog xTrace projection chunk
+            return! startMainFromContext deps ctx
         }

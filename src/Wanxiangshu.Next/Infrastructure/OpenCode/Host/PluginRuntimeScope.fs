@@ -33,8 +33,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// dictionary entry is the guard that makes the invariant structural).
     let parkedGate = obj ()
     let parked = Dictionary<string, ParkedTransform>()
-    // ENFORCER-050/051: stage full typed request context, never bare string.
-    let parkedOffer = Dictionary<string, BloggerRequestContext>()
+    // ENFORCER-047/050: two physical slots — never share one dictionary.
+    // CurrentRequest = InFlight cycle authority; PendingOffer = Parked next material.
+    let currentRequest = Dictionary<string, BloggerRequestContext>()
+    let pendingOffer = Dictionary<string, BloggerRequestContext>()
+    let bloggerRuntime = Dictionary<string, BloggerRuntimeCell>()
 
     /// HOST-006: the first compaction setting the config hook could not establish.
     ///
@@ -127,10 +130,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                             let created = ParkedTransform(sessionId, lifetime)
                             parked.[sessionId] <- created
 
-                            // ENFORCER-050 offer-first merge: an offer that
-                            // raced ahead (staged while no transform was parked)
-                            // makes this park return immediately with `true`.
-                            let staged = parkedOffer.ContainsKey sessionId
+                            // ENFORCER-050 offer-first merge: PendingOffer staged
+                            // while no transform was parked makes this park return
+                            // immediately with `true`.
+                            let staged = pendingOffer.ContainsKey sessionId
 
                             if staged then
                                 created.TryResume()
@@ -147,28 +150,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 return resumed
             }
 
-        /// ENFORCER-050: fresh material arrived for a parked Blogger transform.
-        ///
-        /// The typed context is staged in `parkedOffer` BEFORE the resume, so a
-        /// racing transform (park after this call) consumes it from the staged slot
-        /// instead of parking forever. This is the "offer first, park later" merge.
-        /// Returns true when a parked transform was resumed, false when the offer
-        /// was only staged (Blogger provider request in flight, or no transform
-        /// parked yet — ENFORCER-050's skip branch).
-        member this.OfferParked(sessionId: string, context: BloggerRequestContext) : bool =
-            lock parkedGate (fun () ->
-                parkedOffer.[sessionId] <- context
-
-                match parked.TryGetValue sessionId with
-                | true, entry ->
-                    entry.TryResume()
-                    parked.Remove sessionId |> ignore
-                    true
-                | false, _ -> false)
-
-        /// Resume a parked transform without staging new material. Used when the
-        /// waiter's resume carries no injection (e.g. a Replica completion whose
-        /// frames were dropped). `OfferParked` is the injection-carrying path.
         member this.ResumeParked(sessionId: string) : bool =
             lock parkedGate (fun () ->
                 match parked.TryGetValue sessionId with
@@ -178,9 +159,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     true
                 | false, _ -> false)
 
-        /// ENFORCER-162: cancel a parked transform and release its waiter.
-        /// Always clears any staged offer for the session — dispose/abort must
-        /// not leave a half-consumed context for a later park to pick up.
         member this.CancelParked(sessionId: string) : unit =
             lock parkedGate (fun () ->
                 match parked.TryGetValue sessionId with
@@ -189,20 +167,57 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     parked.Remove sessionId |> ignore
                 | false, _ -> ()
 
-                parkedOffer.Remove sessionId |> ignore)
+                currentRequest.Remove sessionId |> ignore
+                pendingOffer.Remove sessionId |> ignore
+                // Park cancel/timeout leaves the logical Blogger idle, not disposed.
+                match bloggerRuntime.TryGetValue sessionId with
+                | true, cell when cell.State = BloggerRuntimeState.Disposed -> bloggerRuntime.[sessionId] <- cell
+                | _ -> bloggerRuntime.[sessionId] <- BloggerRuntime.empty)
 
-        /// Whether a session currently has a parked continuation transform.
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)
 
-        /// Consume a staged offer once. Missing context → None (fail closed upstream).
-        member this.TryConsumeStagedOffer(sessionId: string) : BloggerRequestContext option =
+        member this.SetCurrentRequest(sessionId: string, context: BloggerRequestContext) : unit =
+            lock parkedGate (fun () -> currentRequest.[sessionId] <- context)
+
+        member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () ->
-                match parkedOffer.TryGetValue sessionId with
+                match currentRequest.TryGetValue sessionId with
+                | true, context -> Some context
+                | false, _ -> None)
+
+        member this.ClearCurrentRequest(sessionId: string) : unit =
+            lock parkedGate (fun () -> currentRequest.Remove sessionId |> ignore)
+
+        member this.SetPendingOffer(sessionId: string, context: BloggerRequestContext) : bool =
+            lock parkedGate (fun () ->
+                pendingOffer.[sessionId] <- context
+
+                match parked.TryGetValue sessionId with
+                | true, entry ->
+                    entry.TryResume()
+                    parked.Remove sessionId |> ignore
+                    true
+                | false, _ -> false)
+
+        member this.TryTakePendingOffer(sessionId: string) : BloggerRequestContext option =
+            lock parkedGate (fun () ->
+                match pendingOffer.TryGetValue sessionId with
                 | true, context ->
-                    parkedOffer.Remove sessionId |> ignore
+                    pendingOffer.Remove sessionId |> ignore
                     Some context
                 | false, _ -> None)
+
+        member this.GetBloggerRuntime(sessionId: string) : BloggerRuntimeCell =
+            lock parkedGate (fun () -> this.GetBloggerRuntimeUnlocked sessionId)
+
+        member this.SetBloggerRuntime(sessionId: string, cell: BloggerRuntimeCell) : unit =
+            lock parkedGate (fun () -> bloggerRuntime.[sessionId] <- cell)
+
+    member private _.GetBloggerRuntimeUnlocked(sessionId: string) : BloggerRuntimeCell =
+        match bloggerRuntime.TryGetValue sessionId with
+        | true, cell -> cell
+        | false, _ -> BloggerRuntime.empty
 
     /// HOST-006 prevention layer: the config hook's finding.
     ///
@@ -268,8 +283,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
 
-        // ENFORCER-162: a deleted session must not keep a waiter parked.
+        // ENFORCER-162: a deleted session must not keep a waiter/context parked.
         (this :> IParkedTransformHost).CancelParked sessionId
+        lock parkedGate (fun () ->
+            bloggerRuntime.[sessionId] <- BloggerRuntime.onDispose BloggerRuntime.empty
+            bloggerRuntime.Remove sessionId |> ignore)
 
         this.AttemptPlans.Keys
         |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))
@@ -290,7 +308,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     entry.TryCancel()
 
                 parked.Clear()
-                parkedOffer.Clear())
+                currentRequest.Clear()
+                pendingOffer.Clear()
+                bloggerRuntime.Clear())
 
             lock toolRuntimeGate (fun () ->
                 toolRuntime |> Option.iter (fun owner -> owner.Dispose())

@@ -128,10 +128,17 @@ type CompanionHost
     /// tools), which has no reconcile pass that could consult a plan.
     member val RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit = fun _ _ -> () with get, set
 
-    /// ENFORCER-045: stage the typed request context for the continuation
-    /// transform's commitCycle. The default is a no-op (scope-less host); the
-    /// composition root rebinds it to `PluginRuntimeScope.OfferParked`.
+    /// ENFORCER-045: optional stage hook kept for tests; production freezes
+    /// CurrentRequest via BloggerCoordinator before send (not this callback).
     member val StageBloggerContext: SessionId -> BloggerRequestContext -> unit = fun _ _ -> () with get, set
+
+    /// Ensure the Blogger child exists (create or restore). Key for runtime cell.
+    member this.EnsureBloggerAsync() : Task<SessionId> = ensureBlogger ()
+
+    /// C1: physical Main send from a frozen typed context. Called only by
+    /// BloggerCoordinator after CurrentRequest is registered and state is InFlight.
+    member this.StartMainFromContext(ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
+        CompanionHostBlogger.startMainFromContext this.BloggerDeps ctx
 
     /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
     ///
@@ -152,6 +159,8 @@ type CompanionHost
             | None -> 0uy
         | None -> 0uy
 
+    /// Legacy SubmitProjection — production main material uses BloggerCoordinator.
+    /// Kept for unit tests that drive Companion without a PluginRuntimeScope.
     member this.SubmitProjection(projection: ProviderSemanticProjection) : CompanionOutcome =
         let deps = this.BloggerDeps
 
@@ -162,8 +171,7 @@ type CompanionHost
             this.BloggerCursorOffset
         )
 
-    /// Exposes the canonical CompanionFlow calculation for adapters and tests;
-    /// SubmitProjection remains the non-blocking side-effecting operation.
+    /// Exposes the canonical CompanionFlow calculation for adapters and tests.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =
         let memory = companion.Memory
 
@@ -183,32 +191,12 @@ type CompanionHost
 
     member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
 
-    /// COMPANION-005: hand the raw history to the Y as a projection and give the
-    /// Host back exactly what it passed in.
+    /// COMPANION-005 / CTX-002: return Host messages unchanged.
     ///
-    /// This used to be where X's prefix got replaced: a watermark diff against the
-    /// last projection, a `FreezeEpoch` on first sight of a B, a coverage digest
-    /// re-checked on every later turn, and a synthetic B-head message spliced over
-    /// the deleted prefix. It ran on every single transform, before any failure, and
-    /// the epoch it consumed was written from a context-window estimate.
-    ///
-    /// CTX-002 puts prefix replacement behind a real failed attempt, and CTX-012
-    /// behind a probe the Host actually accepted, so the decision cannot be made
-    /// here — this hook has no attempt outcome to look at. Until an attempt fails,
-    /// SSOT/12 says X sees raw history, which is what returning `messages` means.
-    member this.TransformRaw(messages: obj list) : obj list =
-        let current = Projection.decodeMessageView messages |> ProviderProjection.toSemantic
-        let deps = this.BloggerDeps
-
-        companion.Submit(
-            current,
-            (fun projection chunk -> CompanionHostBlogger.blog deps projection chunk),
-            (fun frameCount -> CompanionHostBlogger.squash deps frameCount),
-            this.BloggerCursorOffset
-        )
-        |> ignore
-
-        messages
+    /// Blogger material decisions are NOT made here. BloggerCoordinator.OnMainMaterial
+    /// is the sole entry (C1). Prefix replacement stays behind a failed attempt
+    /// (CTX-012), which this hook cannot see.
+    member _.TransformRaw(messages: obj list) : obj list = messages
 
     member _.BloggerSession = lock gate (fun () -> bloggerId)
 

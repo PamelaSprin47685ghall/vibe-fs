@@ -104,7 +104,7 @@ module SpikePlugin =
                                 | false, _ -> ())
                         | None -> ()
 
-                        do
+                        do!
                             CompanionTransform.handleCompanionTransform
                                 scope.Companions
                                 scope.CompanionGate
@@ -122,16 +122,9 @@ module SpikePlugin =
 
                         do! XWire.applyTransform snapshotOpt journal scope outObj
 
-                        // SSOT/15 ENFORCER-044/047/050: the Blogger continuation
-                        // host and the main-side offer.
-                        //
-                        // A Companion satellite's transform is a tool-loop
-                        // continuation after the first request: the plugin merges
-                        // and commits the cycle, then parks the transform until the
-                        // main session offers fresh material (the offer stages the
-                        // cumulative delta and resumes the parked transform, which
-                        // injects it as a synthetic user message — ENFORCER-051).
-                        // The first transform of a Blogger turn never parks.
+                        // SSOT/15 ENFORCER-044/047/050: Blogger continuation only.
+                        // Main-session material is decided once in
+                        // CompanionTransform → BloggerCoordinator.onMainMaterial.
                         match projectionSessionIdOpt with
                         | Some sessionId ->
                             let sid = SessionId.create sessionId
@@ -147,16 +140,7 @@ module SpikePlugin =
                                     let! messages = EnforcerHost.handleContinuation scope journal sid bloggerMessages
 
                                     CompanionProjection.replaceMessagesInPlace outObj messages
-                                | None ->
-                                    match SessionAssociationProjection.tryBloggerOf sid associations with
-                                    | Some bloggerId ->
-                                        let mainMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                                        let semantic =
-                                            Projection.decodeMessageView mainMessages |> ProviderProjection.toSemantic
-
-                                        EnforcerHost.offerToBlogger scope journal sid bloggerId semantic |> ignore
-                                    | None -> ()
+                                | None -> ()
                             | None -> ()
                         | None -> ()
 

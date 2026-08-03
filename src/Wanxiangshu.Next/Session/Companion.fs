@@ -52,31 +52,24 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     let mutable bloggerSessionId: SessionId option =
         restoredMemory |> Option.bind (fun m -> m.BloggerSessionId)
 
-    // Fable Tasks do not expose IsCompleted; this bit belongs to the
-    // single in-flight completion cell and is not a second blogger state.
-    let mutable inFlightTask: Task<unit> option = None
-    let mutable inFlightCompleted = true
+    // Physical send Task is not the Blogger busy authority (ENFORCER-047).
+    // Busy = BloggerRuntimeState.InFlight on the coordinator cell.
+    // Keep a fire-and-forget handle only for WaitInFlightAsync diagnostics.
+    let mutable lastSendTask: Task<unit> option = None
 
     let startAsTask (work: Async<unit>) : Task<unit> =
         let completion = TaskCompletionSource<unit>()
-        inFlightCompleted <- false
 
         Async.StartImmediate(
             async {
                 try
                     do! work
                 finally
-                    inFlightCompleted <- true
                     completion.SetResult(())
             }
         )
 
         completion.Task
-
-    let isBusyUnlocked () =
-        match inFlightTask with
-        | Some _ when not inFlightCompleted -> true
-        | _ -> false
 
     member _.Memory: CompanionMemory =
         lock lockObj (fun () ->
@@ -114,22 +107,19 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory
-    member _.IsBusy: bool = lock lockObj isBusyUnlocked
-    member _.InFlightTask: Task<unit> option = lock lockObj (fun () -> inFlightTask)
+
+    /// Diagnostic only — not the busy definition (see BloggerRuntimeState).
+    member _.LastSendTask: Task<unit> option = lock lockObj (fun () -> lastSendTask)
 
     member this.WaitInFlightAsync() : Task =
-        let tOpt = lock lockObj (fun () -> inFlightTask)
+        let tOpt = lock lockObj (fun () -> lastSendTask)
 
         match tOpt with
         | Some t -> t :> Task
         | None -> Task.FromResult(()) :> Task
 
-    /// CTX-006: one armed slot may prepend a squash sub-request to the main request.
-    ///
-    /// All three `RecoverySlot.mayRecover` conditions are checked here, inside the
-    /// single flight: the arming flag (this sequence saw a real failure), the odd
-    /// fallback Offset, and at least one frame to squash. The decision never reaches
-    /// the transform boundary (CTX-002).
+    /// Test/legacy Submit. Production single-flight is BloggerCoordinator.
+    /// This path does NOT gate on a Task-busy flag.
     member this.Submit
         (
             currentProjection: ProviderSemanticProjection,
@@ -138,42 +128,34 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             ?cursorOffset: unit -> byte
         ) : CompanionOutcome =
         lock lockObj (fun () ->
-            if isBusyUnlocked () then
-                SkippedBusy
-            else
-                let ingestCursor =
-                    XTraceProjection.semanticCursorFor blogProjection.Coverage.IngestedThroughSequence xTraceProjection
+            let ingestCursor =
+                XTraceProjection.semanticCursorFor blogProjection.Coverage.IngestedThroughSequence xTraceProjection
 
-                match
-                    BloggerDelta.nextChunk
-                        BloggerDelta.DeltaLimitBytes
-                        ingestCursor
-                        blogProjection.Coverage.CoverableTurnCutoffExclusive
-                        currentProjection.Messages
-                with
-                | None -> Submitted
-                | Some delta ->
-                    match durable, sessionId with
-                    | None, _
-                    | _, None -> DurableJournalUnavailable
-                    | Some _, Some _ ->
-                        // ENFORCER-047: the companion sends the prompt and returns.
-                        // The commit happens in the Blogger continuation transform
-                        // (EnforcerHost.handleContinuation → commitCycle →
-                        // BlogEntryCommitted), not here. No persistSuccessful, no
-                        // terminal wait.
-                        let t =
-                            async {
-                                try
-                                    let! sent = blogFn currentProjection delta |> Async.AwaitTask
+            match
+                BloggerDelta.nextChunk
+                    BloggerDelta.DeltaLimitBytes
+                    ingestCursor
+                    blogProjection.Coverage.CoverableTurnCutoffExclusive
+                    currentProjection.Messages
+            with
+            | None -> Submitted
+            | Some delta ->
+                match durable, sessionId with
+                | None, _
+                | _, None -> DurableJournalUnavailable
+                | Some _, Some _ ->
+                    let t =
+                        async {
+                            try
+                                let! sent = blogFn currentProjection delta |> Async.AwaitTask
 
-                                    match sent with
-                                    | Ok _ -> ()
-                                    | Error _ -> ()
-                                with _ ->
-                                    ()
-                            }
-                            |> startAsTask
+                                match sent with
+                                | Ok _ -> ()
+                                | Error _ -> ()
+                            with _ ->
+                                ()
+                        }
+                        |> startAsTask
 
-                        inFlightTask <- Some t
-                        Submitted)
+                    lastSendTask <- Some t
+                    Submitted)

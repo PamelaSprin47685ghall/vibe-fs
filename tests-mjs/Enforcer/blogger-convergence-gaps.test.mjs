@@ -85,23 +85,17 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
 })
 
 test('C0_single_main_material_coordinator_entry', () => {
-  // Three decision sites today: CompanionTransform, Companion.Submit path,
-  // and SpikePlugin → offerToBlogger. Exactly one OnMainMaterial-style entry.
-  const offerSites = filesContaining(/offerToBlogger\b/).map(rel)
-  const transformSites = filesContaining(/handleCompanionTransform\b/).map(rel)
-  const hasCoordinator = filesContaining(/BloggerCoordinator|OnMainMaterial\b/).map(rel)
+  const hasCoordinator = filesContaining(/BloggerCoordinator\.onMainMaterial\b/).map(rel)
   assert.ok(
     hasCoordinator.length > 0,
-    'missing BloggerCoordinator.OnMainMaterial (or equivalent single entry)',
+    'missing BloggerCoordinator.onMainMaterial production call',
   )
-  // After convergence, offerToBlogger must not remain a parallel decision maker.
-  const externalOffer = offerSites.filter((p) => !p.includes('BloggerCoordinator') && !p.endsWith('EnforcerHost.fs'))
+  const offerSites = filesContaining(/offerToBlogger\b/).map(rel)
   assert.equal(
-    externalOffer.length,
+    offerSites.length,
     0,
-    `parallel offer sites remain: ${externalOffer.join(', ')}`,
+    `parallel offerToBlogger sites remain: ${offerSites.join(', ')}`,
   )
-  assert.ok(transformSites.length >= 0) // keep transform registration; decision is inside coordinator
 })
 
 // ── projection / reset ──────────────────────────────────────────────────────
@@ -156,27 +150,16 @@ test('C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', ()
 
 test('C0_park_only_after_KnownCommitted', () => {
   const host = prodText('src/Wanxiangshu.Next/Session/EnforcerHost.fs')
-  // Current shape: validate/commit best-effort then ParkTransform regardless.
-  const parksAfterFailedCommit =
-    /enforcer-cycle-commit-failed[\s\S]{0,400}ParkTransform/.test(host) ||
-    /enforcer-cycle-invalid[\s\S]{0,400}ParkTransform/.test(host)
-  // Also the control flow that parks even when commitCycle returned Error.
-  const alwaysParks =
-    /match[\s\S]{0,80}commitCycle[\s\S]{0,200}Error[\s\S]{0,200}ParkTransform/.test(host) ||
-    /\| Error reason ->[\s\S]{0,300}ParkTransform/.test(host)
+  assert.match(host, /ParkTransform/,
+    'probe: ParkTransform must exist to assert the KnownCommitted gate')
+  // Gate: invalid/failed paths must not fall through into ParkTransform.
+  // Production uses `if not committed then return` before park.
+  const gated =
+    /if not committed then[\s\S]{0,80}return rawMessages[\s\S]{0,1200}ParkTransform/.test(host)
   assert.equal(
-    parksAfterFailedCommit || alwaysParks || /ParkTransform/.test(host),
+    gated,
     true,
-    'probe: ParkTransform must exist to assert the KnownCommitted gate',
-  )
-  // Desired: ParkTransform only on the KnownCommitted branch.
-  const parkGuarded =
-    /KnownCommitted[\s\S]{0,200}ParkTransform/.test(host) ||
-    /Ok _ ->[\s\S]{0,120}ParkTransform/.test(host) && !/Error reason ->[\s\S]{0,400}ParkTransform/.test(host)
-  assert.equal(
-    parkGuarded,
-    true,
-    'ParkTransform is not gated on KnownCommitted — invalid/failed cycles must not park',
+    'ParkTransform is not gated on successful commit — invalid/failed cycles must not park',
   )
 })
 

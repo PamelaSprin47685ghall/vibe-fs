@@ -1,5 +1,5 @@
 /**
- * ENFORCER-047: pure BloggerRuntimeState transitions.
+ * ENFORCER-047: pure BloggerRuntime cell transitions (state + PendingOffer).
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -14,6 +14,7 @@ test('ENFORCER_047_idle_plus_material_starts_inflight', () => {
   assert.equal(rt.stateOf(r.state), 'InFlight')
   assert.equal(r.decision, 'Start')
   assert.equal(ctx.toml(rt.inFlightContext(r.state)), 'work')
+  assert.equal(r.pending, undefined)
 })
 
 test('ENFORCER_047_inflight_plus_material_skips_without_queue', () => {
@@ -23,6 +24,7 @@ test('ENFORCER_047_inflight_plus_material_skips_without_queue', () => {
   assert.equal(r.decision, 'Skip')
   assert.equal(rt.stateOf(r.state), 'InFlight')
   assert.equal(ctx.toml(rt.inFlightContext(r.state)), 'work', 'original context kept')
+  assert.equal(r.pending, undefined, 'InFlight must not write PendingOffer')
 })
 
 test('ENFORCER_047_cycle_commit_moves_inflight_to_parked', () => {
@@ -33,12 +35,13 @@ test('ENFORCER_047_cycle_commit_moves_inflight_to_parked', () => {
   assert.equal(rt.inFlightContext(r.state), undefined)
 })
 
-test('ENFORCER_047_parked_plus_material_offers_and_inflights', () => {
+test('ENFORCER_047_parked_plus_material_offers_without_leaving_parked', () => {
   const r = rt.onMaterial(rt.parked, main2())
   assert.equal(r.ok, true)
   assert.equal(r.decision, 'Offer')
-  assert.equal(rt.stateOf(r.state), 'InFlight')
-  assert.equal(ctx.toml(rt.inFlightContext(r.state)), 'more')
+  assert.equal(rt.stateOf(r.state), 'Parked', 'PendingOffer must not flip state to InFlight')
+  assert.equal(ctx.toml(r.pending), 'more')
+  assert.equal(rt.inFlightContext(r.state), undefined)
 })
 
 test('ENFORCER_047_try_take_inflight_consumes_context_once', () => {
@@ -93,4 +96,14 @@ test('ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
   assert.equal(b.decision, 'Skip')
   assert.equal(ctx.toml(rt.inFlightContext(b.state)), 'work')
   assert.notEqual(ctx.toml(rt.inFlightContext(b.state)), 'more')
+})
+
+test('ENFORCER_047_pending_offer_is_consumed_once', () => {
+  const offered = rt.onMaterial(rt.parked, main2())
+  const taken = rt.tryTakePending(offered.state)
+  assert.equal(taken.ok, true)
+  assert.equal(ctx.toml(taken.pending), 'more')
+  const again = rt.tryTakePending(taken.state)
+  assert.equal(again.ok, true)
+  assert.equal(again.pending, undefined)
 })

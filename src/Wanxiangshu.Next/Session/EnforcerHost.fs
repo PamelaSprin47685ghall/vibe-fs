@@ -456,37 +456,43 @@ module EnforcerHost =
                     |> Option.flatten
                     |> Option.isSome
 
+                let key = SessionId.value bloggerSessionId
+
                 if alreadyCommitted then
-                    // Resumed continuation: the cycle was already committed.
-                    // Rebuild the view from the staged offer (the next delta)
-                    // and return — no commit, no park.
+                    // Resumed continuation: cycle already committed. Consume
+                    // PendingOffer only (never CurrentRequest of a future cycle).
                     let resumeWithContext ctx =
                         rebuildFromContext durable bloggerSessionId ctx
 
-                    match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                    | Some ctx -> return resumeWithContext ctx
+                    match scope.TryTakePendingOffer key with
+                    | Some ctx ->
+                        match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                        | Ok cell ->
+                            scope.SetBloggerRuntime(key, cell)
+                            scope.SetCurrentRequest(key, ctx)
+                        | Error _ -> ()
+
+                        return resumeWithContext ctx
                     | None -> return rawMessages
                 else
-                    // ENFORCER-045: consume the staged typed context for the full
-                    // coverage advance (RecordCoverage + PrefixCoverage). The blog
-                    // function staged it after sending the prompt; missing context
-                    // is fail-closed, not re-derived from XTrace.
-                    let stagedCtx = scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId)
+                    // ENFORCER-045: CurrentRequest is the InFlight authority.
+                    // Peek (do not clear) until KnownCommitted.
+                    let currentCtx = scope.TryPeekCurrentRequest key
 
                     let declaredCoverage =
-                        stagedCtx
+                        currentCtx
                         |> Option.bind (fun ctx ->
                             match ctx with
                             | BloggerRequestContext.Main main -> Some main
                             | BloggerRequestContext.Squash _ -> None)
 
+                    let mutable committed = false
+
                     match validateCycle messageId calls with
                     | Error reason ->
-                        // ENFORCER-043: an invalid cycle is not a frame. Diagnose
-                        // and proceed — the continuation still parks.
                         Diagnostic.emit
                             "enforcer-cycle-invalid"
-                            [ "session_id", SessionId.value bloggerSessionId; "result", reason ]
+                            [ "session_id", key; "result", reason ]
                     | Ok(merged, toolCallIds) ->
                         match
                             commitCycle
@@ -498,34 +504,54 @@ module EnforcerHost =
                                 merged
                                 declaredCoverage
                         with
-                        | Ok _ -> ()
+                        | Ok _ ->
+                            committed <- true
+
+                            match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
+                            | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                            | Error _ -> ()
+
+                            scope.ClearCurrentRequest key
                         | Error reason ->
                             Diagnostic.emit
                                 "enforcer-cycle-commit-failed"
-                                [ "session_id", SessionId.value bloggerSessionId; "result", reason ]
+                                [ "session_id", key; "result", reason ]
 
-                    // ENFORCER-047: after the commit the continuation parks and waits
-                    // for the next offer. An offer that raced ahead (staged while this
-                    // transform was still running) is consumed instead of parking.
-                    let resumeWithContext ctx =
-                        match journal with
-                        | Some durable -> rebuildFromContext durable bloggerSessionId ctx
-                        | None -> rawMessages
+                    // Only KnownCommitted may park. Invalid/failed cycles stay
+                    // fail-closed without parking (C4 will add repair).
+                    if not committed then
+                        return rawMessages
+                    else
+                        let resumeWithContext ctx =
+                            match journal with
+                            | Some durable -> rebuildFromContext durable bloggerSessionId ctx
+                            | None -> rawMessages
 
-                    match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                    | Some ctx -> return resumeWithContext ctx
-                    | None ->
-                        let! resumed = scope.ParkTransform(SessionId.value bloggerSessionId, ParkedTransformLifetime)
+                        match scope.TryTakePendingOffer key with
+                        | Some ctx ->
+                            match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                            | Ok cell ->
+                                scope.SetBloggerRuntime(key, cell)
+                                scope.SetCurrentRequest(key, ctx)
+                            | Error _ -> ()
 
-                        if not resumed then
-                            // Cancelled (dispose/delete/abort) or timed out: fail
-                            // closed — return the messages unchanged and let the
-                            // Host's step loop continue on its own.
-                            return rawMessages
-                        else
-                            match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                            | Some ctx -> return resumeWithContext ctx
-                            | None -> return rawMessages
+                            return resumeWithContext ctx
+                        | None ->
+                            let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
+
+                            if not resumed then
+                                return rawMessages
+                            else
+                                match scope.TryTakePendingOffer key with
+                                | Some ctx ->
+                                    match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                                    | Ok cell ->
+                                        scope.SetBloggerRuntime(key, cell)
+                                        scope.SetCurrentRequest(key, ctx)
+                                    | Error _ -> ()
+
+                                    return resumeWithContext ctx
+                                | None -> return rawMessages
             | _ ->
                 // COMPANION-005 first request: no blog calls yet, but the raw
                 // TOML prompt still needs the request shape. Rebuild the provider
@@ -603,51 +629,4 @@ module EnforcerHost =
                 | _ -> return rawMessages
         }
 
-    /// ENFORCER-050: the main-session offer — fresh material for a parked
-    /// Blogger. Computes the cumulative delta from the un-advanced baseline and
-    /// stages it; a parked transform is resumed. Returns whether a resume
-    /// actually happened.
-    let offerToBlogger
-        (scope: IParkedTransformHost)
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (projection: ProviderProjection.ProviderSemanticProjection)
-        : bool =
-        match journal with
-        | None -> false
-        | Some durable ->
-            let projections = AgentJournal.snapshot durable
 
-            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-            | None -> false
-            | Some session ->
-                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-                let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
-
-                let ingestCursor =
-                    XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
-
-                let delta =
-                    BloggerDelta.nextChunk
-                        BloggerDelta.DeltaLimitBytes
-                        ingestCursor
-                        blog.Coverage.CoverableTurnCutoffExclusive
-                        projection.Messages
-
-                match delta with
-                | None -> false
-                | Some chunk when scope.HasParked(SessionId.value bloggerSessionId) ->
-                    let ctx = mainContextFromChunk blog xTrace projection chunk
-                    scope.OfferParked(SessionId.value bloggerSessionId, ctx)
-                | Some _ ->
-                    // ENFORCER-050 skip branch: no suspended transform. The
-                    // Blogger is either mid-request (in flight) or idle (the
-                    // Submit pipeline's prompt_async origin will carry this
-                    // material). Do NOT stage the delta: a staged offer would
-                    // be consumed by the NEXT continuation transform even
-                    // though the material was already delivered by the normal
-                    // pipeline, double-feeding it. Un-advanced material simply
-                    // accumulates (no delta queue — baseline just does not
-                    // advance, ENFORCER-160).
-                    false

@@ -14,15 +14,24 @@ module internal ParkedTransformInterop =
     [<Emit("clearTimeout($0)")>]
     let clearTimeoutJs (handle: obj) : unit = jsNative
 
-/// Parking surface. Offers stage a full BloggerRequestContext (ENFORCER-050/051),
-/// never a bare string — cycle commit needs coverage baselines from the context.
+/// Parking + dual request slots (ENFORCER-047/050/160).
+///
+/// CurrentRequest = the InFlight cycle's typed context (commit authority).
+/// PendingOffer = the next Main material staged only while Parked.
+/// The two must never share one dictionary slot.
 type IParkedTransformHost =
     abstract ParkTransform: string * TimeSpan -> Task<bool>
-    abstract OfferParked: string * BloggerRequestContext -> bool
     abstract ResumeParked: string -> bool
     abstract CancelParked: string -> unit
     abstract HasParked: string -> bool
-    abstract TryConsumeStagedOffer: string -> BloggerRequestContext option
+    abstract SetCurrentRequest: string * BloggerRequestContext -> unit
+    abstract TryPeekCurrentRequest: string -> BloggerRequestContext option
+    abstract ClearCurrentRequest: string -> unit
+    /// Stage PendingOffer. Returns true when a parked waiter was resumed.
+    abstract SetPendingOffer: string * BloggerRequestContext -> bool
+    abstract TryTakePendingOffer: string -> BloggerRequestContext option
+    abstract GetBloggerRuntime: string -> BloggerRuntimeCell
+    abstract SetBloggerRuntime: string * BloggerRuntimeCell -> unit
 
 /// One parkable transform wait for one session (ENFORCER-160).
 type ParkedTransform(sessionId: string, lifetime: TimeSpan) as this =
