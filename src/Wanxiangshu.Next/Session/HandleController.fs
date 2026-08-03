@@ -4,6 +4,15 @@ open Wanxiangshu.Next.Kernel.Fact
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Journal
 
+/// Why a controlled consume refused to retire (EXEC-009).
+type HandleConsumeRejection =
+    /// Handle is already Retired — a concurrent join won, or a restart replay.
+    | AlreadyRetired
+    /// Handle is still Active — no completion cell yet.
+    | NotJoinable of HandleTransitionRejection
+    /// Journal append failed (includes CommitUnknown). Must not deliver.
+    | AppendFailed of string
+
 /// EXEC-009: the only writer of `HandleLinked`, `HandleCompleted` and
 /// `HandleRetired`.
 ///
@@ -55,26 +64,38 @@ module HandleController =
 
     /// EXEC-004: claim the single-assignment completion cell.
     ///
-    /// Terminal, send-failure and cancel all arrive here; `HandleProjection.complete`
-    /// refuses the second claim, so a duplicate is a no-op rather than an overwrite.
-    /// The rejection is absorbed at the fold, which is why this returns `unit` on a
-    /// replayed claim instead of an error the caller would have to ignore.
+    /// Terminal and send-failure write the join payload blob BEFORE the fact
+    /// (PERSIST-007). Cancelled carries no body. The fold refuses a second claim,
+    /// so a duplicate is a no-op rather than an overwrite.
     let recordCompletion
         (journal: AgentJournal option)
         (parentId: SessionId)
         (agentId: string)
         (kind: HandleCompletionKind)
+        (body: string option)
         : Result<unit, string> =
         match journal with
         | None -> Ok()
         | Some durable ->
-            append
-                durable
-                parentId
-                (AgentFact.HandleCompleted
-                    {| ParentSessionId = parentId
-                       Handle = agentHandle agentId
-                       Kind = kind |})
+            let writeRefs () : Result<BlobRef option * BlobDigest option, string> =
+                match body with
+                | None -> Ok(None, None)
+                | Some content ->
+                    match durable.WriteBlob content with
+                    | Error err -> Error err
+                    | Ok receipt -> Ok(Some receipt.BlobRef, Some receipt.BlobDigest)
+
+            writeRefs ()
+            |> Result.bind (fun (completionRef, completionDigest) ->
+                append
+                    durable
+                    parentId
+                    (AgentFact.HandleCompleted
+                        {| ParentSessionId = parentId
+                           Handle = agentHandle agentId
+                           Kind = kind
+                           CompletionRef = completionRef
+                           CompletionDigest = completionDigest |}))
 
     /// EXEC-004/EXEC-009: `join` consumed the completion, so write the tombstone.
     ///
@@ -92,7 +113,44 @@ module HandleController =
                     {| ParentSessionId = parentId
                        Handle = agentHandle agentId |})
 
-    /// Parent cancel: claim the cell as `Cancelled`, then retire.
+    /// EXEC-009: one controlled consume. Projection must already show
+    /// `CompletedAwaitingJoin`; success writes `HandleRetired`. Concurrent callers
+    /// race on the journal gate — the loser sees `AlreadyRetired`.
+    ///
+    /// CommitUnknown must not hand the payload out: the caller would treat the
+    /// work as consumed while a later restart might still show it joinable.
+    let consume
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (handle: HandleId)
+        : Result<HandleRecord, HandleConsumeRejection> =
+        let projection = AgentJournal.handleProjection journal parentId
+
+        match HandleProjection.tryFind handle projection with
+        | None -> Error(NotJoinable UnknownHandle)
+        | Some { Lifecycle = Retired } -> Error AlreadyRetired
+        | Some { Lifecycle = Active } -> Error(NotJoinable NotCompleted)
+        | Some record ->
+            match
+                AgentJournal.appendAgent
+                    (StreamId.Session parentId)
+                    None
+                    (AgentFact.HandleRetired
+                        {| ParentSessionId = parentId
+                           Handle = handle |})
+                    journal
+            with
+            | Ok _ -> Ok record
+            | Error failure ->
+                // Re-read: a concurrent winner may have retired between our check and
+                // the append, or CommitUnknown may have actually landed.
+                let after = AgentJournal.handleProjection journal parentId
+
+                match HandleProjection.tryFind handle after with
+                | Some { Lifecycle = Retired } -> Error AlreadyRetired
+                | _ -> Error(AppendFailed(JournalAppendFailure.describe failure))
+
+    /// Parent cancel: claim the cell as `Cancelled` (no blob), then retire.
     ///
     /// Both facts, in this order, per child. Writing only the tombstone would skip
     /// the state EXEC-005's `list` reports and make the transition unauditable;
@@ -109,7 +167,7 @@ module HandleController =
             match ids with
             | [] -> Ok()
             | agentId :: rest ->
-                recordCompletion journal parentId agentId HandleCompletionKind.Cancelled
+                recordCompletion journal parentId agentId HandleCompletionKind.Cancelled None
                 |> Result.bind (fun () -> retire journal parentId agentId)
                 |> Result.bind (fun () -> loop rest)
 

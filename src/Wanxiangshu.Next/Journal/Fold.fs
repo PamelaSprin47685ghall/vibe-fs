@@ -472,7 +472,9 @@ module Fold =
                 (fun session ->
                     HandleProjection.complete
                         payload.Handle
-                        payload.Kind
+                        { Kind = payload.Kind
+                          CompletionRef = payload.CompletionRef
+                          CompletionDigest = payload.CompletionDigest }
                         (Option.defaultValue HandleProjection.empty session.Handles)
                     |> Result.map (fun updated -> { session with Handles = Some updated }))
                 projection

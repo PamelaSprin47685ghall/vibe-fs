@@ -531,10 +531,7 @@ module EnforcerHost =
 
     /// C5: inverse of BloggerCoordinator.materializeRequest blob.
     /// Full typed context — never leave cutoff/digest at zero defaults.
-    let tryReloadRequestContext
-        (journal: AgentJournal)
-        (openReq: OpenBloggerRequest)
-        : BloggerRequestContext option =
+    let tryReloadRequestContext (journal: AgentJournal) (openReq: OpenBloggerRequest) : BloggerRequestContext option =
         match journal.Writer.BlobWriter.Read openReq.ContextRef with
         | Error _ -> None
         | Ok json ->
@@ -634,8 +631,7 @@ module EnforcerHost =
                         |> Option.defaultValue openReq.PreviousIngestedThroughSequence
 
                     let nextIngest =
-                        asInt64 "next_ingest"
-                        |> Option.defaultValue openReq.NextIngestedThroughSequence
+                        asInt64 "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
 
                     Some(
                         BloggerRequestContext.Main

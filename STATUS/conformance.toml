@@ -1857,14 +1857,20 @@ status = "implementing"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
+  "src/Wanxiangshu.Next/Journal/LinkageProjection.fs",
+  "src/Wanxiangshu.Next/Session/HandleController.fs",
+  "src/Wanxiangshu.Next/Session/HandleCompletionBlob.fs",
   "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu.Next/Session/HostForkRunLifecycle.fs",
+  "src/Wanxiangshu.Next/Session/HostForkRestart.fs",
 ]
 tests = [
   "tests-mjs/Context/session-association.test.mjs",
   "tests-mjs/Execution/handle.test.mjs",
+  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
-evidence = ""
+evidence = "docs/evidence/0.5.2/EXEC-009-DURABLE-JOIN.txt"
 
 [[clause]]
 id = "EXEC-010"

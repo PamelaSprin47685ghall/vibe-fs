@@ -191,30 +191,90 @@ type HostForkRuntime
                 (fun run outcome -> this.Complete(run, outcome))
         )
 
-    /// EXEC-004: consume any available completion, then retire its handle.
+    /// EXEC-009: projection-first join. Durable `HandleProjection.joinable` is the
+    /// fact source; the mailbox only wakes waiters. Agent payloads from the mailbox
+    /// are discarded and the loop re-reads the projection. PTY stays mailbox-driven
+    /// (EXEC-015).
     ///
-    /// Retirement is part of consuming, not a later cleanup step. The durable
-    /// projection keeps a consumed handle in `CompletedAwaitingJoin` until the
-    /// tombstone lands, so a restart between the two would restore it as joinable
-    /// and deliver the same completion twice.
-    ///
-    /// A PTY completion is skipped: `PtyPort` owns that lifecycle (EXEC-015), and
-    /// this runtime holds no agent handle for it.
+    /// Consume = read blob → CAS `HandleRetired`. CommitUnknown / append failure
+    /// must not deliver. Concurrent joins: single winner via journal gate.
     member this.Join() : Task<Result<RunCompletion, ForkError>> =
+        let isPty runId =
+            lock gate (fun () -> ptyRuns.Contains runId)
+
+        let tryConsumeDurable (durable: AgentJournal) : Result<RunCompletion, string> option =
+            let joinable =
+                HandleProjection.joinable (AgentJournal.handleProjection durable parentId)
+
+            let rec attempt records =
+                match records with
+                | [] -> None
+                | record :: rest ->
+                    match HandleId.tryAgent record.Handle with
+                    | None -> attempt rest
+                    | Some agentHandleId ->
+                        let agentId = AgentHandleId.value agentHandleId
+
+                        match HandleCompletionBlob.tryRead durable record agentId with
+                        | Error err -> Some(Error err)
+                        | Ok None ->
+                            // Cancelled / 0.5.1 line without blob: still CAS-retire so
+                            // the handle cannot be joined twice after a hollow complete.
+                            match HandleController.consume durable parentId record.Handle with
+                            | Ok _ ->
+                                Some(
+                                    Ok
+                                        { RunId = "run-" + agentId
+                                          AgentId = agentId
+                                          AgentName = record.TargetAgent
+                                          Role = AgentRoleIdentity.ofRole record.CanonicalRole
+                                          Outcome =
+                                            AgentCompletion.aborted
+                                                agentId
+                                                ("run-" + agentId)
+                                                (Some(AgentRoleIdentity.ofRole record.CanonicalRole))
+                                                (Some record.ChildSessionId)
+                                                "CANCELLED"
+                                                "handle completed without durable payload"
+                                          CompletedAt = System.DateTimeOffset.UtcNow }
+                                )
+                            | Error AlreadyRetired -> attempt rest
+                            | Error(NotJoinable _) -> attempt rest
+                            | Error(AppendFailed err) -> Some(Error err)
+                        | Ok(Some completion) ->
+                            match HandleController.consume durable parentId record.Handle with
+                            | Ok _ -> Some(Ok completion)
+                            | Error AlreadyRetired -> attempt rest
+                            | Error(NotJoinable _) -> attempt rest
+                            | Error(AppendFailed err) -> Some(Error err)
+
+            attempt joinable
+
+        let rec loop () : Task<Result<RunCompletion, ForkError>> =
+            task {
+                match journal with
+                | Some durable ->
+                    match tryConsumeDurable durable with
+                    | Some(Ok completion) -> return Ok completion
+                    | Some(Error err) ->
+                        return Error(ForkError.NotFound(sprintf "join could not consume handle: %s" err))
+                    | None ->
+                        let! joined = runtime.Join()
+
+                        match joined with
+                        | Ok completion when isPty completion.RunId -> return Ok completion
+                        | Ok _ ->
+                            // Agent mailbox payload is notification only — re-loop.
+                            return! loop ()
+                        | Error e -> return Error e
+                | None ->
+                    let! joined = runtime.Join()
+                    return joined
+            }
+
         task {
             do! this.AwaitRecovery()
-            let! joined = runtime.Join()
-
-            match joined with
-            | Ok completion when not (lock gate (fun () -> ptyRuns.Contains completion.RunId)) ->
-                match HandleController.retire journal parentId completion.AgentId with
-                | Ok() -> return joined
-                // A completion that cannot be retired must not be handed out: the
-                // caller would treat the work as consumed while the journal still
-                // offers it. Reported rather than raised, because `join` is a tool
-                // call and its failure belongs in the tool result.
-                | Error err -> return Error(ForkError.NotFound(sprintf "join could not retire handle: %s" err))
-            | _ -> return joined
+            return! loop ()
         }
 
     member this.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =

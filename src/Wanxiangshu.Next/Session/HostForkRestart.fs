@@ -127,7 +127,23 @@ module HostForkRestart =
                 match record.Lifecycle, HandleId.tryAgent record.Handle with
                 | HandleLifecycle.Retired, _
                 | _, None -> ()
-                | _, Some agentHandle ->
+                | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
+                    let agentId = AgentHandleId.value agentHandle
+                    let role = AgentRoleIdentity.ofRole record.CanonicalRole
+
+                    children.[agentId] <- record.ChildSessionId
+                    childCreatedDir agentId record.ChildSessionId (directoryOf agentId)
+                    runtime.Restore(agentId, role, record.TargetAgent)
+                    runtime.BindChildSession(agentId, record.ChildSessionId)
+
+                    // EXEC-009: restore the join cell from the durable blob when
+                    // present. Transcript synthesis is only a fallback for 0.5.1
+                    // lines that predate CompletionRef.
+                    match HandleCompletionBlob.tryRead journal record agentId with
+                    | Ok(Some completion) -> runtime.PublishCompletion completion
+                    | Ok None -> do! recoverChild runtime snapshot agentId record.ChildSessionId role record.TargetAgent
+                    | Error reason -> runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
+                | HandleLifecycle.Active, Some agentHandle ->
                     let agentId = AgentHandleId.value agentHandle
 
                     // The role is the durable CanonicalRole. `TargetAgent` carries the

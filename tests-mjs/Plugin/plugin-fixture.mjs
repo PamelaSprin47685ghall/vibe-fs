@@ -144,8 +144,35 @@ export const withExecutablePlugin = async (body) => {
           if (agentId !== undefined) {
             // HandleCompletionKind.Terminal is Fable union case tag 0
             // (Session/HandleController.fs, Kind = Terminal for Completed).
+            // EXEC-009: body is the durable join payload; fixture writes a minimal
+            // completed blob so projection-first join can consume after restart.
             const kind = outcome.tag === 0 ? { tag: 0, fields: [] } : { tag: 1, fields: [] }
-            const recorded = recordCompletion(runtime.journal, SessionIdModule_create(parentSessionId), agentId, kind)
+            const body =
+              outcome.tag === 0
+                ? JSON.stringify({
+                    status: 'completed',
+                    run_id: `run-${agentId}`,
+                    work_record: '',
+                    child_session_id: sessionId,
+                    authority_root: '',
+                    provider_run: '',
+                    directory: '',
+                  })
+                : JSON.stringify({
+                    status: 'failed',
+                    run_id: `run-${agentId}`,
+                    code: 'ERROR',
+                    message: 'fixture terminal failure',
+                    child_session_id: sessionId,
+                  })
+            // Fable erases `string option`: Some x = x, None = null/undefined.
+            const recorded = recordCompletion(
+              runtime.journal,
+              SessionIdModule_create(parentSessionId),
+              agentId,
+              kind,
+              body,
+            )
             if (recorded.tag !== 0) {
               throw new Error(`HandleCompleted(${agentId}) rejected: ${recorded.fields?.[0]}`)
             }

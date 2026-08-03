@@ -21,7 +21,7 @@ const CLAUSE_RE = /^(#{2,4})\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|C
 
 const PREFIX_DEFAULT_MODULE = {
   ARCH: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
-  AGENT: 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs',
+  AGENT: 'src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs',
   PROMPT: 'src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs',
   FALLBACK: 'src/Wanxiangshu.Next/Session/FallbackController.fs',
   REVIEW: 'src/Wanxiangshu.Next/Session/ReviewController.fs',

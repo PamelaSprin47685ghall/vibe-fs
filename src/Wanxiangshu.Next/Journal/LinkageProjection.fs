@@ -10,12 +10,21 @@ open Wanxiangshu.Next.Kernel.Identity
 /// The previous model held two maps (linked / unlinked), which cannot express
 /// completed-awaiting-join. EXEC-005 requires `list` to show that state, so a
 /// finished-but-unjoined child was reported as running.
+type HandleCompletion =
+    {
+        Kind: HandleCompletionKind
+        /// Durable join payload. `None` for Cancelled and for 0.5.1 lines that
+        /// predate the blob fields.
+        CompletionRef: BlobRef option
+        CompletionDigest: BlobDigest option
+    }
+
 type HandleLifecycle =
     /// Linked and not yet completed. `list` shows running or busy.
     | Active
-    /// A completion landed in the mailbox; nobody consumed it yet. `list` shows
-    /// CompletedAwaitingJoin, and `join` may still return it.
-    | CompletedAwaitingJoin of HandleCompletionKind
+    /// Completion is durable; nobody has consumed it yet. `list` shows
+    /// CompletedAwaitingJoin, and `join` may still return it from the blob.
+    | CompletedAwaitingJoin of HandleCompletion
     /// EXEC-009 tombstone. Permanent. A retired id answers RetiredHandle forever
     /// and must never degrade into "treat the input as an agent name and fork
     /// again".
@@ -83,7 +92,7 @@ module HandleProjection =
     /// arrives first wins; later arrivals are refused, not overwritten.
     let complete
         (handle: HandleId)
-        (kind: HandleCompletionKind)
+        (completion: HandleCompletion)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         match Map.tryFind handle current.Handles with
@@ -97,7 +106,7 @@ module HandleProjection =
                         Map.add
                             handle
                             { record with
-                                Lifecycle = CompletedAwaitingJoin kind }
+                                Lifecycle = CompletedAwaitingJoin completion }
                             current.Handles }
 
     /// `join` consumed the completion and wrote the tombstone (EXEC-004).

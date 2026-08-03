@@ -94,6 +94,7 @@ const [
   ProviderProj,
   XTraceModule,
   LifecycleWorkRecordModule,
+  ManagedAgentCatalogModule,
   XTraceCaptureModule,
   HostMessageCodecModule,
   DeadlineModule,
@@ -162,6 +163,7 @@ const [
   prod('Domain/ProviderProjection'),
   prod('Domain/XTrace'),
   prod('Domain/LifecycleWorkRecord'),
+  prod('Domain/ManagedAgentCatalog'),
   prod('Application/Reconciliation/XTraceCapture'),
   prod('Infrastructure/OpenCode/Codec/HostMessageCodec'),
   prod('Process/Deadline'),
@@ -1583,6 +1585,76 @@ export const roles = (() => {
 })()
 
 /**
+ * AGENT-001…004 (C5): the sole managed-agent identity directory.
+ *
+ * `nameOf`/`peerNameOf` take Role/AgentTier VALUES; build them with `roles.of`
+ * and `roles.tier` above (same union construction). List/set members are read
+ * fresh per call so a renamed Fable member fails loudly at load time instead
+ * of reading `undefined` (VERIFY-008).
+ */
+export const managedAgentCatalog = (() => {
+  const m = bind(ManagedAgentCatalogModule, 'ManagedAgentCatalog', [
+    'roleLabel',
+    'tryParseRole',
+    'tierLabel',
+    'wireTierLabel',
+    'tryParseTier',
+    'peerTier',
+    'nameOf',
+    'peerNameOf',
+    'allPublicRoles',
+    'allInternalRoles',
+    'allRoles',
+    'publicForkableRoles',
+    'requiredNames',
+    'publicForkableNames',
+    'orchestratorForkableNames',
+    'inspectorToolNames',
+    'coderToolNames',
+    'legacyAgentNames',
+    'isLegacyAgentName',
+    'formatLegacyNameNotSupported',
+    'formatLegacyNameInConfig',
+  ])
+
+  return {
+    /** AGENT-001: canonical role → lowercase label. */
+    roleLabel: (role) => m.roleLabel(role),
+    /** AGENT-001: label → Role, or undefined. */
+    tryParseRole: (name) => unwrapOption(m.tryParseRole(name)),
+    /** AGENT-001: journal spelling Fast / Deep. */
+    tierLabel: (tier) => m.tierLabel(tier),
+    /** AGENT-001: wire spelling fast / deep. */
+    wireTierLabel: (tier) => m.wireTierLabel(tier),
+    /** AGENT-001: wire label → AgentTier, or undefined. */
+    tryParseTier: (name) => unwrapOption(m.tryParseTier(name)),
+    /** AGENT-003: Fast ⇄ Deep. */
+    peerTier: (tier) => m.peerTier(tier),
+    /** AGENT-002: `nameOf(Fast, Coder)` = 'fast-coder'. */
+    nameOf: (tier, role) => m.nameOf(tier, role),
+    /** AGENT-003: same role, opposite tier. */
+    peerNameOf: (tier, role) => m.peerNameOf(tier, role),
+    allPublicRoles: () => listItems(m.allPublicRoles).map(caseOf),
+    allInternalRoles: () => listItems(m.allInternalRoles).map(caseOf),
+    allRoles: () => listItems(m.allRoles).map(caseOf),
+    publicForkableRoles: () => listItems(m.publicForkableRoles).map(caseOf),
+    /** AGENT-002: exactly 20 names. */
+    requiredNames: () => listItems(m.requiredNames),
+    publicForkableNames: () => listItems(m.publicForkableNames),
+    orchestratorForkableNames: () => listItems(m.orchestratorForkableNames),
+    inspectorToolNames: () => listItems(m.inspectorToolNames),
+    coderToolNames: () => listItems(m.coderToolNames),
+    /** AGENT-004: the exact bare legacy names. */
+    legacyAgentNames: () => setItems(m.legacyAgentNames),
+    /** AGENT-004: legacy rejection predicate (lowercase input). */
+    isLegacyAgentName: (lower) => m.isLegacyAgentName(lower),
+    /** AGENT-004: version-agnostic rejection prose. */
+    formatLegacyNameNotSupported: (name) => m.formatLegacyNameNotSupported(name),
+    formatLegacyNameInConfig: (name) => m.formatLegacyNameInConfig(name),
+  }
+})()
+
+/**
  * COMPANION-009 / CTX-010: which prefix X sends, as a plan over message positions.
  *
  * `frozenBBody` is supplied by the caller because the snapshot carries a `BlobRef`,
@@ -2085,10 +2157,19 @@ export const handleProjection = (() => {
     return value.ok ? value : { ok: false, error: caseOf(value.error) }
   }
 
+  /** EXEC-009 completion cell: kind + optional durable blob refs. */
+  const completionOf = (kind, ref = undefined, digest = undefined) => ({
+    Kind: typeof kind === 'string' ? buildCompletionKind(kind) : kind,
+    CompletionRef: ref,
+    CompletionDigest: digest,
+  })
+
   return {
     empty: m.empty,
     link: (handle, child, targetAgent, role, current) => decided(m.link(handle, child, targetAgent, role, current)),
-    complete: (handle, kind, current) => decided(m.complete(handle, kind, current)),
+    complete: (handle, completion, current) =>
+      decided(m.complete(handle, typeof completion === 'string' ? completionOf(completion) : completion, current)),
+    completionOf,
     retire: (handle, current) => decided(m.retire(handle, current)),
     tryFind: (handle, current) => unwrapOption(m.tryFind(handle, current)),
     isRetired: (handle, current) => m.isRetired(handle, current),
@@ -2100,16 +2181,30 @@ export const handleProjection = (() => {
     lifecycleOf: (record) => caseOf(record.Lifecycle),
 
     /** One handle record as comparable text. */
-    read: (record) => ({
-      handle: handleId.describe(record.Handle),
-      child: idValue.session(record.ChildSessionId),
-      targetAgent: record.TargetAgent,
-      role: caseOf(record.CanonicalRole),
-      lifecycle: caseOf(record.Lifecycle),
-      // EXEC-005: `list` must distinguish which completion landed, so the kind is
-      // part of the state rather than a flag beside it.
-      completion: caseOf(record.Lifecycle) === 'CompletedAwaitingJoin' ? caseOf(payloadOf(record.Lifecycle)) : undefined,
-    }),
+    read: (record) => {
+      const lifecycle = caseOf(record.Lifecycle)
+      let completion
+      let completionRef
+      let completionDigest
+      if (lifecycle === 'CompletedAwaitingJoin') {
+        const cell = payloadOf(record.Lifecycle)
+        completion = caseOf(cell.Kind)
+        completionRef = isSome(cell.CompletionRef) ? idValue.blobRef(cell.CompletionRef) : undefined
+        completionDigest = isSome(cell.CompletionDigest) ? idValue.blobDigest(cell.CompletionDigest) : undefined
+      }
+      return {
+        handle: handleId.describe(record.Handle),
+        child: idValue.session(record.ChildSessionId),
+        targetAgent: record.TargetAgent,
+        role: caseOf(record.CanonicalRole),
+        lifecycle,
+        // EXEC-005: `list` must distinguish which completion landed, so the kind is
+        // part of the state rather than a flag beside it.
+        completion,
+        completionRef,
+        completionDigest,
+      }
+    },
   }
 })()
 

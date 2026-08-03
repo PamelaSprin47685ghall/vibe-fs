@@ -13,6 +13,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  blobDigest,
+  blobRef,
   clockAt,
   caseOf,
   completionKind,
@@ -24,6 +26,7 @@ import {
   handleId,
   handleProjection,
   isSome,
+  journal,
   listItems,
   payloadOf,
   processEstimate,
@@ -43,8 +46,12 @@ const linkOn = (projection, { handle = HANDLE, child = CHILD, agent = 'fast-code
   return applied.value
 }
 
-const completeOn = (projection, { handle = HANDLE, kind = 'Terminal' } = {}) => {
-  const applied = handleProjection.complete(handle, completionKind.of(kind), projection)
+const completeOn = (projection, { handle = HANDLE, kind = 'Terminal', ref, digest } = {}) => {
+  const applied = handleProjection.complete(
+    handle,
+    handleProjection.completionOf(kind, ref, digest),
+    projection,
+  )
   assert.equal(applied.ok, true, applied.ok ? '' : `complete refused: ${applied.error}`)
   return applied.value
 }
@@ -121,6 +128,8 @@ test('EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
     role: 'Coder',
     lifecycle: 'Active',
     completion: undefined,
+    completionRef: undefined,
+    completionDigest: undefined,
   })
 })
 
@@ -135,7 +144,7 @@ test('EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {
 
   for (const late of ['SendFailure', 'Cancelled', 'Terminal']) {
     assert.deepEqual(
-      handleProjection.complete(HANDLE, completionKind.of(late), completed),
+      handleProjection.complete(HANDLE, handleProjection.completionOf(late), completed),
       { ok: false, error: 'AlreadyCompleted' },
       `a late ${late} must not overwrite the first winner`,
     )
@@ -159,7 +168,7 @@ test('EXEC_004_each_completion_kind_survives_into_the_state', () => {
 test('EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
   const projection = linkOn(handleProjection.empty)
 
-  assert.deepEqual(handleProjection.complete(handleId.agent('never'), completionKind.of('Terminal'), projection), {
+  assert.deepEqual(handleProjection.complete(handleId.agent('never'), handleProjection.completionOf('Terminal'), projection), {
     ok: false,
     error: 'UnknownHandle',
   })
@@ -216,7 +225,7 @@ test('EXEC_009_a_retired_handle_answers_retired_forever', () => {
 
   // Every transition is refused from here, including a second retirement.
   assert.deepEqual(handleProjection.retire(HANDLE, retired), { ok: false, error: 'HandleIsRetired' })
-  assert.deepEqual(handleProjection.complete(HANDLE, completionKind.of('Terminal'), retired), {
+  assert.deepEqual(handleProjection.complete(HANDLE, handleProjection.completionOf('Terminal'), retired), {
     ok: false,
     error: 'HandleIsRetired',
   })
@@ -293,6 +302,15 @@ const handleFact = {
     ParentSessionId: PARENT,
     Handle: HANDLE,
     Kind: completionKind.of('Terminal'),
+    CompletionRef: undefined,
+    CompletionDigest: undefined,
+  }),
+  completedWithBlob: fact('HandleCompleted', {
+    ParentSessionId: PARENT,
+    Handle: HANDLE,
+    Kind: completionKind.of('Terminal'),
+    CompletionRef: blobRef('blobs/completion-h1'),
+    CompletionDigest: blobDigest('sha-completion-h1'),
   }),
   retired: fact('HandleRetired', { ParentSessionId: PARENT, Handle: HANDLE }),
 }
@@ -316,6 +334,8 @@ test('EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
     role: 'Coder',
     lifecycle: 'Retired',
     completion: undefined,
+    completionRef: undefined,
+    completionDigest: undefined,
   })
   assert.deepEqual(views(handles), { listable: [], joinable: [], active: [] })
 })
@@ -449,6 +469,8 @@ test('EXEC_001_fork_creates_a_child_run', () => {
     role: 'Coder',
     lifecycle: 'Active',
     completion: undefined,
+    completionRef: undefined,
+    completionDigest: undefined,
   })
 
   const completed = completeOn(active, { kind: 'Terminal' })
@@ -486,6 +508,97 @@ test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
   assert.equal(rendered.includes(latestB), true)
   assert.equal(rendered.includes(forkChildPayload.parentWorkRecordInstruction), true)
   assert.equal(rendered.includes('parent_work_record'), true)
+})
+
+// ── EXEC-009: durable completion payload on the lifecycle ────────────────────
+
+test('EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
+  const completed = completeOn(linkOn(handleProjection.empty), {
+    kind: 'Terminal',
+    ref: blobRef('blobs/completion-h1'),
+    digest: blobDigest('sha-completion-h1'),
+  })
+
+  assert.deepEqual(stateOf(completed), {
+    handle: 'agent:h1',
+    child: 'ses_c',
+    targetAgent: 'fast-coder',
+    role: 'Coder',
+    lifecycle: 'CompletedAwaitingJoin',
+    completion: 'Terminal',
+    completionRef: 'blobs/completion-h1',
+    completionDigest: 'sha-completion-h1',
+  })
+  assert.deepEqual(views(completed).joinable, ['agent:h1'])
+})
+
+test('EXEC_009_cancelled_completion_has_no_blob', () => {
+  const cancelled = completeOn(linkOn(handleProjection.empty), { kind: 'Cancelled' })
+  assert.deepEqual(
+    {
+      lifecycle: stateOf(cancelled).lifecycle,
+      completion: stateOf(cancelled).completion,
+      completionRef: stateOf(cancelled).completionRef,
+      completionDigest: stateOf(cancelled).completionDigest,
+    },
+    {
+      lifecycle: 'CompletedAwaitingJoin',
+      completion: 'Cancelled',
+      completionRef: undefined,
+      completionDigest: undefined,
+    },
+  )
+})
+
+test('EXEC_009_fold_replays_completion_blob_refs', () => {
+  const folded = foldFacts([handleFact.linked, handleFact.completedWithBlob])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+  const handles = fold.session(folded.value, 'ses_p').Handles
+  assert.deepEqual(stateOf(handles), {
+    handle: 'agent:h1',
+    child: 'ses_c',
+    targetAgent: 'fast-coder',
+    role: 'Coder',
+    lifecycle: 'CompletedAwaitingJoin',
+    completion: 'Terminal',
+    completionRef: 'blobs/completion-h1',
+    completionDigest: 'sha-completion-h1',
+  })
+})
+
+test('EXEC_009_codec_migrates_0_5_1_handle_completed_missing_blob_fields', () => {
+  // 0.5.1 lines lack CompletionRef/CompletionDigest. Decode must inject None rather
+  // than refuse the journal — forward-compat for in-flight 0.5.1 runtimes.
+  const modern = fact('HandleCompleted', {
+    ParentSessionId: PARENT,
+    Handle: HANDLE,
+    Kind: completionKind.of('Terminal'),
+    CompletionRef: undefined,
+    CompletionDigest: undefined,
+  })
+  const modernLine = journal.serializeFact(modern)
+  const modernDecoded = journal.deserializeFact(modernLine)
+  assert.equal(modernDecoded.ok, true, modernDecoded.ok ? '' : modernDecoded.error)
+
+  // Strip the new keys to simulate a 0.5.1 line, then migrate on read.
+  const stripped = modernLine
+    .replace(/,"CompletionRef":null/g, '')
+    .replace(/,"CompletionDigest":null/g, '')
+    .replace(/"CompletionRef":null,/g, '')
+    .replace(/"CompletionDigest":null,/g, '')
+  assert.equal(stripped.includes('CompletionRef'), false, 'fixture must lack CompletionRef')
+  assert.equal(stripped.includes('CompletionDigest'), false, 'fixture must lack CompletionDigest')
+  const migrated = journal.deserializeFact(stripped)
+  assert.equal(migrated.ok, true, migrated.ok ? '' : migrated.error)
+
+  // Fold the migrated fact: missing refs become None, handle is still joinable.
+  const folded = foldFacts([handleFact.linked, migrated.value])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+  const state = stateOf(fold.session(folded.value, 'ses_p').Handles)
+  assert.equal(state.lifecycle, 'CompletedAwaitingJoin')
+  assert.equal(state.completion, 'Terminal')
+  assert.equal(state.completionRef, undefined)
+  assert.equal(state.completionDigest, undefined)
 })
 
 // ── EXEC-010: a process request carries the full executor estimate ─────────────

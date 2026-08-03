@@ -87,73 +87,61 @@ module HostForkRunLifecycle =
             subscriptionToDispose
             |> Option.iter (fun subscription -> subscription.Dispose())
 
-            // EXEC-009: the durable completion precedes the mailbox delivery. The
-            // `join` that consumes the completion retires the handle, and the fold
-            // rejects that retirement unless `HandleCompleted` is already on disk —
-            // measured on Host 1.18.10: every agent `join` poisoned the journal
-            // with `join retired a handle that had no completion (EXEC-004)`, which
-            // permanently disabled every later durable effect. The previous code
-            // wrote the completion only on the cancel path.
-            let completionKind =
+            // EXEC-009: durable blob + HandleCompleted precede mailbox delivery.
+            // Join consumes from projection/blob; mailbox is wait-notification only.
+            let runId = "run-" + run.AgentId
+            let childId = run.ChildId
+
+            let completionKind, agentOutcome =
                 match outcome with
-                | Completed _ -> HandleCompletionKind.Terminal
-                | Aborted _
-                | Failed _ -> HandleCompletionKind.SendFailure
+                | Completed result when not result.IsValid ->
+                    // EXEC-006: `IsValid` decides whether a completed run carries
+                    // terminal output. The join wire then carries the materialised LWR.
+                    HandleCompletionKind.SendFailure,
+                    AgentCompletion.failed
+                        run.AgentId
+                        runId
+                        (Some run.Role)
+                        (Some childId)
+                        "MISSING_FINAL_REPORT"
+                        "completed with empty terminal output"
+                | Completed result ->
+                    HandleCompletionKind.Terminal,
+                    AgentCompletion.completed
+                        run.AgentId
+                        childId
+                        runId
+                        run.Role
+                        result.AuthorityRootUserMessageId
+                        // HOST-010/HOST-011: terminal provider run IS the assistant message.
+                        result.ProviderRun
+                        (completedWorkRecord |> Option.defaultValue "")
+                        result.Directory
+                | Aborted reason ->
+                    HandleCompletionKind.SendFailure,
+                    AgentCompletion.aborted run.AgentId runId (Some run.Role) (Some childId) "ABORTED" reason
+                | Failed error ->
+                    let code =
+                        if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
+                            "MISSING_FINAL_REPORT"
+                        elif error = "cancelled" then
+                            "CANCELLED"
+                        else
+                            "ERROR"
+
+                    HandleCompletionKind.SendFailure,
+                    AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
+
+            let body = Some(HandleCompletionBlob.encodeOutcome runId agentOutcome)
 
             match journal with
             | None -> ()
             | Some _ ->
-                match HandleController.recordCompletion journal parentId run.AgentId completionKind with
+                match HandleController.recordCompletion journal parentId run.AgentId completionKind body with
                 | Ok() -> ()
                 | Error error -> failwith (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
 
-            let runId = "run-" + run.AgentId
-            let childId = run.ChildId
-
-            match outcome with
-            | Completed result ->
-                // EXEC-006: `IsValid` is the one place that decides whether a
-                // completed run actually carries terminal output. Re-testing the
-                // text here would be a second copy of that rule. The join wire
-                // then carries the materialised LWR (not TerminalText alone).
-                if not result.IsValid then
-                    run.Source.SetResult(
-                        AgentCompletion.failed
-                            run.AgentId
-                            runId
-                            (Some run.Role)
-                            (Some childId)
-                            "MISSING_FINAL_REPORT"
-                            "completed with empty terminal output"
-                    )
-                else
-                    run.Source.SetResult(
-                        AgentCompletion.completed
-                            run.AgentId
-                            childId
-                            runId
-                            run.Role
-                            result.AuthorityRootUserMessageId
-                            // HOST-010/HOST-011: the terminal provider run IS the
-                            // assistant message, so there is no separate id to pass.
-                            result.ProviderRun
-                            (completedWorkRecord |> Option.defaultValue "")
-                            result.Directory
-                    )
-            | Aborted reason ->
-                run.Source.SetResult(
-                    AgentCompletion.aborted run.AgentId runId (Some run.Role) (Some childId) "ABORTED" reason
-                )
-            | Failed error ->
-                let code =
-                    if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
-                        "MISSING_FINAL_REPORT"
-                    elif error = "cancelled" then
-                        "CANCELLED"
-                    else
-                        "ERROR"
-
-                run.Source.SetResult(AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error)
+            run.Source.SetResult agentOutcome
 
     let installRun
         (gate: obj)

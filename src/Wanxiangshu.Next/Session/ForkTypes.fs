@@ -52,7 +52,7 @@ type PtyRecord =
 type AgentRecord =
     {
         AgentId: string
-        /// Exact managed agent name when known (fast-ROLE / deep-ROLE); may be empty for legacy records.
+        /// Managed agent name (fast-ROLE / deep-ROLE). Required; empty is refused at reuse.
         Agent: string
         Role: AgentRole
         Status: AgentStatus

@@ -238,10 +238,16 @@ module Fact =
                TargetAgent: string
                CanonicalRole: Role |}
 
+        /// `CompletionRef` / `CompletionDigest` locate the durable join payload
+        /// (EXEC-009). Written before the fact. `Cancelled` carries `None`: parent
+        /// abort has no body to join. 0.5.1 lines missing the fields migrate to
+        /// `None` on read (forward-compatible).
         | HandleCompleted of
             {| ParentSessionId: SessionId
                Handle: HandleId
-               Kind: HandleCompletionKind |}
+               Kind: HandleCompletionKind
+               CompletionRef: BlobRef option
+               CompletionDigest: BlobDigest option |}
 
         /// The durable tombstone. EXEC-009: a retired id returns RetiredHandle
         /// forever and must never degrade into "treat the input as an agent name
