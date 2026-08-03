@@ -298,6 +298,19 @@ async function oracleXd(scenario, ctx) {
   const prevEpochs = fieldValues(rebases, 'PreviousEpochId');
   assert.ok(nextEpochs.length >= 1, 'X-D: NextEpochId present on PrefixRebaseCommitted');
   assert.ok(prevEpochs.length >= 1, 'X-D: PreviousEpochId present on PrefixRebaseCommitted');
+  // HOST-010 X-chain observable proxy: SolvingProviderRun is bindableRun's
+  // assistant id persisted at promote (XWire.reconcileAttempt). Transform-side
+  // incomplete assistant id is not journaled; this field is its durable stand-in.
+  const solvingRuns = [...new Set(fieldValues(rebases, 'SolvingProviderRun'))];
+  assert.equal(
+    solvingRuns.length,
+    1,
+    `HOST-010: PrefixRebaseCommitted.SolvingProviderRun unique non-empty (got ${solvingRuns.length})`,
+  );
+  assert.ok(
+    typeof solvingRuns[0] === 'string' && solvingRuns[0].length > 0,
+    `HOST-010: SolvingProviderRun must be non-empty string (got ${JSON.stringify(solvingRuns[0])})`,
+  );
   assert.equal(
     scenario.provider.matchCount('continue.0'),
     1,

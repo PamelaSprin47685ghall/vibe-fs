@@ -10,8 +10,11 @@
  *  - the Host's tool-loop continuation re-enters the transform (step 0.2) and
  *    the continuation commits exactly one EnforcementCycleCommitted with the
  *    misspelled rule field mapped (step 0.7, ENFORCER-024) and identity
- *    present (step 0.6: HOST-010 ProviderRun + HOST-011 ToolCallIds from
- *    ToolContext; ENFORCER-041/154 duals);
+ *    present (step 0.6 HOST-011: BlogEntryCommitted.ProviderRun = tool
+ *    ToolContext.messageID half via lastAssistantStep; ToolCallIds = callID
+ *    half; ENFORCER-041/154 duals). HOST-010 is not asserted here — its
+ *    observable proxies are Reviewer seal/verdict equality
+ *    (reviewer-verdict-canary) and X SolvingProviderRun (x-recovery-canary);
  *  - the continuation transform parks (step 0.3): the SECOND Blogger request
  *    must arrive only AFTER the second main turn's offer. A failed park would
  *    consume step 1 immediately, before the second main turn, and the index
@@ -464,7 +467,12 @@ try {
     `BloggerRequestMaterialized must land before sends (got ${materialized.length})`,
   );
 
-  // HOST-010: every BlogEntryCommitted carries a unique non-empty ProviderRun.
+  // HOST-011 messageID half: BlogEntryCommitted.ProviderRun is the completed
+  // assistant id from lastAssistantStep (EnforcerHost), which is the same Host
+  // identity ToolContext.messageID carries for blog tools on that run.
+  // Not HOST-010: that clause's left side is the unique incomplete assistant at
+  // transform time; journal proxy for HOST-010 is Reviewer seal/verdict equality
+  // + X PrefixRebaseCommitted.SolvingProviderRun.
   // Journal envelope and payload both carry ProviderRun (same value); fieldValues
   // walks both — take the unique set per fact, require exactly one non-empty id.
   const providerRuns = [];
@@ -473,22 +481,22 @@ try {
     assert.equal(
       runs.length,
       1,
-      `HOST-010: each BlogEntryCommitted must resolve to exactly one ProviderRun (got ${runs.length}): ${JSON.stringify(fact).slice(0, 200)}`,
+      `HOST-011: each BlogEntryCommitted must resolve to exactly one ProviderRun/messageID (got ${runs.length}): ${JSON.stringify(fact).slice(0, 200)}`,
     );
     assert.ok(
       typeof runs[0] === 'string' && runs[0].length > 0,
-      `HOST-010: ProviderRun must be non-empty string (got ${JSON.stringify(runs[0])})`,
+      `HOST-011: ProviderRun (messageID half) must be non-empty string (got ${JSON.stringify(runs[0])})`,
     );
     providerRuns.push(runs[0]);
   }
   assert.equal(
     new Set(providerRuns).size,
     providerRuns.length,
-    `HOST-010: ProviderRun unique across cycles (got ${providerRuns.length} runs, ${new Set(providerRuns).size} unique)`,
+    `HOST-011: ProviderRun unique across cycles (got ${providerRuns.length} runs, ${new Set(providerRuns).size} unique)`,
   );
 
-  // HOST-011: every cycle records ≥1 non-empty ToolCallId from ToolContext
-  // (callID half of ReviewAttemptIdentity). ENFORCER-041 dual.
+  // HOST-011 callID half: every cycle records ≥1 non-empty ToolCallId from
+  // ToolContext (callID). ENFORCER-041 dual.
   const allToolCallIds = [];
   for (const fact of facts) {
     const ids = toolCallIdsOf(fact);

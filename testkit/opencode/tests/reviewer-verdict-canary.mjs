@@ -91,7 +91,28 @@ async function oracleCheck(scenario, ctx, step) {
   assert.equal(rvFacts.length, 2, 'two distinct PERFECT verdict facts required');
   assert.ok(rvFacts.every(f => JSON.stringify(f).includes('Perfect')), 'both persisted facts must be PERFECT');
   assert.equal(new Set(valuesOf(rvFacts, 'ToolCallId')).size, 2, 'two verdict facts require distinct tool call IDs');
-  assert.equal(new Set(valuesOf(rvFacts, 'ProviderRun')).size, 2, 'two verdict facts require distinct provider runs');
+  const verdictRuns = [...new Set(valuesOf(rvFacts, 'ProviderRun'))];
+  assert.equal(verdictRuns.length, 2, 'two verdict facts require distinct provider runs');
+  // HOST-010 observable proxy (SSOT/07 transform id ≡ ToolContext.messageID is
+  // not co-present on the wire). Both sides land in journal for the seal-bound run:
+  //   ReviewVerdictRecorded.ProviderRun = ToolContext.messageID (VerdictTool)
+  //   ProviderInputSealed.ProviderRun   = same messageID via ReviewSeal.bindToRun
+  // First PERFECT has no pending challenge → no seal; second PERFECT binds.
+  // Proof: every sealed run appears among verdict runs (same ToolContext.messageID).
+  const sealFacts = factsIn(scenario.host.workDir, 'ProviderInputSealed');
+  assert.ok(sealFacts.length >= 1, 'HOST-010: dual PERFECT must seal ≥1 ProviderInputSealed');
+  const sealedRuns = [...new Set(valuesOf(sealFacts, 'ProviderRun'))];
+  assert.ok(sealedRuns.length >= 1, 'HOST-010: ProviderInputSealed.ProviderRun non-empty');
+  for (const run of sealedRuns) {
+    assert.ok(
+      typeof run === 'string' && run.length > 0,
+      `HOST-010: sealed ProviderRun must be non-empty string (got ${JSON.stringify(run)})`,
+    );
+    assert.ok(
+      verdictRuns.includes(run),
+      `HOST-010: ProviderInputSealed.ProviderRun ${run} must equal a ReviewVerdictRecorded.ProviderRun (verdict=[${verdictRuns.join(', ')}])`,
+    );
+  }
   // Both PERFECT verdicts are accepted inside the SAME physical user turn
   // (the second request reuses the envelope's user message): the reviewer's
   // verdict-bearing requests all carry the same last user text.
