@@ -85,6 +85,10 @@ assistant message 在 transform 之前已经创建并持久化。
 运行后再做 `git add`，可确保提交内容通过 `gate:static` 与 `prepare` 安装的
 pre-commit 钩子一致检查。
 
+`npm run lint` 也用于满足 Reasonix 编程器的 delivery work-mode 检查：
+在交付阶段，该检查要求工作区无未格式化的 F# 与 XML 源文件；
+`--all` 模式会重写所有相关文件，因此必须先跑 lint 再提交。
+
 ### 迷路时向上走
 
 在代码里陷住、或发现「怎么改都别扭」时，不要继续往下调。回到条款问三个问题：
