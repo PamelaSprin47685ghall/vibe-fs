@@ -1,6 +1,6 @@
 ### CONTEXT-RECOVERY.txt — X recovery chain (SSOT/12)
-gate_commit: 17358c38
-date_utc: 2026-08-03T18:12:02Z
+gate_commit: 39e05500
+date_utc: 2026-08-03T20:10:34Z
 
 ## Production wiring (closed)
 XWire.applyTransform  — SpikePlugin.fs:127 (transform, after Companion rewrite, before ReviewSeal)

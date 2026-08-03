@@ -1,23 +1,27 @@
-### COMMIT.txt — C15 release evidence
-source_commit: 17358c386fdc2ef08bad4c27dc957e3d14231863
-short: 17358c38
-date_utc: 2026-08-03T18:14:00Z
+### COMMIT.txt — C15 release evidence (REVISE alignment + X-A–X-D)
+source_commit: 39e05500a78984e01e099e7badaf32e4468a0040
+short: 39e05500
+date_utc: 2026-08-03T20:10:34Z
 branch: master
-subject: fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
+subject: test(canary): deliver X-A–X-D recovery scenarios + blogger epoch 0-55
 tag: v0.5.2
-# tag tip: annotated tag target verified at release time (git rev-parse v0.5.2^{commit} == HEAD); not a frozen parent SHA
-evidence_commit: 7443007a43d0a5b6483e816c2c8d909d7aeb6e32
+# tag tip: annotated tag target verified at release time (git rev-parse v0.5.2^{commit} == HEAD)
+evidence_commit: (filled by evidence commit SHA after this file lands)
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification_commits:
-  - bcc99217 docs(status): SSOT docs format + LOOP conformant ledger + README drift fix
-  - ff68d962 fix(companion): remove AppendSquash legacy port and version-bound errors
-  - 4b4bd25a test(loop): LOOP-001/002/007/008/010 criterion layer-0 assertions
-  - 21c1a9df fix(blogger): Parked survives onReactivate; CAS commitCycle on ingest cursor
   - 17358c38 fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
+  - 21c1a9df fix(blogger): Parked survives onReactivate; CAS commitCycle on ingest cursor
+  - 4b4bd25a test(loop): LOOP-001/002/007/008/010 criterion layer-0 assertions
+  - ff68d962 fix(companion): remove AppendSquash legacy port and version-bound errors
+  - 90140dff docs: mark X-A–X-D layer-4 delivery and 19-canary forest
+  - 6f8d3d14 docs(conformance): bind HOST-010/011 and CTX-001/002/006/007/011/012 to layer-4 canaries
+  - 67f2e232 fix(testkit): support X crash-window canaries on fault and restart
+  - 39e05500 test(canary): deliver X-A–X-D recovery scenarios + blogger epoch 0-55
 pack:
   tarball: wanxiangshu-0.5.2.tgz
   sha256: f6e1b2b479aa6fa12f92a6f3b6ef483995d125b3b1eab6bc93a5299d9c689af4
   files: 298
   size_bytes: 1577263
-prior_evidence_commit: 982ece0f022201060eef7b6fda336bb399311890
+prior_evidence_commit: 7443007a43d0a5b6483e816c2c8d909d7aeb6e32
+notes: REVISE closed — X-A–X-D layer-4 delivered; HOST-010/011 layer-4 bound; canary forest 19

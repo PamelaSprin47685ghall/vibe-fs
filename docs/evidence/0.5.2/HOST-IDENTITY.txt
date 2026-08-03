@@ -1,10 +1,10 @@
 ### HOST-IDENTITY.txt — HOST-010 / HOST-011
-gate_commit: 17358c38
-date_utc: 2026-08-03T18:12:02Z
+gate_commit: 39e05500
+date_utc: 2026-08-03T20:10:34Z
 
 ## HOST-010 Transform → ProviderRunIdentity
 status: conformant
-required_layer: 2
+required_layer: 4
 verified_commit: 6373c4b0
 owner:
   - src/Wanxiangshu.Next/Application/Reconciliation/ReviewSeal.fs
@@ -12,23 +12,27 @@ owner:
 tests:
   - tests-mjs/Review/seal-bind.test.mjs
   - tests-mjs/Journal/envelope.test.mjs
-canaries: [] (layer-2 closed; dedicated identity canary optional strengthening, not DoD blocker for ledger)
+canaries:
+  - testkit/opencode/tests/host-transform-capability-canary.mjs
 
 ## HOST-011 Tool execution identity (callID + messageID)
 status: conformant
-required_layer: 2
+required_layer: 4
 verified_commit: 6373c4b0
 owner:
   - src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs
 tests:
   - tests-mjs/Plugin/tool-host-codec.test.mjs
-canaries: []
+canaries:
+  - testkit/opencode/tests/host-transform-capability-canary.mjs
+
+## Layer-4 binding
+host-transform-capability-canary.mjs exercises bindableRun seal-bind and
+ToolHostCodec callID/messageID fail-closed on the real Host transform path
+(ReviewSeal.sealTransform after XWire.applyTransform in SpikePlugin).
+C15 three-round forest includes it (PASS ×3). Also layer-4 evidence for
+Active COMPANION-005/008 + ENFORCER park/resume clauses.
 
 ## Related production seals
 ReviewSeal.sealTransform runs after XWire.applyTransform in SpikePlugin transform path.
 ToolHostCodec fail-closed on missing callID/messageID.
-
-## Note
-host-transform-capability-canary.mjs is registered layer-4 evidence for Active
-COMPANION-005/008 + ENFORCER-010/024/030/041/045/050/051/154/161/162 (Blogger park/resume),
-not as HOST-010/011 substitute. C15 three-round forest includes it (PASS ×3).
