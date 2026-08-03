@@ -42,6 +42,22 @@ module EnforcerHost =
     let MaxSerializedScoresBytes = 64 * 1024
     let MaxMergedToolCalls = 32
 
+    /// Item 14: three commit outcomes. Park only on KnownCommitted.
+    [<RequireQualifiedAccess>]
+    type CycleCommitOutcome =
+        | KnownCommitted
+        | KnownNotCommitted of reason: string
+        | CommitUnknown of reason: string
+
+    /// Item 15: stable minimal repair instruction (no dynamic context resend).
+    let RepairInstruction =
+        "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
+
+    let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
+        match failure with
+        | WriteUnknown(_, _) -> CycleCommitOutcome.CommitUnknown(JournalAppendFailure.describe failure)
+        | FactRejected(_, _) -> CycleCommitOutcome.KnownNotCommitted(JournalAppendFailure.describe failure)
+
     /// Raw part object → completed `blog` call arguments.
     ///
     /// ENFORCER-041: identity comes from the part itself here (the transform
@@ -230,7 +246,7 @@ module EnforcerHost =
         (toolCallIds: ToolCallId list)
         (merged: EnforcerCycle.MergedCycle)
         (declared: BloggerMainRequestContext option)
-        : Result<EnforcementCycleRecord, string> =
+        : CycleCommitOutcome =
         let projections = AgentJournal.snapshot journal
 
         let already =
@@ -240,17 +256,18 @@ module EnforcerHost =
             |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
             |> Option.flatten
 
+        // CommitUnknown reconcile: receipt already present → treat as KnownCommitted.
         match already with
-        | Some record -> Ok record
+        | Some _ -> CycleCommitOutcome.KnownCommitted
         | None ->
             match declared with
-            | None -> Error "blog cycle has no staged coverage context (ENFORCER-045)"
+            | None -> CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
             | Some coverage ->
                 // C5: use epoch frozen at request materialization, never live PrefixEpoch.
                 let epoch = coverage.ObservedPrefixEpochId
 
                 match journal.WriteBlob merged.MergedText with
-                | Error error -> Error error
+                | Error error -> CycleCommitOutcome.KnownNotCommitted error
                 | Ok textBlob ->
                     let writeScore () =
                         if Map.isEmpty merged.MergedScores then
@@ -266,19 +283,8 @@ module EnforcerHost =
 
                     match writeScore (), writeEvidence () with
                     | Error error, _
-                    | _, Error error -> Error error
+                    | _, Error error -> CycleCommitOutcome.KnownNotCommitted error
                     | Ok scoreRef, Ok evidenceRef ->
-                        let record =
-                            { MainSessionId = mainSessionId
-                              BloggerSessionId = bloggerSessionId
-                              ProviderRun = providerRun
-                              ToolCallIds = toolCallIds
-                              CycleTextRef = textBlob.BlobRef
-                              CycleTextDigest = textBlob.BlobDigest
-                              CycleScoreRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
-                              CycleEvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
-                              ObservedPrefixEpochId = epoch }
-
                         let fact =
                             AgentFact.BlogEntryCommitted
                                 {| SessionId = mainSessionId
@@ -295,8 +301,8 @@ module EnforcerHost =
                                    TextDigest = textBlob.BlobDigest
                                    ProviderRun = providerRun
                                    ToolCallIds = toolCallIds
-                                   ScoreVectorRef = record.CycleScoreRef
-                                   EvidenceRef = record.CycleEvidenceRef
+                                   ScoreVectorRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
+                                   EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
                                    ObservedPrefixEpochId = epoch |}
 
                         match
@@ -306,8 +312,8 @@ module EnforcerHost =
                                 fact
                                 journal
                         with
-                        | Error failure -> Error(JournalAppendFailure.describe failure)
-                        | Ok _ -> Ok record
+                        | Error failure -> classifyAppendFailure failure
+                        | Ok _ -> CycleCommitOutcome.KnownCommitted
 
     /// CTX-012: single production constructor path for BlogSquashCommitted from tool loop.
     let private commitSquash
@@ -317,54 +323,69 @@ module EnforcerHost =
         (providerRun: ProviderRunIdentity)
         (squash: BloggerSquashRequestContext)
         (squashText: string)
-        : Result<unit, string> =
+        : CycleCommitOutcome =
         let projections = AgentJournal.snapshot journal
 
-        match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-        | None -> Error "BlogSquashCommitted requires an existing work session projection"
-        | Some session ->
-            match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
-            | Some linked when linked = bloggerSessionId ->
-                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-                let k = squash.CoveredFrameCount
+        // CommitUnknown reconcile via unified receipt.
+        let alreadyReceipt =
+            projections.AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+            |> Option.bind (fun s -> s.BloggerCycles)
+            |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
 
-                if k < 1 || k > List.length blog.Frames then
-                    Error(sprintf "BlogSquashCommitted covers %d frames but %d exist" k (List.length blog.Frames))
-                elif blog.FrameEpochId <> squash.FrameEpochId then
-                    Error "BlogSquashCommitted frame epoch mismatch"
-                else
-                    let selected = List.truncate k blog.Frames
-                    let digests = selected |> List.map (fun f -> f.Digest)
+        match alreadyReceipt with
+        | Some _ -> CycleCommitOutcome.KnownCommitted
+        | None ->
+            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
+            | None ->
+                CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted requires an existing work session projection"
+            | Some session ->
+                match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
+                | Some linked when linked = bloggerSessionId ->
+                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+                    let k = squash.CoveredFrameCount
 
-                    if digests <> squash.FrameDigests then
-                        Error "BlogSquashCommitted frame digests mismatch"
+                    if k < 1 || k > List.length blog.Frames then
+                        CycleCommitOutcome.KnownNotCommitted(
+                            sprintf "BlogSquashCommitted covers %d frames but %d exist" k (List.length blog.Frames)
+                        )
+                    elif blog.FrameEpochId <> squash.FrameEpochId then
+                        CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted frame epoch mismatch"
                     else
-                        match journal.WriteBlob squashText with
-                        | Error error -> Error error
-                        | Ok blob ->
-                            let fact =
-                                AgentFact.BlogSquashCommitted
-                                    {| SessionId = mainSessionId
-                                       BloggerSessionId = bloggerSessionId
-                                       RequestId = squash.RequestId
-                                       PreviousFrameEpochId = blog.FrameEpochId
-                                       NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
-                                       CoveredFrameCount = k
-                                       TextRef = blob.BlobRef
-                                       TextDigest = blob.BlobDigest
-                                       ProviderRun = providerRun |}
+                        let selected = List.truncate k blog.Frames
+                        let digests = selected |> List.map (fun f -> f.Digest)
 
-                            match
-                                AgentJournal.appendAgent
-                                    (StreamId.Session mainSessionId)
-                                    (Some providerRun)
-                                    fact
-                                    journal
-                            with
-                            | Error failure -> Error(JournalAppendFailure.describe failure)
-                            | Ok _ -> Ok()
-            | Some _ -> Error "Squash completion belongs to a different Blogger session"
-            | None -> Error "BlogSquashCommitted requires a durably linked Blogger session"
+                        if digests <> squash.FrameDigests then
+                            CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted frame digests mismatch"
+                        else
+                            match journal.WriteBlob squashText with
+                            | Error error -> CycleCommitOutcome.KnownNotCommitted error
+                            | Ok blob ->
+                                let fact =
+                                    AgentFact.BlogSquashCommitted
+                                        {| SessionId = mainSessionId
+                                           BloggerSessionId = bloggerSessionId
+                                           RequestId = squash.RequestId
+                                           PreviousFrameEpochId = blog.FrameEpochId
+                                           NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
+                                           CoveredFrameCount = k
+                                           TextRef = blob.BlobRef
+                                           TextDigest = blob.BlobDigest
+                                           ProviderRun = providerRun |}
+
+                                match
+                                    AgentJournal.appendAgent
+                                        (StreamId.Session mainSessionId)
+                                        (Some providerRun)
+                                        fact
+                                        journal
+                                with
+                                | Error failure -> classifyAppendFailure failure
+                                | Ok _ -> CycleCommitOutcome.KnownCommitted
+                | Some _ ->
+                    CycleCommitOutcome.KnownNotCommitted "Squash completion belongs to a different Blogger session"
+                | None ->
+                    CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted requires a durably linked Blogger session"
 
     type FrameLoadError =
         | MissingAssociation
@@ -564,6 +585,46 @@ module EnforcerHost =
                         (AgentJournal.snapshot j).AgentProjections.Associations)
 
             match journal, mainSessionId, extractCalls rawMessages with
+            | Some durable, Some owner, Some(messageId, calls) when List.isEmpty calls ->
+                // Item 15: pure prose / no blog call — one interaction repair max.
+                let key = SessionId.value bloggerSessionId
+
+                match scope.TryPeekCurrentRequest key with
+                | None -> return rawMessages
+                | Some _ ->
+                    let cell = scope.GetBloggerRuntime key
+
+                    if not cell.RepairSpent then
+                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+
+                        Diagnostic.emit
+                            "enforcer-cycle-repair"
+                            [ "session_id", key; "result", "no completed blog calls" ]
+
+                        let repairMsg =
+                            createObj
+                                [ "info",
+                                  box (
+                                      createObj
+                                          [ "id", box (sprintf "enforcer-repair-%s" key)
+                                            "role", box "user" ]
+                                  )
+                                  "parts",
+                                  box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
+
+                        return rawMessages @ [ repairMsg ]
+                    else
+                        match BloggerRuntime.onFail cell with
+                        | Ok failed -> scope.SetBloggerRuntime(key, failed)
+                        | Error _ -> ()
+
+                        scope.ClearCurrentRequest key
+
+                        Diagnostic.emit
+                            "enforcer-cycle-failed"
+                            [ "session_id", key; "result", "no blog call after repair" ]
+
+                        return []
             | Some durable, Some owner, Some(messageId, calls) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and
@@ -578,15 +639,24 @@ module EnforcerHost =
                 let key = SessionId.value bloggerSessionId
                 let currentCtx = scope.TryPeekCurrentRequest key
 
+                let snapshot = AgentJournal.snapshot durable
+
                 let alreadyEntry =
-                    (AgentJournal.snapshot durable).AgentProjections.Sessions
+                    snapshot.AgentProjections.Sessions
                     |> Map.tryFind mainSessionId
                     |> Option.bind (fun session -> session.Enforcement)
                     |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
                     |> Option.flatten
                     |> Option.isSome
 
-                if alreadyEntry then
+                let alreadyReceipt =
+                    snapshot.AgentProjections.Sessions
+                    |> Map.tryFind mainSessionId
+                    |> Option.bind (fun session -> session.BloggerCycles)
+                    |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
+                    |> Option.isSome
+
+                if alreadyEntry || alreadyReceipt then
                     let resumeWithContext ctx =
                         rebuildFromContext durable bloggerSessionId ctx
 
@@ -603,19 +673,45 @@ module EnforcerHost =
                 else
                     let mutable committed = false
                     let mutable afterSquashMain: BloggerRequestContext option = None
+                    let mutable commitUnknown = false
+                    let mutable injectRepair = false
+
+                    let failClosedNoPark (reason: string) =
+                        Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
+
+                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                        | Error _ -> ()
+
+                        scope.ClearCurrentRequest key
 
                     match validateCycle messageId calls with
                     | Error reason ->
-                        Diagnostic.emit
-                            "enforcer-cycle-invalid"
-                            [ "session_id", key; "result", reason ]
+                        // Item 15: one repair max for invalid cycle (empty text / multi-call merge fail).
+                        let cell = scope.GetBloggerRuntime key
+
+                        if not cell.RepairSpent then
+                            scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                            injectRepair <- true
+
+                            Diagnostic.emit
+                                "enforcer-cycle-repair"
+                                [ "session_id", key; "result", reason ]
+                        else
+                            failClosedNoPark reason
                     | Ok(merged, toolCallIds) ->
                         match currentCtx with
                         | Some(BloggerRequestContext.Squash squash) ->
-                            // CTX-012 / C3: squash commits via the same blog tool loop.
-                            // Coverage must not advance. Single writer = BlogSquashCommitted.
-                            match commitSquash durable mainSessionId bloggerSessionId providerRun squash merged.MergedText with
-                            | Ok _ ->
+                            match
+                                commitSquash
+                                    durable
+                                    mainSessionId
+                                    bloggerSessionId
+                                    providerRun
+                                    squash
+                                    merged.MergedText
+                            with
+                            | CycleCommitOutcome.KnownCommitted ->
                                 committed <- true
                                 afterSquashMain <- None
 
@@ -624,22 +720,21 @@ module EnforcerHost =
                                 | Error _ -> ()
 
                                 scope.ClearCurrentRequest key
-                            | Error reason ->
+                            | CycleCommitOutcome.KnownNotCommitted reason -> failClosedNoPark reason
+                            | CycleCommitOutcome.CommitUnknown reason ->
+                                // No re-ask model, no re-append. Reconcile via receipt only.
+                                commitUnknown <- true
+
                                 Diagnostic.emit
-                                    "enforcer-squash-commit-failed"
+                                    "enforcer-cycle-commit-unknown"
                                     [ "session_id", key; "result", reason ]
                         | Some(BloggerRequestContext.Main main) ->
-                            // C4/C5: hard digest check on staged context.
                             let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
 
                             if tomlDigest <> main.DeltaDigest then
-                                Diagnostic.emit
-                                    "enforcer-cycle-commit-failed"
-                                    [ "session_id", key; "result", "delta digest mismatch" ]
+                                failClosedNoPark "delta digest mismatch"
                             elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
-                                Diagnostic.emit
-                                    "enforcer-cycle-commit-failed"
-                                    [ "session_id", key; "result", "coverage did not advance" ]
+                                failClosedNoPark "coverage did not advance"
                             else
                                 match
                                     commitCycle
@@ -651,10 +746,8 @@ module EnforcerHost =
                                         merged
                                         (Some main)
                                 with
-                                | Ok _ ->
+                                | CycleCommitOutcome.KnownCommitted ->
                                     committed <- true
-
-                                    // C4: Main Entry success clears Blogger owner fallback failures.
                                     AgentJournal.recordDerivedFallbackSuccess (Some durable) mainSessionId
 
                                     match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
@@ -662,17 +755,33 @@ module EnforcerHost =
                                     | Error _ -> ()
 
                                     scope.ClearCurrentRequest key
-                                | Error reason ->
-                                    Diagnostic.emit
-                                        "enforcer-cycle-commit-failed"
-                                        [ "session_id", key; "result", reason ]
-                        | None ->
-                            Diagnostic.emit
-                                "enforcer-cycle-commit-failed"
-                                [ "session_id", key; "result", "missing CurrentRequest" ]
+                                | CycleCommitOutcome.KnownNotCommitted reason -> failClosedNoPark reason
+                                | CycleCommitOutcome.CommitUnknown reason ->
+                                    commitUnknown <- true
 
-                    if not committed then
-                        return rawMessages
+                                    Diagnostic.emit
+                                        "enforcer-cycle-commit-unknown"
+                                        [ "session_id", key; "result", reason ]
+                        | None -> failClosedNoPark "missing CurrentRequest"
+
+                    if injectRepair then
+                        // Stay InFlight with CurrentRequest; inject minimal repair only.
+                        let repairMsg =
+                            createObj
+                                [ "info",
+                                  box (
+                                      createObj
+                                          [ "id", box (sprintf "enforcer-repair-%s" key)
+                                            "role", box "user" ]
+                                  )
+                                  "parts", box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
+
+                        return rawMessages @ [ repairMsg ]
+                    elif commitUnknown then
+                        // Fail closed: do not park, do not re-prompt, keep state for reconcile.
+                        return []
+                    elif not committed then
+                        return []
                     else
                         let resumeWithContext ctx =
                             match journal with

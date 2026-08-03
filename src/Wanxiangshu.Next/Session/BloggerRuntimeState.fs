@@ -14,10 +14,13 @@ type BloggerRuntimeState =
     | Parked
     | Disposed
 
-/// Host-owned cell: state + pending offer. CurrentRequest lives in InFlight payload.
+/// Host-owned cell: state + pending offer + one-repair budget.
+/// CurrentRequest lives in InFlight payload; RepairSpent is per logical request.
 type BloggerRuntimeCell =
     { State: BloggerRuntimeState
-      PendingOffer: BloggerRequestContext option }
+      PendingOffer: BloggerRequestContext option
+      /// FALLBACK-008 / item 15: at most one repair per logical request.
+      RepairSpent: bool }
 
 [<RequireQualifiedAccess>]
 module BloggerRuntime =
@@ -38,11 +41,13 @@ module BloggerRuntime =
 
     let empty: BloggerRuntimeCell =
         { State = BloggerRuntimeState.Idle
-          PendingOffer = None }
+          PendingOffer = None
+          RepairSpent = false }
 
     let ofState (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { State = state
-          PendingOffer = None }
+          PendingOffer = None
+          RepairSpent = false }
 
     /// Main-session material arrived. InFlight never writes PendingOffer (XTrace keeps it).
     /// Parked writes PendingOffer and stays Parked until the continuation takes it.
@@ -54,14 +59,16 @@ module BloggerRuntime =
         | BloggerRuntimeState.Idle ->
             Ok(
                 { State = BloggerRuntimeState.InFlight ctx
-                  PendingOffer = None },
+                  PendingOffer = None
+                  RepairSpent = false },
                 Decision.Start ctx
             )
         | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
         | BloggerRuntimeState.Parked ->
             Ok(
                 { State = BloggerRuntimeState.Parked
-                  PendingOffer = Some ctx },
+                  PendingOffer = Some ctx
+                  RepairSpent = false },
                 Decision.Offer ctx
             )
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
@@ -78,14 +85,16 @@ module BloggerRuntime =
         | BloggerRuntimeState.Parked ->
             Ok
                 { State = BloggerRuntimeState.InFlight ctx
-                  PendingOffer = None }
+                  PendingOffer = None
+                  RepairSpent = false }
 
     let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { State = BloggerRuntimeState.Parked
-                  PendingOffer = cell.PendingOffer }
+                  PendingOffer = cell.PendingOffer
+                  RepairSpent = false }
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NotInFlight
 
@@ -100,13 +109,15 @@ module BloggerRuntime =
             | Some ctx ->
                 Ok(
                     { State = BloggerRuntimeState.InFlight ctx
-                      PendingOffer = None },
+                      PendingOffer = None
+                      RepairSpent = false },
                     Decision.Start ctx
                 )
             | None ->
                 Ok(
                     { State = BloggerRuntimeState.Parked
-                      PendingOffer = None },
+                      PendingOffer = None
+                      RepairSpent = false },
                     Decision.Ignore
                 )
         | _ -> Error TransitionError.NotInFlight
@@ -117,12 +128,18 @@ module BloggerRuntime =
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { State = BloggerRuntimeState.Idle
-                  PendingOffer = None }
+                  PendingOffer = None
+                  RepairSpent = false }
         | _ -> Error TransitionError.NotInFlight
+
+    let markRepairSpent (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        { cell with
+            RepairSpent = true }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
-          PendingOffer = None }
+          PendingOffer = None
+          RepairSpent = false }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
         match cell.State with
@@ -145,7 +162,8 @@ module BloggerRuntime =
             Ok(
                 ctx,
                 { State = BloggerRuntimeState.Parked
-                  PendingOffer = cell.PendingOffer }
+                  PendingOffer = cell.PendingOffer
+                  RepairSpent = false }
             )
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NoContext
@@ -176,4 +194,5 @@ module BloggerRuntime =
         | BloggerRuntimeState.Parked ->
             Ok
                 { State = BloggerRuntimeState.InFlight ctx
-                  PendingOffer = None }
+                  PendingOffer = None
+                  RepairSpent = false }

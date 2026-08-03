@@ -249,7 +249,8 @@ module BloggerCoordinator =
 
                         let inflight =
                             { State = BloggerRuntimeState.InFlight startCtx
-                              PendingOffer = None }
+                              PendingOffer = None
+                              RepairSpent = false }
 
                         let! effect = startFrozen scope host journal key inflight startCtx
                         return Some effect

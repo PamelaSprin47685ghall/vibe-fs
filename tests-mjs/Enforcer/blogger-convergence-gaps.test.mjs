@@ -152,10 +152,11 @@ test('C0_park_only_after_KnownCommitted', () => {
   const host = prodText('src/Wanxiangshu.Next/Session/EnforcerHost.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
-  // Gate: invalid/failed paths must not fall through into ParkTransform.
-  // Production uses `if not committed then return` before park.
+  // Gate: invalid/failed/unknown paths must not fall through into ParkTransform.
+  // Production: KnownCommitted sets committed; other outcomes return [] before park.
   const gated =
-    /if not committed then[\s\S]{0,80}return rawMessages[\s\S]{0,1200}ParkTransform/.test(host)
+    /KnownCommitted/.test(host) &&
+    /if not committed then[\s\S]{0,120}return \[\][\s\S]{0,1600}ParkTransform/.test(host)
   assert.equal(
     gated,
     true,
