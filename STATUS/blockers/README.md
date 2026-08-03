@@ -1,5 +1,21 @@
 # Active Blockers
 
+## Blogger 垂直切片剩余缺口（2026-08，C0–C4 已合入）
+
+状态：活跃。主链 C0–C4 + frame loader/anti-regression 已合入（`1d0568e4` 及前序）。
+下列项阻止将 COMPANION-005/008、CTX-006/007/012、ENFORCER-010 升为 `CONFORMANT`。
+
+| 级别 | 缺口 | 评估 | 处置 |
+|------|------|------|------|
+| HIGH | durable request materialization 事实 | 发送前 context 仅在内存 CurrentRequest；crash 后无法从 Journal 恢复本次 coverage 意图 | C5：`BloggerRequestMaterialized` 或 Prompt claim 挂 ref |
+| HIGH | 五窗口 crash recovery | 依赖 durable context + Host snapshot reconcile | C5：A–E 窗口 |
+| MEDIUM | invalid cycle 一次 repair 生产接线 | 纯分派表有；tool-loop/interaction repair instruction 未发 | C4 剩余 |
+| MEDIUM | CommitUnknown reconcile | append 三态后按 ProviderRun 查 receipt；不得重问模型 | C4/C5 |
+| MEDIUM | layer-4 竞态/Squash/invalid canary | 第 1 层红测/门禁已绿；三轮 canary 未建 | C7 |
+| LOW | ObservedPrefixEpoch 请求时冻结 | commit 仍读当前 PrefixEpoch；慢请求可能挂到未来 epoch | C5 |
+| LOW | physical/synthetic provenance 在 Host obj 上保留 | builder 有 `IsPhysical`；转 Host obj 时未携带 | C6 |
+| LOW | Unified ProviderRun receipt（Entry\|Squash） | Entry 有 Enforcement 索引；Squash 幂等依赖 fold，未统一 receipt 类型 | C5 |
+
 ## Enforcer 接线 security_review 观察项（2026-08，f854c092 + 0255a6b4）
 
 状态：观察项，不阻塞。security_review（sa_..._8de306a069d9）对 SSOT/15 Enforcer 纵向
