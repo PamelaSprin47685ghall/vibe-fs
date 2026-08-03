@@ -62,5 +62,6 @@ test('ORCH_007_NeedsReview_preserves_the_active_worktree', async () => {
     details: 'review barrier was not confirmed',
   })
   assert.equal(removeCalls, 0)
-  assert.equal(appended.length, 1)
+  // PERSIST-009 order: WorktreeCreateRequested → WorktreeCreated → ManagerJobCreated.
+  assert.equal(appended.length, 3)
 })

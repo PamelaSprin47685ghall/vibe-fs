@@ -668,9 +668,17 @@ module EnforcerHost =
             with _ ->
                 None
 
-    /// ENFORCER-045/050/154: commit authority for the in-flight cycle.
-    /// Order: live InFlight payload → durable open materialization (heal InFlight).
-    /// Never overwrite a live InFlight RequestId with a different open request.
+    /// Live commit authority: InFlight payload only.
+    /// Completed-blog transform must NEVER heal InFlight from durable open —
+    /// Host msgs end on the historical last assistant (new outbound shell is
+    /// not in the list). Healing open here re-binds a new RequestId to an old
+    /// provider run (stale-cycle race). Crash recovery re-arms InFlight before
+    /// handleContinuation when the open request is still live.
+    let tryLiveCycleContext (scope: IParkedTransformHost) (bloggerSessionId: SessionId) : BloggerRequestContext option =
+        scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId)
+
+    /// Rebuild / empty-calls only: live InFlight, else reload open without
+    /// committing. Does not SetCurrentRequest (no side effect on authority).
     let resolveCycleContext
         (scope: IParkedTransformHost)
         (journal: AgentJournal)
@@ -696,16 +704,7 @@ module EnforcerHost =
                 | Some ctx ->
                     match scope.GetBloggerRuntime(key).State with
                     | BloggerRuntimeState.Disposed -> None
-                    | BloggerRuntimeState.InFlight live when
-                        BloggerRequestContext.requestId live <> BloggerRequestContext.requestId ctx
-                        ->
-                        // Live InFlight is authority; open belongs to another request.
-                        Some live
-                    | _ ->
-                        // Completed blog calls prove the physical cycle is live.
-                        // SetCurrentRequest alone re-arms InFlight (single authority).
-                        scope.SetCurrentRequest(key, ctx)
-                        Some ctx
+                    | _ -> Some ctx
 
     let private tryOpenByBlogger
         (journal: AgentJournal)
@@ -960,20 +959,20 @@ module EnforcerHost =
                         let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
                         return withRepairInstruction rawMessages requestKey
                     | Some _ -> return bestEffortEnd "protocol-repair-exhausted (ENFORCER-060)"
-            | Some durable, Some owner, Some(messageId, calls, _) when not (List.isEmpty calls) ->
-                // ENFORCER-044 step 2: this is a tool-loop continuation whose
-                // provider step produced completed blog calls — merge and
-                // commit one cycle, then park (ENFORCER-047).
+            | Some durable, Some owner, Some(messageId, calls, assistantCompleted) when not (List.isEmpty calls) ->
+                // ENFORCER-044: merge/commit only on a LIVE tool-loop continuation.
+                //
+                // Host prompt.ts: transform msgs do NOT include the newly created
+                // outbound assistant. lastAssistant is always the previous one.
+                // A previous cycle's assistant has time.completed set; the in-flight
+                // tool-loop assistant does not until the turn ends/cleanup.
+                // Treating a completed historical tail as "this cycle" is the race
+                // behind stale-cycle-after-abandon and cross-RequestId commit.
                 let mainSessionId = owner
                 let providerRun = ProviderRunIdentity.create messageId
-
-                // ENFORCER-154: the commit is idempotent — a resumed transform
-                // re-enters with the same raw messages (same provider run) and
-                // must NOT consume the staged offer again. The offer belongs to
-                // the NEXT cycle's coverage advance, not this one's.
                 let key = SessionId.value bloggerSessionId
-                // ENFORCER-045/154: live InFlight first; else durable open materialization.
-                let currentCtx = resolveCycleContext scope durable mainSessionId bloggerSessionId
+                // Peek only — never heal InFlight from open on this arm.
+                let liveCtx = tryLiveCycleContext scope bloggerSessionId
 
                 let snapshot = AgentJournal.snapshot durable
 
@@ -992,11 +991,11 @@ module EnforcerHost =
                     |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
                     |> Option.isSome
 
-                if alreadyEntry || alreadyReceipt then
-                    let resumeWithContext ctx =
-                        tryRebuildFromContext durable bloggerSessionId ctx
-                        |> Option.defaultValue rawMessages
+                let resumeWithContext ctx =
+                    tryRebuildFromContext durable bloggerSessionId ctx
+                    |> Option.defaultValue rawMessages
 
+                let takePendingOr (fallback: obj list) =
                     match scope.TryTakePendingOffer key with
                     | Some ctx ->
                         match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
@@ -1005,19 +1004,30 @@ module EnforcerHost =
                             scope.SetCurrentRequest(key, ctx)
                         | Error _ -> ()
 
-                        return resumeWithContext ctx
-                    | None -> return rawMessages
+                        resumeWithContext ctx
+                    | None -> fallback
+
+                if alreadyEntry || alreadyReceipt then
+                    // ENFORCER-154: same provider run already committed — offer only.
+                    return takePendingOr rawMessages
+                elif assistantCompleted then
+                    // Historical completed assistant still at tail of transform msgs.
+                    // Not this provider step. Zero cycle side effects.
+                    // Live InFlight (new request) → rebuild projection; else leave msgs.
+                    match liveCtx with
+                    | Some ctx -> return resumeWithContext ctx
+                    | None -> return takePendingOr rawMessages
                 else
+                    // Live tool-loop: assistant open, blog tools completed on THIS step.
                     let mutable committed = false
                     let mutable afterSquashMain: BloggerRequestContext option = None
                     let mutable commitUnknown = false
                     let mutable injectRepair = false
 
-                    // Expected protocol/business end: abandon + Idle, silent.
                     let bestEffortEnd (reason: string) =
                         Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
-                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId currentCtx reason
+                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
 
                         match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
                         | Ok cell -> scope.SetBloggerRuntime(key, cell)
@@ -1025,11 +1035,10 @@ module EnforcerHost =
 
                         scope.ClearCurrentRequest key
 
-                    // Unexpected invariant: print + kill process (tests gate kill off).
                     let unexpectedEnd (reason: string) =
                         Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
-                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId currentCtx reason
+                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
 
                         match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
                         | Ok cell -> scope.SetBloggerRuntime(key, cell)
@@ -1037,73 +1046,49 @@ module EnforcerHost =
 
                         scope.ClearCurrentRequest key
 
-                    match validateCycle messageId calls with
-                    | Error reason when
-                        isEmptyTextCycleFailure reason
-                        && not (scope.GetBloggerRuntime key).RepairSpent
-                        && not (hasIncompleteBlogTool rawMessages)
-                        ->
-                        // ENFORCER-061: one InteractionRepair for empty canonical text.
-                        let cell = scope.GetBloggerRuntime key
-                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
-                        injectRepair <- true
-                        // Expected provider variance — silent.
-                        Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
-                    | Error reason ->
-                        // Empty-text after one repair is expected protocol exhaustion.
-                        // Other validate failures (no provider run, duplicate ids, bounds)
-                        // are unexpected shape bugs → fatal.
-                        if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
-                            bestEffortEnd "protocol-repair-exhausted"
-                        else
-                            unexpectedEnd reason
-                    | Ok(merged, toolCallIds) ->
-                        match currentCtx with
-                        | Some(BloggerRequestContext.Squash squash) ->
-                            match
-                                commitSquash durable mainSessionId bloggerSessionId providerRun squash merged.MergedText
-                            with
-                            | CycleCommitOutcome.KnownCommitted ->
-                                committed <- true
-                                afterSquashMain <- None
-
-                                match BloggerRuntime.onSquashCommitted (scope.GetBloggerRuntime key) None with
-                                | Ok(cell, _) -> scope.SetBloggerRuntime(key, cell)
-                                | Error _ -> ()
-
-                                scope.ClearCurrentRequest key
-                            | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
-                            | CycleCommitOutcome.CommitUnknown reason ->
-                                // Journal durability unknown — not safe to continue.
-                                commitUnknown <- true
-                                Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
-                        | Some(BloggerRequestContext.Main main) ->
-                            let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
-
-                            if tomlDigest <> main.DeltaDigest then
-                                unexpectedEnd "delta digest mismatch"
-                            elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
-                                unexpectedEnd "coverage did not advance"
+                    match liveCtx with
+                    | None ->
+                        // Live tool-loop (assistant not completed) with completed blog
+                        // but no InFlight: crash recovery should have re-armed when open
+                        // exists; when open is also absent the plugin never owned this
+                        // step. Both are unexpected — fatal, not silent ignore.
+                        match tryOpenByBlogger durable mainSessionId bloggerSessionId with
+                        | Some _ -> unexpectedEnd "missing CurrentRequest"
+                        | None -> unexpectedEnd "live blog without cycle authority"
+                    | Some _ ->
+                        match validateCycle messageId calls with
+                        | Error reason when
+                            isEmptyTextCycleFailure reason
+                            && not (scope.GetBloggerRuntime key).RepairSpent
+                            && not (hasIncompleteBlogTool rawMessages)
+                            ->
+                            let cell = scope.GetBloggerRuntime key
+                            scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                            injectRepair <- true
+                            Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+                        | Error reason ->
+                            if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
+                                bestEffortEnd "protocol-repair-exhausted"
                             else
+                                unexpectedEnd reason
+                        | Ok(merged, toolCallIds) ->
+                            match liveCtx with
+                            | Some(BloggerRequestContext.Squash squash) ->
                                 match
-                                    commitCycle
+                                    commitSquash
                                         durable
                                         mainSessionId
                                         bloggerSessionId
                                         providerRun
-                                        toolCallIds
-                                        merged
-                                        (Some main)
+                                        squash
+                                        merged.MergedText
                                 with
                                 | CycleCommitOutcome.KnownCommitted ->
                                     committed <- true
-                                    // Do NOT call recordDerivedFallbackSuccess on mainSessionId.
-                                    // Blogger Entry success is not a Main Logical-Run success;
-                                    // clearing main's consecutive failure count breaks AABB
-                                    // (FALLBACK-011 / FALLBACK-012).
+                                    afterSquashMain <- None
 
-                                    match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
-                                    | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                                    match BloggerRuntime.onSquashCommitted (scope.GetBloggerRuntime key) None with
+                                    | Ok(cell, _) -> scope.SetBloggerRuntime(key, cell)
                                     | Error _ -> ()
 
                                     scope.ClearCurrentRequest key
@@ -1114,22 +1099,44 @@ module EnforcerHost =
                                     Diagnostic.fatal
                                         "enforcer-cycle-commit-unknown"
                                         [ "session_id", key; "result", reason ]
-                        | None ->
-                            // Host transform msgs end on the historical last assistant
-                            // (new outbound shell is NOT in msgs). After abandon/supersede
-                            // that tail still carries completed blog parts with no open
-                            // request — expected noise, not a cycle. Zero side effects.
-                            // Open still present but no InFlight is true out-of-sync → fatal.
-                            let openStill = tryOpenByBlogger durable mainSessionId bloggerSessionId
+                            | Some(BloggerRequestContext.Main main) ->
+                                let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
 
-                            match openStill with
-                            | None -> ()
-                            | Some _ -> unexpectedEnd "missing CurrentRequest"
+                                if tomlDigest <> main.DeltaDigest then
+                                    unexpectedEnd "delta digest mismatch"
+                                elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
+                                    unexpectedEnd "coverage did not advance"
+                                else
+                                    match
+                                        commitCycle
+                                            durable
+                                            mainSessionId
+                                            bloggerSessionId
+                                            providerRun
+                                            toolCallIds
+                                            merged
+                                            (Some main)
+                                    with
+                                    | CycleCommitOutcome.KnownCommitted ->
+                                        committed <- true
+
+                                        match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
+                                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                                        | Error _ -> ()
+
+                                        scope.ClearCurrentRequest key
+                                    | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
+                                    | CycleCommitOutcome.CommitUnknown reason ->
+                                        commitUnknown <- true
+
+                                        Diagnostic.fatal
+                                            "enforcer-cycle-commit-unknown"
+                                            [ "session_id", key; "result", reason ]
+                            | None -> unexpectedEnd "missing CurrentRequest"
 
                     if injectRepair then
-                        // Keep InFlight + CurrentRequest; do not Park; do not commit.
                         let requestKey =
-                            match currentCtx with
+                            match liveCtx with
                             | Some ctx -> BloggerRequestId.value (BloggerRequestContext.requestId ctx)
                             | None -> key
 
@@ -1137,23 +1144,10 @@ module EnforcerHost =
                     elif commitUnknown then
                         return rawMessages
                     elif not committed then
-                        // Idle / abandoned historical tail, or bestEffortEnd already ran:
-                        // rebuild from typed context when present; else leave Host msgs.
-                        match currentCtx with
-                        | Some ctx ->
-                            return
-                                tryRebuildFromContext durable bloggerSessionId ctx
-                                |> Option.defaultValue rawMessages
+                        match liveCtx with
+                        | Some ctx -> return resumeWithContext ctx
                         | None -> return rawMessages
                     else
-                        let resumeWithContext ctx =
-                            match journal with
-                            | Some durableJournal ->
-                                tryRebuildFromContext durableJournal bloggerSessionId ctx
-                                |> Option.defaultValue rawMessages
-                            | None -> rawMessages
-
-                        // Prefer PendingOffer (Main after park), else post-squash Main if any.
                         match scope.TryTakePendingOffer key, afterSquashMain with
                         | Some ctx, _
                         | None, Some ctx ->
@@ -1168,8 +1162,6 @@ module EnforcerHost =
                             let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
 
                             if not resumed then
-                                // C4/item 16: timeout/cancel must not release raw transcript.
-                                // Abandon open so journal and runtime stay co-lived.
                                 BloggerAbandon.openRequest
                                     durable
                                     mainSessionId

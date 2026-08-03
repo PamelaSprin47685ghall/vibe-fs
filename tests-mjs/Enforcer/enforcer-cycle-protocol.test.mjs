@@ -112,15 +112,38 @@ const assistantStep = (id, parts, { completed = true } = {}) =>
     },
   ])
 
-const completedBlog = (id, callId, input) =>
-  assistantStep(id, [
-    {
-      type: 'tool',
-      tool: 'blog',
-      callID: callId,
-      state: { status: 'completed', input },
-    },
-  ])
+/**
+ * Live tool-loop blog: tool status=completed but assistant.time.completed unset.
+ * Host only completes the assistant after the turn ends / cleanup.
+ */
+const liveBlog = (id, callId, input) =>
+  assistantStep(
+    id,
+    [
+      {
+        type: 'tool',
+        tool: 'blog',
+        callID: callId,
+        state: { status: 'completed', input },
+      },
+    ],
+    { completed: false },
+  )
+
+/** Historical tail after a finished cycle (assistant already completed). */
+const historicalBlog = (id, callId, input) =>
+  assistantStep(
+    id,
+    [
+      {
+        type: 'tool',
+        tool: 'blog',
+        callID: callId,
+        state: { status: 'completed', input },
+      },
+    ],
+    { completed: true },
+  )
 
 const pendingBlog = (id, callId) =>
   assistantStep(
@@ -167,7 +190,6 @@ const outboundShell = (id) => assistantStep(id, [], { completed: false })
  * (prompt.ts). Continuation after restart therefore sees the historical tail.
  */
 const historicalTail = (...steps) => {
-  // steps are already FSharp lists of one message; flatten to one list.
   const msgs = steps.flatMap((step) => listItems(step))
   return toList(msgs)
 }
@@ -199,16 +221,11 @@ test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
   assert.equal(ok.fields[0], 'work log')
 })
 
-// ── empty text cycle → real one-shot InteractionRepair ──────────────────────
+// ── empty text cycle → real one-shot InteractionRepair (live tool-loop) ─────
 
 test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
-    const out = await handleContinuation(
-      scope,
-      journal,
-      blog,
-      completedBlog('asst-1', 'c1', { text: '' }),
-    )
+    const out = await handleContinuation(scope, journal, blog, liveBlog('asst-1', 'c1', { text: '' }))
 
     assert.equal(hasRepairMessage(out), true, 'must inject RepairInstruction (not fake spent-only)')
     assert.equal(repairSpent(scope), true)
@@ -220,19 +237,32 @@ test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
 
 test('ENFORCER_061_second_empty_text_exhausts_repair_and_idles', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
-    await handleContinuation(scope, journal, blog, completedBlog('asst-1', 'c1', { text: '' }))
-    const out = await handleContinuation(
-      scope,
-      journal,
-      blog,
-      completedBlog('asst-2', 'c2', { text: '   ' }),
-    )
+    await handleContinuation(scope, journal, blog, liveBlog('asst-1', 'c1', { text: '' }))
+    const out = await handleContinuation(scope, journal, blog, liveBlog('asst-2', 'c2', { text: '   ' }))
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(repairSpent(scope), false, 'onFail resets spent only after final fail')
     assert.equal(fatals.length, 0, 'protocol exhaustion is expected best-effort')
+  })
+})
+
+test('ENFORCER_061_historical_empty_blog_tail_is_not_live_repair', async () => {
+  // Finished assistant (time.completed set) with empty blog is historical noise,
+  // not a live tool-loop. Must not mark RepairSpent / inject repair.
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    const out = await handleContinuation(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-hist', 'c-hist', { text: '' }),
+    )
+
+    assert.equal(hasRepairMessage(out), false)
+    assert.equal(repairSpent(scope), false)
+    assert.equal(runtimeTag(scope), 'InFlight', 'live request kept; historical tail ignored')
+    assert.equal(fatals.length, 0)
   })
 })
 
@@ -273,8 +303,6 @@ test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
 })
 
 test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () => {
-  // Host creates empty assistant before provider on every outbound transform,
-  // including resume-after-restart. That is not ENFORCER-060 pure-prose terminal.
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(scope, journal, blog, outboundShell('asst-outbound'))
 
@@ -291,16 +319,8 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
 })
 
 test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => {
-  // opencode SessionProcessor.cleanup: hanging tool → status=error + interrupted,
-  // assistant time.completed. Transform msgs still end on that historical tail
-  // (new outbound assistant is NOT in msgs). Must not ENFORCER-060.
   await withHarness(async ({ journal, scope, blog, fatals }) => {
-    const out = await handleContinuation(
-      scope,
-      journal,
-      blog,
-      interruptedBlog('asst-killed', 'blog-hang'),
-    )
+    const out = await handleContinuation(scope, journal, blog, interruptedBlog('asst-killed', 'blog-hang'))
 
     assert.equal(hasRepairMessage(out), false, 'interrupted blog ≠ missing blog call')
     assert.equal(fatals.length, 0, 'Host abort cleanup is expected — silent best-effort')
@@ -310,16 +330,12 @@ test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => 
 })
 
 test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async () => {
-  // Resume after kill: transform sees prior interrupted blog assistant as last.
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(
       scope,
       journal,
       blog,
-      historicalTail(
-        pureProse('asst-old-prose', 'earlier'),
-        interruptedBlog('asst-last', 'c-int'),
-      ),
+      historicalTail(pureProse('asst-old-prose', 'earlier'), interruptedBlog('asst-last', 'c-int')),
     )
 
     assert.equal(hasRepairMessage(out), false)
@@ -329,8 +345,6 @@ test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async
 })
 
 test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', async () => {
-  // Restart cleared tools/runtime; session transcript may still hold a completed
-  // prose assistant. No live/open request → do not invent InteractionRepair.
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(runtimeTag(scope), 'Idle')
@@ -344,37 +358,73 @@ test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', a
   })
 })
 
-// ── stale cycle after abandon (out-of-sync closed) ──────────────────────────
+// ── historical completed blog tail must never re-enter cycle logic ──────────
 
-test('ENFORCER_stale_cycle_after_abandon_is_noop', async () => {
+test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
-    // Spend repair then exhaust → Idle, no open.
-    await handleContinuation(scope, journal, blog, completedBlog('a1', 'c1', { text: '' }))
-    await handleContinuation(scope, journal, blog, completedBlog('a2', 'c2', { text: '' }))
+    await handleContinuation(scope, journal, blog, liveBlog('a1', 'c1', { text: '' }))
+    await handleContinuation(scope, journal, blog, liveBlog('a2', 'c2', { text: '' }))
     assert.equal(runtimeTag(scope), 'Idle')
 
-    // Host transform still ends on historical completed blog (outbound shell not in msgs).
-    // Must not re-enter fail/abandon/repair — pure ignore.
+    // Host transform msgs still end on a finished assistant with completed blog.
+    // Must not commit / abandon / repair / fatal.
     const out = await handleContinuation(
       scope,
       journal,
       blog,
-      completedBlog('a3', 'c3', { text: 'late work that arrived after abandon' }),
+      historicalBlog('a3', 'c3', { text: 'late work after abandon' }),
     )
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 0)
-    // Second pass identical — still no state churn.
-    await handleContinuation(
-      scope,
-      journal,
-      blog,
-      completedBlog('a3', 'c3', { text: 'late work that arrived after abandon' }),
-    )
+    await handleContinuation(scope, journal, blog, historicalBlog('a3', 'c3', { text: 'late work after abandon' }))
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(fatals.length, 0)
+  })
+})
+
+// ── unexpected = fatal (console.error; kill gated under node:test) ──────────
+
+test('ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', async () => {
+  // Live tool-loop blog (assistant not completed) with no InFlight and no open
+  // materialization means the plugin never owned this step — programmer gap.
+  await withHarness(async ({ journal, scope, blog, fatals, lastFatal }) => {
+    parkedTransform.clearCurrentRequest(scope, BLOG)
+    assert.equal(runtimeTag(scope), 'Idle')
+
+    await handleContinuation(scope, journal, blog, liveBlog('asst-orphan-live', 'c-orphan', { text: 'work' }))
+
+    assert.equal(fatals.length, 1, 'unexpected live blog without authority must fatal')
+    assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
+    assert.match(lastFatal()?.result ?? '', /no live cycle authority|missing CurrentRequest|without/)
+  })
+})
+
+test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals, lastFatal, ctx }) => {
+    // Corrupt InFlight delta digest so commit path hits unexpectedEnd.
+    const bad = bloggerRequestContext.main({
+      requestId: 'req-bad-digest',
+      mainSession: MAIN,
+      bloggerSession: BLOG,
+      toml: 'work',
+      previousIngested: 0,
+      nextIngested: 1,
+      previousCutoff: 0,
+      nextCutoff: 1,
+      nextDigest: 'd1',
+      deltaDigest: 'sha-NOT-matching-toml',
+    })
+    parkedTransform.setCurrentRequest(scope, BLOG, bad)
+
+    await handleContinuation(scope, journal, blog, liveBlog('asst-bad', 'c-bad', { text: 'entry' }))
+
+    assert.equal(fatals.length, 1)
+    assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
+    assert.equal(lastFatal()?.result, 'delta digest mismatch')
+    assert.equal(runtimeTag(scope), 'Idle')
   })
 })
 

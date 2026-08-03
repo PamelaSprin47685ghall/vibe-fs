@@ -90,14 +90,22 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   )
 })
 
-test('C0_commit_resolves_context_from_inflight_or_durable_open', () => {
+test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
+  // Host transform msgs end on the historical last assistant (new outbound shell
+  // is not in the list). Commit must peek InFlight only — healing open here
+  // rebinds a new RequestId onto an old provider run (stale-cycle race).
+  // Durable open reload stays for rebuild / crash recovery, not cycle commit.
   const host = prodText('src/Wanxiangshu.Next/Session/EnforcerHost.fs')
-  assert.match(host, /resolveCycleContext/, 'commit must resolve cycle context via one helper')
+  assert.match(host, /tryLiveCycleContext/, 'commit authority is live InFlight peek')
+  assert.match(host, /let liveCtx = tryLiveCycleContext/, 'completed-blog arm peeks live only')
+  assert.match(host, /resolveCycleContext/, 'rebuild/empty-calls still resolve typed context')
   assert.match(host, /tryReloadRequestContext/, 'durable open materialization must reload full typed context')
-  assert.match(
-    host,
-    /let currentCtx = resolveCycleContext/,
-    'handleContinuation must not only TryPeekCurrentRequest without durable fallback',
+  assert.equal(
+    /SetCurrentRequest\(key, ctx\)[\s\S]{0,80}Some ctx[\s\S]{0,40}resolveCycleContext|resolveCycleContext[\s\S]{0,200}SetCurrentRequest\(key, ctx\)/.test(
+      host,
+    ),
+    false,
+    'resolveCycleContext must not heal InFlight via SetCurrentRequest',
   )
   assert.equal(
     /PreviousCoverableTurnCutoffExclusive = 0\s*\n\s*NextCoverableTurnCutoffExclusive = 0/.test(
