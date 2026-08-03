@@ -316,11 +316,21 @@ export class StrictMockProvider {
     this._scenario.consume(parsed, selection, context);
     this._state.requests.push(requestRecordOf(parsed, context));
 
-    // A refused delivery wakes nothing. `never-end` is different: its content arrives
-    // below, but the SSE transport deliberately withholds its terminal marker.
+    // A refused delivery still matched an entry: wake afterExpectation / matchCount so
+    // crash-window canaries (X-A) can kill on the faulted attempt. Content waiters that
+    // need a real response must wait on a non-faulted edge (fallback waits on continue).
+    // `never-end` is different: its content arrives below, but the SSE transport
+    // deliberately withholds its terminal marker.
     const neverEnds = selection.fault?.kind === 'never-end';
     if (selection.fault !== undefined && !neverEnds) {
       const fault = selection.fault;
+      const faulted = selection.entry;
+      if (faulted) {
+        for (const id of new Set([faulted.id, faulted.turnId])) {
+          this._signals.consume({ id, permanent: true });
+          this._runAfterExpectation(id);
+        }
+      }
       if (fault.kind === 'disconnect') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
         return res.destroy();

@@ -94,9 +94,11 @@ export class ScenarioRuntime {
   clearSeals() {
     this.seals.clear();
     // A restart rebuilds the request view from the journal: every previous seal is
-    // incomparable. The new process starts unsealed, and a declaration that never
-    // fires on the new timeline must still be reported.
-    this.firedBoundaries.clear();
+    // incomparable, so the next request is a fresh baseline. Deliveries and
+    // `firedBoundaries` survive: a `prefix-probe` that already admitted a break
+    // before the kill is still a fired declaration (CTX-010 / X-B–X-D), and
+    // `unfiredBoundaries` must not forget it. A boundary that never fired on
+    // either timeline remains unfired and is still reported at scenario end.
   }
 
   /**
