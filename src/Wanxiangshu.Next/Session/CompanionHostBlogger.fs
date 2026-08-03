@@ -125,6 +125,36 @@ module internal CompanionHostBlogger =
                 return outcome
         }
 
+    /// CTX-012: squash prompt = Working Record frames + squash instruction,
+    /// built by the same projection builder as normal (no raw transcript).
+    let private squashPrompt (deps: BloggerDeps) (frameCount: int) : string =
+        let blog = deps.Companion.Memory.Blog
+
+        let frameBodies =
+            blog.Frames
+            |> List.truncate frameCount
+            |> List.choose (fun frame ->
+                match deps.Durable with
+                | Some port ->
+                    match port.Load deps.PrimaryId with
+                    | Ok(Some memory) ->
+                        memory.Blog.Frames
+                        |> List.tryFind (fun f -> f.Digest = frame.Digest)
+                        |> Option.bind (fun f ->
+                            match deps.Journal with
+                            | Some journal ->
+                                match journal.Writer.BlobWriter.Read f.TextRef with
+                                | Ok text -> Some text
+                                | Error _ -> None
+                            | None -> None)
+                    | _ -> None
+                | None -> None)
+
+        let wrapped =
+            frameBodies |> List.map (fun body -> CompanionPrompt.workingRecordMessage body)
+
+        String.concat "\n\n" (wrapped @ [ CompanionPrompt.SquashInstruction ])
+
     /// CTX-006 / CTX-007 / CTX-012: one recovery-slot squash on the Y chain.
     ///
     /// The decision lives in `RecoverySlot.onSquashOutcome`; this function executes
@@ -135,7 +165,8 @@ module internal CompanionHostBlogger =
     let squash (deps: BloggerDeps) (frameCount: int) : Task<Result<BlogProjectionState, string>> =
         task {
             let! childId = deps.EnsureBlogger()
-            let! terminal = sendSquashAttempt deps childId CompanionPrompt.SquashInstruction frameCount
+            let prompt = squashPrompt deps frameCount
+            let! terminal = sendSquashAttempt deps childId prompt frameCount
             let outcome, detail = squashOutcomeOf terminal
 
             match RecoverySlot.onSquashOutcome outcome with
