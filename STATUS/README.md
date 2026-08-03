@@ -3,13 +3,14 @@
 ## 当前基线
 
 - 分支：`master`
-- 发布目标：`0.5.1`（Blogger 垂直切片 C0–C7）
-- 最后验证：`test:release` 全绿（gate:static → build → unit → harness → P0×3）
-- 证据：`docs/evidence/0.5.1/`（canary 18×3、tarball sha256）
+- 已发布：`0.5.1` / tag `v0.5.1`（tip `4bf06ba0`）
+- 最后验证：`test:release` 全绿（gate:static → build → unit → harness → P0×3，canary 18×3）
+- 证据：`docs/evidence/0.5.1/`
+- 分发包：`build/wanxiangshu-0.5.1.tgz`（private；sha256 见 evidence）
 
 ## 当前产品状态
 
-0.5.0 已发布。0.5.1 闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
+0.5.0 已发布。0.5.1 已发布（tag `v0.5.1`）：闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
 唯一 coordinator、typed materialize、blog-tool Squash、KnownCommitted 才 Park、
 crash-window 不 stomp live CurrentRequest。canary 证据见 `host-transform-capability`
 与 `companion-canary`；发布证据目录 `docs/evidence/0.5.1/`。
