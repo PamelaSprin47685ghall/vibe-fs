@@ -102,8 +102,10 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.ArmRecoverySlot() : unit =
         lock lockObj (fun () -> slotArmed <- true)
 
-    member private _.DisarmRecoverySlot() : unit =
+    member _.DisarmRecoverySlot() : unit =
         lock lockObj (fun () -> slotArmed <- false)
+
+    member _.IsRecoveryArmed: bool = lock lockObj (fun () -> slotArmed)
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory
@@ -124,7 +126,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         (
             currentProjection: ProviderSemanticProjection,
             blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<Result<PromptKey, string>>,
-            ?squashFn: int -> Task<Result<BlogProjectionState, string>>,
             ?cursorOffset: unit -> byte
         ) : CompanionOutcome =
         lock lockObj (fun () ->

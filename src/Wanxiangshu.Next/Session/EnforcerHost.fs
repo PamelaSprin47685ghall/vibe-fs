@@ -292,6 +292,62 @@ module EnforcerHost =
                         | Error failure -> Error(JournalAppendFailure.describe failure)
                         | Ok _ -> Ok record
 
+    /// CTX-012: single production constructor path for BlogSquashCommitted from tool loop.
+    let private commitSquash
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (squash: BloggerSquashRequestContext)
+        (squashText: string)
+        : Result<unit, string> =
+        let projections = AgentJournal.snapshot journal
+
+        match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
+        | None -> Error "BlogSquashCommitted requires an existing work session projection"
+        | Some session ->
+            match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
+            | Some linked when linked = bloggerSessionId ->
+                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+                let k = squash.CoveredFrameCount
+
+                if k < 1 || k > List.length blog.Frames then
+                    Error(sprintf "BlogSquashCommitted covers %d frames but %d exist" k (List.length blog.Frames))
+                elif blog.FrameEpochId <> squash.FrameEpochId then
+                    Error "BlogSquashCommitted frame epoch mismatch"
+                else
+                    let selected = List.truncate k blog.Frames
+                    let digests = selected |> List.map (fun f -> f.Digest)
+
+                    if digests <> squash.FrameDigests then
+                        Error "BlogSquashCommitted frame digests mismatch"
+                    else
+                        match journal.WriteBlob squashText with
+                        | Error error -> Error error
+                        | Ok blob ->
+                            let fact =
+                                AgentFact.BlogSquashCommitted
+                                    {| SessionId = mainSessionId
+                                       BloggerSessionId = bloggerSessionId
+                                       PreviousFrameEpochId = blog.FrameEpochId
+                                       NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
+                                       CoveredFrameCount = k
+                                       TextRef = blob.BlobRef
+                                       TextDigest = blob.BlobDigest
+                                       ProviderRun = providerRun |}
+
+                            match
+                                AgentJournal.appendAgent
+                                    (StreamId.Session mainSessionId)
+                                    (Some providerRun)
+                                    fact
+                                    journal
+                            with
+                            | Error failure -> Error(JournalAppendFailure.describe failure)
+                            | Ok _ -> Ok()
+            | Some _ -> Error "Squash completion belongs to a different Blogger session"
+            | None -> Error "BlogSquashCommitted requires a durably linked Blogger session"
+
     /// ENFORCER-051: rebuild the full provider view from durable frames + context.
     ///
     /// Replaces `rawMessages @ [syntheticDelta]`. The raw transcript is NOT the
@@ -448,7 +504,10 @@ module EnforcerHost =
                 // re-enters with the same raw messages (same provider run) and
                 // must NOT consume the staged offer again. The offer belongs to
                 // the NEXT cycle's coverage advance, not this one's.
-                let alreadyCommitted =
+                let key = SessionId.value bloggerSessionId
+                let currentCtx = scope.TryPeekCurrentRequest key
+
+                let alreadyEntry =
                     (AgentJournal.snapshot durable).AgentProjections.Sessions
                     |> Map.tryFind mainSessionId
                     |> Option.bind (fun session -> session.Enforcement)
@@ -456,11 +515,7 @@ module EnforcerHost =
                     |> Option.flatten
                     |> Option.isSome
 
-                let key = SessionId.value bloggerSessionId
-
-                if alreadyCommitted then
-                    // Resumed continuation: cycle already committed. Consume
-                    // PendingOffer only (never CurrentRequest of a future cycle).
+                if alreadyEntry then
                     let resumeWithContext ctx =
                         rebuildFromContext durable bloggerSessionId ctx
 
@@ -475,18 +530,8 @@ module EnforcerHost =
                         return resumeWithContext ctx
                     | None -> return rawMessages
                 else
-                    // ENFORCER-045: CurrentRequest is the InFlight authority.
-                    // Peek (do not clear) until KnownCommitted.
-                    let currentCtx = scope.TryPeekCurrentRequest key
-
-                    let declaredCoverage =
-                        currentCtx
-                        |> Option.bind (fun ctx ->
-                            match ctx with
-                            | BloggerRequestContext.Main main -> Some main
-                            | BloggerRequestContext.Squash _ -> None)
-
                     let mutable committed = false
+                    let mutable afterSquashMain: BloggerRequestContext option = None
 
                     match validateCycle messageId calls with
                     | Error reason ->
@@ -494,31 +539,52 @@ module EnforcerHost =
                             "enforcer-cycle-invalid"
                             [ "session_id", key; "result", reason ]
                     | Ok(merged, toolCallIds) ->
-                        match
-                            commitCycle
-                                durable
-                                mainSessionId
-                                bloggerSessionId
-                                providerRun
-                                toolCallIds
-                                merged
-                                declaredCoverage
-                        with
-                        | Ok _ ->
-                            committed <- true
+                        match currentCtx with
+                        | Some(BloggerRequestContext.Squash squash) ->
+                            // CTX-012 / C3: squash commits via the same blog tool loop.
+                            // Coverage must not advance. Single writer = BlogSquashCommitted.
+                            match commitSquash durable mainSessionId bloggerSessionId providerRun squash merged.MergedText with
+                            | Ok _ ->
+                                committed <- true
+                                afterSquashMain <- None
 
-                            match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
-                            | Ok cell -> scope.SetBloggerRuntime(key, cell)
-                            | Error _ -> ()
+                                match BloggerRuntime.onSquashCommitted (scope.GetBloggerRuntime key) None with
+                                | Ok(cell, _) -> scope.SetBloggerRuntime(key, cell)
+                                | Error _ -> ()
 
-                            scope.ClearCurrentRequest key
-                        | Error reason ->
+                                scope.ClearCurrentRequest key
+                            | Error reason ->
+                                Diagnostic.emit
+                                    "enforcer-squash-commit-failed"
+                                    [ "session_id", key; "result", reason ]
+                        | Some(BloggerRequestContext.Main main) ->
+                            match
+                                commitCycle
+                                    durable
+                                    mainSessionId
+                                    bloggerSessionId
+                                    providerRun
+                                    toolCallIds
+                                    merged
+                                    (Some main)
+                            with
+                            | Ok _ ->
+                                committed <- true
+
+                                match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
+                                | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                                | Error _ -> ()
+
+                                scope.ClearCurrentRequest key
+                            | Error reason ->
+                                Diagnostic.emit
+                                    "enforcer-cycle-commit-failed"
+                                    [ "session_id", key; "result", reason ]
+                        | None ->
                             Diagnostic.emit
                                 "enforcer-cycle-commit-failed"
-                                [ "session_id", key; "result", reason ]
+                                [ "session_id", key; "result", "missing CurrentRequest" ]
 
-                    // Only KnownCommitted may park. Invalid/failed cycles stay
-                    // fail-closed without parking (C4 will add repair).
                     if not committed then
                         return rawMessages
                     else
@@ -527,8 +593,10 @@ module EnforcerHost =
                             | Some durable -> rebuildFromContext durable bloggerSessionId ctx
                             | None -> rawMessages
 
-                        match scope.TryTakePendingOffer key with
-                        | Some ctx ->
+                        // Prefer PendingOffer (Main after park), else post-squash Main if any.
+                        match scope.TryTakePendingOffer key, afterSquashMain with
+                        | Some ctx, _
+                        | None, Some ctx ->
                             match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
                             | Ok cell ->
                                 scope.SetBloggerRuntime(key, cell)
@@ -536,7 +604,7 @@ module EnforcerHost =
                             | Error _ -> ()
 
                             return resumeWithContext ctx
-                        | None ->
+                        | None, None ->
                             let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
 
                             if not resumed then

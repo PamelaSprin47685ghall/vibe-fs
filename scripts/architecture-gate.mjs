@@ -196,12 +196,13 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'BlogSquashCommitted',
     allowed: [
+      'Session/EnforcerHost.fs',
       'Session/CompanionJournalPort.fs',
       'Journal/BlogProjection.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
     ],
-    reason: 'only AppendSquash may build BlogSquashCommitted (CTX-012); tool-loop migration must keep one writer',
+    reason: 'BlogSquashCommitted sole constructors: EnforcerHost.commitSquash (tool loop) and CompanionJournalPort.AppendSquash (legacy port); fold/codec only',
   },
 ]
 

@@ -125,23 +125,22 @@ type CompanionHost
     /// Ensure the Blogger child exists (create or restore). Key for runtime cell.
     member this.EnsureBloggerAsync() : Task<SessionId> = ensureBlogger ()
 
-    /// C1: physical Main send from a frozen typed context. Called only by
-    /// BloggerCoordinator after CurrentRequest is registered and state is InFlight.
+    /// Physical send from frozen typed context (Main or Squash). Coordinator only.
     member this.StartMainFromContext(ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
-        CompanionHostBlogger.startMainFromContext this.BloggerDeps ctx
+        CompanionHostBlogger.startFromContext this.BloggerDeps ctx
+
+    member this.StartFromContext(ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
+        CompanionHostBlogger.startFromContext this.BloggerDeps ctx
 
     /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
-    ///
-    /// Called by the composition root from the reconcile path when the Y session's
-    /// turn failed — the Y half of `PluginRuntimeScope.ArmRecovery`. The Companion
-    /// owns the flag; this member only forwards through the gate.
     member this.ArmRecoverySlot() = companion.ArmRecoverySlot()
 
-    /// CTX-006: the primary session's current fallback cursor Offset.
-    ///
-    /// Read from the durable projection at decision time rather than cached, so a
-    /// cursor advanced by the X chain or a squash failure is never stale.
-    member private this.BloggerCursorOffset() : byte =
+    member this.IsRecoveryArmed: bool = companion.IsRecoveryArmed
+
+    member this.DisarmRecoverySlot() = companion.DisarmRecoverySlot()
+
+    /// CTX-006: primary session fallback cursor Offset (durable, not cached).
+    member this.BloggerCursorOffset() : byte =
         match journal with
         | Some j ->
             match DurableFallback.tryCurrentState primaryId (AgentJournal.snapshot j) with
@@ -149,15 +148,13 @@ type CompanionHost
             | None -> 0uy
         | None -> 0uy
 
-    /// Legacy SubmitProjection — production main material uses BloggerCoordinator.
-    /// Kept for unit tests that drive Companion without a PluginRuntimeScope.
+    /// Legacy SubmitProjection — production uses BloggerCoordinator.
     member this.SubmitProjection(projection: ProviderSemanticProjection) : CompanionOutcome =
         let deps = this.BloggerDeps
 
         companion.Submit(
             projection,
             (fun current chunk -> CompanionHostBlogger.blog deps current chunk),
-            (fun frameCount -> CompanionHostBlogger.squash deps frameCount),
             this.BloggerCursorOffset
         )
 
