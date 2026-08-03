@@ -79,8 +79,7 @@ module Diagnostic =
         )
 
     /// Expected / best-effort. Validates CTX-014 whitelist; never prints.
-    let emit (operation: string) (fields: (string * string) list) : unit =
-        validate fields
+    let emit (operation: string) (fields: (string * string) list) : unit = validate fields
 
     /// Unexpected invariant break. Print one JSON line, then kill the process.
     let fatal (operation: string) (fields: (string * string) list) : unit =

@@ -346,14 +346,15 @@ test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', a
 
 // ── stale cycle after abandon (out-of-sync closed) ──────────────────────────
 
-test('ENFORCER_stale_cycle_after_abandon_is_silent_best_effort', async () => {
+test('ENFORCER_stale_cycle_after_abandon_is_noop', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     // Spend repair then exhaust → Idle, no open.
     await handleContinuation(scope, journal, blog, completedBlog('a1', 'c1', { text: '' }))
     await handleContinuation(scope, journal, blog, completedBlog('a2', 'c2', { text: '' }))
     assert.equal(runtimeTag(scope), 'Idle')
 
-    // Old provider step still delivers a completed blog with valid text.
+    // Host transform still ends on historical completed blog (outbound shell not in msgs).
+    // Must not re-enter fail/abandon/repair — pure ignore.
     const out = await handleContinuation(
       scope,
       journal,
@@ -363,7 +364,17 @@ test('ENFORCER_stale_cycle_after_abandon_is_silent_best_effort', async () => {
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
-    assert.equal(fatals.length, 0, 'stale after abandon is expected race — silent')
+    assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
+    assert.equal(fatals.length, 0)
+    // Second pass identical — still no state churn.
+    await handleContinuation(
+      scope,
+      journal,
+      blog,
+      completedBlog('a3', 'c3', { text: 'late work that arrived after abandon' }),
+    )
+    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(fatals.length, 0)
   })
 })
 

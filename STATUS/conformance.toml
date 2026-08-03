@@ -2320,7 +2320,7 @@ tests = [
   "tests-mjs/Journal/envelope.test.mjs",
 ]
 canaries = [
-  "orchestrator-restart-publish",
+  "testkit/opencode/tests/orchestrator-restart-publish-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/PERSIST-009-EFFECTS.txt"
 

@@ -83,8 +83,12 @@ type ManagerJobProjection =
 /// physical evidence of an external side effect's claim window.
 [<RequireQualifiedAccess>]
 type WorktreeEffectStatus =
-    | Requested of {| ManagerJobId: ManagerJobId; WorktreePath: WorktreePath |}
-    | Created of {| ManagerJobId: ManagerJobId; WorktreePath: WorktreePath |}
+    | Requested of
+        {| ManagerJobId: ManagerJobId
+           WorktreePath: WorktreePath |}
+    | Created of
+        {| ManagerJobId: ManagerJobId
+           WorktreePath: WorktreePath |}
 
 /// PERSIST-008: keyed lookup, no history scan. Terminal jobs stay in the map so
 /// re-folding a Published fact is recognised as a duplicate rather than

@@ -1110,16 +1110,20 @@ module EnforcerHost =
                                 | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
                                 | CycleCommitOutcome.CommitUnknown reason ->
                                     commitUnknown <- true
+
                                     Diagnostic.fatal
                                         "enforcer-cycle-commit-unknown"
                                         [ "session_id", key; "result", reason ]
                         | None ->
-                            // Stale tool after abandon/supersede is expected race → silent.
-                            // Open still present but no context is true out-of-sync → fatal.
+                            // Host transform msgs end on the historical last assistant
+                            // (new outbound shell is NOT in msgs). After abandon/supersede
+                            // that tail still carries completed blog parts with no open
+                            // request — expected noise, not a cycle. Zero side effects.
+                            // Open still present but no InFlight is true out-of-sync → fatal.
                             let openStill = tryOpenByBlogger durable mainSessionId bloggerSessionId
 
                             match openStill with
-                            | None -> bestEffortEnd "stale-cycle-after-abandon"
+                            | None -> ()
                             | Some _ -> unexpectedEnd "missing CurrentRequest"
 
                     if injectRepair then
@@ -1133,7 +1137,14 @@ module EnforcerHost =
                     elif commitUnknown then
                         return rawMessages
                     elif not committed then
-                        return rawMessages
+                        // Idle / abandoned historical tail, or bestEffortEnd already ran:
+                        // rebuild from typed context when present; else leave Host msgs.
+                        match currentCtx with
+                        | Some ctx ->
+                            return
+                                tryRebuildFromContext durable bloggerSessionId ctx
+                                |> Option.defaultValue rawMessages
+                        | None -> return rawMessages
                     else
                         let resumeWithContext ctx =
                             match journal with
