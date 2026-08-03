@@ -3329,15 +3329,17 @@ id = "LOOP-001"
 title = "问题与非目标"
 ssot = "SSOT/17.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 0
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
   "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Domain/loop-sensor.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -3346,15 +3348,18 @@ id = "LOOP-002"
 title = "传感器边界（ARCH-002 的唯一定点例外）"
 ssot = "SSOT/17.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 0
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
   "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests-mjs/Domain/loop-sensor.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -3365,7 +3370,7 @@ ssot = "SSOT/17.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 2
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
@@ -3384,7 +3389,7 @@ ssot = "SSOT/17.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 2
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
@@ -3403,7 +3408,7 @@ ssot = "SSOT/17.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 2
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
@@ -3422,7 +3427,7 @@ ssot = "SSOT/17.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 2
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
@@ -3439,15 +3444,18 @@ id = "LOOP-007"
 title = "作用域与豁免"
 ssot = "SSOT/17.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 0
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
   "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests-mjs/Domain/loop-sensor.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -3456,15 +3464,17 @@ id = "LOOP-008"
 title = "与既有恢复协议的关系"
 ssot = "SSOT/17.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 0
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
   "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Domain/loop-sensor.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -3475,7 +3485,7 @@ ssot = "SSOT/17.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 2
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
@@ -3492,15 +3502,17 @@ id = "LOOP-010"
 title = "诊断"
 ssot = "SSOT/17.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 0
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
   "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Context/ctx014.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -3511,7 +3523,7 @@ ssot = "SSOT/17.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 2
-verified_commit = "892bbcd7"
+verified_commit = "d6ef20a6"
 owner = [
   "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",

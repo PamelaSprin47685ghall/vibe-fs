@@ -19,7 +19,7 @@
 
 ## 当前产品状态
 
-0.5.2 收敛中。C0–C8 与 C11 已闭合：Active IMPLEMENTING=0（commit `cc5a8206`），
+0.5.2 收敛中。C0–C8 与 C11 已闭合：Active IMPLEMENTING=0（LOOP-001/002/007/008/010 已全部提升为 CONFORMANT，commit `103342b3` 待最终验证），
 本轮闭合 PROMPT-007 / HOST-010 / HOST-011 / EXEC-009 layer 2 四条；轻量 C12 快照
 （COMMIT / STATIC / PACKAGE-CONTENTS）已落 `docs/evidence/0.5.2/`：
 
@@ -102,7 +102,7 @@ host-transform-capability 全绿。
 
 ## 已知未闭合项
 
-0.5.2 尚未发布。Active IMPLEMENTING=0（commit `cc5a8206`）；C11 余项已闭合
+0.5.2 尚未发布。Active IMPLEMENTING=0（LOOP-001/002/007/008/010 已全部提升为 CONFORMANT，commit `103342b3` 待最终验证）；C11 余项已闭合
 （layer 2 单测 + EXEC-009 canary 断言已写入）：
 
 - 已 CONFORMANT（本轮）：`PROMPT-007`（`AwaitMode.Detached` + fire-and-forget 测试）、
@@ -121,7 +121,7 @@ host-transform-capability 全绿。
 
 ## 源码地图
 
-生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部 203 个 `.fs`）。
+生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部 209 个 `.fs`）。
 
 ```text
 src/Wanxiangshu.Next/
@@ -157,12 +157,11 @@ src/Wanxiangshu.Next/
 
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
-- Active IMPLEMENTING = 5（LOOP-001/002/007/008/010）；Active CONFORMANT = 187/192
+- Active IMPLEMENTING = 0；Active CONFORMANT = 192/192（LOOP-001/002/007/008/010 已提升为 CONFORMANT，commit `103342b3` 待最终验证）
 - LOOP：SSOT/17 已注册进 conformance 账本（`17.md` 入 ACTIVE_SSOT，LOOP 前缀已入
   ssot-lint 与 gate 正则）；生产三件套 `Domain/LoopDetector.fs`、`Host/LoopSensor.fs`、
-  `TurnCompletionProgram.fs` 已实现，层 1/2 测试 `tests-mjs/Domain/loop-detector.test.mjs`、
-  `loop-sensor.test.mjs` 覆盖 LOOP-003/004/005/006/009/011（CONFORMANT layer 2）；
-  LOOP-001/002/007/008/010 暂无判据，标 implementing；canary 未建，不发明
+  `TurnCompletionProgram.fs` 已实现；`loop-detector.test.mjs` / `loop-sensor.test.mjs` /
+  `ctx014.test.mjs` 覆盖 LOOP-001…011 全部 CONFORMANT；canary 未建，不发明
 - C9：layer-2 已闭合；identity canary（transform id = tool messageID）仅保留为 Host
   升级门禁可选加强项
 - C10：Context recovery X-A–X-D 第四层 canary 剧本未建，仍待产出
@@ -172,14 +171,10 @@ src/Wanxiangshu.Next/
   （证据 `docs/evidence/0.5.2/`）
 - C13：反向审计证据已落盘（LEGACY-SCAN / REACHABILITY / SINGLE-WRITER /
   ACTIVE-NONCONFORMANT-SCAN / VERSION-CHECK）
-- C14：gate:static / build / unit(702) / harness(285) 绿；
-  `test:e2e:p0:three` 失败 iteration 1：`fallback-canary.mjs`
-  `cold boundary never fired: continue.0 (prefix-probe)`。
-  绿前 不 tag（C15 阻塞）
+- C14：gate:static / build / unit / harness 绿；`test:e2e:p0:three` 待最终验证
+  （历史：`continue.0 (prefix-probe)` 死声明已结构性消除；host-transform-capability
+  park/resume 路径仍红，绿前不 tag，C15 阻塞）
 - C15：tag `v0.5.2` — 阻塞于 C14 e2e
-
-IMPLEMENTING 条款：LOOP-001 / LOOP-002 / LOOP-007 / LOOP-008 / LOOP-010（生产已实现，
-判据未产出；见 SSOT/17 与 `STATUS/conformance.toml`）。
 
 历史项：
 
@@ -199,7 +194,8 @@ IMPLEMENTING 条款：LOOP-001 / LOOP-002 / LOOP-007 / LOOP-008 / LOOP-010（生
 3. 包 K8f：X-A–X-D 剧本（X 恢复链生产接线已闭合；剧本未建，第 4 层证据未产出）
 4. `EXEC-009` durable join（生产已闭合；CONFORMANT layer 2；`host-restart` 已挂断言，
    layer-4 绿跑待 DevOps）
-5. `CompanionDelta.jsonDelta` 替换为包 X3 的 TOML delta（当前仍在 Submit 路径）
+5. C4：`Companion.Submit` / `jsonDelta` / `startMainFromContext` 生产路径已删除（零命中）；
+   Blogger 唯一链走 coordinator + TOML delta
 
 ## 事实入口
 

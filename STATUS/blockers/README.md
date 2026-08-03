@@ -1,4 +1,4 @@
-# Active Blockers
+# 活跃 Blocker 账本（当前为空）
 
 0.5.2 收敛进行中，当前无活跃 blocker。
 
