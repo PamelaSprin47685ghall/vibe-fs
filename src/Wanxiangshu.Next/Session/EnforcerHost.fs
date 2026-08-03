@@ -755,6 +755,42 @@ module EnforcerHost =
                    | Some "running" -> true
                    | _ -> false)
 
+    /// Any blog tool part on the last assistant (completed/error/pending/running).
+    /// Host cleanup after abort marks hanging tools status=error + interrupted=true
+    /// and sets assistant time.completed — that is NOT ENFORCER-060 pure prose.
+    let private hasAnyBlogToolPart (rawMessages: obj list) : bool =
+        match lastAssistantStep rawMessages with
+        | None -> false
+        | Some(_, parts, _) -> parts |> List.exists isBlogToolPart
+
+    let private blogPartInterrupted (part: obj) : bool =
+        if isNull part || isNull part?state then
+            false
+        else
+            let meta = part?state?metadata
+
+            if isNull meta then
+                false
+            else
+                match meta?interrupted with
+                | null -> false
+                | value -> unbox<bool> value = true
+
+    /// Abort/cleanup terminal: blog attempted but never completed successfully.
+    let private hasFailedBlogAttempt (rawMessages: obj list) : bool =
+        match lastAssistantStep rawMessages with
+        | None -> false
+        | Some(_, parts, _) ->
+            parts
+            |> List.exists (fun part ->
+                isBlogToolPart part
+                && match blogPartStatus part with
+                   | Some "completed" -> false
+                   | Some "error" -> true
+                   | Some "pending"
+                   | Some "running" -> false
+                   | _ -> blogPartInterrupted part)
+
     /// ENFORCER-060/061: stable InteractionRepair user message (item 15 — fixed text only).
     let private withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
         let msgId =
@@ -858,42 +894,61 @@ module EnforcerHost =
 
             match journal, mainSessionId, extractCalls rawMessages with
             | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
-                // Empty completed-blog list. Three shapes share this arm:
-                // 1) outbound shell (assistant not completed) — Host just created it
-                //    before provider; rebuild frames+context, never InteractionRepair
-                // 2) pending/running blog — Host re-enters after tool completion
-                // 3) terminal pure prose (assistant completed) — ENFORCER-060 once
-                // Restart / resume keeps session content; tools reset is best-effort:
-                // open materialization + rebuild, not fake protocol repair on outbound.
+                // Host transform msgs do NOT include the newly created outbound assistant
+                // (prompt.ts: updateMessage then trigger transform on prior msgs).
+                // lastAssistant = historical tail. Empty completed-blog list means:
+                // 1) pending/running blog — Host re-enters after tool completion
+                // 2) abort cleanup: blog status=error+interrupted, assistant completed
+                //    → NOT pure prose; fail closed if still InFlight
+                // 3) outbound after prior success is non-empty extractCalls (other arm)
+                // 4) pure prose terminal (no blog parts at all) — ENFORCER-060 once
+                // 5) no live request — rebuild best-effort, never invent repair
                 let key = SessionId.value bloggerSessionId
+
+                let currentCtx =
+                    match scope.TryPeekCurrentRequest key with
+                    | Some c -> Some c
+                    | None -> resolveCycleContext scope durable owner bloggerSessionId
+
+                let rebuild () =
+                    match currentCtx with
+                    | Some c ->
+                        tryRebuildFromContext durable bloggerSessionId c
+                        |> Option.defaultValue rawMessages
+                    | None -> rawMessages
+
+                let failClosed (reason: string) =
+                    Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
+
+                    BloggerAbandon.openRequest durable owner bloggerSessionId currentCtx reason
+
+                    match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                    | Ok next -> scope.SetBloggerRuntime(key, next)
+                    | Error _ -> ()
+
+                    scope.ClearCurrentRequest key
+                    rawMessages
 
                 if hasIncompleteBlogTool rawMessages then
                     return rawMessages
+                elif hasFailedBlogAttempt rawMessages then
+                    // Host cleanup after kill/abort: hanging blog → error+interrupted.
+                    // Do not InteractionRepair; end the logical request if still open.
+                    match currentCtx with
+                    | Some _ -> return failClosed "blog tool interrupted without completed call"
+                    | None -> return rebuild ()
+                elif hasAnyBlogToolPart rawMessages then
+                    // blog parts exist but none completed and none classified failed —
+                    // treat as non-prose; rebuild without protocol repair.
+                    return rebuild ()
                 elif not assistantCompleted then
-                    // Outbound transform / resume shell: project from typed context.
-                    let ctx =
-                        match scope.TryPeekCurrentRequest key with
-                        | Some c -> Some c
-                        | None -> resolveCycleContext scope durable owner bloggerSessionId
-
-                    match ctx with
-                    | Some c ->
-                        return
-                            tryRebuildFromContext durable bloggerSessionId c
-                            |> Option.defaultValue rawMessages
-                    | None -> return rawMessages
+                    return rebuild ()
                 else
-                    // ENFORCER-060: pure prose terminal → one InteractionRepair max.
-                    // Require a live/open request; otherwise nothing to repair against.
+                    // ENFORCER-060: completed assistant, zero blog parts → pure prose.
                     let cell = scope.GetBloggerRuntime key
 
-                    let currentCtx =
-                        match scope.TryPeekCurrentRequest key with
-                        | Some c -> Some c
-                        | None -> resolveCycleContext scope durable owner bloggerSessionId
-
                     match currentCtx with
-                    | None -> return rawMessages
+                    | None -> return rebuild ()
                     | Some ctx when not cell.RepairSpent ->
                         scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
 
@@ -903,19 +958,7 @@ module EnforcerHost =
 
                         let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
                         return withRepairInstruction rawMessages requestKey
-                    | Some ctx ->
-                        Diagnostic.emit
-                            "enforcer-cycle-failed"
-                            [ "session_id", key; "result", "protocol-repair-exhausted (ENFORCER-060)" ]
-
-                        BloggerAbandon.openRequest durable owner bloggerSessionId (Some ctx) "protocol-repair-exhausted"
-
-                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                        | Ok next -> scope.SetBloggerRuntime(key, next)
-                        | Error _ -> ()
-
-                        scope.ClearCurrentRequest key
-                        return rawMessages
+                    | Some _ -> return failClosed "protocol-repair-exhausted (ENFORCER-060)"
             | Some durable, Some owner, Some(messageId, calls, _) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and

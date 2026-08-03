@@ -134,10 +134,41 @@ const pendingBlog = (id, callId) =>
     { completed: false },
   )
 
+/** Host SessionProcessor.cleanup after abort/kill. */
+const interruptedBlog = (id, callId) =>
+  assistantStep(
+    id,
+    [
+      {
+        type: 'tool',
+        tool: 'blog',
+        callID: callId,
+        state: {
+          status: 'error',
+          error: 'Tool execution aborted',
+          input: { text: 'was writing' },
+          metadata: { interrupted: true },
+          time: { start: 1, end: 2 },
+        },
+      },
+    ],
+    { completed: true },
+  )
+
 const pureProse = (id, text) => assistantStep(id, [{ type: 'text', text }], { completed: true })
 
 /** Outbound shell: Host created assistant before provider; not a terminal. */
 const outboundShell = (id) => assistantStep(id, [], { completed: false })
+
+/**
+ * Host transform msgs do not include the newly created outbound assistant
+ * (prompt.ts). Continuation after restart therefore sees the historical tail.
+ */
+const historicalTail = (...steps) => {
+  // steps are already FSharp lists of one message; flatten to one list.
+  const msgs = steps.flatMap((step) => listItems(step))
+  return toList(msgs)
+}
 
 const hasRepairMessage = (messages) =>
   listItems(messages).some((msg) => {
@@ -266,6 +297,52 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
       listItems(out).some((m) => m?.info?.source === 'interaction-repair'),
       false,
     )
+  })
+})
+
+test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => {
+  // opencode SessionProcessor.cleanup: hanging tool → status=error + interrupted,
+  // assistant time.completed. Transform msgs still end on that historical tail
+  // (new outbound assistant is NOT in msgs). Must not ENFORCER-060.
+  await withHarness(async ({ journal, scope, blog, warns, lastWarn }) => {
+    const out = await handleContinuation(
+      scope,
+      journal,
+      blog,
+      interruptedBlog('asst-killed', 'blog-hang'),
+    )
+
+    assert.equal(hasRepairMessage(out), false, 'interrupted blog ≠ missing blog call')
+    assert.equal(
+      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
+      false,
+    )
+    assert.equal(lastWarn()?.operation, 'enforcer-cycle-failed')
+    assert.match(lastWarn()?.result ?? '', /interrupted/)
+    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
+  })
+})
+
+test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async () => {
+  // Resume after kill: transform sees prior interrupted blog assistant as last.
+  await withHarness(async ({ journal, scope, blog, warns }) => {
+    const out = await handleContinuation(
+      scope,
+      journal,
+      blog,
+      historicalTail(
+        pureProse('asst-old-prose', 'earlier'),
+        interruptedBlog('asst-last', 'c-int'),
+      ),
+    )
+
+    assert.equal(hasRepairMessage(out), false)
+    assert.equal(
+      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
+      false,
+    )
+    assert.equal(runtimeTag(scope), 'Idle')
   })
 })
 
