@@ -31,7 +31,7 @@ import {
   teardownScenario,
   getSessionId,
 } from './index.js';
-import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
+import { WAIT_FACT_WINDOW_MS, ENFORCER_POLL_SLICE_MS } from './time-budget.js';
 import { bindLaneSession } from './tests/lane.mjs';
 import { compileScenario } from './scenario-schema.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
@@ -427,11 +427,18 @@ async function runFlow(scenario, doc, ctx) {
       // belong to the Logical Run under test. The old canary filtered by two hard-coded
       // prompt substrings instead, which also swept in any other session that happened to
       // send the same text.
+      //
+      // Poll until exact equality. `wait = "continue"` is permanent-after-first consume in
+      // StrictMockSignals, so it cannot barrier multi-delivery continues; this poll is the
+      // barrier for the trailing success delivery. Renew watchdog only on observed progress
+      // (length growth or matching-prefix growth). Overshoot or prefix divergence fails
+      // immediately — no slice/normalize (VERIFY-002). Stuck silence → existing watchdog.
       const claim = step.assertModelTrajectory;
       const sessionId = scenario.provider.sessionFor(claim.lane);
       assert.ok(sessionId, `assertModelTrajectory lane '${claim.lane}' is not bound`);
+      const expected = claim.models;
 
-      const models = (scenario.provider.requests || [])
+      const collectModels = () => (scenario.provider.requests || [])
         .filter((request) => (request?.sessionID ?? request?.sessionId) === sessionId)
         .filter((request) => kindOf(request) === 'chat')
         .map((request) => {
@@ -439,12 +446,53 @@ async function runFlow(scenario, doc, ctx) {
           return typeof model === 'string' ? model : (model?.modelID ?? model?.id ?? null);
         });
 
-      // Exact, and deliberately so. The old canary carried a
-      // `rawModels.length === 5 → slice(1)` normalization to tolerate a duplicated first
-      // attempt — assertion weakening of the kind VERIFY-002 forbids. If the Host ever does
-      // deliver that duplicate, this must fail and be explained.
-      assert.deepEqual(models, claim.models, `model trajectory for lane ${claim.lane}`);
-      ctx.modelTrajectory = models;
+      let lastProgress = -1;
+      for (;;) {
+        const models = collectModels();
+
+        if (models.length > expected.length) {
+          assert.fail(
+            `model trajectory for lane ${claim.lane}: overshot expected length ` +
+            `${expected.length}, got ${models.length}: ${JSON.stringify(models)} ` +
+            `(expected ${JSON.stringify(expected)})`,
+          );
+        }
+
+        for (let i = 0; i < models.length; i++) {
+          if (models[i] !== expected[i]) {
+            assert.fail(
+              `model trajectory for lane ${claim.lane}: diverged at index ${i}: ` +
+              `got ${JSON.stringify(models)} (expected prefix of ${JSON.stringify(expected)})`,
+            );
+          }
+        }
+
+        if (models.length === expected.length) {
+          // Exact, and deliberately so. The old canary carried a
+          // `rawModels.length === 5 → slice(1)` normalization to tolerate a duplicated first
+          // attempt — assertion weakening of the kind VERIFY-002 forbids. If the Host ever does
+          // deliver that duplicate, this must fail and be explained.
+          assert.deepEqual(models, expected, `model trajectory for lane ${claim.lane}`);
+          ctx.modelTrajectory = models;
+          scenario.watchdog?.advance({
+            reason: `model-trajectory-ready:${claim.lane}`,
+            lane: claim.lane,
+          });
+          break;
+        }
+
+        // Progress = longer matching prefix (length growth under the prefix check above).
+        const progress = models.length;
+        if (progress > lastProgress) {
+          lastProgress = progress;
+          scenario.watchdog?.advance({
+            reason: `model-trajectory:${claim.lane}:len=${progress}`,
+            lane: claim.lane,
+          });
+        }
+
+        await pollSlice(ENFORCER_POLL_SLICE_MS);
+      }
       continue;
     }
     if (step.assertPtyEcho) {

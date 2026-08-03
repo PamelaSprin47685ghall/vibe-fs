@@ -41,18 +41,15 @@ flow = [
   { awaitTerminal = { requireAssistantTerminal = true, requireIdleAfterActivity = true } },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
 
-  # The fifth delivery (inside the recovery budget) is the run's last request and the
-  # one that completes the Logical Run. Waited on before the trajectory assertion so
-  # the request is already recorded: `waitFact` polls on 500ms slices and can observe
-  # the fourth failure before the fifth continuation has left the send path.
+  # First continue match only. StrictMockSignals permanent-consume makes wait="continue"
+  # return immediately after the first continue delivery — it cannot barrier multi-delivery
+  # continues. assertModelTrajectory polls for the fifth (success) chat request.
   { wait = "continue" },
 
-  # The trajectory assertion. Exact list: four settled failures cycle A→A→B→B, then
-  # the fifth delivery (Offset 3→0, still inside FALLBACK-005's budget of 12) succeeds
-  # and the run completes. The old canary hard-coded a `rawModels.length === 5 → slice(1)`
-  # normalization to tolerate a duplicate first attempt, which is assertion weakening
-  # of the kind VERIFY-002 forbids. If the Host ever does deliver that duplicate, this
-  # must fail and be explained, not absorbed.
+  # Exact list: four settled failures cycle A→A→B→B, then the fifth delivery
+  # (Offset 3→0, still inside FALLBACK-005's budget of 12) succeeds and the run completes.
+  # Poll barrier (canary-driver assertModelTrajectory): wait="continue" is not enough under
+  # load. No rawModels.length===5→slice(1) normalization (VERIFY-002).
   { assertModelTrajectory = { lane = "med", models = ["test-model", "test-model", "test-model-b", "test-model-b", "test-model"] } },
   { custom = "assertFailureEvidence" },
 
