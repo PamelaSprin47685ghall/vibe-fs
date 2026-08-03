@@ -608,45 +608,38 @@ module EnforcerHost =
 
             match journal, mainSessionId, extractCalls rawMessages with
             | Some durable, Some owner, Some(messageId, calls) when List.isEmpty calls ->
-                // Item 15: pure prose / no blog call — one interaction repair max.
+                // Item 15: pure prose only — one interaction repair max.
+                // Incomplete blog tool cycles (pending/running status) are NOT pure prose:
+                // Host will re-enter after tool completion. Repair would poison the mock
+                // and restart paths with an undeclared user message.
                 let key = SessionId.value bloggerSessionId
 
-                match scope.TryPeekCurrentRequest key with
-                | None -> return rawMessages
-                | Some _ ->
-                    let cell = scope.GetBloggerRuntime key
+                let hasBlogToolPart =
+                    match lastAssistantStep rawMessages with
+                    | None -> false
+                    | Some(_, parts) ->
+                        parts
+                        |> List.exists (fun part ->
+                            if isNull part then
+                                false
+                            else
+                                let kind =
+                                    if isNull part?``type`` then "" else unbox<string> part?``type``
 
-                    if not cell.RepairSpent then
-                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                                let name =
+                                    if not (isNull part?tool) then unbox<string> part?tool
+                                    elif not (isNull part?name) then unbox<string> part?name
+                                    else ""
 
-                        Diagnostic.emit
-                            "enforcer-cycle-repair"
-                            [ "session_id", key; "result", "no completed blog calls" ]
+                                kind = "tool" && name = "blog")
 
-                        let repairMsg =
-                            createObj
-                                [ "info",
-                                  box (
-                                      createObj
-                                          [ "id", box (sprintf "enforcer-repair-%s" key)
-                                            "role", box "user" ]
-                                  )
-                                  "parts",
-                                  box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
-
-                        return rawMessages @ [ repairMsg ]
-                    else
-                        match BloggerRuntime.onFail cell with
-                        | Ok failed -> scope.SetBloggerRuntime(key, failed)
-                        | Error _ -> ()
-
-                        scope.ClearCurrentRequest key
-
-                        Diagnostic.emit
-                            "enforcer-cycle-failed"
-                            [ "session_id", key; "result", "no blog call after repair" ]
-
-                        return []
+                // 0.5.1: do not inject interaction repair into Host transcript.
+                // Incomplete/pending blog tools and restart snapshots were misclassified
+                // as pure prose and poisoned canaries with undeclared repair messages.
+                // RepairSpent + RepairInstruction remain for unit-level protocol; production
+                // wiring returns rawMessages fail-closed without parking.
+                let _ = hasBlogToolPart
+                return rawMessages
             | Some durable, Some owner, Some(messageId, calls) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and
@@ -771,7 +764,10 @@ module EnforcerHost =
                                 with
                                 | CycleCommitOutcome.KnownCommitted ->
                                     committed <- true
-                                    AgentJournal.recordDerivedFallbackSuccess (Some durable) mainSessionId
+                                    // Do NOT call recordDerivedFallbackSuccess on mainSessionId.
+                                    // Blogger Entry success is not a Main Logical-Run success;
+                                    // clearing main's consecutive failure count breaks AABB
+                                    // (FALLBACK-011 / FALLBACK-012).
 
                                     match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
                                     | Ok cell -> scope.SetBloggerRuntime(key, cell)
@@ -787,24 +783,15 @@ module EnforcerHost =
                                         [ "session_id", key; "result", reason ]
                         | None -> failClosedNoPark "missing CurrentRequest"
 
+                    // 0.5.1: no production repair injection (see empty-calls branch).
+                    // Fail closed without blanking Host transcript — return [] made the next
+                    // provider request lastUser=null and broke canary matching.
                     if injectRepair then
-                        // Stay InFlight with CurrentRequest; inject minimal repair only.
-                        let repairMsg =
-                            createObj
-                                [ "info",
-                                  box (
-                                      createObj
-                                          [ "id", box (sprintf "enforcer-repair-%s" key)
-                                            "role", box "user" ]
-                                  )
-                                  "parts", box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
-
-                        return rawMessages @ [ repairMsg ]
+                        return rawMessages
                     elif commitUnknown then
-                        // Fail closed: do not park, do not re-prompt, keep state for reconcile.
-                        return []
+                        return rawMessages
                     elif not committed then
-                        return []
+                        return rawMessages
                     else
                         let resumeWithContext ctx =
                             match journal with

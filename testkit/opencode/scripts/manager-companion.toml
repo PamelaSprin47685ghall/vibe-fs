@@ -29,10 +29,83 @@ tools = ["fork", "join", "list"]
   [[turn.step]]
   respond = { type = "text", text = "Manager turn 1." }
 
+# Host may inject a review-guard continuation after the manager turn settles
+# (RuntimeNudge.managerReviewGuard). Production-composed → internal.
+[[turn]]
+id = "manager-guard"
+internal = true
+user = ["# Review is required before completion.", "# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."]
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager review guard acknowledged." }
+
 [[turn]]
 id = "manager-blogger-1"
 internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "text", text = "Manager Blogger paragraph 1." }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager Blogger paragraph 1.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager Blogger paragraph continued.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", "enf-primitive-obsessin" = 7 } }
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 0
+reason = "frame-commit"

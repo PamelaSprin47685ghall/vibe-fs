@@ -114,6 +114,10 @@ const HOST_INTEROP_ALLOWLIST = new Map([
     'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
     'C5: createObj context payload for durable request materialization blob (CanonicalJson boundary)',
   ],
+  [
+    'src/Wanxiangshu.Next/Application/Reconciliation/BloggerCrashRecovery.fs',
+    'C5: StringBuilder + blob JSON field scrape to reload Toml into typed context on restart',
+  ],
 ])
 
 // Kernel and Domain are the pure core. VERIFY-005 hard-blocks "Kernel 引用 Host
@@ -804,7 +808,7 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
 
   // BloggerRuntime must have production call sites beyond its own module.
   const runtimeCallers = productionCallers(/BloggerRuntime\.(onMaterial|onCycleCommitted|onSquashCommitted|onFail)\b/).filter(
-    (path) => !path.endsWith('Session/BloggerRuntimeState.fs'),
+    (path) => !path.endsWith('src/Wanxiangshu.Next/Session/BloggerRuntimeState.fs'),
   )
   if (runtimeCallers.length === 0) {
     fail('blogger-convergence', 'BloggerRuntime transitions have no production call site')
@@ -822,13 +826,13 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
     if (containsToken(text, 'BloggerNeedsReset')) {
       fail('blogger-convergence', `${file}: BloggerNeedsReset must stay deleted`)
     }
-    if (/SubscribeTerminal/.test(text) && norm(file).endsWith('Session/CompanionHostBlogger.fs')) {
+    if (/SubscribeTerminal/.test(text) && norm(file).endsWith('src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs')) {
       fail('blogger-convergence', `${file}: Squash/Normal path must not SubscribeTerminal`)
     }
     if (/Extract the TOML from the raw messages/.test(text) || /"first"; toml/.test(text)) {
       fail('blogger-convergence', `${file}: raw user TOML extraction is forbidden`)
     }
-    if (/\| EnforcementCycleCommitted\b/.test(text) && norm(file).endsWith('Kernel/Fact.fs')) {
+    if (/\| EnforcementCycleCommitted\b/.test(text) && norm(file).endsWith('src/Wanxiangshu.Next/Kernel/Fact.fs')) {
       fail('blogger-convergence', `${file}: EnforcementCycleCommitted fact must stay deleted`)
     }
   }

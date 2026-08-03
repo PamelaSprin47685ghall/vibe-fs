@@ -135,12 +135,21 @@ test('C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
   assert.ok(error, 'mixed Entry+Squash on one ProviderRun must fail')
 })
 
-test('C5_duplicate_request_materialize_rejected', () => {
+test('C5_same_request_materialize_is_idempotent', () => {
+  // Same RequestId + same context digest: restart re-materialize must not fail.
+  const s = foldOk([
+    materialize({ requestId: 'req-idem', n: 1 }),
+    materialize({ requestId: 'req-idem', n: 1 }),
+  ])
+  assert.equal(s.BloggerCycles.OpenByRequestId.size, 1)
+})
+
+test('C5_duplicate_request_materialize_different_context_rejected', () => {
   const error = foldErr([
     materialize({ requestId: 'req-dup' }),
     materialize({ requestId: 'req-dup', n: 2 }),
   ])
-  assert.ok(error, 'duplicate open RequestId must fail')
+  assert.ok(error, 'same RequestId with different context digest must fail')
 })
 
 test('C5_abandon_clears_open_request', () => {

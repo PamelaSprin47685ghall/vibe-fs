@@ -59,22 +59,30 @@ module BloggerCycleProjection =
         (state: BloggerCycleProjectionState)
         : Result<BloggerCycleProjectionState, string> =
         match Map.tryFind openReq.RequestId state.OpenByRequestId with
+        | Some existing when existing.ContextDigest = openReq.ContextDigest ->
+            // Idempotent: restart / double materialize of the same logical request.
+            Ok state
         | Some _ ->
             Error(
                 sprintf
-                    "BloggerRequestMaterialized already open for request %s"
+                    "BloggerRequestMaterialized already open for request %s with different context"
                     (BloggerRequestId.value openReq.RequestId)
             )
         | None ->
             match Map.tryFind openReq.BloggerSessionId state.OpenByBlogger with
-            | Some existing when existing <> openReq.RequestId ->
+            | Some existing when existing = openReq.RequestId ->
+                // OpenByBlogger already points here but OpenByRequestId missing — heal.
+                Ok
+                    { state with
+                        OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId }
+            | Some existing ->
                 Error(
                     sprintf
                         "Blogger session %s already has open request %s"
                         (SessionId.value openReq.BloggerSessionId)
                         (BloggerRequestId.value existing)
                 )
-            | _ ->
+            | None ->
                 Ok
                     { state with
                         OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId

@@ -219,7 +219,69 @@ internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "text", text = "Session background." }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", "enf-primitive-obsessin" = 7 } }
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
 
 [[turn]]
 id = "title"

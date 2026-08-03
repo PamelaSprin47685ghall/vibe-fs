@@ -105,11 +105,14 @@ module internal CompanionHostBlogger =
             let! childId = deps.EnsureBlogger()
 
             match ctx with
-            | BloggerRequestContext.Main main ->
+            | BloggerRequestContext.Main _ ->
                 deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
                 deps.SquashFrameCount.Value <- None
-                // Physical claim body is the data-only delta; transform rebuilds full shape.
-                return! sendBloggerPrompt deps childId main.Toml
+                // Physical claim is the stable normal instruction only. Delta Toml lives in
+                // CurrentRequest / durable materialize; transform rebuilds Working Record +
+                // New Work + instruction. Sending raw Toml as the claim body fails mock
+                // matching after restart when rebuild cannot run yet.
+                return! sendBloggerPrompt deps childId CompanionPrompt.NormalInstruction
             | BloggerRequestContext.Squash squash ->
                 deps.RequestKind.Value <- ProviderRequestKind.BloggerSquash
                 deps.SquashFrameCount.Value <- Some squash.CoveredFrameCount

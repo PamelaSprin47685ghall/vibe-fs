@@ -3,15 +3,16 @@
 ## 当前基线
 
 - 分支：`master`
-- 最后验证 commit：`f8678808`（Blogger 垂直切片 C0–C4：runtime authority / coordinator / squash tool loop）
-- 本轮验证：build + 616 unit + fallback / fallback-aabb-trace / host-transform-capability 全绿
+- 发布目标：`0.5.1`（Blogger 垂直切片 C0–C7）
+- 最后验证：`test:release` 全绿（gate:static → build → unit → harness → P0×3）
+- 证据：`docs/evidence/0.5.1/`（canary 18×3、tarball sha256）
 
 ## 当前产品状态
 
-0.5.0 已发布（正式版，从 rc.1 收口）。canary 森林 17 驱动（18 剧本）× 3 轮全绿，
-`test:release`（gate:static → build → unit → harness → P0×3）完整通过。生产代码与测试
-整体迁移到 `SSOT/` 条款；测试体系为直接消费 `build/next` 发布产物的 `tests-mjs`。
-conformance 表 `UNVERIFIED` 已清零（绑定 commit `24bda4f5`）。
+0.5.0 已发布。0.5.1 闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
+唯一 coordinator、typed materialize、blog-tool Squash、KnownCommitted 才 Park、
+crash-window 不 stomp live CurrentRequest。canary 证据见 `host-transform-capability`
+与 `companion-canary`；发布证据目录 `docs/evidence/0.5.1/`。
 
 LifecycleWorkRecord 迁移已完成（方案 `STATUS/lifecycle-work-record.md`）：父→子与子→父统一为
 LWR（Opening + Y frames + X gap + Terminal）；A/B 双轨、FinalText、Seed、TerminalSessionA、
@@ -20,26 +21,25 @@ join 最小 wire（status/agent/work_record）。
 
 ## 当前开发阶段
 
-SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并测试；共享
-Host capability canary（`host-transform-capability`，STRENGTH-078 C-01…C-10 /
-ENFORCER-180 第 0 步 1–6）已建并全绿，Enforcer 的 blog 工具与挂起链已接线
-（PARTIAL）。下一步是逐纵向接线（推荐顺序：Strength shadow → Enforcer nudge
-overlay → Student/Teacher）。
+SSOT/15 Blogger 垂直切片（ENFORCER runtime authority / Squash / recovery）已闭合并
+标 CONFORMANT。SSOT/14 Strength shadow 与 ENFORCER nudge overlay、SSOT/16
+Student&Teacher 生产接线仍为后续纵向。推荐顺序：Strength shadow → Enforcer nudge
+overlay → Student/Teacher。
 
 ### 本轮已闭合：PrefixCoverage 推进与 prefix-probe
 
 `8bfea409` 之后 fallback canary 的 `prefix-probe` 从未触发。根因不是
 `semanticCursorFor`，而是 `commitCycle` 只推进了 RecordCoverage 一半：
 
-1. **`commitCycle` 未消费 staged PrefixCoverage**（`Session/EnforcerHost.fs`）：
+1. `commitCycle` 未消费 staged PrefixCoverage（`Session/EnforcerHost.fs`）：
    `NextCoverableTurnCutoffExclusive` / `NextCoveredPrefixDigest` 写成当前值
    自指，PrefixCoverage 永远停在 0 → `hasCoverage=false` → probe 永不选中。
    修复：staged `BloggerMainRequestContext` 成为唯一 coverage 源（fail closed）。
-2. **`mainContextFromChunk` 不计算 CoveredPrefixDigest**：恢复旧路径——cutoff
+2. `mainContextFromChunk` 不计算 CoveredPrefixDigest：恢复旧路径——cutoff
    前进时对 projection 前缀做 `renderSemantic` 哈希；cutoff 不动时保留旧 digest。
-3. **`lastCoveredSequence` 对齐 `semanticCursorFor` 的 `>` 语义**：chunk 的
+3. `lastCoveredSequence` 对齐 `semanticCursorFor` 的 `>` 语义：chunk 的
    `NextCursor` 是「首个未覆盖」位置，映射为「末个已覆盖」XTrace sequence。
-4. **canary 剧本**：Enforcer 接线后 Blogger 只接受 `blog` 工具；fallback /
+4. canary 剧本：Enforcer 接线后 Blogger 只接受 `blog` 工具；fallback /
    fallback-aabb-trace 仍回 plain text → 无 `BlogEntryCommitted` → 无 coverage。
    已改为 `tool-call blog`，并声明 `frame-commit` 冷边界。
 
@@ -97,8 +97,7 @@ src/Wanxiangshu.Next/
    `Journal/EnforcementProjection.fs`（`BlogEntryCommitted` 原子推进；独立
    `EnforcementCycleCommitted` 已删除）。接线经普通 review + security_review 双审查
    （无 blocking）；security_review 观察项记于 `STATUS/blockers/README.md`。
-   Blogger 垂直切片（runtime authority / Squash tool loop / crash recovery）仍 PARTIAL，
-   见 `STATUS/conformance.md` COMPANION-005/008、CTX-006/007/012、ENFORCER-010 行
+   Blogger 垂直切片已 CONFORMANT（0.5.1）
 2. 逐纵向接线（推荐顺序不变）：Strength shadow（Replica session/ruleset/候选帧，解锁
    STRENGTH-078 C-11…C-21）→ Enforcer nudge overlay（ENFORCER-080…115，第 0 步 7–9
    补完）→ Student&Teacher（teacher/return 工具、QA 落盘，LEARN-082…088）

@@ -87,9 +87,11 @@ export const SURFACE_STANDINGS = Object.freeze(['CanonicalPayload', 'VerbatimFor
 const CANONICAL_WRITERS = Object.freeze(['SyntheticToml', 'ForkChildPayload', 'RuntimeNudge', 'BloggerToml']);
 
 const TYPED_PAYLOAD_ROUTES = Object.freeze({
-  'BloggerDeltaChunk.Toml': Object.freeze({
-    pattern: /\belse\s+chunk\.Toml\b/,
-    description: 'the normal Blogger branch must forward chunk.Toml without a prose wrapper',
+  // C2/C5: physical claim body is typed Main context Toml (data-only delta),
+  // not a prose wrapper. Squash sends CompanionPrompt.SquashInstruction only.
+  'BloggerMainRequestContext.Toml': Object.freeze({
+    pattern: /\bmain\.Toml\b/,
+    description: 'startFromContext Main branch must forward main.Toml without a prose wrapper',
   }),
 });
 
@@ -137,12 +139,17 @@ const SURFACES = new Map([
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
-      surface: 'Blogger normal delta prompt',
+      surface: 'Blogger typed-context physical claim (Main Toml / Squash instruction)',
       composer:
-        'BloggerDelta.fs:33-34 renders CompanionPrompt.NormalInstruction plus typed ' +
-        'BloggerDeltaChunk.Toml; CompanionHostBlogger.fs:69-76 forwards chunk.Toml on the normal path',
-      composerFiles: ['src/Wanxiangshu.Next/Domain/BloggerDelta.fs', 'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs'],
-      typedPayload: 'BloggerDeltaChunk.Toml',
+        'BloggerCoordinator materializes BloggerRequestContext; CompanionHostBlogger.startFromContext ' +
+        'forwards main.Toml (data-only) or CompanionPrompt.SquashInstruction; transform rebuilds full ' +
+        'provider view via CompanionProjectionBuilder',
+      composerFiles: [
+        'src/Wanxiangshu.Next/Domain/BloggerDelta.fs',
+        'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs',
+        'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
+      ],
+      typedPayload: 'BloggerMainRequestContext.Toml',
     },
   ],
   [

@@ -10,6 +10,7 @@ import {
 import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from '../scenario-schema.js';
 import { ScenarioRuntime } from '../scenario-runtime.js';
+import { WATCHDOG_TIMEOUT_MS } from '../time-budget.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const managerTools = ['fork', 'join', 'list'];
@@ -63,10 +64,29 @@ try {
   const bloggers = sessions.filter((session) => session?.agent === 'fast-blogger');
   assert.equal(bloggers.length, 1, 'the Host snapshot must contain exactly one fast-blogger');
 
-  await scenario.events.awaitEvent(
-    (event) => event.type === 'session.idle' && event.sessionID === bloggers[0].id,
-    null,
-  );
+  // Blogger parks after blog tool cycle — may never go session.idle while parked.
+  // Journal BlogEntryCommitted is the completion signal for the first cycle.
+  const workDir = scenario.host.workDir;
+  const { execFileSync } = await import('node:child_process');
+  const { join } = await import('node:path');
+  const { existsSync, readdirSync, readFileSync } = await import('node:fs');
+  const runtimeFacts = (factName) => {
+    const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
+    const runtimeDir = join(common.startsWith('/') ? common : join(workDir, common), 'wanxiangshu-next', 'runtimes');
+    if (!existsSync(runtimeDir)) return [];
+    return readdirSync(runtimeDir)
+      .filter((name) => name.endsWith('.ndjson'))
+      .flatMap((name) => readFileSync(join(runtimeDir, name), 'utf8').split('\n'))
+      .filter((line) => line.trim() !== '')
+      .map((line) => JSON.parse(line))
+      .filter((fact) => JSON.stringify(fact).includes(factName));
+  };
+  const deadline = Date.now() + WATCHDOG_TIMEOUT_MS;
+  while (Date.now() < deadline && runtimeFacts('BlogEntryCommitted').length < 1) {
+    await new Promise((r) => setTimeout(r, 50));
+    scenario.watchdog?.advance({ reason: 'blog-entry-wait', lane: 'manager-blogger', blocking: true });
+  }
+  assert.ok(runtimeFacts('BlogEntryCommitted').length >= 1, 'manager blogger must commit at least one BlogEntry');
   assert.deepEqual(runtime.unanswered().map((entry) => entry.id), [], 'all non-internal scenario steps must complete');
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
 

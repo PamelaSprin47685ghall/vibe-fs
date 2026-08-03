@@ -153,10 +153,11 @@ test('C0_park_only_after_KnownCommitted', () => {
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
   // Gate: invalid/failed/unknown paths must not fall through into ParkTransform.
-  // Production: KnownCommitted sets committed; other outcomes return [] before park.
+  // Production: KnownCommitted sets committed; other outcomes return rawMessages before park.
   const gated =
     /KnownCommitted/.test(host) &&
-    /if not committed then[\s\S]{0,120}return \[\][\s\S]{0,1600}ParkTransform/.test(host)
+    (/if not committed then[\s\S]{0,160}return rawMessages[\s\S]{0,2000}ParkTransform/.test(host) ||
+      /if not committed then[\s\S]{0,160}return \[\][\s\S]{0,2000}ParkTransform/.test(host))
   assert.equal(
     gated,
     true,

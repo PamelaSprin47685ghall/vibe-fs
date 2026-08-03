@@ -127,27 +127,53 @@ module BloggerCoordinator =
                       box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
                       "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
 
-        match journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
-        | Error error -> Error error
-        | Ok blob ->
-            let fact =
-                AgentFact.BloggerRequestMaterialized
-                    {| RequestId = requestId
+        // One open request per Blogger. Restart / re-offer with a new RequestId
+        // must supersede a stale open slot (fold rejects two opens on one session).
+        let projections = AgentJournal.snapshot journal
+
+        let staleOpen =
+            projections.AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+            |> Option.bind (fun s -> s.BloggerCycles)
+            |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
+
+        match staleOpen with
+        | Some openReq when openReq.RequestId <> requestId ->
+            let abandon =
+                AgentFact.BloggerRequestAbandoned
+                    {| RequestId = openReq.RequestId
                        MainSessionId = mainSessionId
                        BloggerSessionId = bloggerSessionId
-                       RequestKind = kind
-                       ContextRef = blob.BlobRef
-                       ContextDigest = blob.BlobDigest
-                       ObservedPrefixEpochId = epoch
-                       PreviousIngestedThroughSequence = prevSeq
-                       NextIngestedThroughSequence = nextSeq
-                       FrameEpochId = frameEpoch
-                       SelectedFrameDigests = selectedDigests
-                       PromptKey = None |}
+                       Reason = "superseded-by-new-materialize" |}
 
-            match AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
+            match AgentJournal.appendAgent (StreamId.Session mainSessionId) None abandon journal with
             | Error failure -> Error(JournalAppendFailure.describe failure)
             | Ok _ -> Ok()
+        | _ -> Ok()
+        |> function
+            | Error e -> Error e
+            | Ok() ->
+                match journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
+                | Error error -> Error error
+                | Ok blob ->
+                    let fact =
+                        AgentFact.BloggerRequestMaterialized
+                            {| RequestId = requestId
+                               MainSessionId = mainSessionId
+                               BloggerSessionId = bloggerSessionId
+                               RequestKind = kind
+                               ContextRef = blob.BlobRef
+                               ContextDigest = blob.BlobDigest
+                               ObservedPrefixEpochId = epoch
+                               PreviousIngestedThroughSequence = prevSeq
+                               NextIngestedThroughSequence = nextSeq
+                               FrameEpochId = frameEpoch
+                               SelectedFrameDigests = selectedDigests
+                               PromptKey = None |}
+
+                    match AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
+                    | Error failure -> Error(JournalAppendFailure.describe failure)
+                    | Ok _ -> Ok()
 
     let private abandonRequest
         (journal: AgentJournal option)

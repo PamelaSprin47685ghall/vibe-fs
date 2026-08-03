@@ -89,23 +89,74 @@ module BloggerCrashRecovery =
               RepairSpent = false }
         )
 
-    let private stubMainContext (openReq: OpenBloggerRequest) : BloggerRequestContext =
-        // Coverage fields from durable open request. Toml body is reloaded only
-        // when blob decode lands (C5 remaining); empty Toml is never written over
-        // a live CurrentRequest that already has Toml.
-        BloggerRequestContext.Main
-            { RequestId = openReq.RequestId
-              MainSessionId = openReq.MainSessionId
-              BloggerSessionId = openReq.BloggerSessionId
-              Toml = ""
-              PreviousIngestedThroughSequence = openReq.PreviousIngestedThroughSequence
-              NextIngestedThroughSequence = openReq.NextIngestedThroughSequence
-              PreviousCoverableTurnCutoffExclusive = 0
-              NextCoverableTurnCutoffExclusive = 0
-              NextCoveredPrefixDigest = ""
-              FrameEpochId = openReq.FrameEpochId
-              DeltaDigest = openReq.ContextDigest
-              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+    let private tryReloadMainContext
+        (journal: AgentJournal)
+        (openReq: OpenBloggerRequest)
+        : BloggerRequestContext option =
+        match journal.Writer.BlobWriter.Read openReq.ContextRef with
+        | Error _ -> None
+        | Ok json ->
+            // Materialize blob is CanonicalJson of createObj fields. Pull toml if Main.
+            // Minimal parse without full schema: look for "toml" string field.
+            let toml =
+                let marker = "\"toml\":"
+                let idx = json.IndexOf(marker)
+
+                if idx < 0 then
+                    ""
+                else
+                    let start = idx + marker.Length
+                    // value is JSON string; strip quotes crudely for recovery only.
+                    let rest = json.Substring(start).TrimStart()
+
+                    if rest.StartsWith("\"") then
+                        let sb = System.Text.StringBuilder()
+                        let mutable i = 1
+                        let mutable done' = false
+
+                        while i < rest.Length && not done' do
+                            let c = rest.[i]
+
+                            if c = '\\' && i + 1 < rest.Length then
+                                sb.Append(rest.[i + 1]) |> ignore
+                                i <- i + 2
+                            elif c = '"' then
+                                done' <- true
+                            else
+                                sb.Append(c) |> ignore
+                                i <- i + 1
+
+                        sb.ToString()
+                    else
+                        ""
+
+            if openReq.RequestKind = "squash" then
+                Some(
+                    BloggerRequestContext.Squash
+                        { RequestId = openReq.RequestId
+                          MainSessionId = openReq.MainSessionId
+                          BloggerSessionId = openReq.BloggerSessionId
+                          FrameEpochId = openReq.FrameEpochId
+                          CoveredFrameCount = List.length openReq.SelectedFrameDigests
+                          FrameDigests = openReq.SelectedFrameDigests
+                          ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+                )
+            else
+                Some(
+                    BloggerRequestContext.Main
+                        { RequestId = openReq.RequestId
+                          MainSessionId = openReq.MainSessionId
+                          BloggerSessionId = openReq.BloggerSessionId
+                          Toml = toml
+                          PreviousIngestedThroughSequence = openReq.PreviousIngestedThroughSequence
+                          NextIngestedThroughSequence = openReq.NextIngestedThroughSequence
+                          PreviousCoverableTurnCutoffExclusive = 0
+                          NextCoverableTurnCutoffExclusive = 0
+                          NextCoveredPrefixDigest = ""
+                          FrameEpochId = openReq.FrameEpochId
+                          DeltaDigest = openReq.ContextDigest
+                          ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+                )
 
     /// Startup pass: walk open materializations + receipts.
     let reconcile
@@ -150,10 +201,6 @@ module BloggerCrashRecovery =
                     match live.State, liveCurrent with
                     | BloggerRuntimeState.InFlight _, Some _ ->
                         results.Add(WindowOutcome.AlreadyLive openReq.BloggerSessionId)
-                    | BloggerRuntimeState.InFlight _, None ->
-                        // Runtime says InFlight but CurrentRequest missing — restore key only.
-                        host.SetCurrentRequest(bloggerKey, stubMainContext openReq)
-                        results.Add(WindowOutcome.RestoredInFlight openReq.BloggerSessionId)
                     | BloggerRuntimeState.Disposed, _ ->
                         results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "disposed"))
                     | _ ->
@@ -180,24 +227,26 @@ module BloggerCrashRecovery =
                                                | MessagePart.ToolResult(_, _) -> true
                                                | _ -> false))
 
-                                let ctx = stubMainContext openReq
-
-                                if hasCompletedBlog then
+                                match tryReloadMainContext durable openReq with
+                                | None ->
+                                    results.Add(
+                                        WindowOutcome.Unreadable(
+                                            openReq.BloggerSessionId,
+                                            "context blob unreadable"
+                                        )
+                                    )
+                                | Some ctx ->
                                     restoreRuntime host openReq.BloggerSessionId (BloggerRuntimeState.InFlight ctx)
 
                                     if liveCurrent.IsNone then
                                         host.SetCurrentRequest(bloggerKey, ctx)
 
-                                    results.Add(WindowOutcome.Recommitted(ProviderRunIdentity.create "pending-tool"))
-                                else
-                                    // Window B / live empty transcript: restore InFlight
-                                    // without abandoning. Never clear a richer live CurrentRequest.
-                                    restoreRuntime host openReq.BloggerSessionId (BloggerRuntimeState.InFlight ctx)
-
-                                    if liveCurrent.IsNone then
-                                        host.SetCurrentRequest(bloggerKey, ctx)
-
-                                    results.Add(WindowOutcome.RestoredInFlight openReq.BloggerSessionId)
+                                    if hasCompletedBlog then
+                                        results.Add(
+                                            WindowOutcome.Recommitted(ProviderRunIdentity.create "pending-tool")
+                                        )
+                                    else
+                                        results.Add(WindowOutcome.RestoredInFlight openReq.BloggerSessionId)
 
                 return results |> Seq.toList
         }

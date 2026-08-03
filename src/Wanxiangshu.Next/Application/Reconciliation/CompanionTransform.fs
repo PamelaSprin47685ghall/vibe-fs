@@ -167,16 +167,44 @@ module CompanionTransform =
                     let projection =
                         Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
 
-                    let! bloggerId = companion.EnsureBloggerAsync()
+                    // No child until there is a real X gap. Empty fixture transforms
+                    // (HOST-009 positional hooks) must not require Host transport.
+                    let blog, xTrace =
+                        match journal with
+                        | Some j ->
+                            let sessions = (AgentJournal.snapshot j).AgentProjections.Sessions
+                            let session = sessions |> Map.tryFind (SessionId.create sessionId)
 
-                    let! _ =
-                        BloggerCoordinator.onMainMaterial
-                            (scope :> IParkedTransformHost)
-                            companion
-                            journal
-                            (SessionId.create sessionId)
-                            bloggerId
-                            projection
+                            (session
+                             |> Option.bind (fun s -> s.Blog)
+                             |> Option.defaultValue BlogProjection.empty),
+                            (session
+                             |> Option.bind (fun s -> s.XTrace)
+                             |> Option.defaultValue XTraceProjection.empty)
+                        | None -> companion.Memory.Blog, companion.Memory.XTrace
 
-                    ()
+                    let ingestCursor =
+                        XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+
+                    let hasMaterial =
+                        BloggerDelta.nextChunk
+                            BloggerDelta.DeltaLimitBytes
+                            ingestCursor
+                            blog.Coverage.CoverableTurnCutoffExclusive
+                            projection.Messages
+                        |> Option.isSome
+
+                    if hasMaterial then
+                        let! bloggerId = companion.EnsureBloggerAsync()
+
+                        let! _ =
+                            BloggerCoordinator.onMainMaterial
+                                (scope :> IParkedTransformHost)
+                                companion
+                                journal
+                                (SessionId.create sessionId)
+                                bloggerId
+                                projection
+
+                        ()
         }

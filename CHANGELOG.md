@@ -2,19 +2,33 @@
 
 ## Unreleased
 
-### Blogger vertical-slice convergence (SSOT/15)
+## 0.5.1 — Blogger vertical-slice convergence (SSOT/15)
 
-- C0: downgrade overclaimed CONFORMANT rows; archive ADOPTED motion; red inventory + anti-regression gate.
-- C1: production `BloggerRuntimeCell`; CurrentRequest/PendingOffer dual slots; sole `BloggerCoordinator.onMainMaterial`.
-- C2: freeze typed context before send; delete `BloggerNeedsReset` and raw TOML extraction.
-- C3: typed Squash context; blog-tool continuation commits `BlogSquashCommitted`; no terminal wait.
-- C4: park only after commit; resource limits; Main success clears fallback; fail invalidates child cache.
-- C6 partial: fail-closed `loadEffectiveFrames`; `CompanionIdentity.newWorkMessageId`.
-- Further: durable `BloggerRequestMaterialized` + cycle receipts; CommitUnknown tri-state;
-one-shot repair; crash-window recovery gate; provenance markers; main→blogger teardown.
-layer-4: host-transform-capability (+ third-turn single-flight + materialize) and companion-canary green.
-Conformance COMPANION-005/008, CTX-006/007/012, ENFORCER-010 restored to CONFORMANT.
+生产闭环 Blogger 请求形状 / 挂起 / Squash / 恢复载体（不做 Enforcer throttle、nudge、Strength、Student&Teacher）。
 
+### Runtime authority
+- 生产 `BloggerRuntimeCell`（Idle / InFlight / Parked / Disposed）
+- `CurrentRequest` 与 `PendingOffer` 双槽；唯一 busy 定义 = InFlight
+- 唯一入口 `BloggerCoordinator.onMainMaterial`；删除 `offerToBlogger` 旁路与 `inFlightTask` busy 权威
+
+### Projection & commit
+- 发送前冻结 typed context 并落盘 `BloggerRequestMaterialized`
+- 首次 / resume / Squash 共用 `CompanionProjectionBuilder`；删除 raw TOML 抽取与 `BloggerNeedsReset`
+- Squash 迁入 blog tool continuation，提交 `BlogSquashCommitted`（coverage 不变）
+- 仅 `KnownCommitted` 后 Park；`KnownNotCommitted` / `CommitUnknown` 不 Park、不重问
+- 统一 `BloggerCycleReceipt`（Entry|Squash）按 ProviderRun 幂等
+- 一次 `RepairSpent` repair；资源上限；Main Entry 成功清 fallback
+
+### Recovery & teardown
+- crash-window recovery 挂 `EnsureRecoveryDone`；live CurrentRequest 不 stomp
+- fail-closed `loadEffectiveFrames`；`CompanionIdentity.newWorkMessageId`
+- Host 重建消息带 synthetic/source 标记；main dispose 清 linked Blogger waiter
+
+### Evidence
+- layer-4：`host-transform-capability-canary`（park/resume、第三 turn 单飞、materialize）
+- layer-4：`companion-canary`（同 child 两轮 blog tool）
+- 静态 `blogger-convergence` 防回退门禁
+- conformance：`COMPANION-005/008`、`CTX-006/007/012`、`ENFORCER-010` → CONFORMANT
 
 ## 0.5.0 — 正式版
 
