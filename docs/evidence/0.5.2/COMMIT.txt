@@ -5,6 +5,7 @@ date_utc: 2026-08-03T18:14:00Z
 branch: master
 subject: fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
 tag: v0.5.2
+evidence_commit: 7443007a43d0a5b6483e816c2c8d909d7aeb6e32
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification_commits:
