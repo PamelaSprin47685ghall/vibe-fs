@@ -1,5 +1,5 @@
 ### CONTEXT-RECOVERY.txt — X recovery chain (SSOT/12)
-gate_commit: f66bbdc7
+gate_commit: ddd504ca
 date_utc: 2026-08-03T20:10:34Z
 
 ## Production wiring (closed)
@@ -46,3 +46,6 @@ x-recovery green ×3 in CANARY-3ROUND (X-A–X-D)
 - RawGap must not enter FrozenRecordPrefix: blob excludes "# Uncompressed tail" and "# Final output"; includes "# Opening task" or "# Work log"
 - Frame commit vs prefix probe independent: after PrefixRebaseCommitted, BlogEntryCommitted + FrameEpochId remain; blog count does not retreat
 Wired into oracleXc + oracleXd. X-A–X-D solo + 3-round forest green at f66bbdc7.
+
+## Final tip stamp
+gate_commit ddd504ca: X-A–X-D green; HOST-010 SolvingProviderRun on PrefixRebaseCommitted.

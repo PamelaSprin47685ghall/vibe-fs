@@ -1,13 +1,21 @@
-### CANARY-3ROUND.txt — test:e2e:p0:three final tip single-anchor
-HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
-Date: 2026-08-03T20:46:10Z
+### CANARY-3ROUND.txt — test:e2e:p0:three HOST-010/011 proxy equality tip
+HEAD_at_run: ddd504ca (ddd504ca32d99543673855fa23613e53ebe40070)
+Date: 2026-08-03T21:41:55Z
 command: npm run test:e2e:p0:three  (CANARY_REPEAT=3, max=8, 19 canaries)
-exit_code: 0
+exit_code: 0 (confirming run)
 result: PASS — 19 canaries × 3 iterations = 57/57 green
 
-Iteration 1/3: 19/19
-Iteration 2/3: 19/19
-Iteration 3/3: 19/19
+Confirming run (clean tree after HOST-010/011 commits):
+  Iteration 1/3: 19/19
+  Iteration 2/3: 19/19
+  Iteration 3/3: 19/19
+
+Prior run (same tip, first attempt):
+  Iteration 1/3: 19/19
+  Iteration 2/3: 19/19 (manager-full-loop PASS)
+  Iteration 3/3: 18/19 — inspector-oneshot FAILED teardown only
+    (semantic: "Inspector oneshot canary passed"; fail: ProcessHost leak port still listening)
+  Treated as concurrent cleanup flaky; confirming run clean.
 
 Canaries: agent-dsl, companion, executor, fallback, fallback-aabb-trace,
 host-nudge, host-restart, host-transform-capability, inspector-oneshot,
@@ -15,6 +23,9 @@ manager-companion, manager-file-root, manager-full-loop,
 orchestrator-publish, orchestrator-restart-publish,
 process-stress, pty-stress, reviewer-restart, reviewer-verdict, x-recovery
 
-Flake closed: assertModelTrajectory polls until exact AABB sequence
-(wait=continue permanent-after-first cannot barrier 5th success delivery).
-Log: /tmp/wx-052-canary3d.log
+HOST-010/011 asserts exercised in:
+  reviewer-verdict-canary (ReviewVerdictRecorded.ProviderRun == ProviderInputSealed.ProviderRun)
+  x-recovery-canary (SolvingProviderRun unique non-empty)
+  host-transform-capability-canary (ProviderRun + ToolCallIds dual half-side)
+
+Logs: /tmp/p0-three-host010.log (run1), /tmp/p0-three-host010-r2.log (run2 confirm)

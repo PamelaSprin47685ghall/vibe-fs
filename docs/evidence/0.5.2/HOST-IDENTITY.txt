@@ -1,26 +1,35 @@
-### HOST-IDENTITY.txt — HOST-010 / HOST-011
-gate_commit: f66bbdc7
-date_utc: 2026-08-03T20:58:22Z
+### HOST-IDENTITY.txt — HOST-010 / HOST-011 (rev.2 journal-side proxy)
+gate_commit: ddd504ca
+date_utc: 2026-08-03T21:41:55Z
 
-## HOST-010 Transform → ProviderRunIdentity
+## HOST-010 Transform → ProviderRunIdentity (SSOT/07 rev.2)
 status: conformant
 required_layer: 4
 canaries:
-  - testkit/opencode/tests/host-transform-capability-canary.mjs
-asserts (D1):
-  - every BlogEntryCommitted resolves to exactly one non-empty ProviderRun
-    (envelope+payload deduped; dual with ENFORCER-154 uniqueness)
-  - ProviderRun unique across cycles
+  - testkit/opencode/tests/reviewer-verdict-canary.mjs
+  - testkit/opencode/tests/x-recovery-canary.mjs
+asserts (journal-side observable proxy equality):
+  - ReviewVerdictRecorded.ProviderRun == ProviderInputSealed.ProviderRun
+    (Reviewer chain; both sides of ToolContext.messageID land in journal)
+  - PrefixRebaseCommitted.SolvingProviderRun unique non-empty
+    (X recovery chain; solve-run identity after promote)
+
+Exception protocol: transform-side direct equality (unique incomplete assistant id
+≡ ToolContext.messageID at transform time) is not journal-observable under ARCH-003
+(Host prompt.ts creates assistant before transform; ToolContext not on wire).
+SSOT/07:206 rev.2 supersedes to journal-side proxy. Blocker closed in
+STATUS/blockers/README.md.
 
 ## HOST-011 Tool execution identity (callID + messageID)
 status: conformant
 required_layer: 4
 canaries:
   - testkit/opencode/tests/host-transform-capability-canary.mjs
-asserts (D1):
-  - each BlogEntryCommitted has ≥1 non-empty ToolCallId (F# ["ToolCallId", id])
+asserts:
+  - each BlogEntryCommitted has non-empty ProviderRun
+  - each BlogEntryCommitted has ≥1 non-empty ToolCallId
   - ToolCallIds unique across cycles (dual half with ProviderRun)
 
 ## Verification
-solo host-transform-capability-canary.mjs exit 0
-test:e2e:p0:three includes host-transform-capability PASS ×3
+solo reviewer-verdict / x-recovery / host-transform-capability exit 0 (prior frame)
+test:e2e:p0:three includes all three PASS ×3 on confirming run
