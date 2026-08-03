@@ -4,8 +4,8 @@
 
 - 分支：`master`
 - 版本：`0.5.2` 已发布（tag `v0.5.2`）
-- 最终验证 commit：`17358c38`
-- evidence commit：`7443007a`
+- 最终验证 commit：`39e05500`
+- evidence commit：`d6dc8972`
 - tag tip：本 commit（`git rev-parse v0.5.2^{commit}` 与 HEAD 一致）
 - 最后验证：
   - `npm run gate:static` 通过（10 子门禁，含 `gate:conformance`）
