@@ -1,5 +1,10 @@
 # Current Repository Status
 
+## 0.5.3 正规化进度
+
+- 已完成：enforcer JSON（resources/enforcer/catalog.json）、prompts → resources/prompts、单 package manifest、gitignore/根白名单、宝典 → docs/decisions/kolmogorov.md、Directory.Build.props 单一化、scripts 公共命令面收敛、RFC → docs/rfcs、spec 骨架（README + coverage.toml）
+- 未做：SSOT 全量改名、STATUS 删除、tests 树合并、Wanxiangshu.Next 改名、dist 输出、README 终稿
+
 ## 当前基线
 
 - 分支：`master`
@@ -23,7 +28,7 @@
 
 ## 当前产品状态
 
-0.5.2 已发布。Active SSOT 全部 conformant。当前无活跃 blocker。未来功能见 `RFC/`，
+0.5.2 已发布。Active SSOT 全部 conformant。当前无活跃 blocker。未来功能见 `docs/rfcs/`，
 不属于当前产品合同。
 
 0.5.2 收敛（C0–C15）已闭合。关键交付：
@@ -68,7 +73,7 @@ Seed、TerminalSessionA、FrozenB 全部废止。
 
 0.5.2 已发布。Active 子集为 SSOT/01–13 + SSOT/15 Blogger 工具化 + SSOT/17 LOOP
 （退化循环检测与强杀）。SSOT/14 Strength、SSOT/16 Student&Teacher 与 ENFORCER
-nudge/throttle 在 `RFC/`，不属于当前产品合同。
+nudge/throttle 在 `docs/rfcs/`，不属于当前产品合同。
 
 ### PrefixCoverage 与 prefix-probe（已闭合）
 
@@ -87,7 +92,7 @@ nudge/throttle 在 `RFC/`，不属于当前产品合同。
 - X 恢复链：生产接线已闭合；X-A–X-D layer-4 canary 已交付（`x-recovery-canary.mjs` 四场景）
 - `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
 - HOST-010：可观测代理 = Reviewer 链 seal/verdict 等式（`reviewer-verdict-canary`）+ X 链 `SolvingProviderRun`（`x-recovery-canary`）；HOST-011：ToolCallIds + BlogEntryCommitted.ProviderRun（`host-transform-capability-canary`）
-- 未来功能（Strength shadow / Enforcer nudge / Student&Teacher）见 `RFC/`
+- 未来功能（Strength shadow / Enforcer nudge / Student&Teacher）见 `docs/rfcs/`
 
 ## 源码地图
 
@@ -130,7 +135,7 @@ Fable 输出 `build/next/`；根 `package.json` 为唯一 manifest（`main` →
 
 ## 下一步
 
-0.5.2 已发布。Active SSOT 全部 conformant。当前无活跃 blocker。未来功能见 `RFC/`，
+0.5.2 已发布。Active SSOT 全部 conformant。当前无活跃 blocker。未来功能见 `docs/rfcs/`，
 不属于当前产品合同。
 
 ## 事实入口

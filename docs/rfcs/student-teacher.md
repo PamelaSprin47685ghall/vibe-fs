@@ -1,5 +1,7 @@
 # RFC/student-teacher — Student & Teacher：主动学习与 SKILL 编译
 
+Status: proposed
+
 > 合入说明（2026-08-02）：本文档由 `PENDING/16-Student-Teacher方案.md` 原样合入（正文未改）。
 > 原稿「状态：APPROVED AS FINAL ARCHITECTURE」随合入更新为「已合入规范」；实现仍受
 > Host canary（第二十三节 LEARN-082…088 清单）门禁。本文档为 Student/Teacher/QA/SKILL
@@ -10,7 +12,7 @@
 
 状态：未来设计（已批准但未启用）
 实现门禁：IMPLEMENT ONLY AFTER HOST CANARIES —— 实现只能在 Host canary（第二十三节清单）通过后启动
-文件：`RFC/student-teacher.md`
+文件：`docs/rfcs/student-teacher.md`
 条款前缀：`LEARN-`
 
 ---

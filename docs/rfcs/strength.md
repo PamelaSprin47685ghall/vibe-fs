@@ -1,5 +1,7 @@
 # RFC/strength — Predict & Reduce Strength
 
+Status: proposed
+
 > 本文件为已批准但尚未启用的未来设计，不属于 0.5.x 产品合同。编号原 `SSOT/14.md`。
 > 原稿「状态：最终修订稿（已通过审阅，待 Host canary 和灰度验证）」随合入更新为「已合入规范」；
 > 实现仍受 Host canary（STRENGTH-078 C-01…C-21）与阶段 A（Projection DSL 迁移）门禁。
@@ -12,7 +14,7 @@
 
 状态：未来设计（已批准但未启用）
 条款前缀：`STRENGTH-`
-关联文档：`RFC/strength.md` 为历史设计；`SSOT/13.md` 为运行时 LLM 可见合成内容的 TOML 记法
+关联文档：`docs/rfcs/strength.md` 为历史设计；`SSOT/13.md` 为运行时 LLM 可见合成内容的 TOML 记法
 目标版本：未来生产版本
 默认状态：关闭；通过 Host canary 和灰度门禁后启用
 

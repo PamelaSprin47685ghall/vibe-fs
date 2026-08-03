@@ -72,7 +72,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | 测试、门禁、canary 剧本 | SSOT/10 | conformance Verify 段 |
 | Journal、事实、持久化 | SSOT/11 | — |
 | 运行时合成 TOML 记法 | SSOT/13（`ARCH-010`） | conformance ARCH-010 行 + `tests-mjs/Context/synthetic-toml.test.mjs` |
-| Strength / Enforcer nudge / Student&Teacher（未来设计） | `RFC/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `STATUS/README.md`「已知说明」段 |
+| Strength / Enforcer nudge / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `STATUS/README.md`「已知说明」段 |
 | 任何生产代码改动 | SSOT/01（架构 DNA） | `STATUS/conformance.md`（由 `STATUS/conformance.toml` 生成） |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
 
@@ -117,6 +117,9 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 | `docs/archive/shock-anneal-2026/` | 休克—退火迁移最终报告（`FINAL-REPORT.md`）+ 原始机器证据（`evidence/`） |
 | `docs/evidence/` | 发布验证证据（按版本目录） |
 | `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
+| `docs/rfcs/` | 未来设计 RFC（strength / student-teacher / enforcer-nudge）；非产品合同 |
+| `resources/` | 运行时静态资源：prompts/ + enforcer/catalog.json（随 npm pack 发布） |
+| `spec/` | 0.5.3 过渡：coverage.toml 骨架；条款正文仍在 SSOT/ |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
@@ -149,8 +152,8 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 0.5.2 全 SSOT 收敛已发布：Active 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
 0 PURE_CORE_ONLY / 0 NOT_IMPLEMENTED。Active 子集 = SSOT/01–13 + SSOT/15 Blogger
 工具化 + SSOT/17 LOOP。SSOT/14 Strength 与 SSOT/16 Student&Teacher 已迁
-`RFC/strength.md` / `RFC/student-teacher.md`，ENFORCER nudge/throttle 在
-`RFC/enforcer-nudge.md`——均为已批准但未交付的未来设计，不属于当前产品合同。
+`docs/rfcs/strength.md` / `docs/rfcs/student-teacher.md`，ENFORCER nudge/throttle 在
+`docs/rfcs/enforcer-nudge.md`——均为已批准但未交付的未来设计，不属于当前产品合同。
 
 ### 已知说明（非发布阻塞）
 

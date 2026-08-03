@@ -1,5 +1,8 @@
 # RFC/enforcer-nudge — Blogger as Enforcer（未来设计）
 
+Status: accepted
+Rule catalog instance data: resources/enforcer/catalog.json
+
 > 本文件为已批准但尚未启用的未来设计，不属于 0.5.x 产品合同。
 > 0.5.1 仅实现 Blogger 工具化；nudge overlay、throttle 与规则目录待 Host canary 验证后启用。
 

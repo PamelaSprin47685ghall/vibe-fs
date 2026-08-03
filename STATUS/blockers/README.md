@@ -29,4 +29,4 @@
 - `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md`
 - `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md`
 
-未来设计（Strength / Enforcer nudge / Student&Teacher）见 `RFC/`，不属于当前产品合同。
+未来设计（Strength / Enforcer nudge / Student&Teacher）见 `docs/rfcs/`，不属于当前产品合同。

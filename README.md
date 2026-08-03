@@ -10,7 +10,7 @@ OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧�
 
 本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，合规表由 [`STATUS/conformance.md`](STATUS/conformance.md) 从 `STATUS/conformance.toml` 生成。
 
-休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（Active SSOT 192/192 CONFORMANT，零 `PURE_CORE_ONLY`；SSOT/14 Strength 与 SSOT/16 Student&Teacher 已迁入 [`RFC/strength.md`](RFC/strength.md) / [`RFC/student-teacher.md`](RFC/student-teacher.md)，不再是 Active 规范）。
+休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（Active SSOT 192/192 CONFORMANT，零 `PURE_CORE_ONLY`；SSOT/14 Strength 与 SSOT/16 Student&Teacher 已迁入 [`docs/rfcs/strength.md`](docs/rfcs/strength.md) / [`docs/rfcs/student-teacher.md`](docs/rfcs/student-teacher.md)，不再是 Active 规范）。
 
 TestKit 以 `ProviderSemanticProjection` 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容（VERIFY-003、VERIFY-007）。P0 保持并行，release gate 恰好 3 轮；每个场景使用 2 秒 causal-progress Watchdog（VERIFY-004）。
 
