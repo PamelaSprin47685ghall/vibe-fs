@@ -3,10 +3,10 @@
 # The Blogger chain is the real production carrier for the Host capability
 # proof: the blog tool returns "OK" without suspending (step 0.1), the Host's
 # tool-loop continuation re-enters the transform (step 0.2), the continuation
-# commits one EnforcementCycleCommitted and parks (step 0.3), the main session's
+# commits one BlogEntryCommitted and parks (step 0.3), the main session's
 # next turn offers fresh material which resumes the parked transform (step 0.4),
-# and the resumed transform injects the delta as a synthetic user message
-# (ENFORCER-051) before the provider request goes out.
+# and the resumed transform rebuilds the full provider view from durable frames
+# via CompanionProjectionBuilder (ENFORCER-051).
 #
 # The temporal assertions live in the driver: the second Blogger request must
 # happen AFTER the second main turn (a failed park would send it immediately,
@@ -62,19 +62,21 @@ user = "Parallel inspector turn while the Blogger transform is parked."
   respond = { type = "title", text = "E2E Test Session" }
 
 # Production composes the Blogger prompt itself, so no scenario text reaches
-# this lane — hence `internal`. The delta TOML always starts with `[[message]]`.
+# this lane — hence `internal`. The final user message of every Blogger request
+# is the exactly-once instruction; match on its stable prefix.
 #
 # Every Blogger request (the main session's and the parallel session's) matches
 # this one entry: step 0 answers with a completed blog call (ENFORCER-024's
 # misspelled `enf-primitive-obsessin` → `primitive-obsession`). The continuation
 # transform then commits the cycle and parks; the offer from the main session's
-# second turn resumes it with the cumulative delta, which reaches the mock as
-# another `[[message]]` user and gets the same step-0 answer — one more cycle,
-# then the transform parks again until teardown cancels it (ENFORCER-162).
+# second turn resumes it with the cumulative delta — rebuilt from durable frames
+# via CompanionProjectionBuilder — which reaches the mock as another instruction
+# user message and gets the same step-0 answer: one more cycle, then the
+# transform parks again until teardown cancels it (ENFORCER-162).
 [[turn]]
 id = "blogger"
 internal = true
-user = "[["
+user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "cycle one text", "enf-primitive-obsessin" = 7 } }

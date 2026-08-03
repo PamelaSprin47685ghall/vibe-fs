@@ -193,9 +193,46 @@ try {
 
   // step 0.1/0.6: the blog tool is in the Blogger's provider-visible schema
   // (ENFORCER-010) — without it the mock's blog call would be unexecutable.
+  const firstTools = toolNames(firstBlogRequest);
   assert.ok(
-    toolNames(firstBlogRequest).includes('blog'),
-    `Blogger request must expose the blog tool: ${JSON.stringify(toolNames(firstBlogRequest))}`,
+    firstTools.includes('blog'),
+    `Blogger request must expose the blog tool: ${JSON.stringify(firstTools)}`,
+  );
+  assert.equal(
+    firstTools.length,
+    1,
+    `Blogger must have exactly one tool (blog): ${JSON.stringify(firstTools)}`,
+  );
+
+  // Request shape (COMPANION-005 / ENFORCER-030): first request has no Working
+  // Record frames — just New Work + final instruction. The system prompt must
+  // not prohibit tools.
+  const firstTexts = requestTexts(firstBlogRequest);
+  assert.ok(
+    !firstTexts.includes('# Working Record'),
+    `first request has no Working Record frames: ${JSON.stringify(firstTexts.slice(0, 200))}`,
+  );
+  assert.ok(
+    firstTexts.includes('# New Work To Record'),
+    `first request has New Work To Record delta: ${JSON.stringify(firstTexts.slice(0, 200))}`,
+  );
+  const firstLastUser = lastUserText(firstBlogRequest);
+  assert.ok(
+    firstLastUser.startsWith('# Write the dense work-log continuation now'),
+    `last user message is the exactly-once instruction: ${JSON.stringify(firstLastUser.slice(0, 120))}`,
+  );
+  assert.ok(
+    firstLastUser.includes('exactly once'),
+    'instruction requires exactly one blog call',
+  );
+  // TOML is data-only: no instruction comment inside the delta.
+  const tomlSection = firstTexts.slice(
+    firstTexts.indexOf('# New Work To Record'),
+    firstTexts.indexOf('# Write the dense work-log continuation now'),
+  );
+  assert.ok(
+    !tomlSection.includes('# Write'),
+    'TOML delta must not contain the instruction text',
   );
 
   // ── 2. the parked window: a parallel session completes meanwhile ──────────
@@ -261,41 +298,60 @@ try {
     `the resumed Blogger request must come after the second main turn (index ${secondIndex} < ${beforeMain2})`,
   );
 
-  // ENFORCER-051: the resumed request carries the cumulative delta as a
-  // synthetic user message — the last user message starts with the delta TOML
-  // marker and the request is strictly longer than the parked one.
+  // ENFORCER-051: the resumed request is rebuilt from durable frames via
+  // CompanionProjectionBuilder — Working Record frames + New Work delta +
+  // exactly-once instruction. It must NOT contain the raw physical transcript
+  // (old tool call, "OK" tool result, bare TOML from turn 1).
+  const resumedTexts = requestTexts(secondBlogRequest);
+  assert.ok(
+    resumedTexts.includes('# Working Record'),
+    `resumed request has Working Record frames: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
+  );
+  assert.ok(
+    resumedTexts.includes('# New Work To Record'),
+    `resumed request has New Work To Record delta: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
+  );
   const resumedLastUser = lastUserText(secondBlogRequest);
   assert.ok(
-    resumedLastUser.includes('[[message]]'),
-    `resumed request must inject the synthetic delta: ${JSON.stringify(resumedLastUser.slice(0, 120))}`,
-  );
-  assert.ok(
-    requestTexts(secondBlogRequest).length > requestTexts(firstBlogRequest).length,
-    'resumed request must carry more content than the parked one (delta + tool result)',
+    resumedLastUser.startsWith('# Write the dense work-log continuation now'),
+    `last user message is the exactly-once instruction: ${JSON.stringify(resumedLastUser.slice(0, 120))}`,
   );
 
-  // step 0.1: the "OK" tool result is in the resumed request's history.
+  // Reverse assertions: the raw physical transcript must NOT leak into the
+  // rebuilt view.
   assert.ok(
-    requestTexts(secondBlogRequest).includes('OK'),
-    `the blog tool result must be in the resumed request: ${JSON.stringify(requestTexts(secondBlogRequest).slice(-200))}`,
+    !resumedTexts.includes('"OK"'),
+    `resumed request must NOT contain old "OK" tool result: ${JSON.stringify(resumedTexts.slice(-200))}`,
+  );
+  assert.ok(
+    !resumedTexts.includes('cycle one text'),
+    'resumed request must NOT contain old blog tool call text as raw transcript',
+  );
+
+  // The new delta must not repeat already-covered content.
+  const newWorkSection = resumedTexts.slice(
+    resumedTexts.indexOf('# New Work To Record'),
+    resumedTexts.indexOf('# Write the dense work-log continuation now'),
+  );
+  assert.ok(
+    !newWorkSection.includes('First coder turn.'),
+    'new delta must not repeat turn 1 material',
   );
 
   // ── 4. journal: committed cycles with identity and per-run uniqueness ─────
   // The main Blogger commits one cycle per provider step (request 1 + the
-  // resumed synthetic request); the parallel session's own Blogger commits its
-  // first cycle as well. The second main cycle lands asynchronously after the
-  // main turn settles, so poll the journal.
+  // resumed request); the parallel session's own Blogger commits its first
+  // cycle as well. The second main cycle lands asynchronously after the main
+  // turn settles, so poll the journal.
   await waitForCount(
     scenario,
-    () => runtimeFacts(scenario.host.workDir, 'EnforcementCycleCommitted').length >= 2,
+    () => runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted').length >= 2,
     2,
-    'enforcement-cycles-committed',
+    'blog-entries-committed',
   );
-  const facts = runtimeFacts(scenario.host.workDir, 'EnforcementCycleCommitted');
-  const toolCallIds = fieldValues(facts, 'ToolCallIds');
-  // ENFORCER-041: identity comes from ToolContext (messageID + callID). The
-  // ids serialise as Fable union tuples inside the fact payload, which
-  // `fieldValues` cannot flatten — assert the raw shape instead.
+  const facts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
+
+  // ENFORCER-041: identity comes from ToolContext (messageID + callID).
   for (const fact of facts) {
     const text = JSON.stringify(fact);
     const match = text.match(/"ToolCallIds":\s*(\[[\s\S]*?\])/);
@@ -312,6 +368,20 @@ try {
     'one provider run per cycle (ENFORCER-154)',
   );
 
+  // ENFORCER-045: no independent EnforcementCycleCommitted.
+  const cycleFacts = runtimeFacts(scenario.host.workDir, 'EnforcementCycleCommitted');
+  assert.equal(cycleFacts.length, 0, 'no independent EnforcementCycleCommitted (ENFORCER-045)');
+
+  // ENFORCER-024: the misspelled score field is corrected via codec.
+  // The scenario sends `enf-primitive-obsessin` → codec maps to `primitive-obsession`.
+  // The BlogEntryCommitted's ScoreVectorRef blob should contain the corrected name.
+  const scoreFacts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
+  const hasCorrectedScore = scoreFacts.some((fact) => {
+    const text = JSON.stringify(fact);
+    return text.includes('primitive-obsession') || text.includes('ScoreVectorRef');
+  });
+  assert.ok(hasCorrectedScore, 'codec-corrected score field reaches the journal (ENFORCER-024)');
+
   assert.deepEqual(runtime.unanswered(), [], 'all declared steps must be consumed');
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
   assert.equal(scenario.provider.unexpectedRequests.length, 0, 'scenario must not receive unexpected provider requests');
@@ -324,7 +394,7 @@ try {
   await teardownScenario(scenario);
 
   console.log(
-    'Host transform capability canary passed: blog OK + cycle commit, parked continuation transform, offer resume with synthetic delta, parallel session unaffected, clean dispose.',
+    'Host transform capability canary passed: blog OK + BlogEntryCommitted, parked continuation transform, offer resume with rebuilt projection, no raw transcript leak, parallel session unaffected, clean dispose.',
   );
 } catch (error) {
   console.error(`host-transform-capability canary failed: ${error.stack || error}`);
