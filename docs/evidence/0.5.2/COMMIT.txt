@@ -1,14 +1,10 @@
-# 0.5.2 lightweight C12 snapshot — COMMIT
-
-commit: cc5a82064307b568be049cd3f0b60a2e950621cc
-short: cc5a8206
-date_utc: 2026-08-03T10:11:39Z
-date_local: 2026-08-03 18:11:12 +0800
+### COMMIT.txt — C13/C14 evidence capture point
+source_commit: da3193b956fc238fafaaecac82f986b58d375649
+short: da3193b9
+date_utc: 2026-08-03T10:34:52Z
 branch: master
-dirty: 0
-subject: Close remaining IMPLEMENTING: AwaitMode, bindableRun, ToolHostCodec, host-restart facts
-
-notes:
-- Worktree clean at capture time (git status --porcelain empty).
-- Not a release tag. C15 tag deferred until C14 RC (test:release ×3) green.
-- IMPLEMENTING Active clauses: 0 (conformance.toml scan empty for status=implementing).
+subject: feat(docs): add various evidence files for version 0.5.2 compliance and status
+dirty_before_evidence_commit: yes (evidence files only + optional STATUS)
+tag: none (C15 deferred — C14 e2e not green)
+IMPLEMENTING: 0
+CONFORMANT: 181/181

@@ -1,0 +1,9 @@
+### INSTALL.txt — isolated tarball install
+Date: 2026-08-03T10:23:19Z
+dir: /tmp/wx-0.5.2-install
+tarball: /tmp/wx-0.5.2-artifacts/wanxiangshu-0.5.2.tgz (moved off repo root for gate:layout)
+command: npm install <tarball>
+result: OK — added 143 packages, 0 vulnerabilities
+EBADENGINE: ini@7.0.0 wants node ^22.22.2 || ^24.15.0 || >=26; current v25.9.0 (warn only)
+node_modules/wanxiangshu present: yes
+installed version: 0.5.2

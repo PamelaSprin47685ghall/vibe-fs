@@ -8,13 +8,13 @@
   - `npm run lint` 通过
   - `npm run gate:static` 通过（含新增 `gate:conformance`）
   - `npm run build` 通过
-  - `npm run test:unit` 通过（641 / 641）
+  - `npm run test:unit` 通过（702 / 702）
   - `npm run test:harness` 通过（285 / 285）
   - `manager-companion-canary.mjs` 独立重跑通过
   - `npm pack` 产出 `wanxiangshu-0.5.2.tgz`（404 files, 1.8 MB packed）
-- 证据：`docs/evidence/0.5.2-baseline/`；本轮轻量 C12 快照 `docs/evidence/0.5.2/`
-  （`COMMIT.txt` / `STATIC.txt` / `PACKAGE-CONTENTS.txt`，commit `cc5a8206`，gate:static
-  绿，`npm pack --dry-run` 407 files / 1.8 MB；非完整 C12，不替代 build / unit / harness / P0）
+- 证据：`docs/evidence/0.5.2-baseline/` + `docs/evidence/0.5.2/`（C12–C14 反向审计与 RC
+  快照：STATIC/BUILD/UNIT/HARNESS/CANARY-3ROUND、pack+sha256、INSTALL/IMPORT、LEGACY 等；
+  P0×3 当前红 — 见 CANARY-3ROUND.txt）
 - 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成；C11 partial 已升 7 条 layer-2）
 
 ## 当前产品状态
@@ -156,16 +156,21 @@ src/Wanxiangshu.Next/
 
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
-- Active IMPLEMENTING = 0（commit `cc5a8206`）
+- Active IMPLEMENTING = 0；Active CONFORMANT = 181/181
 - C9：layer-2 已闭合；identity canary（transform id = tool messageID）仅保留为 Host
   升级门禁可选加强项
 - C10：Context recovery X-A–X-D 第四层 canary 剧本未建，仍待产出
 - C11：已闭合（IMPLEMENTING=0）
-- C12：轻量快照（COMMIT / STATIC / PACKAGE-CONTENTS）已捕获；剩余 NODE-MATRIX、
-  真实 pack + sha256、隔离环境 INSTALL / IMPORT
-- C13：全仓反向审计
-- C14：完整 RC（gate:static → build → unit → harness → P0×3）；绿前不 tag
-- C15：tag `v0.5.2` + dirty=0 + 证据 pin——未开始
+- C12：已补全 — NODE-MATRIX（single-node v25.9.0，诚实声明 expand later）、
+  真实 `npm pack` + `TARBALL.sha256`、隔离 INSTALL/IMPORT 绿
+  （证据 `docs/evidence/0.5.2/`）
+- C13：反向审计证据已落盘（LEGACY-SCAN / REACHABILITY / SINGLE-WRITER /
+  ACTIVE-NONCONFORMANT-SCAN / VERSION-CHECK）
+- C14：gate:static / build / unit(702) / harness(285) 绿；
+  `test:e2e:p0:three` **失败** iteration 1：`fallback-canary.mjs`
+  `cold boundary never fired: continue.0 (prefix-probe)`。
+  绿前 **不** tag（C15 阻塞）
+- C15：tag `v0.5.2` — 阻塞于 C14 e2e
 
 IMPLEMENTING 条款：无（Active 账本已清）。
 

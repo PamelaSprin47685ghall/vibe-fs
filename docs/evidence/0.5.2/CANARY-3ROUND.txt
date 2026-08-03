@@ -1,0 +1,28 @@
+### CANARY-3ROUND.txt — C14 RC test:e2e:p0:three
+HEAD_at_run: da3193b9 (da3193b956fc238fafaaecac82f986b58d375649)
+Date: 2026-08-03T10:35:45Z
+command: npm run test:e2e:p0:three  (CANARY_REPEAT=3, max=8 parallel, 18 canaries)
+exit_code: 1
+result: FAIL on iteration 1 — 4 canaries failed; rounds 2–3 not reached (fail-fast)
+
+## Failed canaries (iteration 1)
+1. host-transform-capability-canary.mjs — AssertionError: Blogger must stay parked during the parallel turn; requests = 3 (host-transform-capability-canary.mjs:272)
+2. manager-companion-canary.mjs — AssertionError: manager blogger must commit at least one BlogEntry (manager-companion-canary.mjs:89)
+3. companion-canary.mjs — AssertionError: executor must not create a Blogger companion (companion-canary.mjs:144)
+4. fallback-canary.mjs — Error: cold boundary never fired: continue.0 (prefix-probe) — the declaration admits a break the run never produced (strict-mock-provider.js:121)
+
+## Passed (14):
+agent-dsl, orchestrator-publish, orchestrator-restart-publish, pty-stress, inspector-oneshot,
+reviewer-verdict, reviewer-restart, executor, manager-file-root, process-stress, host-nudge,
+manager-full-loop, host-restart, fallback-aabb-trace
+
+## Observation
+All 4 failures involve Blogger/companion sidecar behavior (parked-during-parallel,
+BlogEntry commit, sidecar creation, prefix-probe cold boundary). Pattern consistent with
+known concurrent-suite flakiness (STATUS/README.md:118–119: manager-companion flaky in
+concurrent suite; watchdog/milestone-event gap). Determinism check: isolated rerun of
+fallback-canary below (FALLBACK-ISOLATED).
+
+## Scope
+C14 e2e NOT GREEN → C15 tag blocked. gate:static/build/unit/harness all green.
+Raw log retained: docs/evidence/0.5.2/CANARY-3ROUND.txt.raw (291477 bytes)

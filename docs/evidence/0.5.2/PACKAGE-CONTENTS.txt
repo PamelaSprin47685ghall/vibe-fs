@@ -1,71 +1,13 @@
-# 0.5.2 lightweight C12 snapshot — PACKAGE-CONTENTS (npm pack --dry-run)
+### PACKAGE-CONTENTS.txt — real npm pack (C12)
+HEAD: da3193b9
+Date: 2026-08-03T10:34:52Z
+command: npm pack (real, not dry-run)
 
-command: npm pack --dry-run
-captured_at_utc: 2026-08-03T10:11:39Z
-commit: cc5a82064307b568be049cd3f0b60a2e950621cc
-
-## Tarball Details
-npm notice name: wanxiangshu
-npm notice version: 0.5.2
-npm notice filename: wanxiangshu-0.5.2.tgz
-npm notice package size: 1.8 MB
-npm notice unpacked size: 6.5 MB
-npm notice shasum: 2d4a42cb456d125bc70e47f49debae6368c4194e
-npm notice integrity: sha512-sDRqCzjSFtXAj[...]uPMfyeeVfrNEA==
-npm notice total files: 407
-
-## Summary
-name: wanxiangshu
-version: 0.5.2
 filename: wanxiangshu-0.5.2.tgz
-package_size: 1.8 MB
+package_size: 1808675 bytes (1.8 MB)
 unpacked_size: 6.5 MB
 total_files: 407
-shasum: 2d4a42cb456d125bc70e47f49debae6368c4194e
-
-## Tail of dry-run listing (last 40 notice lines)
-
-npm notice 14.5kB build/testkit/opencode/tests/gate-readiness-cases.mjs
-npm notice 27.4kB build/testkit/opencode/tests/gate-runtime-key-cases.mjs
-npm notice 19.3kB build/testkit/opencode/tests/gate-scenario-runtime-cases.mjs
-npm notice 23.8kB build/testkit/opencode/tests/gate-schema-cases.mjs
-npm notice 22.6kB build/testkit/opencode/tests/gate-single-source-cases.mjs
-npm notice 20.9kB build/testkit/opencode/tests/gate-source-cases.mjs
-npm notice 3.4kB build/testkit/opencode/tests/gate-testkit.mjs
-npm notice 18.7kB build/testkit/opencode/tests/gate-timeout-cases.mjs
-npm notice 14.9kB build/testkit/opencode/tests/gate-unit-runner-cases.mjs
-npm notice 3.4kB build/testkit/opencode/tests/host-nudge-canary.mjs
-npm notice 454B build/testkit/opencode/tests/host-restart-canary.mjs
-npm notice 21.7kB build/testkit/opencode/tests/host-transform-capability-canary.mjs
-npm notice 411B build/testkit/opencode/tests/inspector-oneshot-canary.mjs
-npm notice 140B build/testkit/opencode/tests/lane.mjs
-npm notice 5.5kB build/testkit/opencode/tests/manager-companion-canary.mjs
-npm notice 3.5kB build/testkit/opencode/tests/manager-file-root-canary.mjs
-npm notice 411B build/testkit/opencode/tests/manager-full-loop-canary.mjs
-npm notice 422B build/testkit/opencode/tests/orchestrator-publish-canary.mjs
-npm notice 532B build/testkit/opencode/tests/orchestrator-restart-publish-canary.mjs
-npm notice 399B build/testkit/opencode/tests/process-stress-canary.mjs
-npm notice 383B build/testkit/opencode/tests/pty-stress-canary.mjs
-npm notice 1.3kB build/testkit/opencode/tests/reviewer-restart-canary.mjs
-npm notice 6.3kB build/testkit/opencode/tests/reviewer-verdict-canary.mjs
-npm notice 13.9kB build/testkit/opencode/time-budget.js
-npm notice 9.6kB build/testkit/opencode/watchdog.js
-npm notice 4.1kB build/testkit/process-lifecycle.js
-npm notice 5.7kB build/testkit/reaper.mjs
-npm notice 2.2kB build/testkit/spawn-ledger.js
-npm notice 3.6kB package.json
-npm notice Tarball Details
-npm notice name: wanxiangshu
-npm notice version: 0.5.2
-npm notice filename: wanxiangshu-0.5.2.tgz
-npm notice package size: 1.8 MB
-npm notice unpacked size: 6.5 MB
-npm notice shasum: 2d4a42cb456d125bc70e47f49debae6368c4194e
-npm notice integrity: sha512-sDRqCzjSFtXAj[...]uPMfyeeVfrNEA==
-npm notice total files: 407
-npm notice
-wanxiangshu-0.5.2.tgz
-
-## Scope note
-Dry-run only — no .tgz written to workspace. Full C12 also needs NODE-MATRIX,
-INSTALL, IMPORT, TARBALL.sha256 after real pack + isolated install.
+npm_shasum: 2d4a42cb456d125bc70e47f49debae6368c4194e
+sha256: f07c8f55fffe669295a5f2fb1234ec299c83898efa3f91be13944d747fcf44d7
+artifact_path_after_layout: /tmp/wx-0.5.2-artifacts/wanxiangshu-0.5.2.tgz
+note: tarball must not live at repo root (gate:layout ROOT_ALLOWLIST)
