@@ -54,16 +54,13 @@ module RuntimeNudge =
         [ "Submit a structured verdict with the verdict tool: PERFECT or REVISE."
           "Do not put a verdict in prose." ]
 
-    /// The interaction repair for a turn that ran tools and never reported.
+    /// Interaction repair after tool work with no final report.
     ///
-    /// The field list is one line rather than a Markdown bullet list, matching
-    /// `ForkChildPayload.BaseInstructions`. Two reasons: a bullet list inside a comment header renders
-    /// as `# - result`, which reads as a comment about a list rather than a list; and the two prompts
-    /// ask for the same report, so they should ask for it the same way.
-    let MissingFinalReportInstructions =
-        [ "Your tool work is complete, but no final task report was produced."
-          "Return a concise final report with exactly these fields: result, evidence, files changed, tests run, remaining risks or blockers."
-          "Do not call another tool unless necessary." ]
+    /// Bare `#` only. The model already knows the report shape
+    /// (`ForkChildPayload.BaseInstructions`); this is just the poke that the turn is unfinished.
+    /// `SyntheticToml.comment ""` renders as `#`.
+    // ponytail: one-byte nudge; expand only if bare `#` stops eliciting the report.
+    let MissingFinalReportInstructions = [ "" ]
 
     let providerRetry = SyntheticToml.document ProviderRetryInstructions []
     let managerReviewGuard = SyntheticToml.document ManagerReviewGuardInstructions []
