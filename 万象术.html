@@ -1,0 +1,2015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>万象术 Wanxiangshu</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --text: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent: #ff6900;
+            --accent-blue: #2a8cff;
+            --card-bg: rgba(255,255,255,0.05);
+            --card-border: rgba(255,255,255,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .viewport {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slides {
+            height: 100%;
+            width: 100%;
+            transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .slide {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 6vh 8vw;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(255,105,0,0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(42,140,255,0.06) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        .content {
+            --content-scale: 1;
+            max-width: 1200px;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+            opacity: 0;
+            transform: translateY(60px) rotateX(12deg) scale(var(--content-scale));
+            transform-origin: center center;
+            transition: all 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide.active .content {
+            opacity: 1;
+            transform: translateY(0) rotateX(0deg) scale(var(--content-scale));
+        }
+
+        .eyebrow {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 700;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        p {
+            font-size: clamp(1.1rem, 2vw, 1.5rem);
+            line-height: 1.7;
+            color: var(--text-secondary);
+            max-width: 800px;
+        }
+
+        .highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .big-number {
+            font-size: clamp(5rem, 12vw, 10rem);
+            font-weight: 800;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+            width: 100%;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 2rem;
+            backdrop-filter: blur(20px);
+            transform: translateZ(0);
+            transition: transform 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .card:hover {
+            transform: translateY(-8px) translateZ(20px);
+            border-color: rgba(255,105,0,0.4);
+            box-shadow: 0 30px 80px rgba(255,105,0,0.15);
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h3 {
+            font-size: 1.4rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .card p {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .list {
+            list-style: none;
+            margin-top: 2rem;
+        }
+
+        .list li {
+            font-size: clamp(1rem, 1.8vw, 1.3rem);
+            line-height: 2;
+            color: var(--text-secondary);
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.9em;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .quote {
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            font-weight: 500;
+            line-height: 1.5;
+            border-left: 4px solid var(--accent);
+            padding-left: 2rem;
+            margin: 2rem 0;
+            color: var(--text);
+        }
+
+        .cta {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 1rem 2.5rem;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 10px 40px rgba(255,105,0,0.3);
+        }
+
+        .cta:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 50px rgba(255,105,0,0.4);
+        }
+
+        .nav-dots {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .nav-dot.active {
+            background: var(--accent);
+            transform: scale(1.4);
+            box-shadow: 0 0 20px rgba(255,105,0,0.6);
+        }
+
+        .scroll-hint {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            animation: bounce 2s infinite;
+            opacity: 0.7;
+        }
+
+        .scroll-hint.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(10px); }
+        }
+
+        .progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-blue));
+            z-index: 1000;
+            transition: width 0.3s ease;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            background: rgba(255,105,0,0.15);
+            border: 1px solid rgba(255,105,0,0.3);
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            width: 100%;
+        }
+
+        .visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .orb {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,105,0,0.6), rgba(42,140,255,0.3));
+            filter: blur(60px);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-30px) scale(1.1); }
+        }
+
+        .floating-cards {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .floating-card {
+            position: absolute;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .fc-1 { top: 10%; left: 10%; animation: float-card 5s ease-in-out infinite; }
+        .fc-2 { top: 50%; right: 5%; animation: float-card 7s ease-in-out infinite 0.5s; }
+        .fc-3 { bottom: 15%; left: 20%; animation: float-card 6s ease-in-out infinite 1s; }
+
+        @keyframes float-card {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(2deg); }
+        }
+
+        .center-text {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .center-text p, .center-text .list {
+            text-align: center;
+        }
+
+        .center-text .list li {
+            padding-left: 0;
+        }
+
+        .center-text .list li::before {
+            display: none;
+        }
+
+        .roles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+            width: 100%;
+        }
+
+        .role-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .role-card:hover {
+            background: rgba(255,105,0,0.1);
+            border-color: rgba(255,105,0,0.3);
+            transform: translateY(-5px);
+        }
+
+        .role-card .role-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        .role-card .role-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .feature-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            padding: 1.5rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .feature-item .num {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+
+        .feature-item .text h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .feature-item .text p {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .ending h1 {
+            font-size: clamp(2.5rem, 6vw, 5rem);
+        }
+
+        .ending .slogan {
+            font-size: clamp(1.2rem, 2.5vw, 2rem);
+            color: var(--text-secondary);
+            letter-spacing: 0.1em;
+        }
+
+        @media (max-width: 768px) {
+            .two-col { grid-template-columns: 1fr; gap: 2rem; }
+            .cards { grid-template-columns: 1fr; }
+            .nav-dots { right: 1rem; }
+            .slide { padding: 4vh 6vw; }
+            .orb { width: 200px; height: 200px; }
+        }
+
+        /* Dense layouts for content-heavy slides */
+        .dense .cards {
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .dense .card {
+            padding: 1.2rem;
+            border-radius: 18px;
+        }
+        .dense .card h3 {
+            font-size: 1.15rem;
+            margin-bottom: 0.4rem;
+        }
+        .dense .card p {
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        .dense .card-icon {
+            font-size: 1.8rem;
+            margin-bottom: 0.6rem;
+        }
+        .dense .roles-grid {
+            gap: 0.6rem;
+            margin-top: 1.2rem;
+        }
+        .dense .role-card {
+            padding: 0.8rem 0.6rem;
+            border-radius: 12px;
+        }
+        .dense .role-card .role-name {
+            font-size: 0.95rem;
+            margin-bottom: 0.2rem;
+        }
+        .dense .role-card .role-desc {
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+        .dense .feature-row {
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .dense .feature-item {
+            padding: 1rem;
+        }
+        .dense .feature-item .num {
+            font-size: 1.2rem;
+        }
+        .dense .feature-item .text h4 {
+            font-size: 1rem;
+        }
+        .dense .feature-item .text p {
+            font-size: 0.8rem;
+        }
+        .dense .eyebrow, .dense .tag {
+            margin-bottom: 0.8rem;
+            font-size: 0.9rem;
+        }
+        .dense h2 {
+            margin-bottom: 0.8rem;
+        }
+        .dense h3 {
+            margin-bottom: 0.6rem;
+        }
+        .dense p {
+            line-height: 1.5;
+        }
+        .dense .quote {
+            margin: 1rem 0;
+            padding-left: 1rem;
+            font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+        }
+        .dense .list {
+            margin-top: 1rem;
+        }
+        .dense .list li {
+            line-height: 1.7;
+            font-size: clamp(0.9rem, 1.6vw, 1.1rem);
+        }
+
+        /* Vertical-height aware adjustments */
+        @media (max-height: 800px) {
+            .slide { padding: 5vh 8vw; }
+            .cards { gap: 1rem; margin-top: 2rem; }
+            .card { padding: 1.5rem; }
+            .roles-grid { gap: 0.8rem; }
+            .role-card { padding: 1rem; }
+            .feature-row { gap: 1rem; margin-top: 1.5rem; }
+            .feature-item { padding: 1.2rem; }
+            .eyebrow { margin-bottom: 1rem; font-size: 1rem; }
+            h2 { margin-bottom: 1rem; }
+            .quote { margin: 1.2rem 0; }
+            .list { margin-top: 1.2rem; }
+            .list li { line-height: 1.8; }
+        }
+        @media (max-height: 650px) {
+            .slide { padding: 3vh 6vw; }
+            .cards { gap: 0.8rem; margin-top: 1.2rem; }
+            .card { padding: 1.2rem; border-radius: 18px; }
+            .card h3 { font-size: 1.1rem; }
+            .card p { font-size: 0.85rem; }
+            .card-icon { font-size: 1.8rem; margin-bottom: 0.6rem; }
+            .roles-grid { gap: 0.5rem; margin-top: 1rem; }
+            .role-card { padding: 0.7rem 0.5rem; }
+            .role-card .role-name { font-size: 0.85rem; }
+            .role-card .role-desc { font-size: 0.7rem; }
+            .feature-row { gap: 0.8rem; margin-top: 1rem; }
+            .feature-item { padding: 0.8rem; }
+            .feature-item .num { font-size: 1.1rem; }
+            .feature-item .text h4 { font-size: 0.95rem; }
+            .feature-item .text p { font-size: 0.75rem; }
+            .eyebrow, .tag { margin-bottom: 0.6rem; font-size: 0.85rem; }
+            h2 { margin-bottom: 0.6rem; }
+            .quote { margin: 0.8rem 0; padding-left: 1rem; }
+            .list { margin-top: 0.8rem; }
+            .list li { line-height: 1.6; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress" id="progress"></div>
+    <div class="viewport" id="viewport">
+        <div class="slides" id="slides">
+            <!-- Slide 1: Cover -->
+            <section class="slide active">
+                <div class="content center-text">
+                    <div class="eyebrow">Wanxiangshu · OpenCode Plugin</div>
+                    <h1>万象术</h1>
+                    <p class="highlight">一支随叫随到的 AI 工程团队</p>
+                    <p>有记忆、有纪律、有证据 — 让「完成了」可以被证明</p>
+                    <div class="cards" style="margin-top: 4rem; max-width: 900px;">
+                        <div class="card">
+                            <div class="card-icon">⚡</div>
+                            <h3>Strength</h3>
+                            <p>便宜模型提前跑完机械调查，主模型只做真正的思考</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🛡️</div>
+                            <h3>Enforcer</h3>
+                            <p>120 条工程规则持续体检，问题追着你报告</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🎓</div>
+                            <h3>Student &amp; Teacher</h3>
+                            <p>先学透再动笔，把经验编译成可复用技能</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 2: Problem -->
+            <section class="slide">
+                <div class="content two-col">
+                    <div>
+                        <div class="eyebrow">The Problem</div>
+                        <h2>你熟悉这些瞬间</h2>
+                        <p>问题不在模型不够聪明 — 在于它独自工作、没有记忆、没有纪律。</p>
+                        <ul class="list">
+                            <li>聊到一半，它忘了你们两小时前定下的方案</li>
+                            <li>它说「完成了」，你一跑测试，红了一片</li>
+                            <li>网络抖一下，它从头再来，还改了主意</li>
+                            <li>同一个文件，它搜了四遍，每次都说「我看看」</li>
+                            <li>几个子任务同时开工，互相覆盖了修改</li>
+                            <li>交付的文档读起来漂亮，细问全是空话</li>
+                        </ul>
+                    </div>
+                    <div class="visual">
+                        <div class="orb"></div>
+                        <div class="floating-cards">
+                            <div class="floating-card fc-1">❌ 健忘</div>
+                            <div class="floating-card fc-2">❌ 假完成</div>
+                            <div class="floating-card fc-3">❌ 空文档</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 3: Story -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">A Familiar Afternoon</div>
+                    <h2>一个熟悉的下午</h2>
+                    <p class="quote">「修一下支付模块的并发 bug。」</p>
+                    <p>三小时后：上下文爆了两次，历史被压缩得走了样，它宣布完成 — 用的却是你们早已否决的方案。</p>
+                    <p style="margin-top: 1.5rem;">它不是在骗你。它只是没有地方记住约定，没有纪律要求验证，也没有人为它的「完成」签字。</p>
+                </div>
+            </section>
+
+            <!-- Slide 4: Vision -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">The Answer</div>
+                    <h2>万象术的回答</h2>
+                    <p class="quote">不是换一个更聪明的模型，而是给模型一支团队、一份记忆、一套纪律。</p>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🤝</div>
+                            <h3>一支团队</h3>
+                            <p>十二个角色各司其职：协调的不写代码，写代码的不当裁判</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">📓</div>
+                            <h3>一份记忆</h3>
+                            <p>每个会话配一名随行记录员，工作日志永不丢失</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🛡️</div>
+                            <h3>一套纪律</h3>
+                            <p>评审要证据，越界有人管，失败有预案</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 5: Team Overview -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>十二个角色，各司其职</h2>
+                    <p>你面对的是一个团队，不是一个聊天框。</p>
+                    <div class="roles-grid">
+                        <div class="role-card">
+                            <div class="role-name">Orchestrator 总调度</div>
+                            <div class="role-desc">把大需求分给多个 Manager</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Manager 项目经理</div>
+                            <div class="role-desc">拆任务、派专家、盯交付</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Coder 工程师</div>
+                            <div class="role-desc">在授权范围内写代码</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Inspector 调查员</div>
+                            <div class="role-desc">只读查证，建立证据链</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">DevOps 运维</div>
+                            <div class="role-desc">唯一能碰终端与进程</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Browser 调研员</div>
+                            <div class="role-desc">查阅外部文档资料</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Meditator 分析师</div>
+                            <div class="role-desc">用系统方法啃硬问题</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Reviewer 评审</div>
+                            <div class="role-desc">只读的独立裁判</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Student 学生</div>
+                            <div class="role-desc">主动学习，把经验变技能</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Blogger · 幕后</div>
+                            <div class="role-desc">随行记录员兼纪律委员</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Executor · 幕后</div>
+                            <div class="role-desc">专职跑程序的执行体</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">Teacher · 幕后</div>
+                            <div class="role-desc">学生的全能导师</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 6: Manager -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>你只管说目标</h2>
+                    <p>你说「做什么」，Manager 决定「谁来做、怎么拆、何时收」。</p>
+                    <div class="feature-row" style="margin-top: 3rem;">
+                        <div class="feature-item">
+                            <div class="num">01</div>
+                            <div class="text">
+                                <h4>理解需求</h4>
+                                <p>把一句话变成可执行的计划</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">02</div>
+                            <div class="text">
+                                <h4>拆解任务</h4>
+                                <p>识别依赖，分出可并行的部分</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">03</div>
+                            <div class="text">
+                                <h4>派给专家</h4>
+                                <p>调查、编码、验证各有专人</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">04</div>
+                            <div class="text">
+                                <h4>验收交付</h4>
+                                <p>收齐工作记录，确认证据齐全</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">Manager 自己不写一行代码 — 协调者一下场，必然顾此失彼。</p>
+                </div>
+            </section>
+
+            <!-- Slide 7: Coder & Inspector -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>写代码的手，不翻卷宗</h2>
+                    <div class="two-col">
+                        <div>
+                            <h3>Coder 工程师</h3>
+                            <ul class="list">
+                                <li>拿到明确的任务范围</li>
+                                <li>专注读写与修改代码</li>
+                                <li>随时可以叫 Inspector 查证</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>Inspector 调查员</h3>
+                            <ul class="list">
+                                <li>只读，改不了任何东西</li>
+                                <li>追调用链、定位根因</li>
+                                <li>必要时运行程序验证猜想</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">调查归调查，修改归修改 — 证据链不会被「顺手改一下」污染。</p>
+                </div>
+            </section>
+
+            <!-- Slide 8: Why Separation -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>为什么不一个人全干</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🔍</div>
+                            <h3>调查更彻底</h3>
+                            <p>Inspector 不急着改，顺着线索摸到底</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">✏️</div>
+                            <h3>修改更专注</h3>
+                            <p>Coder 拿到的是结论，不是半成品线索</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧪</div>
+                            <h3>验证更可信</h3>
+                            <p>查证与修改不是同一个人，「自己验自己」不成立</p>
+                        </div>
+                    </div>
+                    <p style="margin-top: 2rem;">这套分工不靠自觉，由工具权限强制：不在工具箱里的东西，连试的机会都没有。</p>
+                </div>
+            </section>
+
+            <!-- Slide 9: DevOps -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>终端只有一个人能碰</h2>
+                    <p>服务器、进程、交互式命令行，全部归 DevOps 一个人管。别人要用终端，得向 DevOps 开口。</p>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🖥️</div>
+                            <h3>独占交互终端</h3>
+                            <p>多个 AI 不会在同一个 shell 里互相踩</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🔌</div>
+                            <h3>完成只认真实退出</h3>
+                            <p>进程真的结束才算完，不会因为「看起来结束」就误判</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧹</div>
+                            <h3>善后到底</h3>
+                            <p>任务取消时，整棵进程树被清理干净</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 10: Reviewer -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>裁判不上场踢球</h2>
+                    <p>Reviewer 没有写权限，跑不了命令，只有眼睛、证据和一枚 verdict 印章。</p>
+                    <p class="quote">独立性不是态度，是结构 — 它改不了代码，也就没有「自己修一下算了」的诱惑。</p>
+                </div>
+            </section>
+
+            <!-- Slide 11: Fast & Deep -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>每个角色，两种强度</h2>
+                    <div class="two-col">
+                        <div>
+                            <h3>⚡ fast 快版</h3>
+                            <p>反应快、成本低，处理常规任务</p>
+                        </div>
+                        <div>
+                            <h3>🧠 deep 深版</h3>
+                            <p>思考深、推理强，啃硬骨头</p>
+                        </div>
+                    </div>
+                    <p style="margin-top: 2rem;">同一套 prompt、同一套工具、同一套纪律 — 只有背后的模型不同。</p>
+                    <p class="quote">换强度，不换规矩。</p>
+                </div>
+            </section>
+
+            <!-- Slide 12: Backstage Roles -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第一章 · 你的团队</div>
+                    <h2>你看不到的齿轮</h2>
+                    <p>Blogger、Executor、Teacher 永远不会出现在你的选择列表里 — 它们是内部角色。</p>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🙈</div>
+                            <h3>选择保持简单</h3>
+                            <p>你的列表里只有该由你决定的角色</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">⚙️</div>
+                            <h3>系统照样精密</h3>
+                            <p>记录、执行、教学在幕后持续运转</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🔒</div>
+                            <h3>模型也不知道</h3>
+                            <p>内部角色不进任何模型可见的清单</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 13: Companion -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第二章 · 记忆</div>
+                    <div class="big-number">1</div>
+                    <h2>每个会话，一名随行记录员</h2>
+                    <p>无论任务大小、无论角色快慢，每个工作会话都恰好配一名 Companion 记录员 — 不是选配，是标配。</p>
+                    <p class="quote">记忆不是功能，是结构。</p>
+                </div>
+            </section>
+
+            <!-- Slide 14: What It Records -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第二章 · 记忆</div>
+                    <h2>它记下什么</h2>
+                    <div class="two-col">
+                        <div>
+                            <h3>记</h3>
+                            <ul class="list">
+                                <li>你的原始任务，逐字</li>
+                                <li>每一步的发现与结论</li>
+                                <li>每次修改的原因</li>
+                                <li>工具调用了什么、返回了什么</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>不记</h3>
+                            <ul class="list">
+                                <li>时间戳</li>
+                                <li>花了多少钱</li>
+                                <li>运行实例编号</li>
+                                <li>一切与「做了什么」无关的噪音</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">记住该记的，忘掉该忘的 — 这份记录因此永远干净。</p>
+                </div>
+            </section>
+
+            <!-- Slide 15: How It Records -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第二章 · 记忆</div>
+                    <h2>开头与结尾，逐字保留</h2>
+                    <p>记录员持续把中段工作压缩成稠密日志，但有两样东西永远不压缩。</p>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">📜</div>
+                            <h3>你的原始需求</h3>
+                            <p>第一条任务 prompt 逐字保留，永不送去压缩</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🏁</div>
+                            <h3>最终交付</h3>
+                            <p>最后一次输出原文保留，不再经任何加工</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🗜️</div>
+                            <h3>中段滚动压缩</h3>
+                            <p>已消化的工作变成致密日志，越来越紧凑</p>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">你最在意的两句话 — 你说了什么，它交付了什么 — 永远逐字在案。</p>
+                </div>
+            </section>
+
+            <!-- Slide 16: Three Uses -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第二章 · 记忆</div>
+                    <h2>这份记录的三个用处</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🧬</div>
+                            <h3>子任务继承背景</h3>
+                            <p>新任务开工时带着完整的来龙去脉，不用你重讲一遍</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">💾</div>
+                            <h3>崩溃原地复活</h3>
+                            <p>重启后回到同一局面 — 不是差不多的局面</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">📦</div>
+                            <h3>交付完整档案</h3>
+                            <p>任务收工时，你拿到从需求到结论的完整工作记录</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 17: Parent-Child -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第二章 · 记忆</div>
+                    <h2>子任务不背父任务的包袱</h2>
+                    <p>大任务套小任务可以套很多层。万象术的规定：父任务的完整记录是子任务的起点背景，但子任务自己的记录只讲自己的故事。</p>
+                    <p class="quote">不传包袱，只传背景 — 套多少层，记忆都不膨胀。</p>
+                </div>
+            </section>
+
+            <!-- Slide 18: Disk First -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第二章 · 记忆</div>
+                    <h2>先落盘，再行动</h2>
+                    <p>每个事实先写进只增不删的日志，确认安全后才改变内存。崩溃后重放这些事实，回到同一局面。</p>
+                    <p class="quote">别信「刚写入已安全」，除非证明安全。</p>
+                </div>
+            </section>
+
+            <!-- Slide 19: Hidden Killer -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>长任务的隐形杀手</h2>
+                    <p>模型的上下文窗口装不下无限对话。聊到一定长度，早期内容必须让位 — 你的约定、它的承诺，都在让位名单上。</p>
+                    <ul class="list">
+                        <li>它开始忘记两小时前定下的方案</li>
+                        <li>新结论和旧决定互相矛盾</li>
+                        <li>已经查过的文件，又查了一遍</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Slide 20: Others Guess -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>别人的做法：猜</h2>
+                    <p>估算 token、设定阈值、提前压缩。猜错一次的代价：你的历史被提前压扁，压坏的部分永远找不回来。</p>
+                    <p class="quote">万象术的第一条规矩 — 不观察容量，不估算余量，不预测溢出。</p>
+                </div>
+            </section>
+
+            <!-- Slide 21: Recover On Failure -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>万象术的做法：真摔了再治</h2>
+                    <p>正常请求总是先直接跑。第一次真实失败就是唯一的信号 — 在此之前，不做任何「预防性」压缩。</p>
+                    <p class="quote">第一次溢出必然表现为一次失败。这是主动接受的代价，换来的是从不误伤你的历史。</p>
+                </div>
+            </section>
+
+            <!-- Slide 22: X Probe -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <div class="big-number">0</div>
+                    <h2>主会话恢复，零额外花费</h2>
+                    <p>失败后，用记录员早已写好的工作日志替换掉最早的原始历史 — 本地完成，不多花一次模型调用。</p>
+                    <p class="quote">而且这只是「试」：这次请求成功，替换才生效；失败，就当从没试过。</p>
+                </div>
+            </section>
+
+            <!-- Slide 23: Y Squash -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>记录员自己也会压缩</h2>
+                    <p>如果连记录员的笔记都快装不下，它会把最旧的一半笔记重写成精华 — 一次额外的模型调用，永久生效。</p>
+                    <p class="quote">精华本身就是有效劳动，所以不撤销、不重写 — 即使随后的主请求失败。</p>
+                </div>
+            </section>
+
+            <!-- Slide 24: Three Conditions -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>不是每次失败都动手</h2>
+                    <p>三个条件同时满足，恢复才真正发生 — 缺一不可。</p>
+                    <div class="feature-row" style="margin-top: 3rem;">
+                        <div class="feature-item">
+                            <div class="num">01</div>
+                            <div class="text">
+                                <h4>刚真的失败过</h4>
+                                <p>不是例行公事，是响应真实失败</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">02</div>
+                            <div class="text">
+                                <h4>轮到恢复位</h4>
+                                <p>固定节奏，不是一失败就压缩</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">03</div>
+                            <div class="text">
+                                <h4>手头确有材料</h4>
+                                <p>没有压缩好的日志，就发正常请求</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">缺任何一个，都按正常请求处理 — 防止「一失败就碾压历史」，把记录越磨越薄。</p>
+                </div>
+            </section>
+
+            <!-- Slide 25: Byte-Stable Prefix -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>逐字节稳定的前缀</h2>
+                    <p>模型的速度与价格，取决于输入前缀的缓存命中。万象术保证：同一段时期内，发给模型的历史前缀一个字节都不变。</p>
+                    <div class="two-col" style="margin-top: 2rem;">
+                        <div>
+                            <h3>你的收益</h3>
+                            <ul class="list">
+                                <li>响应更快</li>
+                                <li>成本更低</li>
+                                <li>行为更可预期</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>前缀只在三件实事后切换</h3>
+                            <ul class="list">
+                                <li>一次成功的恢复被确认</li>
+                                <li>一次日志压缩被提交</li>
+                                <li>宿主真的压缩了对话</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 26: Host Compaction -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第三章 · 上下文</div>
+                    <h2>就算宿主自己动手</h2>
+                    <p>你手动触发压缩，或宿主越过防线自动压缩 — 万象术观察到就重新锚定：日志全部保留，恢复能力后续自然回归。</p>
+                    <p class="quote">不崩溃、不丢记忆，最多损失一次缓存的连续性。</p>
+                </div>
+            </section>
+
+            <!-- Slide 27: Failure Points -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第四章 · 韧性</div>
+                    <h2>模型服务是别人家的</h2>
+                    <p>超时、限流、配额、断流 — 问题不是会不会发生，而是发生时，你的任务怎么办。</p>
+                    <ul class="list">
+                        <li>深夜跑长任务，模型服务开始限流</li>
+                        <li>供应商配额耗尽，请求连续失败</li>
+                        <li>响应到一半断了，前功尽弃？</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Slide 28: Two Drivers -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第四章 · 韧性</div>
+                    <h2>每个任务，两名司机</h2>
+                    <p>你选择的 fast / deep 两个版本互为搭档：主司机开不动，副司机已经在副驾上，接着开。</p>
+                    <p class="quote">切换的只是模型 — 任务、记忆、纪律原封不动。</p>
+                </div>
+            </section>
+
+            <!-- Slide 29: AABB Rotation -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第四章 · 韧性</div>
+                    <h2>主两次，备两次</h2>
+                    <p>不一次失败就换人 — 可能只是网络抖了一下；也不死等一个 — 真出故障不能干耗。</p>
+                    <div class="roles-grid" style="grid-template-columns: repeat(4, 1fr); margin-top: 3rem;">
+                        <div class="role-card">
+                            <div class="role-name">A</div>
+                            <div class="role-desc">主司机 · 第一次</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">A</div>
+                            <div class="role-desc">主司机 · 第二次</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">B</div>
+                            <div class="role-desc">副司机 · 第一次</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">B</div>
+                            <div class="role-desc">副司机 · 第二次</div>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">循环往复，永不判死 — 没有「失败四次就放弃」的说法。</p>
+                </div>
+            </section>
+
+            <!-- Slide 30: Budget -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第四章 · 韧性</div>
+                    <div class="big-number">12</div>
+                    <h2>连续失败十二次，明确告诉你</h2>
+                    <p>尝试有底线。默认连续十二次失败，万象术宣布这个任务现在做不了 — 而不是假装还在努力。</p>
+                    <p class="quote">恢复方式同样明确：你下达新指令，或显式让它再试。决定权在你。</p>
+                </div>
+            </section>
+
+            <!-- Slide 31: Success Clears -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第四章 · 韧性</div>
+                    <h2>原谅失败，记住位置</h2>
+                    <p>半路成功一次，失败计数立刻清零 — 零散的颠簸不会累积成冤案。</p>
+                    <p style="margin-top: 1.5rem;">但轮换的位置记住不动 — 下次失败从上次的位置继续，不白走弯路。</p>
+                    <p class="quote">成功清零计数，不清零经验。</p>
+                </div>
+            </section>
+
+            <!-- Slide 32: Fake Done -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第五章 · 评审</div>
+                    <h2>「完成了」值多少钱</h2>
+                    <p class="quote">AI 最流利的一句话是「完成了」。它值多少钱，取决于背后有没有证据。</p>
+                    <p>万象术里，「完成」要经过一名独立评审 — 而且要过两次。</p>
+                </div>
+            </section>
+
+            <!-- Slide 33: Independent Reviewer -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第五章 · 评审</div>
+                    <h2>评审不是自评</h2>
+                    <p>Reviewer 是独立会话、只读权限，与写代码的从来不是同一个。</p>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">👀</div>
+                            <h3>只看证据</h3>
+                            <p>需求是否覆盖、验证是否真实、有没有引入新问题</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🚫</div>
+                            <h3>没有写权限</h3>
+                            <p>改不了代码，也就没有和稀泥的手段</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧍</div>
+                            <h3>独立身份</h3>
+                            <p>它不是 Coder 的分身，不共享结论</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 34: Challenge -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第五章 · 评审</div>
+                    <h2>第一次「完美」，换来一句质疑</h2>
+                    <p>Reviewer 第一次说 PERFECT，系统固定回复：</p>
+                    <p class="quote">“Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?”</p>
+                    <p>第一次通过，从来不算数。</p>
+                </div>
+            </section>
+
+            <!-- Slide 35: Second Proof -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第五章 · 评审</div>
+                    <h2>第二次，必须证明真的重查过</h2>
+                    <p>第二次 PERFECT 成立的条件，每一条都由系统验证：</p>
+                    <ul class="list">
+                        <li>同一名 Reviewer、同一份代码、同一次评审任务</li>
+                        <li>必须是一次全新的模型运行 — 不是复制粘贴</li>
+                        <li>这次运行的输入里，确实带着上次那句质疑 — 哈希级证据</li>
+                        <li>两次之间，代码一行没动，没有人说 REVISE</li>
+                    </ul>
+                    <p class="quote" style="margin-top: 2rem;">装不了糊涂 — 证据链缺一环，评审就不成立。</p>
+                </div>
+            </section>
+
+            <!-- Slide 36: Tree Change -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第五章 · 评审</div>
+                    <h2>改一行，重审</h2>
+                    <p>评审通过后又动了代码？通过的印章立即失效，必须重新走完双 PERFECT。</p>
+                    <p class="quote">没有通过评审的任务，Manager 无法收工 — 这道门没有「下不为例」。</p>
+                </div>
+            </section>
+
+            <!-- Slide 37: Parallel Intro -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第六章 · 并行</div>
+                    <h2>一个大需求，几支小队同时开工</h2>
+                    <p>万象术把大型需求拆成多个 Job，每个 Job 一名 Manager 带队，在互不相见的工地里并行推进，最后安全合龙。</p>
+                    <div class="feature-row" style="margin-top: 3rem;">
+                        <div class="feature-item">
+                            <div class="num">01</div>
+                            <div class="text">
+                                <h4>拆解</h4>
+                                <p>分析依赖，识别可并行项</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">02</div>
+                            <div class="text">
+                                <h4>隔离</h4>
+                                <p>每个 Job 独立的代码副本与会话</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">03</div>
+                            <div class="text">
+                                <h4>完工</h4>
+                                <p>各自完成，各自通过评审</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">04</div>
+                            <div class="text">
+                                <h4>合龙</h4>
+                                <p>排队进入主干，冲突有人处理</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 38: Isolated & Clean -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第六章 · 并行</div>
+                    <h2>独立工地，干净开工</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🏗️</div>
+                            <h3>每个 Job 一块独立工地</h3>
+                            <p>代码副本、分支、会话互不干扰；一个 Job 崩了不波及别人</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧹</div>
+                            <h3>桌面不干净就拒绝开工</h3>
+                            <p>你有未提交的改动，它绝不替你收拾、不替你提交、不猜你的意图</p>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">你的 workspace，只有你能动 — 这是纪律，不是客气。</p>
+                </div>
+            </section>
+
+            <!-- Slide 39: Done Is Not Merged -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第六章 · 并行</div>
+                    <h2>完工，不等于能合并</h2>
+                    <p>其他小队可能已经把新代码合进了主干。所以每个 Job 在合并前必须：先把主干最新内容并进自己的工地，再重新通过双 PERFECT 评审。</p>
+                    <p class="quote">在旧世界通过的评审，管不了新世界。</p>
+                </div>
+            </section>
+
+            <!-- Slide 40: CAS Gate -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第六章 · 并行</div>
+                    <h2>只在最后一瞬上锁</h2>
+                    <p>并行开发期间零锁 — 大家全速推进。只在真正改写主干的那一瞬间拿锁：再确认一次主干没动过，原样合入，立即放锁。</p>
+                    <p class="quote">主干动过了？放锁、重新合并、重新评审 — 没有例外。</p>
+                </div>
+            </section>
+
+            <!-- Slide 41: Crash Recovery -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第六章 · 并行</div>
+                    <h2>崩了，接着干</h2>
+                    <p>每个 Job 的每个里程碑都是落盘事实。进程崩溃、机器重启后，恢复动作是唯一确定的：</p>
+                    <ul class="list">
+                        <li>已发布 — 清理工地，收档</li>
+                        <li>合并途中崩溃 — 判断合没合上，补上或重来</li>
+                        <li>冲突解决中 — 回到同一工地、同一 Manager 继续</li>
+                        <li>还在开发 — 从工地现场接着干</li>
+                    </ul>
+                    <p class="quote" style="margin-top: 2rem;">不重建工地，不换 Manager — 不是重来，是续上。</p>
+                </div>
+            </section>
+
+            <!-- Slide 42: Where Waiting Goes -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第七章 · Strength</div>
+                    <h2>你等待的时间，去了哪里</h2>
+                    <p>观察真实工作流，大量请求是机械的：搜一下、读一个、再读一个 — 搜索结果几乎决定了下一步读什么。</p>
+                    <p class="quote">用昂贵的主模型做机械调查，就像让建筑师去搬砖。</p>
+                </div>
+            </section>
+
+            <!-- Slide 43: Scout -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第七章 · Strength</div>
+                    <h2>让便宜模型先跑</h2>
+                    <p>Strength 在旁路派出一颗侦察卫星：便宜模型照着主会话的视角，提前把最可能的机械调查跑完，结果以普通历史的样子交给主模型。</p>
+                    <p style="margin-top: 1.5rem;">主模型接着做真正的思考：推理、修改、交付。</p>
+                </div>
+            </section>
+
+            <!-- Slide 44: At Most Two Steps -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第七章 · Strength</div>
+                    <div class="big-number">2</div>
+                    <h2>最多替跑两步</h2>
+                    <p>预测深度固定为最多两个请求。为什么是两步？越深越容易猜错方向 — 猜错三步的浪费，就超过了省下的成本。</p>
+                    <p class="quote">有限深度不是保守，是算账。</p>
+                </div>
+            </section>
+
+            <!-- Slide 45: Zero Cost Miss -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第七章 · Strength</div>
+                    <h2>猜错了，零成本</h2>
+                    <p>侦察兵的结果在证明有用之前不算数：主模型没采纳，整批丢弃 — 主会话的历史里连痕迹都没有，更不需要回滚。</p>
+                    <p class="quote">可丢弃，是投机的第一美德。</p>
+                </div>
+            </section>
+
+            <!-- Slide 46: Both Unaware -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第七章 · Strength</div>
+                    <h2>双方都蒙在鼓里</h2>
+                    <div class="two-col">
+                        <div>
+                            <h3>主模型不知道</h3>
+                            <ul class="list">
+                                <li>侦察结果看起来和普通历史一模一样</li>
+                                <li>没有任何「这是别人给的」标记</li>
+                                <li>它不会对信息来源区别对待</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>侦察兵也不知道</h3>
+                            <ul class="list">
+                                <li>它以为自己在正常工作</li>
+                                <li>没有「只做机械步骤」的特殊合同</li>
+                                <li>用的是同一份角色 prompt</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">最好的旁路，是没人发现旁路。</p>
+                </div>
+            </section>
+
+            <!-- Slide 47: Gets Better -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第七章 · Strength</div>
+                    <h2>越用越准的预测器</h2>
+                    <p>系统持续统计预测的成败：太激进就自动收敛，太保守就适当放松 — 负反馈把预测倾向稳定在长期划算的工作点。</p>
+                    <p class="quote">不承诺每次都省，承诺长期划算。</p>
+                </div>
+            </section>
+
+            <!-- Slide 48: Discipline Officer -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第八章 · Enforcer</div>
+                    <h2>记录员还有第二份工作</h2>
+                    <p>每次写工作日志时，记录员顺便对最近的工作做一次工程体检 — 这就是 Enforcer。</p>
+                    <p style="margin-top: 1.5rem;">不是又一个爱提意见的 AI，而是一套有评分、有耐性、有分寸的监督机制。</p>
+                </div>
+            </section>
+
+            <!-- Slide 49: Confidence Score -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第八章 · Enforcer</div>
+                    <div class="big-number">0–9</div>
+                    <h2>评分是置信度，不是严重度</h2>
+                    <p>每项检查打 0 到 9 分 — 表示「我有多确定这事真的发生了」。</p>
+                    <div class="two-col" style="margin-top: 2rem;">
+                        <div>
+                            <h3>小毛病可以是 9 分</h3>
+                            <p>铁证如山</p>
+                        </div>
+                        <div>
+                            <h3>大问题也可以是 2 分</h3>
+                            <p>只是迹象</p>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">没观察到的项直接不写，缺失就是零 — 不为了凑数而打分。</p>
+                </div>
+            </section>
+
+            <!-- Slide 50: Rule Catalog -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">第八章 · Enforcer</div>
+                    <h2>120 条工程规则</h2>
+                    <div class="roles-grid">
+                        <div class="role-card">
+                            <div class="role-name">A 类型设计</div>
+                            <div class="role-desc">用类型消灭不可能的状态</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">B 控制流</div>
+                            <div class="role-desc">流程直白不绕弯</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">C 模块边界</div>
+                            <div class="role-desc">各守其位不越界</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">D 纯度</div>
+                            <div class="role-desc">不改旧数据，不偷看时钟</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">E 持久化</div>
+                            <div class="role-desc">先落盘再行动</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">F 并发</div>
+                            <div class="role-desc">该并行不串行</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">G 测试纪律</div>
+                            <div class="role-desc">先写失败测试再改实现</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">H 验证</div>
+                            <div class="role-desc">没验证不说完成</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">I 调查</div>
+                            <div class="role-desc">不猜，去查</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">J 范围</div>
+                            <div class="role-desc">不做没让做的事</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">K 经验</div>
+                            <div class="role-desc">可复用的教训要记录</div>
+                        </div>
+                        <div class="role-card">
+                            <div class="role-name">L 命名</div>
+                            <div class="role-desc">名字说真话</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 51: Quiet Alarm -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第八章 · Enforcer</div>
+                    <h2>不吵的报警器</h2>
+                    <p>偶尔一次低分，它记下但不烦你；同一个问题持续出现，它一定会说。</p>
+                    <p style="margin-top: 1.5rem;">平滑累积的压力跨过阈值才触发 — 陈旧的孤立报告，不会只因时间过去而突然响起。</p>
+                    <p class="quote">像烟雾报警器 — 对持续的烟雾反应，对炒菜的油烟宽容。</p>
+                </div>
+            </section>
+
+            <!-- Slide 52: Nudge Example -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第八章 · Enforcer</div>
+                    <h2>提醒长什么样</h2>
+                    <p class="quote"># [ENF-G01] TDD order was skipped. Add a failing behavioral test before changing the implementation.</p>
+                    <p>这条提醒以用户消息的身份出现 — 和你的话同等分量，模型没法把它当背景噪音。它不冒充你的新指令，只在当前阶段有效，过后自然退场。</p>
+                </div>
+            </section>
+
+            <!-- Slide 53: Never Waits -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第八章 · Enforcer</div>
+                    <h2>主会话从不等待</h2>
+                    <p>监督是异步的：你的对话零延迟，体检报告在它准备好时自然插入。</p>
+                    <p class="quote">你永远不会因为「系统在做纪律检查」而多等一秒。</p>
+                </div>
+            </section>
+
+            <!-- Slide 54: Thin Documents -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第九章 · Student &amp; Teacher</div>
+                    <h2>AI 写的文档，为什么稀薄</h2>
+                    <p>普通 Agent 接到「读读这个仓库，总结经验」：读三个文件，套一个模板，洋洋洒洒三千字。</p>
+                    <p class="quote">问题不在文笔 — 在开始写之前，它根本还没搞懂。</p>
+                </div>
+            </section>
+
+            <!-- Slide 55: Learn First -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第九章 · Student &amp; Teacher</div>
+                    <h2>换一个流程：先学透，再动笔</h2>
+                    <p>你显式选择 Student，流程就此反转：它不断向 Teacher 提问，直到再也没有高价值的问题，才开始编译成果。</p>
+                    <div class="feature-row" style="margin-top: 3rem;">
+                        <div class="feature-item">
+                            <div class="num">01</div>
+                            <div class="text">
+                                <h4>你选择 Student</h4>
+                                <p>唯一触发方式，不做意图猜测</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">02</div>
+                            <div class="text">
+                                <h4>持续追问</h4>
+                                <p>一次一个问题，最有价值的先问</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">03</div>
+                            <div class="text">
+                                <h4>收敛判断</h4>
+                                <p>学生自己决定何时学够了</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="num">04</div>
+                            <div class="text">
+                                <h4>编译技能</h4>
+                                <p>把完整学习历史压成可复用 SKILL</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 56: Student & Teacher -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第九章 · Student &amp; Teacher</div>
+                    <h2>学生问，导师查</h2>
+                    <div class="two-col">
+                        <div>
+                            <h3>Student 学生</h3>
+                            <ul class="list">
+                                <li>学习期只有一个工具：teacher</li>
+                                <li>不能自己翻仓库瞎猜</li>
+                                <li>负责提问、消化、判断收敛</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3>Teacher 导师</h3>
+                            <ul class="list">
+                                <li>拥有全部工具</li>
+                                <li>读仓库、跑测试、查资料</li>
+                                <li>用 return 把完整答案交还学生</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">学生绕过导师的可能是零 — 工具箱里根本没有别的工具。</p>
+                </div>
+            </section>
+
+            <!-- Slide 57: QA.md -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第九章 · Student &amp; Teacher</div>
+                    <h2>学习全程，先落盘</h2>
+                    <p>你的原始请求、学生的每个问题、导师的每个回答，按真实顺序逐字追加进 QA.md — 先写进文件，再产生任何外部效果。</p>
+                    <p class="quote">知识生产的全过程可追溯：不靠回忆，不靠转述。</p>
+                </div>
+            </section>
+
+            <!-- Slide 58: SKILL -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第九章 · Student &amp; Teacher</div>
+                    <h2>产物是技能，不是文章</h2>
+                    <p>收敛之后，学生把整段学习历史编译成 SKILL.md — 第一性原理、语义无损，下次同类任务直接复用。</p>
+                    <p style="margin-top: 1.5rem;">交付前，草稿 QA.md 被删除并确认不存在 — 留下的只有精华。</p>
+                    <p class="quote">把一次学习，变成永久能力。</p>
+                </div>
+            </section>
+
+            <!-- Slide 59: Execution Boundaries -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">第十章 · 地基</div>
+                    <h2>跑命令，也有边界</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">⏱️</div>
+                            <h3>超时自己估</h3>
+                            <p>每个命令附带预估时长，超估三倍就停 — 但永远停在你设的硬上限之内</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">📦</div>
+                            <h3>输出爆了自动摘要</h3>
+                            <p>超长输出分段压缩给你；压缩失败，也留下原文尾巴</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🖥️</div>
+                            <h3>交互终端归专人</h3>
+                            <p>PTY 只有 DevOps 能碰；完成只认进程真实退出</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🚧</div>
+                            <h3>大任务排队</h3>
+                            <p>预估大内存的任务串行执行，不把机器跑垮</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 60: Trust Foundation -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">第十章 · 地基</div>
+                    <h2>可以验证的信任</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">📜</div>
+                            <h3>事实先落盘</h3>
+                            <p>日志只增不删，崩溃后重放事实回到同一局面</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🔏</div>
+                            <h3>每个指令有指纹</h3>
+                            <p>崩溃恢复最多生效一次，绝不重复执行</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧱</div>
+                            <h3>旧数据不猜</h3>
+                            <p>遇到旧格式直接拒绝，不拿你的历史冒险</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧪</div>
+                            <h3>六层验证</h3>
+                            <p>从纯函数到真机考试，每层过了才进下一层</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 61: Scenarios -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">尾声 · 场景</div>
+                    <h2>它擅长什么</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <h3>大型代码库理解</h3>
+                            <p>调查员建立证据链，记录员留住全貌</p>
+                        </div>
+                        <div class="card">
+                            <h3>复杂 Bug 根治</h3>
+                            <p>调查、修改、验证、评审闭环，拒绝表面修补</p>
+                        </div>
+                        <div class="card">
+                            <h3>跨模块功能开发</h3>
+                            <p>多角色并行推进，记忆不断线</p>
+                        </div>
+                        <div class="card">
+                            <h3>长周期重构</h3>
+                            <p>工作日志跨越任意长的对话</p>
+                        </div>
+                        <div class="card">
+                            <h3>高约束代码修改</h3>
+                            <p>纪律委员盯着边界与规矩</p>
+                        </div>
+                        <div class="card">
+                            <h3>大规模并行工程</h3>
+                            <p>多小队隔离开发，安全合龙</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 62: Value -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">尾声 · 价值</div>
+                    <h2>你获得的直接价值</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">⏱️</div>
+                            <h3>更少等待</h3>
+                            <p>机械调查被提前跑完</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">📓</div>
+                            <h3>更长记忆</h3>
+                            <p>约定与进展永不丢失</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">✅</div>
+                            <h3>更少假完成</h3>
+                            <p>完成要过双重证据评审</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🛡️</div>
+                            <h3>更少越界</h3>
+                            <p>120 条规则持续体检</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">💰</div>
+                            <h3>更低成本</h3>
+                            <p>便宜模型干粗活，缓存常年命中</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🎓</div>
+                            <h3>更厚积累</h3>
+                            <p>经验沉淀为可复用技能</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 63: Enablement -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">尾声 · Roadmap</div>
+                    <h2>新能力，考过才开</h2>
+                    <p>团队、记忆、恢复、评审、并行 — 这些已是生产基线。三大旗舰各自还有一道真机考试，默认关闭。</p>
+                    <div class="cards" style="margin-top: 3rem;">
+                        <div class="card">
+                            <div class="card-icon">⚡</div>
+                            <h3>Strength</h3>
+                            <p>21 项真机考试，两项硬门槛</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🛡️</div>
+                            <h3>Enforcer</h3>
+                            <p>9 项真机考试</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🎓</div>
+                            <h3>Student &amp; Teacher</h3>
+                            <p>完整 canary 清单</p>
+                        </div>
+                    </div>
+                    <p class="quote" style="margin-top: 2rem;">不拿你的任务当试验场 — 考过，才上岗。</p>
+                </div>
+            </section>
+
+            <!-- Slide 64: Summary -->
+            <section class="slide">
+                <div class="content center-text">
+                    <div class="eyebrow">Summary</div>
+                    <h2>一句话总结</h2>
+                    <p class="quote" style="max-width: 900px; margin: 2rem auto;">
+                        万象术把 AI 从一个会聊天的工具，变成一支有记忆、有纪律、有证据的工程团队 — 它记住你们的一切约定，从失败中原地站起，并为每一句「完成了」出示证据。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 65: Ending -->
+            <section class="slide ending">
+                <div class="content center-text">
+                    <div class="eyebrow">Wanxiangshu</div>
+                    <h1>Think Ahead</h1>
+                    <p class="slogan">记住一切 · 恢复一切 · 证明一切</p>
+                    <a href="#" class="cta" onclick="goToSlide(0); return false;">重新播放</a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="nav-dots" id="navDots"></div>
+    <div class="scroll-hint" id="scrollHint">
+        <span>滚动或按方向键切换</span>
+        <span>↓</span>
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const slidesContainer = document.getElementById('slides');
+        const navDots = document.getElementById('navDots');
+        const progress = document.getElementById('progress');
+        const scrollHint = document.getElementById('scrollHint');
+        let currentSlide = 0;
+        let isScrolling = false;
+        let scrollTimeout = null;
+        let touchStartY = 0;
+
+        // Create nav dots
+        slides.forEach((_, index) => {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (index === 0 ? ' active' : '');
+            dot.addEventListener('click', () => goToSlide(index));
+            navDots.appendChild(dot);
+        });
+
+        function updateSlide() {
+            slides.forEach((slide, index) => {
+                slide.classList.toggle('active', index === currentSlide);
+            });
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+            slidesContainer.style.transform = `translateY(-${currentSlide * 100}vh)`;
+            progress.style.width = `${((currentSlide + 1) / slides.length) * 100}%`;
+
+            if (currentSlide === slides.length - 1) {
+                scrollHint.classList.add('hidden');
+            } else {
+                scrollHint.classList.remove('hidden');
+            }
+
+            fitContent();
+        }
+
+        function fitContent() {
+            requestAnimationFrame(() => {
+                const activeSlide = slides[currentSlide];
+                if (!activeSlide) return;
+                const content = activeSlide.querySelector('.content');
+                if (!content) return;
+
+                // Reset scale to measure natural height
+                content.style.setProperty('--content-scale', '1');
+                activeSlide.style.overflowY = 'hidden';
+
+                const slideHeight = activeSlide.clientHeight;
+                const availableHeight = slideHeight * 0.84; // leave 8% top + 8% bottom padding
+                const contentHeight = content.scrollHeight;
+
+                if (contentHeight > availableHeight) {
+                    const scale = availableHeight / contentHeight;
+                    const clampedScale = Math.max(scale, 0.72); // don't shrink below 72%
+                    content.style.setProperty('--content-scale', clampedScale.toFixed(4));
+                    if (scale < 0.72) {
+                        activeSlide.style.overflowY = 'auto';
+                    }
+                }
+            });
+        }
+
+        function goToSlide(index) {
+            if (index < 0 || index >= slides.length) return;
+            currentSlide = index;
+            updateSlide();
+        }
+
+        function nextSlide() {
+            goToSlide(Math.min(currentSlide + 1, slides.length - 1));
+        }
+
+        function prevSlide() {
+            goToSlide(Math.max(currentSlide - 1, 0));
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            if (isScrolling) return;
+            isScrolling = true;
+            if (e.deltaY > 0) nextSlide();
+            else prevSlide();
+            setTimeout(() => isScrolling = false, 800);
+        }
+
+        function handleKey(e) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                goToSlide(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                goToSlide(slides.length - 1);
+            }
+        }
+
+        function handleTouchStart(e) {
+            touchStartY = e.touches[0].clientY;
+        }
+
+        function handleTouchEnd(e) {
+            const touchEndY = e.changedTouches[0].clientY;
+            const diff = touchStartY - touchEndY;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) nextSlide();
+                else prevSlide();
+            }
+        }
+
+        const viewport = document.getElementById('viewport');
+        viewport.addEventListener('wheel', handleWheel, { passive: false });
+        document.addEventListener('keydown', handleKey);
+        viewport.addEventListener('touchstart', handleTouchStart, { passive: true });
+        viewport.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        // Initial render
+        updateSlide();
+
+        window.addEventListener('resize', () => {
+            // Debounce resize
+            clearTimeout(window.__fitTimeout);
+            window.__fitTimeout = setTimeout(fitContent, 100);
+        });
+    </script>
+</body>
+</html>
