@@ -37,8 +37,9 @@ module CompletedTurnClassifier =
             |> String.concat ""
 
     /// Session terminal material: formal text + host-visible reasoning/thinking.
-    /// Still excludes tool raw streams / tool results. This is the XTrace
-    /// terminal segment's text (COMPANION-003), not a parallel A channel.
+    /// COMPANION-003: TerminalOutputRaw 与 LWR 禁止 raw tool call/result——
+    /// 末回合工具可能极大且不经 transform。This is the XTrace terminal segment's
+    /// text, not a parallel A channel.
     let partsSessionText (parts: MessagePart array) : string =
         if isNull parts then
             ""

@@ -1010,7 +1010,19 @@ export const bloggerDelta = (() => {
  * Fable 把 int64 编译为 BigInt，facade 在此吸收（VERIFY-008：Fable 约定只允许
  * 出现在 domain.mjs）。
  */export const xTrace = (() => {
-  const m = bind(XTraceModule, 'XTrace', ['originCursor', 'nextCursor', 'isAfter', 'sliceBetween', 'sliceFrom', 'head', 'flatten', 'renderItem', 'render'])
+  const m = bind(XTraceModule, 'XTrace', [
+    'originCursor',
+    'nextCursor',
+    'isAfter',
+    'sliceBetween',
+    'sliceFrom',
+    'head',
+    'flatten',
+    'isWorkRecordPart',
+    'forWorkRecord',
+    'renderItem',
+    'render',
+  ])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
 
   const part = (kind, ...fields) => semanticPart(kind, fields)
@@ -1049,6 +1061,9 @@ export const bloggerDelta = (() => {
 
     renderItem: m.renderItem,
     render: m.render,
+    /** COMPANION-003: LWR projection — drop raw tool call/result. */
+    forWorkRecord: (items) => fromCursorList(m.forWorkRecord(toCursorList(items))),
+    isWorkRecordPart: (partValue) => m.isWorkRecordPart(partValue),
     toItems: (items) => toList(items),
   }
 })()

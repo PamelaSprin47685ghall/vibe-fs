@@ -90,3 +90,23 @@ test('XTRACE_render_is_deterministic_and_never_emits_provenance', () => {
 test('XTRACE_empty_render_is_empty_string', () => {
   assert.equal(xTrace.render(xTrace.toItems([])), '')
 })
+
+test('XTRACE_forWorkRecord_drops_raw_tools_keeps_text_reasoning_media', () => {
+  // COMPANION-003: XTrace 全量可含 tool；LWR 投影剔除 raw tool。
+  const items = [
+    xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
+    xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.reasoning('why') }),
+    xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.toolCall('read', '{}') }),
+    xTrace.item({ sequence: 3, role: 'assistant', part: xTrace.toolResult('payload') }),
+    xTrace.item({ sequence: 4, role: 'assistant', part: xTrace.media('image/png', 'd') }),
+  ]
+
+  const filtered = xTrace.forWorkRecord(items)
+  assert.deepEqual(
+    filtered.map((item) => item.Cursor.Sequence),
+    [0, 1, 4],
+  )
+  assert.equal(xTrace.isWorkRecordPart(xTrace.toolCall('read', '{}')), false)
+  assert.equal(xTrace.isWorkRecordPart(xTrace.toolResult('x')), false)
+  assert.equal(xTrace.isWorkRecordPart(xTrace.text('x')), true)
+})

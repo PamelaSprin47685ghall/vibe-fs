@@ -4,13 +4,30 @@
 
 - 分支：`master`
 - 收敛目标：`0.5.2`（开发中，尚未 tag）
-- 最后验证：`test:release` 全绿（gate:static → build → unit → harness → P0×3，canary 18×3）
-- 证据：`docs/evidence/0.5.2-baseline/` 与生成中的 `docs/evidence/0.5.2/`
-- 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成）
+- 最后验证：
+  - `npm run lint` 通过
+  - `npm run gate:static` 通过（含新增 `gate:conformance`）
+  - `npm run build` 通过
+  - `npm run test:unit` 通过（641 / 641）
+  - `npm run test:harness` 通过（285 / 285）
+  - `manager-companion-canary.mjs` 独立重跑通过
+  - `npm pack` 产出 `wanxiangshu-0.5.2.tgz`（404 files, 1.8 MB packed）
+- 证据：`docs/evidence/0.5.2-baseline/`
+- 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成，机器默认状态尚未经 C11 审计）
 
 ## 当前产品状态
 
-0.5.2 收敛中。目标：Active SSOT 全 CONFORMANT，未来设计迁出到 `RFC/`，状态唯一源为 `STATUS/conformance.toml`。
+0.5.2 收敛中。本会话完成 C0–C4：
+
+- C0：建立 0.5.2 baseline，跑通 `test:release` 并记录证据。
+- C1：把 Strength / StudentTeacher / Enforcer nudge throttle 迁出 Active SSOT 到 `RFC/`，
+  `SSOT/00.md` 拆分 Active 与 RFC 索引，`SSOT/15.md` 明确为 Blogger 工具化 Active 子集。
+- C2：建立 `STATUS/conformance.toml` 与 `scripts/conformance-gen.mjs` / `conformance-gate.mjs`，
+  生成 180 条 Active 条款机器账本。
+- C3：版本与状态真值对齐到 `0.5.2`（package.json、package-lock.json、packaging template、
+  README、CHANGELOG、STATUS/blockers/README.md）。
+- C4：删除 legacy Companion/Blogger 旁路入口（`Companion.Submit`、`SubmitProjection`、
+  `StartMainFromContext`、`startMainFromContext`、`blog` 函数、`CompanionOutcome` DU）。
 
 0.5.1 已发布（tag `v0.5.1`）：闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
 唯一 coordinator、typed materialize、blog-tool Squash、KnownCommitted 才 Park、
@@ -20,7 +37,8 @@ crash-window 不 stomp live CurrentRequest。canary 证据见 `host-transform-ca
 LifecycleWorkRecord 迁移已完成（方案 `STATUS/lifecycle-work-record.md`）：父→子与子→父统一为
 LWR（Opening + Y frames + X gap + Terminal）；A/B 双轨、FinalText、Seed、TerminalSessionA、
 FrozenB 全部废止；Y normal delta data-only、Blogger delta 稀疏 schema、TOML data body 单 LF、
-join 最小 wire（status/agent/work_record）。
+join 最小 wire（status/agent/work_record）。tool call/result 可进 XTrace 作 Y 压缩源；
+LWR gap/terminal 禁止 raw tool（COMPANION-003 `forWorkRecord`）。
 
 ## 当前开发阶段
 
@@ -51,9 +69,22 @@ host-transform-capability 全绿。
 
 ## 活跃阻塞
 
-见 `STATUS/blockers/README.md`。HOST-006 次生风险（运行时探测）已闭合：探测已实现并
-接线（`HostSignalBootstrap.onSnapshot` → `HostCompactionGate.judgeStartup` →
-`PluginRuntimeScope.TryClaimStartupProbe`）。无未闭合 blocker。
+见 `STATUS/blockers/README.md`。当前无活跃 blocker。
+
+## 已知未闭合项
+
+0.5.2 尚未发布。`STATUS/conformance.toml` 由脚本从 Active SSOT 与测试引用自动生成，状态
+`conformant` 是机器默认值，尚未经 C11 人工审计。已知缺少第 4 层证据或实现未闭合的条款
+包括：
+
+- `PROMPT-004/006/007/009`、`AGENT-007`、`HOST-005/009/010/011`、`PERSIST-009`、
+  `COMPANION-013`
+- `EXEC-009`：`HandleProjection.joinable` 零生产调用点，`join` 仍走运行期 mailbox。
+- X 恢复链：生产接线已闭合，但 X-A–X-D canary 剧本未建，第 4 层证据未产出。
+- `EnforcerCodec` / `EnforcerCycle` / `EnforcerHost` 仍携带 `ScoreVectorRef`、`MergedScores`、
+  nudge/throttle 路径；0.5.2 Active 子集仅保留 text/evidence，C5–C7 需清理。
+- `manager-companion-canary.mjs` 在并发套件中存在 flaky：两次判据事件间隔超过
+  `WATCHDOG_TIMEOUT_MS` 导致 watchdog 误触发。已写入 `AGENTS.md`，待修复。
 
 ## 源码地图
 
@@ -93,19 +124,17 @@ src/Wanxiangshu.Next/
 
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
-1. C3：版本与状态真值（进行中）
-2. C4：删除旧 Companion/Blogger 旁路入口
-3. C5：建立唯一 ManagedAgentCatalog
-4. C6：durable join（EXEC-009）
-5. C7：durable effects（PERSIST-009）
-6. C8：ARCH-001 与 Orchestrator stage-like 语义清理
-7. C9：Host/Review/Cold boundary 证据
-8. C10：Context recovery X-A–X-D 第四层证据
-9. C11：测试与 clause coverage 补齐
-10. C12：运行环境与发布包
-11. C13：全仓反向审计
-12. C14：RC 验证
-13. C15：0.5.2 发布
+1. C5：建立唯一 `ManagedAgentCatalog`，删除重复角色/peer/legacy name
+2. C6：durable join（`EXEC-009`）
+3. C7：durable effects（`PERSIST-009`）
+4. C8：`ARCH-001` 与 Orchestrator stage-like 语义清理
+5. C9：Host/Review/Cold boundary 证据
+6. C10：Context recovery X-A–X-D 第四层证据
+7. C11：测试与 clause coverage 补齐；人工审计 `STATUS/conformance.toml`
+8. C12：运行环境与发布包
+9. C13：全仓反向审计
+10. C14：RC 验证
+11. C15：0.5.2 发布
 
 历史项：
 

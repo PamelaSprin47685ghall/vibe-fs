@@ -91,11 +91,10 @@ module XTraceCapture =
             let existing = xTraceOf durable turn.SessionId
 
             if existing.Terminal.IsNone then
-                // COMPANION-003: the terminal segment is the session's final raw
-                // output — formal text PLUS host-visible reasoning, matching the
-                // TerminalText the completion reports (partsSessionText, not
-                // partsText) so the LWR's Final output segment is byte-consistent
-                // with AgentRunResult.TerminalText.
+                // COMPANION-003: TerminalOutputRaw = formal text + host-visible
+                // reasoning only. partsSessionText drops tool call/result so
+                // LWR Final output stays free of raw tools and matches
+                // AgentRunResult.TerminalText.
                 let text = CompletedTurnClassifier.partsSessionText turn.Parts
 
                 if not (String.IsNullOrWhiteSpace text) then

@@ -18,12 +18,13 @@ type OpeningPromptRaw =
 /// ```text
 /// LWR(X) = OpeningPromptRaw
 ///        + CompressedMiddleFromY（全部有效 frame，恰好一次）
-///        + RawGapFromX（Y 尚未覆盖的 X suffix）
-///        + TerminalOutputRaw（恰好一次，逐字）
+///        + RawGapFromX（Y 尚未覆盖的 X suffix，经 forWorkRecord）
+///        + TerminalOutputRaw（formal text + host-visible reasoning）
 /// ```
 ///
-/// 相邻 segment 不重复、不丢失，顺序与 XTrace 一致；同一 projection state
-/// 产生相同 bytes；物化不触发 LLM、不写新 Y frame、不改变 coverage。
+/// tool call/result 是 Y 的压缩来源，不得作为 raw 进入 LWR。相邻 segment
+/// 不重复；同一 projection state 产生相同 bytes；物化不触发 LLM、不写新 Y
+/// frame、不改变 coverage。
 type LifecycleWorkRecord =
     { Opening: OpeningPromptRaw
       Frames: string list
@@ -40,6 +41,7 @@ module LifecycleWorkRecord =
             heading + "\n" + body
 
     /// 稳定 Markdown 渲染。空段整段省略，不输出空标题。
+    /// `Gap` 调用方必须已 `XTrace.forWorkRecord`；render 再次过滤作 fail-closed。
     let render (record: LifecycleWorkRecord) : string =
         let openingBody =
             let requirements =
@@ -63,7 +65,7 @@ module LifecycleWorkRecord =
             |> List.filter (System.String.IsNullOrWhiteSpace >> not)
             |> String.concat "\n\n"
 
-        let gapText = XTrace.render record.Gap
+        let gapText = record.Gap |> XTrace.forWorkRecord |> XTrace.render
 
         let sections =
             [ section "# Opening task" openingBody
@@ -80,6 +82,8 @@ module LifecycleWorkRecord =
     /// digest cursor 起点设在 Opening 之后）。gap 起点 = max(ingestedThrough,
     /// openingEnd)——Y 从未成功时 coverage 在 origin，gap 仍从 opening 之后
     /// 开始，Opening 不会重复出现于 gap（方案 4.4）。
+    ///
+    /// COMPANION-003：gap 与 terminal 均经 `forWorkRecord`，剔除 raw tool。
     let materialize
         (opening: OpeningPromptRaw)
         (frames: string list)
@@ -96,14 +100,18 @@ module LifecycleWorkRecord =
             |> List.filter (fun item ->
                 terminalItems
                 |> List.forall (fun terminal -> terminal.Cursor.Sequence <> item.Cursor.Sequence))
+            |> XTrace.forWorkRecord
 
-        // 2.6：Final output 段是原文，不带 role 前缀、不包装。terminal 通常
-        // 是 assistant 正文；reasoning 等非文本 part 用统一 renderer。
+        let terminalForLwr = terminalItems |> XTrace.forWorkRecord
+
+        // Final output：原文，不带 role 前缀。terminal 路径通常已是
+        // partsSessionText（text + reasoning）；此处再过滤 tool 作 fail-closed。
         let terminalText =
-            terminalItems
+            terminalForLwr
             |> List.map (fun item ->
                 match item.Part with
                 | SemanticText text -> text
+                | SemanticReasoning text -> text
                 | _ -> XTrace.renderItem item)
             |> String.concat "\n"
 
@@ -112,7 +120,7 @@ module LifecycleWorkRecord =
               Frames = frames
               Gap = gap
               Terminal =
-                if List.isEmpty terminalItems then
+                if List.isEmpty terminalForLwr then
                     None
                 else
                     Some terminalText }

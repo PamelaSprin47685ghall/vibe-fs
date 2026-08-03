@@ -58,17 +58,35 @@ module XTrace =
 
     /// 从 SemanticMessage 平铺为带 role 的语义 part 序列。
     ///
-    /// 这是 XTrace、Y delta、LWR gap 与 terminal capture 的共同单一 source
-    /// （COMPANION-007、COMPANION-012）：同一 XTrace segment 不得由两套独立
-    /// parser/renderer 生成。cursor 由调用方在 append 时赋值。
+    /// XTrace 是 Y delta、LWR gap、terminal capture 的共同唯一 source
+    /// （COMPANION-007、COMPANION-012）。同一 segment 的语义解析不得分叉；
+    /// 到 BloggerDelta 与 LWR 的投影各自有损。cursor 由调用方在 append 时赋值。
     let flatten (messages: SemanticMessage list) : {| Role: string; Part: SemanticPart |} list =
         messages
         |> List.collect (fun message -> message.Parts |> List.map (fun part -> {| Role = message.Role; Part = part |}))
 
+    // ── LWR projection ─────────────────────────────────────────────────────
+    //
+    // COMPANION-003: tool call/result 留在 XTrace 供 Y 压缩；LWR（gap + terminal）
+    // 禁止 raw tool。cursor 仍按 XTrace 推进；被剔除的 part 不进入渲染文本。
+
+    /// part 是否允许进入 LWR 渲染（gap / terminal）。
+    let isWorkRecordPart (part: SemanticPart) : bool =
+        match part with
+        | SemanticToolCall _
+        | SemanticToolResult _ -> false
+        | SemanticText _
+        | SemanticReasoning _
+        | SemanticMedia _ -> true
+
+    /// LWR 投影：剔除 raw tool call/result，保留 text/reasoning/omission。
+    let forWorkRecord (items: XTraceItem list) : XTraceItem list =
+        items |> List.filter (fun item -> isWorkRecordPart item.Part)
+
     // ── canonical rendering ────────────────────────────────────────────────
     //
-    // LWR 的人类可读段用稳定文本。逐字节确定性：同一 XTrace items 必须产生
-    // 相同文本（COMPANION-012）。
+    // XTrace 诊断/全量渲染可含 tool；LWR 调用方必须先 `forWorkRecord`。
+    // 同一输入 items 必须产生相同文本（COMPANION-012）。
 
     let private rolePrefix (role: string) =
         match role with
@@ -95,5 +113,6 @@ module XTrace =
         | _ -> renderPart item.Part
 
     /// 整个 items 的稳定渲染：空 items 为空字符串，非空以单 LF 连接。
+    /// LWR 入口必须先 `forWorkRecord`；本函数本身不做 tool 剔除。
     let render (items: XTraceItem list) : string =
         items |> List.map renderItem |> String.concat "\n"
