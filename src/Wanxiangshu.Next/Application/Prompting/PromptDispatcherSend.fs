@@ -53,9 +53,16 @@ module PromptDispatcherSend =
             (key: PromptKey)
             (sessionId: SessionId)
             (outcome: SendOutcome)
+            (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (acceptPhysical: PhysicalUserMessageId -> Result<unit, string>)
             : Result<PromptKey, string> =
+            // PROMPT-007: Detached never observes PhysicalAccepted at the caller.
+            let acceptanceCallback =
+                match awaitMode with
+                | PromptDispatcher.AwaitMode.Detached -> None
+                | PromptDispatcher.AwaitMode.Await -> onAccepted
+
             let submitted (receipt: TransportReceipt) =
                 AgentFact.PluginPromptSubmitted
                     {| PromptKey = key
@@ -74,6 +81,7 @@ module PromptDispatcherSend =
                 // PROMPT-005: an `accepted-*` receipt is not a message identity, so
                 // the chain stops at Submitted. `chat.message` supplies the physical
                 // id later and PromptIngress writes PhysicalAccepted then.
+                // PROMPT-007 Detached: this is already a complete success for the caller.
                 submitted receipt |> Result.map (fun () -> key)
 
             | AdmittedWithPhysicalMessage physicalId ->
@@ -83,7 +91,7 @@ module PromptDispatcherSend =
                 submitted (TransportReceipt.create (PhysicalUserMessageId.value physicalId))
                 |> Result.bind (fun () -> acceptPhysical physicalId)
                 |> Result.map (fun () ->
-                    onAccepted |> Option.iter (fun callback -> callback physicalId)
+                    acceptanceCallback |> Option.iter (fun callback -> callback physicalId)
                     key)
 
             | Retryable error -> abandon (PromptAbandonReason.SendFailed error) error
@@ -104,6 +112,7 @@ module PromptDispatcherSend =
             (text: string)
             (agent: string)
             (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
             task {
@@ -144,7 +153,7 @@ module PromptDispatcherSend =
                         let! outcome = port.SendPrompt(sessionId, text, options)
 
                         return
-                            this.RecordSendOutcome key sessionId outcome onAccepted (fun physicalId ->
+                            this.RecordSendOutcome key sessionId outcome awaitMode onAccepted (fun physicalId ->
                                 this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent
                                 |> Result.map ignore)
             }
@@ -168,6 +177,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (effectiveAgent: string)
             (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
             task {
@@ -211,7 +221,7 @@ module PromptDispatcherSend =
                     let! outcome = port.SendPrompt(sessionId, text, options)
 
                     return
-                        this.RecordSendOutcome key sessionId outcome onAccepted (fun physicalId ->
+                        this.RecordSendOutcome key sessionId outcome awaitMode onAccepted (fun physicalId ->
                             this.AcceptContinuation key sessionId physicalId |> Result.map ignore)
             }
 
@@ -223,6 +233,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (effectiveAgent: string)
             (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigest
@@ -234,6 +245,7 @@ module PromptDispatcherSend =
                 profile
                 effectiveAgent
                 directory
+                awaitMode
                 onAccepted
 
         /// FALLBACK-008: the one interaction repair an unusable terminal earns.
@@ -255,6 +267,7 @@ module PromptDispatcherSend =
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (effectiveAgent: string)
             (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
             this.SendContinuationWithDigest
@@ -266,4 +279,5 @@ module PromptDispatcherSend =
                 profile
                 effectiveAgent
                 directory
+                awaitMode
                 onAccepted

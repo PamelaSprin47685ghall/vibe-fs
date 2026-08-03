@@ -122,6 +122,9 @@ const [
   HostEventCodecModule,
   HandleControllerModule,
   HandleCompletionCodecModule,
+  ReviewSealModule,
+  SessionSnapshotPortModule,
+  ToolHostCodecModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -193,6 +196,9 @@ const [
   prod('Infrastructure/OpenCode/Codec/HostEventCodec'),
   prod('Session/HandleController'),
   prod('Session/HandleCompletionCodec'),
+  prod('Application/Reconciliation/ReviewSeal'),
+  prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
+  prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -2422,8 +2428,8 @@ export const authorityRun = {
 }
 
 /**
- * PROMPT-006: the send-time `SessionPromptOptions` construction, as the Host
- * sees it.
+ * PROMPT-006/007: the send-time `SessionPromptOptions` construction and AwaitMode,
+ * as the Host sees them.
  *
  * `SendAgentOwnerRoot` and `SendContinuation` build `{ Agent = Some …;
  * Model = None; … }` inside the send body, so the only way to observe them is
@@ -2437,20 +2443,78 @@ export const promptDispatcher = (() => {
     .Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_SendAgentOwnerRoot
   const sendContinuation = PromptDispatcherSendModule
     .Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_SendContinuation
+  // Instance members on Runtime: Fable may emit
+  //   Runtime__ProjectionFor
+  //   Runtime__ProjectionFor_<hash>   (overload hash)
+  //   Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_ProjectionFor
+  // Pick the first matching function export; fail closed if none.
+  const projectionForMember = (() => {
+    const keys = Object.keys(PromptDispatcherModule)
+    const candidates = [
+      'Wanxiangshu_Next_OpenCode_PromptDispatcher_Runtime__Runtime_ProjectionFor',
+      'Runtime__ProjectionFor',
+      ...keys.filter((k) => /^Runtime__ProjectionFor(_|$)/.test(k) || /Runtime__Runtime_ProjectionFor/.test(k)),
+    ]
+    for (const key of candidates) {
+      const value = PromptDispatcherModule[key]
+      if (typeof value === 'function') return value
+    }
+    const near = keys.filter((k) => /Projection/i.test(k)).join(', ')
+    throw new Error(`PromptDispatcher.Runtime.ProjectionFor missing. Near: ${near || '(none)'}`)
+  })()
   const buildSendOutcome = unionCase(Outcome.Outcome_SendOutcome, 'Outcome.SendOutcome')
+  // Nested DU under PromptDispatcher: Fable may emit AwaitMode or PromptDispatcher_AwaitMode.
+  const AwaitModeClass =
+    PromptDispatcherModule.AwaitMode
+    ?? PromptDispatcherModule.PromptDispatcher_AwaitMode
+  if (typeof AwaitModeClass !== 'function') {
+    const near = Object.keys(PromptDispatcherModule).filter((k) => /Await/i.test(k)).join(', ')
+    throw new Error(`PromptDispatcher.AwaitMode missing. Near: ${near || '(none)'}`)
+  }
+  const awaitModeOf = unionCase(AwaitModeClass, 'PromptDispatcher.AwaitMode')
+  const journalSnapshot = member(AgentJournalModule, 'AgentJournal', 'snapshot')
 
   const decode = (result) => {
     const value = resultOf(result)
     return value.ok ? { ok: true, key: idValue.promptKey(value.value) } : value
   }
 
+  /** PROMPT-007: default Detached (fire-and-forget) unless the test asks Await. */
+  const resolveAwaitMode = (mode) => {
+    if (mode === undefined || mode === null) return awaitModeOf('Detached')
+    if (typeof mode === 'string') return awaitModeOf(mode)
+    return mode
+  }
+
   return {
     forJournal: (journal) => PromptDispatcherModule.forJournal(journal),
+
+    /** PROMPT-007 AwaitMode constructors. */
+    awaitMode: {
+      await: () => awaitModeOf('Await'),
+      detached: () => awaitModeOf('Detached'),
+      of: (name) => awaitModeOf(name),
+    },
 
     /** PROMPT-006: an `AdmittedWithReceipt` outcome for a stub port to return. */
     admittedWithReceipt: (receipt) => buildSendOutcome('AdmittedWithReceipt', [receipt]),
 
-    sendAgentOwnerRoot: async (runtime, port, { session, text, agent, directory, onAccepted }) =>
+    /**
+     * PROMPT-005/007: authority projection after a send.
+     * Detached success still claims/submits; no PhysicalAccepted required for caller Ok.
+     */
+    projectionFor: (runtime, session) => projectionForMember(runtime, sessionId(session)),
+
+    /** Integrated journal projection (PendingClaims live under session.PromptAuthority). */
+    journalSnapshot: (journal) => journalSnapshot(journal),
+
+    /** Pending claim count for one session after Detached/Await send. */
+    pendingClaimCount: (runtime, session) => {
+      const projection = projectionForMember(runtime, sessionId(session))
+      return mapCount(projection.PendingClaims)
+    },
+
+    sendAgentOwnerRoot: async (runtime, port, { session, text, agent, directory, awaitMode, onAccepted }) =>
       decode(
         await sendAgentOwnerRoot(
           runtime,
@@ -2459,11 +2523,12 @@ export const promptDispatcher = (() => {
           text,
           agent,
           directory,
+          resolveAwaitMode(awaitMode),
           onAccepted,
         ),
       ),
 
-    sendContinuation: async (runtime, port, { session, text, continuation, profile, effectiveAgent, directory, onAccepted }) =>
+    sendContinuation: async (runtime, port, { session, text, continuation, profile, effectiveAgent, directory, awaitMode, onAccepted }) =>
       decode(
         await sendContinuation(
           runtime,
@@ -2474,9 +2539,80 @@ export const promptDispatcher = (() => {
           profile,
           effectiveAgent,
           directory,
+          resolveAwaitMode(awaitMode),
           onAccepted,
         ),
       ),
+  }
+})()
+
+/**
+ * HOST-010: transform → ProviderRunIdentity binding (ReviewSeal.bindableRun).
+ * Messages are Host-raw objects projected via SessionSnapshotPort.projectMessages.
+ */
+export const reviewSeal = (() => {
+  const bindableRun = member(ReviewSealModule, 'ReviewSeal', 'bindableRun')
+  const projectMessages = member(SessionSnapshotPortModule, 'SessionSnapshotPort', 'projectMessages')
+  const decodeRejection = (error) => {
+    const name = caseOf(error)
+    if (name === 'AmbiguousRun') {
+      const fields = error.fields ?? []
+      return { case: name, count: fields[0] }
+    }
+    return { case: name }
+  }
+
+  return {
+    /** Project Host-shaped message objects into SessionMessage list. */
+    projectMessages: (rawMessages) => projectMessages(rawMessages),
+
+    /**
+     * HOST-010 bindableRun. `physicalUser` is the last user message id.
+     * `messages` may be a projected F# list or Host-raw objects (auto-projected).
+     * Returns `{ ok: true, id }` or `{ ok: false, rejection: { case, count? } }`.
+     */
+    bindableRun: (physicalUser, messages) => {
+      // Host-raw JS array → project; already-projected F# list passes through.
+      const list =
+        Array.isArray(messages) ? projectMessages(messages) : messages
+      const result = resultOf(bindableRun(physicalUser, list))
+      if (result.ok) {
+        const msg = result.value
+        return {
+          ok: true,
+          id: msg.Id,
+          parentId: unwrapOption(msg.ParentId),
+          completed: Boolean(msg.Completed),
+        }
+      }
+      return { ok: false, rejection: decodeRejection(result.error) }
+    },
+  }
+})()
+
+/**
+ * HOST-011: ToolContext decode at the adapter boundary.
+ * callID + messageID must both be present; either missing → None fail-closed.
+ */
+export const toolHostCodec = (() => {
+  const decodeContext = member(ToolHostCodecModule, 'ToolHostCodec', 'decodeContext')
+  return {
+    decodeContext: (raw) => {
+      const ctx = decodeContext(raw)
+      return {
+        sessionId: ctx.SessionId,
+        agent: unwrapOption(ctx.Agent),
+        toolCallId: (() => {
+          const id = unwrapOption(ctx.ToolCallId)
+          return id === undefined ? undefined : idValue.toolCall(id)
+        })(),
+        providerRunId: (() => {
+          const id = unwrapOption(ctx.ProviderRunId)
+          return id === undefined ? undefined : idValue.providerRun(id)
+        })(),
+        promptText: unwrapOption(ctx.PromptText),
+      }
+    },
   }
 })()
 

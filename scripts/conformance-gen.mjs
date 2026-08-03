@@ -116,14 +116,9 @@ function searchReferences (clauses) {
 
 // 0.5.2 已知未闭合项：机器生成阶段不能谎称 CONFORMANT。
 // C11 人工审计后应逐条收敛到 conformant/blocked。
-// C11 partial: only keep clauses still lacking code+test proof.
-// Promoted to conformant (layer 2 unit): AGENT-007, PROMPT-004/006/009,
-// HOST-005/009, COMPANION-013. PERSIST-009 already conformant outside this set.
-const KNOWN_IMPLEMENTING = new Set([
-  'PROMPT-007',
-  'HOST-010', 'HOST-011',
-  'EXEC-009'
-])
+// All former IMPLEMENTING rows promoted (PROMPT-007/HOST-010/011/EXEC-009).
+// Keep empty set so regen does not re-mark closed clauses implementing.
+const KNOWN_IMPLEMENTING = new Set([])
 
 function requiredLayer (rec, refs) {
   if (rec.id.startsWith('ARCH') || rec.id.startsWith('VERIFY-001') || rec.id.startsWith('VERIFY-002')) return 0

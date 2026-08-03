@@ -74,9 +74,20 @@ Not changed
 - PTY completion remains mailbox-driven (EXEC-015).
 - ManagedAgentCatalog / C5 files.
 
+Layer-4 canary assertion (added)
+--------------------------------
+testkit/opencode/scripts/host-restart.toml flow now asserts after post-restart waits:
+
+  { assertFacts = { name = "HandleCompleted", gte = 1 } }
+  { assertFacts = { name = "HandleRetired", gte = 1 } }
+
+Note: assignment text said CompletionRef — that is a field on HandleCompleted, not a
+journal fact name. countFact indexes fact case names; HandleCompleted + HandleRetired
+are the durable facts join leaves. DevOps must green-run host-restart-canary before
+claiming layer-4 CONFORMANT. Until then ledger stays required_layer=2 with canary listed.
+
 Residual
 --------
-- Layer-4 canary (host-restart / manager-full-loop) not re-bound this commit.
-- status remains IMPLEMENTING until DevOps verifies build + test:mjs + optional canary.
+- Layer-4 canary green run still owned by DevOps (not run in this Coder pass).
 - Fixture dual-writes HandleCompleted via terminal listener AND production complete;
   fold absorbs AlreadyCompleted; second write is no-op on the cell.

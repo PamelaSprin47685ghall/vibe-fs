@@ -36,7 +36,16 @@ module OneShotAgentTool =
             | None -> return Error "No journal: a one-shot agent prompt cannot be claimed"
             | Some journal ->
                 let dispatcher = PromptDispatcher.forJournal journal
-                return! dispatcher.SendAgentOwnerRoot scope.Sessions childId prompt agent directory None
+                // PROMPT-007 Detached: one-shot dispatch does not wait for PhysicalAccepted.
+                return!
+                    dispatcher.SendAgentOwnerRoot
+                        scope.Sessions
+                        childId
+                        prompt
+                        agent
+                        directory
+                        PromptDispatcher.AwaitMode.Detached
+                        None
         }
 
     let run

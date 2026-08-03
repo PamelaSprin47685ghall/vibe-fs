@@ -13,6 +13,16 @@ module PromptDispatcher =
 
     let internal originLabel = PromptAuthority.originLabel
 
+    /// PROMPT-007: whether the caller waits for PhysicalAccepted.
+    ///
+    /// Detached = fire-and-forget: claim, authority, persist, idempotence and error
+    /// recording still run; the caller does not require a physical message id.
+    /// Await = same send path; reserved for callers that bind an acceptance callback.
+    [<RequireQualifiedAccess>]
+    type AwaitMode =
+        | Await
+        | Detached
+
     /// The single PROMPT-005 sender.
     ///
     /// Holds no authority state. The previous version kept a `mutable authority`

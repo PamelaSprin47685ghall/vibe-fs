@@ -20,12 +20,6 @@ type ISessionHostPort =
     /// `Retryable` — resending the former can produce two logical effects.
     abstract SendPrompt: sessionId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
 
-    /// EXEC-002 nudge. Fire-and-forget in that no id is returned, not in that the
-    /// outcome is unexamined — the caller still may not resend on
-    /// `AcceptanceUnknown`.
-    abstract SendChildPromptFireAndForget:
-        parentId: SessionId * childId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
-
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
@@ -150,12 +144,6 @@ type InjectedSessionPort
                         // "test output" here, which made a misconfigured runtime
                         // indistinguishable from a finished agent.
                         return Fatal "No Host transport: plugin input carried no client, serverUrl, baseUrl or port"
-            }
-
-        member me.SendChildPromptFireAndForget(parentId, childId, text, opts) =
-            task {
-                registerChild parentId childId
-                return! (me :> ISessionHostPort).SendPrompt(childId, text, opts)
             }
 
         member me.AbortSession(sessionId) =

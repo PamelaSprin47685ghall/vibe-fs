@@ -214,7 +214,6 @@ module HostReviewGuard =
                                     continuationKind
                                     recordedDir
                                     (Some durable)
-                                    None
 
                             match sent with
                             | Ok key -> return GuardNudgeOutcome.Sent key

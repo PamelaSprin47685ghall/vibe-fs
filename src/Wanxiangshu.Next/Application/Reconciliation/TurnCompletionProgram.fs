@@ -37,7 +37,6 @@ module TurnCompletionProgram =
                     journal
                     turn.ProviderRun
                     repairKind
-                    None
 
             match sent with
             | Ok _ -> ()
@@ -93,6 +92,7 @@ module TurnCompletionProgram =
                             PromptAuthority.ProviderRetryAttempt
                             turn.Directory
                             journal
+                            PromptDispatcher.AwaitMode.Detached
                             None
 
                     match continuation with

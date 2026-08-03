@@ -41,6 +41,7 @@ module HostForkBusyNudge =
 
                     let rt = PromptDispatcher.forJournal j
 
+                    // PROMPT-007 Detached: busy nudge does not wait for PhysicalAccepted.
                     let! sent =
                         rt.SendContinuation
                             sessions
@@ -50,6 +51,7 @@ module HostForkBusyNudge =
                             profile
                             busyAgent
                             directory
+                            PromptDispatcher.AwaitMode.Detached
                             None
 
                     match sent with

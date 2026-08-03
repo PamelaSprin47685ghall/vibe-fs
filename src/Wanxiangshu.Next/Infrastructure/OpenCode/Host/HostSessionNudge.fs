@@ -87,6 +87,7 @@ module HostSessionNudge =
         (kind: PromptAuthority.ContinuationKind)
         (directory: string option)
         (journal: AgentJournal option)
+        (awaitMode: PromptDispatcher.AwaitMode)
         (onAccepted: (PhysicalUserMessageId -> unit) option)
         : Task<Result<PromptKey, string>> =
         task {
@@ -106,10 +107,11 @@ module HostSessionNudge =
                         profile
                         agent
                         (liveDirectory directory)
+                        awaitMode
                         onAccepted
         }
 
-    /// PROMPT-007 fire-and-forget: the caller does not await physical acceptance.
+    /// PROMPT-007 fire-and-forget: Detached — caller does not await PhysicalAccepted.
     ///
     /// The task is still observed. Discarding it — as `|> ignore` on the task did
     /// — also discarded the claim/abandon bookkeeping inside it, so a send that
@@ -121,9 +123,16 @@ module HostSessionNudge =
         (kind: PromptAuthority.ContinuationKind)
         (directory: string option)
         (journal: AgentJournal option)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
         : Task<Result<PromptKey, string>> =
-        sendContinuationResult sessionPort sessionId prompt kind directory journal onAccepted
+        sendContinuationResult
+            sessionPort
+            sessionId
+            prompt
+            kind
+            directory
+            journal
+            PromptDispatcher.AwaitMode.Detached
+            None
 
     /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
     ///
@@ -142,7 +151,6 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
-        (onAccepted: (PhysicalUserMessageId -> unit) option)
         : Task<Result<PromptKey, string>> =
         task {
             match journal, tryActiveProfile journal sessionId with
@@ -156,6 +164,7 @@ module HostSessionNudge =
                 else
                     let agent = agentForActiveCursor journal sessionId profile
 
+                    // PROMPT-007 Detached: repair does not wait for PhysicalAccepted.
                     return!
                         rt.SendInteractionRepair
                             sessionPort
@@ -166,5 +175,6 @@ module HostSessionNudge =
                             profile
                             agent
                             (liveDirectory directory)
-                            onAccepted
+                            PromptDispatcher.AwaitMode.Detached
+                            None
         }

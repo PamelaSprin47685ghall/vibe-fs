@@ -90,7 +90,16 @@ module internal CompanionHostBlogger =
             | Some journal ->
                 let dispatcher = PromptDispatcher.forJournal journal
 
-                return! dispatcher.SendAgentOwnerRoot deps.Sessions childId prompt deps.EffectiveAgent None None
+                // PROMPT-007 Detached: Blogger dispatch does not wait for PhysicalAccepted.
+                return!
+                    dispatcher.SendAgentOwnerRoot
+                        deps.Sessions
+                        childId
+                        prompt
+                        deps.EffectiveAgent
+                        None
+                        PromptDispatcher.AwaitMode.Detached
+                        None
         }
 
     /// Physical send from frozen typed context (Main or Squash). No terminal wait.

@@ -597,13 +597,19 @@ id = "PROMPT-007"
 title = "Fire-and-forget 的定义"
 ssot = "SSOT/03.md"
 lifecycle = "active"
-status = "implementing"
-required_layer = 0
-verified_commit = "151fee58"
+status = "conformant"
+required_layer = 2
+verified_commit = "6373c4b0"
 owner = [
   "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcherSend.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSessionNudge.fs",
+  "src/Wanxiangshu.Next/Session/HostForkBusyNudge.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Prompt/fire-and-forget.test.mjs",
+  "tests-mjs/Prompt/send-format.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -1400,13 +1406,15 @@ id = "HOST-010"
 title = "Transform → ProviderRunIdentity 绑定"
 ssot = "SSOT/07.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "6373c4b0"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu.Next/Application/Reconciliation/ReviewSeal.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/SessionSnapshotPort.fs",
 ]
 tests = [
+  "tests-mjs/Review/seal-bind.test.mjs",
   "tests-mjs/Journal/envelope.test.mjs",
   "tests-mjs/domain.mjs",
 ]
@@ -1418,13 +1426,15 @@ id = "HOST-011"
 title = "Tool 执行身份的两个半边"
 ssot = "SSOT/07.md"
 lifecycle = "active"
-status = "implementing"
-required_layer = 0
-verified_commit = "151fee58"
+status = "conformant"
+required_layer = 2
+verified_commit = "6373c4b0"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
 ]
-tests = []
+tests = [
+  "tests-mjs/Plugin/tool-host-codec.test.mjs",
+]
 canaries = []
 evidence = ""
 
@@ -1863,7 +1873,7 @@ id = "EXEC-009"
 title = "Handle 生命周期持久化"
 ssot = "SSOT/09.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
 verified_commit = "cb3457db"
 owner = [
@@ -1879,7 +1889,9 @@ tests = [
   "tests-mjs/Execution/handle.test.mjs",
   "tests-mjs/Plugin/manager-tool-contract.test.mjs",
 ]
-canaries = []
+canaries = [
+  "testkit/opencode/tests/host-restart-canary.mjs",
+]
 evidence = "docs/evidence/0.5.2/EXEC-009-DURABLE-JOIN.txt"
 
 [[clause]]

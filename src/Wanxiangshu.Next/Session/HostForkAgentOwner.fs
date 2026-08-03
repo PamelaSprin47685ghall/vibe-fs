@@ -30,5 +30,14 @@ module HostForkAgentOwner =
             | None -> return Error "No journal: an AgentOwnerRoot prompt cannot be claimed"
             | Some durable ->
                 let dispatcher = PromptDispatcher.forJournal durable
-                return! dispatcher.SendAgentOwnerRoot sessions childId prompt agent directory None
+                // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
+                return!
+                    dispatcher.SendAgentOwnerRoot
+                        sessions
+                        childId
+                        prompt
+                        agent
+                        directory
+                        PromptDispatcher.AwaitMode.Detached
+                        None
         }

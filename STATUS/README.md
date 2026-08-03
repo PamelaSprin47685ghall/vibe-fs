@@ -97,12 +97,12 @@ host-transform-capability 全绿。
 
 ## 已知未闭合项
 
-0.5.2 尚未发布。C11 partial 已把有 layer-2 单测证明的 IMPLEMENTING 升为 CONFORMANT
-（`verified_commit=db6693f5`）。仍缺证据或实现未闭合的条款：
+0.5.2 尚未发布。C11 余项已闭合（layer 2 单测 + EXEC-009 canary 断言已写入）：
 
-- IMPLEMENTING（勿升 CONFORMANT）：`PROMPT-007`（无 `AwaitMode.Detached` / 无测试）、
-  `HOST-010`（弱测试，缺 transform→run 绑定 canary）、`HOST-011`（`tests=[]`）、
-  `EXEC-009`（layer 2 已钉 `cb3457db`；缺 layer-4 canary）
+- 已 CONFORMANT（本轮）：`PROMPT-007`（`AwaitMode.Detached` + fire-and-forget 测试）、
+  `HOST-010`（`bindableRun` 正/负用例）、`HOST-011`（`ToolHostCodec.decodeContext`）、
+  `EXEC-009`（layer 2；`host-restart.toml` 已加 `HandleCompleted`/`HandleRetired` 断言；
+  layer-4 绿跑仍归 DevOps）
 - 已 CONFORMANT（C11 partial，layer 2）：`AGENT-007`、`PROMPT-004/006/009`、
   `HOST-005/009`、`COMPANION-013`（`verified_commit=db6693f5`）
 - `PERSIST-009`：已 CONFORMANT（layer 2，`db6693f5`）；worktree 路径无独立 fault-injection
@@ -152,23 +152,16 @@ src/Wanxiangshu.Next/
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
 1. C5–C8：已完成（见上「本会话完成」；C8 = gate 禁词 + 账本诚实，无 Orchestrator 重写）
-2. C9：Host/Review/Cold boundary 证据——`HOST-010/011` identity canary
+2. C9：`HOST-010/011` layer-2 单测已闭合；identity canary（transform id = tool messageID）
+   仍可作为 Host 升级门禁加强项
 3. C10：Context recovery X-A–X-D 第四层证据
-4. C11 余项：`PROMPT-007` / `HOST-010` / `HOST-011` / `EXEC-009` layer-4；
-   勿在证据不足时升 CONFORMANT
+4. C11 余项：已闭合（见上「已知未闭合项」）；`EXEC-009` layer-4 绿跑归 DevOps
 5. C12：运行环境与发布包
 6. C13：全仓反向审计
 7. C14：RC 验证
 8. C15：0.5.2 发布
 
-仍为 IMPLEMENTING 的条款（勿在证据不足时升 CONFORMANT）：
-
-| 条款 | 备注 |
-|------|------|
-| `PROMPT-007` | 无 `AwaitMode.Detached`；`tests=[]` |
-| `HOST-010` | 实现在；弱测试（envelope/domain）；需 binding canary |
-| `HOST-011` | `tests=[]`；需 tool-identity canary |
-| `EXEC-009` | layer 2 已钉 `cb3457db`；缺 layer-4 canary |
+IMPLEMENTING 条款：无（Active 账本已清）。
 
 历史项：
 
@@ -186,8 +179,8 @@ src/Wanxiangshu.Next/
    STRENGTH-078 C-11…C-21）→ Enforcer nudge overlay（ENFORCER-080…115，第 0 步 7–9
    补完）→ Student&Teacher（teacher/return 工具、QA 落盘，LEARN-082…088）
 3. 包 K8f：X-A–X-D 剧本（X 恢复链生产接线已闭合；剧本未建，第 4 层证据未产出）
-4. `EXEC-009` durable join（生产已闭合 `cb3457db`/`99fcb06f`；账本 IMPLEMENTING layer 2）：
-   `HandleProjection.joinable` 已有生产调用点；layer-4 canary 与 CONFORMANT 升级待后续
+4. `EXEC-009` durable join（生产已闭合；CONFORMANT layer 2；`host-restart` 已挂断言，
+   layer-4 绿跑待 DevOps）
 5. `CompanionDelta.jsonDelta` 替换为包 X3 的 TOML delta（当前仍在 Submit 路径）
 
 ## 事实入口

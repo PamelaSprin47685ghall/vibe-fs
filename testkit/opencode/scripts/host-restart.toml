@@ -45,6 +45,12 @@ flow = [
   { wait = "child-a2", timeoutMs = 15000 },
   { wait = "manager-after-restart.1", timeoutMs = 15000 },
 
+  # EXEC-009 layer-4: durable completion blob + retire must exist after join across restart.
+  # CompletionRef is a field on HandleCompleted (not a fact name); HandleCompleted +
+  # HandleRetired are the durable facts join consumption leaves behind.
+  { assertFacts = { name = "HandleCompleted", gte = 1 } },
+  { assertFacts = { name = "HandleRetired", gte = 1 } },
+
   { awaitTerminal = true, requireAssistantTerminal = true },
   { expectSatisfied = true },
 ]
