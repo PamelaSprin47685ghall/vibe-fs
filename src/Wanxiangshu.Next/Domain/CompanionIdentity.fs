@@ -94,15 +94,5 @@ module CompanionIdentity =
     ///
     /// Pure function of blogger session + delta digest. No "first"/"delta" ad hoc
     /// strings with raw TOML, no GUID, no clock.
-    let newWorkMessageId
-        (sha256: string -> string)
-        (bloggerSessionId: SessionId)
-        (deltaDigest: BlobDigest)
-        : string =
-        sha256 (
-            String.concat
-                "|"
-                [ SessionId.value bloggerSessionId
-                  BlobDigest.value deltaDigest
-                  "new-work" ]
-        )
+    let newWorkMessageId (sha256: string -> string) (bloggerSessionId: SessionId) (deltaDigest: BlobDigest) : string =
+        sha256 (String.concat "|" [ SessionId.value bloggerSessionId; BlobDigest.value deltaDigest; "new-work" ])

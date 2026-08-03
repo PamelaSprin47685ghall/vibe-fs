@@ -47,8 +47,7 @@ module CompanionTransform =
                         sessionPort,
                         ?durable = durable,
                         onBloggerCreated =
-                            (fun bloggerId ->
-                                onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
+                            (fun bloggerId -> onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
                         ?restoredBloggerId = restoredBloggerId,
                         ?journal = journal,
                         ?bloggerDirectory = workspaceDirectory

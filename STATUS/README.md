@@ -3,14 +3,16 @@
 ## 当前基线
 
 - 分支：`master`
-- 已发布：`0.5.1` / tag `v0.5.1`（tip `4bf06ba0`）
+- 收敛目标：`0.5.2`（开发中，尚未 tag）
 - 最后验证：`test:release` 全绿（gate:static → build → unit → harness → P0×3，canary 18×3）
-- 证据：`docs/evidence/0.5.1/`
-- 分发包：`build/wanxiangshu-0.5.1.tgz`（private；sha256 见 evidence）
+- 证据：`docs/evidence/0.5.2-baseline/` 与生成中的 `docs/evidence/0.5.2/`
+- 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成）
 
 ## 当前产品状态
 
-0.5.0 已发布。0.5.1 已发布（tag `v0.5.1`）：闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
+0.5.2 收敛中。目标：Active SSOT 全 CONFORMANT，未来设计迁出到 `RFC/`，状态唯一源为 `STATUS/conformance.toml`。
+
+0.5.1 已发布（tag `v0.5.1`）：闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
 唯一 coordinator、typed materialize、blog-tool Squash、KnownCommitted 才 Park、
 crash-window 不 stomp live CurrentRequest。canary 证据见 `host-transform-capability`
 与 `companion-canary`；发布证据目录 `docs/evidence/0.5.1/`。
@@ -22,10 +24,10 @@ join 最小 wire（status/agent/work_record）。
 
 ## 当前开发阶段
 
-SSOT/15 Blogger 垂直切片（ENFORCER runtime authority / Squash / recovery）已闭合并
-标 CONFORMANT。SSOT/14 Strength shadow 与 ENFORCER nudge overlay、SSOT/16
-Student&Teacher 生产接线仍为后续纵向。推荐顺序：Strength shadow → Enforcer nudge
-overlay → Student/Teacher。
+0.5.2 收敛：按 `STATUS/0.5.2-convergence.md` 执行 C0–C15。
+
+SSOT/14 Strength、SSOT/16 Student&Teacher 与 ENFORCER nudge/throttle 已迁出 Active
+SSOT 至 `RFC/`，不属于 0.5.2 产品合同。Active 子集为 SSOT/01–13 + SSOT/15 Blogger 工具化。
 
 ### 本轮已闭合：PrefixCoverage 推进与 prefix-probe
 
@@ -55,7 +57,7 @@ host-transform-capability 全绿。
 
 ## 源码地图
 
-生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部 190 个 `.fs`）。
+生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部 203 个 `.fs`）。
 
 ```text
 src/Wanxiangshu.Next/
@@ -88,6 +90,24 @@ src/Wanxiangshu.Next/
 （模板 `packaging/npm-package.template.json`）。
 
 ## 下一步
+
+0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
+
+1. C3：版本与状态真值（进行中）
+2. C4：删除旧 Companion/Blogger 旁路入口
+3. C5：建立唯一 ManagedAgentCatalog
+4. C6：durable join（EXEC-009）
+5. C7：durable effects（PERSIST-009）
+6. C8：ARCH-001 与 Orchestrator stage-like 语义清理
+7. C9：Host/Review/Cold boundary 证据
+8. C10：Context recovery X-A–X-D 第四层证据
+9. C11：测试与 clause coverage 补齐
+10. C12：运行环境与发布包
+11. C13：全仓反向审计
+12. C14：RC 验证
+13. C15：0.5.2 发布
+
+历史项：
 
 1. （已闭合）共享 Host capability canary——`host-transform-capability` 已建并全绿：证明
    STRENGTH-078 C-01…C-10（每请求一次 transform、挂起/恢复、跨 session 并行、取消、

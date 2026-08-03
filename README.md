@@ -2,13 +2,13 @@
 
 OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
 
-当前版本：`0.5.0-rc.1`（OpenCode Agent DSL） — 唯一产品语义见 [`SSOT/00.md`](SSOT/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
+当前版本：`0.5.2`（0.5.2 全 SSOT 收敛） — 唯一产品语义见 [`SSOT/00.md`](SSOT/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
 
 产品语义：[`SSOT/00.md`](SSOT/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前状态：[`STATUS/README.md`](STATUS/README.md)。
 
 ## 当前边界
 
-本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，迁移全过程归档见 [`docs/archive/shock-anneal-2026/FINAL-REPORT.md`](docs/archive/shock-anneal-2026/FINAL-REPORT.md)。
+本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `SSOT/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，合规表由 [`STATUS/conformance.md`](STATUS/conformance.md) 从 `STATUS/conformance.toml` 生成。
 
 休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（含 SSOT/14-16 的 `PURE_CORE_ONLY` 纯领域内核）。
 

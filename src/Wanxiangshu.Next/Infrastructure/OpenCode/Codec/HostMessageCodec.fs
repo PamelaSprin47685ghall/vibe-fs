@@ -19,7 +19,10 @@ type MessagePart =
 module HostMessageCodec =
 
     let private readField (value: obj) (name: string) : obj =
-        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private readString (value: obj) (name: string) =
         let field = readField value name
@@ -31,9 +34,12 @@ module HostMessageCodec =
             if String.IsNullOrWhiteSpace text then None else Some text
 
     let private canonicalArgs (value: obj) =
-        if isNull value then "null"
-        elif emitJsExpr value "typeof $0 === 'string'" then unbox<string> value
-        else CanonicalJson.canonicalJson value
+        if isNull value then
+            "null"
+        elif emitJsExpr value "typeof $0 === 'string'" then
+            unbox<string> value
+        else
+            CanonicalJson.canonicalJson value
 
     let decodePart (raw: obj) : MessagePart option =
         if isNull raw then
@@ -69,6 +75,7 @@ module HostMessageCodec =
                 let args =
                     let direct = readField raw "args"
                     let alternate = readField raw "arguments"
+
                     if not (isNull direct) then canonicalArgs direct
                     elif not (isNull alternate) then canonicalArgs alternate
                     else "{}"
@@ -101,4 +108,7 @@ module HostMessageCodec =
             | _ -> None
 
     let decodeParts (rawParts: obj array) =
-        if isNull rawParts then [||] else rawParts |> Array.choose decodePart
+        if isNull rawParts then
+            [||]
+        else
+            rawParts |> Array.choose decodePart

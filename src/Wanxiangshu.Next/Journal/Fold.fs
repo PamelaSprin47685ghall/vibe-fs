@@ -683,8 +683,7 @@ module Fold =
 
         | AgentFact.BloggerRequestMaterialized payload ->
             let apply session =
-                let cycles =
-                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
                 BloggerCycleProjection.materialize
                     { RequestId = payload.RequestId
@@ -710,18 +709,12 @@ module Fold =
 
         | AgentFact.BloggerRequestAbandoned payload ->
             let apply session =
-                let cycles =
-                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
                 Ok
                     { session with
                         BloggerCycles =
-                            Some(
-                                BloggerCycleProjection.abandon
-                                    payload.RequestId
-                                    payload.BloggerSessionId
-                                    cycles
-                            ) }
+                            Some(BloggerCycleProjection.abandon payload.RequestId payload.BloggerSessionId cycles) }
 
             match AgentProjection.tryUpdate payload.MainSessionId apply projection with
             | Error reason -> reject "BloggerRequestAbandoned" reason
@@ -733,8 +726,7 @@ module Fold =
                 let enforcement =
                     Option.defaultValue EnforcementProjection.empty session.Enforcement
 
-                let cycles =
-                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
                 EnforcementProjection.applyFromEntry
                     enforcement
@@ -778,8 +770,7 @@ module Fold =
 
         | AgentFact.BlogSquashCommitted payload ->
             let applyReceipt session =
-                let cycles =
-                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
                 BloggerCycleProjection.recordReceipt
                     { ProviderRun = payload.ProviderRun

@@ -29,8 +29,7 @@ type CompanionProjection =
 /// `None` and silently discard the session's existing companion state.
 module CompanionProjection =
 
-    let empty =
-        { BloggerSessionId = None }
+    let empty = { BloggerSessionId = None }
 
     let linkBlogger (bloggerSessionId: SessionId) (current: CompanionProjection) =
         { current with

@@ -31,11 +31,7 @@ module CompanionProgram =
                 fromTask (fun _ _ct ->
                     task {
                         return
-                            BloggerDelta.nextChunk
-                                BloggerDelta.DeltaLimitBytes
-                                cursor
-                                previousCutoff
-                                current.Messages
+                            BloggerDelta.nextChunk BloggerDelta.DeltaLimitBytes cursor previousCutoff current.Messages
                     })
 
             return delta

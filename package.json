@@ -1,6 +1,6 @@
 {
   "name": "wanxiangshu",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -18,6 +18,7 @@
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
     "format": "node scripts/pre-commit-formatter.mjs",
+    "lint": "node scripts/pre-commit-formatter.mjs --all",
 
     "gate:ssot": "node scripts/ssot-lint.mjs",
     "gate:architecture": "node scripts/architecture-gate.mjs",
@@ -26,8 +27,9 @@
     "gate:toml": "node scripts/toml-format.mjs",
     "gate:budget": "node scripts/budget-gate.mjs",
     "gate:surface": "node scripts/surface-inventory.mjs",
+    "gate:conformance": "node scripts/conformance-gate.mjs --check",
     "gate:generated": "node scripts/enforcer-catalog-gen.mjs --check",
-    "gate:static": "npm run gate:layout && npm run gate:ssot && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface && npm run gate:generated",
+    "gate:static": "npm run gate:layout && npm run gate:ssot && npm run gate:conformance && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface && npm run gate:generated",
     "gate:layout": "node scripts/repository-layout-gate.mjs",
 
     "build": "node scripts/clean-fable-output.mjs build && dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj -o build/next",

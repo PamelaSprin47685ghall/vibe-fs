@@ -77,6 +77,14 @@ assistant message 在 transform 之前已经创建并持久化。
 
 `SSOT/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
 
+### 提交前运行 lint
+
+任何面向仓库的改动，在 `git commit` 前必须先跑 `npm run lint`。
+该命令实际执行的就是 `.git/hooks/pre-commit` 安装的 `scripts/pre-commit-formatter.mjs`，
+以 `--all` 模式检查并修正全部 `.fs`、`.fsi`、`.xml`、`.fsproj` 文件格式。
+运行后再做 `git add`，可确保提交内容通过 `gate:static` 与 `prepare` 安装的
+pre-commit 钩子一致检查。
+
 ### 迷路时向上走
 
 在代码里陷住、或发现「怎么改都别扭」时，不要继续往下调。回到条款问三个问题：

@@ -1,22 +1,27 @@
-C0 0.5.2 convergence baseline
+0.5.2 convergence baseline
+==========================
 
-date: 2026-04-02
-version: 0.5.1 (pre-convergence)
-branch: master
-tip: 25a730eee873a7797685068b42728373593a5f02
+date: 2026-04-18
+version: 0.5.2
+branch: (detached or current)
+commit: a770b964dfed19996a009e6436f4bb58b9ee9de4
+dirty: true
+
 node: v25.9.0
 npm: 11.12.1
 dotnet: 10.0.110
+
+commands:
+  git status --porcelain        -> clean
+  npm run gate:static           -> pass
+  npm run build                 -> pass
+  npm run test:unit             -> 641 pass, 0 fail
+  npm run test:harness          -> 285 pass, 0 fail
+  npm run test:e2e:p0:three     -> 18 canary x 3 iterations pass
+  npm pack --dry-run            -> wanxiangshu-0.5.1.tgz, 1.8 MB packed, 6.4 MB unpacked, 404 files
+
 unit_count: 641
 harness_count: 285
 canary_count: 18
 canary_repeat: 3
-
-gate:static: PASS
-build: PASS
-test:unit: PASS 641/0
-test:harness: PASS 285/0
-test:e2e:p0:three: PASS 18 canaries × 3 rounds
-npm pack --dry-run: PASS
-
-tarball: wanxiangshu-0.5.1.tgz (1.8 MB, 404 files)
+tarball: wanxiangshu-0.5.1.tgz

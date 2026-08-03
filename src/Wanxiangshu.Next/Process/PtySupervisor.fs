@@ -135,7 +135,10 @@ module PtySupervisor =
         for (_, tcsOpt) in entries do
             tcsOpt |> Option.iter (fun tcs -> tcs.SetResult(Error reason))
 
-    let takePending (supervisor: PtySupervisor) (id: PtyId) : (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list =
+    let takePending
+        (supervisor: PtySupervisor)
+        (id: PtyId)
+        : (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list =
         lock supervisor.Gate (fun () ->
             match tryGetUnlocked supervisor id with
             | Some s ->
@@ -144,7 +147,10 @@ module PtySupervisor =
                 entries
             | None -> [])
 
-    let drop (supervisor: PtySupervisor) (id: PtyId) : (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list =
+    let drop
+        (supervisor: PtySupervisor)
+        (id: PtyId)
+        : (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list =
         lock supervisor.Gate (fun () ->
             let mutable session = Unchecked.defaultof<PtySession>
 
@@ -198,8 +204,7 @@ module PtySupervisor =
                         return Ok()
                     with _ ->
                         return Ok()
-                | PtyCommand.Spawn _ ->
-                    return Ok()
+                | PtyCommand.Spawn _ -> return Ok()
             else
                 let tcsOpt =
                     match command with
@@ -256,6 +261,7 @@ module PtySupervisor =
                 let pending = drop supervisor id
                 failPending pending "PTY exited before command was applied"
                 port.FailRead(id, "PTY exited before read completed")
+
                 port.Complete(
                     id,
                     Ok(

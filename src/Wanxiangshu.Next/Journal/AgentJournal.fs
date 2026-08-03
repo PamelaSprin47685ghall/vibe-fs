@@ -82,11 +82,7 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
                         { projection with
                             AgentProjections =
                                 { projection.AgentProjections with
-                                    Sessions =
-                                        Map.add
-                                            sessionId
-                                            updatedSession
-                                            projection.AgentProjections.Sessions } })
+                                    Sessions = Map.add sessionId updatedSession projection.AgentProjections.Sessions } })
 
     /// Append one fact and fold it.
     ///
@@ -171,7 +167,8 @@ module AgentJournal =
     /// FALLBACK-004: derive success from a valid completed turn without appending
     /// a fact. Missing journals, sessions, and fallback projections are all no-op.
     let recordDerivedFallbackSuccess (journal: AgentJournal option) (sessionId: SessionId) : unit =
-        journal |> Option.iter (fun value -> value.RecordDerivedFallbackSuccess sessionId)
+        journal
+        |> Option.iter (fun value -> value.RecordDerivedFallbackSuccess sessionId)
 
     let handleProjection (journal: AgentJournal) (sessionId: SessionId) : AgentLinkageProjection =
         AgentProjection.tryFind sessionId (snapshot journal).AgentProjections

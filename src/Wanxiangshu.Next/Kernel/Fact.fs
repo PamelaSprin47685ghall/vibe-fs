@@ -430,7 +430,6 @@ module Fact =
             {| RequestId: BloggerRequestId
                MainSessionId: SessionId
                BloggerSessionId: SessionId
-               /// "main" | "squash"
                RequestKind: string
                ContextRef: BlobRef
                ContextDigest: BlobDigest

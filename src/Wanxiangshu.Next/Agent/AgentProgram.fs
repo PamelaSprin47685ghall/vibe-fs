@@ -11,8 +11,7 @@ open Wanxiangshu.Next.Kernel.Flow
 module AgentProgram =
 
     /// Lift a plain Task into the AgentFlow.
-    let private fromTask (f: AgentContext -> CancellationToken -> Task<'a>) : AgentFlow<'a> =
-        Flow.lift f
+    let private fromTask (f: AgentContext -> CancellationToken -> Task<'a>) : AgentFlow<'a> = Flow.lift f
 
     /// Fork a sub-agent and return once it completes.
     /// Production usage of the `agent {}` builder with fork/join semantics.
@@ -34,21 +33,13 @@ module AgentProgram =
         }
 
     /// Run a simple agent program that validates session identity.
-    let validateSession
-        (expectedName: string)
-        : AgentFlow<bool> =
+    let validateSession (expectedName: string) : AgentFlow<bool> =
         agent {
-            let! name =
-                fromTask (fun ctx _ct ->
-                    task { return ctx.AgentName })
+            let! name = fromTask (fun ctx _ct -> task { return ctx.AgentName })
 
             return name = expectedName
         }
 
     /// Execute an agent flow to completion and return the result.
-    let runAgentFlow
-        (ctx: AgentContext)
-        (ct: CancellationToken)
-        (flow: AgentFlow<'a>)
-        : Task<Result<'a, AgentError>> =
+    let runAgentFlow (ctx: AgentContext) (ct: CancellationToken) (flow: AgentFlow<'a>) : Task<Result<'a, AgentError>> =
         Flow.run ctx ct flow

@@ -17,10 +17,12 @@ type BloggerRuntimeState =
 /// Host-owned cell: state + pending offer + one-repair budget.
 /// CurrentRequest lives in InFlight payload; RepairSpent is per logical request.
 type BloggerRuntimeCell =
-    { State: BloggerRuntimeState
-      PendingOffer: BloggerRequestContext option
-      /// FALLBACK-008 / item 15: at most one repair per logical request.
-      RepairSpent: bool }
+    {
+        State: BloggerRuntimeState
+        PendingOffer: BloggerRequestContext option
+        /// FALLBACK-008 / item 15: at most one repair per logical request.
+        RepairSpent: bool
+    }
 
 [<RequireQualifiedAccess>]
 module BloggerRuntime =
@@ -132,9 +134,7 @@ module BloggerRuntime =
                   RepairSpent = false }
         | _ -> Error TransitionError.NotInFlight
 
-    let markRepairSpent (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
-        { cell with
-            RepairSpent = true }
+    let markRepairSpent (cell: BloggerRuntimeCell) : BloggerRuntimeCell = { cell with RepairSpent = true }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
@@ -175,12 +175,7 @@ module BloggerRuntime =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.InFlight _ when cell.PendingOffer.IsSome -> Error TransitionError.PendingWhileInFlight
-        | _ ->
-            Ok(
-                cell.PendingOffer,
-                { cell with
-                    PendingOffer = None }
-            )
+        | _ -> Ok(cell.PendingOffer, { cell with PendingOffer = None })
 
     /// After taking a pending offer, move to InFlight as the next CurrentRequest.
     let adoptPendingAsCurrent

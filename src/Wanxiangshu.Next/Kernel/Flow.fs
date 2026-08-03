@@ -184,10 +184,11 @@ module Flow =
     /// in Ok. Cancellation or exception escapes as an uncatchable
     /// OperationCanceledException / exception (caller may use TryWith).
     let lift (f: 'ctx -> CancellationToken -> Task<'a>) : Flow<'ctx, 'error, 'a> =
-        create (fun ctx ct -> task {
-            let! r = f ctx ct
-            return Ok r
-        })
+        create (fun ctx ct ->
+            task {
+                let! r = f ctx ct
+                return Ok r
+            })
 
 type JsTcs<'T>() =
     let mutable completed = false

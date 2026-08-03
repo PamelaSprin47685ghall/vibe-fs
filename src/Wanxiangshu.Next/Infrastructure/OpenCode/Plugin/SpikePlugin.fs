@@ -71,6 +71,7 @@ module SpikePlugin =
                 // Attach the gate instead; the first real Host event starts the
                 // pass (single-flight), and every business entry point awaits it.
                 scope.AttachRecoveryGate(PromptRecovery.RecoveryGate(journal, snapshotOpt))
+
                 scope.AttachBloggerRecoveryGate(
                     BloggerCrashRecovery.RecoveryGate(journal, scope :> IParkedTransformHost, snapshotOpt)
                 )

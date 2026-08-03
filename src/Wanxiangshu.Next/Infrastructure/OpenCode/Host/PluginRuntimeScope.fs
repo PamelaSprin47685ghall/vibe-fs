@@ -312,8 +312,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.RecoveryArming.Remove sessionId |> ignore
 
         // Always cancel the deleted id; also cancel linked Blogger keys.
-        let cancelKeys =
-            (sessionId :: linkedBloggerKeys) |> List.distinct
+        let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct
 
         for key in cancelKeys do
             (this :> IParkedTransformHost).CancelParked key

@@ -125,10 +125,6 @@ type CompanionHost
     /// Ensure the Blogger child exists (create or restore). Key for runtime cell.
     member this.EnsureBloggerAsync() : Task<SessionId> = ensureBlogger ()
 
-    /// Physical send from frozen typed context (Main or Squash). Coordinator only.
-    member this.StartMainFromContext(ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
-        CompanionHostBlogger.startFromContext this.BloggerDeps ctx
-
     member this.StartFromContext(ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
         CompanionHostBlogger.startFromContext this.BloggerDeps ctx
 
@@ -156,16 +152,6 @@ type CompanionHost
             | Some current -> current.Cursor.Offset
             | None -> 0uy
         | None -> 0uy
-
-    /// Legacy SubmitProjection — production uses BloggerCoordinator.
-    member this.SubmitProjection(projection: ProviderSemanticProjection) : CompanionOutcome =
-        let deps = this.BloggerDeps
-
-        companion.Submit(
-            projection,
-            (fun current chunk -> CompanionHostBlogger.blog deps current chunk),
-            this.BloggerCursorOffset
-        )
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =

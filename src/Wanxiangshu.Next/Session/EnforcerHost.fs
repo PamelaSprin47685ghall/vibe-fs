@@ -293,8 +293,7 @@ module EnforcerHost =
                                    FrameEpochId = coverage.FrameEpochId
                                    PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
                                    NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
-                                   PreviousCoverableTurnCutoffExclusive =
-                                       coverage.PreviousCoverableTurnCutoffExclusive
+                                   PreviousCoverableTurnCutoffExclusive = coverage.PreviousCoverableTurnCutoffExclusive
                                    NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
                                    NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
                                    TextRef = textBlob.BlobRef
@@ -306,11 +305,7 @@ module EnforcerHost =
                                    ObservedPrefixEpochId = epoch |}
 
                         match
-                            AgentJournal.appendAgent
-                                (StreamId.Session mainSessionId)
-                                (Some providerRun)
-                                fact
-                                journal
+                            AgentJournal.appendAgent (StreamId.Session mainSessionId) (Some providerRun) fact journal
                         with
                         | Error failure -> classifyAppendFailure failure
                         | Ok _ -> CycleCommitOutcome.KnownCommitted
@@ -488,7 +483,12 @@ module EnforcerHost =
                                     "role", box msg.Role
                                     "synthetic", box (not msg.IsPhysical)
                                     "source",
-                                    box (if msg.IsPhysical then "physical-delta" else "synthetic-projection") ]
+                                    box (
+                                        if msg.IsPhysical then
+                                            "physical-delta"
+                                        else
+                                            "synthetic-projection"
+                                    ) ]
                           )
                           "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
                 |> Some
@@ -541,6 +541,7 @@ module EnforcerHost =
         (chunk: BloggerDeltaChunk)
         : BloggerRequestContext =
         let nextSeq = lastCoveredSequence xTrace chunk.NextCursor
+
         let nextDigest =
             coveredPrefixDigest
                 blog.Coverage.CoverableTurnCutoffExclusive
@@ -624,7 +625,10 @@ module EnforcerHost =
                                 false
                             else
                                 let kind =
-                                    if isNull part?``type`` then "" else unbox<string> part?``type``
+                                    if isNull part?``type`` then
+                                        ""
+                                    else
+                                        unbox<string> part?``type``
 
                                 let name =
                                     if not (isNull part?tool) then unbox<string> part?tool
@@ -710,22 +714,14 @@ module EnforcerHost =
                             scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
                             injectRepair <- true
 
-                            Diagnostic.emit
-                                "enforcer-cycle-repair"
-                                [ "session_id", key; "result", reason ]
+                            Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                         else
                             failClosedNoPark reason
                     | Ok(merged, toolCallIds) ->
                         match currentCtx with
                         | Some(BloggerRequestContext.Squash squash) ->
                             match
-                                commitSquash
-                                    durable
-                                    mainSessionId
-                                    bloggerSessionId
-                                    providerRun
-                                    squash
-                                    merged.MergedText
+                                commitSquash durable mainSessionId bloggerSessionId providerRun squash merged.MergedText
                             with
                             | CycleCommitOutcome.KnownCommitted ->
                                 committed <- true
@@ -741,9 +737,7 @@ module EnforcerHost =
                                 // No re-ask model, no re-append. Reconcile via receipt only.
                                 commitUnknown <- true
 
-                                Diagnostic.emit
-                                    "enforcer-cycle-commit-unknown"
-                                    [ "session_id", key; "result", reason ]
+                                Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
                         | Some(BloggerRequestContext.Main main) ->
                             let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
 
@@ -845,5 +839,3 @@ module EnforcerHost =
                         |> Option.defaultValue rawMessages
                 | _ -> return rawMessages
         }
-
-

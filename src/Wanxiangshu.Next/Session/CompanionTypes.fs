@@ -17,10 +17,7 @@ type BloggerCompletion =
       NextCoverableTurnCutoffExclusive: int
       NextCoveredPrefixDigest: string }
 
-type CompanionOutcome =
-    | Submitted
-    | SkippedBusy
-    | DurableJournalUnavailable
+
 
 type CompanionMemory =
     {

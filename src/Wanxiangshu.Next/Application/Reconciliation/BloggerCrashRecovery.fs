@@ -45,11 +45,7 @@ module BloggerCrashRecovery =
                 |> Map.toList
                 |> List.map (fun (_, openReq) -> mainSessionId, openReq))
 
-    let private abandon
-        (journal: AgentJournal)
-        (openReq: OpenBloggerRequest)
-        (reason: string)
-        : unit =
+    let private abandon (journal: AgentJournal) (openReq: OpenBloggerRequest) (reason: string) : unit =
         let fact =
             AgentFact.BloggerRequestAbandoned
                 {| RequestId = openReq.RequestId
@@ -205,8 +201,7 @@ module BloggerCrashRecovery =
                         results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "disposed"))
                     | _ ->
                         match snapshotOpt with
-                        | None ->
-                            results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "no snapshot port"))
+                        | None -> results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "no snapshot port"))
                         | Some snapshot ->
                             match! snapshot.GetMessages openReq.BloggerSessionId with
                             | Error reason ->
@@ -230,10 +225,7 @@ module BloggerCrashRecovery =
                                 match tryReloadMainContext durable openReq with
                                 | None ->
                                     results.Add(
-                                        WindowOutcome.Unreadable(
-                                            openReq.BloggerSessionId,
-                                            "context blob unreadable"
-                                        )
+                                        WindowOutcome.Unreadable(openReq.BloggerSessionId, "context blob unreadable")
                                     )
                                 | Some ctx ->
                                     restoreRuntime host openReq.BloggerSessionId (BloggerRuntimeState.InFlight ctx)

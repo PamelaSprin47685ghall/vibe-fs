@@ -86,10 +86,7 @@ module BloggerCoordinator =
 
     /// C5: durable materialization BEFORE physical send. Context blob is the
     /// irrecomputable semantic input; recovery reads this + Host snapshot + receipts.
-    let private materializeRequest
-        (journal: AgentJournal)
-        (ctx: BloggerRequestContext)
-        : Result<unit, string> =
+    let private materializeRequest (journal: AgentJournal) (ctx: BloggerRequestContext) : Result<unit, string> =
         let requestId = BloggerRequestContext.requestId ctx
         let mainSessionId = BloggerRequestContext.mainSessionId ctx
         let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
@@ -123,8 +120,7 @@ module BloggerCoordinator =
                     [ "kind", box "squash"
                       "frame_epoch", box (FrameEpochId.value squash.FrameEpochId)
                       "covered_frame_count", box squash.CoveredFrameCount
-                      "frame_digests",
-                      box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
+                      "frame_digests", box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
                       "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
 
         // One open request per Blogger. Restart / re-offer with a new RequestId
@@ -175,11 +171,7 @@ module BloggerCoordinator =
                     | Error failure -> Error(JournalAppendFailure.describe failure)
                     | Ok _ -> Ok()
 
-    let private abandonRequest
-        (journal: AgentJournal option)
-        (ctx: BloggerRequestContext)
-        (reason: string)
-        : unit =
+    let private abandonRequest (journal: AgentJournal option) (ctx: BloggerRequestContext) (reason: string) : unit =
         match journal with
         | None -> ()
         | Some j ->
@@ -190,11 +182,7 @@ module BloggerCoordinator =
                        BloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
                        Reason = reason |}
 
-            AgentJournal.appendAgent
-                (StreamId.Session(BloggerRequestContext.mainSessionId ctx))
-                None
-                fact
-                j
+            AgentJournal.appendAgent (StreamId.Session(BloggerRequestContext.mainSessionId ctx)) None fact j
             |> ignore
 
     let private startFrozen
@@ -259,13 +247,7 @@ module BloggerCoordinator =
             if not maySquash then
                 return None
             else
-                match
-                    CompanionHostBlogger.tryBuildSquashContext
-                        mainSessionId
-                        bloggerSessionId
-                        observedEpoch
-                        blog
-                with
+                match CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog with
                 | None -> return None
                 | Some squashCtx ->
                     match BloggerRuntime.onMaterial cell squashCtx with
@@ -311,29 +293,12 @@ module BloggerCoordinator =
                 let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
 
                 let! squashEffect =
-                    tryStartSquash
-                        scope
-                        host
-                        journal
-                        mainSessionId
-                        bloggerSessionId
-                        observedEpoch
-                        key
-                        cell
-                        blog
+                    tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key cell blog
 
                 match squashEffect with
                 | Some effect -> return effect
                 | None ->
-                    match
-                        nextMainContext
-                            mainSessionId
-                            bloggerSessionId
-                            observedEpoch
-                            blog
-                            xTrace
-                            projection
-                    with
+                    match nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace projection with
                     | None -> return DecisionEffect.NoMaterial
                     | Some ctx ->
                         match BloggerRuntime.onMaterial (scope.GetBloggerRuntime key) ctx with

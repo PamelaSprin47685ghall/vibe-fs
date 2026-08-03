@@ -16,20 +16,18 @@ open Wanxiangshu.Next.Host
 module internal CompanionHostBlogger =
 
     type BloggerDeps =
-        {
-            Sessions: ISessionHostPort
-            PrimaryId: SessionId
-            Durable: ICompanionDurablePort option
-            EnsureBlogger: unit -> Task<SessionId>
-            Gate: obj
-            Companion: Companion
-            RequestKind: ProviderRequestKind ref
-            SquashFrameCount: int option ref
-            Journal: AgentJournal option
-            EffectiveAgent: string
-            RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit
-            StageBloggerContext: SessionId -> BloggerRequestContext -> unit
-        }
+        { Sessions: ISessionHostPort
+          PrimaryId: SessionId
+          Durable: ICompanionDurablePort option
+          EnsureBlogger: unit -> Task<SessionId>
+          Gate: obj
+          Companion: Companion
+          RequestKind: ProviderRequestKind ref
+          SquashFrameCount: int option ref
+          Journal: AgentJournal option
+          EffectiveAgent: string
+          RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit
+          StageBloggerContext: SessionId -> BloggerRequestContext -> unit }
 
     /// CTX-012: covered frame count = ceil(m / 2).
     let coveredFrameCount (frameCount: int) : int =
@@ -97,10 +95,7 @@ module internal CompanionHostBlogger =
 
     /// Physical send from frozen typed context (Main or Squash). No terminal wait.
     /// Transform rebuilds the provider view from durable frames + this context.
-    let startFromContext
-        (deps: BloggerDeps)
-        (ctx: BloggerRequestContext)
-        : Task<Result<PromptKey, string>> =
+    let startFromContext (deps: BloggerDeps) (ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
         task {
             let! childId = deps.EnsureBlogger()
 
@@ -119,31 +114,4 @@ module internal CompanionHostBlogger =
                 // Physical claim body is the stable squash instruction only.
                 // Frames arrive via rebuildFromContext on the transform (no raw transcript).
                 return! sendBloggerPrompt deps childId CompanionPrompt.SquashInstruction
-        }
-
-    /// Back-compat name used by CompanionHost.StartMainFromContext.
-    let startMainFromContext deps ctx = startFromContext deps ctx
-
-    /// Legacy chunk entry for tests that still call Companion.Submit.
-    let blog
-        (deps: BloggerDeps)
-        (projection: ProviderSemanticProjection)
-        (chunk: BloggerDeltaChunk)
-        : Task<Result<PromptKey, string>> =
-        task {
-            let! bloggerId = deps.EnsureBlogger()
-            let blog = deps.Companion.Memory.Blog
-            let xTrace = deps.Companion.Memory.XTrace
-
-            let ctx =
-                EnforcerHost.mainContextFromChunk
-                    deps.PrimaryId
-                    bloggerId
-                    PrefixEpochId.initial
-                    blog
-                    xTrace
-                    projection
-                    chunk
-
-            return! startFromContext deps ctx
         }

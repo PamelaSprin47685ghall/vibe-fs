@@ -29,14 +29,16 @@ type OpenBloggerRequest =
       PromptKey: PromptKey option }
 
 type BloggerCycleProjectionState =
-    { /// ProviderRun → receipt (Entry or Squash). Duplicate kind or mixed kinds rejected.
-      ByProviderRun: Map<ProviderRunIdentity, BloggerCycleReceipt>
-      /// RequestId → open materialization (cleared on commit/abandon).
-      OpenByRequestId: Map<BloggerRequestId, OpenBloggerRequest>
-      /// BloggerSession → open RequestId (at most one open request per Blogger).
-      OpenByBlogger: Map<SessionId, BloggerRequestId>
-      /// RequestId → ProviderRun after first commit (reject rebinding).
-      ProviderRunByRequestId: Map<BloggerRequestId, ProviderRunIdentity> }
+    {
+        /// ProviderRun → receipt (Entry or Squash). Duplicate kind or mixed kinds rejected.
+        ByProviderRun: Map<ProviderRunIdentity, BloggerCycleReceipt>
+        /// RequestId → open materialization (cleared on commit/abandon).
+        OpenByRequestId: Map<BloggerRequestId, OpenBloggerRequest>
+        /// BloggerSession → open RequestId (at most one open request per Blogger).
+        OpenByBlogger: Map<SessionId, BloggerRequestId>
+        /// RequestId → ProviderRun after first commit (reject rebinding).
+        ProviderRunByRequestId: Map<BloggerRequestId, ProviderRunIdentity>
+    }
 
 module BloggerCycleProjection =
 
@@ -51,8 +53,7 @@ module BloggerCycleProjection =
         | None -> None
         | Some requestId -> Map.tryFind requestId state.OpenByRequestId
 
-    let tryReceipt (run: ProviderRunIdentity) (state: BloggerCycleProjectionState) =
-        Map.tryFind run state.ByProviderRun
+    let tryReceipt (run: ProviderRunIdentity) (state: BloggerCycleProjectionState) = Map.tryFind run state.ByProviderRun
 
     let materialize
         (openReq: OpenBloggerRequest)
@@ -137,8 +138,7 @@ module BloggerCycleProjection =
                 let withoutRequest = Map.remove receipt.RequestId state.OpenByRequestId
 
                 let withoutBlogger =
-                    state.OpenByBlogger
-                    |> Map.filter (fun _ rid -> rid <> receipt.RequestId)
+                    state.OpenByBlogger |> Map.filter (fun _ rid -> rid <> receipt.RequestId)
 
                 Ok
                     { state with
