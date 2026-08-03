@@ -5,7 +5,7 @@
 - 分支：`master`
 - 版本：`0.5.2` 已发布（tag `v0.5.2`）
 - 最终验证 commit：`ddd504ca`
-- evidence commit：`a2e8105d`
+- evidence commit：`2e7a75fc`
 - tag tip：随发布锚点对齐更新（`git rev-parse v0.5.2^{commit}` 与 HEAD 一致；仅含
   evidence 提交，生产+testkit 与验证 tip `ddd504ca` 一致）
 - 最后验证：
