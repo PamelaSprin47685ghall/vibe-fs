@@ -167,9 +167,9 @@ src/Wanxiangshu.Next/
 - C13：反向审计证据已落盘（LEGACY-SCAN / REACHABILITY / SINGLE-WRITER /
   ACTIVE-NONCONFORMANT-SCAN / VERSION-CHECK）
 - C14：gate:static / build / unit(702) / harness(285) 绿；
-  `test:e2e:p0:three` **失败** iteration 1：`fallback-canary.mjs`
+  `test:e2e:p0:three` 失败 iteration 1：`fallback-canary.mjs`
   `cold boundary never fired: continue.0 (prefix-probe)`。
-  绿前 **不** tag（C15 阻塞）
+  绿前 不 tag（C15 阻塞）
 - C15：tag `v0.5.2` — 阻塞于 C14 e2e
 
 IMPLEMENTING 条款：无（Active 账本已清）。
