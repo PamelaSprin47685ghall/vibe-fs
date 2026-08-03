@@ -17,7 +17,7 @@
 
 ## 当前产品状态
 
-0.5.2 收敛中。本会话完成 C0–C6：
+0.5.2 收敛中。本会话完成 C0–C8（C8 最小诚实范围）：
 
 - C0：建立 0.5.2 baseline，跑通 `test:release` 并记录证据。
 - C1：把 Strength / StudentTeacher / Enforcer nudge throttle 迁出 Active SSOT 到 `RFC/`，
@@ -37,6 +37,16 @@
   completion blob ref/digest；`HostForkRuntime.Join` 改投影优先消费
   （`HandleProjection.joinable` + `HandleController.consume` CAS 退休），mailbox 降级
   为通知；restart 从 blob 恢复完成；`ForkTypes` legacy 宽松语义删除。
+- C7：durable effects（`PERSIST-009` CONFORMANT layer 2，`verified_commit` `db6693f5`）：
+  删除零调用点 `DurableEffectRequested`/`Accepted` + `EffectProjection`；typed
+  `WorktreeCreateRequested`/`WorktreeCreated`（writer=`Orchestrator.forkManagerCore`）；
+  Git publish 既有 `PublishClaimed`/`Published`；session create 物理限制记入 SSOT/11
+  （`HandleLinked`/`CompanionBloggerLinked` 作 Accepted 证据）。证据
+  `docs/evidence/0.5.2/PERSIST-009-EFFECTS.txt`。
+- C8：ARCH-001 最小诚实范围——`JobProgress` 已是纯业务事实 DU（每 case 带物理证据，
+  `recoveryAction` 从事实推导，非程序计数器）；无重写 Orchestrator。仅向
+  `architecture-gate` `FORBIDDEN_TOKENS` 补 `CurrentStage`/`StepIndex`（standalone
+  `Phase` 不加：word-boundary 会误伤禁令自引用注释）。
 
 0.5.1 已发布（tag `v0.5.1`）：闭合 SSOT/15 Blogger 请求形状 / 挂起 / Squash / crash recovery 纵向链：
 唯一 coordinator、typed materialize、blog-tool Squash、KnownCommitted 才 Park、
@@ -91,14 +101,16 @@ host-transform-capability 全绿。
 `conformant` 是机器默认值，尚未经 C11 人工审计。已知缺少第 4 层证据或实现未闭合的条款
 包括：
 
-- `PROMPT-004/006/007/009`、`AGENT-007`、`HOST-005/009/010/011`、`PERSIST-009`、
-  `COMPANION-013`
+- IMPLEMENTING（诚实未升 CONFORMANT）：`PROMPT-004/006/007/009`、`AGENT-007`、
+  `HOST-005/009/010/011`、`COMPANION-013`、`EXEC-009`
+- `PERSIST-009`：已 CONFORMANT（layer 2，`db6693f5`）；worktree 路径无独立 fault-injection
+  canary（依赖 fold 单测 + publish canary）
 - `EXEC-009`：durable join 已接线（`cb3457db`/`99fcb06f`），`HandleProjection.joinable`
   已有生产调用点（`HostForkRuntime.Join`）；conformance 仍为 IMPLEMENTING（layer 2，
-  `verified_commit` 未钉），layer-4 canary 未建——CONFORMANT 升级待 DevOps 绿测后执行。
+  `verified_commit=cb3457db`），layer-4 canary 未建——CONFORMANT 升级待 DevOps 绿测后执行。
 - X 恢复链：生产接线已闭合，但 X-A–X-D canary 剧本未建，第 4 层证据未产出。
 - `EnforcerCodec` / `EnforcerCycle` / `EnforcerHost` 仍携带 `ScoreVectorRef`、`MergedScores`、
-  nudge/throttle 路径；0.5.2 Active 子集仅保留 text/evidence，C5–C7 需清理。
+  nudge/throttle 路径；0.5.2 Active 子集仅保留 text/evidence。
 - `manager-companion-canary.mjs` 在并发套件中存在 flaky：两次判据事件间隔超过
   `WATCHDOG_TIMEOUT_MS` 导致 watchdog 误触发。已写入 `AGENTS.md`，待修复。
 
@@ -140,18 +152,25 @@ src/Wanxiangshu.Next/
 
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
-1. C5：建立唯一 `ManagedAgentCatalog`，删除重复角色/peer/legacy name（已完成 `204a41ca`）
-2. C6：durable join（`EXEC-009`，已完成 `cb3457db`/`99fcb06f`；layer-4 canary 与
-   CONFORMANT 升级待后续）
-3. C7：durable effects（`PERSIST-009`）——当前下一步
-4. C8：`ARCH-001` 与 Orchestrator stage-like 语义清理
-5. C9：Host/Review/Cold boundary 证据
-6. C10：Context recovery X-A–X-D 第四层证据
-7. C11：测试与 clause coverage 补齐；人工审计 `STATUS/conformance.toml`
-8. C12：运行环境与发布包
-9. C13：全仓反向审计
-10. C14：RC 验证
-11. C15：0.5.2 发布
+1. C5–C8：已完成（见上「本会话完成」；C8 = gate 禁词 + 账本诚实，无 Orchestrator 重写）
+2. C9：Host/Review/Cold boundary 证据——当前下一步
+3. C10：Context recovery X-A–X-D 第四层证据
+4. C11：测试与 clause coverage 补齐；人工审计 `STATUS/conformance.toml`（钉 IMPLEMENTING
+   行；`EXEC-009` layer-4 canary 后升 CONFORMANT）
+5. C12：运行环境与发布包
+6. C13：全仓反向审计
+7. C14：RC 验证
+8. C15：0.5.2 发布
+
+仍为 IMPLEMENTING 的条款（C11 责任，勿在证据不足时升 CONFORMANT）：
+
+| 条款 | 备注 |
+|------|------|
+| `PROMPT-004/006/007/009` | 部分实现/测试在；C11 逐条核 |
+| `AGENT-007` | 双层 gate 在；layer 证据待审 |
+| `HOST-005/009/010/011` | transform/run 绑定等；C9 证据 |
+| `COMPANION-013` | synthetic 稳定身份 |
+| `EXEC-009` | layer 2 已钉 `cb3457db`；缺 layer-4 canary |
 
 历史项：
 
@@ -169,9 +188,8 @@ src/Wanxiangshu.Next/
    STRENGTH-078 C-11…C-21）→ Enforcer nudge overlay（ENFORCER-080…115，第 0 步 7–9
    补完）→ Student&Teacher（teacher/return 工具、QA 落盘，LEARN-082…088）
 3. 包 K8f：X-A–X-D 剧本（X 恢复链生产接线已闭合；剧本未建，第 4 层证据未产出）
-4. `EXEC-009` durable join（已闭合 `cb3457db`/`99fcb06f`）：`HandleProjection.joinable`
-   已有生产调用点，`CompletedAwaitingJoin` 由 `HandleController.consume` CAS 消费；
-   layer-4 canary 与 CONFORMANT 升级待后续
+4. `EXEC-009` durable join（生产已闭合 `cb3457db`/`99fcb06f`；账本 IMPLEMENTING layer 2）：
+   `HandleProjection.joinable` 已有生产调用点；layer-4 canary 与 CONFORMANT 升级待后续
 5. `CompanionDelta.jsonDelta` 替换为包 X3 的 TOML delta（当前仍在 Submit 路径）
 
 ## 事实入口

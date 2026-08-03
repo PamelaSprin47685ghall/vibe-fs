@@ -34,9 +34,16 @@ const TEST_EXTENSIONS = ['.mjs']
 // ── forbidden vocabulary ────────────────────────────────────────────────────
 
 // Program-counter and framework-ceremony names (ARCH-001, ARCH-008).
+// C8: bare CurrentStage / StepIndex banned as program counters. Standalone
+// Phase is NOT listed — word-boundary match would false-positive on comments
+// that cite the ban itself (e.g. PromptRecovery "no Stage/Phase counter").
+// Compound forms (FallbackPhase, ReviewPhase, SessionStage, …) already cover
+// historical stage-like type names.
 const FORBIDDEN_TOKENS = [
   'idleProposals',
   'callOnce',
+  'CurrentStage',
+  'StepIndex',
   'FallbackPhase',
   'FallbackState',
   'ContinuationStage',
