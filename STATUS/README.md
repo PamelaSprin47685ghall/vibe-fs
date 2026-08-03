@@ -91,9 +91,11 @@ nudge/throttle 在 `RFC/`，不属于当前产品合同。
 
 ## 源码地图
 
-生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部；
-**209 个生产 `.fs` 源文件**，`gate:layout` / `gate:architecture` 口径；Fable 解析
-project+references 报告 212 编译单元，含工程外引用，不等于生产 `.fs` 文件数）。
+生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部）。三口径：
+
+- **208** 生产 `.fs` 源文件（`find … -name '*.fs'`）
+- **209** gate source files（208 `.fs` + 1 `.fsproj`；`gate:layout` / `gate:architecture` 的 `SOURCE_EXTENSIONS`）
+- **212** Fable 编译单元（project + references；含工程外引用，≠ 生产 `.fs` 数）
 
 ```text
 src/Wanxiangshu.Next/
