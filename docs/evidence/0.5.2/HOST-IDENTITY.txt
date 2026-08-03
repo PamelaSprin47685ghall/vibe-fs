@@ -1,6 +1,6 @@
 ### HOST-IDENTITY.txt — HOST-010 / HOST-011
 gate_commit: f66bbdc7
-date_utc: 2026-08-03T20:57:58Z
+date_utc: 2026-08-03T20:58:22Z
 
 ## HOST-010 Transform → ProviderRunIdentity
 status: conformant

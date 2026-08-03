@@ -1,11 +1,11 @@
 ### COMMIT.txt — 0.5.2 D1/D2 canary asserts on verified tip
 source_commit: f66bbdc793e8c6e598c01638da61298ca6667381
 short: f66bbdc7
-date_utc: 2026-08-03T20:57:58Z
+date_utc: 2026-08-03T20:58:22Z
 branch: master
 subject: test(canary): D1/D2 layer-4 asserts for HOST-010/011 and X recovery
 tag: v0.5.2
-evidence_commit: 449843ce
+evidence_commit: c8c2ff91
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification:
@@ -20,3 +20,4 @@ notes: D1/D2 landed after D3. source_commit is sole verified tip (code+testkit).
   Production tree: git diff ffa168c7 f66bbdc7 -- src/ is empty.
   HOST-010 ProviderRun per-fact dedup (envelope+payload). HOST-011 ToolCallIds unique.
   X FrozenRecordPrefix excludes # Uncompressed tail / # Final output.
+  tag tip c8c2ff91 is evidence-only; git diff f66bbdc7 HEAD -- src/ testkit/ empty after evidence commits.
