@@ -74,7 +74,8 @@ module BloggerCrashRecovery =
             key,
             { State = state
               PendingOffer = None
-              RepairSpent = false }
+              RepairSpent = false
+              ReactivatedAfterSeal = false }
         )
 
     /// C5: one reload path — EnforcerHost.tryReloadRequestContext (full cutoff/digest).
@@ -111,6 +112,7 @@ module BloggerCrashRecovery =
                             match live.State with
                             | BloggerRuntimeState.InFlight _
                             | BloggerRuntimeState.Parked
+                            | BloggerRuntimeState.Sealed
                             | BloggerRuntimeState.Disposed -> ()
                             | BloggerRuntimeState.Idle when hasAnyReceipt && not hasOpen && not (host.HasParked key) ->
                                 restoreRuntime host bloggerId BloggerRuntimeState.Parked

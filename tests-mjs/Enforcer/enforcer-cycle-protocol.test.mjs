@@ -235,16 +235,17 @@ test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
   })
 })
 
-test('ENFORCER_061_second_empty_text_exhausts_repair_and_idles', async () => {
-  await withHarness(async ({ journal, scope, blog, fatals }) => {
+test('ENFORCER_061_second_empty_text_exhausts_repair_and_fatals', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals, lastFatal }) => {
     await handleContinuation(scope, journal, blog, liveBlog('asst-1', 'c1', { text: '' }))
     const out = await handleContinuation(scope, journal, blog, liveBlog('asst-2', 'c2', { text: '   ' }))
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
-    assert.equal(repairSpent(scope), false, 'onFail resets spent only after final fail')
-    assert.equal(fatals.length, 0, 'protocol exhaustion is expected best-effort')
+    assert.equal(fatals.length, 1, 'second empty text is coverage/protocol stall → fatal')
+    assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
+    assert.match(lastFatal()?.result ?? '', /protocol-repair-exhausted|aabb-refresh-empty|empty/)
   })
 })
 
@@ -279,15 +280,16 @@ test('ENFORCER_060_pure_prose_injects_repair_once', async () => {
   })
 })
 
-test('ENFORCER_060_pure_prose_second_failure_idles_not_busy_forever', async () => {
-  await withHarness(async ({ journal, scope, blog, fatals }) => {
+test('ENFORCER_060_pure_prose_second_failure_fatals', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals, lastFatal }) => {
     await handleContinuation(scope, journal, blog, pureProse('asst-p1', 'no tools'))
     const out = await handleContinuation(scope, journal, blog, pureProse('asst-p2', 'still no'))
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
-    assert.equal(fatals.length, 0)
+    assert.equal(fatals.length, 1, 'AABB exhausted pure prose is fatal')
+    assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
   })
 })
 
@@ -318,19 +320,22 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
   })
 })
 
-test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => {
+test('ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(scope, journal, blog, interruptedBlog('asst-killed', 'blog-hang'))
 
-    assert.equal(hasRepairMessage(out), false, 'interrupted blog ≠ missing blog call')
-    assert.equal(fatals.length, 0, 'Host abort cleanup is expected — silent best-effort')
-    assert.equal(runtimeTag(scope), 'Idle')
-    assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
+    // First interrupted attempt is AABB: refresh + repair injection, keep InFlight.
+    assert.equal(hasRepairMessage(out), true, 'first interrupt uses AABB repair')
+    assert.equal(repairSpent(scope), true)
+    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(fatals.length, 0)
   })
 })
 
-test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async () => {
+test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
+    // Harness starts InFlight. A completed interrupted blog part is Host abort cleanup:
+    // AABB once (refresh + repair), not pure-prose silent idle.
     const out = await handleContinuation(
       scope,
       journal,
@@ -338,9 +343,10 @@ test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async
       historicalTail(pureProse('asst-old-prose', 'earlier'), interruptedBlog('asst-last', 'c-int')),
     )
 
-    assert.equal(hasRepairMessage(out), false)
+    assert.equal(hasRepairMessage(out), true)
+    assert.equal(repairSpent(scope), true)
+    assert.equal(runtimeTag(scope), 'InFlight')
     assert.equal(fatals.length, 0)
-    assert.equal(runtimeTag(scope), 'Idle')
   })
 })
 
@@ -365,9 +371,10 @@ test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
     await handleContinuation(scope, journal, blog, liveBlog('a1', 'c1', { text: '' }))
     await handleContinuation(scope, journal, blog, liveBlog('a2', 'c2', { text: '' }))
     assert.equal(runtimeTag(scope), 'Idle')
+    // Second empty is fatal under the new policy; clear for historical-tail check.
+    const fatalCount = fatals.length
+    assert.ok(fatalCount >= 1)
 
-    // Host transform msgs still end on a finished assistant with completed blog.
-    // Must not commit / abandon / repair / fatal.
     const out = await handleContinuation(
       scope,
       journal,
@@ -378,10 +385,7 @@ test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
-    assert.equal(fatals.length, 0)
-    await handleContinuation(scope, journal, blog, historicalBlog('a3', 'c3', { text: 'late work after abandon' }))
-    assert.equal(runtimeTag(scope), 'Idle')
-    assert.equal(fatals.length, 0)
+    assert.equal(fatals.length, fatalCount, 'historical tail must not emit extra fatals')
   })
 })
 

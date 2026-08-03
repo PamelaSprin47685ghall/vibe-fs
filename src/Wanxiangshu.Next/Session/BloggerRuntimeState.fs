@@ -6,12 +6,14 @@ open Wanxiangshu.Next.Domain
 ///
 /// InFlight = provider still working on an uncommitted request (the only busy definition).
 /// Parked = last cycle committed; waiting for future material (not busy).
+/// Sealed = fork-child main handle is joinable/retired AND not reactivated by a new root.
 /// PendingOffer is NOT part of the state tag — it is a separate physical slot on the cell.
 [<RequireQualifiedAccess>]
 type BloggerRuntimeState =
     | Idle
     | InFlight of BloggerRequestContext
     | Parked
+    | Sealed
     | Disposed
 
 /// Host-owned cell: state + pending offer + one-repair budget.
@@ -22,6 +24,9 @@ type BloggerRuntimeCell =
         PendingOffer: BloggerRequestContext option
         /// FALLBACK-008 / item 15: at most one repair per logical request.
         RepairSpent: bool
+        /// Handle is CompletedAwaitingJoin/Retired but main received a new Authority Root:
+        /// Blogger may run again until the next HandleCompleted seals it.
+        ReactivatedAfterSeal: bool
     }
 
 [<RequireQualifiedAccess>]
@@ -32,6 +37,7 @@ module BloggerRuntime =
         | NotInFlight
         | NotParked
         | Disposed
+        | Sealed
         | NoContext
         | PendingWhileInFlight
 
@@ -44,15 +50,24 @@ module BloggerRuntime =
     let empty: BloggerRuntimeCell =
         { State = BloggerRuntimeState.Idle
           PendingOffer = None
-          RepairSpent = false }
+          RepairSpent = false
+          ReactivatedAfterSeal = false }
 
     let ofState (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { State = state
           PendingOffer = None
-          RepairSpent = false }
+          RepairSpent = false
+          ReactivatedAfterSeal = false }
+
+    let private withState (cell: BloggerRuntimeCell) (state: BloggerRuntimeState) : BloggerRuntimeCell =
+        { cell with
+            State = state
+            PendingOffer = None
+            RepairSpent = false }
 
     /// Main-session material arrived. InFlight never writes PendingOffer (XTrace keeps it).
     /// Parked writes PendingOffer and stays Parked until the continuation takes it.
+    /// Sealed ignores all material until onReactivate.
     let onMaterial
         (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
@@ -60,19 +75,22 @@ module BloggerRuntime =
         match cell.State with
         | BloggerRuntimeState.Idle ->
             Ok(
-                { State = BloggerRuntimeState.InFlight ctx
-                  PendingOffer = None
-                  RepairSpent = false },
+                { cell with
+                    State = BloggerRuntimeState.InFlight ctx
+                    PendingOffer = None
+                    RepairSpent = false },
                 Decision.Start ctx
             )
         | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
         | BloggerRuntimeState.Parked ->
             Ok(
-                { State = BloggerRuntimeState.Parked
-                  PendingOffer = Some ctx
-                  RepairSpent = false },
+                { cell with
+                    State = BloggerRuntimeState.Parked
+                    PendingOffer = Some ctx
+                    RepairSpent = false },
                 Decision.Offer ctx
             )
+        | BloggerRuntimeState.Sealed -> Ok(cell, Decision.Ignore)
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
 
     /// Physical send is about to leave: freeze CurrentRequest (InFlight payload).
@@ -82,22 +100,26 @@ module BloggerRuntime =
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->
             Ok
-                { State = BloggerRuntimeState.InFlight ctx
-                  PendingOffer = None
-                  RepairSpent = false }
+                { cell with
+                    State = BloggerRuntimeState.InFlight ctx
+                    PendingOffer = None
+                    RepairSpent = false }
 
     let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight _ ->
             Ok
-                { State = BloggerRuntimeState.Parked
-                  PendingOffer = cell.PendingOffer
-                  RepairSpent = false }
+                { cell with
+                    State = BloggerRuntimeState.Parked
+                    // keep PendingOffer
+                    RepairSpent = false }
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NotInFlight
 
     let onSquashCommitted
@@ -106,58 +128,114 @@ module BloggerRuntime =
         : Result<BloggerRuntimeCell * Decision, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | BloggerRuntimeState.InFlight _ ->
             match pendingMain with
             | Some ctx ->
                 Ok(
-                    { State = BloggerRuntimeState.InFlight ctx
-                      PendingOffer = None
-                      RepairSpent = false },
+                    { cell with
+                        State = BloggerRuntimeState.InFlight ctx
+                        PendingOffer = None
+                        RepairSpent = false },
                     Decision.Start ctx
                 )
             | None ->
                 Ok(
-                    { State = BloggerRuntimeState.Parked
-                      PendingOffer = None
-                      RepairSpent = false },
+                    { cell with
+                        State = BloggerRuntimeState.Parked
+                        PendingOffer = None
+                        RepairSpent = false },
                     Decision.Ignore
                 )
         | _ -> Error TransitionError.NotInFlight
 
     /// Final fail of the logical request: Idle + clear PendingOffer + reset RepairSpent.
-    /// Call only after open materialization is abandoned (or never existed).
-    /// Mid-request InteractionRepair uses markRepairSpent and MUST keep InFlight.
     let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed ->
+            Ok
+                { cell with
+                    PendingOffer = None
+                    RepairSpent = false }
         | BloggerRuntimeState.InFlight _ ->
             Ok
-                { State = BloggerRuntimeState.Idle
-                  PendingOffer = None
-                  RepairSpent = false }
+                { cell with
+                    State = BloggerRuntimeState.Idle
+                    PendingOffer = None
+                    RepairSpent = false }
         | _ -> Error TransitionError.NotInFlight
 
-    /// ENFORCER-060/061: at most one InteractionRepair per logical request.
     let markRepairSpent (cell: BloggerRuntimeCell) : BloggerRuntimeCell = { cell with RepairSpent = true }
+
+    /// Fork-child handle became joinable/retired: stop new Y requests.
+    let onSeal (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        match cell.State with
+        | BloggerRuntimeState.Disposed -> cell
+        | BloggerRuntimeState.InFlight _ ->
+            // Let the in-flight cycle finish; seal after commit via coordinator re-check.
+            // Mark not reactivated so post-commit paths see the durable seal.
+            { cell with
+                PendingOffer = None
+                ReactivatedAfterSeal = false }
+        | _ ->
+            { State = BloggerRuntimeState.Sealed
+              PendingOffer = None
+              RepairSpent = false
+              ReactivatedAfterSeal = false }
+
+    /// Force sealed (no in-flight preserve). Used when dropping offers after join.
+    let forceSeal (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        { State = BloggerRuntimeState.Sealed
+          PendingOffer = None
+          RepairSpent = false
+          ReactivatedAfterSeal = false }
+
+    /// New Authority Root on this main after a handle seal: Blogger may run again.
+    let onReactivate (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        match cell.State with
+        | BloggerRuntimeState.Disposed -> cell
+        | BloggerRuntimeState.InFlight _ ->
+            { cell with
+                ReactivatedAfterSeal = true }
+        | _ ->
+            { State = BloggerRuntimeState.Idle
+              PendingOffer = None
+              RepairSpent = false
+              ReactivatedAfterSeal = true }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
           PendingOffer = None
-          RepairSpent = false }
+          RepairSpent = false
+          ReactivatedAfterSeal = false }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
         match cell.State with
         | BloggerRuntimeState.InFlight ctx -> Some ctx
         | _ -> None
 
-    /// Peek CurrentRequest without leaving InFlight (commit path).
+    let isSealed (cell: BloggerRuntimeCell) : bool =
+        match cell.State with
+        | BloggerRuntimeState.Sealed -> true
+        | _ -> false
+
+    /// Durable handle seal blocks new work unless ReactivatedAfterSeal.
+    let blocksNewRequest (durableHandleSealed: bool) (cell: BloggerRuntimeCell) : bool =
+        match cell.State with
+        | BloggerRuntimeState.Disposed
+        | BloggerRuntimeState.Sealed -> true
+        | BloggerRuntimeState.InFlight _ -> false
+        | BloggerRuntimeState.Idle
+        | BloggerRuntimeState.Parked -> durableHandleSealed && not cell.ReactivatedAfterSeal
+
     let tryPeekInFlight (cell: BloggerRuntimeCell) : Result<BloggerRequestContext, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight ctx -> Ok ctx
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NoContext
 
-    /// Consume InFlight for a successful cycle commit → Parked. PendingOffer untouched.
     let tryTakeInFlight
         (cell: BloggerRuntimeCell)
         : Result<BloggerRequestContext * BloggerRuntimeCell, TransitionError> =
@@ -165,33 +243,35 @@ module BloggerRuntime =
         | BloggerRuntimeState.InFlight ctx ->
             Ok(
                 ctx,
-                { State = BloggerRuntimeState.Parked
-                  PendingOffer = cell.PendingOffer
-                  RepairSpent = false }
+                { cell with
+                    State = BloggerRuntimeState.Parked
+                    RepairSpent = false }
             )
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NoContext
 
-    /// Consume PendingOffer once (parked resume). Fail closed if InFlight.
     let tryTakePending
         (cell: BloggerRuntimeCell)
         : Result<BloggerRequestContext option * BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Ok(None, { cell with PendingOffer = None })
         | BloggerRuntimeState.InFlight _ when cell.PendingOffer.IsSome -> Error TransitionError.PendingWhileInFlight
         | _ -> Ok(cell.PendingOffer, { cell with PendingOffer = None })
 
-    /// After taking a pending offer, move to InFlight as the next CurrentRequest.
     let adoptPendingAsCurrent
         (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
+        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->
             Ok
-                { State = BloggerRuntimeState.InFlight ctx
-                  PendingOffer = None
-                  RepairSpent = false }
+                { cell with
+                    State = BloggerRuntimeState.InFlight ctx
+                    PendingOffer = None
+                    RepairSpent = false }

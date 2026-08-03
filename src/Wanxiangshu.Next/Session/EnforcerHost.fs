@@ -813,6 +813,64 @@ module EnforcerHost =
     let private isEmptyTextCycleFailure (reason: string) : bool =
         reason.IndexOf("merged text is empty", StringComparison.Ordinal) >= 0
 
+    /// Rebuild provider-semantic turns from durable XTrace (AABB refresh source).
+    let private projectionFromXTrace
+        (journal: AgentJournal)
+        (xTrace: XTraceProjectionState)
+        : ProviderProjection.ProviderSemanticProjection =
+        let byTurn =
+            xTrace.Parts
+            |> List.groupBy (fun part -> part.Turn)
+            |> List.sortBy fst
+
+        let messages =
+            byTurn
+            |> List.choose (fun (_turn, parts) ->
+                let ordered = parts |> List.sortBy (fun p -> p.PartIndex)
+
+                let role =
+                    ordered
+                    |> List.tryHead
+                    |> Option.map (fun p -> p.Role)
+                    |> Option.defaultValue "user"
+
+                let semanticParts =
+                    ordered
+                    |> List.choose (fun part ->
+                        match journal.Writer.BlobWriter.Read part.TextRef with
+                        | Error _ -> None
+                        | Ok body ->
+                            match part.Kind with
+                            | "text" -> Some(ProviderProjection.SemanticText body)
+                            | "reasoning" -> Some(ProviderProjection.SemanticReasoning body)
+                            | "tool_call" ->
+                                part.ToolName
+                                |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
+                            | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
+                            | "media_omitted" ->
+                                let mediaType =
+                                    if String.IsNullOrWhiteSpace body then
+                                        None
+                                    else
+                                        Some body
+
+                                Some(ProviderProjection.SemanticMedia(mediaType, ""))
+                            | _ -> None)
+
+                if List.isEmpty semanticParts then
+                    None
+                else
+                    Some
+                        { ProviderProjection.SemanticMessage.Role = role
+                          ProviderProjection.SemanticMessage.Parts = semanticParts })
+
+        { ProviderId = None
+          ModelId = None
+          Variant = None
+          Tools = []
+          System = []
+          Messages = messages }
+
     /// Public: build the staged offer context from the same delta the coordinator
     /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
     let internal mainContextFromChunk
@@ -862,6 +920,59 @@ module EnforcerHost =
               FrameEpochId = blog.FrameEpochId
               DeltaDigest = deltaDigest
               ObservedPrefixEpochId = observedEpoch }
+
+    /// AABB: re-chunk from current IngestedThrough against latest XTrace.
+    /// Returns None when sealed or no material.
+    let tryRefreshMainContextFromJournal
+        (scope: IParkedTransformHost)
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        : BloggerRequestContext option =
+        let key = SessionId.value bloggerSessionId
+        let cell = scope.GetBloggerRuntime key
+        let durableSealed =
+            AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot journal).AgentProjections
+
+        if BloggerRuntime.blocksNewRequest durableSealed cell then
+            None
+        else
+            let session =
+                AgentProjection.tryFind mainSessionId (AgentJournal.snapshot journal).AgentProjections
+                |> Option.defaultValue AgentProjection.emptySession
+
+            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+
+            let epoch =
+                session.PrefixEpoch
+                |> Option.map (fun e -> e.EpochId)
+                |> Option.defaultValue PrefixEpochId.initial
+
+            let projection = projectionFromXTrace journal xTrace
+
+            let ingestCursor =
+                XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+
+            match
+                BloggerDelta.nextChunk
+                    BloggerDelta.DeltaLimitBytes
+                    ingestCursor
+                    blog.Coverage.CoverableTurnCutoffExclusive
+                    projection.Messages
+            with
+            | None -> None
+            | Some chunk ->
+                Some(
+                    mainContextFromChunk
+                        mainSessionId
+                        bloggerSessionId
+                        epoch
+                        blog
+                        xTrace
+                        projection
+                        chunk
+                )
 
     /// The Blogger continuation-transform handler.
     ///
@@ -916,9 +1027,8 @@ module EnforcerHost =
                         |> Option.defaultValue rawMessages
                     | None -> rawMessages
 
-                // Expected terminal of a logical request: abandon + Idle, no console.
-                let bestEffortEnd (reason: string) =
-                    Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
+                let fatalEnd (reason: string) =
+                    Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
                     BloggerAbandon.openRequest durable owner bloggerSessionId currentCtx reason
 
@@ -929,17 +1039,60 @@ module EnforcerHost =
                     scope.ClearCurrentRequest key
                     rawMessages
 
+                /// AABB once: prefer latest XTrace chunk; if none, keep old ctx (same prev).
+                let aabbRepair (ctx: BloggerRequestContext) (reason: string) =
+                    let cell = scope.GetBloggerRuntime key
+
+                    if
+                        AgentProjection.mainSealedForBlogger
+                            owner
+                            (AgentJournal.snapshot durable).AgentProjections
+                        && not cell.ReactivatedAfterSeal
+                    then
+                        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
+                        scope.ClearCurrentRequest key
+                        scope.TryTakePendingOffer key |> ignore
+                        rawMessages
+                    else
+                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+
+                        let fresh =
+                            tryRefreshMainContextFromJournal scope durable owner bloggerSessionId
+                            |> Option.defaultValue ctx
+
+                        scope.SetCurrentRequest(key, fresh)
+
+                        match scope.GetBloggerRuntime key with
+                        | c ->
+                            match c.State with
+                            | BloggerRuntimeState.InFlight _ ->
+                                scope.SetBloggerRuntime(
+                                    key,
+                                    { c with
+                                        State = BloggerRuntimeState.InFlight fresh
+                                        RepairSpent = true }
+                                )
+                            | _ -> ()
+
+                        Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
+
+                        let rebuilt =
+                            tryRebuildFromContext durable bloggerSessionId fresh
+                            |> Option.defaultValue rawMessages
+
+                        withRepairInstruction rebuilt requestKey
+
                 if hasIncompleteBlogTool rawMessages then
                     return rawMessages
                 elif hasFailedBlogAttempt rawMessages then
                     // Host cleanup after kill/abort: hanging blog → error+interrupted.
-                    // Expected resume tail; end logical request quietly if still open.
                     match currentCtx with
-                    | Some _ -> return bestEffortEnd "blog tool interrupted without completed call"
+                    | Some ctx when not (scope.GetBloggerRuntime key).RepairSpent ->
+                        return aabbRepair ctx "blog tool interrupted without completed call"
+                    | Some _ -> return fatalEnd "blog tool interrupted; aabb exhausted"
                     | None -> return rebuild ()
                 elif hasAnyBlogToolPart rawMessages then
-                    // blog parts exist but none completed and none classified failed —
-                    // treat as non-prose; rebuild without protocol repair.
                     return rebuild ()
                 elif not assistantCompleted then
                     return rebuild ()
@@ -949,16 +1102,8 @@ module EnforcerHost =
 
                     match currentCtx with
                     | None -> return rebuild ()
-                    | Some ctx when not cell.RepairSpent ->
-                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
-                        // Protocol repair is expected provider variance — silent.
-                        Diagnostic.emit
-                            "enforcer-cycle-repair"
-                            [ "session_id", key; "result", "no completed blog calls (ENFORCER-060)" ]
-
-                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-                        return withRepairInstruction rawMessages requestKey
-                    | Some _ -> return bestEffortEnd "protocol-repair-exhausted (ENFORCER-060)"
+                    | Some ctx when not cell.RepairSpent -> return aabbRepair ctx "no completed blog calls (ENFORCER-060)"
+                    | Some _ -> return fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
             | Some durable, Some owner, Some(messageId, calls, assistantCompleted) when not (List.isEmpty calls) ->
                 // ENFORCER-044: merge/commit only on a LIVE tool-loop continuation.
                 //
@@ -995,47 +1140,53 @@ module EnforcerHost =
                     tryRebuildFromContext durable bloggerSessionId ctx
                     |> Option.defaultValue rawMessages
 
-                let takePendingOr (fallback: obj list) =
-                    match scope.TryTakePendingOffer key with
-                    | Some ctx ->
-                        match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
-                        | Ok cell ->
-                            scope.SetBloggerRuntime(key, cell)
-                            scope.SetCurrentRequest(key, ctx)
-                        | Error _ -> ()
+                let mainBlocks () =
+                    let cell = scope.GetBloggerRuntime key
+                    let durableSealed =
+                        AgentProjection.mainSealedForBlogger
+                            mainSessionId
+                            (AgentJournal.snapshot durable).AgentProjections
 
-                        resumeWithContext ctx
-                    | None -> fallback
+                    BloggerRuntime.blocksNewRequest durableSealed cell
+
+                let takePendingOr (fallback: obj list) =
+                    if mainBlocks () then
+                        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
+                        scope.TryTakePendingOffer key |> ignore
+                        scope.CancelParked key
+                        fallback
+                    else
+                        match scope.TryTakePendingOffer key with
+                        | Some ctx ->
+                            // Prefer a refreshed chunk so resume eats latest progress.
+                            let ctx =
+                                tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
+                                |> Option.defaultValue ctx
+
+                            match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                            | Ok cell ->
+                                scope.SetBloggerRuntime(key, cell)
+                                scope.SetCurrentRequest(key, ctx)
+                            | Error _ -> ()
+
+                            resumeWithContext ctx
+                        | None -> fallback
 
                 if alreadyEntry || alreadyReceipt then
                     // ENFORCER-154: same provider run already committed — offer only.
                     return takePendingOr rawMessages
                 elif assistantCompleted then
-                    // Historical completed assistant still at tail of transform msgs.
-                    // Not this provider step. Zero cycle side effects.
-                    // Live InFlight (new request) → rebuild projection; else leave msgs.
                     match liveCtx with
                     | Some ctx -> return resumeWithContext ctx
                     | None -> return takePendingOr rawMessages
                 else
-                    // Live tool-loop: assistant open, blog tools completed on THIS step.
                     let mutable committed = false
                     let mutable afterSquashMain: BloggerRequestContext option = None
                     let mutable commitUnknown = false
                     let mutable injectRepair = false
+                    let mutable repairCtx: BloggerRequestContext option = None
 
-                    let bestEffortEnd (reason: string) =
-                        Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
-
-                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
-
-                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
-                        | Error _ -> ()
-
-                        scope.ClearCurrentRequest key
-
-                    let unexpectedEnd (reason: string) =
+                    let fatalEnd (reason: string) =
                         Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
                         BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
@@ -1046,12 +1197,10 @@ module EnforcerHost =
 
                         scope.ClearCurrentRequest key
 
+                    let unexpectedEnd (reason: string) = fatalEnd reason
+
                     match liveCtx with
                     | None ->
-                        // Live tool-loop (assistant not completed) with completed blog
-                        // but no InFlight: crash recovery should have re-armed when open
-                        // exists; when open is also absent the plugin never owned this
-                        // step. Both are unexpected — fatal, not silent ignore.
                         match tryOpenByBlogger durable mainSessionId bloggerSessionId with
                         | Some _ -> unexpectedEnd "missing CurrentRequest"
                         | None -> unexpectedEnd "live blog without cycle authority"
@@ -1062,13 +1211,36 @@ module EnforcerHost =
                             && not (scope.GetBloggerRuntime key).RepairSpent
                             && not (hasIncompleteBlogTool rawMessages)
                             ->
-                            let cell = scope.GetBloggerRuntime key
-                            scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
                             injectRepair <- true
-                            Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+
+                            let fresh =
+                                tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
+                                |> Option.orElse liveCtx
+
+                            match fresh with
+                            | None -> unexpectedEnd (reason + "; aabb-refresh-empty")
+                            | Some freshCtx ->
+                                repairCtx <- Some freshCtx
+                                let cell = scope.GetBloggerRuntime key
+                                scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                                scope.SetCurrentRequest(key, freshCtx)
+
+                                match scope.GetBloggerRuntime key with
+                                | c ->
+                                    match c.State with
+                                    | BloggerRuntimeState.InFlight _ ->
+                                        scope.SetBloggerRuntime(
+                                            key,
+                                            { c with
+                                                State = BloggerRuntimeState.InFlight freshCtx
+                                                RepairSpent = true }
+                                        )
+                                    | _ -> ()
+
+                                Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                         | Error reason ->
                             if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
-                                bestEffortEnd "protocol-repair-exhausted"
+                                unexpectedEnd "protocol-repair-exhausted"
                             else
                                 unexpectedEnd reason
                         | Ok(merged, toolCallIds) ->
@@ -1092,7 +1264,7 @@ module EnforcerHost =
                                     | Error _ -> ()
 
                                     scope.ClearCurrentRequest key
-                                | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
+                                | CycleCommitOutcome.KnownNotCommitted reason -> unexpectedEnd reason
                                 | CycleCommitOutcome.CommitUnknown reason ->
                                     commitUnknown <- true
 
@@ -1121,11 +1293,22 @@ module EnforcerHost =
                                         committed <- true
 
                                         match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
-                                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                                        | Ok cell ->
+                                            // Handle may have sealed during the cycle.
+                                            if
+                                                AgentProjection.mainSealedForBlogger
+                                                    mainSessionId
+                                                    (AgentJournal.snapshot durable).AgentProjections
+                                                && not cell.ReactivatedAfterSeal
+                                            then
+                                                scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
+                                                scope.TryTakePendingOffer key |> ignore
+                                            else
+                                                scope.SetBloggerRuntime(key, cell)
                                         | Error _ -> ()
 
                                         scope.ClearCurrentRequest key
-                                    | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
+                                    | CycleCommitOutcome.KnownNotCommitted reason -> unexpectedEnd reason
                                     | CycleCommitOutcome.CommitUnknown reason ->
                                         commitUnknown <- true
 
@@ -1135,22 +1318,30 @@ module EnforcerHost =
                             | None -> unexpectedEnd "missing CurrentRequest"
 
                     if injectRepair then
-                        let requestKey =
-                            match liveCtx with
-                            | Some ctx -> BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-                            | None -> key
-
-                        return withRepairInstruction rawMessages requestKey
+                        match repairCtx with
+                        | Some ctx ->
+                            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+                            return withRepairInstruction (resumeWithContext ctx) requestKey
+                        | None -> return rawMessages
                     elif commitUnknown then
                         return rawMessages
                     elif not committed then
                         match liveCtx with
                         | Some ctx -> return resumeWithContext ctx
                         | None -> return rawMessages
+                    else if mainBlocks () then
+                        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
+                        scope.TryTakePendingOffer key |> ignore
+                        scope.CancelParked key
+                        return rawMessages
                     else
                         match scope.TryTakePendingOffer key, afterSquashMain with
                         | Some ctx, _
                         | None, Some ctx ->
+                            let ctx =
+                                tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
+                                |> Option.defaultValue ctx
+
                             match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
                             | Ok cell ->
                                 scope.SetBloggerRuntime(key, cell)
@@ -1162,30 +1353,43 @@ module EnforcerHost =
                             let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
 
                             if not resumed then
-                                BloggerAbandon.openRequest
-                                    durable
-                                    mainSessionId
-                                    bloggerSessionId
-                                    (scope.TryPeekCurrentRequest key)
-                                    "park-timeout"
+                                // Timeout with durable seal or no material: quiet stop.
+                                // Timeout while still blocked falsely: already sealed above.
+                                if mainBlocks () then
+                                    scope.SetBloggerRuntime(
+                                        key,
+                                        BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
+                                    )
 
-                                match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                                | Ok cell -> scope.SetBloggerRuntime(key, cell)
-                                | Error _ -> scope.SetBloggerRuntime(key, BloggerRuntime.empty)
-
-                                scope.ClearCurrentRequest key
-                                scope.TryTakePendingOffer key |> ignore
-                                return []
+                                    scope.ClearCurrentRequest key
+                                    scope.TryTakePendingOffer key |> ignore
+                                    return []
+                                else
+                                    // Still open gap after park lifetime with no offer = stuck.
+                                    unexpectedEnd "park-timeout with pending material"
+                                    return []
                             else
                                 match scope.TryTakePendingOffer key with
                                 | Some ctx ->
-                                    match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
-                                    | Ok cell ->
-                                        scope.SetBloggerRuntime(key, cell)
-                                        scope.SetCurrentRequest(key, ctx)
-                                    | Error _ -> ()
+                                    let ctx =
+                                        tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
+                                        |> Option.defaultValue ctx
 
-                                    return resumeWithContext ctx
+                                    if mainBlocks () then
+                                        scope.SetBloggerRuntime(
+                                            key,
+                                            BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
+                                        )
+
+                                        return rawMessages
+                                    else
+                                        match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                                        | Ok cell ->
+                                            scope.SetBloggerRuntime(key, cell)
+                                            scope.SetCurrentRequest(key, ctx)
+                                        | Error _ -> ()
+
+                                        return resumeWithContext ctx
                                 | None -> return rawMessages
             | _ ->
                 // COMPANION-005 first request / non-tool step: rebuild only from

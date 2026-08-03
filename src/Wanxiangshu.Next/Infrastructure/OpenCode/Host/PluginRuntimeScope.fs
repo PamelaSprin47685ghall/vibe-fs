@@ -187,10 +187,17 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
                 pendingOffer.Remove sessionId |> ignore
                 // Park cancel/timeout leaves the logical Blogger idle, not disposed.
-                // CurrentRequest is InFlight payload — empty cell clears it.
+                // Sealed/Disposed stick; otherwise clear to empty Idle.
                 match bloggerRuntime.TryGetValue sessionId with
-                | true, cell when cell.State = BloggerRuntimeState.Disposed -> bloggerRuntime.[sessionId] <- cell
-                | _ -> bloggerRuntime.[sessionId] <- BloggerRuntime.empty)
+                | true, cell ->
+                    match cell.State with
+                    | BloggerRuntimeState.Disposed
+                    | BloggerRuntimeState.Sealed -> bloggerRuntime.[sessionId] <- { cell with PendingOffer = None }
+                    | _ ->
+                        bloggerRuntime.[sessionId] <-
+                            { BloggerRuntime.empty with
+                                ReactivatedAfterSeal = cell.ReactivatedAfterSeal }
+                | false, _ -> ())
 
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)
@@ -201,7 +208,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 let cell = this.GetBloggerRuntimeUnlocked sessionId
 
                 match cell.State with
-                | BloggerRuntimeState.Disposed -> ()
+                | BloggerRuntimeState.Disposed
+                | BloggerRuntimeState.Sealed -> ()
                 | BloggerRuntimeState.InFlight _ ->
                     bloggerRuntime.[sessionId] <-
                         { cell with
@@ -210,9 +218,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 | BloggerRuntimeState.Parked ->
                     // Materialize / recovery may re-arm before onCycleCommitted flips state.
                     bloggerRuntime.[sessionId] <-
-                        { State = BloggerRuntimeState.InFlight context
-                          PendingOffer = cell.PendingOffer
-                          RepairSpent = cell.RepairSpent })
+                        { cell with
+                            State = BloggerRuntimeState.InFlight context
+                            RepairSpent = cell.RepairSpent })
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
@@ -226,9 +234,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     match cell.State with
                     | BloggerRuntimeState.InFlight _ ->
                         bloggerRuntime.[sessionId] <-
-                            { State = BloggerRuntimeState.Idle
-                              PendingOffer = cell.PendingOffer
-                              RepairSpent = false }
+                            { cell with
+                                State = BloggerRuntimeState.Idle
+                                RepairSpent = false }
                     | _ -> ()
                 | false, _ -> ())
 
