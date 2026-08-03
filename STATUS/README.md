@@ -6,7 +6,7 @@
 - 版本：`0.5.2` 已发布（tag `v0.5.2`）
 - 最终验证 commit：`17358c38`
 - evidence commit：`7443007a`
-- tag commit：`a6668d10`
+- tag tip：本 commit（`git rev-parse v0.5.2^{commit}` 与 HEAD 一致）
 - 最后验证：
   - `npm run gate:static` 通过（10 子门禁，含 `gate:conformance`）
   - `npm run build` 通过（Fable 编译 212 源单元 → `build/next`）
