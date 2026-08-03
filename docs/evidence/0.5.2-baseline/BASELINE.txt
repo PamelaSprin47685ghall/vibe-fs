@@ -1,0 +1,22 @@
+C0 0.5.2 convergence baseline
+
+date: 2026-04-02
+version: 0.5.1 (pre-convergence)
+branch: master
+tip: 25a730eee873a7797685068b42728373593a5f02
+node: v25.9.0
+npm: 11.12.1
+dotnet: 10.0.110
+unit_count: 641
+harness_count: 285
+canary_count: 18
+canary_repeat: 3
+
+gate:static: PASS
+build: PASS
+test:unit: PASS 641/0
+test:harness: PASS 285/0
+test:e2e:p0:three: PASS 18 canaries × 3 rounds
+npm pack --dry-run: PASS
+
+tarball: wanxiangshu-0.5.1.tgz (1.8 MB, 404 files)
