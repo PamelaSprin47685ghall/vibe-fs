@@ -57,14 +57,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     let mutable inFlightTask: Task<unit> option = None
     let mutable inFlightCompleted = true
 
-    let persistSuccessful (completion: BloggerCompletion) =
-        match durable, sessionId with
-        | Some port, Some sid ->
-            match port.AppendSuccessful(sid, completion) with
-            | Ok updated -> lock lockObj (fun () -> blogProjection <- updated)
-            | Error error -> raise (InvalidOperationException error)
-        | _ -> raise (InvalidOperationException "No durable Companion port")
-
     let startAsTask (work: Async<unit>) : Task<unit> =
         let completion = TaskCompletionSource<unit>()
         inFlightCompleted <- false
@@ -141,7 +133,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member this.Submit
         (
             currentProjection: ProviderSemanticProjection,
-            blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<BloggerCompletion>,
+            blogFn: ProviderSemanticProjection -> BloggerDeltaChunk -> Task<Result<PromptKey, string>>,
             ?squashFn: int -> Task<Result<BlogProjectionState, string>>,
             ?cursorOffset: unit -> byte
         ) : CompanionOutcome =
@@ -149,9 +141,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
             if isBusyUnlocked () then
                 SkippedBusy
             else
-                // COMPANION-003: the chunker works in semantic coordinates; the
-                // RecordCoverage is an XTrace cursor sequence, so it is mapped back
-                // through the XTrace projection's turn/part coordinates.
                 let ingestCursor =
                     XTraceProjection.semanticCursorFor blogProjection.Coverage.IngestedThroughSequence xTraceProjection
 
@@ -168,76 +157,19 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                     | None, _
                     | _, None -> DurableJournalUnavailable
                     | Some _, Some _ ->
-                        let previousCutoff = blogProjection.Coverage.CoverableTurnCutoffExclusive
-                        let previousDigest = blogProjection.Coverage.CoveredPrefixDigest
-
-                        // CTX-006: decide the slot BEFORE the flight starts so the same
-                        // flight owns the whole slot sequence (squash, then main).
-                        let arming =
-                            if slotArmed then
-                                RecoverySlot.afterFailureAdvance
-                            else
-                                RecoverySlot.beginSequence
-
-                        let offset = defaultArg cursorOffset (fun () -> 0uy) ()
-                        let hasMaterial = not (List.isEmpty blogProjection.Frames)
-                        let maySquash = squashFn.IsSome && RecoverySlot.mayRecover arming offset hasMaterial
-
-                        // The squash covers the oldest ceil(m/2) frames (design §13.1).
-                        let squashFrameCount =
-                            if maySquash then
-                                (List.length blogProjection.Frames + 1) / 2
-                            else
-                                0
-
-                        // FALLBACK-012: whatever this slot decides, the arming it
-                        // consumed does not survive into a later slot — a new failure
-                        // is the only thing that arms again.
-                        slotArmed <- false
-
-                        let squashPhase =
-                            async {
-                                match squashFn, maySquash with
-                                | Some squash, true ->
-                                    let! outcome = squash squashFrameCount |> Async.AwaitTask
-
-                                    match outcome with
-                                    | Ok updated ->
-                                        // CTX-012: the committed squash frames become
-                                        // the base for the same slot's main request.
-                                        lock lockObj (fun () -> blogProjection <- updated)
-                                        return true
-                                    | Error _ ->
-                                        // SquashFailed: the slot failed (cursor already
-                                        // advanced by the squash writer). Skip the main
-                                        // request of this slot (design §13.4).
-                                        return false
-                                | _ -> return true
-                            }
-
+                        // ENFORCER-047: the companion sends the prompt and returns.
+                        // The commit happens in the Blogger continuation transform
+                        // (EnforcerHost.handleContinuation → commitCycle →
+                        // BlogEntryCommitted), not here. No persistSuccessful, no
+                        // terminal wait.
                         let t =
                             async {
                                 try
-                                    let! proceedToMain = squashPhase
+                                    let! sent = blogFn currentProjection delta |> Async.AwaitTask
 
-                                    if proceedToMain then
-                                        let! produced = blogFn currentProjection delta |> Async.AwaitTask
-
-                                        let completion =
-                                            if delta.NextCoverableTurnCutoffExclusive = previousCutoff then
-                                                { produced with
-                                                    NextCoveredPrefixDigest = previousDigest }
-                                            else
-                                                produced
-
-                                        persistSuccessful completion
-
-                                        let nextB =
-                                            match latestB with
-                                            | None -> completion.Text
-                                            | Some old -> old + "\n\n" + completion.Text
-
-                                        lock lockObj (fun () -> latestB <- Some nextB)
+                                    match sent with
+                                    | Ok _ -> ()
+                                    | Error _ -> ()
                                 with _ ->
                                     ()
                             }

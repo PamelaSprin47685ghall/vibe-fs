@@ -162,25 +162,15 @@ module internal CompanionHostBlogger =
             | decision -> return Error(sprintf "squash slot decision %A is not a squash outcome" decision)
         }
 
+    /// ENFORCER-047: send the prompt and return. No terminal wait — the Blogger
+    /// does not terminal; the continuation transform commits and parks.
     let blog
         (deps: BloggerDeps)
         (projection: ProviderSemanticProjection)
         (chunk: BloggerDeltaChunk)
-        : Task<BloggerCompletion> =
+        : Task<Result<PromptKey, string>> =
         task {
             let! childId = deps.EnsureBlogger()
-
-            let completion =
-                TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let mutable terminalDelivered = false
-
-            let onTerminal _ outcome =
-                if not terminalDelivered then
-                    terminalDelivered <- true
-                    completion.SetResult outcome
-
-            use subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
             let reset = lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value)
 
@@ -188,70 +178,34 @@ module internal CompanionHostBlogger =
             deps.SquashFrameCount.Value <- None
 
             // COMPANION-004: restart/reset goes through the SAME delta projector as
-            // a normal request. The prior bare-English splice (`sprintf` + EffectiveFrames +
-            // JSON semantic dump) is gone: the reset sends the full current
-            // projection as a data-only TOML delta, exactly like a normal chunk but
-            // without the ingest-cursor gap — the Companion re-anchors on the whole
-            // history because its prior context was lost.
+            // a normal request.
             let prompt =
                 if reset then
-                    let fullDelta =
-                        BloggerToml.render (
-                            XTrace.flatten projection.Messages
-                            |> List.map (fun entry ->
-                                { Role = entry.Role
-                                  Part =
-                                    match entry.Part with
-                                    | SemanticText text -> BloggerDeltaPart.TextPart text
-                                    | SemanticReasoning text -> BloggerDeltaPart.ReasoningPart text
-                                    | SemanticToolCall(name, args) -> BloggerDeltaPart.ToolCallPart(name, args)
-                                    | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart result
-                                    | SemanticMedia(mediaType, _digest) ->
-                                        if mediaType |> Option.exists (fun value -> value.StartsWith "image/") then
-                                            BloggerDeltaPart.ImageOmitted mediaType
-                                        else
-                                            BloggerDeltaPart.MediaOmitted mediaType
-                                  Truncated = false })
-                        )
-
-                    fullDelta
+                    BloggerToml.render (
+                        XTrace.flatten projection.Messages
+                        |> List.map (fun entry ->
+                            { Role = entry.Role
+                              Part =
+                                match entry.Part with
+                                | SemanticText text -> BloggerDeltaPart.TextPart text
+                                | SemanticReasoning text -> BloggerDeltaPart.ReasoningPart text
+                                | SemanticToolCall(name, args) -> BloggerDeltaPart.ToolCallPart(name, args)
+                                | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart result
+                                | SemanticMedia(mediaType, _digest) ->
+                                    if mediaType |> Option.exists (fun value -> value.StartsWith "image/") then
+                                        BloggerDeltaPart.ImageOmitted mediaType
+                                    else
+                                        BloggerDeltaPart.MediaOmitted mediaType
+                              Truncated = false })
+                    )
                 else
                     chunk.Toml
 
             let! sent = sendBloggerPrompt deps childId prompt
 
             match sent with
-            | Error error -> return failBlog error
-            | Ok _ ->
-                let! outcome = completion.Task
+            | Ok _ -> lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
+            | Error _ -> ()
 
-                match outcome with
-                | Completed result ->
-                    let text = result.TurnFormalText
-
-                    match TerminalValidity.check text with
-                    | Error rejection -> return failBlog (TerminalValidity.describe rejection)
-                    | Ok() ->
-                        lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
-
-                        return
-                            { BloggerSessionId = childId
-                              ProviderRun = result.ProviderRun
-                              Text = text
-                              NextCursor = chunk.NextCursor
-                              NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
-                              NextCoveredPrefixDigest =
-                                let coveredMessages =
-                                    projection.Messages
-                                    |> List.truncate (
-                                        min chunk.NextCoverableTurnCutoffExclusive (List.length projection.Messages)
-                                    )
-
-                                HostDigest.sha256Hex (
-                                    ProviderProjection.renderSemantic
-                                        { projection with
-                                            Messages = coveredMessages }
-                                ) }
-                | Aborted reason -> return failBlog reason
-                | Failed error -> return failBlog error
+            return sent
         }

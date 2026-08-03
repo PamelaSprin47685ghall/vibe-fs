@@ -302,22 +302,61 @@ module EnforcerHost =
                     | Error failure -> Error(JournalAppendFailure.describe failure)
                     | Ok _ -> Ok record
 
-    /// ENFORCER-051: synthetic user message for cycle-2+ (temporary bridge until
-    /// Commit 4 rebuilds full Working Record projection from context).
-    let private syntheticDeltaMessage (bloggerSessionId: SessionId) (deltaText: string) : obj =
-        let text = CompanionPrompt.newWorkMessage deltaText
+    /// ENFORCER-051: rebuild the full provider view from durable frames + context.
+    ///
+    /// Replaces `rawMessages @ [syntheticDelta]`. The raw transcript is NOT the
+    /// history source — durable BlogFrames + the typed context are.
+    let private rebuildFromContext
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (ctx: BloggerRequestContext)
+        : obj list =
+        let projections = AgentJournal.snapshot journal
 
-        let syntheticId =
-            HostDigest.sha256Hex (String.concat "|" [ SessionId.value bloggerSessionId; "enforcer-delta"; text ])
+        let mainSessionId =
+            SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
 
-        createObj
-            [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
-              "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
+        let blog =
+            mainSessionId
+            |> Option.bind (fun sid -> projections.AgentProjections.Sessions |> Map.tryFind sid)
+            |> Option.bind (fun session -> session.Blog)
+            |> Option.defaultValue BlogProjection.empty
 
-    let private injectFromContext (bloggerSessionId: SessionId) (rawMessages: obj list) (ctx: BloggerRequestContext) =
-        match BloggerRequestContext.toml ctx with
-        | Some toml -> rawMessages @ [ syntheticDeltaMessage bloggerSessionId toml ]
-        | None -> rawMessages
+        let frameBodies =
+            blog.Frames
+            |> List.choose (fun frame ->
+                match journal.Writer.BlobWriter.Read frame.TextRef with
+                | Ok text -> Some(frame.Digest, text)
+                | Error _ -> None)
+
+        let kind =
+            match ctx with
+            | BloggerRequestContext.Main _ -> CompanionRequestKind.Normal
+            | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount
+
+        let delta =
+            match BloggerRequestContext.toml ctx with
+            | Some toml ->
+                let messageId =
+                    HostDigest.sha256Hex (String.concat "|" [ SessionId.value bloggerSessionId; "delta"; toml ])
+
+                Some(messageId, toml)
+            | None -> None
+
+        let plan =
+            CompanionProjectionBuilder.build
+                HostDigest.sha256Hex
+                bloggerSessionId
+                blog.FrameEpochId
+                kind
+                frameBodies
+                delta
+
+        plan.Messages
+        |> List.map (fun msg ->
+            createObj
+                [ "info", box (createObj [ "id", box msg.MessageId; "role", box msg.Role ])
+                  "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
 
     /// Map chunk NextCursor (semantic) → XTrace sequence for typed context.
     let private nextIngestSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) =
@@ -400,8 +439,13 @@ module EnforcerHost =
                 // ENFORCER-047: after the commit the continuation parks and waits
                 // for the next offer. An offer that raced ahead (staged while this
                 // transform was still running) is consumed instead of parking.
+                let resumeWithContext ctx =
+                    match journal with
+                    | Some durable -> rebuildFromContext durable bloggerSessionId ctx
+                    | None -> rawMessages
+
                 match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                | Some ctx -> return injectFromContext bloggerSessionId rawMessages ctx
+                | Some ctx -> return resumeWithContext ctx
                 | None ->
                     let! resumed = scope.ParkTransform(SessionId.value bloggerSessionId, ParkedTransformLifetime)
 
@@ -412,7 +456,7 @@ module EnforcerHost =
                         return rawMessages
                     else
                         match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                        | Some ctx -> return injectFromContext bloggerSessionId rawMessages ctx
+                        | Some ctx -> return resumeWithContext ctx
                         | None -> return rawMessages
             | _ ->
                 // Not a blog-bearing continuation: a fresh turn's first request
