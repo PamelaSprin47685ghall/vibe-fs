@@ -355,6 +355,64 @@ try {
     'new delta must not repeat turn 1 material',
   );
 
+  // ── 3b. third main turn while Blogger is InFlight after resume ────────────
+  // ENFORCER-050 / COMPANION-008: while the resumed Blogger request is still
+  // InFlight (or parks after its cycle), a third main material must NOT start a
+  // third concurrent Blogger provider request. Material stays in XTrace and is
+  // batch-consumed later. Snapshot request count before the third prompt.
+  const blogCountBeforeThird = blogRequests().length;
+  const beforeMain3 = scenario.provider.requests.length;
+  const turn3 = scenario.turn.start(primaryId);
+  const thirdPrompt = await scenario.client.request('POST', `/session/${primaryId}/prompt_async`, {
+    body: {
+      agent: 'fast-coder',
+      parts: [{ type: 'text', text: 'Third coder turn.' }],
+      model: { providerID: 'test', modelID: 'test-model' },
+    },
+  });
+  assert.ok(thirdPrompt.ok, `third coder prompt failed: ${JSON.stringify(thirdPrompt.data)}`);
+  await turn3.awaitTerminal({
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    requireActivity: true,
+    requireAssistantTerminal: true,
+    requireIdleAfterActivity: true,
+  });
+  scenario.watchdog?.advance({ reason: 'main-turn-3', lane: 'manager', blocking: true });
+
+  // Single-flight: no second concurrent blogger request starts during the third
+  // main turn's synchronous window (skip while InFlight). After the parked
+  // cycle commits, at most one additional request may start for the batched
+  // third material (offer/start from Parked), never two for the same material.
+  await waitForCount(
+    scenario,
+    () => blogRequests().length >= blogCountBeforeThird,
+    blogCountBeforeThird,
+    'blogger-stable-after-third',
+  );
+  // Allow one more request for the third material offer, but not unbounded fan-out.
+  await waitForCount(
+    scenario,
+    () => blogRequests().length >= blogCountBeforeThird + 1,
+    blogCountBeforeThird + 1,
+    'blogger-request-for-third-material',
+  );
+  assert.ok(
+    blogRequests().length <= blogCountBeforeThird + 1,
+    `single-flight: at most one blogger request for third material (got ${blogRequests().length}, before=${blogCountBeforeThird})`,
+  );
+  const thirdBlogRequest = blogRequests()[blogRequests().length - 1];
+  if (thirdBlogRequest && thirdBlogRequest !== secondBlogRequest) {
+    const thirdTexts = requestTexts(thirdBlogRequest);
+    assert.ok(
+      thirdTexts.includes('Third coder turn.') || thirdTexts.includes('# New Work To Record'),
+      'third blogger request must carry batched third material in New Work, not a concurrent InFlight override',
+    );
+    assert.ok(
+      !thirdTexts.includes('First coder turn.'),
+      'third delta must not re-cover turn 1 material',
+    );
+  }
+
   // ── 4. journal: committed cycles with identity and per-run uniqueness ─────
   // The main Blogger commits one cycle per provider step (request 1 + the
   // resumed request); the parallel session's own Blogger commits its first
@@ -367,6 +425,13 @@ try {
     'blog-entries-committed',
   );
   const facts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
+
+  // C5: each physical send materializes a durable request context first.
+  const materialized = runtimeFacts(scenario.host.workDir, 'BloggerRequestMaterialized');
+  assert.ok(
+    materialized.length >= 2,
+    `BloggerRequestMaterialized must land before sends (got ${materialized.length})`,
+  );
 
   // ENFORCER-041: identity comes from ToolContext (messageID + callID).
   for (const fact of facts) {

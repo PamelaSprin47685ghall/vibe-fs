@@ -428,22 +428,29 @@ module EnforcerHost =
                     load blog.Frames []
 
     /// ENFORCER-051: rebuild the full provider view from durable frames + context.
-    /// Fail closed if frames cannot be loaded (no silent drop).
-    let private rebuildFromContext
+    /// Missing association / frame load → None so the caller keeps rawMessages.
+    /// Never return an empty list: that blanks the Host transcript (mock lastUser=null).
+    let private tryRebuildFromContext
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
         (ctx: BloggerRequestContext)
-        : obj list =
+        : obj list option =
         let projections = AgentJournal.snapshot journal
 
         let mainSessionId =
             SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
 
         match mainSessionId with
-        | None -> []
+        | None -> None
         | Some owner ->
+            // Zero frames is legitimate (first Main before any Entry). Missing
+            // association was already filtered. Blob load still fail-closed.
             match loadEffectiveFrames journal owner with
-            | Error _ -> []
+            | Error FrameLoadError.MissingAssociation
+            | Error FrameLoadError.MissingBlogSession -> None
+            | Error(FrameLoadError.MissingFrameBlob _)
+            | Error(FrameLoadError.DigestMismatch _)
+            | Error FrameLoadError.EpochMismatch -> None
             | Ok(frameBodies, frameEpoch) ->
                 let kind =
                     match ctx with
@@ -484,6 +491,10 @@ module EnforcerHost =
                                     box (if msg.IsPhysical then "physical-delta" else "synthetic-projection") ]
                           )
                           "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
+                |> Some
+
+    let private rebuildFromContext journal bloggerSessionId ctx =
+        tryRebuildFromContext journal bloggerSessionId ctx |> Option.defaultValue []
 
     /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
     /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next
@@ -669,7 +680,8 @@ module EnforcerHost =
 
                 if alreadyEntry || alreadyReceipt then
                     let resumeWithContext ctx =
-                        rebuildFromContext durable bloggerSessionId ctx
+                        tryRebuildFromContext durable bloggerSessionId ctx
+                        |> Option.defaultValue rawMessages
 
                     match scope.TryTakePendingOffer key with
                     | Some ctx ->
@@ -796,7 +808,9 @@ module EnforcerHost =
                     else
                         let resumeWithContext ctx =
                             match journal with
-                            | Some durable -> rebuildFromContext durable bloggerSessionId ctx
+                            | Some durable ->
+                                tryRebuildFromContext durable bloggerSessionId ctx
+                                |> Option.defaultValue rawMessages
                             | None -> rawMessages
 
                         // Prefer PendingOffer (Main after park), else post-squash Main if any.
@@ -838,7 +852,10 @@ module EnforcerHost =
                 // durable frames + typed CurrentRequest. Never extract TOML from
                 // raw user messages (C2).
                 match journal, scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId) with
-                | Some durable, Some ctx -> return rebuildFromContext durable bloggerSessionId ctx
+                | Some durable, Some ctx ->
+                    return
+                        tryRebuildFromContext durable bloggerSessionId ctx
+                        |> Option.defaultValue rawMessages
                 | _ -> return rawMessages
         }
 

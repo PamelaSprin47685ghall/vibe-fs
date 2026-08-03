@@ -17,12 +17,13 @@ scenario = "host-transform-capability"
 description = "STRENGTH-078 C-01..C-10 / ENFORCER-180 step 0: blog OK, continuation transform, park/resume, cross-session isolation"
 session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
 prompt = { agent = "fast-coder", text = "First coder turn." }
-must = ["coder.0", "inspector.0", "blogger.0", "coder2.0", "coder-title", "inspector-title"]
+must = ["coder.0", "inspector.0", "blogger.0", "coder2.0", "coder3.0", "coder-title", "inspector-title"]
 
 flow = [
   { prompt = { text = "First coder turn." } },
   { prompt = { text = "Parallel inspector turn while the Blogger transform is parked." } },
   { prompt = { text = "Second coder turn." } },
+  { prompt = { text = "Third coder turn." } },
 ]
 
 [[turn]]
@@ -42,6 +43,15 @@ tools = ["read", "glob", "grep"]
 
   [[turn.step]]
   respond = { type = "text", text = "coder turn two complete." }
+
+[[turn]]
+id = "coder3"
+lane = "fast-coder"
+user = "Third coder turn."
+tools = ["read", "glob", "grep"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "coder turn three complete." }
 
 [[turn]]
 id = "inspector"
