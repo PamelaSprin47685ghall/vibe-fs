@@ -2837,6 +2837,7 @@ export const bloggerRuntime = (() => {
     'onCycleCommitted',
     'onSquashCommitted',
     'onFail',
+    'markRepairSpent',
     'onDispose',
     'inFlightContext',
     'tryPeekInFlight',
@@ -2844,13 +2845,6 @@ export const bloggerRuntime = (() => {
     'tryTakePending',
     'adoptPendingAsCurrent',
   ])
-
-  const cellOf = (state, pending = undefined) => m.ofState(state)
-  const projectCell = (cell) => ({
-    state: cell,
-    stateTag: caseOf(cell.State),
-    pending: unwrapOption(cell.PendingOffer),
-  })
 
   return {
     idle: m.ofState(stateCase('Idle', [])),
@@ -2867,22 +2861,28 @@ export const bloggerRuntime = (() => {
         state: pair[0],
         decision: caseOf(pair[1]),
         pending: unwrapOption(pair[0].PendingOffer),
+        repairSpent: pair[0].RepairSpent,
       }
     },
     onCycleCommitted: (cell) => {
       const r = resultOf(m.onCycleCommitted(cell))
-      return r.ok ? { ok: true, state: r.value } : { ok: false, error: caseOf(r.error) }
+      return r.ok
+        ? { ok: true, state: r.value, repairSpent: r.value.RepairSpent }
+        : { ok: false, error: caseOf(r.error) }
     },
     onSquashCommitted: (cell, pendingMain) => {
       const r = resultOf(m.onSquashCommitted(cell, pendingMain === undefined ? undefined : pendingMain))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
-      return { ok: true, state: pair[0], decision: caseOf(pair[1]) }
+      return { ok: true, state: pair[0], decision: caseOf(pair[1]), repairSpent: pair[0].RepairSpent }
     },
     onFail: (cell) => {
       const r = resultOf(m.onFail(cell))
-      return r.ok ? { ok: true, state: r.value } : { ok: false, error: caseOf(r.error) }
+      return r.ok
+        ? { ok: true, state: r.value, repairSpent: r.value.RepairSpent }
+        : { ok: false, error: caseOf(r.error) }
     },
+    markRepairSpent: (cell) => m.markRepairSpent(cell),
     onDispose: (cell) => m.onDispose(cell),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
     tryTakeInFlight: (cell) => {
@@ -2898,6 +2898,7 @@ export const bloggerRuntime = (() => {
       return { ok: true, pending: unwrapOption(pair[0]), state: pair[1] }
     },
     stateOf: (cell) => caseOf(cell.State),
+    repairSpentOf: (cell) => cell.RepairSpent,
   }
 })()
 

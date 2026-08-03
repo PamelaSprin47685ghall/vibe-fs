@@ -223,13 +223,12 @@ const SINGLE_WRITER_FACTS = [
   {
     fact: 'BloggerRequestAbandoned',
     allowed: [
-      'Session/BloggerCoordinator.fs',
-      'Application/Reconciliation/BloggerCrashRecovery.fs',
+      'Session/BloggerAbandon.fs',
       'Journal/BloggerCycleProjection.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
     ],
-    reason: 'send-fail abandon (coordinator) + crash-window-A abandon (BloggerCrashRecovery); fold/codec only',
+    reason: 'BloggerAbandon is the sole production constructor; coordinator/enforcer/crash-recovery call it',
   },
 ]
 

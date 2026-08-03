@@ -124,6 +124,9 @@ module BloggerRuntime =
                 )
         | _ -> Error TransitionError.NotInFlight
 
+    /// Final fail of the logical request: Idle + clear PendingOffer + reset RepairSpent.
+    /// Call only after open materialization is abandoned (or never existed).
+    /// Mid-request InteractionRepair uses markRepairSpent and MUST keep InFlight.
     let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
@@ -134,6 +137,7 @@ module BloggerRuntime =
                   RepairSpent = false }
         | _ -> Error TransitionError.NotInFlight
 
+    /// ENFORCER-060/061: at most one InteractionRepair per logical request.
     let markRepairSpent (cell: BloggerRuntimeCell) : BloggerRuntimeCell = { cell with RepairSpent = true }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =

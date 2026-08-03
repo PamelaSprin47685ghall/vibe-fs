@@ -164,6 +164,7 @@
     <Compile Include="Session/HostForkPty.fs"/>
     <Compile Include="Session/BloggerRuntimeState.fs"/>
     <Compile Include="Session/ParkedTransform.fs"/>
+    <Compile Include="Session/BloggerAbandon.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Session/EnforcerHost.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>

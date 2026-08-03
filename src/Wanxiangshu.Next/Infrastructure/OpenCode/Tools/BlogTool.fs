@@ -1,24 +1,34 @@
 namespace Wanxiangshu.Next.OpenCode
 
+open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Domain.EnforcerCatalogData
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Session
 
-/// SSOT/15 — the `blog` tool (ENFORCER-010/020/040/041).
+/// SSOT/15 — the `blog` tool (ENFORCER-010/020/040/041/061).
 ///
 /// Provider schema: `text` (required), `evidence` (optional), plus the 120
 /// canonical rule fields (optional 0..9 integers) generated from the one
-/// catalog (ENFORCER-170). The execute body never suspends: it parses the raw
-/// arguments, checks identity, and returns the fixed string "OK" — the Host's
-/// tool-loop continuation depends on the promise resolving (ENFORCER-040).
+/// catalog (ENFORCER-170). Execute never suspends (ENFORCER-040).
 ///
-/// The cycle merge happens later, at the continuation transform, where the
-/// full provider step is re-read and re-canonicalised (ENFORCER-044) — nothing
-/// of the merge may happen inside execute, or scheduling order would become a
-/// business fact (ENFORCER-042).
+/// ENFORCER-061: empty/missing canonical text returns a readable error so the
+/// Host tool-loop can repair once. Valid entry still returns fixed "OK".
+/// Cycle merge stays at the continuation transform (ENFORCER-044).
 module BlogTool =
+
+    /// ENFORCER-061: tool-visible rejection for empty canonical text.
+    let EmptyTextError = "blog text is empty after canonicalisation (ENFORCER-061)"
+
+    /// ENFORCER-022/061 pure gate — same trim/non-empty rule as EnforcerCodec.decodeCall.
+    let tryCanonicalText (rawText: string) : Result<string, string> =
+        let trimmed = if isNull rawText then "" else rawText.Trim()
+
+        if trimmed.Length = 0 then
+            Error EmptyTextError
+        else
+            Ok trimmed
 
     /// ENFORCER-170: the provider-visible argument schema is derived from the
     /// catalog — FieldName, ScoreWhen description, optional 0..9.
@@ -48,27 +58,21 @@ module BlogTool =
           Execute =
             fun args ctx ->
                 task {
-                    // ENFORCER-040: parse the raw arguments. The codec's
-                    // tolerance work happens here too — a misspelled rule field
-                    // must survive to the merge, so nothing is dropped here.
-                    let text = args.Text "text"
+                    // ENFORCER-061 first gate: reject empty canonical text before "OK".
+                    match tryCanonicalText (args.Text "text") with
+                    | Error err -> return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString err ]
+                    | Ok _ ->
+                        match ctx.ProviderRunId, ctx.ToolCallId with
+                        | Some _, Some _ ->
+                            // ENFORCER-040: fixed OK. Merge is continuation's job (ENFORCER-044).
+                            return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
+                        | _ ->
+                            // ENFORCER-041: missing identity is filtered at merge, not here.
+                            // Still resolve so the tool loop cannot stall.
+                            Diagnostic.emit
+                                "blog-execute"
+                                [ "session_id", ctx.SessionId
+                                  "result", "blog call without ToolContext identity (ENFORCER-041)" ]
 
-                    match ctx.ProviderRunId, ctx.ToolCallId with
-                    | Some _, Some _ ->
-                        // ENFORCER-040: return the fixed string. The merge is
-                        // the continuation transform's job (ENFORCER-044).
-                        return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
-                    | _ ->
-                        // ENFORCER-041: identity comes from ToolContext; the
-                        // merge side re-derives it from the transcript (the
-                        // part's callID + assistant message id), so a call with
-                        // missing identity here is filtered out of the merge
-                        // there, not committed. Execute still resolves with
-                        // "OK" so the tool loop cannot stall.
-                        Diagnostic.emit
-                            "blog-execute"
-                            [ "session_id", ctx.SessionId
-                              "result", "blog call without ToolContext identity (ENFORCER-041)" ]
-
-                        return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
+                            return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
                 } }

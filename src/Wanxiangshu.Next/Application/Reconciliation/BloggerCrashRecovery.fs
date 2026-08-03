@@ -46,15 +46,7 @@ module BloggerCrashRecovery =
                 |> List.map (fun (_, openReq) -> mainSessionId, openReq))
 
     let private abandon (journal: AgentJournal) (openReq: OpenBloggerRequest) (reason: string) : unit =
-        let fact =
-            AgentFact.BloggerRequestAbandoned
-                {| RequestId = openReq.RequestId
-                   MainSessionId = openReq.MainSessionId
-                   BloggerSessionId = openReq.BloggerSessionId
-                   Reason = reason |}
-
-        AgentJournal.appendAgent (StreamId.Session openReq.MainSessionId) None fact journal
-        |> ignore
+        BloggerAbandon.byRequestId journal openReq.RequestId openReq.MainSessionId openReq.BloggerSessionId reason
 
     /// Pure decision for window A/B/C given Host tool-call presence and receipts.
     let classifyOpenRequest

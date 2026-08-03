@@ -135,16 +135,14 @@ module BloggerCoordinator =
 
         match staleOpen with
         | Some openReq when openReq.RequestId <> requestId ->
-            let abandon =
-                AgentFact.BloggerRequestAbandoned
-                    {| RequestId = openReq.RequestId
-                       MainSessionId = mainSessionId
-                       BloggerSessionId = bloggerSessionId
-                       Reason = "superseded-by-new-materialize" |}
+            BloggerAbandon.byRequestId
+                journal
+                openReq.RequestId
+                mainSessionId
+                bloggerSessionId
+                "superseded-by-new-materialize"
 
-            match AgentJournal.appendAgent (StreamId.Session mainSessionId) None abandon journal with
-            | Error failure -> Error(JournalAppendFailure.describe failure)
-            | Ok _ -> Ok()
+            Ok()
         | _ -> Ok()
         |> function
             | Error e -> Error e
@@ -175,15 +173,12 @@ module BloggerCoordinator =
         match journal with
         | None -> ()
         | Some j ->
-            let fact =
-                AgentFact.BloggerRequestAbandoned
-                    {| RequestId = BloggerRequestContext.requestId ctx
-                       MainSessionId = BloggerRequestContext.mainSessionId ctx
-                       BloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
-                       Reason = reason |}
-
-            AgentJournal.appendAgent (StreamId.Session(BloggerRequestContext.mainSessionId ctx)) None fact j
-            |> ignore
+            BloggerAbandon.openRequest
+                j
+                (BloggerRequestContext.mainSessionId ctx)
+                (BloggerRequestContext.bloggerSessionId ctx)
+                (Some ctx)
+                reason
 
     let private startFrozen
         (scope: IParkedTransformHost)

@@ -653,6 +653,7 @@ module EnforcerHost =
 
     /// ENFORCER-045/050/154: commit authority for the in-flight cycle.
     /// Order: live InFlight payload → durable open materialization (heal InFlight).
+    /// Never overwrite a live InFlight RequestId with a different open request.
     let resolveCycleContext
         (scope: IParkedTransformHost)
         (journal: AgentJournal)
@@ -678,11 +679,87 @@ module EnforcerHost =
                 | Some ctx ->
                     match scope.GetBloggerRuntime(key).State with
                     | BloggerRuntimeState.Disposed -> None
+                    | BloggerRuntimeState.InFlight live when
+                        BloggerRequestContext.requestId live <> BloggerRequestContext.requestId ctx
+                        ->
+                        // Live InFlight is authority; open belongs to another request.
+                        Some live
                     | _ ->
                         // Completed blog calls prove the physical cycle is live.
                         // SetCurrentRequest alone re-arms InFlight (single authority).
                         scope.SetCurrentRequest(key, ctx)
                         Some ctx
+
+    let private tryOpenByBlogger
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        : OpenBloggerRequest option =
+        (AgentJournal.snapshot journal).AgentProjections.Sessions
+        |> Map.tryFind mainSessionId
+        |> Option.bind (fun session -> session.BloggerCycles)
+        |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
+
+    let private isBlogToolPart (part: obj) : bool =
+        if isNull part then
+            false
+        else
+            let kind =
+                if isNull part?``type`` then
+                    ""
+                else
+                    unbox<string> part?``type``
+
+            let name =
+                if not (isNull part?tool) then unbox<string> part?tool
+                elif not (isNull part?name) then unbox<string> part?name
+                else ""
+
+            kind = "tool" && name = "blog"
+
+    let private blogPartStatus (part: obj) : string option =
+        if isNull part || isNull part?state then
+            None
+        else
+            match part?state?status with
+            | null -> None
+            | value -> Some(unbox<string> value)
+
+    /// pending/running blog: Host will re-enter after tool completion — not pure prose.
+    let private hasIncompleteBlogTool (rawMessages: obj list) : bool =
+        match lastAssistantStep rawMessages with
+        | None -> false
+        | Some(_, parts) ->
+            parts
+            |> List.exists (fun part ->
+                isBlogToolPart part
+                && match blogPartStatus part with
+                   | Some "pending"
+                   | Some "running" -> true
+                   | _ -> false)
+
+    /// ENFORCER-060/061: stable InteractionRepair user message (item 15 — fixed text only).
+    let private withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
+        let msgId =
+            "enforcer-repair-"
+            + (HostDigest.sha256Hex (requestKey + "|" + RepairInstruction)).Substring(0, 24)
+
+        let repairMsg =
+            createObj
+                [ "info",
+                  box (
+                      createObj
+                          [ "id", box msgId
+                            "role", box "user"
+                            "synthetic", box true
+                            "source", box "interaction-repair" ]
+                  )
+                  "parts", box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
+
+        rawMessages @ [ repairMsg ]
+
+    let private isEmptyTextCycleFailure (reason: string) : bool =
+        reason.IndexOf("merged text is empty", StringComparison.Ordinal) >= 0
 
     /// Public: build the staged offer context from the same delta the coordinator
     /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
@@ -763,42 +840,44 @@ module EnforcerHost =
                         (AgentJournal.snapshot j).AgentProjections.Associations)
 
             match journal, mainSessionId, extractCalls rawMessages with
-            | Some durable, Some owner, Some(messageId, calls) when List.isEmpty calls ->
-                // Item 15: pure prose only — one interaction repair max.
-                // Incomplete blog tool cycles (pending/running status) are NOT pure prose:
-                // Host will re-enter after tool completion. Repair would poison the mock
-                // and restart paths with an undeclared user message.
+            | Some durable, Some owner, Some(_messageId, calls) when List.isEmpty calls ->
+                // ENFORCER-060: pure prose terminal → one InteractionRepair max.
+                // Incomplete blog (pending/running) is NOT pure prose — Host re-enters.
                 let key = SessionId.value bloggerSessionId
 
-                let hasBlogToolPart =
-                    match lastAssistantStep rawMessages with
-                    | None -> false
-                    | Some(_, parts) ->
-                        parts
-                        |> List.exists (fun part ->
-                            if isNull part then
-                                false
-                            else
-                                let kind =
-                                    if isNull part?``type`` then
-                                        ""
-                                    else
-                                        unbox<string> part?``type``
+                if hasIncompleteBlogTool rawMessages then
+                    return rawMessages
+                else
+                    let cell = scope.GetBloggerRuntime key
+                    let currentCtx = scope.TryPeekCurrentRequest key
 
-                                let name =
-                                    if not (isNull part?tool) then unbox<string> part?tool
-                                    elif not (isNull part?name) then unbox<string> part?name
-                                    else ""
+                    if not cell.RepairSpent then
+                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
 
-                                kind = "tool" && name = "blog")
+                        Diagnostic.emit
+                            "enforcer-cycle-repair"
+                            [ "session_id", key; "result", "no completed blog calls (ENFORCER-060)" ]
 
-                // 0.5.1: do not inject interaction repair into Host transcript.
-                // Incomplete/pending blog tools and restart snapshots were misclassified
-                // as pure prose and poisoned canaries with undeclared repair messages.
-                // RepairSpent + RepairInstruction remain for unit-level protocol; production
-                // wiring returns rawMessages fail-closed without parking.
-                let _ = hasBlogToolPart
-                return rawMessages
+                        let requestKey =
+                            match currentCtx with
+                            | Some ctx -> BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+                            | None -> key
+
+                        return withRepairInstruction rawMessages requestKey
+                    else
+                        // Repair exhausted: abandon open + Idle. Never leave busy forever.
+                        Diagnostic.emit
+                            "enforcer-cycle-failed"
+                            [ "session_id", key; "result", "protocol-repair-exhausted (ENFORCER-060)" ]
+
+                        BloggerAbandon.openRequest durable owner bloggerSessionId currentCtx "protocol-repair-exhausted"
+
+                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                        | Ok next -> scope.SetBloggerRuntime(key, next)
+                        | Error _ -> ()
+
+                        scope.ClearCurrentRequest key
+                        return rawMessages
             | Some durable, Some owner, Some(messageId, calls) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and
@@ -855,6 +934,8 @@ module EnforcerHost =
                     let failClosedNoPark (reason: string) =
                         Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
+                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId currentCtx reason
+
                         match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
                         | Ok cell -> scope.SetBloggerRuntime(key, cell)
                         | Error _ -> ()
@@ -862,17 +943,25 @@ module EnforcerHost =
                         scope.ClearCurrentRequest key
 
                     match validateCycle messageId calls with
-                    | Error reason ->
-                        // Item 15: one repair max for invalid cycle (empty text / multi-call merge fail).
+                    | Error reason when
+                        isEmptyTextCycleFailure reason
+                        && not (scope.GetBloggerRuntime key).RepairSpent
+                        && not (hasIncompleteBlogTool rawMessages)
+                        ->
+                        // ENFORCER-061: one InteractionRepair for empty canonical text.
                         let cell = scope.GetBloggerRuntime key
+                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                        injectRepair <- true
 
-                        if not cell.RepairSpent then
-                            scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
-                            injectRepair <- true
-
-                            Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
-                        else
-                            failClosedNoPark reason
+                        Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+                    | Error reason ->
+                        // Repair spent, incomplete blog still running, or structural invalidity.
+                        failClosedNoPark (
+                            if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
+                                "protocol-repair-exhausted"
+                            else
+                                reason
+                        )
                     | Ok(merged, toolCallIds) ->
                         match currentCtx with
                         | Some(BloggerRequestContext.Squash squash) ->
@@ -931,13 +1020,22 @@ module EnforcerHost =
                                     Diagnostic.emit
                                         "enforcer-cycle-commit-unknown"
                                         [ "session_id", key; "result", reason ]
-                        | None -> failClosedNoPark "missing CurrentRequest"
+                        | None ->
+                            // Completed blog with no live/open request: stale after abandon/supersede.
+                            let openStill = tryOpenByBlogger durable mainSessionId bloggerSessionId
 
-                    // 0.5.1: no production repair injection (see empty-calls branch).
-                    // Fail closed without blanking Host transcript — return [] made the next
-                    // provider request lastUser=null and broke canary matching.
+                            match openStill with
+                            | None -> failClosedNoPark "stale-cycle-after-abandon"
+                            | Some _ -> failClosedNoPark "missing CurrentRequest"
+
                     if injectRepair then
-                        return rawMessages
+                        // Keep InFlight + CurrentRequest; do not Park; do not commit.
+                        let requestKey =
+                            match currentCtx with
+                            | Some ctx -> BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+                            | None -> key
+
+                        return withRepairInstruction rawMessages requestKey
                     elif commitUnknown then
                         return rawMessages
                     elif not committed then
@@ -945,8 +1043,8 @@ module EnforcerHost =
                     else
                         let resumeWithContext ctx =
                             match journal with
-                            | Some durable ->
-                                tryRebuildFromContext durable bloggerSessionId ctx
+                            | Some durableJournal ->
+                                tryRebuildFromContext durableJournal bloggerSessionId ctx
                                 |> Option.defaultValue rawMessages
                             | None -> rawMessages
 
@@ -966,6 +1064,14 @@ module EnforcerHost =
 
                             if not resumed then
                                 // C4/item 16: timeout/cancel must not release raw transcript.
+                                // Abandon open so journal and runtime stay co-lived.
+                                BloggerAbandon.openRequest
+                                    durable
+                                    mainSessionId
+                                    bloggerSessionId
+                                    (scope.TryPeekCurrentRequest key)
+                                    "park-timeout"
+
                                 match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
                                 | Ok cell -> scope.SetBloggerRuntime(key, cell)
                                 | Error _ -> scope.SetBloggerRuntime(key, BloggerRuntime.empty)
