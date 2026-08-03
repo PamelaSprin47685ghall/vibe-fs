@@ -104,4 +104,4 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                         LoopDetector.pushText detector delta.Delta)
 
                 if evaluation.IsLoop then
-                    this.Kill delta.SessionId evaluation.EffectiveCharacterCount evaluation.Step
+                    this.Kill delta.SessionId (Some evaluation.EffectiveCharacterCount) evaluation.Step

@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Next.Domain
 
-/// LOOP-003…005: low character-diversity loop detector.
+/// LOOP-003…005: low 4-gram-diversity loop detector.
 ///
-/// Three exponential kernels approximate Zipf infinite history. Fixed hash
-/// buckets keep memory O(1) relative to stream length. No ring buffer.
+/// Sliding 4-grams + three slow exponential kernels + normal-code prior
+/// (innocent until proven looping). Fixed hash buckets keep memory O(1).
 ///
 /// Pure: no Host, no Journal, no side effects. One fresh detector per provider
 /// attempt (LOOP-005 lifecycle).
@@ -11,47 +11,71 @@ namespace Wanxiangshu.Next.Domain
 module LoopDetector =
 
     let K = 3
-    let MinChars = 256
-    let LoopThreshold = 6.0
+    let NgramSize = 4
     let HashBuckets = 4096
 
-    let Lambda = [| 0.50000000; 0.84089642; 0.98922801 |]
-    let Coef = [| 0.42375922; 0.29672805; 0.27951273 |]
+    /// Half-lives 8 / 64 / 512 (in 4-grams): λ = 2^(-1/half_life).
+    let Lambda = [| 0.9170040432; 0.9892280132; 0.9986471129 |]
+    let Coef = [| 0.15; 0.25; 0.60 |]
+
+    /// Normal-code prior: N_eff = 64 ⇒ HHI = 1/64.
+    let NormalEffectiveCount = 64.0
+    let NormalHhi = 1.0 / NormalEffectiveCount
+
+    /// LOOP when HHI ≥ this (N_eff ≲ 33.333). Unified code threshold.
+    let LoopHhi = 0.03
+    let LoopEffectiveThreshold = 1.0 / LoopHhi
 
     let Epsilon = 1e-300
 
     [<RequireQualifiedAccess>]
     type State =
-        | WarmingUp
         | Normal
         | Loop
 
     type Evaluation =
         { State: State
           IsLoop: bool
-          EffectiveCharacterCount: float option
+          /// N_eff of the mixed 4-gram distribution.
+          EffectiveCharacterCount: float
+          /// HHI = 1 / N_eff.
+          Hhi: float
+          /// Number of 4-grams processed (not raw characters).
           Step: int }
 
     type Detector =
         { mutable Step: int
+          Prefix: char[]
+          mutable PrefixLength: int
           Value: float[][]
           LastStep: int[]
           Total: float[]
           Cross: float[][] }
 
+    let private steadyTotals () : float[] =
+        Array.init K (fun j -> 1.0 / (1.0 - Lambda.[j]))
+
+    let private priorCross (totals: float[]) : float[][] =
+        Array.init K (fun j -> Array.init K (fun k -> NormalHhi * totals.[j] * totals.[k]))
+
     let create () : Detector =
+        let totals = steadyTotals ()
+
         { Step = 0
+          Prefix = Array.zeroCreate NgramSize
+          PrefixLength = 0
           Value = Array.init HashBuckets (fun _ -> Array.zeroCreate K)
           LastStep = Array.zeroCreate HashBuckets
-          Total = Array.zeroCreate K
-          Cross = Array.init K (fun _ -> Array.zeroCreate K) }
+          Total = totals
+          Cross = priorCross totals }
 
-    /// Stable bucket for one Unicode code unit. DJB2-style; collisions only make
-    /// N_eff slightly lower (more sensitive) — LOOP-005 accepts that bias.
-    let bucketOf (c: char) : int =
+    /// Stable bucket for one 4-gram (four Unicode code units).
+    let bucketOfGram (a: char) (b: char) (c: char) (d: char) : int =
         let mutable h = 5381u
-
+        h <- ((h <<< 5) + h) ^^^ uint32 (int a)
+        h <- ((h <<< 5) + h) ^^^ uint32 (int b)
         h <- ((h <<< 5) + h) ^^^ uint32 (int c)
+        h <- ((h <<< 5) + h) ^^^ uint32 (int d)
         int (h % uint32 HashBuckets)
 
     let private materialize (detector: Detector) (bucket: int) : float[] =
@@ -68,34 +92,35 @@ module LoopDetector =
         detector.Value.[bucket]
 
     let evaluate (detector: Detector) : Evaluation =
-        if detector.Step < MinChars then
-            { State = State.WarmingUp
-              IsLoop = false
-              EffectiveCharacterCount = None
-              Step = detector.Step }
-        else
-            let mutable totalWeight = 0.0
+        let mutable totalWeight = 0.0
 
-            for j = 0 to K - 1 do
-                totalWeight <- totalWeight + Coef.[j] * detector.Total.[j]
+        for j = 0 to K - 1 do
+            totalWeight <- totalWeight + Coef.[j] * detector.Total.[j]
 
-            let mutable squared = 0.0
+        let mutable squared = 0.0
 
-            for j = 0 to K - 1 do
-                for k = 0 to K - 1 do
-                    squared <- squared + Coef.[j] * Coef.[k] * detector.Cross.[j].[k]
+        for j = 0 to K - 1 do
+            for k = 0 to K - 1 do
+                squared <- squared + Coef.[j] * Coef.[k] * detector.Cross.[j].[k]
 
-            let q = if squared < Epsilon then Epsilon else squared
-            let effective = (totalWeight * totalWeight) / q
-            let isLoop = effective < LoopThreshold
+        let z2 = totalWeight * totalWeight
 
-            { State = if isLoop then State.Loop else State.Normal
-              IsLoop = isLoop
-              EffectiveCharacterCount = Some effective
-              Step = detector.Step }
+        let hhi =
+            if z2 <= Epsilon then
+                NormalHhi
+            else
+                max (squared / z2) Epsilon
 
-    let pushCharacter (detector: Detector) (c: char) : Evaluation =
-        let bucket = bucketOf c
+        let effective = 1.0 / hhi
+        let isLoop = hhi >= LoopHhi
+
+        { State = if isLoop then State.Loop else State.Normal
+          IsLoop = isLoop
+          EffectiveCharacterCount = effective
+          Hhi = hhi
+          Step = detector.Step }
+
+    let private updateGram (detector: Detector) (bucket: int) : unit =
         let old = materialize detector bucket |> Array.copy
 
         for j = 0 to K - 1 do
@@ -112,7 +137,31 @@ module LoopDetector =
 
         detector.Step <- detector.Step + 1
         detector.LastStep.[bucket] <- detector.Step
-        evaluate detector
+
+    let pushCharacter (detector: Detector) (ch: char) : Evaluation =
+        if detector.PrefixLength < NgramSize then
+            detector.Prefix.[detector.PrefixLength] <- ch
+            detector.PrefixLength <- detector.PrefixLength + 1
+        else
+            // Slide: drop oldest, shift left, append.
+            for i = 0 to NgramSize - 2 do
+                detector.Prefix.[i] <- detector.Prefix.[i + 1]
+
+            detector.Prefix.[NgramSize - 1] <- ch
+
+        if detector.PrefixLength < NgramSize then
+            // Innocent prior until the first 4-gram exists.
+            { State = State.Normal
+              IsLoop = false
+              EffectiveCharacterCount = NormalEffectiveCount
+              Hhi = NormalHhi
+              Step = detector.Step }
+        else
+            let bucket =
+                bucketOfGram detector.Prefix.[0] detector.Prefix.[1] detector.Prefix.[2] detector.Prefix.[3]
+
+            updateGram detector bucket
+            evaluate detector
 
     /// Push every UTF-16 code unit. Whitespace and punctuation count (LOOP-004).
     let pushText (detector: Detector) (text: string) : Evaluation =

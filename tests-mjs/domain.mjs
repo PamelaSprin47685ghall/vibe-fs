@@ -2788,34 +2788,39 @@ export const diagnostic = (() => {
  */
 export const loopDetector = (() => {
   const m = bind(LoopDetectorModule, 'LoopDetector', [
-    'MinChars',
-    'LoopThreshold',
+    'NgramSize',
     'HashBuckets',
     'K',
+    'NormalEffectiveCount',
+    'NormalHhi',
+    'LoopHhi',
+    'LoopEffectiveThreshold',
     'create',
     'pushCharacter',
     'pushText',
     'evaluate',
-    'bucketOf',
   ])
 
   const read = (evaluation) => ({
     state: caseOf(evaluation.State),
     isLoop: Boolean(evaluation.IsLoop),
-    effective: unwrapOption(evaluation.EffectiveCharacterCount),
+    effective: evaluation.EffectiveCharacterCount,
+    hhi: evaluation.Hhi,
     step: evaluation.Step,
   })
 
   return {
-    minChars: m.MinChars,
-    loopThreshold: m.LoopThreshold,
+    ngramSize: m.NgramSize,
     hashBuckets: m.HashBuckets,
     k: m.K,
+    normalEffectiveCount: m.NormalEffectiveCount,
+    normalHhi: m.NormalHhi,
+    loopHhi: m.LoopHhi,
+    loopEffectiveThreshold: m.LoopEffectiveThreshold,
     create: () => m.create(),
     pushCharacter: (detector, character) => read(m.pushCharacter(detector, character)),
     pushText: (detector, text) => read(m.pushText(detector, text)),
     evaluate: (detector) => read(m.evaluate(detector)),
-    bucketOf: (character) => m.bucketOf(character),
   }
 })()
 

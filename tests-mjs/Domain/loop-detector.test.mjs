@@ -1,56 +1,70 @@
 // tests-mjs/Domain/loop-detector.test.mjs — LOOP-003/004/005/011 pure detector.
 //
-// Layer 1 only: no Host, no abort, no journal. The sensor/AABB bridge is a
-// separate path; this file locks the metric and the O(1) state machine.
+// Final design: sliding 4-grams, slow exp mixture, normal-code prior (N_eff=64),
+// LOOP when HHI ≥ 0.03. Layer 1 only.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { loopDetector, loopEventCodec } from '../domain.mjs'
 
 test('LOOP_004_constants_match_the_clause', () => {
-  assert.equal(loopDetector.minChars, 256)
-  assert.equal(loopDetector.loopThreshold, 6)
+  assert.equal(loopDetector.ngramSize, 4)
   assert.equal(loopDetector.hashBuckets, 4096)
   assert.equal(loopDetector.k, 3)
+  assert.equal(loopDetector.normalEffectiveCount, 64)
+  assert.ok(Math.abs(loopDetector.normalHhi - 1 / 64) < 1e-12)
+  assert.equal(loopDetector.loopHhi, 0.03)
+  assert.ok(Math.abs(loopDetector.loopEffectiveThreshold - 1 / 0.03) < 1e-9)
 })
 
-test('LOOP_003_short_stream_stays_warming_up', () => {
+test('LOOP_003_fresh_detector_is_innocent_normal_code_prior', () => {
   const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, 'a'.repeat(loopDetector.minChars - 1))
+  const result = loopDetector.evaluate(detector)
 
-  assert.deepEqual(
-    { state: result.state, isLoop: result.isLoop, step: result.step, effective: result.effective },
-    { state: 'WarmingUp', isLoop: false, step: loopDetector.minChars - 1, effective: undefined },
-  )
+  assert.equal(result.state, 'Normal')
+  assert.equal(result.isLoop, false)
+  assert.equal(result.step, 0)
+  assert.ok(Math.abs(result.effective - 64) < 1e-6, `n_eff=${result.effective}`)
+  assert.ok(Math.abs(result.hhi - 1 / 64) < 1e-9, `hhi=${result.hhi}`)
 })
 
-test('LOOP_003_single_character_repetition_is_loop', () => {
+test('LOOP_003_fewer_than_four_characters_keeps_prior', () => {
   const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, 'x'.repeat(loopDetector.minChars))
+  const result = loopDetector.pushText(detector, 'abc')
 
+  assert.equal(result.state, 'Normal')
+  assert.equal(result.isLoop, false)
+  assert.equal(result.step, 0)
+  assert.ok(Math.abs(result.effective - 64) < 1e-6)
+})
+
+test('LOOP_003_single_character_long_run_is_loop', () => {
+  // A pure single-character stream collapses 4-grams to one bucket → HHI→1.
+  // Prior dilutes slowly; need enough grams to overcome N_eff=64 seed.
+  const detector = loopDetector.create()
+  const result = loopDetector.pushText(detector, 'x'.repeat(4000))
+
+  assert.equal(result.isLoop, true, `n_eff=${result.effective} hhi=${result.hhi}`)
   assert.equal(result.state, 'Loop')
-  assert.equal(result.isLoop, true)
-  assert.equal(result.step, loopDetector.minChars)
-  assert.ok(result.effective !== undefined)
-  assert.ok(result.effective < loopDetector.loopThreshold, `n_eff=${result.effective}`)
-  // A pure single character should land near 1.0 (hashing cannot invent diversity).
-  assert.ok(result.effective < 1.5, `n_eff=${result.effective}`)
+  assert.ok(result.hhi >= loopDetector.loopHhi)
+  assert.ok(result.effective <= loopDetector.loopEffectiveThreshold)
 })
 
-test('LOOP_003_diverse_alphabet_is_normal', () => {
-  // 26 letters cycled — far above the single-digit threshold once the window fills.
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz'
-  const body = alphabet.repeat(Math.ceil(loopDetector.minChars / alphabet.length)).slice(0, loopDetector.minChars)
+test('LOOP_003_diverse_alphabet_stays_normal', () => {
+  // Cycle a large alphabet so 4-grams stay diverse under the slow kernel.
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const body = alphabet.repeat(80)
   const detector = loopDetector.create()
   const result = loopDetector.pushText(detector, body)
 
-  assert.equal(result.isLoop, false)
+  assert.equal(result.isLoop, false, `n_eff=${result.effective} hhi=${result.hhi}`)
   assert.equal(result.state, 'Normal')
-  assert.ok(result.effective >= loopDetector.loopThreshold, `n_eff=${result.effective}`)
+  assert.ok(result.hhi < loopDetector.loopHhi)
+  assert.ok(result.effective > loopDetector.loopEffectiveThreshold)
 })
 
-test('LOOP_005_streaming_character_by_character_matches_batch_push', () => {
-  const text = 'deadbeef'.repeat(40).slice(0, loopDetector.minChars)
+test('LOOP_005_streaming_matches_batch_push', () => {
+  const text = 'deadbeef'.repeat(200)
   const batch = loopDetector.create()
   const stream = loopDetector.create()
 
@@ -64,15 +78,16 @@ test('LOOP_005_streaming_character_by_character_matches_batch_push', () => {
   assert.equal(streamResult.step, batchResult.step)
   assert.equal(streamResult.isLoop, batchResult.isLoop)
   assert.ok(Math.abs(streamResult.effective - batchResult.effective) < 1e-9)
+  assert.ok(Math.abs(streamResult.hhi - batchResult.hhi) < 1e-12)
 })
 
 test('LOOP_005_whitespace_and_punctuation_count_as_characters', () => {
-  // Pure spaces fill the warm-up and still loop: LOOP-004 forbids ignoring them.
   const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, ' \n\t,'.repeat(loopDetector.minChars).slice(0, loopDetector.minChars))
+  // Pure whitespace collapses diversity just like a single character.
+  const result = loopDetector.pushText(detector, ' \n\t,'.repeat(1000))
 
-  assert.equal(result.step, loopDetector.minChars)
-  assert.equal(result.isLoop, true)
+  assert.ok(result.step > 0)
+  assert.equal(result.isLoop, true, `n_eff=${result.effective}`)
 })
 
 test('LOOP_009_text_delta_decodes_fail_closed', () => {
@@ -98,7 +113,6 @@ test('LOOP_009_text_delta_decodes_fail_closed', () => {
     delta: 'aaaa',
   })
 
-  // Reasoning field is ignored so a thinking loop does not kill formal text.
   assert.equal(
     loopEventCodec.tryDecodeTextDelta({
       type: 'message.part.delta',
@@ -111,7 +125,6 @@ test('LOOP_009_text_delta_decodes_fail_closed', () => {
     undefined,
   )
 
-  // Missing session id is refuse, not invent.
   assert.equal(
     loopEventCodec.tryDecodeTextDelta({
       type: 'message.part.delta',

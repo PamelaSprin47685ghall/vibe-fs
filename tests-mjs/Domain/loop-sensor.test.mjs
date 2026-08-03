@@ -27,7 +27,8 @@ import {
 import * as PromptDispatcher from '../../build/next/Application/Prompting/PromptDispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-const loopText = (character = 'x') => character.repeat(loopDetector.minChars)
+// Slow prior: need enough 4-grams of a single character to climb past HHI=0.03.
+const loopText = (character = 'x') => character.repeat(4000)
 
 test('LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
   const aborts = []
@@ -39,14 +40,14 @@ test('LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('a')))
-  await wait(30)
+  await wait(50)
 
   assert.deepEqual(aborts, ['ses_loop'])
   assert.equal(loopSensor.isArmed(sensor, 'ses_loop'), true)
 
   // Same attempt: more loop text must not re-abort (LOOP-006 idempotent).
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('a')))
-  await wait(20)
+  await wait(30)
   assert.deepEqual(aborts, ['ses_loop'])
 })
 
@@ -76,7 +77,7 @@ test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('c')))
-  await wait(20)
+  await wait(50)
   assert.equal(aborts.length, 1)
 
   // LOOP-006: completion path clears the mark before the next attempt streams.
@@ -85,7 +86,7 @@ test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
   assert.equal(loopSensor.isArmed(sensor, 'ses_loop'), false)
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('c')))
-  await wait(20)
+  await wait(50)
   assert.deepEqual(aborts, ['ses_loop', 'ses_loop'])
 })
 
