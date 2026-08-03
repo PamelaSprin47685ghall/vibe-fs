@@ -5,7 +5,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "description": "Wanxiangshu.Next Structured Flow runtime compiled via Fable",
-  "main": "build/next/Infrastructure/OpenCode/Plugin/Plugin.js",
+  "main": "./build/next/Infrastructure/OpenCode/Plugin/Plugin.js",
   "exports": {
     ".": {
       "import": "./build/next/Infrastructure/OpenCode/Plugin/Plugin.js",
@@ -13,11 +13,16 @@
     }
   },
   "files": [
-    "build",
+    "build/next",
     "resources"
   ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
   "scripts": {
-    "prepare": "node scripts/setup-git-hooks.mjs",
     "format": "node scripts/pre-commit-formatter.mjs",
     "lint": "node scripts/pre-commit-formatter.mjs --all",
 
@@ -34,7 +39,6 @@
     "gate:layout": "node scripts/repository-layout-gate.mjs",
 
     "build": "node scripts/clean-fable-output.mjs build && dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj -o build/next",
-    "postbuild": "node scripts/postbuild.mjs",
 
     "test:mjs": "node tests-mjs/runner.mjs",
     "test:unit": "npm run test:mjs",

@@ -123,9 +123,10 @@ src/Wanxiangshu.Next/
 ```
 
 布局纪律由 `scripts/repository-layout-gate.mjs`（gate:static 第一段）机器验证：
-根目录白名单、生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约
-不变：Fable 输出 `build/next/`，npm 包 main 指向 `next/Infrastructure/OpenCode/Plugin/Plugin.js`
-（模板 `packaging/npm-package.template.json`）。
+根目录白名单、生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约：
+Fable 输出 `build/next/`；根 `package.json` 为唯一 manifest（`main` →
+`build/next/Infrastructure/OpenCode/Plugin/Plugin.js`，`files` → `build/next` + `resources`）；
+从仓库根执行 `npm pack`，无第二 package root / postbuild staging。
 
 ## 下一步
 

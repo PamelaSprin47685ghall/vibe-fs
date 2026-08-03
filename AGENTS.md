@@ -38,6 +38,7 @@ assistant message 在 transform 之前已经创建并持久化。
 布局纪律由 `scripts/repository-layout-gate.mjs`（`gate:layout`）机器验证：根目录白名单、
 生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约：Fable 输出
 `build/next/`，npm 包 main 指向 `build/next/Infrastructure/OpenCode/Plugin/Plugin.js`。
+根 `package.json` 为唯一 manifest；`files` = `build/next` + `resources`；无 postbuild staging。
 
 ---
 
@@ -80,10 +81,11 @@ assistant message 在 transform 之前已经创建并持久化。
 ### 提交前运行 lint
 
 任何面向仓库的改动，在 `git commit` 前必须先跑 `npm run lint`。
-该命令实际执行的就是 `.git/hooks/pre-commit` 安装的 `scripts/pre-commit-formatter.mjs`，
-以 `--all` 模式检查并修正全部 `.fs`、`.fsi`、`.xml`、`.fsproj` 文件格式。
-运行后再做 `git add`，可确保提交内容通过 `gate:static` 与 `prepare` 安装的
-pre-commit 钩子一致检查。
+该命令执行 `scripts/pre-commit-formatter.mjs --all`，检查并修正全部
+`.fs`、`.fsi`、`.xml`、`.fsproj` 文件格式。
+运行后再做 `git add`，可确保提交内容通过 `gate:static` 与本地可选的
+pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
+安装依赖不修改 `.git/hooks`（无 `prepare` 钩子）。
 
 `npm run lint` 也用于满足 Reasonix 编程器的 delivery work-mode 检查：
 在交付阶段，该检查要求工作区无未格式化的 F# 与 XML 源文件；
