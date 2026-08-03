@@ -68,13 +68,14 @@ module OneShotAgentTool =
                 | Some managed ->
                     let parentId = SessionId.create context.SessionId
                     let directory = scope.DirectoryFor context.SessionId
-                    let background = scope.BackgroundFor context.SessionId
+                    // EXEC-006: parent → child keeps Opening.
+                    let parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
                     let fullPrompt =
-                        match background with
+                        match parentWorkRecord with
                         | Some text when not (String.IsNullOrWhiteSpace text) ->
                             sprintf
-                                "Parent work record (background only; B preferred, else session A):\n%s\n\n%s request:\n%s"
+                                "Parent work record (background only):\n%s\n\n%s request:\n%s"
                                 text
                                 roleLabel
                                 request.Prompt
@@ -151,7 +152,7 @@ module OneShotAgentTool =
                                 Ok
                                     { ChildId = SessionId.value childId
                                       Managed = managed
-                                      ParentBackgroundDigest = background |> Option.map ToolHostCodec.digest
+                                      ParentBackgroundDigest = parentWorkRecord |> Option.map ToolHostCodec.digest
                                       Output = output }
                         finally
                             detachAbort ()

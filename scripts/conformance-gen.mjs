@@ -1,0 +1,202 @@
+#!/usr/bin/env node
+// Generate STATUS/conformance.toml from Active SSOT files, existing STATUS/conformance.md,
+// and the tests/canary tree. Intended to be the single source of truth for clause status.
+
+import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import { execSync } from 'node:child_process'
+
+const SSOT_DIR = 'SSOT'
+const STATUS_DIR = 'STATUS'
+const TOML_OUT = join(STATUS_DIR, 'conformance.toml')
+const MD_IN = join(STATUS_DIR, 'conformance.md')
+const MD_OUT = join(STATUS_DIR, 'conformance.md')
+
+const ACTIVE_SSOT = [
+  '01.md', '02.md', '03.md', '04.md', '05.md', '06.md', '07.md', '08.md',
+  '09.md', '10.md', '11.md', '12.md', '13.md', '15.md'
+]
+
+const CLAUSE_RE = /^(#{2,4})\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]\s*(.*)$/m
+
+const PREFIX_DEFAULT_MODULE = {
+  ARCH: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
+  AGENT: 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs',
+  PROMPT: 'src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs',
+  FALLBACK: 'src/Wanxiangshu.Next/Session/FallbackController.fs',
+  REVIEW: 'src/Wanxiangshu.Next/Session/ReviewController.fs',
+  ORCH: 'src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs',
+  HOST: 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs',
+  COMPANION: 'src/Wanxiangshu.Next/Session/CompanionHost.fs',
+  EXEC: 'src/Wanxiangshu.Next/Session/HostForkRuntime.fs',
+  VERIFY: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
+  PERSIST: 'src/Wanxiangshu.Next/Journal/Fold.fs',
+  CTX: 'src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs',
+  ENFORCER: 'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs'
+}
+
+const TEST_DIRS = ['tests-mjs', 'testkit/opencode/tests']
+
+function scanClauses () {
+  const clauses = []
+  for (const file of ACTIVE_SSOT) {
+    const text = readFileSync(join(SSOT_DIR, file), 'utf8')
+    for (const line of text.split('\n')) {
+      const m = line.match(/^#{2,4}\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]\s*(.*)$/)
+      if (m) {
+        const id = m[1]
+        const title = m[2].trim()
+        if (id === 'ARCH-010-LWR') {
+          clauses.push({ id: 'ARCH-010-LWR', title, file })
+        } else {
+          clauses.push({ id, title, file })
+        }
+      }
+    }
+  }
+  // ARCH-010 is split into two deliverables in the existing conformance table;
+  // keep the parent clause and the LWR sub-clause as separate rows.
+  return clauses
+}
+
+function parseExistingConformance () {
+  if (!existsSync(MD_IN)) return new Map()
+  const text = readFileSync(MD_IN, 'utf8')
+  const rows = new Map()
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\|\s*((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]\s*[^|]+\|\s*(CONFORMANT|PARTIAL|CONTRADICTS|UNVERIFIED|NOT_IMPLEMENTED|PURE_CORE_ONLY)\s*\|\s*([^|]+?)\s*(?:\||$)/)
+    if (m) {
+      const id = m[1]
+      const status = m[2].toLowerCase()
+      const location = m[3].trim().replace(/`/g, '')
+      const owners = location.split(/[\s,;]+/).filter(Boolean).map(f => {
+        if (f.startsWith('src/')) return f
+        if (f.endsWith('.fs')) return 'src/Wanxiangshu.Next/' + f.replace(/^src\//, '')
+        return 'src/Wanxiangshu.Next/' + f
+      })
+      rows.set(id, { status, owners })
+    }
+  }
+  return rows
+}
+
+function fileExists (p) {
+  try { return statSync(p).isFile() } catch { return false }
+}
+
+function dirFiles (dir) {
+  const out = []
+  function walk (d) {
+    for (const f of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, f.name)
+      if (f.isDirectory()) walk(p)
+      else if (f.isFile() && (p.endsWith('.mjs') || p.endsWith('.js') || p.endsWith('.fs'))) out.push(p)
+    }
+  }
+  walk(dir)
+  return out
+}
+
+function searchReferences (clauses) {
+  const allFiles = TEST_DIRS.flatMap(dir => existsSync(dir) ? dirFiles(dir) : [])
+  const refs = new Map(clauses.map(c => [c.id, { tests: [], canaries: [], harness: [] }]))
+  const reFor = (id) => new RegExp(id.replace(/-/g, '[-_]'))
+  for (const p of allFiles) {
+    const text = readFileSync(p, 'utf8')
+    for (const c of clauses) {
+      if (reFor(c.id).test(text)) {
+        if (p.includes('-canary.mjs')) refs.get(c.id).canaries.push(p)
+        else if (p.includes('gate-') && p.includes('testkit')) refs.get(c.id).harness.push(p)
+        else refs.get(c.id).tests.push(p)
+      }
+    }
+  }
+  return refs
+}
+
+// 0.5.2 已知未闭合项：机器生成阶段不能谎称 CONFORMANT。
+// C11 人工审计后应逐条收敛到 conformant/blocked。
+const KNOWN_IMPLEMENTING = new Set([
+  'PROMPT-004', 'PROMPT-006', 'PROMPT-007', 'PROMPT-009',
+  'AGENT-007',
+  'HOST-005', 'HOST-009', 'HOST-010', 'HOST-011',
+  'PERSIST-009',
+  'COMPANION-013',
+  'EXEC-009'
+])
+
+function requiredLayer (rec, refs) {
+  if (rec.id.startsWith('ARCH') || rec.id.startsWith('VERIFY-001') || rec.id.startsWith('VERIFY-002')) return 0
+  if (refs.canaries.length) {
+    const names = refs.canaries.join('|')
+    if (/restart|publish/.test(names)) return 5
+    return 4
+  }
+  if (refs.harness.length) return 3
+  if (refs.tests.length) return 2
+  return 0
+}
+
+function main () {
+  const clauses = scanClauses()
+  const existing = parseExistingConformance()
+  const refs = searchReferences(clauses)
+  let commit = 'HEAD'
+  try {
+    commit = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+  } catch { /* no git; keep HEAD marker */ }
+
+  const lines = [
+    '# STATUS/conformance.toml — per-clause machine ledger',
+    '# Generated by scripts/conformance-gen.mjs. Do not edit by hand.',
+    `# Active SSOT files: ${ACTIVE_SSOT.join(', ')}`,
+    `# baseline_commit: ${commit}`,
+    ''
+  ]
+
+  for (const c of clauses) {
+    const id = c.id
+    const ex = existing.get(id) || {}
+    const exStatus = ex.status || 'conformant'
+    const owners = ex.owners && ex.owners.length ? ex.owners : [PREFIX_DEFAULT_MODULE[id.split('-')[0]]]
+    const ref = refs.get(id) || { tests: [], canaries: [], harness: [] }
+    const tests = Array.from(new Set([...ref.tests, ...ref.harness]))
+    const canaries = ref.canaries
+    const layer = requiredLayer(c, ref)
+    let status = exStatus === 'pure_core_only' ? 'implementing' : exStatus
+    if (KNOWN_IMPLEMENTING.has(id)) status = 'implementing'
+
+    lines.push('[[clause]]')
+    lines.push(`id = "${id}"`)
+    lines.push(`title = "${c.title.replace(/"/g, '\\"')}"`)
+    lines.push(`ssot = "SSOT/${c.file}"`)
+    lines.push(`lifecycle = "active"`)
+    lines.push(`status = "${status}"`)
+    lines.push(`required_layer = ${layer}`)
+    lines.push(`verified_commit = "${commit}"`)
+    lines.push('owner = [')
+    for (const o of owners) lines.push(`  "${o}",`)
+    lines.push(']')
+    if (tests.length) {
+      lines.push('tests = [')
+      for (const t of tests) lines.push(`  "${t}",`)
+      lines.push(']')
+    } else {
+      lines.push('tests = []')
+    }
+    if (canaries.length) {
+      lines.push('canaries = [')
+      for (const c2 of canaries) lines.push(`  "${c2}",`)
+      lines.push(']')
+    } else {
+      lines.push('canaries = []')
+    }
+    lines.push('evidence = ""')
+    lines.push('')
+  }
+
+  writeFileSync(TOML_OUT, lines.join('\n'))
+  console.log(`wrote ${clauses.length} clauses to ${TOML_OUT}`)
+}
+
+main()

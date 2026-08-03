@@ -113,16 +113,19 @@ module XTraceCapture =
                                ProviderRun = turn.ProviderRun |}
                         |> appendFact durable turn.SessionId (Some turn.ProviderRun)
 
-    /// COMPANION-003 / EXEC-006 / EXEC-008: the session's LifecycleWorkRecord as
-    /// opaque text — one materialiser for parent background, child final join,
-    /// and any other cross-session hand-off.
+    /// COMPANION-003 / EXEC-006 / EXEC-008: session LifecycleWorkRecord as opaque text.
     ///
-    /// Opening verbatim + effective Y frames + X gap after RecordCoverage +
-    /// terminal. There is no "B else A" / EffectiveFrames / TerminalText branch:
-    /// the same algorithm covers zero frames, lagging Y, and terminal completion.
-    /// Returns `None` only when Opening has not been captured yet (LWR is not
-    /// defined without the opening task anchor).
-    let lifecycleWorkRecord (journal: AgentJournal option) (sessionId: SessionId) : string option =
+    /// `includeOpening`:
+    /// - parent → child background: true（子需要父任务上下文）
+    /// - child → parent join: false（布置者已知任务，Opening 不回传）
+    ///
+    /// Opening 必须仍已 captured（否则 LWR 未定义 → None）；标志只控制渲染。
+    /// Same materialiser for frames/gap/terminal; no B-else-A branch.
+    let lifecycleWorkRecord
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (includeOpening: bool)
+        : string option =
         match journal with
         | None -> None
         | Some durable ->
@@ -208,7 +211,16 @@ module XTraceCapture =
                                 Part = SemanticText text } ])
                         |> Option.defaultValue []
 
-                    Some(LifecycleWorkRecord.materialize opening frames trace coverage openingEnd terminalItems)
+                    Some(
+                        LifecycleWorkRecord.materialize
+                            opening
+                            frames
+                            trace
+                            coverage
+                            openingEnd
+                            terminalItems
+                            includeOpening
+                    )
 
     /// COMPANION-003 / COMPANION-007: synchronise the XTrace with the provider's
     /// semantic projection at the transform boundary.

@@ -35,10 +35,15 @@ crash-window 不 stomp live CurrentRequest。canary 证据见 `host-transform-ca
 与 `companion-canary`；发布证据目录 `docs/evidence/0.5.1/`。
 
 LifecycleWorkRecord 迁移已完成（方案 `STATUS/lifecycle-work-record.md`）：父→子与子→父统一为
-LWR（Opening + Y frames + X gap + Terminal）；A/B 双轨、FinalText、Seed、TerminalSessionA、
-FrozenB 全部废止；Y normal delta data-only、Blogger delta 稀疏 schema、TOML data body 单 LF、
-join 最小 wire（status/agent/work_record）。tool call/result 可进 XTrace 作 Y 压缩源；
-LWR gap/terminal 禁止 raw tool（COMPANION-003 `forWorkRecord`）。
+LWR（Y frames + X gap + Terminal；Opening 由 `includeOpening` 控制）；A/B 双轨、FinalText、
+Seed、TerminalSessionA、FrozenB 全部废止；Y normal delta data-only、Blogger delta 稀疏 schema、
+TOML data body 单 LF、join 最小 wire（status/agent/work_record）。
+
+本轮补充合同：
+- tool call/result 可进 XTrace 作 Y 压缩源；LWR gap/terminal 禁止 raw tool（`forWorkRecord`）
+- 父→子 `includeOpening=true`；子→父 join `includeOpening=false`（布置者已知任务）
+- 自定义 tool result 经 `ToolResultBound` 抢先留尾截断（34B marker + ≤1998 行 / ≤51166B），
+  使 Host 默认 2000 行 / 50 KiB head 截断 no-op（ARCH-010-TOOL-BOUND）
 
 ## 当前开发阶段
 

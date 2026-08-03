@@ -1,0 +1,36 @@
+0.5.2 convergence status update
+===============================
+
+date: 2026-04-18
+version: 0.5.2
+dirty: true
+
+Completed in this session:
+- C0: baseline evidence recorded (gate:static, build, unit 641, harness 285, canary 18×3, npm pack dry-run)
+- C1: Active SSOT / RFC split; SSOT/15 limited to Blogger tool-cycle subset
+- C2: STATUS/conformance.toml + scripts/conformance-gen.mjs + scripts/conformance-gate.mjs
+- C3: version/state metadata aligned to 0.5.2
+- C4: legacy Companion/Blogger 旁路入口 removed from production source
+
+Known gaps (implementing in STATUS/conformance.toml):
+- PROMPT-004, PROMPT-006, PROMPT-007, PROMPT-009
+- AGENT-007
+- HOST-005, HOST-009, HOST-010, HOST-011
+- PERSIST-009
+- COMPANION-013
+- EXEC-009
+
+Flaky observed:
+- manager-companion-canary.mjs in run-canary-staggered.mjs concurrent suite
+  failed with `manager tool schema must include manager tools`, but passed
+  when run standalone. Root cause: silence between two criterion events exceeded
+  WATCHDOG_TIMEOUT_MS; recorded in AGENTS.md.
+
+Verification results:
+- npm run lint: OK
+- npm run gate:static: OK (includes gate:conformance)
+- npm run build: OK
+- npm run test:unit: 641 passed
+- npm run test:harness: 285 passed
+- node scripts/conformance-gate.mjs --check: 180 clauses, active=180, toml=180
+- npm pack: wanxiangshu-0.5.2.tgz, 404 files, 1.8 MB packed

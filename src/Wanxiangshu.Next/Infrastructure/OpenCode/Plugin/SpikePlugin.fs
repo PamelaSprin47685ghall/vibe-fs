@@ -251,13 +251,15 @@ module SpikePlugin =
                         let onRunStarted =
                             Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                        // Child background SSOT (EXEC-008): the parent's frozen
-                        // LifecycleWorkRecord at creation time — Opening + Y frames
-                        // + X gap + terminal. One materialiser, no EffectiveFrames
-                        // or session-A fallback (COMPANION-003).
-                        let backgroundBFor =
+                        // EXEC-006 / EXEC-008: same LWR materialiser, direction-dependent Opening.
+                        // parent → child: includeOpening=true；child → parent: false.
+                        let parentWorkRecordFor =
                             Some(fun sessionId ->
-                                XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId))
+                                XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId) true)
+
+                        let childWorkRecordFor =
+                            Some(fun sessionId ->
+                                XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId) false)
 
                         let toolRegistration =
                             toolHooks
@@ -269,7 +271,8 @@ module SpikePlugin =
                                 scope
                                 wired.CurrentPhysicalUserMessage
                                 onRunStarted
-                                backgroundBFor
+                                parentWorkRecordFor
+                                childWorkRecordFor
                                 snapshotOpt
                                 (Some wired.CancelSignals)
                                 (Some eventPort)

@@ -70,8 +70,11 @@ module XWire =
 
             // Opening + frames only. Gap/terminal are live X material and must not
             // enter a frozen replacement (COMPANION-009).
+            // COMPANION-009: FrozenRecordPrefix is same-session X memory, not a
+            // parent/child hand-off. Opening stays (includeOpening=true).
             Ok(
                 LifecycleWorkRecord.render
+                    true
                     { Opening = opening
                       Frames = frameBodies
                       Gap = []

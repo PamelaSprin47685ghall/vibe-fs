@@ -211,10 +211,14 @@ module ToolHostCodec =
             |> List.map (fun (name, HostSchema schema) -> name, schema)
             |> createObj
 
+        // OpenCode Host Truncate defaults to head (keep start). Custom tools
+        // pre-bound here with tail retention so decision-relevant endings —
+        // Final output, errors, join work_record — survive, and so Host's
+        // subsequent head pass is a no-op (under 2000 lines / 50 KiB).
         let execute (rawArgs: obj) (rawContext: obj) =
             task {
                 let! result = spec.Execute (HostToolArguments rawArgs) (decodeContext rawContext)
-                return box result
+                return box (ToolResultBound.bound result)
             }
 
         applyTool

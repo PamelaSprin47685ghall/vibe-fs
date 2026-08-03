@@ -637,17 +637,16 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     const joinText = await joinResultP
     const join = parseToml(joinText)
 
-    // EXEC-004: the success wire is exactly status + agent + work_record. The
-    // work record is the child's materialised LWR — the fork assignment
-    // ("work") is the child's OpeningPromptRaw, captured before the first
-    // prompt is sent (EXEC-006); runtime-only identities
-    // (agent_id/run_id/child_session_id/...) never reach the LLM.
+    // EXEC-004 / EXEC-006: success wire is status + agent + work_record.
+    // child → parent: includeOpening=false — Opening is not echoed back to the
+    // assigner. Fixture has only an Opening capture (no frames/terminal), so
+    // the materialised LWR is empty after the Opening section is omitted.
     assert.deepEqual(join, {
       status: 'completed',
       agent: 'fast-coder',
-      work_record: '# Opening task\nwork\n',
+      work_record: '',
     })
-    assert.ok(joinText.includes('# Opening task'), 'the child LWR carries its opening verbatim')
+    assert.ok(!joinText.includes('# Opening task'), 'join LWR must not echo the child opening')
     assert.ok(!joinText.includes('forked coder turn formal report'))
     assert.ok(!joinText.includes('run-'), 'no run id on the LLM-visible wire')
     assert.ok(!joinText.includes('child_session_id'), 'no child session id on the wire')

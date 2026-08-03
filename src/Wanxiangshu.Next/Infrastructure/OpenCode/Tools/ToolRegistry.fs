@@ -25,7 +25,8 @@ module ToolRegistry =
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
-        (backgroundFor: (string -> string option) option)
+        (parentWorkRecordFor: (string -> string option) option)
+        (childWorkRecordFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
@@ -43,7 +44,8 @@ module ToolRegistry =
                 verdictSessions,
                 sessionDirectories,
                 onRunStarted,
-                backgroundFor,
+                parentWorkRecordFor,
+                childWorkRecordFor,
                 snapshot,
                 cancelSignals,
                 ?eventPort = eventPort

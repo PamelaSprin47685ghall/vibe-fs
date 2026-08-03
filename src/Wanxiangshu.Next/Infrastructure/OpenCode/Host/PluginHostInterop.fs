@@ -52,7 +52,8 @@ module PluginHostInterop =
         (scope: PluginRuntimeScope)
         (currentPhysicalUserMessage: string -> string option)
         (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
-        (backgroundBFor: (string -> string option) option)
+        (parentWorkRecordFor: (string -> string option) option)
+        (childWorkRecordFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
@@ -68,7 +69,8 @@ module PluginHostInterop =
             scope.VerdictSessions
             scope.SessionDirectories
             onRunStarted
-            backgroundBFor
+            parentWorkRecordFor
+            childWorkRecordFor
             snapshot
             cancelSignals
             eventPort

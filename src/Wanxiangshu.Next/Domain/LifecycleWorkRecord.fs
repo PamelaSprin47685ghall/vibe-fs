@@ -16,15 +16,18 @@ type OpeningPromptRaw =
 /// COMPANION-003: LWR 的唯一物化规则。
 ///
 /// ```text
-/// LWR(X) = OpeningPromptRaw
-///        + CompressedMiddleFromY（全部有效 frame，恰好一次）
-///        + RawGapFromX（Y 尚未覆盖的 X suffix，经 forWorkRecord）
-///        + TerminalOutputRaw（formal text + host-visible reasoning）
+/// LWR(X) = OpeningPromptRaw?          // includeOpening 控制是否渲染
+///        + CompressedMiddleFromY
+///        + RawGapFromX（经 forWorkRecord）
+///        + TerminalOutputRaw
 /// ```
 ///
-/// tool call/result 是 Y 的压缩来源，不得作为 raw 进入 LWR。相邻 segment
-/// 不重复；同一 projection state 产生相同 bytes；物化不触发 LLM、不写新 Y
-/// frame、不改变 coverage。
+/// 跨 Session 方向不同（EXEC-006 / EXEC-008）：
+/// - 父 → 子：`includeOpening = true`（子未见父任务全文）
+/// - 子 → 父：`includeOpening = false`（布置者已知任务，勿回传 Opening）
+///
+/// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
+/// tool call/result 不得作为 raw 进入 LWR。
 type LifecycleWorkRecord =
     { Opening: OpeningPromptRaw
       Frames: string list
@@ -40,25 +43,29 @@ module LifecycleWorkRecord =
         else
             heading + "\n" + body
 
-    /// 稳定 Markdown 渲染。空段整段省略，不输出空标题。
-    /// `Gap` 调用方必须已 `XTrace.forWorkRecord`；render 再次过滤作 fail-closed。
-    let render (record: LifecycleWorkRecord) : string =
+    /// 稳定 Markdown 渲染。空段整段省略。
+    /// `includeOpening=false` 时省略 `# Opening task`（子→父 join）。
+    /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
+    let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =
         let openingBody =
-            let requirements =
-                record.Opening.AuthoritativeRequirements
+            if not includeOpening then
+                ""
+            else
+                let requirements =
+                    record.Opening.AuthoritativeRequirements
+                    |> List.filter (System.String.IsNullOrWhiteSpace >> not)
+
+                let reqText =
+                    if List.isEmpty requirements then
+                        ""
+                    else
+                        requirements
+                        |> List.mapi (fun index text -> sprintf "%d. %s" (index + 1) text)
+                        |> String.concat "\n"
+
+                [ record.Opening.AssignmentText; reqText ]
                 |> List.filter (System.String.IsNullOrWhiteSpace >> not)
-
-            let reqText =
-                if List.isEmpty requirements then
-                    ""
-                else
-                    requirements
-                    |> List.mapi (fun index text -> sprintf "%d. %s" (index + 1) text)
-                    |> String.concat "\n"
-
-            [ record.Opening.AssignmentText; reqText ]
-            |> List.filter (System.String.IsNullOrWhiteSpace >> not)
-            |> String.concat "\n"
+                |> String.concat "\n"
 
         let framesText =
             record.Frames
@@ -76,14 +83,8 @@ module LifecycleWorkRecord =
 
         String.concat "\n\n" sections
 
-    /// 确定性物化。`terminalStart` 之前的 XTrace 属 gap；terminal 自身独立。
-    ///
-    /// `openingEnd` 是 Opening 段在 XTrace 中的结束 cursor（方案 4.1：Y 的
-    /// digest cursor 起点设在 Opening 之后）。gap 起点 = max(ingestedThrough,
-    /// openingEnd)——Y 从未成功时 coverage 在 origin，gap 仍从 opening 之后
-    /// 开始，Opening 不会重复出现于 gap（方案 4.4）。
-    ///
-    /// COMPANION-003：gap 与 terminal 均经 `forWorkRecord`，剔除 raw tool。
+    /// 确定性物化。gap/terminal 经 `forWorkRecord`。
+    /// `includeOpening`：父→子 true，子→父 false（EXEC-006）。
     let materialize
         (opening: OpeningPromptRaw)
         (frames: string list)
@@ -91,6 +92,7 @@ module LifecycleWorkRecord =
         (coverage: RecordCoverage)
         (openingEnd: XTraceCursor)
         (terminalItems: XTraceItem list)
+        (includeOpening: bool)
         : string =
         let gapStart =
             { Sequence = max coverage.IngestedThrough.Sequence openingEnd.Sequence }
@@ -104,8 +106,6 @@ module LifecycleWorkRecord =
 
         let terminalForLwr = terminalItems |> XTrace.forWorkRecord
 
-        // Final output：原文，不带 role 前缀。terminal 路径通常已是
-        // partsSessionText（text + reasoning）；此处再过滤 tool 作 fail-closed。
         let terminalText =
             terminalForLwr
             |> List.map (fun item ->
@@ -116,6 +116,7 @@ module LifecycleWorkRecord =
             |> String.concat "\n"
 
         render
+            includeOpening
             { Opening = opening
               Frames = frames
               Gap = gap

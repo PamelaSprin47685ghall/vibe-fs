@@ -510,6 +510,21 @@ wire 上真实存在什么——四条实测纠正，每条都曾让整类断言
 - 每个 scenario dispose 后检查 PID / port / session / worktree / temp / lock /
   runtime journal 全空
 
+### Canary 判据静默与事件间隔
+
+`manager-companion-canary.mjs` 在 `run-canary-staggered.mjs` 并发套件中偶发
+`manager tool schema must include manager tools` 失败，独立重跑却通过。根因不是
+schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEOUT_MS`：事件探针在这段时间内
+没有收到续期事件，watchdog 先于真实完成触发。这是一个 flaky 窗口，而非被测语义失败。
+
+处理原则：
+
+- 不要因此放宽断言、删除 canary、或把 manager tools 重新加回来。
+- 要检查该路径是否确实在合理时间范围内产生了应有的判据事件；若没有，说明该工作缺少
+  中间里程碑事件，应让被测代码在长时间步骤中显式发射进度信号，或让 canary 在该步骤上
+  使用更合适的等待判据（如 journal 事实而不是 `awaitTerminal`）。
+- 永远不把 `repeat-until-pass` 当成稳定证据。
+
 ---
 
 ## 8. Journal

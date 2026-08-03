@@ -169,3 +169,38 @@ test('LWR_terminal_excludes_raw_tool_parts', () => {
   assert.equal(rendered.includes('huge.log'), false)
   assert.equal(rendered.includes('LOG_LINE'), false)
 })
+
+test('LWR_parent_to_child_includes_opening', () => {
+  // EXEC-006: parent → child background keeps Opening (includeOpening default true).
+  const rendered = lifecycleWorkRecord.materialize(
+    opening('assigned task'),
+    ['did work'],
+    [],
+    { Sequence: 0 },
+    [],
+    OPENING_END,
+    true,
+  )
+
+  assert.equal(rendered.includes('# Opening task'), true)
+  assert.equal(rendered.includes('assigned task'), true)
+  assert.match(rendered, /# Work log\ndid work/)
+})
+
+test('LWR_child_to_parent_omits_opening', () => {
+  // EXEC-006: child → parent join omits Opening — assigner already knows the task.
+  const rendered = lifecycleWorkRecord.materialize(
+    opening('assigned task'),
+    ['did work'],
+    [],
+    { Sequence: 0 },
+    [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary') })],
+    OPENING_END,
+    false,
+  )
+
+  assert.equal(rendered.includes('# Opening task'), false)
+  assert.equal(rendered.includes('assigned task'), false)
+  assert.match(rendered, /# Work log\ndid work/)
+  assert.match(rendered, /# Final output\nFinal summary/)
+})

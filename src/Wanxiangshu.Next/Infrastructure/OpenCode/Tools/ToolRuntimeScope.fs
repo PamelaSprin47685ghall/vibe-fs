@@ -26,7 +26,8 @@ type ToolRuntimeScope
         verdictSessions: HashSet<string>,
         sessionDirectories: Dictionary<string, string>,
         onRunStarted: (SessionId -> AgentRole -> string option -> unit) option,
-        backgroundFor: (string -> string option) option,
+        parentWorkRecordFor: (string -> string option) option,
+        childWorkRecordFor: (string -> string option) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?eventPort: IEventObservationPort
@@ -39,7 +40,9 @@ type ToolRuntimeScope
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
-    let background = defaultArg backgroundFor (fun _ -> None)
+    // EXEC-006: parent→child keeps Opening; child→parent join omits it.
+    let parentRecord = defaultArg parentWorkRecordFor (fun _ -> None)
+    let childRecord = defaultArg childWorkRecordFor (fun _ -> None)
     let terminalPort = eventPort
     let mutable disposed = false
 
@@ -70,8 +73,8 @@ type ToolRuntimeScope
                     |> Option.iter (fun path -> sessionDirectories.[SessionId.value childId] <- path)),
             directoryFor = (fun _ -> directoryFor sid),
             onRunStarted = onStarted,
-            parentWorkRecordFor = (fun parentId -> background (SessionId.value parentId)),
-            childWorkRecordFor = (fun childId -> background (SessionId.value childId)),
+            parentWorkRecordFor = (fun parentId -> parentRecord (SessionId.value parentId)),
+            childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
             // REVIEW-007: this runtime is a Manager's own fork surface, so a
@@ -200,7 +203,8 @@ type ToolRuntimeScope
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
     member _.DirectoryFor(sessionId) = directoryFor sessionId
-    member _.BackgroundFor(sessionId) = background sessionId
+    member _.ParentWorkRecordFor(sessionId) = parentRecord sessionId
+    member _.ChildWorkRecordFor(sessionId) = childRecord sessionId
 
     member _.RegisterDirectory(sessionId, path) = sessionDirectories.[sessionId] <- path
 
@@ -260,8 +264,8 @@ type ToolRuntimeScope
                           OnRunStarted = onStarted
                           RepoPath = defaultArg workspaceDirectory "."
                           TargetBranch = ""
-                          ParentWorkRecordFor = (fun sid -> background (SessionId.value sid))
-                          ChildWorkRecordFor = (fun sid -> background (SessionId.value sid)) },
+                          ParentWorkRecordFor = (fun sid -> parentRecord (SessionId.value sid))
+                          ChildWorkRecordFor = (fun sid -> childRecord (SessionId.value sid)) },
                         SessionId.create sessionId
                     )
 

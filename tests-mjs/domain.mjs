@@ -76,6 +76,7 @@ const [
   DiagnosticModule,
   ProjectionModule,
   SyntheticTomlModule,
+  ToolResultBoundModule,
   ForkChildPayloadModule,
   BloggerTomlModule,
   BloggerDeltaModule,
@@ -143,6 +144,7 @@ const [
   prod('Infrastructure/OpenCode/Host/Diagnostic'),
   prod('Infrastructure/OpenCode/Codec/Projection'),
   prod('Domain/SyntheticToml'),
+  prod('Domain/ToolResultBound'),
   prod('Domain/ForkChildPayload'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
@@ -896,6 +898,32 @@ export const syntheticToml = (() => {
 })()
 
 /**
+ * Custom tool result pre-bound (tail kept) under OpenCode Host Truncate defaults.
+ * Host: 2000 lines / 51200 bytes / default head. We keep tail so Host no-ops.
+ */
+export const toolResultBound = (() => {
+  const m = bind(ToolResultBoundModule, 'ToolResultBound', [
+    'HostMaxLines',
+    'HostMaxBytes',
+    'Marker',
+    'MarkerBytes',
+    'ContentMaxLines',
+    'ContentMaxBytes',
+    'bound',
+  ])
+
+  return {
+    hostMaxLines: m.HostMaxLines,
+    hostMaxBytes: m.HostMaxBytes,
+    marker: m.Marker,
+    markerBytes: m.MarkerBytes,
+    contentMaxLines: m.ContentMaxLines,
+    contentMaxBytes: m.ContentMaxBytes,
+    bound: (text) => m.bound(text),
+  }
+})()
+
+/**
  * EXECUTOR-001: the plain-intent prompt composers for the Executor map/reduce path.
  *
  * `summarizeChunkPrompt` and `reduceBatchPrompt` are pure string → string functions: they
@@ -1127,9 +1155,12 @@ export const xTraceCapture = (() => {
     captureOpening: (journal, sessionIdValue, text, requirements = []) =>
       m.captureOpening(journal, sessionIdValue, text, toList(requirements)),
 
-    /** COMPANION-003 / EXEC-006 / EXEC-008: LifecycleWorkRecord as opaque text. */
-    lifecycleWorkRecord: (journal, sessionIdValue) => {
-      const result = m.lifecycleWorkRecord(journal, sessionIdValue)
+    /**
+     * COMPANION-003 / EXEC-006: LifecycleWorkRecord as opaque text.
+     * `includeOpening` default true (parent→child). Join path passes false.
+     */
+    lifecycleWorkRecord: (journal, sessionIdValue, includeOpening = true) => {
+      const result = m.lifecycleWorkRecord(journal, sessionIdValue, includeOpening)
       return isNone(result) ? undefined : result
     },
   }
@@ -1144,8 +1175,17 @@ export const xTraceCapture = (() => {
 
   return {
     opening,
-    render: m.render,
-    materialize: (openingValue, frames, traceItems, ingestedThrough, terminalItems, openingEnd = { Sequence: 0 }) =>
+    render: (record, includeOpening = true) => m.render(includeOpening, record),
+    // Default includeOpening=true (parent→child / same-session). Pass false for join.
+    materialize: (
+      openingValue,
+      frames,
+      traceItems,
+      ingestedThrough,
+      terminalItems,
+      openingEnd = { Sequence: 0 },
+      includeOpening = true,
+    ) =>
       m.materialize(
         openingValue,
         toList(frames),
@@ -1153,6 +1193,7 @@ export const xTraceCapture = (() => {
         { IngestedThrough: { Sequence: BigInt(ingestedThrough.Sequence) } },
         { Sequence: BigInt(openingEnd.Sequence) },
         toList(terminalItems),
+        includeOpening,
       ),
   }
 })()
