@@ -6,7 +6,7 @@ branch: master
 subject: test(canary): deliver X-A–X-D recovery scenarios + blogger epoch 0-55
 tag: v0.5.2
 # tag tip: annotated tag target verified at release time (git rev-parse v0.5.2^{commit} == HEAD)
-evidence_commit: (filled by evidence commit SHA after this file lands)
+evidence_commit: d6dc8972c39727d42579f2f6b73515bc34e6be73
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification_commits:
