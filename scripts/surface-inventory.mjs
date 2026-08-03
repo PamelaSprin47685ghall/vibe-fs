@@ -129,10 +129,10 @@ const SURFACES = new Map([
     'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
-      standing: 'VerbatimForward',
+      standing: 'CanonicalPayload',
       surface: 'one-shot agent assignment',
-      composer: 'promptFrom: the caller s own prompt args, joined; the runtime adds nothing',
-    },
+      surface: 'one-shot agent assignment (ARCH-010 TOML envelope)',
+      composer: 'ForkChildPayload.relay — assignment + optional parent_work_record field, [] requirements, None payload',
   ],
   [
     'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',

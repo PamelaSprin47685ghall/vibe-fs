@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Next.Kernel.Identity
 open Wanxiangshu.Next.Session
+open Wanxiangshu.Next.Domain
 
 /// Complete lifecycle for synchronous one-shot Coder/Inspector tools: create,
 /// subscribe-before-send, await one terminal, then physically abort/dispose.
@@ -81,14 +82,7 @@ module OneShotAgentTool =
                     let parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
                     let fullPrompt =
-                        match parentWorkRecord with
-                        | Some text when not (String.IsNullOrWhiteSpace text) ->
-                            sprintf
-                                "Parent work record (background only):\n%s\n\n%s request:\n%s"
-                                text
-                                roleLabel
-                                request.Prompt
-                        | _ -> request.Prompt
+                        ForkChildPayload.relay request.Prompt parentWorkRecord [] None
 
                     match!
                         scope.Sessions.CreateChildSession(
