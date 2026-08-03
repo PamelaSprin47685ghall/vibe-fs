@@ -124,11 +124,10 @@ module StaticTools =
     let reviewerAgentConfig () : obj =
         primaryAgent Role.Reviewer (Some PromptAssets.reviewerSystemPrompt)
 
-    /// Companion Session Y: no tools; system prompt for B-record distillation.
-    let toollessAgentConfig () : obj =
+    /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
+    /// System prompt for B-record distillation with blog tool protocol.
+    let bloggerAgentConfig () : obj =
         primaryAgent Role.Blogger (Some PromptAssets.bloggerSystemPrompt)
-
-    let bloggerAgentConfig () : obj = toollessAgentConfig ()
 
     /// AgentRole.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).

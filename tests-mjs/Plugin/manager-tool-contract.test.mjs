@@ -309,11 +309,11 @@ const PROMPT_CLAUSES = {
   'fast-blogger': {
     required: [
       /Work Log Blogger/,
-      /AgentRole\.Blogger/,
-      /Tool Capability: \[\] \(NONE\)/,
+      /only tool is `blog`/,
+      /exactly once/,
       /Self-Compression/,
     ],
-    forbidden: [],
+    forbidden: [/Tools: \[\]/, /no tools/, /Do not call tools/, /DO NOT attempt/],
   },
 }
 
