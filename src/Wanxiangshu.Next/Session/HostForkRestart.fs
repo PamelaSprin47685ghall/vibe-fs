@@ -139,7 +139,7 @@ module HostForkRestart =
                     // EXEC-009: restore the join cell from the durable blob when
                     // present. Transcript synthesis is only a fallback for 0.5.1
                     // lines that predate CompletionRef.
-                    match HandleCompletionBlob.tryRead journal record agentId with
+                    match HandleCompletionCodec.tryRead journal record agentId with
                     | Ok(Some completion) -> runtime.PublishCompletion completion
                     | Ok None -> do! recoverChild runtime snapshot agentId record.ChildSessionId role record.TargetAgent
                     | Error reason -> runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)

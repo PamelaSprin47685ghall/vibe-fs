@@ -12,7 +12,7 @@ open Wanxiangshu.Next.Journal
 /// EXEC-009 durable join payload. Written before `HandleCompleted`; join reads
 /// it after a controlled consume. Identity fields that already live on the
 /// handle record (`TargetAgent`, `CanonicalRole`, handle id) are not duplicated.
-module HandleCompletionBlob =
+module HandleCompletionCodec =
 
     let private str (value: string) = box value
 

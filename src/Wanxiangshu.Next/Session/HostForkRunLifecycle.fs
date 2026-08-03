@@ -132,7 +132,7 @@ module HostForkRunLifecycle =
                     HandleCompletionKind.SendFailure,
                     AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
 
-            let body = Some(HandleCompletionBlob.encodeOutcome runId agentOutcome)
+            let body = Some(HandleCompletionCodec.encodeOutcome runId agentOutcome)
 
             match journal with
             | None -> ()

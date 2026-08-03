@@ -215,7 +215,7 @@ type HostForkRuntime
                     | Some agentHandleId ->
                         let agentId = AgentHandleId.value agentHandleId
 
-                        match HandleCompletionBlob.tryRead durable record agentId with
+                        match HandleCompletionCodec.tryRead durable record agentId with
                         | Error err -> Some(Error err)
                         | Ok None ->
                             // Cancelled / 0.5.1 line without blob: still CAS-retire so

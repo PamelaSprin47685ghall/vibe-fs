@@ -1859,7 +1859,7 @@ verified_commit = "151fee58"
 owner = [
   "src/Wanxiangshu.Next/Journal/LinkageProjection.fs",
   "src/Wanxiangshu.Next/Session/HandleController.fs",
-  "src/Wanxiangshu.Next/Session/HandleCompletionBlob.fs",
+  "src/Wanxiangshu.Next/Session/HandleCompletionCodec.fs",
   "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
   "src/Wanxiangshu.Next/Session/HostForkRunLifecycle.fs",
   "src/Wanxiangshu.Next/Session/HostForkRestart.fs",
