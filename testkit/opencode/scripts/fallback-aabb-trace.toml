@@ -110,10 +110,6 @@ attempts = [1, 2, 3]
 # prompt and tool set stay byte-identical, which ARCH-004 admits as an explicit cold
 # boundary. Later deliveries of the same entry are append-only and need no second
 # declaration — the boundary is consumed by the request whose break it admitted.
-[[epoch]]
-turn = "continue"
-step = 0
-reason = "prefix-probe"
 
 [[turn]]
 id = "title"

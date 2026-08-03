@@ -72,10 +72,6 @@ attempts = [1]
 # carries an attempt-local X prefix probe — the committed prefix is replaced by the
 # companion-memory head. ARCH-004 admits that as an explicit cold boundary; the
 # system prompt and tool set stay byte-identical while the message prefix rebases.
-[[epoch]]
-turn = "continue"
-step = 0
-reason = "prefix-probe"
 
 # Production composes the Blogger prompt itself (`CompanionHostBlogger.fs:72,77,118`),
 # so no scenario text reaches this lane — hence `internal`. Every Blogger request is at
