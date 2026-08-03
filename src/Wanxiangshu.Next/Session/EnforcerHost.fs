@@ -280,52 +280,119 @@ module EnforcerHost =
             match declared with
             | None -> CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
             | Some coverage ->
-                // C5: use epoch frozen at request materialization, never live PrefixEpoch.
-                let epoch = coverage.ObservedPrefixEpochId
+                // PERSIST-010 precheck (writer-side CAS): fold rejects IngestCursorMismatch
+                // only AFTER the line is durable, which poisons the journal. Staged
+                // PreviousIngestedThroughSequence is frozen at materialization; concurrent
+                // commit / crash-resume may advance coverage first. Refuse before append so
+                // failure is KnownNotCommitted (recoverable abandon), never FactRejected.
+                let liveBlog =
+                    projections.AgentProjections.Sessions
+                    |> Map.tryFind mainSessionId
+                    |> Option.bind (fun session -> session.Blog)
+                    |> Option.defaultValue BlogProjection.empty
 
-                match journal.WriteBlob merged.MergedText with
-                | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                | Ok textBlob ->
-                    let writeScore () =
-                        if Map.isEmpty merged.MergedScores then
-                            Ok None
-                        else
-                            journal.WriteBlob(CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
-                            |> Result.map Some
+                let liveIngest = liveBlog.Coverage.IngestedThroughSequence
+                let liveCutoff = liveBlog.Coverage.CoverableTurnCutoffExclusive
+                let liveFrameEpoch = liveBlog.FrameEpochId
 
-                    let writeEvidence () =
-                        match merged.MergedEvidence with
-                        | "" -> Ok None
-                        | evidence -> journal.WriteBlob evidence |> Result.map Some
+                if coverage.PreviousIngestedThroughSequence <> liveIngest then
+                    CycleCommitOutcome.KnownNotCommitted(
+                        sprintf
+                            "staged previous ingest cursor %d disagrees with projection %d (PERSIST-010 precheck)"
+                            coverage.PreviousIngestedThroughSequence
+                            liveIngest
+                    )
+                elif coverage.PreviousCoverableTurnCutoffExclusive <> liveCutoff then
+                    CycleCommitOutcome.KnownNotCommitted(
+                        sprintf
+                            "staged previous coverable cutoff %d disagrees with projection %d (PERSIST-010 precheck)"
+                            coverage.PreviousCoverableTurnCutoffExclusive
+                            liveCutoff
+                    )
+                elif coverage.FrameEpochId <> liveFrameEpoch then
+                    CycleCommitOutcome.KnownNotCommitted(
+                        sprintf
+                            "staged frame epoch %d disagrees with projection %d (PERSIST-010 precheck)"
+                            (FrameEpochId.value coverage.FrameEpochId)
+                            (FrameEpochId.value liveFrameEpoch)
+                    )
+                elif coverage.NextIngestedThroughSequence <= coverage.PreviousIngestedThroughSequence then
+                    CycleCommitOutcome.KnownNotCommitted "coverage did not advance"
+                else
+                    // C5: use epoch frozen at request materialization, never live PrefixEpoch.
+                    let epoch = coverage.ObservedPrefixEpochId
 
-                    match writeScore (), writeEvidence () with
-                    | Error error, _
-                    | _, Error error -> CycleCommitOutcome.KnownNotCommitted error
-                    | Ok scoreRef, Ok evidenceRef ->
-                        let fact =
-                            AgentFact.BlogEntryCommitted
-                                {| SessionId = mainSessionId
-                                   BloggerSessionId = bloggerSessionId
-                                   RequestId = coverage.RequestId
-                                   FrameEpochId = coverage.FrameEpochId
-                                   PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
-                                   NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
-                                   PreviousCoverableTurnCutoffExclusive = coverage.PreviousCoverableTurnCutoffExclusive
-                                   NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
-                                   NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
-                                   TextRef = textBlob.BlobRef
-                                   TextDigest = textBlob.BlobDigest
-                                   ProviderRun = providerRun
-                                   ToolCallIds = toolCallIds
-                                   ScoreVectorRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
-                                   EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
-                                   ObservedPrefixEpochId = epoch |}
+                    match journal.WriteBlob merged.MergedText with
+                    | Error error -> CycleCommitOutcome.KnownNotCommitted error
+                    | Ok textBlob ->
+                        let writeScore () =
+                            if Map.isEmpty merged.MergedScores then
+                                Ok None
+                            else
+                                journal.WriteBlob(CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
+                                |> Result.map Some
 
-                        match
-                            AgentJournal.appendAgent (StreamId.Session mainSessionId) (Some providerRun) fact journal
-                        with
-                        | Error failure -> classifyAppendFailure failure
-                        | Ok _ -> CycleCommitOutcome.KnownCommitted
+                        let writeEvidence () =
+                            match merged.MergedEvidence with
+                            | "" -> Ok None
+                            | evidence -> journal.WriteBlob evidence |> Result.map Some
+
+                        match writeScore (), writeEvidence () with
+                        | Error error, _
+                        | _, Error error -> CycleCommitOutcome.KnownNotCommitted error
+                        | Ok scoreRef, Ok evidenceRef ->
+                            // Re-read after blobs: only coverage-advancing facts race us;
+                            // refuse still-stale staged cursor without writing the fact.
+                            let latestBlog =
+                                AgentJournal.snapshot journal
+                                |> fun snap -> snap.AgentProjections.Sessions
+                                |> Map.tryFind mainSessionId
+                                |> Option.bind (fun session -> session.Blog)
+                                |> Option.defaultValue BlogProjection.empty
+
+                            if
+                                coverage.PreviousIngestedThroughSequence
+                                <> latestBlog.Coverage.IngestedThroughSequence
+                                || coverage.PreviousCoverableTurnCutoffExclusive
+                                   <> latestBlog.Coverage.CoverableTurnCutoffExclusive
+                                || coverage.FrameEpochId <> latestBlog.FrameEpochId
+                            then
+                                CycleCommitOutcome.KnownNotCommitted(
+                                    sprintf
+                                        "staged previous ingest cursor %d disagrees with projection %d after blob write (PERSIST-010 precheck)"
+                                        coverage.PreviousIngestedThroughSequence
+                                        latestBlog.Coverage.IngestedThroughSequence
+                                )
+                            else
+                                let fact =
+                                    AgentFact.BlogEntryCommitted
+                                        {| SessionId = mainSessionId
+                                           BloggerSessionId = bloggerSessionId
+                                           RequestId = coverage.RequestId
+                                           FrameEpochId = coverage.FrameEpochId
+                                           PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
+                                           NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
+                                           PreviousCoverableTurnCutoffExclusive =
+                                            coverage.PreviousCoverableTurnCutoffExclusive
+                                           NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
+                                           NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
+                                           TextRef = textBlob.BlobRef
+                                           TextDigest = textBlob.BlobDigest
+                                           ProviderRun = providerRun
+                                           ToolCallIds = toolCallIds
+                                           ScoreVectorRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
+                                           EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
+                                           ObservedPrefixEpochId = epoch |}
+
+                                match
+                                    AgentJournal.appendAgent
+                                        (StreamId.Session mainSessionId)
+                                        (Some providerRun)
+                                        fact
+                                        journal
+                                with
+                                | Error failure -> classifyAppendFailure failure
+                                | Ok _ -> CycleCommitOutcome.KnownCommitted
 
     /// CTX-012: single production constructor path for BlogSquashCommitted from tool loop.
     let private commitSquash
@@ -1207,6 +1274,11 @@ module EnforcerHost =
                     let mutable commitUnknown = false
                     let mutable injectRepair = false
                     let mutable repairCtx: BloggerRequestContext option = None
+                    // PERSIST-010 precheck / concurrent coverage advance: abandon stale
+                    // staged cycle then rebuild from live journal coverage. Must NOT
+                    // resumeWithContext(liveCtx) — that freezes PreviousIngestedThrough
+                    // at the pre-crash cursor and loops KnownNotCommitted forever.
+                    let mutable abandonThenCatchUp = false
 
                     let fatalEnd (reason: string) =
                         Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
@@ -1220,6 +1292,21 @@ module EnforcerHost =
                         scope.ClearCurrentRequest key
 
                     let unexpectedEnd (reason: string) = fatalEnd reason
+
+                    /// KnownNotCommitted is recoverable: abandon open + Idle, then
+                    /// resumeCatchUp re-chunks from projection.IngestedThroughSequence.
+                    /// Must NOT Diagnostic.fatal — that SIGKILLs before catch-up runs.
+                    let abandonStaleCycle (reason: string) =
+                        Diagnostic.emit "enforcer-cycle-stale" [ "session_id", key; "result", reason ]
+
+                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
+
+                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                        | Error _ -> ()
+
+                        scope.ClearCurrentRequest key
+                        abandonThenCatchUp <- true
 
                     match validateCycle messageId calls with
                     | Error reason when
@@ -1274,7 +1361,7 @@ module EnforcerHost =
                                 | Error _ -> ()
 
                                 scope.ClearCurrentRequest key
-                            | CycleCommitOutcome.KnownNotCommitted reason -> unexpectedEnd reason
+                            | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
                             | CycleCommitOutcome.CommitUnknown reason ->
                                 commitUnknown <- true
 
@@ -1327,7 +1414,7 @@ module EnforcerHost =
                                     | Error _ -> ()
 
                                     scope.ClearCurrentRequest key
-                                | CycleCommitOutcome.KnownNotCommitted reason -> unexpectedEnd reason
+                                | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
                                 | CycleCommitOutcome.CommitUnknown reason ->
                                     commitUnknown <- true
 
@@ -1344,6 +1431,11 @@ module EnforcerHost =
                         | None -> return rawMessages
                     elif commitUnknown then
                         return rawMessages
+                    elif abandonThenCatchUp then
+                        // Stale staged coverage abandoned: rebuild next window from live
+                        // IngestedThroughSequence. resumeCatchUp sets CurrentRequest +
+                        // InFlight when material remains; None = true catch-up stop.
+                        return resumeCatchUp rawMessages
                     elif not committed then
                         match liveCtx with
                         | Some ctx -> return resumeWithContext ctx

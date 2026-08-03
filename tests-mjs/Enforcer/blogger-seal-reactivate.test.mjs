@@ -72,7 +72,25 @@ test('BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true)
 
   const reactivated = bloggerRuntime.onReactivate(idle)
+  assert.equal(bloggerRuntime.stateOf(reactivated), 'Idle')
   assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
+})
+
+test('BLOGGER_RUNTIME_Parked_survives_onReactivate_so_offer_not_start', () => {
+  // Authority Root on main must not demote Parked→Idle. Idle+material = Start
+  // (new prompt_async) while Host still parks the prior transform; Offer is the
+  // only path that SetPendingOffer-resumes the waiter (ENFORCER-050).
+  const parked = bloggerRuntime.parked
+  assert.equal(bloggerRuntime.stateOf(parked), 'Parked')
+
+  const reactivated = bloggerRuntime.onReactivate(parked)
+  assert.equal(bloggerRuntime.stateOf(reactivated), 'Parked')
+  assert.equal(bloggerRuntime.reactivatedOf(reactivated), true)
+
+  const offered = bloggerRuntime.onMaterial(reactivated, ctx())
+  assert.equal(offered.ok, true)
+  assert.equal(offered.decision, 'Offer')
+  assert.equal(bloggerRuntime.stateOf(offered.state), 'Parked')
 })
 
 test('BLOGGER_RUNTIME_InFlight_survives_onSeal_flag_clear_only', () => {

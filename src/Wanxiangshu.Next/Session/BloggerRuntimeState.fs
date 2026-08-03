@@ -192,18 +192,26 @@ module BloggerRuntime =
           RepairSpent = false
           ReactivatedAfterSeal = false }
 
-    /// New Authority Root on this main after a handle seal: Blogger may run again.
+    /// New Authority Root on this main: Blogger may run again after a handle seal.
+    ///
+    /// Parked/Idle/InFlight keep their state — only the seal flag flips. Demoting
+    /// Parked→Idle made the next material Decision.Start (new prompt_async) while
+    /// the Host step loop was still parked on the prior request, so the new send
+    /// never reached the provider and the parked waiter never received an Offer.
+    /// Sealed alone must reopen to Idle so material can Start after join/return.
     let onReactivate (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         match cell.State with
         | BloggerRuntimeState.Disposed -> cell
-        | BloggerRuntimeState.InFlight _ ->
-            { cell with
-                ReactivatedAfterSeal = true }
-        | _ ->
+        | BloggerRuntimeState.Sealed ->
             { State = BloggerRuntimeState.Idle
               PendingOffer = None
               RepairSpent = false
               ReactivatedAfterSeal = true }
+        | BloggerRuntimeState.InFlight _
+        | BloggerRuntimeState.Idle
+        | BloggerRuntimeState.Parked ->
+            { cell with
+                ReactivatedAfterSeal = true }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
