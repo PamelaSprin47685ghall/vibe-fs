@@ -9,8 +9,9 @@
  *    the NEXT Blogger request, proving execute resolved;
  *  - the Host's tool-loop continuation re-enters the transform (step 0.2) and
  *    the continuation commits exactly one EnforcementCycleCommitted with the
- *    misspelled rule field mapped (step 0.7, ENFORCER-024) and ToolCallIds
- *    present (step 0.6, ENFORCER-041 identity from ToolContext);
+ *    misspelled rule field mapped (step 0.7, ENFORCER-024) and identity
+ *    present (step 0.6: HOST-010 ProviderRun + HOST-011 ToolCallIds from
+ *    ToolContext; ENFORCER-041/154 duals);
  *  - the continuation transform parks (step 0.3): the SECOND Blogger request
  *    must arrive only AFTER the second main turn's offer. A failed park would
  *    consume step 1 immediately, before the second main turn, and the index
@@ -75,6 +76,27 @@ function fieldValues(value, fieldName, values = []) {
     fieldValues(child, fieldName, values);
   }
   return values;
+}
+
+/** Extract ToolCallId strings from F# tagged form ["ToolCallId", id]. */
+function toolCallIdsOf(fact) {
+  const ids = [];
+  const walk = (v) => {
+    if (v === null || v === undefined) return;
+    if (Array.isArray(v)) {
+      if (v.length === 2 && v[0] === 'ToolCallId' && typeof v[1] === 'string') {
+        ids.push(v[1]);
+        return;
+      }
+      for (const x of v) walk(x);
+      return;
+    }
+    if (typeof v === 'object') {
+      for (const c of Object.values(v)) walk(c);
+    }
+  };
+  walk(fact);
+  return ids;
 }
 
 function bloggerRequests(provider, bloggerId) {
@@ -442,22 +464,53 @@ try {
     `BloggerRequestMaterialized must land before sends (got ${materialized.length})`,
   );
 
-  // ENFORCER-041: identity comes from ToolContext (messageID + callID).
+  // HOST-010: every BlogEntryCommitted carries a unique non-empty ProviderRun.
+  // Journal envelope and payload both carry ProviderRun (same value); fieldValues
+  // walks both — take the unique set per fact, require exactly one non-empty id.
+  const providerRuns = [];
   for (const fact of facts) {
-    const text = JSON.stringify(fact);
-    const match = text.match(/"ToolCallIds":\s*(\[[\s\S]*?\])/);
-    assert.ok(
-      match && match[1].length > 4,
-      `cycle must record ToolCallIds from ToolContext (ENFORCER-041): ${text.slice(0, 300)}`,
+    const runs = [...new Set(fieldValues(fact, 'ProviderRun'))];
+    assert.equal(
+      runs.length,
+      1,
+      `HOST-010: each BlogEntryCommitted must resolve to exactly one ProviderRun (got ${runs.length}): ${JSON.stringify(fact).slice(0, 200)}`,
     );
+    assert.ok(
+      typeof runs[0] === 'string' && runs[0].length > 0,
+      `HOST-010: ProviderRun must be non-empty string (got ${JSON.stringify(runs[0])})`,
+    );
+    providerRuns.push(runs[0]);
   }
-
-  // ENFORCER-154: one committed cycle per provider run.
   assert.equal(
-    new Set(fieldValues(facts, 'ProviderRun')).size,
-    facts.length,
-    'one provider run per cycle (ENFORCER-154)',
+    new Set(providerRuns).size,
+    providerRuns.length,
+    `HOST-010: ProviderRun unique across cycles (got ${providerRuns.length} runs, ${new Set(providerRuns).size} unique)`,
   );
+
+  // HOST-011: every cycle records ≥1 non-empty ToolCallId from ToolContext
+  // (callID half of ReviewAttemptIdentity). ENFORCER-041 dual.
+  const allToolCallIds = [];
+  for (const fact of facts) {
+    const ids = toolCallIdsOf(fact);
+    assert.ok(
+      ids.length >= 1,
+      `HOST-011: each BlogEntryCommitted must record ≥1 ToolCallId (got ${ids.length}): ${JSON.stringify(fact).slice(0, 300)}`,
+    );
+    for (const id of ids) {
+      assert.ok(
+        typeof id === 'string' && id.length > 0,
+        `HOST-011: ToolCallId must be non-empty string (got ${JSON.stringify(id)})`,
+      );
+      allToolCallIds.push(id);
+    }
+  }
+  assert.equal(
+    new Set(allToolCallIds).size,
+    allToolCallIds.length,
+    `HOST-011: ToolCallIds unique across cycles (got ${allToolCallIds.length} ids, ${new Set(allToolCallIds).size} unique)`,
+  );
+  // Dual half: every cycle with ProviderRun also has ≥1 ToolCallId
+  // (messageID + callID both present). Already enforced per-fact above.
 
   // ENFORCER-045: no independent EnforcementCycleCommitted.
   const cycleFacts = runtimeFacts(scenario.host.workDir, 'EnforcementCycleCommitted');

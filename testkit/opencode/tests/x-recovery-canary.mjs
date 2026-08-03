@@ -7,6 +7,10 @@
  *   x-c-accepted-before-promote   probe completed + restart; XTrace/coverage hold
  *   x-d-promote-then-restart      PrefixRebaseCommitted durable; no re-promote
  *
+ * Invariants (D2):
+ *   - RawGap must not enter FrozenRecordPrefix (Opening+frames only)
+ *   - Blogger frame commit and prefix probe must not overwrite each other
+ *
  * Production entry points only (ARCH-003): SpikePlugin → XWire.applyTransform,
  * HostSignalBootstrap → XWire.reconcileAttempt. No domain algorithm changes.
  */
@@ -26,15 +30,26 @@ const SCENARIOS = [
   'x-d-promote-then-restart',
 ];
 
-function runtimeFacts(workDir, factName) {
+function runtimeRoot(workDir) {
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
     encoding: 'utf8',
   }).trim();
-  const runtimeDir = path.join(
+  return path.join(
     path.isAbsolute(common) ? common : path.resolve(workDir, common),
     'wanxiangshu-next',
     'runtimes',
   );
+}
+
+function readBlob(workDir, blobRef) {
+  const hash = String(blobRef).replace(/^blobs\//, '');
+  const blobPath = path.join(runtimeRoot(workDir), 'blobs', hash);
+  assert.ok(fs.existsSync(blobPath), `blob missing: ${blobPath}`);
+  return fs.readFileSync(blobPath, 'utf8');
+}
+
+function runtimeFacts(workDir, factName) {
+  const runtimeDir = runtimeRoot(workDir);
   if (!fs.existsSync(runtimeDir)) return [];
 
   return fs.readdirSync(runtimeDir)
@@ -120,6 +135,71 @@ function assertRecordCoverageHolds(before, after, label) {
   );
 }
 
+/**
+ * RawGap must not enter FrozenRecordPrefix.
+ * Frozen prefix = Opening + frames only; XWire materializes Gap=[].
+ */
+function assertFrozenPrefixExcludesRawGap(workDir, label) {
+  const rebases = runtimeFacts(workDir, 'PrefixRebaseCommitted');
+  for (const fact of rebases) {
+    const refs = fieldValues(fact, 'FrozenRecordPrefixRef');
+    assert.ok(
+      refs.length >= 1,
+      `${label}: FrozenRecordPrefixRef required on PrefixRebaseCommitted`,
+    );
+    for (const ref of refs) {
+      const body = readBlob(workDir, ref);
+      assert.ok(
+        !body.includes('# Uncompressed tail'),
+        `${label}: RawGap (# Uncompressed tail) must not enter FrozenRecordPrefix`,
+      );
+      assert.ok(
+        !body.includes('# Final output'),
+        `${label}: Terminal (# Final output) must not enter FrozenRecordPrefix`,
+      );
+      assert.ok(
+        body.includes('# Opening task') || body.includes('# Work log'),
+        `${label}: FrozenRecordPrefix must include Opening or Work log frames`,
+      );
+    }
+  }
+}
+
+/**
+ * Blogger frame commit and prefix probe must not overwrite each other.
+ * No-op when no promote (rebases.length === 0).
+ */
+function assertFrameProbeIndependent(workDir, label, preRestart) {
+  const rebases = runtimeFacts(workDir, 'PrefixRebaseCommitted');
+  if (rebases.length === 0) return;
+
+  const blogs = runtimeFacts(workDir, 'BlogEntryCommitted');
+  assert.ok(
+    blogs.length >= 1,
+    `${label}: frame/probe BlogEntryCommitted still present after promote (got ${blogs.length})`,
+  );
+
+  const frameEpochs = fieldValues(blogs, 'FrameEpochId');
+  assert.ok(
+    frameEpochs.length >= 1,
+    `${label}: frame/probe FrameEpochId non-empty on BlogEntryCommitted`,
+  );
+
+  const nextEpochs = fieldValues(rebases, 'NextEpochId');
+  assert.ok(
+    nextEpochs.length >= 1,
+    `${label}: frame/probe NextEpochId non-empty on PrefixRebaseCommitted`,
+  );
+
+  // Promote does not wipe blogs: count holds vs pre-restart when available.
+  if (preRestart) {
+    assert.ok(
+      blogs.length >= preRestart.blogEntry,
+      `${label}: frame/probe blog entry count must not retreat after promote (before=${preRestart.blogEntry}, after=${blogs.length})`,
+    );
+  }
+}
+
 async function snapshotBeforeRestart(scenario, ctx) {
   ctx.preRestart = snapshotCoverage(scenario.host.workDir);
   assert.ok(
@@ -155,6 +235,17 @@ async function oracleXb(scenario, ctx) {
   } else {
     assert.ok(xTraceCount(workDir) >= 1, 'X-B: XTrace durable facts present');
   }
+
+  // No promote expected — blog path independent of the single continue.0 probe.
+  assert.ok(
+    after.blogEntry >= 0,
+    `X-B: frame/probe BlogEntryCommitted path independent of probe (count=${after.blogEntry})`,
+  );
+  assert.equal(
+    scenario.provider.matchCount('continue.0'),
+    1,
+    'X-B: frame/probe probe delivery count === 1 without requiring PrefixRebase',
+  );
 }
 
 async function oracleXc(scenario, ctx) {
@@ -185,6 +276,9 @@ async function oracleXc(scenario, ctx) {
     1,
     'X-C: same probe key delivered once',
   );
+
+  assertFrozenPrefixExcludesRawGap(workDir, 'X-C');
+  assertFrameProbeIndependent(workDir, 'X-C', ctx.preRestart);
 }
 
 async function oracleXd(scenario, ctx) {
@@ -209,6 +303,9 @@ async function oracleXd(scenario, ctx) {
     1,
     'X-D: no second physical probe for the same promote',
   );
+
+  assertFrozenPrefixExcludesRawGap(workDir, 'X-D');
+  assertFrameProbeIndependent(workDir, 'X-D', ctx.preRestart);
 }
 
 const CUSTOMS = {
