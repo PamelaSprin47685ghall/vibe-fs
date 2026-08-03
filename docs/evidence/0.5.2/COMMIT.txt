@@ -5,7 +5,7 @@ date_utc: 2026-08-03T20:46:10Z
 branch: master
 subject: fix(testkit): poll assertModelTrajectory until exact AABB sequence
 tag: v0.5.2
-evidence_commit: 452b38f37c980782a9919f12cb5968c3e048cb7f
+evidence_commit: 5e337f5d8891dde7aa066ac53f4dae72828e7fc1
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification:
@@ -22,4 +22,4 @@ pack:
   sha256: ccd8c338f9dcb4a9d5f76ea2e3c9ccb97074ec7089bb85e62a676ddaafed73bc
   files: 298
   size_bytes: 1577263
-notes: D3 single-anchor — source_commit is verified tip (code+testkit AABB poll); evidence_commit is this capture; tag on evidence tip; git diff source_commit tag -- src/ empty
+notes: D3 closed — source_commit ffa168c7 is sole verified source tip (code+testkit); tag tip 5e337f5d is evidence-only capture; git diff ffa168c7 5e337f5d -- src/ is empty (no production split); PACKAGE HEAD=ffa168c7; tarball rebuilt on verified tip
