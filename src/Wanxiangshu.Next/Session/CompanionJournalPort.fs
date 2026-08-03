@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Next.Session
 
 open System
-open System.Threading.Tasks
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Host
 open Wanxiangshu.Next.Journal
@@ -55,68 +54,6 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                                     session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId)
                                   XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }
                         )
-
-        /// CTX-006 / CTX-012: blob first, then the single BlogSquashCommitted append.
-        /// Frame-epoch freshness and the covered-frame bound are checked here so no
-        /// call site can commit a squash against a stale or oversized base.
-        member _.AppendSquash(sessionId, bloggerSessionId, coveredFrameCount, squashText, providerRun) =
-            // Legacy port path: synthesize a stable RequestId from the provider run
-            // so BlogSquashCommitted still carries the C5 field. Production tool-loop
-            // commits go through EnforcerHost.commitSquash with the frozen RequestId.
-            let requestId =
-                BloggerRequestId.create (
-                    HostDigest.sha256Hex (
-                        String.concat
-                            "|"
-                            [ SessionId.value sessionId
-                              SessionId.value bloggerSessionId
-                              "squash-legacy"
-                              ProviderRunIdentity.value providerRun ]
-                    )
-                )
-
-            let projection = AgentJournal.snapshot journal
-
-            match Map.tryFind sessionId projection.AgentProjections.Sessions with
-            | None -> Error "BlogSquashCommitted requires an existing work session projection"
-            | Some session ->
-                match session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId) with
-                | Some linked when linked = bloggerSessionId ->
-                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-
-                    if coveredFrameCount < 1 || coveredFrameCount > List.length blog.Frames then
-                        Error(
-                            sprintf
-                                "BlogSquashCommitted covers %d frames but %d exist"
-                                coveredFrameCount
-                                (List.length blog.Frames)
-                        )
-                    else
-                        match blobWriter.Write squashText with
-                        | Error error -> Error error
-                        | Ok blob ->
-                            let fact =
-                                AgentFact.BlogSquashCommitted
-                                    {| SessionId = sessionId
-                                       BloggerSessionId = bloggerSessionId
-                                       RequestId = requestId
-                                       PreviousFrameEpochId = blog.FrameEpochId
-                                       NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
-                                       CoveredFrameCount = coveredFrameCount
-                                       TextRef = blob.BlobRef
-                                       TextDigest = blob.BlobDigest
-                                       ProviderRun = providerRun |}
-
-                            match
-                                AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal
-                            with
-                            | Error failure -> Error(JournalAppendFailure.describe failure)
-                            | Ok updated ->
-                                match Map.tryFind sessionId updated.AgentProjections.Sessions with
-                                | Some { Blog = Some blog } -> Ok blog
-                                | _ -> Error "BlogSquashCommitted append returned no blog projection"
-                | Some _ -> Error "Squash completion belongs to a different Blogger session"
-                | None -> Error "BlogSquashCommitted requires a durably linked Blogger session"
 
         member _.LinkBlogger(sessionId, bloggerSessionId, bloggerAgent) =
             append

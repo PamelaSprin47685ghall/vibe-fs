@@ -72,6 +72,8 @@ const EXTINCTION = [
   { symbol: 'HumanPromptAccepted', clause: 'PROMPT-004' },
   { symbol: 'shouldCreateCompanion', clause: 'COMPANION-002' },
   { symbol: 'ProjectionSnapshot', clause: 'COMPANION-005' },
+  // Reverse-audit sentinels (C4 deleted production modules). target=0: any
+  // resurrection of CompanionDelta / jsonDelta fails the gate. Do not remove.
   { symbol: 'CompanionDelta', clause: 'CTX-013' },
   { symbol: 'jsonDelta', clause: 'CTX-013' },
   { symbol: 'userMessageID', clause: 'HOST-011' },

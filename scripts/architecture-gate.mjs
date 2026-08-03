@@ -219,13 +219,12 @@ const SINGLE_WRITER_FACTS = [
     fact: 'BlogSquashCommitted',
     allowed: [
       'Session/EnforcerHost.fs',
-      'Session/CompanionJournalPort.fs',
       'Journal/BlogProjection.fs',
       'Journal/BloggerCycleProjection.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
     ],
-    reason: 'BlogSquashCommitted sole constructors: EnforcerHost.commitSquash (tool loop) and CompanionJournalPort.AppendSquash (legacy port); fold/codec only',
+    reason: 'sole constructor: EnforcerHost.commitSquash (tool loop)',
   },
   {
     fact: 'BloggerRequestMaterialized',

@@ -45,21 +45,6 @@ type CompanionMemory =
 type ICompanionDurablePort =
     abstract Load: SessionId -> Result<CompanionMemory option, string>
 
-    /// CTX-006 / CTX-012: the only production constructor of `BlogSquashCommitted`.
-    ///
-    /// The blob is written before the fact, the frame epoch is checked against the
-    /// current projection, and `CoveredFrameCount` must not exceed the frame list —
-    /// all three invariants live here rather than at each call site, because a
-    /// squash folded against a stale epoch or covering nonexistent frames is not a
-    /// recoverable condition but a corrupted journal.
-    abstract AppendSquash:
-        SessionId *
-        bloggerSessionId: SessionId *
-        coveredFrameCount: int *
-        squashText: BlogText *
-        providerRun: ProviderRunIdentity ->
-            Result<BlogProjectionState, string>
-
     /// COMPANION-003. Takes the Blogger's own SessionId, not a `ChildId` plus a
     /// `"blogger"` target string: the previous shape recorded an EXEC-009 handle
     /// link and then recovered Y by searching for the literal target `"blogger"`,

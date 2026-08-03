@@ -494,18 +494,18 @@ test('EXEC_007_nudge_is_fire_and_forget', () => {
   assert.deepEqual(stateOf(nudged).child, 'ses_c')
 })
 
-// ── EXEC-008: child background uses the latest durable B snapshot ─────────────
+// ── EXEC-008: child background uses the latest durable work record ────────────
 
 test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
-  const latestB = 'LatestB snapshot at turn 9'
+  const lwrSnapshot = 'LWR snapshot at turn 9'
   const rendered = forkChildPayload.render({
     assignment: 'Summarize the output',
-    parentWorkRecord: latestB,
+    parentWorkRecord: lwrSnapshot,
     originalUserRequirements: [],
     payload: undefined,
   })
 
-  assert.equal(rendered.includes(latestB), true)
+  assert.equal(rendered.includes(lwrSnapshot), true)
   assert.equal(rendered.includes(forkChildPayload.parentWorkRecordInstruction), true)
   assert.equal(rendered.includes('parent_work_record'), true)
 })

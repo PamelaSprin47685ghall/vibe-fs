@@ -65,7 +65,7 @@ module ManagedAgentConfig =
 
     let private formatError (err: ConfigGateError) : string =
         match err with
-        | MissingAgentMap -> "Wanxiangshu 0.5.0 requires config.agent from the Host-final opencode.json."
+        | MissingAgentMap -> "Managed agents require config.agent from the Host-final opencode.json."
         | MissingManagedAgent name -> sprintf "Missing required managed agent '%s' in opencode.json agent map." name
         | MissingModel name -> sprintf "Managed agent '%s' is missing a non-empty model binding." name
         | EmptyModel name -> sprintf "Managed agent '%s' has an empty model binding." name
@@ -205,7 +205,7 @@ module ManagedAgentConfig =
 
             if not loggedSource.Value then
                 loggedSource.Value <- true
-                printfn "Wanxiangshu 0.5.0 model configuration source: OpenCode config.agent"
+                printfn "Model configuration source: OpenCode config.agent"
                 printfn "Legacy model environment variables are ignored."
 
             Ok inventory
