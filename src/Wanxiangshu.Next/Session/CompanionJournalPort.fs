@@ -60,6 +60,21 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
         /// Frame-epoch freshness and the covered-frame bound are checked here so no
         /// call site can commit a squash against a stale or oversized base.
         member _.AppendSquash(sessionId, bloggerSessionId, coveredFrameCount, squashText, providerRun) =
+            // Legacy port path: synthesize a stable RequestId from the provider run
+            // so BlogSquashCommitted still carries the C5 field. Production tool-loop
+            // commits go through EnforcerHost.commitSquash with the frozen RequestId.
+            let requestId =
+                BloggerRequestId.create (
+                    HostDigest.sha256Hex (
+                        String.concat
+                            "|"
+                            [ SessionId.value sessionId
+                              SessionId.value bloggerSessionId
+                              "squash-legacy"
+                              ProviderRunIdentity.value providerRun ]
+                    )
+                )
+
             let projection = AgentJournal.snapshot journal
 
             match Map.tryFind sessionId projection.AgentProjections.Sessions with
@@ -84,6 +99,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                                 AgentFact.BlogSquashCommitted
                                     {| SessionId = sessionId
                                        BloggerSessionId = bloggerSessionId
+                                       RequestId = requestId
                                        PreviousFrameEpochId = blog.FrameEpochId
                                        NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
                                        CoveredFrameCount = coveredFrameCount

@@ -391,6 +391,7 @@ module Fact =
         | BlogEntryCommitted of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
+               RequestId: BloggerRequestId
                FrameEpochId: FrameEpochId
                PreviousIngestedThroughSequence: int64
                NextIngestedThroughSequence: int64
@@ -414,12 +415,39 @@ module Fact =
         | BlogSquashCommitted of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
+               RequestId: BloggerRequestId
                PreviousFrameEpochId: FrameEpochId
                NextFrameEpochId: FrameEpochId
                CoveredFrameCount: int
                TextRef: BlobRef
                TextDigest: BlobDigest
                ProviderRun: ProviderRunIdentity |}
+
+        /// C5: one external Blogger request's irrecomputable semantic input,
+        /// written BEFORE physical send. Not a program counter — recovery reads
+        /// this + Host snapshot + receipts, never reverse-parses TOML or guesses X.
+        | BloggerRequestMaterialized of
+            {| RequestId: BloggerRequestId
+               MainSessionId: SessionId
+               BloggerSessionId: SessionId
+               /// "main" | "squash"
+               RequestKind: string
+               ContextRef: BlobRef
+               ContextDigest: BlobDigest
+               ObservedPrefixEpochId: PrefixEpochId
+               PreviousIngestedThroughSequence: int64
+               NextIngestedThroughSequence: int64
+               FrameEpochId: FrameEpochId
+               SelectedFrameDigests: BlobDigest list
+               PromptKey: PromptKey option |}
+
+        /// C5: open request abandoned (send failed, dispose, explicit fail).
+        /// Clears the open materialization without producing an Entry/Squash.
+        | BloggerRequestAbandoned of
+            {| RequestId: BloggerRequestId
+               MainSessionId: SessionId
+               BloggerSessionId: SessionId
+               Reason: string |}
 
         /// CTX-012: a probe attempt produced a valid terminal, so its candidate
         /// prefix is promoted to the committed epoch.

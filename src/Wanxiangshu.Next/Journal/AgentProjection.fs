@@ -35,6 +35,8 @@ type SessionAgentProjection =
         /// session's Companion. Per-session because a cycle belongs to one
         /// main session's Companion, keyed by the Blogger provider run.
         Enforcement: EnforcementProjectionState option
+        /// C5: open materializations + unified Entry|Squash receipts.
+        BloggerCycles: BloggerCycleProjectionState option
     }
 
 type AgentProjectionSet =
@@ -72,7 +74,8 @@ module AgentProjection =
           Fallback = None
           PromptAuthority = None
           Effects = None
-          Enforcement = None }
+          Enforcement = None
+          BloggerCycles = None }
 
     let empty =
         { Sessions = Map.empty

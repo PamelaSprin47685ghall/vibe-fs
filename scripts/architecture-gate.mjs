@@ -110,6 +110,10 @@ const HOST_INTEROP_ALLOWLIST = new Map([
     'src/Wanxiangshu.Next/Kernel/Flow.fs',
     'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',
   ],
+  [
+    'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
+    'C5: createObj context payload for durable request materialization blob (CanonicalJson boundary)',
+  ],
 ])
 
 // Kernel and Domain are the pure core. VERIFY-005 hard-blocks "Kernel 引用 Host
@@ -199,10 +203,31 @@ const SINGLE_WRITER_FACTS = [
       'Session/EnforcerHost.fs',
       'Session/CompanionJournalPort.fs',
       'Journal/BlogProjection.fs',
+      'Journal/BloggerCycleProjection.fs',
       'Journal/Fold.fs',
       'Kernel/Fact.fs',
     ],
     reason: 'BlogSquashCommitted sole constructors: EnforcerHost.commitSquash (tool loop) and CompanionJournalPort.AppendSquash (legacy port); fold/codec only',
+  },
+  {
+    fact: 'BloggerRequestMaterialized',
+    allowed: [
+      'Session/BloggerCoordinator.fs',
+      'Journal/BloggerCycleProjection.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'only BloggerCoordinator materializes request context before send (C5)',
+  },
+  {
+    fact: 'BloggerRequestAbandoned',
+    allowed: [
+      'Session/BloggerCoordinator.fs',
+      'Journal/BloggerCycleProjection.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'only BloggerCoordinator abandons a failed open request (C5)',
   },
 ]
 

@@ -21,7 +21,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { blogProjection as blog, envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, frameEpochId, prefixEpochId, idValue } from '../domain.mjs'
+import { blogProjection as blog, bloggerRequestId, envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, frameEpochId, prefixEpochId, idValue } from '../domain.mjs'
 
 const SESSION = 'ses_ctx'
 const session = sessionId(SESSION)
@@ -36,6 +36,7 @@ const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cu
     fact('BlogEntryCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
+      RequestId: bloggerRequestId(`req-e${n}`),
       FrameEpochId: frameEpochId(epoch),
       PreviousIngestedThroughSequence: BigInt(from),
       NextIngestedThroughSequence: BigInt(to),
@@ -58,6 +59,7 @@ const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}` 
     fact('BlogSquashCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
+      RequestId: bloggerRequestId(`req-s${n}`),
       PreviousFrameEpochId: frameEpochId(previousEpoch),
       NextFrameEpochId: frameEpochId(nextEpoch),
       CoveredFrameCount: count,

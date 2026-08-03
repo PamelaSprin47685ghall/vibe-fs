@@ -681,11 +681,60 @@ module Fold =
 
         // ── failure-driven context recovery (SSOT/12) ───────────────────────
 
+        | AgentFact.BloggerRequestMaterialized payload ->
+            let apply session =
+                let cycles =
+                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+
+                BloggerCycleProjection.materialize
+                    { RequestId = payload.RequestId
+                      MainSessionId = payload.MainSessionId
+                      BloggerSessionId = payload.BloggerSessionId
+                      RequestKind = payload.RequestKind
+                      ContextRef = payload.ContextRef
+                      ContextDigest = payload.ContextDigest
+                      ObservedPrefixEpochId = payload.ObservedPrefixEpochId
+                      PreviousIngestedThroughSequence = payload.PreviousIngestedThroughSequence
+                      NextIngestedThroughSequence = payload.NextIngestedThroughSequence
+                      FrameEpochId = payload.FrameEpochId
+                      SelectedFrameDigests = payload.SelectedFrameDigests
+                      PromptKey = payload.PromptKey }
+                    cycles
+                |> Result.map (fun updated ->
+                    { session with
+                        BloggerCycles = Some updated })
+
+            match AgentProjection.tryUpdate payload.MainSessionId apply projection with
+            | Error reason -> reject "BloggerRequestMaterialized" reason
+            | Ok updated -> Ok updated
+
+        | AgentFact.BloggerRequestAbandoned payload ->
+            let apply session =
+                let cycles =
+                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+
+                Ok
+                    { session with
+                        BloggerCycles =
+                            Some(
+                                BloggerCycleProjection.abandon
+                                    payload.RequestId
+                                    payload.BloggerSessionId
+                                    cycles
+                            ) }
+
+            match AgentProjection.tryUpdate payload.MainSessionId apply projection with
+            | Error reason -> reject "BloggerRequestAbandoned" reason
+            | Ok updated -> Ok updated
+
         | AgentFact.BlogEntryCommitted payload ->
-            // ENFORCER-045: one fact updates Blog and Enforcement atomically.
-            let applyEnforcement session =
+            // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
+            let applyEnforcementAndReceipt session =
                 let enforcement =
                     Option.defaultValue EnforcementProjection.empty session.Enforcement
+
+                let cycles =
+                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
                 EnforcementProjection.applyFromEntry
                     enforcement
@@ -698,11 +747,18 @@ module Fold =
                       CycleScoreRef = payload.ScoreVectorRef
                       CycleEvidenceRef = payload.EvidenceRef
                       ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
-                |> Result.map (fun updated ->
-                    { session with
-                        Enforcement = Some updated })
+                |> Result.bind (fun enfUpdated ->
+                    BloggerCycleProjection.recordReceipt
+                        { ProviderRun = payload.ProviderRun
+                          Kind = BloggerCycleKind.Entry
+                          RequestId = payload.RequestId }
+                        cycles
+                    |> Result.map (fun cycleUpdated ->
+                        { session with
+                            Enforcement = Some enfUpdated
+                            BloggerCycles = Some cycleUpdated }))
 
-            match AgentProjection.tryUpdate payload.SessionId applyEnforcement projection with
+            match AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection with
             | Error reason -> reject "BlogEntryCommitted" reason
             | Ok updated ->
                 tryUpdateBlog
@@ -721,17 +777,33 @@ module Fold =
                 |> blogOutcome "BlogEntryCommitted"
 
         | AgentFact.BlogSquashCommitted payload ->
-            tryUpdateBlog
-                payload.SessionId
-                (BlogProjection.applySquash
-                    payload.PreviousFrameEpochId
-                    payload.NextFrameEpochId
-                    payload.CoveredFrameCount
-                    { Kind = BlogFrameKind.Squash
-                      Digest = payload.TextDigest
-                      TextRef = payload.TextRef })
-                projection
-            |> blogOutcome "BlogSquashCommitted"
+            let applyReceipt session =
+                let cycles =
+                    Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+
+                BloggerCycleProjection.recordReceipt
+                    { ProviderRun = payload.ProviderRun
+                      Kind = BloggerCycleKind.Squash
+                      RequestId = payload.RequestId }
+                    cycles
+                |> Result.map (fun updated ->
+                    { session with
+                        BloggerCycles = Some updated })
+
+            match AgentProjection.tryUpdate payload.SessionId applyReceipt projection with
+            | Error reason -> reject "BlogSquashCommitted" reason
+            | Ok updated ->
+                tryUpdateBlog
+                    payload.SessionId
+                    (BlogProjection.applySquash
+                        payload.PreviousFrameEpochId
+                        payload.NextFrameEpochId
+                        payload.CoveredFrameCount
+                        { Kind = BlogFrameKind.Squash
+                          Digest = payload.TextDigest
+                          TextRef = payload.TextRef })
+                    updated
+                |> blogOutcome "BlogSquashCommitted"
 
         | AgentFact.PrefixRebaseCommitted payload ->
             tryUpdatePrefix

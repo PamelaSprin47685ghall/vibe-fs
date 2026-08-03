@@ -246,13 +246,8 @@ module EnforcerHost =
             match declared with
             | None -> Error "blog cycle has no staged coverage context (ENFORCER-045)"
             | Some coverage ->
-                let session = projections.AgentProjections.Sessions |> Map.tryFind mainSessionId
-
-                let epoch =
-                    session
-                    |> Option.bind (fun s -> s.PrefixEpoch)
-                    |> Option.map (fun e -> e.EpochId)
-                    |> Option.defaultValue PrefixEpochId.initial
+                // C5: use epoch frozen at request materialization, never live PrefixEpoch.
+                let epoch = coverage.ObservedPrefixEpochId
 
                 match journal.WriteBlob merged.MergedText with
                 | Error error -> Error error
@@ -288,6 +283,7 @@ module EnforcerHost =
                             AgentFact.BlogEntryCommitted
                                 {| SessionId = mainSessionId
                                    BloggerSessionId = bloggerSessionId
+                                   RequestId = coverage.RequestId
                                    FrameEpochId = coverage.FrameEpochId
                                    PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
                                    NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
@@ -350,6 +346,7 @@ module EnforcerHost =
                                 AgentFact.BlogSquashCommitted
                                     {| SessionId = mainSessionId
                                        BloggerSessionId = bloggerSessionId
+                                       RequestId = squash.RequestId
                                        PreviousFrameEpochId = blog.FrameEpochId
                                        NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
                                        CoveredFrameCount = k
@@ -490,9 +487,11 @@ module EnforcerHost =
             )
 
     /// Public: build the staged offer context from the same delta the coordinator
-    /// computed. The projection is required so COMPANION-011 can hash the covered
-    /// prefix at the new cutoff.
+    /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
     let internal mainContextFromChunk
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (observedEpoch: PrefixEpochId)
         (blog: BlogProjectionState)
         (xTrace: XTraceProjectionState)
         (projection: ProviderProjection.ProviderSemanticProjection)
@@ -506,15 +505,35 @@ module EnforcerHost =
                 chunk.NextCoverableTurnCutoffExclusive
                 projection
 
+        let deltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml)
+
+        let requestId =
+            BloggerRequestId.create (
+                HostDigest.sha256Hex (
+                    String.concat
+                        "|"
+                        [ SessionId.value mainSessionId
+                          SessionId.value bloggerSessionId
+                          "main"
+                          BlobDigest.value deltaDigest
+                          string blog.Coverage.IngestedThroughSequence
+                          string nextSeq ]
+                )
+            )
+
         BloggerRequestContext.Main
-            { Toml = chunk.Toml
+            { RequestId = requestId
+              MainSessionId = mainSessionId
+              BloggerSessionId = bloggerSessionId
+              Toml = chunk.Toml
               PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
               NextIngestedThroughSequence = nextSeq
               PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
               NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
               NextCoveredPrefixDigest = nextDigest
               FrameEpochId = blog.FrameEpochId
-              DeltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml) }
+              DeltaDigest = deltaDigest
+              ObservedPrefixEpochId = observedEpoch }
 
     /// The Blogger continuation-transform handler.
     ///

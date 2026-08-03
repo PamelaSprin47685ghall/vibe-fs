@@ -54,6 +54,11 @@ module Identity =
     /// a crash. Derived, never invented at the call site.
     type PromptKey = private PromptKey of string
 
+    /// One Blogger logical request (Main or Squash). Durable materialization key
+    /// (ENFORCER-050 / C5). Distinct from PromptKey: one logical request may share
+    /// a long-lived Blogger session across many physical claims after park/resume.
+    type BloggerRequestId = private BloggerRequestId of string
+
     /// What the Host prompt-send endpoint hands back: an `accepted-*` admission
     /// receipt.
     ///
@@ -224,6 +229,10 @@ module Identity =
     module PromptKey =
         let create (value: string) = PromptKey value
         let value (PromptKey v) = v
+
+    module BloggerRequestId =
+        let create (value: string) = BloggerRequestId value
+        let value (BloggerRequestId v) = v
 
     module TransportReceipt =
         let create (value: string) = TransportReceipt value

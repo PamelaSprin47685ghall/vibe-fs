@@ -451,6 +451,7 @@ const Ids = {
   commit: idModule('CommitHash'),
   blobRef: idModule('BlobRef'),
   blobDigest: idModule('BlobDigest'),
+  bloggerRequest: idModule('BloggerRequestId'),
 }
 
 export const runtimeId = (v) => Ids.runtime.create(v)
@@ -478,6 +479,7 @@ export const targetRef = (v) => Ids.targetRef.create(v)
 export const commitHash = (v) => Ids.commit.create(v)
 export const blobRef = (v) => Ids.blobRef.create(v)
 export const blobDigest = (v) => Ids.blobDigest.create(v)
+export const bloggerRequestId = (v) => Ids.bloggerRequest.create(v)
 
 // Epoch ids wrap int64, so Fable represents them as BigInt. Taking a JS number
 // here and converting once keeps `1` out of every call site — passing a plain
@@ -2604,9 +2606,17 @@ export const enforcer = (() => {
 
 export const bloggerRequestContext = (() => {
   const build = unionCase(BloggerRequestContextModule.BloggerRequestContext, 'BloggerRequestContext')
-  const m = bind(BloggerRequestContextModule, 'BloggerRequestContext', ['toml', 'isMain'])
+  const m = bind(BloggerRequestContextModule, 'BloggerRequestContext', [
+    'toml',
+    'isMain',
+    'requestId',
+    'observedPrefixEpoch',
+  ])
 
   const main = ({
+    requestId = 'req-main',
+    mainSession = 'ses-main',
+    bloggerSession = 'ses-blogger',
     toml,
     previousIngested = 0,
     nextIngested = 1,
@@ -2615,9 +2625,13 @@ export const bloggerRequestContext = (() => {
     nextDigest = '',
     frameEpoch = 0,
     deltaDigest = 'sha-delta',
+    observedEpoch = 0,
   } = {}) =>
     build('Main', [
       {
+        RequestId: bloggerRequestId(requestId),
+        MainSessionId: sessionId(mainSession),
+        BloggerSessionId: sessionId(bloggerSession),
         Toml: toml ?? '[[message]]\nrole = "user"\ntext = "work"',
         PreviousIngestedThroughSequence: previousIngested,
         NextIngestedThroughSequence: nextIngested,
@@ -2626,15 +2640,28 @@ export const bloggerRequestContext = (() => {
         NextCoveredPrefixDigest: nextDigest,
         FrameEpochId: frameEpochId(frameEpoch),
         DeltaDigest: blobDigest(deltaDigest),
+        ObservedPrefixEpochId: prefixEpochId(observedEpoch),
       },
     ])
 
-  const squash = ({ frameEpoch = 0, coveredFrameCount = 1, digests = ['sha-f0'] } = {}) =>
+  const squash = ({
+    requestId = 'req-squash',
+    mainSession = 'ses-main',
+    bloggerSession = 'ses-blogger',
+    frameEpoch = 0,
+    coveredFrameCount = 1,
+    digests = ['sha-f0'],
+    observedEpoch = 0,
+  } = {}) =>
     build('Squash', [
       {
+        RequestId: bloggerRequestId(requestId),
+        MainSessionId: sessionId(mainSession),
+        BloggerSessionId: sessionId(bloggerSession),
         FrameEpochId: frameEpochId(frameEpoch),
         CoveredFrameCount: coveredFrameCount,
         FrameDigests: toList(digests.map(blobDigest)),
+        ObservedPrefixEpochId: prefixEpochId(observedEpoch),
       },
     ])
 
@@ -2643,6 +2670,8 @@ export const bloggerRequestContext = (() => {
     squash,
     toml: (ctx) => unwrapOption(m.toml(ctx)),
     isMain: (ctx) => m.isMain(ctx),
+    requestId: (ctx) => m.requestId(ctx),
+    observedPrefixEpoch: (ctx) => m.observedPrefixEpoch(ctx),
     kindOf: (ctx) => caseOf(ctx),
   }
 })()

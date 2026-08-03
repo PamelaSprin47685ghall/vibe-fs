@@ -36,7 +36,13 @@ module internal CompanionHostBlogger =
         if frameCount <= 0 then 0 else (frameCount + 1) / 2
 
     /// Build typed Squash context from durable frames (exact digests, fail closed if short).
-    let tryBuildSquashContext (blog: BlogProjectionState) : BloggerRequestContext option =
+    /// Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
+    let tryBuildSquashContext
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (observedEpoch: PrefixEpochId)
+        (blog: BlogProjectionState)
+        : BloggerRequestContext option =
         let m = List.length blog.Frames
         let k = coveredFrameCount m
 
@@ -48,11 +54,31 @@ module internal CompanionHostBlogger =
             if List.length selected <> k then
                 None
             else
+                let digests = selected |> List.map (fun f -> f.Digest)
+
+                let requestId =
+                    BloggerRequestId.create (
+                        HostDigest.sha256Hex (
+                            String.concat
+                                "|"
+                                [ SessionId.value mainSessionId
+                                  SessionId.value bloggerSessionId
+                                  "squash"
+                                  string (FrameEpochId.value blog.FrameEpochId)
+                                  string k
+                                  (digests |> List.map BlobDigest.value |> String.concat ",") ]
+                        )
+                    )
+
                 Some(
                     BloggerRequestContext.Squash
-                        { FrameEpochId = blog.FrameEpochId
+                        { RequestId = requestId
+                          MainSessionId = mainSessionId
+                          BloggerSessionId = bloggerSessionId
+                          FrameEpochId = blog.FrameEpochId
                           CoveredFrameCount = k
-                          FrameDigests = selected |> List.map (fun f -> f.Digest) }
+                          FrameDigests = digests
+                          ObservedPrefixEpochId = observedEpoch }
                 )
 
     let private sendBloggerPrompt
@@ -102,8 +128,19 @@ module internal CompanionHostBlogger =
         (chunk: BloggerDeltaChunk)
         : Task<Result<PromptKey, string>> =
         task {
+            let! bloggerId = deps.EnsureBlogger()
             let blog = deps.Companion.Memory.Blog
             let xTrace = deps.Companion.Memory.XTrace
-            let ctx = EnforcerHost.mainContextFromChunk blog xTrace projection chunk
+
+            let ctx =
+                EnforcerHost.mainContextFromChunk
+                    deps.PrimaryId
+                    bloggerId
+                    PrefixEpochId.initial
+                    blog
+                    xTrace
+                    projection
+                    chunk
+
             return! startFromContext deps ctx
         }

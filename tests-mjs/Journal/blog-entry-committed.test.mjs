@@ -12,6 +12,7 @@ import {
   blogProjection as blog,
   envelope,
   fact,
+  bloggerRequestId,
   fold,
   frameEpochId,
   idValue,
@@ -48,6 +49,7 @@ const entryWithEnforcement = ({
     fact('BlogEntryCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
+      RequestId: bloggerRequestId(`req-e${n}`),
       FrameEpochId: frameEpochId(epoch),
       PreviousIngestedThroughSequence: BigInt(from),
       NextIngestedThroughSequence: BigInt(to),
@@ -181,6 +183,7 @@ test('CTX_012_squash_does_not_advance_coverage', () => {
     fact('BlogSquashCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
+      RequestId: bloggerRequestId('req-s1'),
       PreviousFrameEpochId: frameEpochId(0),
       NextFrameEpochId: frameEpochId(1),
       CoveredFrameCount: 1,
