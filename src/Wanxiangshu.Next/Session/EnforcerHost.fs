@@ -369,10 +369,48 @@ module EnforcerHost =
             | Some _ -> Error "Squash completion belongs to a different Blogger session"
             | None -> Error "BlogSquashCommitted requires a durably linked Blogger session"
 
+    type FrameLoadError =
+        | MissingAssociation
+        | MissingBlogSession
+        | MissingFrameBlob of digest: string
+        | DigestMismatch of digest: string
+        | EpochMismatch
+
+    /// C6: unique fail-closed loader for effective BlogFrames.
+    /// Silent List.choose drop of bad frames is forbidden.
+    let loadEffectiveFrames
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        : Result<(BlobDigest * string) list * FrameEpochId, FrameLoadError> =
+        let projections = AgentJournal.snapshot journal
+
+        match SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations with
+        | None -> Error FrameLoadError.MissingAssociation
+        | Some _ ->
+            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
+            | None -> Error FrameLoadError.MissingBlogSession
+            | Some session ->
+                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+
+                if List.isEmpty blog.Frames then
+                    Ok([], blog.FrameEpochId)
+                else
+                    let rec load remaining acc =
+                        match remaining with
+                        | [] -> Ok(List.rev acc, blog.FrameEpochId)
+                        | frame :: rest ->
+                            match journal.Writer.BlobWriter.Read frame.TextRef with
+                            | Error _ -> Error(FrameLoadError.MissingFrameBlob(BlobDigest.value frame.Digest))
+                            | Ok text ->
+                                if HostDigest.sha256Hex text <> BlobDigest.value frame.Digest then
+                                    Error(FrameLoadError.DigestMismatch(BlobDigest.value frame.Digest))
+                                else
+                                    load rest ((frame.Digest, text) :: acc)
+
+                    load blog.Frames []
+
     /// ENFORCER-051: rebuild the full provider view from durable frames + context.
-    ///
-    /// Replaces `rawMessages @ [syntheticDelta]`. The raw transcript is NOT the
-    /// history source — durable BlogFrames + the typed context are.
+    /// Fail closed if frames cannot be loaded (no silent drop).
     let private rebuildFromContext
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
@@ -383,47 +421,40 @@ module EnforcerHost =
         let mainSessionId =
             SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
 
-        let blog =
-            mainSessionId
-            |> Option.bind (fun sid -> projections.AgentProjections.Sessions |> Map.tryFind sid)
-            |> Option.bind (fun session -> session.Blog)
-            |> Option.defaultValue BlogProjection.empty
+        match mainSessionId with
+        | None -> []
+        | Some owner ->
+            match loadEffectiveFrames journal owner with
+            | Error _ -> []
+            | Ok(frameBodies, frameEpoch) ->
+                let kind =
+                    match ctx with
+                    | BloggerRequestContext.Main _ -> CompanionRequestKind.Normal
+                    | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount
 
-        let frameBodies =
-            blog.Frames
-            |> List.choose (fun frame ->
-                match journal.Writer.BlobWriter.Read frame.TextRef with
-                | Ok text -> Some(frame.Digest, text)
-                | Error _ -> None)
+                let delta =
+                    match ctx with
+                    | BloggerRequestContext.Main main ->
+                        let messageId =
+                            CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
-        let kind =
-            match ctx with
-            | BloggerRequestContext.Main _ -> CompanionRequestKind.Normal
-            | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount
+                        Some(messageId, main.Toml)
+                    | BloggerRequestContext.Squash _ -> None
 
-        let delta =
-            match BloggerRequestContext.toml ctx with
-            | Some toml ->
-                let messageId =
-                    HostDigest.sha256Hex (String.concat "|" [ SessionId.value bloggerSessionId; "delta"; toml ])
+                let plan =
+                    CompanionProjectionBuilder.build
+                        HostDigest.sha256Hex
+                        bloggerSessionId
+                        frameEpoch
+                        kind
+                        frameBodies
+                        delta
 
-                Some(messageId, toml)
-            | None -> None
-
-        let plan =
-            CompanionProjectionBuilder.build
-                HostDigest.sha256Hex
-                bloggerSessionId
-                blog.FrameEpochId
-                kind
-                frameBodies
-                delta
-
-        plan.Messages
-        |> List.map (fun msg ->
-            createObj
-                [ "info", box (createObj [ "id", box msg.MessageId; "role", box msg.Role ])
-                  "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
+                plan.Messages
+                |> List.map (fun msg ->
+                    createObj
+                        [ "info", box (createObj [ "id", box msg.MessageId; "role", box msg.Role ])
+                          "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
 
     /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
     /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next

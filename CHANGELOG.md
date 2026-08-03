@@ -1,5 +1,18 @@
 # Changelog — 版本历史
 
+## Unreleased
+
+### Blogger vertical-slice convergence (SSOT/15)
+
+- C0: downgrade overclaimed CONFORMANT rows; archive ADOPTED motion; red inventory + anti-regression gate.
+- C1: production `BloggerRuntimeCell`; CurrentRequest/PendingOffer dual slots; sole `BloggerCoordinator.onMainMaterial`.
+- C2: freeze typed context before send; delete `BloggerNeedsReset` and raw TOML extraction.
+- C3: typed Squash context; blog-tool continuation commits `BlogSquashCommitted`; no terminal wait.
+- C4: park only after commit; resource limits; Main success clears fallback; fail invalidates child cache.
+- C6 partial: fail-closed `loadEffectiveFrames`; `CompanionIdentity.newWorkMessageId`.
+- Still open: one repair wiring, CommitUnknown reconcile, durable request materialization, crash windows, layer-4 canaries.
+
+
 ## 0.5.0 — 正式版
 
 - 正式发布：0.5.0（从 rc.1 收口；breaking changes 见 `0.5.0-rc.1` 条目）

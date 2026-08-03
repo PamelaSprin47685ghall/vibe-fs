@@ -761,6 +761,75 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
   }
 }
 
+// ── gate: blogger vertical-slice anti-regression (SSOT/15 convergence) ──────
+//
+// Pins the Definition of Done items that static analysis can prove without Host
+// canaries. Fail closed if production reintroduces deleted bypasses.
+
+{
+  const bloggerFiles = productionFiles.filter(
+    (file) =>
+      isFs(file) &&
+      /Blogger|Companion|Enforcer|ParkedTransform|SpikePlugin/.test(norm(file)),
+  )
+
+  const productionCallers = (pattern) =>
+    productionFiles.filter((file) => isFs(file) && pattern.test(read(file))).map(norm)
+
+  // BloggerRuntime must have production call sites beyond its own module.
+  const runtimeCallers = productionCallers(/BloggerRuntime\.(onMaterial|onCycleCommitted|onSquashCommitted|onFail)\b/).filter(
+    (path) => !path.endsWith('Session/BloggerRuntimeState.fs'),
+  )
+  if (runtimeCallers.length === 0) {
+    fail('blogger-convergence', 'BloggerRuntime transitions have no production call site')
+  }
+
+  // Single coordinator entry.
+  const coordinatorCallers = productionCallers(/BloggerCoordinator\.onMainMaterial\b/)
+  if (coordinatorCallers.length === 0) {
+    fail('blogger-convergence', 'BloggerCoordinator.onMainMaterial has no production call site')
+  }
+
+  // Forbidden bypasses.
+  for (const file of bloggerFiles) {
+    const text = read(file)
+    if (containsToken(text, 'BloggerNeedsReset')) {
+      fail('blogger-convergence', `${file}: BloggerNeedsReset must stay deleted`)
+    }
+    if (/SubscribeTerminal/.test(text) && norm(file).endsWith('Session/CompanionHostBlogger.fs')) {
+      fail('blogger-convergence', `${file}: Squash/Normal path must not SubscribeTerminal`)
+    }
+    if (/Extract the TOML from the raw messages/.test(text) || /"first"; toml/.test(text)) {
+      fail('blogger-convergence', `${file}: raw user TOML extraction is forbidden`)
+    }
+    if (/\| EnforcementCycleCommitted\b/.test(text) && norm(file).endsWith('Kernel/Fact.fs')) {
+      fail('blogger-convergence', `${file}: EnforcementCycleCommitted fact must stay deleted`)
+    }
+  }
+
+  // Dual slots: CurrentRequest and PendingOffer must both exist; parkedOffer alone is banned.
+  const scopeText = existsSync('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+    ? read('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+    : ''
+  if (scopeText.includes('parkedOffer') && !scopeText.includes('currentRequest')) {
+    fail('blogger-convergence', 'PluginRuntimeScope must not use a single parkedOffer dictionary')
+  }
+  if (!scopeText.includes('currentRequest') || !scopeText.includes('pendingOffer')) {
+    fail('blogger-convergence', 'PluginRuntimeScope must hold currentRequest and pendingOffer slots')
+  }
+
+  // ADOPTED motion must not remain active PENDING.
+  if (existsSync('PENDING/blogger-prompt-shape-and-parking.md')) {
+    fail('blogger-convergence', 'ADOPTED motion still in PENDING/; archive it')
+  }
+
+  // offerToBlogger dual entry must stay gone.
+  const offerSites = productionCallers(/offerToBlogger\b/)
+  if (offerSites.length > 0) {
+    fail('blogger-convergence', `offerToBlogger parallel entry remains: ${offerSites.join(', ')}`)
+  }
+}
+
 // ── gate: the scanner itself sees the tree ──────────────────────────────────
 // A silently empty scan would make every gate above vacuously pass.
 
