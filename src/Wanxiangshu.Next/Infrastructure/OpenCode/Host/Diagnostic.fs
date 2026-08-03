@@ -36,7 +36,10 @@ module Diagnostic =
               "delta_bytes"
               "result"
               "provider_error"
-              "duration" ]
+              "duration"
+              // LOOP-010
+              "effective_character_count"
+              "detector_step" ]
 
     /// CTX-014 禁止字段。出现在 `src/Wanxiangshu.Next/**/*.fs` 即负向测试红灯（与灭绝表同机制）。
     let ForbiddenFields =

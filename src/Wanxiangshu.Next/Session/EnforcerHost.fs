@@ -818,10 +818,7 @@ module EnforcerHost =
         (journal: AgentJournal)
         (xTrace: XTraceProjectionState)
         : ProviderProjection.ProviderSemanticProjection =
-        let byTurn =
-            xTrace.Parts
-            |> List.groupBy (fun part -> part.Turn)
-            |> List.sortBy fst
+        let byTurn = xTrace.Parts |> List.groupBy (fun part -> part.Turn) |> List.sortBy fst
 
         let messages =
             byTurn
@@ -848,11 +845,7 @@ module EnforcerHost =
                                 |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
                             | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
                             | "media_omitted" ->
-                                let mediaType =
-                                    if String.IsNullOrWhiteSpace body then
-                                        None
-                                    else
-                                        Some body
+                                let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
 
                                 Some(ProviderProjection.SemanticMedia(mediaType, ""))
                             | _ -> None)
@@ -931,6 +924,7 @@ module EnforcerHost =
         : BloggerRequestContext option =
         let key = SessionId.value bloggerSessionId
         let cell = scope.GetBloggerRuntime key
+
         let durableSealed =
             AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot journal).AgentProjections
 
@@ -962,17 +956,7 @@ module EnforcerHost =
                     projection.Messages
             with
             | None -> None
-            | Some chunk ->
-                Some(
-                    mainContextFromChunk
-                        mainSessionId
-                        bloggerSessionId
-                        epoch
-                        blog
-                        xTrace
-                        projection
-                        chunk
-                )
+            | Some chunk -> Some(mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk)
 
     /// The Blogger continuation-transform handler.
     ///
@@ -1044,9 +1028,7 @@ module EnforcerHost =
                     let cell = scope.GetBloggerRuntime key
 
                     if
-                        AgentProjection.mainSealedForBlogger
-                            owner
-                            (AgentJournal.snapshot durable).AgentProjections
+                        AgentProjection.mainSealedForBlogger owner (AgentJournal.snapshot durable).AgentProjections
                         && not cell.ReactivatedAfterSeal
                     then
                         scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
@@ -1102,7 +1084,8 @@ module EnforcerHost =
 
                     match currentCtx with
                     | None -> return rebuild ()
-                    | Some ctx when not cell.RepairSpent -> return aabbRepair ctx "no completed blog calls (ENFORCER-060)"
+                    | Some ctx when not cell.RepairSpent ->
+                        return aabbRepair ctx "no completed blog calls (ENFORCER-060)"
                     | Some _ -> return fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
             | Some durable, Some owner, Some(messageId, calls, assistantCompleted) when not (List.isEmpty calls) ->
                 // ENFORCER-044: merge/commit only on a LIVE tool-loop continuation.
@@ -1142,6 +1125,7 @@ module EnforcerHost =
 
                 let mainBlocks () =
                     let cell = scope.GetBloggerRuntime key
+
                     let durableSealed =
                         AgentProjection.mainSealedForBlogger
                             mainSessionId
@@ -1356,10 +1340,7 @@ module EnforcerHost =
                                 // Timeout with durable seal or no material: quiet stop.
                                 // Timeout while still blocked falsely: already sealed above.
                                 if mainBlocks () then
-                                    scope.SetBloggerRuntime(
-                                        key,
-                                        BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
-                                    )
+                                    scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
 
                                     scope.ClearCurrentRequest key
                                     scope.TryTakePendingOffer key |> ignore
@@ -1383,7 +1364,9 @@ module EnforcerHost =
 
                                         return rawMessages
                                     else
-                                        match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                                        match
+                                            BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx
+                                        with
                                         | Ok cell ->
                                             scope.SetBloggerRuntime(key, cell)
                                             scope.SetCurrentRequest(key, ctx)

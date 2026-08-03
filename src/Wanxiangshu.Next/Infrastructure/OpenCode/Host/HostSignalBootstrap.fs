@@ -110,6 +110,7 @@ module HostSignalBootstrap =
                         scope.SessionParents
                         scope.DisposeExecutorRuntime
                         scope.AbortedSessions
+                        (Some scope.LoopSensor)
                         turn
             }
 
@@ -187,14 +188,29 @@ module HostSignalBootstrap =
         /// reconciled snapshot decides, and FallbackController performs the advance.
         let onSignal (signal: HostSignal) =
             match signal with
-            | SessionIdle _
+            | SessionIdle sessionId ->
+                // LOOP-005: a settled idle ends the attempt; next stream starts clean.
+                scope.LoopSensor.ResetDetector sessionId
+                reconciler.Signal signal
             | ProviderRetry _
             | ProviderFailure _ -> reconciler.Signal signal
             | SessionDeleted sessionId ->
+                scope.LoopSensor.DropSession sessionId
                 scope.DisposeSession(SessionId.value sessionId)
                 reconciler.Signal signal
 
-        let signalRouter = HostSignalRouter(scope.OwnedSessions, onSignal)
+        // LOOP-002/006: edge sensor shares the same event subscription, aborts via
+        // the session port, and leaves AABB to TurnCompletionProgram on TurnAborted.
+        let loopSensor =
+            LoopSensor(
+                (fun sessionId -> scope.OwnedSessions.Contains(SessionId.value sessionId)),
+                (fun sessionId -> sessionPort.AbortSession sessionId)
+            )
+
+        do scope.AttachLoopSensor loopSensor
+
+        let signalRouter =
+            HostSignalRouter(scope.OwnedSessions, onSignal, onLoopEvent = loopSensor.Observe)
 
         let subscription =
             match HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal with
@@ -287,8 +303,7 @@ module HostSignalBootstrap =
 
                 match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
                 | None -> ()
-                | Some bloggerId ->
-                    BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId
+                | Some bloggerId -> BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId
 
         let chatMessageHook =
             PromptIngress.createHook
@@ -299,7 +314,10 @@ module HostSignalBootstrap =
                 (Some onAuthorityRoot)
 
         let cancelSignals (ids: SessionId seq) =
-            ids |> Seq.iter (fun id -> signalRouter.UnregisterOwned id)
+            ids
+            |> Seq.iter (fun id ->
+                scope.LoopSensor.DropSession id
+                signalRouter.UnregisterOwned id)
 
         { RegisterOwned = registerOwned
           CancelSignals = cancelSignals

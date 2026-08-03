@@ -66,6 +66,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable bloggerRecoveryGate: BloggerCrashRecovery.RecoveryGate option = None
     let recoveryGateLock = obj ()
 
+    /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
+    /// Optional until HostSignalBootstrap wires abort + ownership.
+    let mutable loopSensor: LoopSensor option = None
+
     member _.Journal = journal
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
@@ -82,6 +86,19 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val AbortedSessions = HashSet<string>()
     member val RecoveryArming = Dictionary<string, SlotArming>()
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
+
+    member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
+
+    member _.LoopSensor =
+        match loopSensor with
+        | Some sensor -> sensor
+        | None ->
+            // Tests / journal-only scopes never stream deltas. A no-op sensor keeps
+            // completion paths callable without inventing an abort port.
+            let empty = LoopSensor((fun _ -> false), (fun _ -> Task.FromResult(Ok())))
+
+            loopSensor <- Some empty
+            empty
 
     member this.AttachRecoveryGate(gate: PromptRecovery.RecoveryGate) =
         lock recoveryGateLock (fun () -> recoveryGate <- Some gate)
@@ -345,6 +362,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
+        this.LoopSensor.DropSession(SessionId.create sessionId)
 
         // Always cancel the deleted id; also cancel linked Blogger keys.
         let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct

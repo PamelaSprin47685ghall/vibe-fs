@@ -34,6 +34,16 @@ module RuntimeNudge =
     /// only that it should carry on.
     let ProviderRetryInstructions = [ "Continue after provider failure." ]
 
+    /// LOOP-006: continuation after a LOOP kill was bridged into the same AABB path.
+    ///
+    /// Same ContinuationKind as provider failure (`ProviderRetryAttempt`). Distinct
+    /// instruction so the model knows the stop was mid-stream degeneration, not a
+    /// transport/provider error.
+    let LoopContinueInstructions =
+        [ "Continue from the interruption without repeating already produced content." ]
+
+    let loopContinue = SyntheticToml.document LoopContinueInstructions []
+
     /// REVIEW-003: the Manager tried to finish without a confirmed double PERFECT.
     let ManagerReviewGuardInstructions =
         [ "Review is required before completion."

@@ -184,8 +184,7 @@ module BloggerCoordinator =
     let private durableSealed (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
         match journal with
         | None -> false
-        | Some j ->
-            AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
+        | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
 
     /// Blocks new Y Start/Offer unless handle unsealed or ReactivatedAfterSeal.
     let private blocksNew

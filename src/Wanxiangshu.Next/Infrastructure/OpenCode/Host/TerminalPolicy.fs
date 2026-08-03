@@ -45,8 +45,7 @@ module TerminalPolicy =
     let mainSealedForBlogger (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
         match journal with
         | None -> false
-        | Some j ->
-            AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
+        | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
 
     /// Manager Guard applies to any manager that still owns the review loop for its
     /// worktree. Manager children of Orchestrator remain linked to the family root,

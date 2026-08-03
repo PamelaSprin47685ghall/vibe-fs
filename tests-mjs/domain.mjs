@@ -120,6 +120,11 @@ const [
   PromptDispatcherModule,
   PromptDispatcherSendModule,
   HostEventCodecModule,
+  LoopDetectorModule,
+  LoopEventCodecModule,
+  LoopSensorModule,
+  RuntimeNudgeModule,
+  FallbackControllerModule,
   HandleControllerModule,
   HandleCompletionCodecModule,
   ReviewSealModule,
@@ -194,12 +199,18 @@ const [
   prod('Application/Prompting/PromptDispatcher'),
   prod('Application/Prompting/PromptDispatcherSend'),
   prod('Infrastructure/OpenCode/Codec/HostEventCodec'),
+  prod('Domain/LoopDetector'),
+  prod('Infrastructure/OpenCode/Codec/LoopEventCodec'),
+  prod('Infrastructure/OpenCode/Host/LoopSensor'),
+  prod('Domain/RuntimeNudge'),
+  prod('Session/FallbackController'),
   prod('Session/HandleController'),
   prod('Session/HandleCompletionCodec'),
   prod('Application/Reconciliation/ReviewSeal'),
   prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
   prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
 ])
+    
 
 // ── the one Fable naming convention ──────────────────────────────────────────
 //
@@ -2768,6 +2779,180 @@ export const diagnostic = (() => {
     fatal: (operation, fields) => m.fatal(operation, toList(fields)),
   }
 })()
+
+// ── SSOT/17: LOOP detector + text-delta codec ────────────────────────────────
+
+/**
+ * LOOP-003…005: pure O(1) exponential-mixture character diversity detector.
+ * One fresh detector per attempt; tests never touch Host abort wiring.
+ */
+export const loopDetector = (() => {
+  const m = bind(LoopDetectorModule, 'LoopDetector', [
+    'MinChars',
+    'LoopThreshold',
+    'HashBuckets',
+    'K',
+    'create',
+    'pushCharacter',
+    'pushText',
+    'evaluate',
+    'bucketOf',
+  ])
+
+  const read = (evaluation) => ({
+    state: caseOf(evaluation.State),
+    isLoop: Boolean(evaluation.IsLoop),
+    effective: unwrapOption(evaluation.EffectiveCharacterCount),
+    step: evaluation.Step,
+  })
+
+  return {
+    minChars: m.MinChars,
+    loopThreshold: m.LoopThreshold,
+    hashBuckets: m.HashBuckets,
+    k: m.K,
+    create: () => m.create(),
+    pushCharacter: (detector, character) => read(m.pushCharacter(detector, character)),
+    pushText: (detector, text) => read(m.pushText(detector, text)),
+    evaluate: (detector) => read(m.evaluate(detector)),
+    bucketOf: (character) => m.bucketOf(character),
+  }
+})()
+
+/** LOOP-009: Host raw event → typed text delta, fail closed. */
+export const loopEventCodec = (() => {
+  const m = bind(LoopEventCodecModule, 'LoopEventCodec', ['isLoopTextDelta', 'tryDecodeTextDelta'])
+  return {
+    isLoopTextDelta: (raw) => Boolean(m.isLoopTextDelta(raw)),
+    tryDecodeTextDelta: (raw) => {
+      const decoded = unwrapOption(m.tryDecodeTextDelta(raw))
+      if (isNone(decoded)) return undefined
+      return {
+        sessionId: idValue.session(decoded.SessionId),
+        messageId: unwrapOption(decoded.MessageId),
+        partId: unwrapOption(decoded.PartId),
+        field: unwrapOption(decoded.Field),
+        delta: decoded.Delta,
+      }
+    },
+  }
+})()
+
+/**
+ * LOOP-002/006: edge sensor over Host deltas.
+ *
+ * Fable emits instance methods as free functions (`LoopSensor__Observe_…`).
+ * The facade owns that spelling; tests only see plain methods.
+ */
+export const loopSensor = (() => {
+  const LoopSensor = LoopSensorModule.LoopSensor
+
+  // Fable instance methods emit as free functions with a content hash suffix
+  // (`LoopSensor__Observe_4E60E31B`). The hash is not stable across Fable
+  // versions, so resolve by prefix once at load time.
+  const method = (name) => {
+    const prefix = `LoopSensor__${name}_`
+    const key = Object.keys(LoopSensorModule).find((entry) => entry.startsWith(prefix))
+    if (key === undefined) {
+      throw new Error(
+        `LoopSensor has no emitted method '${name}'. Available: ${Object.keys(LoopSensorModule)
+          .filter((entry) => entry.startsWith('LoopSensor__'))
+          .join(', ')}`,
+      )
+    }
+    return LoopSensorModule[key]
+  }
+
+  const observe = method('Observe')
+  const isArmed = method('IsArmed')
+  const tryArm = method('TryArm')
+  const clearArmed = method('ClearArmed')
+  const dropSession = method('DropSession')
+  const resetDetector = method('ResetDetector')
+
+  const textDelta = (session, text) => ({
+    type: 'message.part.delta',
+    properties: {
+      sessionID: session,
+      messageID: 'msg_a',
+      partID: 'prt_1',
+      field: 'text',
+      delta: text,
+    },
+  })
+
+  return {
+    /**
+     * `owned` is a Set/array of session ids, or a predicate (sessionId) => bool.
+     * `abort` receives the session id string and may return a Promise.
+     */
+    create: ({ owned, abort }) => {
+      const owns =
+        typeof owned === 'function'
+          ? owned
+          : (sid) => {
+              const value = idValue.session(sid)
+              if (owned instanceof Set) return owned.has(value)
+              if (Array.isArray(owned)) return owned.includes(value)
+              return false
+            }
+
+      const abortFn = (sid) => {
+        const outcome = abort(idValue.session(sid))
+        const asPromise = Promise.resolve(outcome === undefined ? undefined : outcome)
+        return asPromise.then(() => okResult(undefined))
+      }
+
+      return new LoopSensor(owns, abortFn)
+    },
+
+    observe: (sensor, raw) => observe(sensor, raw),
+    isArmed: (sensor, session) => Boolean(isArmed(sensor, sessionId(session))),
+    tryArm: (sensor, session) => Boolean(tryArm(sensor, sessionId(session))),
+    clearArmed: (sensor, session) => clearArmed(sensor, sessionId(session)),
+    dropSession: (sensor, session) => dropSession(sensor, sessionId(session)),
+    resetDetector: (sensor, session) => resetDetector(sensor, sessionId(session)),
+    textDelta,
+  }
+})()
+
+
+/** LOOP-006 continuation text + FALLBACK-003 writer surface for bridge tests. */
+export const runtimeNudge = (() => {
+  const m = bind(RuntimeNudgeModule, 'RuntimeNudge', [
+    'providerRetry',
+    'loopContinue',
+    'ProviderRetryInstructions',
+    'LoopContinueInstructions',
+  ])
+  return {
+    providerRetry: m.providerRetry,
+    loopContinue: m.loopContinue,
+    providerRetryInstructions: listItems(m.ProviderRetryInstructions),
+    loopContinueInstructions: listItems(m.LoopContinueInstructions),
+  }
+})()
+
+export const fallbackController = (() => {
+  const recordConfirmedFailure = member(FallbackControllerModule, 'FallbackController', 'recordConfirmedFailure')
+  const mayContinue = member(FallbackControllerModule, 'FallbackController', 'mayContinue')
+
+  return {
+    /**
+     * LOOP-006 bridge half: after LoopKillArmed is observed, the completion path
+     * records one confirmed failure. Tests drive that single writer directly.
+     */
+    recordConfirmedFailure: (journal, budget, session, run, reason) => {
+      const result = resultOf(
+        recordConfirmedFailure(journal, budget, sessionId(session), providerRun(run), reason),
+      )
+      if (!result.ok) return result
+      return { ok: true, outcome: caseOf(result.value) }
+    },
+    mayContinue: (outcomeUnion) => Boolean(mayContinue(outcomeUnion)),
+  }
+})()
+
 
 // ── SSOT/14: Strength 纯领域内核 ─────────────────────────────────────────────
 

@@ -43,6 +43,7 @@
     <Compile Include="Domain/SyntheticToml.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
+    <Compile Include="Domain/LoopDetector.fs"/>
     <Compile Include="Domain/ForkChildPayload.fs"/>
     <Compile Include="Domain/CompanionPrompt.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
@@ -135,6 +136,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/SharedTerminalBus.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignal.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostEventCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Codec/LoopEventCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostMessageCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalAdapter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs"/>
@@ -165,6 +167,7 @@
     <Compile Include="Session/ParkedTransform.fs"/>
     <Compile Include="Session/BloggerAbandon.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/LoopSensor.fs"/>
     <Compile Include="Session/EnforcerHost.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
     <Compile Include="Session/CompanionJournalPort.fs"/>

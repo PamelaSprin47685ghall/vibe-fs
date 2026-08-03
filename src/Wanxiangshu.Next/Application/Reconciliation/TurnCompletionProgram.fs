@@ -61,6 +61,7 @@ module TurnCompletionProgram =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (error: string)
+        (continuationPrompt: string)
         : Task =
         task {
             let fail reason =
@@ -88,7 +89,7 @@ module TurnCompletionProgram =
                         HostSessionNudge.sendContinuationResult
                             sessionPort
                             turn.SessionId
-                            RuntimeNudge.providerRetry
+                            continuationPrompt
                             PromptAuthority.ProviderRetryAttempt
                             turn.Directory
                             journal
@@ -96,10 +97,34 @@ module TurnCompletionProgram =
                             None
 
                     match continuation with
-                    | Ok _ -> ()
+                    | Ok _ ->
+                        if error = "loop-kill" then
+                            Diagnostic.emit
+                                "loop-kill"
+                                [ "session_id", SessionId.value turn.SessionId; "result", "continue-sent" ]
                     | Error _ -> fail error
         }
         :> Task
+
+
+    /// LOOP-006: an abort we armed is provider failure for AABB purposes.
+    let private continueAfterLoopKill
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        : Task =
+        continueAfterProviderFailure sessionPort eventPort journal turn "loop-kill" RuntimeNudge.loopContinue
+
+    let private continueAfterOrdinaryFailure
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (error: string)
+        : Task =
+        continueAfterProviderFailure sessionPort eventPort journal turn error RuntimeNudge.providerRetry
+
 
     /// Apply the full terminal completion program for a reconciled turn.
     let applyWithContinuation
@@ -113,6 +138,7 @@ module TurnCompletionProgram =
         (sessionParents: Dictionary<string, string>)
         (disposeExecutorRuntime: string -> unit)
         (abortedSessions: HashSet<string>)
+        (loopSensor: LoopSensor option)
         (turn: ReconciledTurn)
         : Task =
         let sessionKey = SessionId.value turn.SessionId
@@ -276,15 +302,27 @@ module TurnCompletionProgram =
             // (The XTrace parts are captured at the transform boundary.)
             sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
         | TurnAborted reason ->
-            abortedSessions.Add sessionKey |> ignore
-            Pty.abortParent sessionKey
-            sessionPort.AbortChildren turn.SessionId |> ignore
+            // LOOP-006: our own kill is bridged into the provider-failure AABB path.
+            // User / cleanup aborts still report Aborted and do not advance the cursor.
+            let loopKill =
+                match loopSensor with
+                | Some sensor when sensor.IsArmed turn.SessionId ->
+                    sensor.ClearArmed turn.SessionId
+                    true
+                | _ -> false
 
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-            |> ignore
+            if loopKill then
+                continueAfterLoopKill sessionPort eventPort journal turn
+            else
+                abortedSessions.Add sessionKey |> ignore
+                Pty.abortParent sessionKey
+                sessionPort.AbortChildren turn.SessionId |> ignore
 
-            AsyncSupport.completedTask ()
-        | TurnFailed error -> continueAfterProviderFailure sessionPort eventPort journal turn error
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+                |> ignore
+
+                AsyncSupport.completedTask ()
+        | TurnFailed error -> continueAfterOrdinaryFailure sessionPort eventPort journal turn error
         | TurnCompleted ->
             // REVIEW-003/007 synchronize before completion: a reviewer awaiting
             // PERFECT confirmation and a manager whose current tree lacks a witness

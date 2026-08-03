@@ -33,6 +33,7 @@ const PREFIX_OWNER = {
   STRENGTH: '14.md',
   ENFORCER: '15.md',
   LEARN: '16.md',
+  LOOP: '17.md',
 }
 
 // 前缀列表派生自 PREFIX_OWNER：新增规范文件只改一处。顺序无关（正则匹配）。
