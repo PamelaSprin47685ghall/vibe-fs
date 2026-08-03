@@ -9,7 +9,7 @@
 //
 //   「超时即遗忘」  a timed-out test is failed and the runner continues; an abandoned test does not
 //                  later reject into an unrelated test's result
-//   in-process parallelism, which is what makes 25 files cost one `build/next` module load
+//   in-process parallelism, which is what makes 25 files cost one `dist` module load
 //
 // Measured (Node v26.4.0): `timeout` here is a VERDICT line, not an abort line. A test that
 // overruns is failed at the deadline and then keeps running to completion, and a test that never

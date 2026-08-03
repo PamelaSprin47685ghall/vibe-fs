@@ -33,7 +33,7 @@
  */
 
 import { messageText, semanticOf } from './provider-wire.js';
-import { toArray as listToArray } from '../../build/next/fable_modules/fable-library-js.5.13.0/List.js';
+import { toArray as listToArray } from '../../dist/fable_modules/fable-library-js.5.13.0/List.js';
 
 // ── lane ────────────────────────────────────────────────────────────────────
 

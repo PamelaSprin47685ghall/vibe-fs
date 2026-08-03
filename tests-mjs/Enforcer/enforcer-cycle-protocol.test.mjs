@@ -25,15 +25,15 @@ import {
 } from '../domain.mjs'
 
 const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
-  '../../build/next/Journal/AgentJournal.js'
+  '../../dist/Journal/AgentJournal.js'
 )
-const { StreamId } = await import('../../build/next/Journal/Envelope.js')
+const { StreamId } = await import('../../dist/Journal/Envelope.js')
 const {
   handleContinuation,
   RepairInstruction,
   resolveCycleContext,
-} = await import('../../build/next/Session/EnforcerHost.js')
-const BlogTool = await import('../../build/next/Infrastructure/OpenCode/Tools/BlogTool.js')
+} = await import('../../dist/Session/EnforcerHost.js')
+const BlogTool = await import('../../dist/Infrastructure/OpenCode/Tools/BlogTool.js')
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'

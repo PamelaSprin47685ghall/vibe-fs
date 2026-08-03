@@ -44,7 +44,7 @@ test('C5_classify_open_request_window_A_unsent', async () => {
   // Import production classify via built module if exported; else structural.
   // classifyOpenRequest is pure and exported from BloggerCrashRecovery.
   const mod = await import(
-    new URL('../../build/next/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
+    new URL('../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
@@ -62,7 +62,7 @@ test('C5_classify_open_request_window_A_unsent', async () => {
 test('C5_classify_open_request_window_C_tool_present', async () => {
   const { caseOf } = await import('../domain.mjs')
   const mod = await import(
-    new URL('../../build/next/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
+    new URL('../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
@@ -76,7 +76,7 @@ test('C5_classify_open_request_window_C_tool_present', async () => {
 test('C5_classify_open_request_window_B_inflight', async () => {
   const { caseOf } = await import('../domain.mjs')
   const mod = await import(
-    new URL('../../build/next/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
+    new URL('../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
   )
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||

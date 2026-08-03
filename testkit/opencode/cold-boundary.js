@@ -27,7 +27,7 @@
  */
 
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
-import { equals } from '../../build/next/fable_modules/fable-library-js.5.13.0/Util.js';
+import { equals } from '../../dist/fable_modules/fable-library-js.5.13.0/Util.js';
 
 export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side', 'prefix-probe', 'frame-commit'];
 

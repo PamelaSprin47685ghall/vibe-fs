@@ -233,7 +233,7 @@ export const projectionCases = [
   {
     name: 'VERIFY-007 testkit asks production, it does not re-implement',
     fn: async () => {
-      const production = await import('../../../build/next/Domain/ProviderProjection.js');
+      const production = await import('../../../dist/Domain/ProviderProjection.js');
       const adapter = await import('../provider-wire.js');
 
       // Identity comparison, not shape comparison: a local copy with the same

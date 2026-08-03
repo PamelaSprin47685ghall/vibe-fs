@@ -15,7 +15,7 @@
   evidence 提交，生产+testkit 与验证 tip `ddd504ca` 一致）
 - 最后验证：
   - `npm run gate:static` 通过（10 子门禁，含 `gate:conformance`）
-  - `npm run build` 通过（Fable 编译 212 源单元 → `build/next`）
+  - `npm run build` 通过（Fable 编译 212 源单元 → `dist`）
   - `npm run test:unit` 通过（737 / 737）
   - `npm run test:harness` 通过（285 / 285）
   - `npm run test:e2e:p0:three` 通过（19 canary × 3 轮 = 57/57）
@@ -129,8 +129,8 @@ src/Wanxiangshu.Next/
 
 布局纪律由 `scripts/repository-layout-gate.mjs`（gate:static 第一段）机器验证：
 根目录白名单、生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约：
-Fable 输出 `build/next/`；根 `package.json` 为唯一 manifest（`main` →
-`build/next/Infrastructure/OpenCode/Plugin/Plugin.js`，`files` → `build/next` + `resources`）；
+Fable 输出 `dist/`；根 `package.json` 为唯一 manifest（`main` →
+`dist/Infrastructure/OpenCode/Plugin/Plugin.js`，`files` → `dist` + `resources`）；
 从仓库根执行 `npm pack`，无第二 package root / postbuild staging。
 
 ## 下一步

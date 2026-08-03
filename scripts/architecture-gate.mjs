@@ -25,7 +25,7 @@ const PRODUCTION_ROOT = 'src/Wanxiangshu.Next'
 const TESTS_ROOT = 'tests-mjs'
 const SOURCE_EXTENSIONS = ['.fs', '.fsproj']
 
-// VERIFY-008: layers 1-3 are `.mjs` importing `build/next`. The test tree is
+// VERIFY-008: layers 1-3 are `.mjs` importing `dist`. The test tree is
 // scanned with its own extensions rather than the production ones, so that
 // deleting `tests-next/` does not silently empty the test-side scan — an empty
 // scan makes every gate over it vacuously pass.
@@ -288,7 +288,7 @@ const DSL_PROGRAMS = [
 // VERIFY-008: the mjs contract that replaced `tests-next/GuideContract/Signatures.fs`.
 //
 // The F# version asserted types exist at COMPILE time; this one asserts each
-// entrypoint is a callable export in `build/next` at RUN time. Weaker about
+// entrypoint is a callable export in `dist` at RUN time. Weaker about
 // signatures, stronger about reachability — a function the build drops now fails.
 const GUIDE_CONTRACT_PATH = 'tests-mjs/guide-contract.test.mjs'
 

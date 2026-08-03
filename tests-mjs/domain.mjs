@@ -1,7 +1,7 @@
 // tests-mjs/domain.mjs — the ONLY file allowed to know Fable's output shape.
 //
 // VERIFY-008. Production is .fs; layers 1-3 tests are .mjs consuming
-// build/next. Fable's emitted names and container shapes are compiler
+// dist. Fable's emitted names and container shapes are compiler
 // artifacts, not domain concepts, so they are confined here — exactly as
 // VERIFY-005 confines dynamic Host access to adapters and codecs.
 //
@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const BUILD_ROOT = new URL('../build/next/', import.meta.url).pathname
+const BUILD_ROOT = new URL('../dist/', import.meta.url).pathname
 
 // ── locating the emitted library ─────────────────────────────────────────────
 // The fable-library directory carries its version (fable-library-js.5.13.0).

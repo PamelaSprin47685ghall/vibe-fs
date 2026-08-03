@@ -26,9 +26,9 @@ import { introspect } from './domain.mjs'
 
 // Repo-relative, because `walk` takes a path and `introspect.buildRoot` is the
 // absolute URL form the facade resolves modules through.
-const BUILD_ROOT = 'build/next'
+const BUILD_ROOT = 'dist'
 
-const load = (modulePath) => import(new URL(`../build/next/${modulePath}.js`, import.meta.url).pathname)
+const load = (modulePath) => import(new URL(`../dist/${modulePath}.js`, import.meta.url).pathname)
 
 /** Every emitted name, minus the reflection metadata Fable adds per type. */
 const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
@@ -191,8 +191,8 @@ test('VERIFY_008_every_emitted_module_actually_loads', async () => {
 // ── the facade is wired to a real build ─────────────────────────────────────
 
 test('VERIFY_008_the_contract_and_the_facade_read_the_same_build', () => {
-  // Both resolve `build/next` independently. If they ever disagreed, this file
+  // Both resolve `dist` independently. If they ever disagreed, this file
   // would be asserting against artifacts no test actually uses.
-  assert.match(introspect.buildRoot, /\/build\/next\/$/)
+  assert.match(introspect.buildRoot, /\/dist\/$/)
   assert.match(introspect.fableLibraryDir, /fable-library-js\.\d+\.\d+\.\d+$/)
 })

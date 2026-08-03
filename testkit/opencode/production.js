@@ -33,7 +33,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const BUILD_ROOT = fileURLToPath(new URL('../../build/next/', import.meta.url));
+const BUILD_ROOT = fileURLToPath(new URL('../../dist/', import.meta.url));
 const FABLE_MODULES = join(BUILD_ROOT, 'fable_modules');
 
 const fableLibraryDir = (() => {

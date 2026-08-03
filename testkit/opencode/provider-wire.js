@@ -4,7 +4,7 @@
  * VERIFY-007 has exactly two projections and they live in
  * `src/Wanxiangshu.Next/Domain/ProviderProjection.fs`. This file is NOT a third one: it decodes a
  * wire format and then asks the production projection every question. Nothing here
- * compares, normalises or digests — those all come from `build/next`.
+ * compares, normalises or digests — those all come from `dist`.
  *
  * ── why an adapter is still needed ──────────────────────────────────────────
  *
@@ -28,9 +28,9 @@
  * questions (there really is one meaning).
  */
 
-import { canonicalJson } from '../../build/next/Infrastructure/OpenCode/Codec/CanonicalJson.js';
-import { sha256Hex } from '../../build/next/Host/HostDigest.js';
-import { ToolCallIdModule_create as toolCallId } from '../../build/next/Kernel/Identity.js';
+import { canonicalJson } from '../../dist/Infrastructure/OpenCode/Codec/CanonicalJson.js';
+import { sha256Hex } from '../../dist/Host/HostDigest.js';
+import { ToolCallIdModule_create as toolCallId } from '../../dist/Kernel/Identity.js';
 import {
   ProviderWireProjection,
   WireMessage,
@@ -43,8 +43,8 @@ import {
   semanticallyEqual,
   toSemantic,
   toolResultDigests,
-} from '../../build/next/Domain/ProviderProjection.js';
-import { ofArray, toArray as listToArray } from '../../build/next/fable_modules/fable-library-js.5.13.0/List.js';
+} from '../../dist/Domain/ProviderProjection.js';
+import { ofArray, toArray as listToArray } from '../../dist/fable_modules/fable-library-js.5.13.0/List.js';
 
 // ── union construction by case NAME ─────────────────────────────────────────
 // Positional construction would silently relabel prose as reasoning: `WireText`

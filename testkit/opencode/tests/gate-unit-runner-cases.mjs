@@ -32,7 +32,7 @@ const FIXTURE_DIR = 'tests-mjs/fixtures';
 /**
  * Run the real runner over ONE fixture and report what happened.
  *
- * `--skip-staleness-check` because these cases are about the supervisor, not about `build/next`, and
+ * `--skip-staleness-check` because these cases are about the supervisor, not about `dist`, and
  * a stale build would otherwise fail them for an unrelated reason. The runner announces the skip on
  * stderr, so it cannot be silent.
  *

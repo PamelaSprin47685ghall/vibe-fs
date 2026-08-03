@@ -189,7 +189,7 @@ module SpikePlugin =
                 // read any of them; they were internal ports exposed for test
                 // visibility, which is the one thing VERIFY-008 names as forbidden.
                 // Two had no reader at all. Layer 1–3 tests reach these modules
-                // directly through `build/next`.
+                // directly through `dist`.
                 let hooks =
                     createObj
                         [ "chat.message", box (curriedHook wired.ChatMessageHook)

@@ -3,7 +3,7 @@
 //
 // Three responsibilities, in order:
 //
-//   1. Staleness gate. mjs tests import build/next, so a stale build means the suite silently
+//   1. Staleness gate. mjs tests import dist, so a stale build means the suite silently
 //      describes yesterday's code. Fail closed rather than emit a green light for bytes nobody
 //      asked about.
 //   2. Supervise a child that runs node:test, with a silence window fed by test VERDICTS.
@@ -57,7 +57,7 @@ import { classifyVerdict } from './verdict-feed.mjs'
 
 const TESTS_ROOT = 'tests-mjs'
 const PRODUCTION_ROOT = 'src/Wanxiangshu.Next'
-const BUILD_ROOT = 'build/next'
+const BUILD_ROOT = 'dist'
 const INNER = fileURLToPath(new URL('./run-inner.mjs', import.meta.url))
 
 const skipStaleness = process.argv.includes('--skip-staleness-check')

@@ -26,7 +26,7 @@ import {
   runtimeNudge,
   sessionId,
 } from '../domain.mjs'
-import * as PromptDispatcher from '../../build/next/Application/Prompting/PromptDispatcher.js'
+import * as PromptDispatcher from '../../dist/Application/Prompting/PromptDispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // Slow prior: need enough 4-grams of a single character to climb past HHI=0.03.

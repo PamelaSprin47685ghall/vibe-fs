@@ -37,8 +37,8 @@ assistant message 在 transform 之前已经创建并持久化。
 生产源码唯一根 `src/Wanxiangshu.Next/`（190 个 `.fs`，`Wanxiangshu.Next.fsproj` 编译全部）。
 布局纪律由 `scripts/repository-layout-gate.mjs`（`gate:layout`）机器验证：根目录白名单、
 生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约：Fable 输出
-`build/next/`，npm 包 main 指向 `build/next/Infrastructure/OpenCode/Plugin/Plugin.js`。
-根 `package.json` 为唯一 manifest；`files` = `build/next` + `resources`；无 postbuild staging。
+`dist/`，npm 包 main 指向 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`。
+根 `package.json` 为唯一 manifest；`files` = `dist` + `resources`；无 postbuild staging。
 
 ---
 
@@ -266,7 +266,7 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 npm run gate:static            # 第 0 层：layout + ssot + conformance + architecture + docs + toml + budget + surface + role-matrix
 npm run gate:shock             # 第 0 层：静态残留审计 + 单一写入口（shock-audit.mjs）
 
-npm run build                                # 生产 Fable → build/next（dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj）
+npm run build                                # 生产 Fable → dist（dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj）
 
 npm run test                   # 第 1–3 层（mjs，无编译步骤）
 npm run test:harness           # gate-testkit：mock 森林与隔离自检
@@ -295,7 +295,7 @@ send 行不得携带 `HumanRoot`。两项均已红过。
 `gate:docs`（`scripts/strip-doc-bold.mjs`）：prose 去加粗 + 全角标点空格规范化，
 fenced code block 不触碰。
 
-`test`（`test:unit`）拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
+`test`（`test:unit`）拒绝在 `dist` 陈旧时运行（fail closed）。先 `npm run build`。
 
 ### 时间界的四条实测语义（VERIFY-004）
 
@@ -338,7 +338,7 @@ repeat-until-pass 宣称成功、在测试中手工写 projection 终态。
 
 ## 6. 测试语言边界（VERIFY-008）
 
-生产 `.fs`。第 1–3 层测试全部 `.mjs`，直接 import `build/next` 发布产物。
+生产 `.fs`。第 1–3 层测试全部 `.mjs`，直接 import `dist` 发布产物。
 
 理由不是省编译时间，而是语言边界物理性地阻止测试触碰实现内部。能从 mjs 干净进入的
 恰好是 SSOT 认定为事实的契约面；碰不到的恰好是实现自由部分。
@@ -391,7 +391,7 @@ tests-mjs/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试（Contex
 Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证击穿过生产入口：
 
 `Task.CompletedTask` 编译成对 `get_CompletedTask` 的引用，而 Fable 不导出该 getter，
-于是 `build/next/Infrastructure/OpenCode/Plugin/Plugin.js` 在 import 时就抛错——整个插件
+于是 `dist/Infrastructure/OpenCode/Plugin/Plugin.js` 在 import 时就抛错——整个插件
 根本加载不了，而 F# 侧毫无警告。用 `src/Wanxiangshu.Next/Kernel/AsyncSupport.fs` 的
 `completedTask()` 代替。
 
