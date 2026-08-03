@@ -3,8 +3,8 @@
 ## 当前基线
 
 - 分支：`refactor/ssot-shock-anneal`
-- 最后验证 commit：`24bda4f5`（0.5.0 发布前全链路验证收口）
-- 工作区干净
+- 最后验证 commit：`e2d00a23`（Enforcer 垂直切片 0–8 合入后）
+- 工作区：9 文件未提交（`semanticCursorFor` 修复 + `frame-commit` 冷边界 + 首次请求重建 + staged context 消费）
 
 ## 当前产品状态
 
@@ -25,6 +25,41 @@ Host capability canary（`host-transform-capability`，STRENGTH-078 C-01…C-10 
 ENFORCER-180 第 0 步 1–6）已建并全绿，Enforcer 的 blog 工具与挂起链已接线
 （PARTIAL）。下一步是逐纵向接线（推荐顺序：Strength shadow → Enforcer nudge
 overlay → Student/Teacher）。
+
+### 未提交的修复（9 文件）
+
+Enforcer 垂直切片合入后发现的三个关联问题，修复使 `host-transform-capability`
+canary 全绿（build + 616 单测 + 285 harness + canary 通过）：
+
+1. **`semanticCursorFor` 从 `>=` 改为 `>`**（`Journal/XTraceProjection.fs`）：
+   覆盖序列表示「已消费」，delta 应从严格之后的部分开始。修复前 resumed 请求
+   的 delta 重复已覆盖的 turn-1 内容（coverage 不前进）。
+   **回归风险**：fallback canary 的 `prefix-probe` 冷边界声明未触发（见下方阻塞）。
+
+2. **`frame-commit` 冷边界**（`testkit/opencode/cold-boundary.js` + TOML）：
+   Blogger 会话的 frame commit 重建 provider view（frame 列表增长 + delta 前进），
+   前缀变化是预期的。新增 `frame-commit` 边界种类，行为同 `prefix-probe`
+   （允许 seal 建立不触发、检查 tools 不变），但命名正确。
+
+3. **首次请求重建 + staged context 消费**（`EnforcerHost.fs` + `CompanionTransform.fs`）：
+   - `handleContinuation` 对无 blog call 的首次请求也重建 provider view
+     （`[system, user(# New Work To Record + TOML), user(instruction)]`）。
+   - `commitCycle` 消费 staged typed context 的 `NextIngestedThroughSequence`
+     作为 coverage advance（ENFORCER-045），而非 XTrace head。
+   - `alreadyCommitted` 检查防止 resumed transform 重复消费 staged offer。
+   - `CompanionTransform` 的 offer 路径从 journal projection 读 coverage
+     （非 in-memory mirror，后者不被 continuation transform 的 commitCycle 更新）。
+
+### 已知未闭合问题
+
+- **fallback canary `prefix-probe` 未触发**：`semanticCursorFor` 从 `>=` 改为 `>`
+  后，X prefix probe 的 cursor 计算可能受影响。probe 应在 `continue` turn 替换
+  已提交前缀（破 seal），但实测未触发。需调查 `semanticCursorFor` 对
+  `Companion.fs` / `CompanionHost.fs` 调用者的影响。
+- **CTX-011「committed entry consumed nothing」**：一次实测中
+  `BlogEntryCommitted` 被 fold 拒绝（`nextIngestSequence <= previousIngestSequence`）。
+  可能与 parallel session 的 XTrace 为空有关（`headSequence = 0` 时
+  `nextIngestSequence = 0`）。需确认 `semanticCursorFor` 改动后此路径是否仍可达。
 
 ## 活跃阻塞
 

@@ -32,6 +32,10 @@ module internal CompanionHostBlogger =
             /// Supplied by `CompanionHost` as a closure over `PluginRuntimeScope` so
             /// this module does not grow a second scope dependency.
             RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit
+            /// ENFORCER-045: stage the typed request context before the prompt
+            /// goes out. The continuation transform consumes it for the coverage
+            /// advance (fail closed when absent).
+            StageBloggerContext: SessionId -> BloggerRequestContext -> unit
         }
 
     /// CTX-007 for one squash attempt: the terminal resolved into an AttemptOutcome.
@@ -228,7 +232,16 @@ module internal CompanionHostBlogger =
             let! sent = sendBloggerPrompt deps childId prompt
 
             match sent with
-            | Ok _ -> lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
+            | Ok _ ->
+                lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
+
+                // ENFORCER-045: stage the typed request context so the
+                // continuation transform's commitCycle consumes the declared
+                // coverage advance (not the XTrace head).
+                let blog = deps.Companion.Memory.Blog
+                let xTrace = deps.Companion.Memory.XTrace
+                let ctx = EnforcerHost.mainContextFromChunk blog xTrace chunk
+                deps.StageBloggerContext childId ctx
             | Error _ -> ()
 
             return sent

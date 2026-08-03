@@ -177,6 +177,15 @@ module CompanionTransform =
 
                                             scope.RecordAttemptPlan bloggerId providerRun plan
 
+                            // ENFORCER-045: the typed request context the
+                            // continuation transform's commitCycle consumes for
+                            // the coverage advance goes through the same staged
+                            // offer channel as a parked resume.
+                            value.StageBloggerContext <-
+                                fun bloggerId ctx ->
+                                    (scope :> IParkedTransformHost).OfferParked(SessionId.value bloggerId, ctx)
+                                    |> ignore
+
                             value)
 
                 // ENFORCER-050: single coordinator. The main session transform
@@ -190,8 +199,30 @@ module CompanionTransform =
                     // Parked: stage the typed delta and resume the parked transform.
                     // The continuation rebuilds the full provider view from durable
                     // frames + this context — no PromptDispatcher, no raw transcript.
-                    let blog = companion.Memory.Blog
-                    let xTrace = companion.Memory.XTrace
+                    //
+                    // ENFORCER-045: coverage comes from the JOURNAL projection, not
+                    // the in-memory mirror — the continuation transform's commitCycle
+                    // advances the journal's Blog projection, and the in-memory
+                    // mirror is only refreshed by the main session's own Submit.
+                    let blog, xTrace =
+                        match journal with
+                        | Some j ->
+                            let projections = (AgentJournal.snapshot j).AgentProjections
+
+                            let session = projections.Sessions |> Map.tryFind (SessionId.create sessionId)
+
+                            let blogProjection =
+                                session
+                                |> Option.bind (fun s -> s.Blog)
+                                |> Option.defaultValue BlogProjection.empty
+
+                            let xTraceProjection =
+                                session
+                                |> Option.bind (fun s -> s.XTrace)
+                                |> Option.defaultValue XTraceProjection.empty
+
+                            blogProjection, xTraceProjection
+                        | None -> companion.Memory.Blog, companion.Memory.XTrace
 
                     let current =
                         Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic

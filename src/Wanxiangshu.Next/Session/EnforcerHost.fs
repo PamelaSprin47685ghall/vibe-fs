@@ -204,6 +204,7 @@ module EnforcerHost =
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
         (merged: EnforcerCycle.MergedCycle)
+        (declaredAdvance: int64 option)
         : Result<EnforcementCycleRecord, string> =
         let projections = AgentJournal.snapshot journal
 
@@ -235,20 +236,22 @@ module EnforcerHost =
                 |> Option.bind (fun s -> s.XTrace)
                 |> Option.defaultValue XTraceProjection.empty
 
-            // Coverage advance: first XTrace part at or after the current
-            // ingest cursor; absent → head (everything recorded consumed).
-            // Commit 4 replaces this with the typed BloggerRequestContext's
-            // declared advance (fail closed when the context is missing).
+            // Coverage advance: the typed context's declared advance when
+            // staged (ENFORCER-045), else the first XTrace part at or after
+            // the current ingest cursor; absent → head.
             let ingestedThrough =
-                let cursor =
-                    XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+                match declaredAdvance with
+                | Some declared -> declared
+                | None ->
+                    let cursor =
+                        XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
 
-                xTrace.Parts
-                |> List.tryFind (fun part ->
-                    part.Turn > cursor.TurnIndex
-                    || (part.Turn = cursor.TurnIndex && part.PartIndex >= cursor.PartIndex))
-                |> Option.map (fun part -> part.Cursor.Sequence)
-                |> Option.defaultValue (XTraceProjection.headSequence xTrace)
+                    xTrace.Parts
+                    |> List.tryFind (fun part ->
+                        part.Turn > cursor.TurnIndex
+                        || (part.Turn = cursor.TurnIndex && part.PartIndex >= cursor.PartIndex))
+                    |> Option.map (fun part -> part.Cursor.Sequence)
+                    |> Option.defaultValue (XTraceProjection.headSequence xTrace)
 
             match journal.WriteBlob merged.MergedText with
             | Error error -> Error error
@@ -423,43 +426,88 @@ module EnforcerHost =
                 let mainSessionId = owner
                 let providerRun = ProviderRunIdentity.create messageId
 
-                match validateCycle messageId calls with
-                | Error reason ->
-                    // ENFORCER-043: an invalid cycle is not a frame. Diagnose
-                    // and proceed — the continuation still parks.
-                    Diagnostic.emit
-                        "enforcer-cycle-invalid"
-                        [ "session_id", SessionId.value bloggerSessionId; "result", reason ]
-                | Ok(merged, toolCallIds) ->
-                    match commitCycle durable mainSessionId bloggerSessionId providerRun toolCallIds merged with
-                    | Ok _ -> ()
+                // ENFORCER-154: the commit is idempotent — a resumed transform
+                // re-enters with the same raw messages (same provider run) and
+                // must NOT consume the staged offer again. The offer belongs to
+                // the NEXT cycle's coverage advance, not this one's.
+                let alreadyCommitted =
+                    (AgentJournal.snapshot durable).AgentProjections.Sessions
+                    |> Map.tryFind mainSessionId
+                    |> Option.bind (fun session -> session.Enforcement)
+                    |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
+                    |> Option.flatten
+                    |> Option.isSome
+
+                if alreadyCommitted then
+                    // Resumed continuation: the cycle was already committed.
+                    // Rebuild the view from the staged offer (the next delta)
+                    // and return — no commit, no park.
+                    let resumeWithContext ctx =
+                        rebuildFromContext durable bloggerSessionId ctx
+
+                    match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
+                    | Some ctx -> return resumeWithContext ctx
+                    | None -> return rawMessages
+                else
+                    // ENFORCER-045: consume the staged typed context for the
+                    // coverage advance. The blog function staged it after sending
+                    // the prompt; the commit must use the declared advance, not
+                    // the XTrace head.
+                    let stagedCtx = scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId)
+
+                    let declaredAdvance =
+                        stagedCtx
+                        |> Option.bind (fun ctx ->
+                            match ctx with
+                            | BloggerRequestContext.Main main -> Some main.NextIngestedThroughSequence
+                            | BloggerRequestContext.Squash _ -> None)
+
+                    match validateCycle messageId calls with
                     | Error reason ->
+                        // ENFORCER-043: an invalid cycle is not a frame. Diagnose
+                        // and proceed — the continuation still parks.
                         Diagnostic.emit
-                            "enforcer-cycle-commit-failed"
+                            "enforcer-cycle-invalid"
                             [ "session_id", SessionId.value bloggerSessionId; "result", reason ]
+                    | Ok(merged, toolCallIds) ->
+                        match
+                            commitCycle
+                                durable
+                                mainSessionId
+                                bloggerSessionId
+                                providerRun
+                                toolCallIds
+                                merged
+                                declaredAdvance
+                        with
+                        | Ok _ -> ()
+                        | Error reason ->
+                            Diagnostic.emit
+                                "enforcer-cycle-commit-failed"
+                                [ "session_id", SessionId.value bloggerSessionId; "result", reason ]
 
-                // ENFORCER-047: after the commit the continuation parks and waits
-                // for the next offer. An offer that raced ahead (staged while this
-                // transform was still running) is consumed instead of parking.
-                let resumeWithContext ctx =
-                    match journal with
-                    | Some durable -> rebuildFromContext durable bloggerSessionId ctx
-                    | None -> rawMessages
+                    // ENFORCER-047: after the commit the continuation parks and waits
+                    // for the next offer. An offer that raced ahead (staged while this
+                    // transform was still running) is consumed instead of parking.
+                    let resumeWithContext ctx =
+                        match journal with
+                        | Some durable -> rebuildFromContext durable bloggerSessionId ctx
+                        | None -> rawMessages
 
-                match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                | Some ctx -> return resumeWithContext ctx
-                | None ->
-                    let! resumed = scope.ParkTransform(SessionId.value bloggerSessionId, ParkedTransformLifetime)
+                    match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
+                    | Some ctx -> return resumeWithContext ctx
+                    | None ->
+                        let! resumed = scope.ParkTransform(SessionId.value bloggerSessionId, ParkedTransformLifetime)
 
-                    if not resumed then
-                        // Cancelled (dispose/delete/abort) or timed out: fail
-                        // closed — return the messages unchanged and let the
-                        // Host's step loop continue on its own.
-                        return rawMessages
-                    else
-                        match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
-                        | Some ctx -> return resumeWithContext ctx
-                        | None -> return rawMessages
+                        if not resumed then
+                            // Cancelled (dispose/delete/abort) or timed out: fail
+                            // closed — return the messages unchanged and let the
+                            // Host's step loop continue on its own.
+                            return rawMessages
+                        else
+                            match scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId) with
+                            | Some ctx -> return resumeWithContext ctx
+                            | None -> return rawMessages
             | _ ->
                 // COMPANION-005 first request: no blog calls yet, but the raw
                 // TOML prompt still needs the request shape. Rebuild the provider

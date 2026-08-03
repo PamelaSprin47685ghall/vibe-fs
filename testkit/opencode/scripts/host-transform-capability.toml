@@ -89,3 +89,11 @@ user = "First coder turn."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
+
+# ENFORCER-030: a frame commit rebuilds the Blogger session's provider view —
+# the frame list grows and the delta advances. The prefix change is expected;
+# declare it so ARCH-004 does not fail closed.
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"

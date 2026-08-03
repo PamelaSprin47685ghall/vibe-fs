@@ -206,15 +206,22 @@ try {
 
   // Request shape (COMPANION-005 / ENFORCER-030): first request has no Working
   // Record frames — just New Work + final instruction. The system prompt must
-  // not prohibit tools.
-  const firstTexts = requestTexts(firstBlogRequest);
+  // not prohibit tools. Check only USER messages (the system prompt documents
+  // the headings, so a substring check on the full transcript would be a false positive).
+  const userTexts = (firstBlogRequest?.messages ?? [])
+    .filter((m) => m?.role === 'user')
+    .map((m) => {
+      const c = m?.content ?? '';
+      return Array.isArray(c) ? c.map((p) => p?.text ?? '').join('') : String(c);
+    })
+    .join('\n');
   assert.ok(
-    !firstTexts.includes('# Working Record'),
-    `first request has no Working Record frames: ${JSON.stringify(firstTexts.slice(0, 200))}`,
+    !userTexts.includes('# Working Record'),
+    `first request has no Working Record frames: ${JSON.stringify(userTexts.slice(0, 200))}`,
   );
   assert.ok(
-    firstTexts.includes('# New Work To Record'),
-    `first request has New Work To Record delta: ${JSON.stringify(firstTexts.slice(0, 200))}`,
+    userTexts.includes('# New Work To Record'),
+    `first request has New Work To Record delta: ${JSON.stringify(userTexts.slice(0, 200))}`,
   );
   const firstLastUser = lastUserText(firstBlogRequest);
   assert.ok(
@@ -226,9 +233,9 @@ try {
     'instruction requires exactly one blog call',
   );
   // TOML is data-only: no instruction comment inside the delta.
-  const tomlSection = firstTexts.slice(
-    firstTexts.indexOf('# New Work To Record'),
-    firstTexts.indexOf('# Write the dense work-log continuation now'),
+  const tomlSection = userTexts.slice(
+    userTexts.indexOf('# New Work To Record'),
+    userTexts.indexOf('# Write the dense work-log continuation now'),
   );
   assert.ok(
     !tomlSection.includes('# Write'),
@@ -323,9 +330,19 @@ try {
     !resumedTexts.includes('"OK"'),
     `resumed request must NOT contain old "OK" tool result: ${JSON.stringify(resumedTexts.slice(-200))}`,
   );
-  assert.ok(
-    !resumedTexts.includes('cycle one text'),
-    'resumed request must NOT contain old blog tool call text as raw transcript',
+  // The committed cycle text appears inside the Working Record frame — that is
+  // the correct carrier. It must NOT appear as raw transcript (old tool call
+  // or bare text in a message without the Working Record heading).
+  const resumedMessages = secondBlogRequest?.messages ?? [];
+  const cycleTextOutsideFrame = resumedMessages.filter((m) => {
+    const c = m?.content ?? '';
+    const text = Array.isArray(c) ? c.map((p) => p?.text ?? '').join('') : String(c);
+    return text.includes('cycle one text') && !text.startsWith('# Working Record');
+  });
+  assert.equal(
+    cycleTextOutsideFrame.length,
+    0,
+    `cycle text must only appear inside the Working Record frame: ${JSON.stringify(cycleTextOutsideFrame.map((m) => (m?.content ?? '').slice(0, 100)))}`,
   );
 
   // The new delta must not repeat already-covered content.
