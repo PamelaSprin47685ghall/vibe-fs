@@ -305,13 +305,23 @@ try {
   );
 
   // ENFORCER-051: the resumed request is rebuilt from durable frames via
-  // CompanionProjectionBuilder — [[do_not_exec]] historic frames + new_work
-  // delta + exactly-once instruction. It must NOT contain the raw physical
-  // transcript (old tool call, "OK" tool result, bare TOML from turn 1).
+  // CompanionProjectionBuilder — assistant [[do_not_exec]] historic frames +
+  // user new_work delta. It must NOT contain the raw physical transcript
+  // (old tool call, "OK" tool result, bare TOML from turn 1).
   const resumedTexts = requestTexts(secondBlogRequest);
   assert.ok(
     resumedTexts.includes('[[do_not_exec]]') && resumedTexts.includes('historic_frame'),
     `resumed request has historic frames: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
+  );
+  const resumedMessages = secondBlogRequest?.messages ?? [];
+  const historicAssistant = resumedMessages.filter((m) => {
+    const c = m?.content ?? '';
+    const text = Array.isArray(c) ? c.map((p) => p?.text ?? '').join('') : String(c);
+    return m?.role === 'assistant' && text.includes('[[do_not_exec]]');
+  });
+  assert.ok(
+    historicAssistant.length >= 1,
+    `historic frames must be assistant role: ${JSON.stringify(resumedMessages.map((m) => m?.role))}`,
   );
   assert.ok(
     resumedTexts.includes('[[new_work_to_record]]'),
@@ -335,7 +345,6 @@ try {
   );
   // The committed cycle text appears inside the historic_frame — that is the
   // correct carrier. It must NOT appear as raw transcript outside do_not_exec.
-  const resumedMessages = secondBlogRequest?.messages ?? [];
   const cycleTextOutsideFrame = resumedMessages.filter((m) => {
     const c = m?.content ?? '';
     const text = Array.isArray(c) ? c.map((p) => p?.text ?? '').join('') : String(c);

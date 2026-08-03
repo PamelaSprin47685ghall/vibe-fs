@@ -29,9 +29,9 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Normal -> "normal"
         | CompanionRequestKind.Squash _ -> "squash"
 
-    /// Normal: [[do_not_exec]] historic frames + one user message
+    /// Normal: assistant `[[do_not_exec]]` historic frames + one user message
     /// (instruction comment header first, then [[new_work_to_record]] data).
-    /// Squash: oldest k historic frames + squash instruction LAST (no delta).
+    /// Squash: oldest k assistant historic frames + squash instruction LAST (no delta).
     ///
     /// HOST-010: last user message binds the outbound assistant. For normal that
     /// is the combined delta message; for squash it is the instruction message.
@@ -52,7 +52,8 @@ module CompanionProjectionBuilder =
             selected
             |> List.mapi (fun ordinal (digest, body) ->
                 { MessageId = CompanionIdentity.frameMessageId sha256 bloggerSessionId frameEpoch ordinal digest
-                  Role = "user"
+                  // Role only: body still `[[do_not_exec]] historic_frame = …`.
+                  Role = "assistant"
                   Text = CompanionPrompt.workingRecordMessage body
                   IsPhysical = false })
 

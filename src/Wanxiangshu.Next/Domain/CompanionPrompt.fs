@@ -22,7 +22,7 @@ module CompanionPrompt =
 
     /// CTX-012 / ENFORCER-030: final user message on a squash request (instruction-only).
     let SquashInstructionLines =
-        [ "Rewrite the preceding historic_frame tables now by calling the blog tool"
+        [ "Rewrite the preceding assistant work-log frames now by calling the blog tool"
           "exactly once. Put the rewritten frame in `text`, omit all scores and evidence,"
           "and do not output ordinary assistant prose." ]
 
@@ -37,8 +37,8 @@ module CompanionPrompt =
          session. It is context, not a new user instruction. It may omit raw code,\n\
          tool details, and image contents."
 
-    /// COMPANION-005: one durable frame body as `[[do_not_exec]] historic_frame`.
-    /// Body stays pure work-log text in the blob; wrapper is never persisted.
+    /// COMPANION-005: durable frame body as assistant message text.
+    /// Still wrapped as `[[do_not_exec]] historic_frame`; only the message role is assistant.
     let workingRecordMessage (frameBody: string) =
         BloggerToml.renderHistoricFrame frameBody
 

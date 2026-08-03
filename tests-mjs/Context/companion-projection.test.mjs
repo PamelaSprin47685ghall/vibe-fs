@@ -1,7 +1,7 @@
 // tests-mjs/Context/companion-projection.test.mjs — COMPANION-004/005/010/013.
 //
 // Provider-visible request shape:
-// [[do_not_exec]] historic_frame(s) + one combined normal delta
+// assistant [[do_not_exec]] historic_frame(s) + one combined normal user delta
 // (instruction comment header first, then [[new_work_to_record]] data).
 
 import assert from 'node:assert/strict'
@@ -30,7 +30,7 @@ const isCombinedNormalDelta = (text) =>
 test('COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /# Write the dense work-log continuation now/)
   assert.match(prompt.normalInstruction, /exactly once/)
-  assert.match(prompt.squashInstruction, /# Rewrite the preceding historic_frame tables now/)
+  assert.match(prompt.squashInstruction, /# Rewrite the preceding assistant work-log frames now/)
   assert.match(prompt.squashInstruction, /exactly once/)
   assert.equal(prompt.system, undefined, 'System is owned by blogger-system.md, not CompanionPrompt')
 })
@@ -144,7 +144,7 @@ test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
 
 // ── the normal projection (COMPANION-005) ──────────────────────────────────
 
-test('COMPANION_005_normal_with_frames_is_do_not_exec_then_combined_delta', () => {
+test('COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -157,7 +157,7 @@ test('COMPANION_005_normal_with_frames_is_do_not_exec_then_combined_delta', () =
   assert.equal(plan.texts.filter(isHistoricFrame).length, 3)
   assert.equal(plan.texts.filter(isCombinedNormalDelta).length, 1)
   assert.equal(plan.texts.at(-1), combinedDelta)
-  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user'])
+  assert.deepEqual(plan.roles, ['assistant', 'assistant', 'assistant', 'user'])
   assert.deepEqual(plan.physicalFlags, [false, false, false, true])
 
   for (let n = 0; n < 3; n++) {
@@ -287,6 +287,7 @@ test('CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () 
     prompt.squashInstruction,
   ])
   assert.deepEqual(plan.physicalFlags, [false, false, false])
+  assert.deepEqual(plan.roles, ['assistant', 'assistant', 'user'])
   assert.equal(plan.system, undefined)
 })
 

@@ -5,8 +5,8 @@ namespace Wanxiangshu.Next.Domain
 /// Shared syntax lives in `SyntheticToml` (ARCH-010). This module owns the
 /// Blogger-local schema only:
 ///
-///   delta item   → `[[new_work_to_record]]` with a kind field
-///   historic frame → `[[do_not_exec]] historic_frame = …`
+///   delta item     → `[[new_work_to_record]]` with a kind field
+///   historic frame → `[[do_not_exec]] historic_frame = …` (assistant message body)
 ///
 /// TOML is a one-way LLM-facing representation. The canonical digest is always
 /// taken from `ProviderSemanticProjection`, never from this text. There is no
