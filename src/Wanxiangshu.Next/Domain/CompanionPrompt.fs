@@ -8,17 +8,28 @@ namespace Wanxiangshu.Next.Domain
 [<RequireQualifiedAccess>]
 module CompanionPrompt =
 
-    /// COMPANION-005: final user message on a normal BloggerMain request.
-    let NormalInstruction =
-        "# Write the dense work-log continuation now by calling the blog tool exactly once.\n\
-         Put the continuation in `text`, omit zero-valued scores, and do not output\n\
-         ordinary assistant prose."
+    /// Plain lines for ARCH-010 TOML instruction header (SyntheticToml.comment adds `# `).
+    let NormalInstructionLines =
+        [ "Write the dense work-log continuation now by calling the blog tool exactly once."
+          "Put the continuation in `text`, omit zero-valued scores, and do not output"
+          "ordinary assistant prose." ]
 
-    /// CTX-012 / ENFORCER-030: final user message on a squash request.
+    /// Standalone normal instruction (prompt_async claim / diagnostics). Same text as header.
+    let NormalInstruction =
+        NormalInstructionLines
+        |> List.map (fun line -> "# " + line)
+        |> String.concat "\n"
+
+    /// CTX-012 / ENFORCER-030: final user message on a squash request (instruction-only).
+    let SquashInstructionLines =
+        [ "Rewrite the preceding historic_frame tables now by calling the blog tool"
+          "exactly once. Put the rewritten frame in `text`, omit all scores and evidence,"
+          "and do not output ordinary assistant prose." ]
+
     let SquashInstruction =
-        "# Rewrite the preceding historic_frame tables now by calling the blog tool\n\
-         exactly once. Put the rewritten frame in `text`, omit all scores and evidence,\n\
-         and do not output ordinary assistant prose."
+        SquashInstructionLines
+        |> List.map (fun line -> "# " + line)
+        |> String.concat "\n"
 
     /// COMPANION-010: low-trust wrapper preamble for companion memory injected into X.
     let CompanionMemoryPreamble =
@@ -31,9 +42,17 @@ module CompanionPrompt =
     let workingRecordMessage (frameBody: string) =
         BloggerToml.renderHistoricFrame frameBody
 
-    /// COMPANION-005: data-only TOML delta is already the user-message body.
-    /// No markdown title; table name `new_work_to_record` is the label (CTX-013).
-    let newWorkMessage (toml: string) = toml
+    /// COMPANION-005: normal delta user message = instruction header first, then data body.
+    ///
+    /// ARCH-010: comment header + one blank line + `[[new_work_to_record]]` tables.
+    /// `toml` is data-only (CTX-013); header is projection-only and not part of the
+    /// 200 KiB chunk meter (metered at nextChunk before wrap).
+    let newWorkMessage (toml: string) =
+        let body = if isNull toml then "" else toml.TrimEnd('\n', '\r')
+
+        match body with
+        | "" -> SyntheticToml.document NormalInstructionLines []
+        | data -> SyntheticToml.document NormalInstructionLines [ data ]
 
     /// COMPANION-010: wrap a frozen record prefix body for injection into X.
     let companionMemoryBlock (frozenRecordPrefix: string) =

@@ -29,13 +29,12 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Normal -> "normal"
         | CompanionRequestKind.Squash _ -> "squash"
 
-    let private instructionFor (kind: CompanionRequestKind) =
-        match kind with
-        | CompanionRequestKind.Normal -> CompanionPrompt.NormalInstruction
-        | CompanionRequestKind.Squash _ -> CompanionPrompt.SquashInstruction
-
-    /// Normal: [[do_not_exec]] historic frames + [[new_work_to_record]] delta + instruction LAST.
+    /// Normal: [[do_not_exec]] historic frames + one user message
+    /// (instruction comment header first, then [[new_work_to_record]] data).
     /// Squash: oldest k historic frames + squash instruction LAST (no delta).
+    ///
+    /// HOST-010: last user message binds the outbound assistant. For normal that
+    /// is the combined delta message; for squash it is the instruction message.
     let build
         (sha256: string -> string)
         (bloggerSessionId: SessionId)
@@ -57,29 +56,32 @@ module CompanionProjectionBuilder =
                   Text = CompanionPrompt.workingRecordMessage body
                   IsPhysical = false })
 
-        let deltaMessages =
-            match kind, physicalDelta with
-            | CompanionRequestKind.Normal, Some(messageId, toml) ->
-                [ { MessageId = messageId
-                    Role = "user"
-                    Text = CompanionPrompt.newWorkMessage toml
-                    IsPhysical = true } ]
-            | _ -> []
+        match kind with
+        | CompanionRequestKind.Normal ->
+            let deltaMessages =
+                match physicalDelta with
+                | Some(messageId, toml) ->
+                    [ { MessageId = messageId
+                        Role = "user"
+                        Text = CompanionPrompt.newWorkMessage toml
+                        IsPhysical = true } ]
+                | None -> []
 
-        let instruction =
-            { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
-              Role = "user"
-              Text = instructionFor kind
-              IsPhysical = false }
+            // Combined delta is last (HOST-010). No separate instruction message.
+            { Messages = frameMessages @ deltaMessages }
+        | CompanionRequestKind.Squash _ ->
+            let instruction =
+                { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
+                  Role = "user"
+                  Text = CompanionPrompt.SquashInstruction
+                  IsPhysical = false }
 
-        // Instruction is always last (HOST-010 parent binding).
-        { Messages = frameMessages @ deltaMessages @ [ instruction ] }
+            { Messages = frameMessages @ [ instruction ] }
 
-    /// First-turn shape: delta + instruction, no historic frames.
+    /// First-turn shape: one physical combined delta (instruction header + data), no frames.
     let isFirstTurnShape (plan: CompanionProjectionPlan) =
         match plan.Messages with
-        | [ delta; instruction ] ->
+        | [ delta ] ->
             delta.IsPhysical
-            && not instruction.IsPhysical
-            && instruction.Text.StartsWith("# Write the dense work-log continuation now")
+            && delta.Text.StartsWith("# Write the dense work-log continuation now")
         | _ -> false

@@ -1,7 +1,8 @@
 // tests-mjs/Context/companion-projection.test.mjs — COMPANION-004/005/010/013.
 //
 // Provider-visible request shape:
-// [[do_not_exec]] historic_frame(s) + [[new_work_to_record]] delta + final instruction.
+// [[do_not_exec]] historic_frame(s) + one combined normal delta
+// (instruction comment header first, then [[new_work_to_record]] data).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -17,10 +18,12 @@ const spy = (input) => `«${input}»`
 const frames = (count) =>
   Array.from({ length: count }, (_, n) => ({ digest: `sha-f${n}`, body: `frame body ${n}` }))
 
-const tomlDelta = '[[new_work_to_record]]\nuser = "work"'
+const dataToml = '[[new_work_to_record]]\nuser = "work"'
+const combinedDelta = prompt.newWork(dataToml)
 
 const isHistoricFrame = (text) => text.startsWith('[[do_not_exec]]') && text.includes('historic_frame')
-const isNewWorkDelta = (text) => text.includes('[[new_work_to_record]]') || text === tomlDelta || !text.startsWith('#')
+const isCombinedNormalDelta = (text) =>
+  text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 
 // ── prompt text is fixed and carries no numbers ─────────────────────────────
 
@@ -62,11 +65,20 @@ test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
 
 test('COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
   assert.equal(prompt.workingRecord('frame body 0'), toml.renderHistoricFrame('frame body 0'))
-  assert.equal(prompt.newWork(tomlDelta), tomlDelta, 'delta body is unmodified identity')
   assert.equal(prompt.workingRecord('frame body 0').includes('[[do_not_exec]]'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('historic_frame'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('# Working Record'), false)
-  assert.equal(prompt.newWork(tomlDelta).includes('# New Work To Record'), false)
+  assert.equal(prompt.newWork(dataToml).includes('# New Work To Record'), false)
+})
+
+test('COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
+  const rendered = prompt.newWork(dataToml)
+  assert.equal(rendered.startsWith('# Write the dense work-log continuation now'), true)
+  assert.equal(rendered.includes('\n\n[[new_work_to_record]]'), true)
+  assert.equal(rendered.endsWith(dataToml + '\n') || rendered.endsWith(dataToml), true)
+  // Data body has no extra instruction after tables.
+  const dataStart = rendered.indexOf('[[new_work_to_record]]')
+  assert.equal(rendered.slice(dataStart).includes('# Write'), false)
 })
 
 // ── synthetic identities (COMPANION-013) ───────────────────────────────────
@@ -132,63 +144,66 @@ test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
 
 // ── the normal projection (COMPANION-005) ──────────────────────────────────
 
-test('COMPANION_005_normal_with_frames_is_do_not_exec_then_delta_then_instruction', () => {
+test('COMPANION_005_normal_with_frames_is_do_not_exec_then_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: frames(3),
-    delta: { messageId: 'msg_delta', toml: tomlDelta },
+    delta: { messageId: 'msg_delta', toml: dataToml },
   })
 
   assert.equal(plan.system, undefined, 'projection plan no longer carries System')
   assert.equal(plan.texts.filter(isHistoricFrame).length, 3)
-  assert.equal(plan.texts.filter((t) => t === tomlDelta || t.includes('[[new_work_to_record]]')).length, 1)
-  assert.equal(plan.texts.at(-1), prompt.normalInstruction)
-  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user', 'user'])
-  assert.deepEqual(plan.physicalFlags, [false, false, false, true, false])
+  assert.equal(plan.texts.filter(isCombinedNormalDelta).length, 1)
+  assert.equal(plan.texts.at(-1), combinedDelta)
+  assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user'])
+  assert.deepEqual(plan.physicalFlags, [false, false, false, true])
 
   for (let n = 0; n < 3; n++) {
     assert.equal(plan.texts[n], toml.renderHistoricFrame(`frame body ${n}`))
   }
-  assert.equal(plan.texts[3], tomlDelta)
+  assert.equal(plan.texts[3], combinedDelta)
+  // No separate trailing instruction message.
+  assert.equal(plan.texts.filter((t) => t === prompt.normalInstruction).length, 0)
 })
 
-test('COMPANION_005_normal_without_frames_is_delta_then_instruction', () => {
+test('COMPANION_005_normal_without_frames_is_one_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: [],
-    delta: { messageId: 'msg_first', toml: 'first' },
+    delta: { messageId: 'msg_first', toml: dataToml },
   })
 
   assert.equal(plan.texts.filter(isHistoricFrame).length, 0)
-  assert.deepEqual(plan.texts, ['first', prompt.normalInstruction])
-  assert.deepEqual(plan.physicalFlags, [true, false])
+  assert.deepEqual(plan.texts, [combinedDelta])
+  assert.deepEqual(plan.physicalFlags, [true])
   assert.equal(plan.isFirstTurnShape, true)
   assert.equal(plan.system, undefined)
 })
 
-test('COMPANION_005_instruction_is_always_the_last_user_message', () => {
+test('COMPANION_005_combined_delta_is_always_the_last_user_message', () => {
   const withFrames = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: 'x' },
+    delta: { messageId: 'msg_d', toml: dataToml },
   })
   const withoutFrames = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: [],
-    delta: { messageId: 'msg_d', toml: 'x' },
+    delta: { messageId: 'msg_d', toml: dataToml },
   })
 
-  assert.equal(withFrames.texts.at(-1), prompt.normalInstruction)
-  assert.equal(withoutFrames.texts.at(-1), prompt.normalInstruction)
-  assert.equal(withFrames.messages.at(-1).physical, false)
+  assert.equal(withFrames.texts.at(-1), combinedDelta)
+  assert.equal(withoutFrames.texts.at(-1), combinedDelta)
+  assert.equal(withFrames.messages.at(-1).physical, true)
+  assert.equal(withoutFrames.messages.at(-1).physical, true)
 })
 
 test('COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
@@ -197,7 +212,7 @@ test('COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
     epoch: 0,
     kind: proj.normal,
     frames: frames(4),
-    delta: { messageId: 'msg_d', toml: 'x' },
+    delta: { messageId: 'msg_d', toml: dataToml },
   })
 
   const frameTexts = plan.texts.slice(0, 4)
@@ -206,7 +221,7 @@ test('COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
     assert.equal(text.startsWith('[[do_not_exec]]'), true)
     assert.equal(text.includes('# Working Record'), false)
   }
-  assert.equal(plan.texts[4], 'x')
+  assert.equal(plan.texts[4], combinedDelta)
 })
 
 test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
@@ -215,13 +230,13 @@ test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
     epoch: 0,
     kind: proj.normal,
     frames: frames(1),
-    delta: { messageId: 'msg_real', toml: 'x' },
+    delta: { messageId: 'msg_real', toml: dataToml },
   })
 
   const physical = plan.messages.filter((m) => m.physical)
   assert.equal(physical.length, 1)
   assert.equal(physical[0].id, 'msg_real')
-  assert.equal(physical[0].text, 'x')
+  assert.equal(physical[0].text, combinedDelta)
 })
 
 test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
@@ -230,14 +245,15 @@ test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () =>
     epoch: 2,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: 'x' },
+    delta: { messageId: 'msg_d', toml: dataToml },
   })
 
   assert.deepEqual(plan.messages.slice(0, 2).map((m) => m.id), [
     '«ses_y|2|0|sha-f0|blog-frame»',
     '«ses_y|2|1|sha-f1|blog-frame»',
   ])
-  assert.equal(plan.messages.at(-1).id, '«ses_y|2|normal|instruction»')
+  // Normal no longer emits a synthetic instruction message id.
+  assert.equal(plan.messages.at(-1).id, 'msg_d')
 })
 
 test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', () => {
@@ -246,7 +262,7 @@ test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', 
     epoch: 4,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: 'body' },
+    delta: { messageId: 'msg_d', toml: dataToml },
   }
 
   assert.deepEqual(proj.build(spy, args).messages, proj.build(spy, args).messages)
@@ -310,13 +326,13 @@ test('CTX_012_a_squash_never_shows_the_later_frames', () => {
   }
 })
 
-test('CTX_012_squash_and_normal_requests_use_different_instruction_ids', () => {
+test('CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => {
   const shared = { blogger: 'ses_y', epoch: 0, frames: frames(1) }
 
-  const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', toml: 'x' } })
+  const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', toml: dataToml } })
   const squash = proj.build(spy, { ...shared, kind: proj.squash(1), delta: undefined })
 
-  assert.equal(normal.messages.at(-1).id, '«ses_y|0|normal|instruction»')
+  assert.equal(normal.messages.at(-1).id, 'm')
   assert.equal(squash.messages.at(-1).id, '«ses_y|0|squash|instruction»')
   assert.notEqual(normal.messages.at(-1).id, squash.messages.at(-1).id)
 })

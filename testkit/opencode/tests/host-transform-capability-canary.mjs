@@ -204,7 +204,7 @@ try {
   );
 
   // Request shape (COMPANION-005 / ENFORCER-030): first request has no historic
-  // frames — just [[new_work_to_record]] delta + final instruction.
+  // frames — one combined message: instruction header first, then data tables.
   const userTexts = (firstBlogRequest?.messages ?? [])
     .filter((m) => m?.role === 'user')
     .map((m) => {
@@ -223,20 +223,22 @@ try {
   const firstLastUser = lastUserText(firstBlogRequest);
   assert.ok(
     firstLastUser.startsWith('# Write the dense work-log continuation now'),
-    `last user message is the exactly-once instruction: ${JSON.stringify(firstLastUser.slice(0, 120))}`,
+    `last user message starts with instruction header: ${JSON.stringify(firstLastUser.slice(0, 120))}`,
   );
   assert.ok(
     firstLastUser.includes('exactly once'),
     'instruction requires exactly one blog call',
   );
-  // TOML is data-only: no instruction comment inside the delta.
-  const tomlSection = userTexts.slice(
-    userTexts.indexOf('[[new_work_to_record]]'),
-    userTexts.indexOf('# Write the dense work-log continuation now'),
-  );
   assert.ok(
-    !tomlSection.includes('# Write'),
-    'TOML delta must not contain the instruction text',
+    firstLastUser.includes('[[new_work_to_record]]'),
+    'last user message carries data body after the instruction header',
+  );
+  // Instruction is before data; data body itself has no second instruction.
+  const dataStart = firstLastUser.indexOf('[[new_work_to_record]]');
+  assert.ok(dataStart > 0, 'data tables follow the instruction header');
+  assert.ok(
+    !firstLastUser.slice(dataStart).includes('# Write'),
+    'data body must not repeat the instruction text',
   );
 
   // ── 2. the parked window: a parallel session completes meanwhile ──────────
@@ -318,7 +320,11 @@ try {
   const resumedLastUser = lastUserText(secondBlogRequest);
   assert.ok(
     resumedLastUser.startsWith('# Write the dense work-log continuation now'),
-    `last user message is the exactly-once instruction: ${JSON.stringify(resumedLastUser.slice(0, 120))}`,
+    `last user message starts with instruction header: ${JSON.stringify(resumedLastUser.slice(0, 120))}`,
+  );
+  assert.ok(
+    resumedLastUser.includes('[[new_work_to_record]]'),
+    'resumed last user carries combined instruction+delta',
   );
 
   // Reverse assertions: the raw physical transcript must NOT leak into the
@@ -341,11 +347,9 @@ try {
     `cycle text must only appear inside the historic frame: ${JSON.stringify(cycleTextOutsideFrame.map((m) => (m?.content ?? '').slice(0, 100)))}`,
   );
 
-  // The new delta must not repeat already-covered content.
-  const newWorkSection = resumedTexts.slice(
-    resumedTexts.indexOf('[[new_work_to_record]]'),
-    resumedTexts.indexOf('# Write the dense work-log continuation now'),
-  );
+  // The new delta data body must not repeat already-covered content.
+  const dataStart = resumedLastUser.indexOf('[[new_work_to_record]]');
+  const newWorkSection = dataStart >= 0 ? resumedLastUser.slice(dataStart) : '';
   assert.ok(
     !newWorkSection.includes('First coder turn.'),
     'new delta must not repeat turn 1 material',
