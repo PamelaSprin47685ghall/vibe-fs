@@ -553,79 +553,11 @@ module EnforcerHost =
                                     return resumeWithContext ctx
                                 | None -> return rawMessages
             | _ ->
-                // COMPANION-005 first request: no blog calls yet, but the raw
-                // TOML prompt still needs the request shape. Rebuild the provider
-                // view from durable frames + the TOML delta (extracted from the
-                // raw messages). For the first request the frame list is empty.
-                match journal, mainSessionId with
-                | Some durable, Some owner ->
-                    let projections = AgentJournal.snapshot durable
-
-                    let blog =
-                        projections.AgentProjections.Sessions
-                        |> Map.tryFind owner
-                        |> Option.bind (fun session -> session.Blog)
-                        |> Option.defaultValue BlogProjection.empty
-
-                    // Extract the TOML from the raw messages: the last user
-                    // message's text is the prompt sent by sendBloggerPrompt.
-                    let tomlDelta =
-                        rawMessages
-                        |> List.choose (fun message ->
-                            if isNull message then
-                                None
-                            else
-                                let info = if isNull message?info then message else message?info
-
-                                let role =
-                                    if isNull info || isNull info?role then
-                                        None
-                                    else
-                                        Some(unbox<string> info?role)
-
-                                match role with
-                                | Some "user" ->
-                                    let parts =
-                                        if isNull message?parts then
-                                            []
-                                        else
-                                            unbox<obj array> message?parts |> Array.toList
-
-                                    parts
-                                    |> List.tryHead
-                                    |> Option.bind (fun part ->
-                                        if isNull part?text then
-                                            None
-                                        else
-                                            Some(unbox<string> part?text))
-                                | _ -> None)
-                        |> List.tryLast
-
-                    match tomlDelta with
-                    | Some toml ->
-                        let messageId =
-                            HostDigest.sha256Hex (String.concat "|" [ SessionId.value bloggerSessionId; "first"; toml ])
-
-                        let plan =
-                            CompanionProjectionBuilder.build
-                                HostDigest.sha256Hex
-                                bloggerSessionId
-                                blog.FrameEpochId
-                                CompanionRequestKind.Normal
-                                (blog.Frames
-                                 |> List.choose (fun frame ->
-                                     match durable.Writer.BlobWriter.Read frame.TextRef with
-                                     | Ok text -> Some(frame.Digest, text)
-                                     | Error _ -> None))
-                                (Some(messageId, toml))
-
-                        return
-                            plan.Messages
-                            |> List.map (fun msg ->
-                                createObj
-                                    [ "info", box (createObj [ "id", box msg.MessageId; "role", box msg.Role ])
-                                      "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
-                    | None -> return rawMessages
+                // COMPANION-005 first request / non-tool step: rebuild only from
+                // durable frames + typed CurrentRequest. Never extract TOML from
+                // raw user messages (C2).
+                match journal, scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId) with
+                | Some durable, Some ctx -> return rebuildFromContext durable bloggerSessionId ctx
                 | _ -> return rawMessages
         }
 

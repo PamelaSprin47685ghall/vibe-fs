@@ -30,7 +30,6 @@ type CompanionHost
     let mutable bloggerTask: Task<SessionId> option = None
     let mutable bloggerId: SessionId option = None
     let mutable bloggerFailed = false
-    let bloggerNeedsReset = ref false
     let bloggerRequestKind = ref ProviderRequestKind.BloggerMain
     let bloggerSquashFrameCount = ref None
     let mutable restoredBloggerIdOpt = restoredBloggerId
@@ -47,28 +46,20 @@ type CompanionHost
             match bloggerTask with
             | Some task -> task
             | None ->
-                // Try restored blogger ID first (one-shot, avoids infinite retry
-                // on stale sessions). If the restored session is dead, the blog
-                // will fail with SendPrompt error. On the next request,
-                // restoredBloggerIdOpt is None so we fall through to create a new
-                // child with a reset frame.
+                // Restore is one-shot. Dead restored child fails send; next material
+                // creates a new child. Request semantics always use durable frames +
+                // X gap via typed context (no full-X reset replay).
                 match restoredBloggerIdOpt, bloggerId with
                 | Some id, None ->
                     let sid = SessionId.create id
                     bloggerId <- Some sid
                     bloggerFailed <- false
-                    // Register the blogger role synchronously.
                     bloggerCreated sid
-                    // One-shot: clear the restore opt so a failure creates new.
                     restoredBloggerIdOpt <- None
-                    bloggerNeedsReset.Value <- companion.Memory.EffectiveFrames.IsSome
                     let t = Task.FromResult(sid)
                     bloggerTask <- Some t
                     t
                 | _ ->
-                    if companion.Memory.EffectiveFrames.IsSome then
-                        bloggerNeedsReset.Value <- true
-
                     let task =
                         task {
                             try
@@ -111,7 +102,6 @@ type CompanionHost
           EnsureBlogger = ensureBlogger
           Gate = gate
           Companion = companion
-          BloggerNeedsReset = bloggerNeedsReset
           RequestKind = bloggerRequestKind
           SquashFrameCount = bloggerSquashFrameCount
           Journal = journal

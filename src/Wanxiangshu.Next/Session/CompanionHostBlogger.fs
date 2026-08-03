@@ -25,7 +25,6 @@ module internal CompanionHostBlogger =
             Companion: Companion
             RequestKind: ProviderRequestKind ref
             SquashFrameCount: int option ref
-            BloggerNeedsReset: bool ref
             Journal: AgentJournal option
             EffectiveAgent: string
             /// CTX-006 step 5: record the squash attempt's plan on the Y chain.
@@ -190,9 +189,9 @@ module internal CompanionHostBlogger =
             | decision -> return Error(sprintf "squash slot decision %A is not a squash outcome" decision)
         }
 
-    /// ENFORCER-047 / C1: physical send from a frozen typed Main context.
+    /// ENFORCER-047 / C2: physical send from a frozen typed Main context.
     /// CurrentRequest was already written by BloggerCoordinator before this call.
-    /// No raw TOML extraction, no BloggerNeedsReset full-X replay, no post-send stage.
+    /// No raw TOML extraction, no full-X reset replay, no post-send stage.
     let startMainFromContext
         (deps: BloggerDeps)
         (ctx: BloggerRequestContext)
@@ -205,8 +204,6 @@ module internal CompanionHostBlogger =
                 let! childId = deps.EnsureBlogger()
                 deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
                 deps.SquashFrameCount.Value <- None
-                // Clear obsolete reset flag; restart uses durable frames + X gap only.
-                lock deps.Gate (fun () -> deps.BloggerNeedsReset.Value <- false)
                 return! sendBloggerPrompt deps childId main.Toml
         }
 
