@@ -7,12 +7,10 @@
 
 | 级别 | 缺口 | 评估 | 处置 |
 |------|------|------|------|
-| HIGH | 五窗口 crash recovery | durable materialization + receipt 已有；缺 Host snapshot reconcile 启动路径（窗口 A–E） | C5 剩余：启动时 fold open requests + Host |
-| MEDIUM | layer-4 竞态/Squash/invalid canary | 第 1 层红测/门禁已绿；三轮 canary 未建 | C7 |
-| LOW | physical/synthetic provenance 在 Host obj 上保留 | builder 有 `IsPhysical`；转 Host obj 时未携带 | C6 |
-| LOW | teardown 全出口审计 | main dispose vs BloggerSessionId waiter key 未完整审计 | C6 |
+| MEDIUM | layer-4 竞态/Squash/invalid canary | 第 1–3 层与 crash classify 已绿；三轮 canary 森林未扩 | C7 |
+| LOW | crash window C 全量 re-commit | 启动恢复 InFlight + CurrentRequest；真正 re-canonical 提交依赖后续 transform 再入 | 观察 |
 
-已闭合：C0–C4 主链；C5 materialize/receipt/冻结 epoch；CommitUnknown 三态 + 一次 repair（`RepairSpent`）；KnownCommitted 才 Park。
+已闭合：C0–C6 主链；durable materialize/receipt/冻结 epoch；CommitUnknown+repair；crash windows A/B/D/E 启动恢复；provenance 标记；main dispose 清 blogger waiter。
 
 ## Enforcer 接线 security_review 观察项（2026-08，f854c092 + 0255a6b4）
 

@@ -10,7 +10,9 @@
 - C3: typed Squash context; blog-tool continuation commits `BlogSquashCommitted`; no terminal wait.
 - C4: park only after commit; resource limits; Main success clears fallback; fail invalidates child cache.
 - C6 partial: fail-closed `loadEffectiveFrames`; `CompanionIdentity.newWorkMessageId`.
-- Still open: one repair wiring, CommitUnknown reconcile, durable request materialization, crash windows, layer-4 canaries.
+- Further: durable `BloggerRequestMaterialized` + cycle receipts; CommitUnknown tri-state;
+one-shot repair; crash-window recovery gate; provenance markers; main→blogger teardown.
+Still open: layer-4 multi-race canaries (keep PARTIAL).
 
 
 ## 0.5.0 — 正式版
