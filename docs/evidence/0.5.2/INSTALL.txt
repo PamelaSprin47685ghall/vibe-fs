@@ -1,9 +1,7 @@
 ### INSTALL.txt — isolated tarball install
-Date: 2026-08-03T18:14:00Z
-dir: /tmp/wanxiangshu-052-install
-tarball: /tmp/wx-0.5.2-artifacts/wanxiangshu-0.5.2.tgz (moved off repo root for gate:layout)
-command: npm init -y && npm install <tarball>
-result: OK — added 135 packages, 0 vulnerabilities
-node: v26.5.0
-node_modules/wanxiangshu present: yes
-installed version: 0.5.2
+HEAD_at_run: ffa168c7
+Date: 2026-08-03T20:46:10Z
+command: npm install /tmp/wx-0.5.2-final-pack/wanxiangshu-0.5.2.tgz
+exit_code: 0
+result: 135 packages, 0 vulnerabilities
+tarball_sha256: ccd8c338f9dcb4a9d5f76ea2e3c9ccb97074ec7089bb85e62a676ddaafed73bc

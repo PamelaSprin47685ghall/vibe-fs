@@ -36,3 +36,8 @@ Active COMPANION-005/008 + ENFORCER park/resume clauses.
 ## Related production seals
 ReviewSeal.sealTransform runs after XWire.applyTransform in SpikePlugin transform path.
 ToolHostCodec fail-closed on missing callID/messageID.
+
+## Final tip stamp
+HEAD: ffa168c7
+Date: 2026-08-03T20:43:47Z
+canary: host-transform-capability green ×3 in CANARY-3ROUND

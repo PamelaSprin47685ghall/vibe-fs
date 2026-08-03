@@ -1,37 +1,6 @@
-### UNIT.txt — C15 test:unit
-HEAD: 17358c38 (17358c386fdc2ef08bad4c27dc957e3d14231863)
-Date: 2026-08-03T18:12:02Z
+### UNIT.txt — test:unit on final tip
+HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
+Date: 2026-08-03T20:46:10Z
+command: npm run test:unit
 exit_code: 0
-result: 737 passed / 0 failed
-
-Tail of runner:
-✔ fallback cursor exposes offsets as case names, not ordinals (0.410056ms)
-✔ cursor.effectiveAgent accepts a plain object as the F# record (0.131753ms)
-✔ the facade resolves exactly one versioned fable-library directory (0.741518ms)
-✔ the AgentFact union is non-empty, so case resolution is meaningful (0.098932ms)
-✔ no facade member is undefined (0.342102ms)
-✔ member resolution prefers a real export over the escaped spelling (0.176024ms)
-✔ VERIFY_005_AgentProgram_publishes_its_flow_entrypoints (1.207077ms)
-✔ VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints (0.277161ms)
-✔ VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint (0.18974ms)
-✔ VERIFY_005_ProcessRunner_publishes_its_run_entrypoints (2.770572ms)
-✔ VERIFY_005_the_Flow_kernel_publishes_run_fail_attempt_and_bounded_parallelism (0.369041ms)
-✔ VERIFY_005_the_journal_publishes_boot_append_and_snapshot (0.42295ms)
-✔ VERIFY_005_the_outcome_kernel_publishes_the_two_commit_results (0.204727ms)
-✔ VERIFY_008_the_published_plugin_entrypoint_loads (29.83267ms)
-✔ VERIFY_008_every_emitted_module_actually_loads (7.949086ms)
-✔ VERIFY_008_the_contract_and_the_facade_read_the_same_build (0.311054ms)
-✔ VERIFY_004_a_verdict_renews_the_silence_window (1.487734ms)
-✔ VERIFY_004_bytes_moving_is_recorded_and_does_not_renew (0.246716ms)
-✔ VERIFY_004_scheduling_noise_is_not_fed_at_all (0.155567ms)
-✔ VERIFY_004_a_verdict_without_a_name_or_file_still_carries_attribution (0.241706ms)
-ℹ tests 737
-ℹ suites 0
-ℹ pass 737
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 1503.07256
-
-runner: 737 passed, 0 failed (authoritative; the spec reporter undercounts on timeout)
+result: 737 passed, 0 failed

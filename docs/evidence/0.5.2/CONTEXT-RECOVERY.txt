@@ -36,3 +36,8 @@ CTX-001/002/006/007/011/012: required_layer=4, canaries=[x-recovery-canary.mjs],
 - Attempt outcomes dispatch by RequestKind (CTX-007)
 - Coverage cursor + candidate selection (CTX-011)
 - Probe attempt-local; promote only on Completed + valid terminal (CTX-012)
+
+## Final tip stamp
+HEAD: ffa168c7
+Date: 2026-08-03T20:43:47Z
+x-recovery green ×3 in CANARY-3ROUND (X-A–X-D)

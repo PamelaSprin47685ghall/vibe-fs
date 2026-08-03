@@ -1,27 +1,25 @@
-### COMMIT.txt — C15 release evidence (REVISE alignment + X-A–X-D)
-source_commit: 39e05500a78984e01e099e7badaf32e4468a0040
-short: 39e05500
-date_utc: 2026-08-03T20:10:34Z
+### COMMIT.txt — 0.5.2 single-anchor alignment on final tip
+source_commit: ffa168c78fe36e9faa6f6587dd7b71a87ba046e5
+short: ffa168c7
+date_utc: 2026-08-03T20:46:10Z
 branch: master
-subject: test(canary): deliver X-A–X-D recovery scenarios + blogger epoch 0-55
+subject: fix(testkit): poll assertModelTrajectory until exact AABB sequence
 tag: v0.5.2
-# tag tip: annotated tag target verified at release time (git rev-parse v0.5.2^{commit} == HEAD)
-evidence_commit: d6dc8972c39727d42579f2f6b73515bc34e6be73
+evidence_commit: PENDING
 IMPLEMENTING: 0
 CONFORMANT: 192/192
-verification_commits:
-  - 17358c38 fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
-  - 21c1a9df fix(blogger): Parked survives onReactivate; CAS commitCycle on ingest cursor
-  - 4b4bd25a test(loop): LOOP-001/002/007/008/010 criterion layer-0 assertions
-  - ff68d962 fix(companion): remove AppendSquash legacy port and version-bound errors
-  - 90140dff docs: mark X-A–X-D layer-4 delivery and 19-canary forest
-  - 6f8d3d14 docs(conformance): bind HOST-010/011 and CTX-001/002/006/007/011/012 to layer-4 canaries
-  - 67f2e232 fix(testkit): support X crash-window canaries on fault and restart
-  - 39e05500 test(canary): deliver X-A–X-D recovery scenarios + blogger epoch 0-55
+verification:
+  gate:static exit 0 (10/10 sub-gates)
+  build exit 0 (Fable 212 sources → build/next)
+  test:unit 737/737
+  test:harness 285/285
+  test:e2e:p0:three 19×3 = 57/57
+  npm pack 298 files, 1577263 bytes
+  isolate install 135 packages, 0 vulns
+  import Plugin.js OK
 pack:
   tarball: wanxiangshu-0.5.2.tgz
-  sha256: f6e1b2b479aa6fa12f92a6f3b6ef483995d125b3b1eab6bc93a5299d9c689af4
+  sha256: ccd8c338f9dcb4a9d5f76ea2e3c9ccb97074ec7089bb85e62a676ddaafed73bc
   files: 298
   size_bytes: 1577263
-prior_evidence_commit: 7443007a43d0a5b6483e816c2c8d909d7aeb6e32
-notes: REVISE closed — X-A–X-D layer-4 delivered; HOST-010/011 layer-4 bound; canary forest 19
+notes: D3 single-anchor — source_commit is verified tip (code+testkit AABB poll); evidence_commit is this capture; tag on evidence tip; git diff source_commit tag -- src/ empty

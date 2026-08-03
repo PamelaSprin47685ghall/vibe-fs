@@ -1,47 +1,6 @@
-### HARNESS.txt — C15 test:harness
-HEAD: 17358c38 (17358c386fdc2ef08bad4c27dc957e3d14231863)
-Date: 2026-08-03T18:12:02Z
+### HARNESS.txt — test:harness on final tip
+HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
+Date: 2026-08-03T20:46:10Z
+command: npm run test:harness
 exit_code: 0
-result: 285 passed / 0 failed
-
-Tail:
-  ✓ VERIFY-004 no fixture is discoverable as a test, and nothing else lives among them (0ms)
-  ✓ VERIFY-004 the runner claims no protection it does not have (0ms)
-  ✓ VERIFY-004 the silence window covers one whole test plus jitter (0ms)
-  ✓ ARCH-010 every payload production renders conforms to the clause (2ms)
-  ✓ ARCH-010 the payload fixtures exercise the paths they claim to (0ms)
-  ✓ ARCH-010 a value that looks like syntax is not a violation (1ms)
-  ✓ ARCH-010 a document that does not parse is refused before any other rule (0ms)
-  ✓ ARCH-010 a top-level comment after the data body is refused (0ms)
-  ✓ ARCH-010 a header separated from the body by more or less than one blank line is refused (0ms)
-  ✓ ARCH-010 a """ multi-line string is refused (0ms)
-  ✓ ARCH-010 a closing delimiter sharing its line with content is refused (0ms)
-  ✓ ARCH-010 an instruction encoded as a field is refused (0ms)
-  ✓ ARCH-010 a fact stated as a comment instead of a field is refused (0ms)
-  ✓ ARCH-010 a literal block body is classified as content, not as syntax (0ms)
-  ✓ ARCH-010 an unterminated literal is caught by the parse guard, not by a second rule (0ms)
-  ✓ ARCH-010 the instruction header may reference the notation without tripping any rule (1ms)
-  ✓ ARCH-010 every rendered string round-trips to the value it was given (0ms)
-  ✓ VERIFY-003 the same request sequence produces the same content sequence, forest-wide (32ms)
-  ✓ VERIFY-003 every declared step of every scenario is reached by its derived sequence (18ms)
-  ✓ VERIFY-003 a second session on the same lane does not change what content is selected (25ms)
-  ✓ VERIFY-003 every already-gated K10 item still has its enforcing symbol (0ms)
-  ✓ VERIFY-003 every already-gated K10 item still has its enforcing case (0ms)
-  ✓ VERIFY-003 the presence table covers exactly the three items K10 delegates (0ms)
-  ✓ VERIFY-003 a prefix rewrite is refused even when tools and the system message are unchanged (0ms)
-  ✓ VERIFY-003 a declared epoch boundary admits the rewrite, and only at the step it names (1ms)
-  ✓ VERIFY-003 two declarations for one point are refused at load, never scored (0ms)
-  ✓ VERIFY-003 two equal-weight prefixes are reported as ambiguous, not resolved by score (0ms)
-  ✓ PROMPT-008 a scenario cannot declare a role, and the refusal names the real source (0ms)
-  ✓ PROMPT-008 the ScenarioRuntime selection path contains no role inference (0ms)
-  ✓ VERIFY-003 a declared edge still resolves after a restart clears the seals (1ms)
-  ✓ VERIFY-003 a restart does not resurrect an edge the scenario never declared (0ms)
-  ✓ VERIFY-004 launch stagger is causal bark, not a fixed sleep (0ms)
-  ✓ VERIFY-004 canary launch enforces its declared concurrency bound (0ms)
-  ✓ VERIFY-004 internal expectations are background progress (0ms)
-  ✓ VERIFY-004 flow waits do not start a competing total timeout (0ms)
-  ✓ VERIFY-004 a canary that never reaches ready, or exits before it, is failed not passed (0ms)
-  ✓ VERIFY-004 the release gate is exactly three rounds, never until-pass (0ms)
-  ✓ VERIFY-004 every forbidden degradation has a covering case, and every citation resolves (0ms)
-
-285 passed, 0 failed
+result: 285 passed, 0 failed

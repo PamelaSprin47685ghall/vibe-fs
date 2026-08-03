@@ -1,40 +1,7 @@
-### BUILD.txt — C15 build
-HEAD: 17358c38 (17358c386fdc2ef08bad4c27dc957e3d14231863)
-Date: 2026-08-03T18:12:02Z
+### BUILD.txt — Fable production build on final tip
+HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
+Date: 2026-08-03T20:46:10Z
+command: npm run build
 exit_code: 0
-
-
-> wanxiangshu@0.5.2 build
-> node scripts/clean-fable-output.mjs build && dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj -o build/next
-
-Fable 5.13.0: F# to JavaScript compiler
-Minimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
-
-Thanks to the contributor! @IanManske
-Stand with Ukraine! https://standwithukraine.com.ua/
-
-Parsing src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj...
-Project and references (212 source files) parsed in 1306ms
-
-Started Fable compilation...
-
-Fable compilation finished in 11400ms
-
-./src/Wanxiangshu.Next/Session/HostForkRuntime.fs(32,9): (34,73) info FSHARP: XML comment is not placed on a valid language element. (code 3520)
-./src/Wanxiangshu.Next/Session/HostForkRuntime.fs(36,9): (39,57) info FSHARP: XML comment is not placed on a valid language element. (code 3520)
-./src/Wanxiangshu.Next/Application/Reconciliation/ReconcileSupervisor.fs(28,13): (33,30) info FSHARP: XML comment is not placed on a valid language element. (code 3520)
-./src/Wanxiangshu.Next/Application/Reconciliation/ReconcileSupervisor.fs(37,13): (47,71) info FSHARP: XML comment is not placed on a valid language element. (code 3520)
-Generating assembly...
-Assembly generated in 5098ms
-Saving precompiled info...
-Precompiled info saved in 172ms
-
-> wanxiangshu@0.5.2 postbuild
-> node scripts/postbuild.mjs
-
-✓ Copied package.json
-✓ Copied LICENSE
-Syncing assets...
-✓ Assets synced
-✓ Cleaned .gitignore
-Postbuild done.
+Fable 5.13.0: 212 source files → build/next
+postbuild: package.json + LICENSE + assets synced

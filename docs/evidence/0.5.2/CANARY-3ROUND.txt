@@ -1,36 +1,20 @@
-### CANARY-3ROUND.txt — C15 RC test:e2e:p0:three (post REVISE + X-A–X-D)
-HEAD_at_run: 39e05500 (39e05500a78984e01e099e7badaf32e4468a0040)
-Date: 2026-08-03T20:10:34Z
-command: npm run test:e2e:p0:three  (CANARY_REPEAT=3, max=8 parallel, 19 canaries)
+### CANARY-3ROUND.txt — test:e2e:p0:three final tip single-anchor
+HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
+Date: 2026-08-03T20:46:10Z
+command: npm run test:e2e:p0:three  (CANARY_REPEAT=3, max=8, 19 canaries)
 exit_code: 0
-result: PASS — all 19 canaries × 3 iterations = 57 runs green
+result: PASS — 19 canaries × 3 iterations = 57/57 green
 
-## Iterations
-Iteration 1/3: 19/19 passed
-Iteration 2/3: 19/19 passed
-Iteration 3/3: 19/19 passed
+Iteration 1/3: 19/19
+Iteration 2/3: 19/19
+Iteration 3/3: 19/19
 
-## Canaries (all passed all rounds)
-agent-dsl, companion, executor, fallback, fallback-aabb-trace,
+Canaries: agent-dsl, companion, executor, fallback, fallback-aabb-trace,
 host-nudge, host-restart, host-transform-capability, inspector-oneshot,
 manager-companion, manager-file-root, manager-full-loop,
 orchestrator-publish, orchestrator-restart-publish,
-process-stress, pty-stress, reviewer-restart, reviewer-verdict,
-x-recovery
+process-stress, pty-stress, reviewer-restart, reviewer-verdict, x-recovery
 
-## X-A–X-D (x-recovery-canary.mjs)
-x-a-probe-before-crash     — arming lost before probe materialises
-x-b-probe-sent-unaccepted  — probe once; no promote; no duplicate send
-x-c-accepted-before-promote — coverage non-retreat across restart
-x-d-promote-then-restart   — PrefixRebaseCommitted durable; no re-promote
-
-## Fixes since 17358c38 (prior C15 green baseline)
-- X-A–X-D dedicated crash-window canaries delivered (C10)
-- HOST-010/011 bound to host-transform-capability-canary (layer 4)
-- CTX-001/002/006/007/011/012 required_layer 4 + x-recovery-canary
-- testkit: faulted delivery wakes afterExpectation; clearSeals keeps firedBoundaries
-- blogger epoch/step expanded 0–55 across forest + x-*.toml
-
-## Scope
-REVISE closed: X recovery layer-4 + Host identity layer-4 + docs/conformance aligned.
-gate:static → build → unit 737 → harness 285 → canary 19×3=57.
+Flake closed: assertModelTrajectory polls until exact AABB sequence
+(wait=continue permanent-after-first cannot barrier 5th success delivery).
+Log: /tmp/wx-052-canary3d.log

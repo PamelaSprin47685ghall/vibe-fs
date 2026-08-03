@@ -1,59 +1,8 @@
-### STATIC.txt — C15 gate:static
-HEAD: 17358c38 (17358c386fdc2ef08bad4c27dc957e3d14231863)
-Date: 2026-08-03T18:12:02Z
+### STATIC.txt — gate:static on final tip single-anchor
+HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
+Date: 2026-08-03T20:46:10Z
+command: npm run gate:static
 exit_code: 0
-
-
-> wanxiangshu@0.5.2 gate:static
-> npm run gate:layout && npm run gate:ssot && npm run gate:conformance && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface && npm run gate:generated && npm run gate:role-matrix
-
-
-> wanxiangshu@0.5.2 gate:layout
-> node scripts/repository-layout-gate.mjs
-
-repository-layout-gate: OK — 209 source files under src/Wanxiangshu.Next/
-
-> wanxiangshu@0.5.2 gate:ssot
-> node scripts/ssot-lint.mjs
-
-ssot-lint: OK — 190 条款，573 处引用，17 个文件
-
-> wanxiangshu@0.5.2 gate:conformance
-> node scripts/conformance-gate.mjs --check
-
-conformance-gate: OK — 192 clauses, active=192, toml=192
-
-> wanxiangshu@0.5.2 gate:architecture
-> node scripts/architecture-gate.mjs
-
-architecture-gate: OK — 209 production + 72 test files
-
-> wanxiangshu@0.5.2 gate:docs
-> node scripts/strip-doc-bold.mjs
-
-strip-doc-bold: clean
-
-> wanxiangshu@0.5.2 gate:toml
-> node scripts/toml-format.mjs
-
-toml-format: clean — 19 file(s)
-
-> wanxiangshu@0.5.2 gate:budget
-> node scripts/budget-gate.mjs
-
-budget-gate: OK — 29 budget(s), 108 file(s), no scattered literals
-
-> wanxiangshu@0.5.2 gate:surface
-> node scripts/surface-inventory.mjs
-
-surface-inventory: OK — 8 surface(s): 5 canonical, 3 verbatim-forward, 0 awaiting N5; system prompt and human raw structurally excluded; 15 tool file(s) audited for TOML returns
-
-> wanxiangshu@0.5.2 gate:generated
-> node scripts/enforcer-catalog-gen.mjs --check
-
-generated-artifact: /home/kunweiz/Desktop/vibe/wanxiangshu/src/Wanxiangshu.Next/Domain/EnforcerCatalog.gen.fs is in sync with RFC/enforcer-nudge.md (120 rules)
-
-> wanxiangshu@0.5.2 gate:role-matrix
-> node scripts/role-matrix-gate.mjs
-
-role-matrix-gate: ok (10 roles × 2 tiers, single catalog, no residual legacy sets)
+layout: 209 sources · ssot 190 · conformance 192 · architecture 209+72
+docs/toml/budget/surface/generated/role-matrix: OK
+production_fs_count: 208 · gate_source_file_count: 209
