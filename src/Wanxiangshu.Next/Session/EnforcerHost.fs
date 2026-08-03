@@ -367,7 +367,9 @@ module EnforcerHost =
         |> Option.map (fun part -> part.Cursor.Sequence)
         |> Option.defaultValue (XTraceProjection.headSequence xTrace)
 
-    let private mainContextFromChunk
+    /// Public: `CompanionHost.TransformRaw` uses it to build the offer context
+    /// from the same delta the coordinator computed.
+    let internal mainContextFromChunk
         (blog: BlogProjectionState)
         (xTrace: XTraceProjectionState)
         (chunk: BloggerDeltaChunk)

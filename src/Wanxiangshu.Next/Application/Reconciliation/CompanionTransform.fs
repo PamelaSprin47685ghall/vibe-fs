@@ -179,19 +179,35 @@ module CompanionTransform =
 
                             value)
 
-                // COMPANION-005: accumulate the delta. Nothing here decides when to
-                // compress.
-                //
-                // What stood between these two statements was the whole active
-                // compression layer: a `BudgetFacts` record built from the Host's
-                // reported context and output limits, `shouldSwitchEpoch` comparing an
-                // estimated token count against that limit, `FreezeEpoch` / `SwitchEpoch`
-                // writing a prefix epoch from the comparison, and a `bloggerSelfRebaseDue`
-                // check firing a Y self-rebase at 80% of a budget.
-                //
-                // Every one of those read or estimated a context window, which CTX-001
-                // forbids outright, and acted before any failure, which CTX-002 forbids.
-                // Their replacements are driven by a real failed attempt: the X prefix by
-                // a promoted probe (CTX-012) and the Y frames by a squash in a recovery
-                // slot (CTX-006).
-                companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
+                // ENFORCER-050: single coordinator. The main session transform
+                // decides start (idle), skip (in-flight), or offer (parked) —
+                // never two paths to the same Blogger.
+                let bloggerIdOpt = companion.BloggerSession
+                let parkedHost = scope :> IParkedTransformHost
+
+                match bloggerIdOpt with
+                | Some bloggerId when parkedHost.HasParked(SessionId.value bloggerId) ->
+                    // Parked: stage the typed delta and resume the parked transform.
+                    // The continuation rebuilds the full provider view from durable
+                    // frames + this context — no PromptDispatcher, no raw transcript.
+                    let blog = companion.Memory.Blog
+                    let xTrace = companion.Memory.XTrace
+
+                    let current =
+                        Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+
+                    let ingestCursor =
+                        XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+
+                    match
+                        BloggerDelta.nextChunk
+                            BloggerDelta.DeltaLimitBytes
+                            ingestCursor
+                            blog.Coverage.CoverableTurnCutoffExclusive
+                            current.Messages
+                    with
+                    | Some chunk ->
+                        let ctx = EnforcerHost.mainContextFromChunk blog xTrace chunk
+                        parkedHost.OfferParked(SessionId.value bloggerId, ctx) |> ignore
+                    | None -> ()
+                | _ -> companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
