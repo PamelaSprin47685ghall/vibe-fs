@@ -21,11 +21,18 @@ continue.0 reason=prefix-probe after CoverableTurnCutoffExclusive advance enable
 hasMaterial → UsePrefixProbe. C15 three-round: fallback + fallback-aabb-trace PASS ×3.
 
 ## Layer-4 X-A…X-D dedicated scenarios
-Not present as named x-a…x-d canaries. Production path exercised via fallback / host-restart
-and full P0 forest. Dedicated X-A–X-D crash-window scripts remain optional strengthening
-(STATUS notes historical gap); CTX clauses currently required_layer 2–3 with tests[].
+X-A–X-D four crash-window scenarios implemented and passing via
+testkit/opencode/tests/x-recovery-canary.mjs (data-driven runner over four TOML scripts):
+  x-a-probe-before-crash.toml     — arming lost before probe materialises
+  x-b-probe-sent-unaccepted.toml  — probe sent, not accepted; no promote; no duplicate send
+  x-c-accepted-before-promote.toml — accepted before promote; coverage non-retreat
+  x-d-promote-then-restart.toml   — promote then Host restart; durable epoch survives
+CTX-001/002/006/007/011/012: required_layer=4, canaries=[x-recovery-canary.mjs], status=conformant.
 
 ## Invariants verified by domain + canary forest
 - No capacity estimation (CTX-001)
 - Recovery only after real failure (CTX-002)
-- Probe attempt-local; promote only on Completed + valid terminal (CTX-010/012)
+- Recovery slot actions after armed+primed+material (CTX-006)
+- Attempt outcomes dispatch by RequestKind (CTX-007)
+- Coverage cursor + candidate selection (CTX-011)
+- Probe attempt-local; promote only on Completed + valid terminal (CTX-012)

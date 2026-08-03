@@ -71,8 +71,8 @@ assistant message 在 transform 之前已经创建并持久化。
 | 测试、门禁、canary 剧本 | SSOT/10 | conformance Verify 段 |
 | Journal、事实、持久化 | SSOT/11 | — |
 | 运行时合成 TOML 记法 | SSOT/13（`ARCH-010`） | conformance ARCH-010 行 + `tests-mjs/Context/synthetic-toml.test.mjs` |
-| Strength / Enforcer / Student&Teacher | SSOT/14 / 15 / 16 | conformance 对应段（`PURE_CORE_ONLY`） |
-| 任何生产代码改动 | SSOT/01（架构 DNA） | `conformance.md`（绑定 commit `38cc1882`） |
+| Strength / Enforcer nudge / Student&Teacher（未来设计） | `RFC/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `STATUS/README.md`「已知说明」段 |
+| 任何生产代码改动 | SSOT/01（架构 DNA） | `STATUS/conformance.md`（由 `STATUS/conformance.toml` 生成） |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
 
 `SSOT/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
@@ -109,7 +109,7 @@ pre-commit 钩子一致检查。
 | 位置 | 性质 |
 |------|------|
 | `SSOT/` | 唯一产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以此为准。`SSOT/00.md` 导航，`SSOT/99.md` 词汇表 |
-| `STATUS/conformance.md` | 条款 vs 代码合规表。绑定 commit `38cc1882`。状态词含 `PURE_CORE_ONLY`（纯内核已实现、生产接线被 Host canary 门禁阻断）与 `UNVERIFIED`（判据未产生，发布前不得存在） |
+| `STATUS/conformance.md` | 条款 vs 代码合规表，由 `scripts/conformance-gate.mjs` 从 `STATUS/conformance.toml` 生成（勿手改）。当前 Active 192/192 CONFORMANT |
 | `STATUS/README.md` | 当前基线：分支、最后验证 commit、产品状态、源码地图、下一步 |
 | `STATUS/blockers/README.md` | 活跃 blocker 账本。HOST-006 已闭合（运行时探测已接线）；V2 runner `compactAfterOverflow` 观察项留给上游（ARCH-003） |
 | `docs/archive/shock-anneal-2026/` | 休克—退火迁移最终报告（`FINAL-REPORT.md`）+ 原始机器证据（`evidence/`） |
@@ -136,30 +136,28 @@ pre-commit 钩子一致检查。
 
 ## 2. 迁移已收口，当前开发阶段
 
-休克—退火迁移已收口（绑定 commit `38cc1882`，最终报告
-`docs/archive/shock-anneal-2026/FINAL-REPORT.md`）。现在生产可用：canary 森林 16/16 全绿，
-`test:release`（gate:static → build → unit → harness → P0×3）完整通过。conformance.md 是该
-收口时刻的状态快照，每一行都绑定第 1 层测试或 `shock-audit` 实测。
+休克—退火迁移已收口（最终报告 `docs/archive/shock-anneal-2026/FINAL-REPORT.md`）。
+0.5.2 已发布（tag `v0.5.2`）：gate:static → build → unit（737）→ harness（285）→
+P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMANT。
+`STATUS/conformance.toml` 是逐条款机器账本，`STATUS/conformance.md` 由
+`scripts/conformance-gate.mjs` 生成。
 
 ### 当前开发阶段
 
-SSOT/14-16（Strength / Enforcer / Student&Teacher）纯领域内核已合入并测试（conformance 标
-`PURE_CORE_ONLY`），生产接线被各自方案自设的 Host canary 门禁阻断（STRENGTH-078 C-01…C-21 /
-ENFORCER-180 九条 / LEARN-082…088）。下一步是建共享 Host capability canary 证明 transform
-挂起/取消/身份绑定，再逐纵向接线（推荐顺序：SatelliteRuntime → Projection DSL → Strength
-shadow → Enforcer → Student/Teacher）。
+0.5.2 全 SSOT 收敛已发布：Active 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
+0 PURE_CORE_ONLY / 0 NOT_IMPLEMENTED。Active 子集 = SSOT/01–13 + SSOT/15 Blogger
+工具化 + SSOT/17 LOOP。SSOT/14 Strength 与 SSOT/16 Student&Teacher 已迁
+`RFC/strength.md` / `RFC/student-teacher.md`，ENFORCER nudge/throttle 在
+`RFC/enforcer-nudge.md`——均为已批准但未交付的未来设计，不属于当前产品合同。
 
-### 已知未闭合项
+### 已知说明（非发布阻塞）
 
-- conformance 表内 `UNVERIFIED` 行（PROMPT-004/006/007/009、AGENT-007、HOST-005/009/010/011、
-  PERSIST-009、COMPANION-013 等）：判据未产生，发布前本表不得存在 `UNVERIFIED`
-- X 恢复链已接线（`XWire.applyTransform` / `reconcileAttempt` 经 `SpikePlugin.fs` 与
-  `HostSignalBootstrap.fs` 进入生产路径，`AttemptPlanner.plan` 两个调用点），但 X-A–X-D
-  canary 剧本尚未建，恢复链还没有第 4 层证据
-- `HandleProjection.joinable` 零生产调用点：`join` 仍走运行期 mailbox，
-  `CompletedAwaitingJoin` 的 durable 消费链未闭合（EXEC-009）
+- X 恢复链生产接线已闭合（`XWire.applyTransform` / `reconcileAttempt` 经 `SpikePlugin.fs`
+  与 `HostSignalBootstrap.fs` 进入生产路径，`AttemptPlanner.plan` 两个调用点）；
+  X-A–X-D layer-4 canary 已交付（`testkit/opencode/tests/x-recovery-canary.mjs` + 四个 TOML 剧本）
+- `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
 - V2 runner `compactAfterOverflow` 不遵守 `compaction.auto=false`：Host 上游观察项
-  （ARCH-003，不可在本仓修，见 `STATUS/blockers/README.md`）
+  （ARCH-003，不可在本仓修；归档见 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §7）
 
 ---
 

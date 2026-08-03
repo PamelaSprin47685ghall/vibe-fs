@@ -12,7 +12,7 @@
   - `npm run build` 通过（Fable 编译 212 源单元 → `build/next`）
   - `npm run test:unit` 通过（737 / 737）
   - `npm run test:harness` 通过（285 / 285）
-  - `npm run test:e2e:p0:three` 通过（18 canary × 3 轮 = 54/54）
+  - `npm run test:e2e:p0:three` 通过（19 canary × 3 轮 = 57/57）
   - `npm pack` 产出 `wanxiangshu-0.5.2.tgz`（298 files, 1.6 MB packed）
   - 隔离 install/import 通过
 - 证据：`docs/evidence/0.5.2/`（ENV / COMMIT / STATIC / BUILD / UNIT / HARNESS /
@@ -83,19 +83,18 @@ nudge/throttle 在 `RFC/`，不属于当前产品合同。
 
 以下不阻挡 0.5.2 已发布状态，仅作后续可选加强：
 
-- X 恢复链：生产接线已闭合；X-A–X-D 独立 canary 剧本可作为后续加强（layer 1–3 与
-  相关 canary 证据已在 0.5.2 账本内）
+- X 恢复链：生产接线已闭合；X-A–X-D layer-4 canary 已交付（`x-recovery-canary.mjs` 四场景）
 - `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
-- identity canary（transform id = tool messageID）可作为 Host 升级门禁可选加强项
+- HOST-010/011：layer-4 绑定 `host-transform-capability-canary.mjs`（transform/tool identity）
 - 未来功能（Strength shadow / Enforcer nudge / Student&Teacher）见 `RFC/`
 
 ## 源码地图
 
 生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部）。三口径：
 
-- **208** 生产 `.fs` 源文件（`find … -name '*.fs'`）
-- **209** gate source files（208 `.fs` + 1 `.fsproj`；`gate:layout` / `gate:architecture` 的 `SOURCE_EXTENSIONS`）
-- **212** Fable 编译单元（project + references；含工程外引用，≠ 生产 `.fs` 数）
+- 208 生产 `.fs` 源文件（`find … -name '*.fs'`）
+- 209 gate source files（208 `.fs` + 1 `.fsproj`；`gate:layout` / `gate:architecture` 的 `SOURCE_EXTENSIONS`）
+- 212 Fable 编译单元（project + references；含工程外引用，≠ 生产 `.fs` 数）
 
 ```text
 src/Wanxiangshu.Next/
