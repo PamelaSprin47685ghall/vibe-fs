@@ -1,25 +1,22 @@
-### COMMIT.txt — 0.5.2 single-anchor alignment on final tip
-source_commit: ffa168c78fe36e9faa6f6587dd7b71a87ba046e5
-short: ffa168c7
-date_utc: 2026-08-03T20:46:10Z
+### COMMIT.txt — 0.5.2 D1/D2 canary asserts on verified tip
+source_commit: f66bbdc793e8c6e598c01638da61298ca6667381
+short: f66bbdc7
+date_utc: 2026-08-03T20:57:58Z
 branch: master
-subject: fix(testkit): poll assertModelTrajectory until exact AABB sequence
+subject: test(canary): D1/D2 layer-4 asserts for HOST-010/011 and X recovery
 tag: v0.5.2
-evidence_commit: 5e337f5d8891dde7aa066ac53f4dae72828e7fc1
+evidence_commit: (pending stamp after this evidence commit)
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification:
-  gate:static exit 0 (10/10 sub-gates)
-  build exit 0 (Fable 212 sources → build/next)
-  test:unit 737/737
-  test:harness 285/285
-  test:e2e:p0:three 19×3 = 57/57
-  npm pack 298 files, 1577263 bytes
-  isolate install 135 packages, 0 vulns
-  import Plugin.js OK
-pack:
-  tarball: wanxiangshu-0.5.2.tgz
-  sha256: ccd8c338f9dcb4a9d5f76ea2e3c9ccb97074ec7089bb85e62a676ddaafed73bc
-  files: 298
-  size_bytes: 1577263
-notes: D3 closed — source_commit ffa168c7 is sole verified source tip (code+testkit); tag tip 5e337f5d is evidence-only capture; git diff ffa168c7 5e337f5d -- src/ is empty (no production split); PACKAGE HEAD=ffa168c7; tarball rebuilt on verified tip
+  gate:static exit 0 (prior D3 baseline; D1/D2 testkit-only)
+  build exit 0 (unchanged production tree vs ffa168c7)
+  test:unit 737/737 (prior)
+  test:harness 285/285 (prior)
+  solo host-transform-capability-canary.mjs exit 0 (HOST-010/011)
+  solo x-recovery-canary.mjs exit 0 (X-A–X-D + RawGap/frame-probe)
+  test:e2e:p0:three exit 0 (3/3 iterations, 19 canaries = 57/57)
+notes: D1/D2 landed after D3. source_commit is sole verified tip (code+testkit).
+  Production tree: git diff ffa168c7 f66bbdc7 -- src/ is empty.
+  HOST-010 ProviderRun per-fact dedup (envelope+payload). HOST-011 ToolCallIds unique.
+  X FrozenRecordPrefix excludes # Uncompressed tail / # Final output.

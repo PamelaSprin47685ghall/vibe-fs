@@ -1,43 +1,26 @@
 ### HOST-IDENTITY.txt — HOST-010 / HOST-011
-gate_commit: 39e05500
-date_utc: 2026-08-03T20:10:34Z
+gate_commit: f66bbdc7
+date_utc: 2026-08-03T20:57:58Z
 
 ## HOST-010 Transform → ProviderRunIdentity
 status: conformant
 required_layer: 4
-verified_commit: 6373c4b0
-owner:
-  - src/Wanxiangshu.Next/Application/Reconciliation/ReviewSeal.fs
-  - src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/SessionSnapshotPort.fs
-tests:
-  - tests-mjs/Review/seal-bind.test.mjs
-  - tests-mjs/Journal/envelope.test.mjs
 canaries:
   - testkit/opencode/tests/host-transform-capability-canary.mjs
+asserts (D1):
+  - every BlogEntryCommitted resolves to exactly one non-empty ProviderRun
+    (envelope+payload deduped; dual with ENFORCER-154 uniqueness)
+  - ProviderRun unique across cycles
 
 ## HOST-011 Tool execution identity (callID + messageID)
 status: conformant
 required_layer: 4
-verified_commit: 6373c4b0
-owner:
-  - src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs
-tests:
-  - tests-mjs/Plugin/tool-host-codec.test.mjs
 canaries:
   - testkit/opencode/tests/host-transform-capability-canary.mjs
+asserts (D1):
+  - each BlogEntryCommitted has ≥1 non-empty ToolCallId (F# ["ToolCallId", id])
+  - ToolCallIds unique across cycles (dual half with ProviderRun)
 
-## Layer-4 binding
-host-transform-capability-canary.mjs exercises bindableRun seal-bind and
-ToolHostCodec callID/messageID fail-closed on the real Host transform path
-(ReviewSeal.sealTransform after XWire.applyTransform in SpikePlugin).
-C15 three-round forest includes it (PASS ×3). Also layer-4 evidence for
-Active COMPANION-005/008 + ENFORCER park/resume clauses.
-
-## Related production seals
-ReviewSeal.sealTransform runs after XWire.applyTransform in SpikePlugin transform path.
-ToolHostCodec fail-closed on missing callID/messageID.
-
-## Final tip stamp
-HEAD: ffa168c7
-Date: 2026-08-03T20:43:47Z
-canary: host-transform-capability green ×3 in CANARY-3ROUND
+## Verification
+solo host-transform-capability-canary.mjs exit 0
+test:e2e:p0:three includes host-transform-capability PASS ×3
