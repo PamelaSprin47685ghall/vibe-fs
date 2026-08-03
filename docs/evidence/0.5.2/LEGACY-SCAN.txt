@@ -1,12 +1,23 @@
 ### LEGACY-SCAN.txt — production src legacy/back-compat/compat shims
-HEAD: 5334c576
-Date: 2026-08-03T10:21:52Z
+gate_commit: ddd504ca
+scan_date: 2026-08-04
+note: re-scanned against production tree at gate_commit ddd504ca (ENV.txt / COMMIT.txt).
+prior scan stamp HEAD:5334c576 is superseded (pre-C4 phantom hits).
+
+## C4 extinction (no longer present)
+C4 (commit ff68d962) deleted AppendSquash / "squash-legacy":
+  - ICompanionDurablePort.AppendSquash (Session/CompanionTypes.fs)
+  - AgentJournalCompanionPort.AppendSquash (Session/CompanionJournalPort.fs)
+  - architecture-gate BlogSquashCommitted allowlist entry for CompanionJournalPort.fs
+Production CompanionJournalPort.fs is now 68 lines: Load / LinkBlogger / CloseBlogger only.
+src/ ripgrep for squash-legacy|AppendSquash → 0 hits.
+Prior evidence lines CompanionJournalPort.fs:63 (// Legacy port path…) and :73 ("squash-legacy")
+were phantom after C4; removed from this scan.
 
 ## ripgrep: legacy|back-compat|compat|shim|deprecated|TODO.*remove|FIXME.*legacy (src/Wanxiangshu.Next)
 
 src/Wanxiangshu.Next/Session/AgentCompletion.fs:180:        /// DEPRECATED: The agentId that owns this completion. Kept for HostFork*
-src/Wanxiangshu.Next/Session/CompanionJournalPort.fs:63:            // Legacy port path: synthesize a stable RequestId from the provider run
-src/Wanxiangshu.Next/Session/CompanionJournalPort.fs:73:                              "squash-legacy"
+src/Wanxiangshu.Next/Session/AgentCompletion.fs:181:        /// backward compatibility. New code should use the Map key or AgentName.
 src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:7:/// Name, tier, role, peer, role groupings, and legacy rejection all derive here.
 src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:109:    /// covered by `isLegacyAgentName` patterns rather than an open-ended string list.
 src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:110:    let legacyAgentNames: Set<string> =
@@ -41,19 +52,21 @@ src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:97:     
 src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:98:                | Some legacy -> Error(formatError (LegacyAgentPresent legacy))
 src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:209:                printfn "Legacy model environment variables are ignored."
 src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagerConfig.fs:12:    /// - reject legacy unprefixed / build / plan names
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/SpikePlugin.fs:202:                          // same function "for compatibility". Host source has only
 
-## Count by pattern
-  legacy → 35 hits
-  back.?compat → 0 hits
-  deprecated → 1 hits
-  shim → 1 hits
-  may be empty → 0 hits
-  0\.5\.0 only → 0 hits
+## Count by pattern (src/Wanxiangshu.Next, post-C4 tree)
+  squash-legacy → 0 hits
+  AppendSquash → 0 hits
+  legacy → rejection API + comments (ManagedAgentCatalog / PromptAuthority / ManagedAgentConfig / FactCodec / Envelope / EnforcerCatalog.gen)
+  back.?compat → 0 production dual-path hits (AgentCompletion.fs DEPRECATED comment only)
+  deprecated → 1 hit (AgentCompletion.fs:180 AgentId field note)
+  shim → catalog rule text only (EnforcerCatalog.gen.fs enforcement-i06)
+  0\.5\.0 only → 0 hits (version-bound error strings neutralized)
 
 ## Summary classification (manual pass)
-Hits are mostly: (1) formatLegacyName* rejection strings in ManagedAgentCatalog,
-(2) FactCodec pre050Markers / forward-compat decode comments,
-(3) SSOT/comment historical notes — not live dual-path shims.
-C5 deleted triple legacy name lists; residual 'legacy' tokens are rejection API names.
-src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/SpikePlugin.fs:202:                          // same function "for compatibility". Host source has only
-src/Wanxiangshu.Next/Domain/EnforcerCatalog.gen.fs:99:        {| RuleId = "enforcement-i06"; FieldName = "dirty-hack"; Family = "I"; ScoreWhen = """A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary."""; Nudge = """A workaround is hiding the root cause. Repair the governing abstraction or invariant instead."""; CatalogOrdinal = 86 |}
+Hits are: (1) formatLegacyName* / isLegacyAgentName rejection API in ManagedAgentCatalog
+(AGENT-004 — reject old names, do not run them),
+(2) FactCodec/Envelope pre-0.5.0 marker refuse (PERSIST-005),
+(3) comments / Enforcer catalog rule prose — not live dual-path shims.
+C4 deleted AppendSquash + "squash-legacy"; C5 single rejection catalog remains.
+No production dual-path writer for BlogSquashCommitted outside EnforcerHost.commitSquash.
