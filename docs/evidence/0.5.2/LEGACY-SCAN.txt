@@ -1,0 +1,59 @@
+### LEGACY-SCAN.txt — production src legacy/back-compat/compat shims
+HEAD: 5334c576
+Date: 2026-08-03T10:21:52Z
+
+## ripgrep: legacy|back-compat|compat|shim|deprecated|TODO.*remove|FIXME.*legacy (src/Wanxiangshu.Next)
+
+src/Wanxiangshu.Next/Session/AgentCompletion.fs:180:        /// DEPRECATED: The agentId that owns this completion. Kept for HostFork*
+src/Wanxiangshu.Next/Session/CompanionJournalPort.fs:63:            // Legacy port path: synthesize a stable RequestId from the provider run
+src/Wanxiangshu.Next/Session/CompanionJournalPort.fs:73:                              "squash-legacy"
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:7:/// Name, tier, role, peer, role groupings, and legacy rejection all derive here.
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:109:    /// covered by `isLegacyAgentName` patterns rather than an open-ended string list.
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:110:    let legacyAgentNames: Set<string> =
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:127:    /// AGENT-004: exact legacy names plus forbidden shapes (no alias, no autocomplete).
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:128:    let isLegacyAgentName (lower: string) : bool =
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:129:        legacyAgentNames.Contains lower
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:136:    let formatLegacyNameNotSupported (name: string) : string =
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:137:        sprintf "Legacy agent name '%s' is not supported. Managed agents require explicit fast-/deep- names." name
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:139:    let formatLegacyNameInConfig (name: string) : string =
+src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs:141:            "Legacy agent name '%s' is present in opencode.json. Managed agents require explicit fast-/deep- names."
+src/Wanxiangshu.Next/Domain/PromptAuthority.fs:207:    /// a caller: a legacy name is a migration error the operator must fix, an unknown
+src/Wanxiangshu.Next/Domain/PromptAuthority.fs:213:        | LegacyAgentName of string
+src/Wanxiangshu.Next/Domain/PromptAuthority.fs:226:    /// The ONE parser for this format. Labels, legacy set, and peer derivation all
+src/Wanxiangshu.Next/Domain/PromptAuthority.fs:235:            if ManagedAgentCatalog.isLegacyAgentName lower then
+src/Wanxiangshu.Next/Domain/PromptAuthority.fs:236:                Error(AgentNameRejection.LegacyAgentName trimmed)
+src/Wanxiangshu.Next/Domain/PromptAuthority.fs:259:            | AgentNameRejection.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
+src/Wanxiangshu.Next/Journal/FactCodec.fs:59:    let containsLegacyFallbackFields (json: string) =
+src/Wanxiangshu.Next/Journal/FactCodec.fs:125:        if containsLegacyFallbackFields json then
+src/Wanxiangshu.Next/Journal/Envelope.fs:79:        if FactCodec.containsLegacyFallbackFields json then
+src/Wanxiangshu.Next/Domain/EnforcerCatalog.gen.fs:99:        {| RuleId = "enforcement-i06"; FieldName = "dirty-hack"; Family = "I"; ScoreWhen = """A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary."""; Nudge = """A workaround is hiding the root cause. Repair the governing abstraction or invariant instead."""; CatalogOrdinal = 86 |}
+src/Wanxiangshu.Next/Domain/EnforcerCatalog.gen.fs:106:        {| RuleId = "enforcement-j03"; FieldName = "legacy-cruft-retained"; Family = "J"; ScoreWhen = """Obsolete code, aliases, compatibility branches, or old names are kept despite an explicit clean-break policy."""; Nudge = """Obsolete compatibility code is being retained. Complete the clean break and remove the old surface."""; CatalogOrdinal = 93 |}
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs:24:    | LegacyAgentName of string
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs:66:            | PromptAuthority.AgentNameRejection.LegacyAgentName name ->
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs:67:                Error(ManagedAgentParseError.LegacyAgentName name)
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs:85:        | ManagedAgentParseError.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/Projection.fs:105:                    // request's own previous assistant turn, or a legacy shape
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:25:        | LegacyAgentPresent of string
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:78:        | LegacyAgentPresent name -> ManagedAgentCatalog.formatLegacyNameInConfig name
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:90:                let legacyHit =
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:91:                    ManagedAgentCatalog.legacyAgentNames
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:97:                match legacyHit with
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:98:                | Some legacy -> Error(formatError (LegacyAgentPresent legacy))
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs:209:                printfn "Legacy model environment variables are ignored."
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagerConfig.fs:12:    /// - reject legacy unprefixed / build / plan names
+
+## Count by pattern
+  legacy → 35 hits
+  back.?compat → 0 hits
+  deprecated → 1 hits
+  shim → 1 hits
+  may be empty → 0 hits
+  0\.5\.0 only → 0 hits
+
+## Summary classification (manual pass)
+Hits are mostly: (1) formatLegacyName* rejection strings in ManagedAgentCatalog,
+(2) FactCodec pre050Markers / forward-compat decode comments,
+(3) SSOT/comment historical notes — not live dual-path shims.
+C5 deleted triple legacy name lists; residual 'legacy' tokens are rejection API names.
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/SpikePlugin.fs:202:                          // same function "for compatibility". Host source has only
+src/Wanxiangshu.Next/Domain/EnforcerCatalog.gen.fs:99:        {| RuleId = "enforcement-i06"; FieldName = "dirty-hack"; Family = "I"; ScoreWhen = """A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary."""; Nudge = """A workaround is hiding the root cause. Repair the governing abstraction or invariant instead."""; CatalogOrdinal = 86 |}

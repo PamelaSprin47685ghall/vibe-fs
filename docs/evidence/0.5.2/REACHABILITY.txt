@@ -1,0 +1,52 @@
+### REACHABILITY.txt — production call sites for critical projections
+HEAD: 5334c576 (5334c5764bb7ba9dc14386d496f1beba70bef6ea)
+Date: 2026-08-03T10:22:26Z
+command: node scripts/architecture-gate.mjs → OK (206 production + 69 test files)
+
+## HandleProjection.joinable / tryJoin production callers
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:128:            HandleProjection.isRetired
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:194:    /// EXEC-009: projection-first join. Durable `HandleProjection.joinable` is the
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:206:            let joinable =
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:207:                HandleProjection.joinable (AgentJournal.handleProjection durable parentId)
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:251:            attempt joinable
+src/Wanxiangshu.Next/Session/HostForkRestart.fs:123:                |> Option.map HandleProjection.linkedChildren
+src/Wanxiangshu.Next/Session/HostForkChildDispatch.fs:174:                HandleProjection.activeHandles handles
+src/Wanxiangshu.Next/Session/HostForkChildDispatch.fs:185:        // session aborted but still joinable, which is what makes a restart restore
+src/Wanxiangshu.Next/Session/HandleController.fs:20:/// `Active → CompletedAwaitingJoin → Retired` — and `HandleProjection` rejects any
+src/Wanxiangshu.Next/Session/HandleController.fs:104:    /// restores it as joinable and the same completion is delivered twice.
+src/Wanxiangshu.Next/Session/HandleController.fs:121:    /// work as consumed while a later restart might still show it joinable.
+src/Wanxiangshu.Next/Session/HandleController.fs:129:        match HandleProjection.tryFind handle projection with
+src/Wanxiangshu.Next/Session/HandleController.fs:149:                match HandleProjection.tryFind handle after with
+src/Wanxiangshu.Next/Session/HandleController.fs:157:    /// writing only the completion would leave the handle joinable after its parent
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ListTool.fs:82:                        [ "error", tString "HandleProjection unavailable: durable journal is not configured" ]
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ListTool.fs:96:                        HandleProjection.listable durableHandles
+src/Wanxiangshu.Next/Kernel/Identity.fs:317:        /// `HandleProjection.isRetired` before acting on the result.
+src/Wanxiangshu.Next/Journal/Fold.fs:86:                match HandleProjection.tryFind handle handles with
+src/Wanxiangshu.Next/Journal/Fold.fs:458:                    HandleProjection.link
+src/Wanxiangshu.Next/Journal/Fold.fs:463:                        (Option.defaultValue HandleProjection.empty session.Handles)
+src/Wanxiangshu.Next/Journal/Fold.fs:473:                    HandleProjection.complete
+src/Wanxiangshu.Next/Journal/Fold.fs:478:                        (Option.defaultValue HandleProjection.empty session.Handles)
+src/Wanxiangshu.Next/Journal/Fold.fs:488:                    HandleProjection.retire payload.Handle (Option.defaultValue HandleProjection.empty session.Handles)
+src/Wanxiangshu.Next/Journal/AgentJournal.fs:176:        |> Option.defaultValue HandleProjection.empty
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginHost.fs:54:                    for record in HandleProjection.linkedChildren handles do
+src/Wanxiangshu.Next/Journal/LinkageProjection.fs:65:module HandleProjection =
+src/Wanxiangshu.Next/Journal/LinkageProjection.fs:148:    let joinable (current: AgentLinkageProjection) =
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/OrchestratorSessionDirectories.fs:21:                for record in HandleProjection.linkedChildren handles do
+
+## WorktreeCreateRequested / WorktreeCreated production writers
+src/Wanxiangshu.Next/Kernel/Fact.fs:503:        | WorktreeCreateRequested of
+src/Wanxiangshu.Next/Kernel/Fact.fs:508:        | WorktreeCreated of
+src/Wanxiangshu.Next/Application/Orchestration/Orchestrator.fs:88:                    AgentFact.WorktreeCreateRequested
+src/Wanxiangshu.Next/Application/Orchestration/Orchestrator.fs:114:                            AgentFact.WorktreeCreated
+src/Wanxiangshu.Next/Journal/Fold.fs:846:        | AgentFact.WorktreeCreateRequested payload ->
+src/Wanxiangshu.Next/Journal/Fold.fs:856:        | AgentFact.WorktreeCreated payload ->
+
+## HandleController.consume / recordCompletion production
+src/Wanxiangshu.Next/Session/HostForkRuntimeFork.fs:199:                                HandleController.link this.Journal this.ParentId agentId childId agentName role
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:223:                            match HandleController.consume durable parentId record.Handle with
+src/Wanxiangshu.Next/Session/HostForkRuntime.fs:245:                            match HandleController.consume durable parentId record.Handle with
+src/Wanxiangshu.Next/Session/HostForkRunLifecycle.fs:150:                match HandleController.recordCompletion journal parentId run.AgentId completionKind body with
+
+## architecture-gate single-constructor / reachability notes
+architecture-gate exit 0 = bidirectional single-constructor + no orphan production-only symbols failing gate.
+Prior C6 closed zero-call-point for joinable: HostForkRuntime.Join uses projection-first path.
