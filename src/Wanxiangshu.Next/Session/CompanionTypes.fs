@@ -47,7 +47,6 @@ type CompanionMemory =
 /// enable flag left to persist.
 type ICompanionDurablePort =
     abstract Load: SessionId -> Result<CompanionMemory option, string>
-    abstract AppendSuccessful: SessionId * BloggerCompletion -> Result<BlogProjectionState, string>
 
     /// CTX-006 / CTX-012: the only production constructor of `BlogSquashCommitted`.
     ///

@@ -46,13 +46,6 @@ module internal CompanionHostBlogger =
         | Failed error -> AttemptOutcome.Failed, error
         | Aborted reason -> AttemptOutcome.Aborted, reason
 
-    let private failBlog (message: string) : BloggerCompletion =
-        raise (InvalidOperationException message)
-
-    /// FALLBACK-003 on the Y chain: a failed squash is a confirmed failed slot, so the
-    /// cursor advances through the single writer. Recorded under the squash attempt's
-    /// own ProviderRun, which is what makes the squash attempt — not the main it
-    /// preempts — the one `FallbackCursorAdvanced` of this slot (FALLBACK-011).
     let private advanceSquashCursor (deps: BloggerDeps) (providerRun: ProviderRunIdentity) (reason: string) =
         match deps.Journal with
         | Some journal ->
