@@ -29,11 +29,9 @@ const ROOT_ALLOWLIST = new Set([
   'AGENTS.md',
   'package.json',
   'package-lock.json',
-  'bun.lock',
   'Directory.Build.props',  'dotnet-tools.json',
   '.gitignore',
-  '.ignore',
-  'repomix-output.xml',
+  'global.json',
 ])
 
 const ROOT_FORBIDDEN_EXTENSIONS = new Set(['.fs', '.fsx', '.fsproj', '.js', '.mjs', '.ts', '.toml'])
@@ -68,7 +66,7 @@ const fail = (gate, message) => violations.push({ gate, message })
 
 const rootEntries = readdirSync(ROOT, { withFileTypes: true })
 for (const entry of rootEntries) {
-  if (entry.name.startsWith('.') && entry.name !== '.gitignore' && entry.name !== '.ignore') continue
+  if (entry.name.startsWith('.') && entry.name !== '.gitignore') continue
   if (entry.isDirectory()) continue
   if (ROOT_ALLOWLIST.has(entry.name)) continue
 

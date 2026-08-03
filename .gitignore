@@ -1,95 +1,38 @@
-## .NET / F# build output
+# Dependencies
+/node_modules/
+
+# Generated output
+/artifacts/
+/build/
+/dist/
+/coverage/
+.fable/
 bin/
 obj/
-.fable/
-*.dll
-*.exe
-*.pdb
-project.lock.json
 
-## Node / npm
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.npm
-*.tgz
+# Package output
+/*.tgz
 
-## Build artifacts (Fable -> JS output)
-build/
-build-kernel/
-build-shell/
-build-tests/
-build_verify/
-build-test/
-artifacts/
-coverage/
-
-## Local E2E probes
-e2e/opencode/specs/_debug*.mjs
-e2e/opencode/specs/debug-*.mjs
-e2e/opencode/specs/.fb-runner.mjs
-e2e/opencode/specs/_review-runner.mjs
-e2e/opencode/specs/p0-canary-recovery-temp.js
-
-## Generated / vendored dumps
-repomix-output.xml
-*.repomix.xml
-
-## OS cruft
-.DS_Store
-Thumbs.db
-desktop.ini
-ehthumbs.db
-
-## Editors / IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-*.sublime-workspace
-*.sublime-project
-
-## Logs & temp
-*.log
-*.tmp
-*.bak
-*.cache
-
-## Workspace event logs (万象术 / 万象阵)
-.wanxiangshu.ndjson
-.wanxiangshu.ndjson.lock
-.wanxiangzhen.ndjson
-.wanxiangzhen.ndjson.lock
-.wanxiangzhen-e2e-meta.json
-.wanxiangshu-recovery/
-
-## Environment / secrets
-.env
-.env.*
-!.env.example
+# Local environment
+/.env
+/.env.*
+!/.env.example
 *.pem
 *.key
 
-.cortexkit/
+# Logs
+*.log
+npm-debug.log*
 
-diagnostics-archive/
+# Editors and OS (minimal)
+.DS_Store
+Thumbs.db
 
-*.fs.js
-.tokensave
-
-## Runtime state snapshots (万象术 next runtime)
-.sdd/
-
-.slim/deepwork/
-
-## Coding-agent scratch state (not product artifacts)
-.omo/
-.codewhale/
-
-
-# BEGIN oh-my-opencode-slim worktrees
-.slim/worktrees/
-.slim/worktrees.json
-# END oh-my-opencode-slim worktrees
+# Current runtime state
+/.wanxiangshu.ndjson
+/.wanxiangshu.ndjson.lock
+/.wanxiangshu-recovery/
+/.wanxiangzhen.ndjson
+/.wanxiangzhen.ndjson.lock
+/.wanxiangzhen-e2e-meta.json
+/.sdd/
