@@ -1,6 +1,6 @@
-// tests-mjs/Enforcer/catalog.test.mjs — SSOT/15 ENFORCER-170/171/172, ENFORCER-190.
+// tests-mjs/Enforcer/catalog.test.mjs — RFC/enforcer-nudge.md ENFORCER-170/171/172, ENFORCER-190.
 //
-// The Rule Catalog is the single source of truth, generated from SSOT/15.md.
+// The Rule Catalog is the single source of truth, generated from RFC/enforcer-nudge.md.
 // ENFORCER-190 (pure tests) items 1, 15:
 //   1. Catalog generation is stable.
 //   15. A catalog update does not change old NudgeAnchored bytes (the nudge text
@@ -51,8 +51,8 @@ test('ENFORCER_170_all_twelve_families_present_with_ten_rules_each', () => {
   }
 })
 
-test('ENFORCER_172_field_names_match_the_ssot_spelling', () => {
-  // Spot-check a few known field names from SSOT/15.md.
+test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
+  // Spot-check a few known field names from RFC/enforcer-nudge.md.
   const fields = new Set(enforcer.fieldNames())
   for (const expected of [
     'primitive-obsession',

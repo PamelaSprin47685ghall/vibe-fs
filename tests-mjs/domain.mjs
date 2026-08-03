@@ -2540,7 +2540,7 @@ export const enforcer = (() => {
   const catalogRules = listItems(catalog.rules)
 
   return {
-    /** 全部 120 项规则（生成自 SSOT/15.md，ENFORCER-170）。 */
+    /** 全部 120 项规则（生成自 RFC/enforcer-nudge.md，ENFORCER-170）。 */
     rules: catalogRules,
     ruleCount: catalogRules.length,
     fieldNames: () => catalogRules.map((r) => r.FieldName),

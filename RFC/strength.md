@@ -1,6 +1,6 @@
-# SSOT/14 — Predict & Reduce Strength
+# RFC/strength — Predict & Reduce Strength
 
-> 合入说明（2026-08-02）：本文档由 `PENDING/14-Predict方案.md` 原样合入（正文未改）。
+> 本文件为已批准但尚未启用的未来设计，不属于 0.5.x 产品合同。编号原 `SSOT/14.md`。
 > 原稿「状态：最终修订稿（已通过审阅，待 Host canary 和灰度验证）」随合入更新为「已合入规范」；
 > 实现仍受 Host canary（STRENGTH-078 C-01…C-21）与阶段 A（Projection DSL 迁移）门禁。
 > `SSOT/13.md` 已恢复为运行时 LLM 可见合成内容的 TOML Instruction/Data 记法规范；
@@ -8,12 +8,12 @@
 
 ---
 
-# SSOT/14 — Predict & Reduce Strength
+# RFC/strength — Predict & Reduce Strength
 
-状态：最终修订稿（已通过审阅，待 Host canary 和灰度验证）
+状态：未来设计（已批准但未启用）
 条款前缀：`STRENGTH-`
-关联文档：SSOT/13.md — 运行时 LLM 可见合成内容的 TOML Instruction/Data 记法
-目标版本：首个生产版本
+关联文档：`RFC/strength.md` 为历史设计；`SSOT/13.md` 为运行时 LLM 可见合成内容的 TOML 记法
+目标版本：未来生产版本
 默认状态：关闭；通过 Host canary 和灰度门禁后启用
 
 > 说明：`SSOT/14` 编号保持不变，Projection DSL 语义由本文档 STRENGTH-066…074 自洽承载。

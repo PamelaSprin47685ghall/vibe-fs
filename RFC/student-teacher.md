@@ -1,4 +1,4 @@
-# SSOT/16 — Student & Teacher：主动学习与 SKILL 编译
+# RFC/student-teacher — Student & Teacher：主动学习与 SKILL 编译
 
 > 合入说明（2026-08-02）：本文档由 `PENDING/16-Student-Teacher方案.md` 原样合入（正文未改）。
 > 原稿「状态：APPROVED AS FINAL ARCHITECTURE」随合入更新为「已合入规范」；实现仍受
@@ -8,9 +8,9 @@
 ---
 
 
-状态：APPROVED AS FINAL ARCHITECTURE（最终架构，一次审阅修订后批准）
+状态：未来设计（已批准但未启用）
 实现门禁：IMPLEMENT ONLY AFTER HOST CANARIES —— 实现只能在 Host canary（第二十三节清单）通过后启动
-文件：`SSOT/16.md`（源自 `PENDING/16-Student-Teacher方案.md`）
+文件：`RFC/student-teacher.md`
 条款前缀：`LEARN-`
 
 ---
