@@ -1,13 +1,13 @@
-### PACKAGE-CONTENTS.txt — real npm pack (C12)
-HEAD: da3193b9
-Date: 2026-08-03T10:34:52Z
-command: npm pack (real, not dry-run)
+### PACKAGE-CONTENTS.txt — real npm pack (C15)
+HEAD: 982ece0f
+Date: 2026-08-03T18:14:00Z
+command: cd build && npm pack (real; postbuild template package.json)
 
 filename: wanxiangshu-0.5.2.tgz
-package_size: 1808675 bytes (1.8 MB)
-unpacked_size: 6.5 MB
-total_files: 407
-npm_shasum: 2d4a42cb456d125bc70e47f49debae6368c4194e
-sha256: f07c8f55fffe669295a5f2fb1234ec299c83898efa3f91be13944d747fcf44d7
+package_size: 1577263 bytes (1.6 MB)
+unpacked_size: 5.7 MB
+total_files: 298
+npm_shasum: 1e4c4dca912b2ceac48d6ec9573fc70e39f1d9ad
+sha256: f6e1b2b479aa6fa12f92a6f3b6ef483995d125b3b1eab6bc93a5299d9c689af4
 artifact_path_after_layout: /tmp/wx-0.5.2-artifacts/wanxiangshu-0.5.2.tgz
-note: tarball must not live at repo root (gate:layout ROOT_ALLOWLIST)
+note: tarball must not live at repo root (gate:layout ROOT_ALLOWLIST); packed from build/ after postbuild

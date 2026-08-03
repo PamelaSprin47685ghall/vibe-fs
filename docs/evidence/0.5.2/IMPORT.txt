@@ -1,14 +1,16 @@
 ### IMPORT.txt — node import of installed package
-Date: 2026-08-03T10:23:19Z
-cwd: /tmp/wx-0.5.2-install
+Date: 2026-08-03T18:14:00Z
+cwd: /tmp/wanxiangshu-052-install
 
 name: wanxiangshu
 version: 0.5.2
-main: build/next/Infrastructure/OpenCode/Plugin/Plugin.js
+main: next/Infrastructure/OpenCode/Plugin/Plugin.js
 main exists: true
 main size: 763
 import: OK
 export_keys: PluginConfig, PluginConfig_$reflection, Plugin_defaultExport, Plugin_initPlugin, default
+export_count: 5
 typeof default: object
 default keys: id, server
+Plugin_initPlugin: function
 exit: 0

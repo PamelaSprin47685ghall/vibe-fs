@@ -1,11 +1,10 @@
-### COMMIT.txt — C15 evidence capture point
+### COMMIT.txt — C15 release evidence
 source_commit: 17358c386fdc2ef08bad4c27dc957e3d14231863
 short: 17358c38
-date_utc: 2026-08-03T18:12:02Z
+date_utc: 2026-08-03T18:14:00Z
 branch: master
 subject: fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
-dirty_before_evidence_commit: dcb23fa9462905e67d66f1d1f665ae3726dadd7b
-tag: none (tag after evidence commit + reconfirm clean)
+tag: v0.5.2
 IMPLEMENTING: 0
 CONFORMANT: 192/192
 verification_commits:
@@ -14,4 +13,9 @@ verification_commits:
   - 4b4bd25a test(loop): LOOP-001/002/007/008/010 criterion layer-0 assertions
   - 21c1a9df fix(blogger): Parked survives onReactivate; CAS commitCycle on ingest cursor
   - 17358c38 fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
-prior_evidence_commit: dcb23fa9462905e67d66f1d1f665ae3726dadd7b
+pack:
+  tarball: wanxiangshu-0.5.2.tgz
+  sha256: f6e1b2b479aa6fa12f92a6f3b6ef483995d125b3b1eab6bc93a5299d9c689af4
+  files: 298
+  size_bytes: 1577263
+prior_evidence_commit: 982ece0f022201060eef7b6fda336bb399311890
