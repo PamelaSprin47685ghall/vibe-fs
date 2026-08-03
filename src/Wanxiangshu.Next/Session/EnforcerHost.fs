@@ -112,7 +112,24 @@ module EnforcerHost =
                 | _ -> None
 
     /// The last assistant message of a transform snapshot and its parts.
-    let private lastAssistantStep (rawMessages: obj list) : (string * obj list) option =
+    /// Host sets `time.completed` only when the run ends or is interrupted
+    /// (SessionSnapshotPort). Outbound `messages.transform` creates the assistant
+    /// shell first — completed is unset. ENFORCER-060 must not fire on that shell.
+    let private assistantIsCompleted (message: obj) : bool =
+        if isNull message then
+            false
+        else
+            let info = if isNull message?info then message else message?info
+
+            let timeCompleted (source: obj) =
+                if isNull source || isNull source?time then
+                    null
+                else
+                    source?time?completed
+
+            not (isNull (timeCompleted info)) || not (isNull (timeCompleted message))
+
+    let private lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
         rawMessages
         |> List.choose (fun message ->
             if isNull message then
@@ -143,7 +160,7 @@ module EnforcerHost =
                         else
                             unbox<obj array> message?parts |> Array.toList
 
-                    Some(messageId, parts)
+                    Some(messageId, parts, assistantIsCompleted message)
                 | _ -> None)
         |> List.tryLast
 
@@ -166,10 +183,10 @@ module EnforcerHost =
     /// parallel execution.
     let extractCalls
         (rawMessages: obj list)
-        : (string * (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list) option =
+        : (string * (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list * bool) option =
         match lastAssistantStep rawMessages with
         | None -> None
-        | Some(messageId, parts) ->
+        | Some(messageId, parts, completed) ->
             let catalog =
                 rules |> List.map (fun rule -> rule.FieldName, rule.RuleId, rule.CatalogOrdinal)
 
@@ -181,7 +198,7 @@ module EnforcerHost =
                     |> Option.map (fun (callId, input) ->
                         ordinal, callId, EnforcerCodec.decodeCall catalog (decodeObject input)))
 
-            Some(messageId, calls)
+            Some(messageId, calls, completed)
 
     /// ENFORCER-045: the score vector as canonical JSON bytes (Map → object).
     let private scoresToObj (scores: Map<string, byte>) : obj =
@@ -729,7 +746,7 @@ module EnforcerHost =
     let private hasIncompleteBlogTool (rawMessages: obj list) : bool =
         match lastAssistantStep rawMessages with
         | None -> false
-        | Some(_, parts) ->
+        | Some(_, parts, _) ->
             parts
             |> List.exists (fun part ->
                 isBlogToolPart part
@@ -840,37 +857,58 @@ module EnforcerHost =
                         (AgentJournal.snapshot j).AgentProjections.Associations)
 
             match journal, mainSessionId, extractCalls rawMessages with
-            | Some durable, Some owner, Some(_messageId, calls) when List.isEmpty calls ->
-                // ENFORCER-060: pure prose terminal → one InteractionRepair max.
-                // Incomplete blog (pending/running) is NOT pure prose — Host re-enters.
+            | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
+                // Empty completed-blog list. Three shapes share this arm:
+                // 1) outbound shell (assistant not completed) — Host just created it
+                //    before provider; rebuild frames+context, never InteractionRepair
+                // 2) pending/running blog — Host re-enters after tool completion
+                // 3) terminal pure prose (assistant completed) — ENFORCER-060 once
+                // Restart / resume keeps session content; tools reset is best-effort:
+                // open materialization + rebuild, not fake protocol repair on outbound.
                 let key = SessionId.value bloggerSessionId
 
                 if hasIncompleteBlogTool rawMessages then
                     return rawMessages
-                else
-                    let cell = scope.GetBloggerRuntime key
-                    let currentCtx = scope.TryPeekCurrentRequest key
+                elif not assistantCompleted then
+                    // Outbound transform / resume shell: project from typed context.
+                    let ctx =
+                        match scope.TryPeekCurrentRequest key with
+                        | Some c -> Some c
+                        | None -> resolveCycleContext scope durable owner bloggerSessionId
 
-                    if not cell.RepairSpent then
+                    match ctx with
+                    | Some c ->
+                        return
+                            tryRebuildFromContext durable bloggerSessionId c
+                            |> Option.defaultValue rawMessages
+                    | None -> return rawMessages
+                else
+                    // ENFORCER-060: pure prose terminal → one InteractionRepair max.
+                    // Require a live/open request; otherwise nothing to repair against.
+                    let cell = scope.GetBloggerRuntime key
+
+                    let currentCtx =
+                        match scope.TryPeekCurrentRequest key with
+                        | Some c -> Some c
+                        | None -> resolveCycleContext scope durable owner bloggerSessionId
+
+                    match currentCtx with
+                    | None -> return rawMessages
+                    | Some ctx when not cell.RepairSpent ->
                         scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
 
                         Diagnostic.emit
                             "enforcer-cycle-repair"
                             [ "session_id", key; "result", "no completed blog calls (ENFORCER-060)" ]
 
-                        let requestKey =
-                            match currentCtx with
-                            | Some ctx -> BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-                            | None -> key
-
+                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
                         return withRepairInstruction rawMessages requestKey
-                    else
-                        // Repair exhausted: abandon open + Idle. Never leave busy forever.
+                    | Some ctx ->
                         Diagnostic.emit
                             "enforcer-cycle-failed"
                             [ "session_id", key; "result", "protocol-repair-exhausted (ENFORCER-060)" ]
 
-                        BloggerAbandon.openRequest durable owner bloggerSessionId currentCtx "protocol-repair-exhausted"
+                        BloggerAbandon.openRequest durable owner bloggerSessionId (Some ctx) "protocol-repair-exhausted"
 
                         match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
                         | Ok next -> scope.SetBloggerRuntime(key, next)
@@ -878,7 +916,7 @@ module EnforcerHost =
 
                         scope.ClearCurrentRequest key
                         return rawMessages
-            | Some durable, Some owner, Some(messageId, calls) when not (List.isEmpty calls) ->
+            | Some durable, Some owner, Some(messageId, calls, _) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and
                 // commit one cycle, then park (ENFORCER-047).

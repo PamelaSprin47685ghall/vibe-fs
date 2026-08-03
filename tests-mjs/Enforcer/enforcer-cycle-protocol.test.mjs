@@ -97,10 +97,15 @@ const withHarness = async (fn) => {
   }
 }
 
-const assistantStep = (id, parts) =>
+/** Host only sets time.completed when the run ends. Outbound transform leaves it unset. */
+const assistantStep = (id, parts, { completed = true } = {}) =>
   toList([
     {
-      info: { id, role: 'assistant' },
+      info: {
+        id,
+        role: 'assistant',
+        ...(completed ? { time: { completed: Date.now() } } : { time: { created: Date.now() } }),
+      },
       parts,
     },
   ])
@@ -116,16 +121,23 @@ const completedBlog = (id, callId, input) =>
   ])
 
 const pendingBlog = (id, callId) =>
-  assistantStep(id, [
-    {
-      type: 'tool',
-      tool: 'blog',
-      callID: callId,
-      state: { status: 'pending', input: { text: 'later' } },
-    },
-  ])
+  assistantStep(
+    id,
+    [
+      {
+        type: 'tool',
+        tool: 'blog',
+        callID: callId,
+        state: { status: 'pending', input: { text: 'later' } },
+      },
+    ],
+    { completed: false },
+  )
 
-const pureProse = (id, text) => assistantStep(id, [{ type: 'text', text }])
+const pureProse = (id, text) => assistantStep(id, [{ type: 'text', text }], { completed: true })
+
+/** Outbound shell: Host created assistant before provider; not a terminal. */
+const outboundShell = (id) => assistantStep(id, [], { completed: false })
 
 const hasRepairMessage = (messages) =>
   listItems(messages).some((msg) => {
@@ -231,6 +243,47 @@ test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
       warns.some((w) => w.operation === 'enforcer-cycle-repair'),
       false,
       'pending/running blog must wait for Host re-entry',
+    )
+  })
+})
+
+test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () => {
+  // Host creates empty assistant before provider on every outbound transform,
+  // including resume-after-restart. That is not ENFORCER-060 pure-prose terminal.
+  await withHarness(async ({ journal, scope, blog, warns }) => {
+    const out = await handleContinuation(scope, journal, blog, outboundShell('asst-outbound'))
+
+    assert.equal(hasRepairMessage(out), false, 'must not inject Protocol repair on outbound shell')
+    assert.equal(repairSpent(scope), false)
+    assert.equal(runtimeTag(scope), 'InFlight', 'keep live request; session content remains')
+    assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
+    assert.equal(
+      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
+      false,
+    )
+    // Rebuild may replace messages; must not append a repair user turn.
+    assert.equal(
+      listItems(out).some((m) => m?.info?.source === 'interaction-repair'),
+      false,
+    )
+  })
+})
+
+test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', async () => {
+  // Restart cleared tools/runtime; session transcript may still hold a completed
+  // prose assistant. No live/open request → do not invent InteractionRepair.
+  await withHarness(async ({ journal, scope, blog, warns }) => {
+    parkedTransform.clearCurrentRequest(scope, BLOG)
+    assert.equal(runtimeTag(scope), 'Idle')
+
+    const out = await handleContinuation(scope, journal, blog, pureProse('asst-orphan', 'old prose'))
+
+    assert.equal(hasRepairMessage(out), false)
+    assert.equal(repairSpent(scope), false)
+    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(
+      warns.some((w) => w.operation === 'enforcer-cycle-repair' || w.operation === 'enforcer-cycle-failed'),
+      false,
     )
   })
 })
