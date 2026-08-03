@@ -29,7 +29,7 @@
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
 import { equals } from '../../build/next/fable_modules/fable-library-js.5.13.0/Util.js';
 
-export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side', 'prefix-probe'];
+export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side', 'prefix-probe', 'frame-commit'];
 
 // ── declaration lookup ──────────────────────────────────────────────────────
 
@@ -110,6 +110,12 @@ const probeKeepsFixedParts = (previousWire, nextWire) => equals(previousWire.Too
  */
 export function sealDecision({ previousWire, body, boundary }) {
   if (previousWire === null || previousWire === undefined) {
+    // `frame-commit` and `prefix-probe` share the multi-delivery shape: the first
+    // request establishes the seal (nothing to break), later ones break it.
+    if (boundary !== null && boundary !== undefined
+        && (boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit')) {
+      return { held: true };
+    }
     return boundary === null || boundary === undefined
       ? { held: true }
       : { broken: 'boundary-not-reached', kind: boundary.kind };
@@ -128,7 +134,10 @@ export function sealDecision({ previousWire, body, boundary }) {
     // alternate as the cursor advances). Only some of those deliveries break the
     // prefix, so an append-only delivery is legal; "the declaration never fired at
     // all" is checked at scenario end by `ScenarioRuntime.unfiredBoundaries`.
-    return boundary.kind === 'prefix-probe'
+    // `frame-commit` shares this shape: the Blogger session's first request
+    // establishes the seal (nothing to break), later requests break it as frames
+    // accumulate.
+    return boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit'
       ? { held: true }
       : { broken: 'boundary-not-reached', kind: boundary.kind };
   }
@@ -158,6 +167,15 @@ export function sealDecision({ previousWire, body, boundary }) {
       return probeKeepsFixedParts(previousWire, nextWire)
         ? { resealed: 'prefix-probe' }
         : { broken: 'prefix-probe-rewrote-fixed' };
+
+    // ENFORCER-030: a frame commit rebuilds the Blogger session's provider view —
+    // the frame list grows by one and the delta advances. The system prompt and
+    // the tool set (blog only) are fixed parts of the Blogger profile
+    // (ENFORCER-010), so only the message prefix may move.
+    case 'frame-commit':
+      return probeKeepsFixedParts(previousWire, nextWire)
+        ? { resealed: 'frame-commit' }
+        : { broken: 'frame-commit-rewrote-fixed' };
 
     default:
       throw new Error(`unknown cold boundary kind '${boundary.kind}'`);

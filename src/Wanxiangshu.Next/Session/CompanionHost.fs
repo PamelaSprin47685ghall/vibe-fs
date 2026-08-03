@@ -116,7 +116,8 @@ type CompanionHost
           SquashFrameCount = bloggerSquashFrameCount
           Journal = journal
           EffectiveAgent = bloggerEffectiveAgent
-          RecordSquashPlan = fun bloggerId providerRun -> this.RecordSquashPlan bloggerId providerRun }
+          RecordSquashPlan = fun bloggerId providerRun -> this.RecordSquashPlan bloggerId providerRun
+          StageBloggerContext = fun bloggerId ctx -> this.StageBloggerContext bloggerId ctx }
 
     /// CTX-006 step 5: the squash attempt's plan hook on the Y chain.
     ///
@@ -126,6 +127,11 @@ type CompanionHost
     /// any X attempt. A no-op is correct for a scope-less CompanionHost (tests,
     /// tools), which has no reconcile pass that could consult a plan.
     member val RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit = fun _ _ -> () with get, set
+
+    /// ENFORCER-045: stage the typed request context for the continuation
+    /// transform's commitCycle. The default is a no-op (scope-less host); the
+    /// composition root rebinds it to `PluginRuntimeScope.OfferParked`.
+    member val StageBloggerContext: SessionId -> BloggerRequestContext -> unit = fun _ _ -> () with get, set
 
     /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
     ///
