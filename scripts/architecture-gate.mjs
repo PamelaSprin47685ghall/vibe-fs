@@ -182,6 +182,27 @@ const SINGLE_WRITER_FACTS = [
     ],
     reason: 'only PromptDispatcher may abandon a plugin prompt (PROMPT-005)',
   },
+  {
+    fact: 'BlogEntryCommitted',
+    allowed: [
+      'Session/EnforcerHost.fs',
+      'Journal/BlogProjection.fs',
+      'Journal/EnforcementProjection.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'only EnforcerHost commitCycle may build BlogEntryCommitted (ENFORCER-045)',
+  },
+  {
+    fact: 'BlogSquashCommitted',
+    allowed: [
+      'Session/CompanionJournalPort.fs',
+      'Journal/BlogProjection.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'only AppendSquash may build BlogSquashCommitted (CTX-012); tool-loop migration must keep one writer',
+  },
 ]
 
 // ── DSL programs ────────────────────────────────────────────────────────────

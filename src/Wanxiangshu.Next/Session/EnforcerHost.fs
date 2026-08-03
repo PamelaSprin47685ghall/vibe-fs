@@ -26,9 +26,9 @@ open Wanxiangshu.Next.Session
 /// (no provider request leaves) until the main session offers fresh material;
 /// the offer stages the new delta and resumes the parked transform, which
 /// injects the delta as a synthetic user message (ENFORCER-051) and returns, so
-/// the Host's step loop sends the next request with the OK results PLUS the new
-/// delta. Cycles after the first therefore never create a PromptDispatcher side
-/// effect.
+/// the Host's step loop resumes with a rebuilt provider view from durable frames
+/// + typed context (not raw transcript append). Cycles after the first therefore
+/// never create a PromptDispatcher side effect.
 module EnforcerHost =
 
     /// ENFORCER-160: the parking lifetime for a continuation transform.
