@@ -238,7 +238,7 @@ module CompanionTransform =
                             current.Messages
                     with
                     | Some chunk ->
-                        let ctx = EnforcerHost.mainContextFromChunk blog xTrace chunk
+                        let ctx = EnforcerHost.mainContextFromChunk blog xTrace current chunk
                         parkedHost.OfferParked(SessionId.value bloggerId, ctx) |> ignore
                     | None -> ()
                 | _ -> companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj

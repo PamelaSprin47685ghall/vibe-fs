@@ -237,10 +237,10 @@ module internal CompanionHostBlogger =
 
                 // ENFORCER-045: stage the typed request context so the
                 // continuation transform's commitCycle consumes the declared
-                // coverage advance (not the XTrace head).
+                // coverage advance (RecordCoverage + PrefixCoverage).
                 let blog = deps.Companion.Memory.Blog
                 let xTrace = deps.Companion.Memory.XTrace
-                let ctx = EnforcerHost.mainContextFromChunk blog xTrace chunk
+                let ctx = EnforcerHost.mainContextFromChunk blog xTrace projection chunk
                 deps.StageBloggerContext childId ctx
             | Error _ -> ()
 

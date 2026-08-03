@@ -2,9 +2,9 @@
 
 ## 当前基线
 
-- 分支：`refactor/ssot-shock-anneal`
-- 最后验证 commit：`e2d00a23`（Enforcer 垂直切片 0–8 合入后）
-- 工作区：9 文件未提交（`semanticCursorFor` 修复 + `frame-commit` 冷边界 + 首次请求重建 + staged context 消费）
+- 分支：`master`
+- 最后验证 commit：`4807b9bb`（PrefixCoverage 从 staged context 推进；fallback prefix-probe 闭合）
+- 本轮验证：build + 616 unit + fallback / fallback-aabb-trace / host-transform-capability 全绿
 
 ## 当前产品状态
 
@@ -26,40 +26,25 @@ ENFORCER-180 第 0 步 1–6）已建并全绿，Enforcer 的 blog 工具与挂�
 （PARTIAL）。下一步是逐纵向接线（推荐顺序：Strength shadow → Enforcer nudge
 overlay → Student/Teacher）。
 
-### 未提交的修复（9 文件）
+### 本轮已闭合：PrefixCoverage 推进与 prefix-probe
 
-Enforcer 垂直切片合入后发现的三个关联问题，修复使 `host-transform-capability`
-canary 全绿（build + 616 单测 + 285 harness + canary 通过）：
+`8bfea409` 之后 fallback canary 的 `prefix-probe` 从未触发。根因不是
+`semanticCursorFor`，而是 `commitCycle` 只推进了 RecordCoverage 一半：
 
-1. **`semanticCursorFor` 从 `>=` 改为 `>`**（`Journal/XTraceProjection.fs`）：
-   覆盖序列表示「已消费」，delta 应从严格之后的部分开始。修复前 resumed 请求
-   的 delta 重复已覆盖的 turn-1 内容（coverage 不前进）。
-   **回归风险**：fallback canary 的 `prefix-probe` 冷边界声明未触发（见下方阻塞）。
+1. **`commitCycle` 未消费 staged PrefixCoverage**（`Session/EnforcerHost.fs`）：
+   `NextCoverableTurnCutoffExclusive` / `NextCoveredPrefixDigest` 写成当前值
+   自指，PrefixCoverage 永远停在 0 → `hasCoverage=false` → probe 永不选中。
+   修复：staged `BloggerMainRequestContext` 成为唯一 coverage 源（fail closed）。
+2. **`mainContextFromChunk` 不计算 CoveredPrefixDigest**：恢复旧路径——cutoff
+   前进时对 projection 前缀做 `renderSemantic` 哈希；cutoff 不动时保留旧 digest。
+3. **`lastCoveredSequence` 对齐 `semanticCursorFor` 的 `>` 语义**：chunk 的
+   `NextCursor` 是「首个未覆盖」位置，映射为「末个已覆盖」XTrace sequence。
+4. **canary 剧本**：Enforcer 接线后 Blogger 只接受 `blog` 工具；fallback /
+   fallback-aabb-trace 仍回 plain text → 无 `BlogEntryCommitted` → 无 coverage。
+   已改为 `tool-call blog`，并声明 `frame-commit` 冷边界。
 
-2. **`frame-commit` 冷边界**（`testkit/opencode/cold-boundary.js` + TOML）：
-   Blogger 会话的 frame commit 重建 provider view（frame 列表增长 + delta 前进），
-   前缀变化是预期的。新增 `frame-commit` 边界种类，行为同 `prefix-probe`
-   （允许 seal 建立不触发、检查 tools 不变），但命名正确。
-
-3. **首次请求重建 + staged context 消费**（`EnforcerHost.fs` + `CompanionTransform.fs`）：
-   - `handleContinuation` 对无 blog call 的首次请求也重建 provider view
-     （`[system, user(# New Work To Record + TOML), user(instruction)]`）。
-   - `commitCycle` 消费 staged typed context 的 `NextIngestedThroughSequence`
-     作为 coverage advance（ENFORCER-045），而非 XTrace head。
-   - `alreadyCommitted` 检查防止 resumed transform 重复消费 staged offer。
-   - `CompanionTransform` 的 offer 路径从 journal projection 读 coverage
-     （非 in-memory mirror，后者不被 continuation transform 的 commitCycle 更新）。
-
-### 已知未闭合问题
-
-- **fallback canary `prefix-probe` 未触发**：`semanticCursorFor` 从 `>=` 改为 `>`
-  后，X prefix probe 的 cursor 计算可能受影响。probe 应在 `continue` turn 替换
-  已提交前缀（破 seal），但实测未触发。需调查 `semanticCursorFor` 对
-  `Companion.fs` / `CompanionHost.fs` 调用者的影响。
-- **CTX-011「committed entry consumed nothing」**：一次实测中
-  `BlogEntryCommitted` 被 fold 拒绝（`nextIngestSequence <= previousIngestSequence`）。
-  可能与 parallel session 的 XTrace 为空有关（`headSequence = 0` 时
-  `nextIngestSequence = 0`）。需确认 `semanticCursorFor` 改动后此路径是否仍可达。
+验证：`npm run build` + 616 unit + fallback + fallback-aabb-trace +
+host-transform-capability 全绿。
 
 ## 活跃阻塞
 

@@ -83,13 +83,23 @@ reason = "prefix-probe"
 # assistant after it, so one declaration answers append, squash and re-anchor alike.
 # That is what the retired `neverEnd` flag was reaching for.
 
+# ENFORCER-045: coverage advances only via BlogEntryCommitted from a completed
+# blog tool cycle. A plain text reply never commits a frame, so PrefixCoverage
+# stays at 0 and the continue turn's prefix-probe never materialises.
 [[turn]]
 id = "blogger"
 internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "text", text = "Coder background." }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Coder background.", "enf-primitive-obsessin" = 7 } }
+
+# ENFORCER-030: frame commit rebuilds the Blogger provider view (frame list +
+# delta). Declare the cold boundary so ARCH-004 does not fail closed.
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
 
 [[turn]]
 id = "title"

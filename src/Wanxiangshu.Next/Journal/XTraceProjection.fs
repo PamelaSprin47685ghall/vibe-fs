@@ -140,12 +140,10 @@ module XTraceProjection =
                 { state with
                     Terminal = Some(textRef, textDigest) }
 
-    /// Map an XTrace cursor sequence back to the semantic (turn/part) position the
-    /// chunker works in. The chunker consumes from the first part at or after the
-    /// sequence; a sequence past the head means "nothing left" (one turn past the
-    /// Maps an ingest cursor (sequence of the last COVERED part) to the semantic
+    /// Map an ingest cursor (sequence of the last COVERED part) to the semantic
     /// cursor of the first UNCOVERED part. `>` not `>=`: the coverage sequence
     /// names a part already consumed, so the delta starts strictly after it.
+    /// A sequence past the head means "nothing left" (one turn past the last part).
     let semanticCursorFor (sequence: int64) (state: XTraceProjectionState) : SemanticCursor =
         match state.Parts |> List.tryFind (fun part -> part.Cursor.Sequence > sequence) with
         | Some part ->

@@ -135,10 +135,16 @@ user = "Prove same-run provider AABB trajectory."
 # The declared text is the sentence all three production shapes share — delta (:77),
 # post-restart re-anchor (:72) and condense (:118) — so one turn answers whichever fires.
 
+# ENFORCER-045: coverage advances only via a completed blog tool cycle.
 [[turn]]
 id = "blogger"
 internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "text", text = "Session background." }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", "enf-primitive-obsessin" = 7 } }
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"

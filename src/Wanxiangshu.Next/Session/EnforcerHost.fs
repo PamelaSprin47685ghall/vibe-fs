@@ -197,6 +197,10 @@ module EnforcerHost =
     /// append (PERSIST-009 shape: durable effect → fact). The fold refuses a
     /// duplicate ProviderRun, so replay of an already-committed step is a no-op
     /// at the caller's idempotency check (ENFORCER-154).
+    ///
+    /// ENFORCER-045: coverage advance is ONLY the staged typed context. Re-deriving
+    /// from XTrace head is forbidden — that path freezes PrefixCoverage at 0 and
+    /// leaves CoveredPrefixDigest empty, so CTX-011 probes never arm.
     let private commitCycle
         (journal: AgentJournal)
         (mainSessionId: SessionId)
@@ -204,7 +208,7 @@ module EnforcerHost =
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
         (merged: EnforcerCycle.MergedCycle)
-        (declaredAdvance: int64 option)
+        (declared: BloggerMainRequestContext option)
         : Result<EnforcementCycleRecord, string> =
         let projections = AgentJournal.snapshot journal
 
@@ -218,92 +222,75 @@ module EnforcerHost =
         match already with
         | Some record -> Ok record
         | None ->
-            let session = projections.AgentProjections.Sessions |> Map.tryFind mainSessionId
+            match declared with
+            | None -> Error "blog cycle has no staged coverage context (ENFORCER-045)"
+            | Some coverage ->
+                let session = projections.AgentProjections.Sessions |> Map.tryFind mainSessionId
 
-            let epoch =
-                session
-                |> Option.bind (fun s -> s.PrefixEpoch)
-                |> Option.map (fun e -> e.EpochId)
-                |> Option.defaultValue PrefixEpochId.initial
+                let epoch =
+                    session
+                    |> Option.bind (fun s -> s.PrefixEpoch)
+                    |> Option.map (fun e -> e.EpochId)
+                    |> Option.defaultValue PrefixEpochId.initial
 
-            let blog =
-                session
-                |> Option.bind (fun s -> s.Blog)
-                |> Option.defaultValue BlogProjection.empty
+                match journal.WriteBlob merged.MergedText with
+                | Error error -> Error error
+                | Ok textBlob ->
+                    let writeScore () =
+                        if Map.isEmpty merged.MergedScores then
+                            Ok None
+                        else
+                            journal.WriteBlob(CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
+                            |> Result.map Some
 
-            let xTrace =
-                session
-                |> Option.bind (fun s -> s.XTrace)
-                |> Option.defaultValue XTraceProjection.empty
+                    let writeEvidence () =
+                        match merged.MergedEvidence with
+                        | "" -> Ok None
+                        | evidence -> journal.WriteBlob evidence |> Result.map Some
 
-            // Coverage advance: the typed context's declared advance when
-            // staged (ENFORCER-045), else the first XTrace part at or after
-            // the current ingest cursor; absent → head.
-            let ingestedThrough =
-                match declaredAdvance with
-                | Some declared -> declared
-                | None ->
-                    let cursor =
-                        XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+                    match writeScore (), writeEvidence () with
+                    | Error error, _
+                    | _, Error error -> Error error
+                    | Ok scoreRef, Ok evidenceRef ->
+                        let record =
+                            { MainSessionId = mainSessionId
+                              BloggerSessionId = bloggerSessionId
+                              ProviderRun = providerRun
+                              ToolCallIds = toolCallIds
+                              CycleTextRef = textBlob.BlobRef
+                              CycleTextDigest = textBlob.BlobDigest
+                              CycleScoreRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
+                              CycleEvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
+                              ObservedPrefixEpochId = epoch }
 
-                    xTrace.Parts
-                    |> List.tryFind (fun part ->
-                        part.Turn > cursor.TurnIndex
-                        || (part.Turn = cursor.TurnIndex && part.PartIndex >= cursor.PartIndex))
-                    |> Option.map (fun part -> part.Cursor.Sequence)
-                    |> Option.defaultValue (XTraceProjection.headSequence xTrace)
+                        let fact =
+                            AgentFact.BlogEntryCommitted
+                                {| SessionId = mainSessionId
+                                   BloggerSessionId = bloggerSessionId
+                                   FrameEpochId = coverage.FrameEpochId
+                                   PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
+                                   NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
+                                   PreviousCoverableTurnCutoffExclusive =
+                                       coverage.PreviousCoverableTurnCutoffExclusive
+                                   NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
+                                   NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
+                                   TextRef = textBlob.BlobRef
+                                   TextDigest = textBlob.BlobDigest
+                                   ProviderRun = providerRun
+                                   ToolCallIds = toolCallIds
+                                   ScoreVectorRef = record.CycleScoreRef
+                                   EvidenceRef = record.CycleEvidenceRef
+                                   ObservedPrefixEpochId = epoch |}
 
-            match journal.WriteBlob merged.MergedText with
-            | Error error -> Error error
-            | Ok textBlob ->
-                let writeScore () =
-                    if Map.isEmpty merged.MergedScores then
-                        Ok None
-                    else
-                        journal.WriteBlob(CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
-                        |> Result.map Some
-
-                let writeEvidence () =
-                    match merged.MergedEvidence with
-                    | "" -> Ok None
-                    | evidence -> journal.WriteBlob evidence |> Result.map Some
-
-                match writeScore (), writeEvidence () with
-                | Error error, _
-                | _, Error error -> Error error
-                | Ok scoreRef, Ok evidenceRef ->
-                    let record =
-                        { MainSessionId = mainSessionId
-                          BloggerSessionId = bloggerSessionId
-                          ProviderRun = providerRun
-                          ToolCallIds = toolCallIds
-                          CycleTextRef = textBlob.BlobRef
-                          CycleTextDigest = textBlob.BlobDigest
-                          CycleScoreRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
-                          CycleEvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
-                          ObservedPrefixEpochId = epoch }
-
-                    let fact =
-                        AgentFact.BlogEntryCommitted
-                            {| SessionId = mainSessionId
-                               BloggerSessionId = bloggerSessionId
-                               FrameEpochId = blog.FrameEpochId
-                               PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
-                               NextIngestedThroughSequence = ingestedThrough
-                               PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
-                               NextCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
-                               NextCoveredPrefixDigest = blog.Coverage.CoveredPrefixDigest
-                               TextRef = textBlob.BlobRef
-                               TextDigest = textBlob.BlobDigest
-                               ProviderRun = providerRun
-                               ToolCallIds = toolCallIds
-                               ScoreVectorRef = record.CycleScoreRef
-                               EvidenceRef = record.CycleEvidenceRef
-                               ObservedPrefixEpochId = epoch |}
-
-                    match AgentJournal.appendAgent (StreamId.Session mainSessionId) (Some providerRun) fact journal with
-                    | Error failure -> Error(JournalAppendFailure.describe failure)
-                    | Ok _ -> Ok record
+                        match
+                            AgentJournal.appendAgent
+                                (StreamId.Session mainSessionId)
+                                (Some providerRun)
+                                fact
+                                journal
+                        with
+                        | Error failure -> Error(JournalAppendFailure.describe failure)
+                        | Ok _ -> Ok record
 
     /// ENFORCER-051: rebuild the full provider view from durable frames + context.
     ///
@@ -361,24 +348,55 @@ module EnforcerHost =
                 [ "info", box (createObj [ "id", box msg.MessageId; "role", box msg.Role ])
                   "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
 
-    /// Map chunk NextCursor (semantic) → XTrace sequence for typed context.
-    let private nextIngestSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) =
+    /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
+    /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next
+    /// delta starts strictly after this sequence (COMPANION-003 / CTX-011).
+    let private lastCoveredSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) =
         xTrace.Parts
-        |> List.tryFind (fun part ->
-            part.Turn > nextCursor.TurnIndex
-            || (part.Turn = nextCursor.TurnIndex && part.PartIndex >= nextCursor.PartIndex))
+        |> List.tryFindBack (fun part ->
+            part.Turn < nextCursor.TurnIndex
+            || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))
         |> Option.map (fun part -> part.Cursor.Sequence)
-        |> Option.defaultValue (XTraceProjection.headSequence xTrace)
+        |> Option.defaultValue 0L
 
-    /// Public: `CompanionHost.TransformRaw` uses it to build the offer context
-    /// from the same delta the coordinator computed.
+    /// COMPANION-011: digest of X's provider-visible prefix at the coverable cutoff.
+    /// When the cutoff does not move, the previous digest is kept so a mid-turn
+    /// chunk cannot rewrite a proof that still describes the same turns.
+    let private coveredPrefixDigest
+        (previousCutoff: int)
+        (previousDigest: string)
+        (nextCutoff: int)
+        (projection: ProviderProjection.ProviderSemanticProjection)
+        : string =
+        if nextCutoff = previousCutoff then
+            previousDigest
+        else
+            let coveredMessages =
+                projection.Messages
+                |> List.truncate (min nextCutoff (List.length projection.Messages))
+
+            HostDigest.sha256Hex (
+                ProviderProjection.renderSemantic
+                    { projection with
+                        Messages = coveredMessages }
+            )
+
+    /// Public: build the staged offer context from the same delta the coordinator
+    /// computed. The projection is required so COMPANION-011 can hash the covered
+    /// prefix at the new cutoff.
     let internal mainContextFromChunk
         (blog: BlogProjectionState)
         (xTrace: XTraceProjectionState)
+        (projection: ProviderProjection.ProviderSemanticProjection)
         (chunk: BloggerDeltaChunk)
         : BloggerRequestContext =
-        let nextSeq = nextIngestSequence xTrace chunk.NextCursor
-        let digest = HostDigest.sha256Hex chunk.Toml
+        let nextSeq = lastCoveredSequence xTrace chunk.NextCursor
+        let nextDigest =
+            coveredPrefixDigest
+                blog.Coverage.CoverableTurnCutoffExclusive
+                blog.Coverage.CoveredPrefixDigest
+                chunk.NextCoverableTurnCutoffExclusive
+                projection
 
         BloggerRequestContext.Main
             { Toml = chunk.Toml
@@ -386,9 +404,9 @@ module EnforcerHost =
               NextIngestedThroughSequence = nextSeq
               PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
               NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
-              NextCoveredPrefixDigest = blog.Coverage.CoveredPrefixDigest
+              NextCoveredPrefixDigest = nextDigest
               FrameEpochId = blog.FrameEpochId
-              DeltaDigest = BlobDigest.create digest }
+              DeltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml) }
 
     /// The Blogger continuation-transform handler.
     ///
@@ -449,17 +467,17 @@ module EnforcerHost =
                     | Some ctx -> return resumeWithContext ctx
                     | None -> return rawMessages
                 else
-                    // ENFORCER-045: consume the staged typed context for the
-                    // coverage advance. The blog function staged it after sending
-                    // the prompt; the commit must use the declared advance, not
-                    // the XTrace head.
+                    // ENFORCER-045: consume the staged typed context for the full
+                    // coverage advance (RecordCoverage + PrefixCoverage). The blog
+                    // function staged it after sending the prompt; missing context
+                    // is fail-closed, not re-derived from XTrace.
                     let stagedCtx = scope.TryConsumeStagedOffer(SessionId.value bloggerSessionId)
 
-                    let declaredAdvance =
+                    let declaredCoverage =
                         stagedCtx
                         |> Option.bind (fun ctx ->
                             match ctx with
-                            | BloggerRequestContext.Main main -> Some main.NextIngestedThroughSequence
+                            | BloggerRequestContext.Main main -> Some main
                             | BloggerRequestContext.Squash _ -> None)
 
                     match validateCycle messageId calls with
@@ -478,7 +496,7 @@ module EnforcerHost =
                                 providerRun
                                 toolCallIds
                                 merged
-                                declaredAdvance
+                                declaredCoverage
                         with
                         | Ok _ -> ()
                         | Error reason ->
@@ -620,7 +638,7 @@ module EnforcerHost =
                 match delta with
                 | None -> false
                 | Some chunk when scope.HasParked(SessionId.value bloggerSessionId) ->
-                    let ctx = mainContextFromChunk blog xTrace chunk
+                    let ctx = mainContextFromChunk blog xTrace projection chunk
                     scope.OfferParked(SessionId.value bloggerSessionId, ctx)
                 | Some _ ->
                     // ENFORCER-050 skip branch: no suspended transform. The
