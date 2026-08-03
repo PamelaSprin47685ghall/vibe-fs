@@ -125,6 +125,24 @@ test('LOOP_009_text_delta_decodes_fail_closed', () => {
     undefined,
   )
 
+  // LOOP-002 / LOOP-007: any non-text field is fail-closed at the codec.
+  for (const field of ['model_thought', 'thinking', 'tool', 'reasoning_content']) {
+    assert.equal(
+      loopEventCodec.tryDecodeTextDelta({
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'ses_loop',
+          messageID: 'msg_a',
+          partID: 'prt_1',
+          field,
+          delta: 'zzzz',
+        },
+      }),
+      undefined,
+      `field=${field} must not decode`,
+    )
+  }
+
   assert.equal(
     loopEventCodec.tryDecodeTextDelta({
       type: 'message.part.delta',

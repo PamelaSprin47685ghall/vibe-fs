@@ -109,3 +109,123 @@ test('CTX_014_diagnostic_fatal_prints_and_refuses_unknown_fields', () => {
     console.error = e
   }
 })
+
+test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
+  // LOOP-010 allowlist: session_id / operation / effective_character_count /
+  // detector_step / result (+ duration, provider_error). Full loop body is forbidden.
+  const allowed = [
+    ['session_id', 'ses_loop'],
+    ['result', 'armed'],
+    ['detector_step', '120'],
+    ['effective_character_count', '12.5000'],
+    ['duration', '3'],
+    ['provider_error', 'abort refused'],
+  ]
+  assert.doesNotThrow(() => diag.emit('loop-kill', allowed))
+
+  for (const result of [
+    'armed',
+    'aborted',
+    'ignored-duplicate',
+    'continue-sent',
+    'budget-exhausted',
+    'abort-failed',
+  ]) {
+    assert.doesNotThrow(() =>
+      diag.emit('loop-kill', [
+        ['session_id', 'ses_loop'],
+        ['result', result],
+      ]),
+    )
+  }
+
+  // Body of the loop must never be a diagnostic field.
+  for (const forbidden of ['loop_body', 'delta', 'text', 'stream_body', 'n_gram_text']) {
+    assert.throws(
+      () => diag.emit('loop-kill', [['session_id', 'ses_loop'], [forbidden, 'xxxx'.repeat(100)]]),
+      /CTX-014/,
+      `field '${forbidden}' must be refused (LOOP-010 no loop body)`,
+    )
+  }
+
+  // Production sites: only Diagnostic.emit "loop-kill" field keys are in scope.
+  // Whole-file scans false-positive on Host delta bindings (e.g. delta.Delta).
+  const LOOP_010_KEYS = new Set([
+    'session_id',
+    'result',
+    'detector_step',
+    'effective_character_count',
+    'duration',
+    'provider_error',
+  ])
+  const FORBIDDEN_BODY_KEYS = ['loop_body', 'delta', 'text', 'stream_body', 'n_gram_text']
+
+  function loopKillFieldKeys(source) {
+    const keys = []
+    const emitRe = /Diagnostic\.emit\s+"loop-kill"\s+(?:fields|\[)/g
+    let m
+    while ((m = emitRe.exec(source)) !== null) {
+      const from = m.index + m[0].length - 1
+      if (m[0].endsWith('fields')) {
+        // Named binding path: keys live in the preceding `fields = [ ... ]` block.
+        const blockStart = source.lastIndexOf('let fields', m.index)
+        const block = blockStart >= 0 ? source.slice(blockStart, m.index) : ''
+        for (const k of block.matchAll(/"([a-z_]+)"\s*,/g)) keys.push(k[1])
+        continue
+      }
+      // Inline list: Diagnostic.emit "loop-kill" [ "k", v; ... ]
+      let depth = 0
+      let end = from
+      for (; end < source.length; end++) {
+        const ch = source[end]
+        if (ch === '[') depth++
+        else if (ch === ']') {
+          depth--
+          if (depth === 0) {
+            end++
+            break
+          }
+        }
+      }
+      const block = source.slice(from, end)
+      for (const k of block.matchAll(/"([a-z_]+)"\s*,/g)) keys.push(k[1])
+    }
+    return keys
+  }
+
+  for (const rel of [
+    ['Infrastructure', 'OpenCode', 'Host', 'LoopSensor.fs'],
+    ['Application', 'Reconciliation', 'TurnCompletionProgram.fs'],
+  ]) {
+    const sitePath = path.join(NEXT_DIR, ...rel)
+    const siteBody = fs.readFileSync(sitePath, 'utf8')
+    assert.match(siteBody, /Diagnostic\.emit\s+"loop-kill"/, `${rel.join('/')} must emit loop-kill`)
+    const keys = loopKillFieldKeys(siteBody)
+    assert.ok(keys.length > 0, `${rel.join('/')} must expose at least one loop-kill field key`)
+    for (const key of keys) {
+      assert.ok(
+        LOOP_010_KEYS.has(key),
+        `${rel.join('/')}: field '${key}' is outside LOOP-010 allowlist`,
+      )
+      assert.ok(
+        !FORBIDDEN_BODY_KEYS.includes(key),
+        `${rel.join('/')}: body field '${key}' must not be a diagnostic key`,
+      )
+    }
+  }
+
+  const sensorPath = path.join(NEXT_DIR, 'Infrastructure', 'OpenCode', 'Host', 'LoopSensor.fs')
+  const sensorBody = fs.readFileSync(sensorPath, 'utf8')
+  for (const key of ['session_id', 'result', 'detector_step', 'effective_character_count', 'provider_error']) {
+    assert.ok(
+      loopKillFieldKeys(sensorBody).includes(key),
+      `LoopSensor loop-kill emit must include field ${key}`,
+    )
+  }
+
+  const diagnosticPath = path.join(NEXT_DIR, 'Infrastructure', 'OpenCode', 'Host', 'Diagnostic.fs')
+  const diagnosticBody = fs.readFileSync(diagnosticPath, 'utf8')
+  assert.match(diagnosticBody, /"effective_character_count"/)
+  assert.match(diagnosticBody, /"detector_step"/)
+  assert.match(diagnosticBody, /\/\/ LOOP-010/)
+})
