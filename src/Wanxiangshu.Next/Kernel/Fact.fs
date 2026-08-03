@@ -386,6 +386,8 @@ module Fact =
         /// is the PrefixCoverage advance and only ever sits on a complete turn
         /// boundary (COMPANION-011). The two prove different claims and neither
         /// may be derived from the other.
+        /// ENFORCER-045: one atomic BloggerMain cycle — frame + coverage +
+        /// enforcement half. No separate EnforcementCycleCommitted.
         | BlogEntryCommitted of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
@@ -397,7 +399,11 @@ module Fact =
                NextCoveredPrefixDigest: string
                TextRef: BlobRef
                TextDigest: BlobDigest
-               ProviderRun: ProviderRunIdentity |}
+               ProviderRun: ProviderRunIdentity
+               ToolCallIds: ToolCallId list
+               ScoreVectorRef: BlobRef option
+               EvidenceRef: BlobRef option
+               ObservedPrefixEpochId: PrefixEpochId |}
 
         /// CTX-012: a valid squash rewrote the oldest frames. Permanent once
         /// committed, even if the same slot's main request then fails.
@@ -433,25 +439,6 @@ module Fact =
                SyntheticMessageId: string
                ProbeId: string
                SolvingProviderRun: ProviderRunIdentity |}
-
-        /// ENFORCER-044/045: one Blogger provider step's merged `blog` calls,
-        /// committed atomically at the continuation transform. The work-log
-        /// text still travels through `BlogEntryCommitted` (unchanged shape);
-        /// this fact carries the enforcement half — scores and evidence — plus
-        /// the merged cycle text so the fold can replay the merge (ENFORCER-154).
-        ///
-        /// ENFORCER-150 second option: a fact following BlogEntryCommitted
-        /// rather than a field extension of it (schema clean break deferred).
-        | EnforcementCycleCommitted of
-            {| MainSessionId: SessionId
-               BloggerSessionId: SessionId
-               ProviderRun: ProviderRunIdentity
-               ToolCallIds: ToolCallId list
-               TextRef: BlobRef
-               TextDigest: BlobDigest
-               ScoreVectorRef: BlobRef option
-               EvidenceRef: BlobRef option
-               ObservedPrefixEpochId: PrefixEpochId |}
 
         /// HOST-006 containment: a Host compaction was observed, so the prefix
         /// epoch is retired and Companion coverage is zeroed.

@@ -102,7 +102,14 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                                    NextCoveredPrefixDigest = completion.NextCoveredPrefixDigest
                                    TextRef = blob.BlobRef
                                    TextDigest = blob.BlobDigest
-                                   ProviderRun = completion.ProviderRun |}
+                                   ProviderRun = completion.ProviderRun
+                                   // Old terminal path: no enforcement data.
+                                   // EnforcerHost.commitCycle is the one
+                                   // writer that carries the enforcement half.
+                                   ToolCallIds = []
+                                   ScoreVectorRef = None
+                                   EvidenceRef = None
+                                   ObservedPrefixEpochId = PrefixEpochId.initial |}
 
                         match
                             AgentJournal.appendAgent

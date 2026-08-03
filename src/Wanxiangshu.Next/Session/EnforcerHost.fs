@@ -18,7 +18,9 @@ open Wanxiangshu.Next.Session
 /// ENFORCER-044: when the Host has collected a provider step's tool results and
 /// enters the continuation transform, this module re-reads the full assistant
 /// snapshot, re-canonicalises every `blog` call, merges them by PartOrdinal, and
-/// commits ONE EnforcementCycleCommitted atomically (ENFORCER-045/154).
+/// commits ONE BlogEntryCommitted atomically (ENFORCER-045/154) — the single
+/// fact that appends the frame, advances coverage, and records the enforcement
+/// half.
 ///
 /// ENFORCER-047/050/051: after the commit the continuation transform parks
 /// (no provider request leaves) until the main session offers fresh material;
@@ -191,7 +193,7 @@ module EnforcerHost =
                 else
                     Ok(merged, callIds)
 
-    /// Commit one cycle: blobs first, then the single EnforcementCycleCommitted
+    /// Commit one cycle: blobs first, then the single BlogEntryCommitted
     /// append (PERSIST-009 shape: durable effect → fact). The fold refuses a
     /// duplicate ProviderRun, so replay of an already-committed step is a no-op
     /// at the caller's idempotency check (ENFORCER-154).
@@ -215,12 +217,38 @@ module EnforcerHost =
         match already with
         | Some record -> Ok record
         | None ->
+            let session = projections.AgentProjections.Sessions |> Map.tryFind mainSessionId
+
             let epoch =
-                projections.AgentProjections.Sessions
-                |> Map.tryFind mainSessionId
-                |> Option.bind (fun session -> session.PrefixEpoch)
-                |> Option.map (fun epoch -> epoch.EpochId)
+                session
+                |> Option.bind (fun s -> s.PrefixEpoch)
+                |> Option.map (fun e -> e.EpochId)
                 |> Option.defaultValue PrefixEpochId.initial
+
+            let blog =
+                session
+                |> Option.bind (fun s -> s.Blog)
+                |> Option.defaultValue BlogProjection.empty
+
+            let xTrace =
+                session
+                |> Option.bind (fun s -> s.XTrace)
+                |> Option.defaultValue XTraceProjection.empty
+
+            // Coverage advance: first XTrace part at or after the current
+            // ingest cursor; absent → head (everything recorded consumed).
+            // Commit 4 replaces this with the typed BloggerRequestContext's
+            // declared advance (fail closed when the context is missing).
+            let ingestedThrough =
+                let cursor =
+                    XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+
+                xTrace.Parts
+                |> List.tryFind (fun part ->
+                    part.Turn > cursor.TurnIndex
+                    || (part.Turn = cursor.TurnIndex && part.PartIndex >= cursor.PartIndex))
+                |> Option.map (fun part -> part.Cursor.Sequence)
+                |> Option.defaultValue (XTraceProjection.headSequence xTrace)
 
             match journal.WriteBlob merged.MergedText with
             | Error error -> Error error
@@ -253,13 +281,19 @@ module EnforcerHost =
                           ObservedPrefixEpochId = epoch }
 
                     let fact =
-                        AgentFact.EnforcementCycleCommitted
-                            {| MainSessionId = mainSessionId
+                        AgentFact.BlogEntryCommitted
+                            {| SessionId = mainSessionId
                                BloggerSessionId = bloggerSessionId
-                               ProviderRun = providerRun
-                               ToolCallIds = toolCallIds
+                               FrameEpochId = blog.FrameEpochId
+                               PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
+                               NextIngestedThroughSequence = ingestedThrough
+                               PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
+                               NextCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
+                               NextCoveredPrefixDigest = blog.Coverage.CoveredPrefixDigest
                                TextRef = textBlob.BlobRef
                                TextDigest = textBlob.BlobDigest
+                               ProviderRun = providerRun
+                               ToolCallIds = toolCallIds
                                ScoreVectorRef = record.CycleScoreRef
                                EvidenceRef = record.CycleEvidenceRef
                                ObservedPrefixEpochId = epoch |}

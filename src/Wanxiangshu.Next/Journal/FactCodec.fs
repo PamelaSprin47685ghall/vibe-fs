@@ -49,7 +49,8 @@ module FactCodec =
            "\"OrchestratorConflictDetected\""
            "\"OrchestratorPreRebaseReviewConfirmed\""
            "\"OrchestratorPostRebaseReviewConfirmed\""
-           "\"OrchestratorPublishClaimed\"" |]
+           "\"OrchestratorPublishClaimed\""
+           "\"EnforcementCycleCommitted\"" |]
 
     let containsLegacyFallbackFields (json: string) =
         pre050Markers

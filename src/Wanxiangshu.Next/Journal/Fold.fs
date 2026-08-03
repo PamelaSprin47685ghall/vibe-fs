@@ -612,35 +612,6 @@ module Fold =
                         Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
             )
 
-        | AgentFact.EnforcementCycleCommitted payload ->
-            // ENFORCER-045/154: at most one committed cycle per Blogger provider
-            // run. A duplicate append is a corrupted journal — no correct writer
-            // produces it — so it stops the replay rather than being absorbed.
-            AgentProjection.tryUpdate
-                payload.MainSessionId
-                (fun session ->
-                    let enforcement =
-                        Option.defaultValue EnforcementProjection.empty session.Enforcement
-
-                    EnforcementProjection.applyCycle
-                        enforcement
-                        { MainSessionId = payload.MainSessionId
-                          BloggerSessionId = payload.BloggerSessionId
-                          ProviderRun = payload.ProviderRun
-                          ToolCallIds = payload.ToolCallIds
-                          CycleTextRef = payload.TextRef
-                          CycleTextDigest = payload.TextDigest
-                          CycleScoreRef = payload.ScoreVectorRef
-                          CycleEvidenceRef = payload.EvidenceRef
-                          ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
-                    |> Result.map (fun updated ->
-                        { session with
-                            Enforcement = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error reason -> reject "EnforcementCycleCommitted" reason
-
         // ── lifecycle work record (SSOT/08, HOST-005) ──────────────────────
 
         | AgentFact.OpeningPromptCaptured payload ->
@@ -711,20 +682,43 @@ module Fold =
         // ── failure-driven context recovery (SSOT/12) ───────────────────────
 
         | AgentFact.BlogEntryCommitted payload ->
-            tryUpdateBlog
-                payload.SessionId
-                (BlogProjection.applyEntry
-                    payload.FrameEpochId
-                    payload.PreviousIngestedThroughSequence
-                    payload.NextIngestedThroughSequence
-                    payload.PreviousCoverableTurnCutoffExclusive
-                    payload.NextCoverableTurnCutoffExclusive
-                    payload.NextCoveredPrefixDigest
-                    { Kind = BlogFrameKind.Entry
-                      Digest = payload.TextDigest
-                      TextRef = payload.TextRef })
-                projection
-            |> blogOutcome "BlogEntryCommitted"
+            // ENFORCER-045: one fact updates Blog and Enforcement atomically.
+            let applyEnforcement session =
+                let enforcement =
+                    Option.defaultValue EnforcementProjection.empty session.Enforcement
+
+                EnforcementProjection.applyFromEntry
+                    enforcement
+                    { MainSessionId = payload.SessionId
+                      BloggerSessionId = payload.BloggerSessionId
+                      ProviderRun = payload.ProviderRun
+                      ToolCallIds = payload.ToolCallIds
+                      CycleTextRef = payload.TextRef
+                      CycleTextDigest = payload.TextDigest
+                      CycleScoreRef = payload.ScoreVectorRef
+                      CycleEvidenceRef = payload.EvidenceRef
+                      ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
+                |> Result.map (fun updated ->
+                    { session with
+                        Enforcement = Some updated })
+
+            match AgentProjection.tryUpdate payload.SessionId applyEnforcement projection with
+            | Error reason -> reject "BlogEntryCommitted" reason
+            | Ok updated ->
+                tryUpdateBlog
+                    payload.SessionId
+                    (BlogProjection.applyEntry
+                        payload.FrameEpochId
+                        payload.PreviousIngestedThroughSequence
+                        payload.NextIngestedThroughSequence
+                        payload.PreviousCoverableTurnCutoffExclusive
+                        payload.NextCoverableTurnCutoffExclusive
+                        payload.NextCoveredPrefixDigest
+                        { Kind = BlogFrameKind.Entry
+                          Digest = payload.TextDigest
+                          TextRef = payload.TextRef })
+                    updated
+                |> blogOutcome "BlogEntryCommitted"
 
         | AgentFact.BlogSquashCommitted payload ->
             tryUpdateBlog

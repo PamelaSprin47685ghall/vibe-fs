@@ -45,6 +45,10 @@ const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cu
       TextRef: blobRef(`blob-e${n}`),
       TextDigest: blobDigest(`sha-e${n}`),
       ProviderRun: providerRun(run),
+      ToolCallIds: [],
+      ScoreVectorRef: undefined,
+      EvidenceRef: undefined,
+      ObservedPrefixEpochId: prefixEpochId(0),
     }),
     run,
   )
