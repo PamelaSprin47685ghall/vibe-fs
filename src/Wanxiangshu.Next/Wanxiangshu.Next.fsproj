@@ -168,6 +168,7 @@
     <Compile Include="Session/CompanionHost.fs"/>
     <Compile Include="Session/CompanionProjection.fs"/>
     <Compile Include="Session/BloggerCoordinator.fs"/>
+    <Compile Include="Application/Reconciliation/BloggerCrashRecovery.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>
