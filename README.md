@@ -51,9 +51,9 @@ Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git �
 
 ```bash
 npm run build
-npm run test:mjs
-node testkit/opencode/tests/gate-testkit.mjs
-npm run test:e2e:p0:three
+npm run test
+npm run test:harness
+npm run test:e2e:three
 ```
 
 先运行当前改动的最小目标测试；只有该阶段的契约已证明后才运行更广的套件。TestKit 每个 scenario 必须独占 workspace、HOME/XDG、Provider、端口、Journal、spool、进程组、diagnostics 和 expectation store。

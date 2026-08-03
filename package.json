@@ -23,7 +23,7 @@
     "access": "restricted"
   },
   "scripts": {
-    "format": "node scripts/pre-commit-formatter.mjs",
+    "format": "node scripts/pre-commit-formatter.mjs --all",
     "lint": "node scripts/pre-commit-formatter.mjs --all",
 
     "gate:ssot": "node scripts/ssot-lint.mjs",
@@ -40,20 +40,14 @@
 
     "build": "node scripts/clean-fable-output.mjs build && dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj -o build/next",
 
-    "test:mjs": "node tests-mjs/runner.mjs",
-    "test:unit": "npm run test:mjs",
-
+    "test": "node tests-mjs/runner.mjs",
+    "test:unit": "node tests-mjs/runner.mjs",
     "test:harness": "node testkit/opencode/tests/gate-testkit.mjs",
+    "test:e2e": "node scripts/run-canary-staggered.mjs",
+    "test:e2e:three": "CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs",
 
-    "test:e2e:p0": "CANARY_REPEAT=1 node scripts/run-canary-staggered.mjs",
-    "test:e2e:p0:three": "CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs",
-    "test:e2e:companion": "node testkit/opencode/tests/companion-canary.mjs",
-    "test:e2e:manager-companion": "node testkit/opencode/tests/manager-companion-canary.mjs",
-    "test:e2e:reviewer": "node testkit/opencode/tests/reviewer-verdict-canary.mjs",
-    "test:e2e:executor": "node testkit/opencode/tests/executor-canary.mjs",
-
-    "test": "npm run gate:static && npm run build && npm run test:unit && npm run test:harness && npm run test:e2e:p0",
-    "test:release": "npm run gate:static && npm run build && npm run test:unit && npm run test:harness && npm run test:e2e:p0:three"
+    "check": "npm run gate:static && npm run build && npm test && npm run test:harness",
+    "check:release": "npm run check && npm run test:e2e:three && npm pack --dry-run"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.5.1",

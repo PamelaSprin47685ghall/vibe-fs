@@ -116,7 +116,7 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 | `STATUS/blockers/README.md` | 活跃 blocker 账本。HOST-006 已闭合（运行时探测已接线）；V2 runner `compactAfterOverflow` 观察项留给上游（ARCH-003） |
 | `docs/archive/shock-anneal-2026/` | 休克—退火迁移最终报告（`FINAL-REPORT.md`）+ 原始机器证据（`evidence/`） |
 | `docs/evidence/` | 发布验证证据（按版本目录） |
-| `PENDING/` | 已审阅通过但未合并的 SSOT 修正动议。合并前不是规范，不得据以改代码。当前仅剩 `ATTACHMENT/宝典.md` |
+| `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
@@ -254,26 +254,25 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 2. 资源契约测试
 3. Fake Host 轨迹
 4. 单 canary（CANARY_REPEAT=1）
-5. 发布门禁（恰好 3 轮 × 完整 test:release）
+5. 发布门禁（恰好 3 轮 × 完整 check:release）
 ```
 
 命令：
 
 ```bash
-npm run gate:static            # 第 0 层：layout + ssot + architecture + docs + toml + budget + surface + generated
+npm run gate:static            # 第 0 层：layout + ssot + conformance + architecture + docs + toml + budget + surface + role-matrix
 npm run gate:shock             # 第 0 层：静态残留审计 + 单一写入口（shock-audit.mjs）
 
 npm run build                                # 生产 Fable → build/next（dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj）
 
-npm run test:mjs               # 第 1–3 层（mjs，无编译步骤）
+npm run test                   # 第 1–3 层（mjs，无编译步骤）
 npm run test:harness           # gate-testkit：mock 森林与隔离自检
-npm run test:e2e:p0            # 单轮 canary（run-canary-staggered.mjs，事件驱动错峰全并行）
-npm run test:e2e:p0:three      # P0 三轮
-npm run test:e2e:companion     # 专项 canary：Companion / Manager+Companion / Reviewer verdict / Executor
-npm run test:release           # gate:static → build → unit → harness → P0×3
+npm run test:e2e              # 单轮 canary（run-canary-staggered.mjs，事件驱动错峰全并行）
+npm run test:e2e:three        # canary 三轮（CANARY_REPEAT=3）
+npm run check:release          # gate:static → build → unit → harness → e2e×3 → npm pack --dry-run
 ```
 
-`test:unit` 只是 `test:mjs` 的别名（`tests-next/` 已删除，残余 F# 套件归零）。
+`test:unit` 只是 `test` 的别名（`tests-next/` 已删除，残余 F# 套件归零）。
 `gate:toml`（`scripts/toml-format.mjs`）：剧本 TOML 必须与 formatter 输出逐字节一致。
 `gate:budget`（`scripts/budget-gate.mjs`）：`testkit/**`、
 `scripts/**`、`tests-mjs/runner.mjs` 里不得出现 ≥1000 的计时字面量，值必须来自
@@ -290,12 +289,10 @@ send 行不得携带 `HumanRoot`。两项均已红过。
 
 `gate:layout`（`scripts/repository-layout-gate.mjs`）：根目录白名单、生产源码唯一根
 （`src/Wanxiangshu.Next/`）、顶层 module 与文件名一致、重复源码探测。
-`gate:generated`（`scripts/enforcer-catalog-gen.mjs --check`）：生成物
-（`Domain/EnforcerCatalog.gen.fs`）与生成器输出一致。
 `gate:docs`（`scripts/strip-doc-bold.mjs`）：prose 去加粗 + 全角标点空格规范化，
 fenced code block 不触碰。
 
-`test:mjs` 拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
+`test`（`test:unit`）拒绝在 `build/next` 陈旧时运行（fail closed）。先 `npm run build`。
 
 ### 时间界的四条实测语义（VERIFY-004）
 
@@ -536,7 +533,7 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 - Pre-0.5.0 journal 不猜测迁移，启动发现旧 schema 直接失败（PERSIST-005）
 - 外部副作用走类型化 Requested → 幂等执行 → Accepted（PERSIST-009；worktree=`WorktreeCreateRequested`/`WorktreeCreated`，publish=`PublishClaimed`/`Published`）
 - 序列化时间戳必须归一化到 UTC offset（PERSIST-001）。否则同一事实在不同时区产出不同
-  字节，快照指纹与跨机重放全部失效。`test:mjs` 跑三个时区正是为了逼出这一类
+  字节，快照指纹与跨机重放全部失效。`test` 跑三个时区正是为了逼出这一类
 - Projection 的 create 类操作必须幂等（`createJob` 曾无条件覆盖，恢复重放会抹掉进度）
 
 ---
@@ -551,7 +548,7 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 
 # Kolmogorov 宝典
 
-本宝典唯一权威副本 `PENDING/ATTACHMENT/宝典.md`。改动必须两边同步。
+本宝典唯一权威副本 `docs/decisions/kolmogorov.md`。改动必须两边同步。
 
 - 从最重要的开始。构建软件设计有两种方法：一种是使其足够简单，以至于明显没有缺陷；另一种是使其足够复杂，以至于没有明显的缺陷：请思考你想要哪种。取法于上，仅得其中；取法于中，不免为下。记住：君子不立危墙之下。当你写下勉强工作的代码时，透支的是未来的可控性，你在完全清醒的状态下，看着自己的逻辑链条一环扣一环地走向疯狂。毁灭你，或者拯救你，取决于你是否愿意写出明显正确的代码。
 - 软件设计把不可消除复杂度压成不可再短的充分描述。好代码每行承载真实概念，名字指向领域事实，分支对应业务边界，类型拦截非法世界。文件数百行函数数十行通常是样板框架礼仪错误抽象挤占空间而非业务变深。工程第一洁癖是拯救读者注意力，让人和机器只付本质复杂度之账。小问题免框架税，大问题不手工搬砖，合适工具让问题露本相，不在配置生命周期隐式约定调试黑箱里绕路。
