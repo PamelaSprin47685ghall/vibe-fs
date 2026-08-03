@@ -339,7 +339,7 @@ export const arch010Cases = [
       const body = ['# not an instruction', 'status = "not a field"', '[[injected_table]]'].join('\n');
       const document = bloggerDocument([toolItem('tool', body)]);
 
-      assertTrue(document.includes("text = '''"), 'the fixture must actually take the literal form');
+      assertTrue(document.includes("tool_result = '''"), 'the fixture must actually take the literal form');
 
       const { syntax, content, misplaced, unterminated } = splitDocument(document);
 

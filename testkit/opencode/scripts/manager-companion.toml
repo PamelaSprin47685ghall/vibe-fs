@@ -105,7 +105,150 @@ user = "# Write the dense work-log continuation now"
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", "enf-primitive-obsessin" = 7 } }
 
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", "enf-primitive-obsessin" = 7 } }
+
 [[epoch]]
 turn = "manager-blogger-1"
 step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 3
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 4
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 5
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 6
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 7
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 8
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 9
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 10
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 11
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 12
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 13
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 14
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 15
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 16
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 17
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 18
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 19
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 20
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 21
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 22
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 23
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 24
+reason = "frame-commit"
+
+[[epoch]]
+turn = "manager-blogger-1"
+step = 25
 reason = "frame-commit"

@@ -357,8 +357,8 @@ try {
   );
 
   // The new delta data body must not repeat already-covered content.
-  const dataStart = resumedLastUser.indexOf('[[new_work_to_record]]');
-  const newWorkSection = dataStart >= 0 ? resumedLastUser.slice(dataStart) : '';
+  const resumedDataStart = resumedLastUser.indexOf('[[new_work_to_record]]');
+  const newWorkSection = resumedDataStart >= 0 ? resumedLastUser.slice(resumedDataStart) : '';
   assert.ok(
     !newWorkSection.includes('First coder turn.'),
     'new delta must not repeat turn 1 material',
