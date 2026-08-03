@@ -49,7 +49,7 @@ test('CTX_014_forbidden_field_names_never_appear_in_production_source', () => {
 })
 
 test('CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
-  // A whitelisted field passes.
+  // Expected path: whitelist ok, no console side effect required.
   assert.doesNotThrow(() => diag.emit('reanchor_failed', [['session_id', 'ses_x']]))
 
   // A field outside the whitelist is refused, not silently dropped.
@@ -73,4 +73,39 @@ test('CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
     /CTX-014/,
     'any unknown field must be refused',
   )
+})
+
+test('CTX_014_diagnostic_emit_is_silent', () => {
+  const lines = []
+  const w = console.warn
+  const e = console.error
+  console.warn = (...a) => lines.push(['warn', ...a])
+  console.error = (...a) => lines.push(['error', ...a])
+  try {
+    diag.emit('reanchor_failed', [['session_id', 'ses_x']])
+    assert.equal(lines.length, 0, 'expected diagnostics must not print')
+  } finally {
+    console.warn = w
+    console.error = e
+  }
+})
+
+test('CTX_014_diagnostic_fatal_prints_and_refuses_unknown_fields', () => {
+  const lines = []
+  const e = console.error
+  console.error = (line) => lines.push(String(line))
+  try {
+    diag.fatal('enforcer-cycle-failed', [
+      ['session_id', 'ses_x'],
+      ['result', 'missing CurrentRequest'],
+    ])
+    assert.equal(lines.length, 1)
+    const payload = JSON.parse(lines[0])
+    assert.equal(payload.operation, 'enforcer-cycle-failed')
+    assert.equal(payload.result, 'missing CurrentRequest')
+
+    assert.throws(() => diag.fatal('operation', [['not_a_real_field', 'x']]), /CTX-014/)
+  } finally {
+    console.error = e
+  }
 })

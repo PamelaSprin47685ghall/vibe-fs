@@ -230,6 +230,26 @@ const SINGLE_WRITER_FACTS = [
     ],
     reason: 'BloggerAbandon is the sole production constructor; coordinator/enforcer/crash-recovery call it',
   },
+  {
+    fact: 'WorktreeCreateRequested',
+    allowed: [
+      'Application/Orchestration/Orchestrator.fs',
+      'Journal/OrchestratorProjection.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'PERSIST-009: only Orchestrator.forkManagerCore claims worktree create before git worktree add',
+  },
+  {
+    fact: 'WorktreeCreated',
+    allowed: [
+      'Application/Orchestration/Orchestrator.fs',
+      'Journal/OrchestratorProjection.fs',
+      'Journal/Fold.fs',
+      'Kernel/Fact.fs',
+    ],
+    reason: 'PERSIST-009: only Orchestrator.forkManagerCore accepts worktree create after git succeeds',
+  },
 ]
 
 // ── DSL programs ────────────────────────────────────────────────────────────

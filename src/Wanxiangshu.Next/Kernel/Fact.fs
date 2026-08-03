@@ -495,19 +495,20 @@ module Fact =
         // (PERSIST-007) and are driven by a real attempt outcome.
 
         // ── Durable effects (PERSIST-009) ───────────────────────────────────
-        // Requested → idempotent side effect → Accepted. After a crash,
-        // Requested-without-Accepted is treated as not having happened.
+        // Typed domain facts, same protocol: Requested → effect → Accepted.
+        // Effect identity = WorktreeIdentity (`WorktreeCommands.identityOf`).
+        // After a crash, Requested-without-Created is treated as not happened;
+        // reconcile is git worktree list --porcelain / OrchestratorSweep.
 
-        | DurableEffectRequested of
-            {| EffectId: string
-               SessionId: SessionId
-               Target: string
-               Payload: string |}
+        | WorktreeCreateRequested of
+            {| ManagerJobId: ManagerJobId
+               WorktreeIdentity: WorktreeIdentity
+               WorktreePath: WorktreePath |}
 
-        | DurableEffectAccepted of
-            {| EffectId: string
-               SessionId: SessionId
-               Result: string |}
+        | WorktreeCreated of
+            {| ManagerJobId: ManagerJobId
+               WorktreeIdentity: WorktreeIdentity
+               WorktreePath: WorktreePath |}
 
     type Fact =
         | Runtime of RuntimeFact

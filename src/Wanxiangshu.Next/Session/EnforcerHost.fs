@@ -917,7 +917,8 @@ module EnforcerHost =
                         |> Option.defaultValue rawMessages
                     | None -> rawMessages
 
-                let failClosed (reason: string) =
+                // Expected terminal of a logical request: abandon + Idle, no console.
+                let bestEffortEnd (reason: string) =
                     Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
                     BloggerAbandon.openRequest durable owner bloggerSessionId currentCtx reason
@@ -933,9 +934,9 @@ module EnforcerHost =
                     return rawMessages
                 elif hasFailedBlogAttempt rawMessages then
                     // Host cleanup after kill/abort: hanging blog → error+interrupted.
-                    // Do not InteractionRepair; end the logical request if still open.
+                    // Expected resume tail; end logical request quietly if still open.
                     match currentCtx with
-                    | Some _ -> return failClosed "blog tool interrupted without completed call"
+                    | Some _ -> return bestEffortEnd "blog tool interrupted without completed call"
                     | None -> return rebuild ()
                 elif hasAnyBlogToolPart rawMessages then
                     // blog parts exist but none completed and none classified failed —
@@ -951,14 +952,14 @@ module EnforcerHost =
                     | None -> return rebuild ()
                     | Some ctx when not cell.RepairSpent ->
                         scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
-
+                        // Protocol repair is expected provider variance — silent.
                         Diagnostic.emit
                             "enforcer-cycle-repair"
                             [ "session_id", key; "result", "no completed blog calls (ENFORCER-060)" ]
 
                         let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
                         return withRepairInstruction rawMessages requestKey
-                    | Some _ -> return failClosed "protocol-repair-exhausted (ENFORCER-060)"
+                    | Some _ -> return bestEffortEnd "protocol-repair-exhausted (ENFORCER-060)"
             | Some durable, Some owner, Some(messageId, calls, _) when not (List.isEmpty calls) ->
                 // ENFORCER-044 step 2: this is a tool-loop continuation whose
                 // provider step produced completed blog calls — merge and
@@ -1012,8 +1013,21 @@ module EnforcerHost =
                     let mutable commitUnknown = false
                     let mutable injectRepair = false
 
-                    let failClosedNoPark (reason: string) =
+                    // Expected protocol/business end: abandon + Idle, silent.
+                    let bestEffortEnd (reason: string) =
                         Diagnostic.emit "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
+
+                        BloggerAbandon.openRequest durable mainSessionId bloggerSessionId currentCtx reason
+
+                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                        | Error _ -> ()
+
+                        scope.ClearCurrentRequest key
+
+                    // Unexpected invariant: print + kill process (tests gate kill off).
+                    let unexpectedEnd (reason: string) =
+                        Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
 
                         BloggerAbandon.openRequest durable mainSessionId bloggerSessionId currentCtx reason
 
@@ -1033,16 +1047,16 @@ module EnforcerHost =
                         let cell = scope.GetBloggerRuntime key
                         scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
                         injectRepair <- true
-
+                        // Expected provider variance — silent.
                         Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                     | Error reason ->
-                        // Repair spent, incomplete blog still running, or structural invalidity.
-                        failClosedNoPark (
-                            if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
-                                "protocol-repair-exhausted"
-                            else
-                                reason
-                        )
+                        // Empty-text after one repair is expected protocol exhaustion.
+                        // Other validate failures (no provider run, duplicate ids, bounds)
+                        // are unexpected shape bugs → fatal.
+                        if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
+                            bestEffortEnd "protocol-repair-exhausted"
+                        else
+                            unexpectedEnd reason
                     | Ok(merged, toolCallIds) ->
                         match currentCtx with
                         | Some(BloggerRequestContext.Squash squash) ->
@@ -1058,19 +1072,18 @@ module EnforcerHost =
                                 | Error _ -> ()
 
                                 scope.ClearCurrentRequest key
-                            | CycleCommitOutcome.KnownNotCommitted reason -> failClosedNoPark reason
+                            | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
                             | CycleCommitOutcome.CommitUnknown reason ->
-                                // No re-ask model, no re-append. Reconcile via receipt only.
+                                // Journal durability unknown — not safe to continue.
                                 commitUnknown <- true
-
-                                Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
+                                Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
                         | Some(BloggerRequestContext.Main main) ->
                             let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
 
                             if tomlDigest <> main.DeltaDigest then
-                                failClosedNoPark "delta digest mismatch"
+                                unexpectedEnd "delta digest mismatch"
                             elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
-                                failClosedNoPark "coverage did not advance"
+                                unexpectedEnd "coverage did not advance"
                             else
                                 match
                                     commitCycle
@@ -1094,20 +1107,20 @@ module EnforcerHost =
                                     | Error _ -> ()
 
                                     scope.ClearCurrentRequest key
-                                | CycleCommitOutcome.KnownNotCommitted reason -> failClosedNoPark reason
+                                | CycleCommitOutcome.KnownNotCommitted reason -> bestEffortEnd reason
                                 | CycleCommitOutcome.CommitUnknown reason ->
                                     commitUnknown <- true
-
-                                    Diagnostic.emit
+                                    Diagnostic.fatal
                                         "enforcer-cycle-commit-unknown"
                                         [ "session_id", key; "result", reason ]
                         | None ->
-                            // Completed blog with no live/open request: stale after abandon/supersede.
+                            // Stale tool after abandon/supersede is expected race → silent.
+                            // Open still present but no context is true out-of-sync → fatal.
                             let openStill = tryOpenByBlogger durable mainSessionId bloggerSessionId
 
                             match openStill with
-                            | None -> failClosedNoPark "stale-cycle-after-abandon"
-                            | Some _ -> failClosedNoPark "missing CurrentRequest"
+                            | None -> bestEffortEnd "stale-cycle-after-abandon"
+                            | Some _ -> unexpectedEnd "missing CurrentRequest"
 
                     if injectRepair then
                         // Keep InFlight + CurrentRequest; do not Park; do not commit.

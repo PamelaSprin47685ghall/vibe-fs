@@ -534,7 +534,7 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 - Append 只有 Committed 或 CommitUnknown，没有部分写入（PERSIST-002）
 - Projection 查询不扫描完整历史，必须 O(1) 积分状态（PERSIST-008）
 - Pre-0.5.0 journal 不猜测迁移，启动发现旧 schema 直接失败（PERSIST-005）
-- 外部副作用走 `DurableEffectRequested → 幂等执行 → DurableEffectAccepted`（PERSIST-009）
+- 外部副作用走类型化 Requested → 幂等执行 → Accepted（PERSIST-009；worktree=`WorktreeCreateRequested`/`WorktreeCreated`，publish=`PublishClaimed`/`Published`）
 - 序列化时间戳必须归一化到 UTC offset（PERSIST-001）。否则同一事实在不同时区产出不同
   字节，快照指纹与跨机重放全部失效。`test:mjs` 跑三个时区正是为了逼出这一类
 - Projection 的 create 类操作必须幂等（`createJob` 曾无条件覆盖，恢复重放会抹掉进度）

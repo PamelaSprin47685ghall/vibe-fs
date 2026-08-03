@@ -841,32 +841,25 @@ module Fold =
                 projection
             |> prefixOutcome "ContextReanchored" projection
 
-        // ── durable effects ─────────────────────────────────────────────────
+        // ── durable effects (PERSIST-009 typed worktree) ────────────────────
 
-        | AgentFact.DurableEffectRequested payload ->
+        | AgentFact.WorktreeCreateRequested payload ->
             Ok(
-                updateSession
-                    payload.SessionId
-                    (fun session ->
-                        { session with
-                            Effects =
-                                Some(
-                                    EffectProjection.request
-                                        payload.EffectId
-                                        payload.Target
-                                        payload.Payload
-                                        session.Effects
-                                ) })
+                updateOrchestrator
+                    (OrchestratorProjection.requestWorktree
+                        payload.WorktreeIdentity
+                        payload.WorktreePath
+                        payload.ManagerJobId)
                     projection
             )
 
-        | AgentFact.DurableEffectAccepted payload ->
+        | AgentFact.WorktreeCreated payload ->
             Ok(
-                updateSession
-                    payload.SessionId
-                    (fun session ->
-                        { session with
-                            Effects = Some(EffectProjection.accept payload.EffectId payload.Result session.Effects) })
+                updateOrchestrator
+                    (OrchestratorProjection.acceptWorktree
+                        payload.WorktreeIdentity
+                        payload.WorktreePath
+                        payload.ManagerJobId)
                     projection
             )
 

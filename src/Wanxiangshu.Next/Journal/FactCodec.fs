@@ -50,7 +50,11 @@ module FactCodec =
            "\"OrchestratorPreRebaseReviewConfirmed\""
            "\"OrchestratorPostRebaseReviewConfirmed\""
            "\"OrchestratorPublishClaimed\""
-           "\"EnforcementCycleCommitted\"" |]
+           "\"EnforcementCycleCommitted\""
+           // 0.5.1 generic durable-effect union — never written in production;
+           // refuse with the migration message rather than an opaque DU error.
+           "\"DurableEffectRequested\""
+           "\"DurableEffectAccepted\"" |]
 
     let containsLegacyFallbackFields (json: string) =
         pre050Markers

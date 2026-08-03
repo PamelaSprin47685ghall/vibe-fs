@@ -1,0 +1,131 @@
+PERSIST-009 Durable Effects — 0.5.2 C7
+========================================
+Baseline HEAD (pre-edit): db6693f5
+Clause: SSOT/11.md PERSIST-009
+Status target: CONFORMANT (layer 2)
+
+1. Protocol (typed domain facts, no giant DurableEffect union)
+--------------------------------------------------------------
+External side effects share one protocol, expressed as domain-typed facts:
+
+  Requested / Claimed
+  -> idempotent physical effect
+  -> Accepted / Created / Published
+
+  Crash: Requested-without-Accepted = not happened (retryable).
+  Accepted proves physical completion. Duplicate Accepted is idempotent.
+  Accepted must never fold back to Requested.
+
+Mapping implemented:
+
+  | Effect           | Request                         | Accepted              | Reconcile                                      |
+  |------------------|---------------------------------|-----------------------|------------------------------------------------|
+  | Worktree create  | WorktreeCreateRequested         | WorktreeCreated       | git worktree list --porcelain / OrchestratorSweep |
+  | Git publish      | PublishClaimed                  | Published             | ORCH-007 ref/head probe (already closed)       |
+  | Prompt send      | (PROMPT-011)                    | PhysicalAccepted      | PROMPT-011 at-most-one                         |
+  | Blogger request  | BloggerRequestMaterialized      | BlogEntry/Squash...   | ProviderRun receipt                            |
+
+Session create — physical-limit exception (documented in SSOT/11.md):
+  Host issues child SessionId only after session.create returns. No
+  SessionCreateRequested. Accepted evidence is HandleLinked /
+  CompanionBloggerLinked.
+
+2. Zombies deleted
+------------------
+Zero production writers existed for:
+  AgentFact.DurableEffectRequested
+  AgentFact.DurableEffectAccepted
+  Journal/EffectProjection.fs (entire module)
+  SessionAgentProjection.Effects field
+
+Removed from:
+  Kernel/Fact.fs
+  Journal/Fold.fs
+  Journal/AgentProjection.fs
+  Wanxiangshu.Next.fsproj (Compile entry)
+  tests-mjs/Journal/envelope.test.mjs session key list
+
+FactCodec.pre050Markers gained "DurableEffectRequested" /
+"DurableEffectAccepted" so an accidental old line fails with the precise
+pre-0.5.0 migration message (not an opaque DU decode error).
+0.5.1 journals without the new Worktree* cases still decode (append-only
+AgentFact cases at end of the DU; Decode.Auto ignores absent cases).
+
+3. Worktree create path
+-----------------------
+Effect identity = WorktreeCommands.identityOf(jobId) = manager/<job>
+  (deterministic before git runs).
+
+Writer: Application/Orchestration/Orchestrator.fs forkManagerCore
+  1. append WorktreeCreateRequested { ManagerJobId; WorktreeIdentity; WorktreePath }
+  2. WorktreeResource.Create → git worktree add -b manager/<job>
+  3. append WorktreeCreated { same identity/path }
+  4. StartManager → ManagerJobCreated (unchanged ORCH-006 ordering)
+
+Fold: Journal/Fold.fs
+  WorktreeCreateRequested → OrchestratorProjection.requestWorktree
+  WorktreeCreated         → OrchestratorProjection.acceptWorktree
+
+Projection: OrchestratorProjection.WorktreeEffects
+  Map<WorktreeIdentity, WorktreeEffectStatus>
+  WorktreeEffectStatus = Requested | Created  (RequireQualifiedAccess)
+
+Idempotency rules (locked by tests-mjs/Orchestrator/job.test.mjs):
+  - request on empty → Requested
+  - request after Requested → no-op
+  - request after Created → no-op (no Accept→Requested regression)
+  - accept after Requested → Created
+  - accept after Created → no-op
+  - fold of [Requested, Created, Requested] stays Created
+  - fold of [Requested, Created, Created] stays Created
+
+Reconcile (existing, unchanged):
+  OrchestratorSweep.sweepStaleArtifacts
+    owned = activeJobs |> map WorktreeIdentity
+    git.ListWorktrees() porcelain
+    remove manager/* worktrees not in owned
+    delete manager/* branches not in owned
+  Requested-without-Created leaves no durable job → next sweep cleans orphan
+  worktree/branch if git succeeded but process died before WorktreeCreated.
+
+4. Git publish
+--------------
+Already closed pre-C7:
+  PublishClaimed (CAS window) → Published
+  recoveryAction: BackfillPublished | AttemptPublish | RebaseAndReviewAgain | CleanUp
+  canary: orchestrator-restart-publish (Published eq 1)
+
+5. Tests
+--------
+tests-mjs/Orchestrator/job.test.mjs
+  PERSIST_009_worktree_request_then_created_marks_identity_created
+  PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested
+  PERSIST_009_duplicate_created_is_idempotent
+  PERSIST_009_request_alone_is_not_created
+  PERSIST_009_direct_request_accept_helpers_match_fold
+
+tests-mjs/Journal/envelope.test.mjs
+  PERSIST_008 session keys: Effects removed
+  PERSIST_005 retired names: DurableEffectRequested / DurableEffectAccepted
+
+tests-mjs/domain.mjs facade (VERIFY-008)
+  orchestratorProjection.requestWorktree / acceptWorktree / tryWorktreeEffect /
+  worktreeEffectOf
+
+6. Residual risks
+-----------------
+- Layer-2 only: no new fault-injection canary windows for worktree create
+  (prefer unit fold + this evidence; publish canary already covers Published).
+- Journal/EffectProjection.fs: body cleared, removed from fsproj. Coder has no
+  unlink tool — MUST `git rm src/Wanxiangshu.Next/Journal/EffectProjection.fs`
+  before gate:static (fsproj-drift fails while the path remains on disk).
+- Coder did not run build / test:mjs (DevOps owns verification).
+
+7. Owners
+---------
+src/Wanxiangshu.Next/Kernel/Fact.fs
+src/Wanxiangshu.Next/Journal/Fold.fs
+src/Wanxiangshu.Next/Journal/OrchestratorProjection.fs
+src/Wanxiangshu.Next/Application/Orchestration/Orchestrator.fs
+src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs
+src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/OrchestratorSweep.fs (reconcile)

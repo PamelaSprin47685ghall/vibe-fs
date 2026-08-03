@@ -434,3 +434,68 @@ test('ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_workt
   )
   assert.equal(orchestratorProjection.activeJobs(again).length, 1)
 })
+
+// ── PERSIST-009: typed worktree durable effect ──────────────────────────────
+
+const WT = worktreeIdentity('manager/job_1')
+const WT_PATH = worktreePath('/tmp/wt1')
+
+const worktreeFact = {
+  requested: fact('WorktreeCreateRequested', {
+    ManagerJobId: JOB,
+    WorktreeIdentity: WT,
+    WorktreePath: WT_PATH,
+  }),
+  created: fact('WorktreeCreated', {
+    ManagerJobId: JOB,
+    WorktreeIdentity: WT,
+    WorktreePath: WT_PATH,
+  }),
+}
+
+test('PERSIST_009_worktree_request_then_created_marks_identity_created', () => {
+  const folded = foldFacts([worktreeFact.requested, worktreeFact.created])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+
+  const orch = fold.orchestrator(folded.value)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Created')
+})
+
+test('PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested', () => {
+  // CommitUnknown retry may rewrite Requested after Accept. Fold must refuse
+  // Accepted → Requested regression (PERSIST-009).
+  const folded = foldFacts([worktreeFact.requested, worktreeFact.created, worktreeFact.requested])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+
+  const orch = fold.orchestrator(folded.value)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Created')
+})
+
+test('PERSIST_009_duplicate_created_is_idempotent', () => {
+  const folded = foldFacts([worktreeFact.requested, worktreeFact.created, worktreeFact.created])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+
+  const orch = fold.orchestrator(folded.value)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Created')
+})
+
+test('PERSIST_009_request_alone_is_not_created', () => {
+  const folded = foldFacts([worktreeFact.requested])
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+
+  const orch = fold.orchestrator(folded.value)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, orch), 'Requested')
+})
+
+test('PERSIST_009_direct_request_accept_helpers_match_fold', () => {
+  let proj = orchestratorProjection.empty
+  proj = orchestratorProjection.requestWorktree(WT, WT_PATH, JOB, proj)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, proj), 'Requested')
+
+  proj = orchestratorProjection.acceptWorktree(WT, WT_PATH, JOB, proj)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, proj), 'Created')
+
+  // Second request after accept: no-op.
+  proj = orchestratorProjection.requestWorktree(WT, WT_PATH, JOB, proj)
+  assert.equal(orchestratorProjection.worktreeEffectOf(WT, proj), 'Created')
+})

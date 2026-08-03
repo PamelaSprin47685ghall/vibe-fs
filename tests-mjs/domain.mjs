@@ -120,6 +120,8 @@ const [
   PromptDispatcherModule,
   PromptDispatcherSendModule,
   HostEventCodecModule,
+  HandleControllerModule,
+  HandleCompletionCodecModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -189,6 +191,8 @@ const [
   prod('Application/Prompting/PromptDispatcher'),
   prod('Application/Prompting/PromptDispatcherSend'),
   prod('Infrastructure/OpenCode/Codec/HostEventCodec'),
+  prod('Session/HandleController'),
+  prod('Session/HandleCompletionCodec'),
 ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
@@ -2208,6 +2212,41 @@ export const handleProjection = (() => {
   }
 })()
 
+// ── EXEC-009 consume path (SSOT/09) ──────────────────────────────────────────
+
+/** `HostForkRuntime.Join` reads `HandleProjection.joinable` (above) as the fact
+ *  source, then CAS-retires via `HandleController.consume` and materialises the
+ *  completion from the durable blob via `HandleCompletionCodec.tryRead`. The
+ *  mailbox is notification-only; these are the production exports C6 added.
+ *  There is no `tryJoin` on the projection — reality uses `joinable` + consume. */
+export const handleController = (() => {
+  const m = bind(HandleControllerModule, 'HandleController', ['consume'])
+
+  return {
+    consume: (journal, parentId, handle) => {
+      const value = resultOf(m.consume(journal, parentId, handle))
+      return value.ok ? { ok: true, record: value.value } : { ok: false, error: caseOf(value.error) }
+    },
+  }
+})()
+
+export const handleCompletionCodec = (() => {
+  const m = bind(HandleCompletionCodecModule, 'HandleCompletionCodec', [
+    'encodeOutcome',
+    'tryDecode',
+    'tryRead',
+  ])
+
+  return {
+    encodeOutcome: (runId, outcome) => m.encodeOutcome(runId, outcome),
+    tryDecode: (record, agentId, json) => resultOf(m.tryDecode(record, agentId, json)),
+    tryRead: (journal, record, agentId) => {
+      const value = resultOf(m.tryRead(journal, record, agentId))
+      return value.ok ? { ok: true, value: unwrapOption(value.value) } : { ok: false, error: value.error }
+    },
+  }
+})()
+
 // ── orchestrator (SSOT/06) ───────────────────────────────────────────────────
 
 export const orchestratorProjection = (() => {
@@ -2215,9 +2254,12 @@ export const orchestratorProjection = (() => {
     'empty',
     'tryFind',
     'tryFindByManagerSession',
+    'tryWorktreeEffect',
     'activeJobs',
     'createJob',
     'recordProgress',
+    'requestWorktree',
+    'acceptWorktree',
     'recoveryAction',
   ])
 
@@ -2225,14 +2267,22 @@ export const orchestratorProjection = (() => {
     empty: m.empty,
     tryFind: (jobId, current) => unwrapOption(m.tryFind(jobId, current)),
     tryFindByManagerSession: (session, current) => unwrapOption(m.tryFindByManagerSession(session, current)),
+    tryWorktreeEffect: (identity, current) => unwrapOption(m.tryWorktreeEffect(identity, current)),
     activeJobs: (current) => listItems(m.activeJobs(current)),
     createJob: (job, current) => m.createJob(job, current),
     recordProgress: (jobId, progress, current) => m.recordProgress(jobId, progress, current),
+    requestWorktree: (identity, path, jobId, current) => m.requestWorktree(identity, path, jobId, current),
+    acceptWorktree: (identity, path, jobId, current) => m.acceptWorktree(identity, path, jobId, current),
 
     /** ORCH-007: the single recovery action, by case name. */
     recoveryAction: (currentHead, job) => caseOf(m.recoveryAction(currentHead, job)),
     recoveryActionPayload: (currentHead, job) => payloadOf(m.recoveryAction(currentHead, job)),
     progressOf: (job) => caseOf(job.Progress),
+    /** PERSIST-009 worktree claim status case name, or undefined if absent. */
+    worktreeEffectOf: (identity, current) => {
+      const status = unwrapOption(m.tryWorktreeEffect(identity, current))
+      return status === undefined ? undefined : caseOf(status)
+    },
   }
 })()
 
@@ -2570,9 +2620,12 @@ export const introspect = {
 // ── CTX-014: diagnostic schema ───────────────────────────────────────────────
 
 export const diagnostic = (() => {
-  const m = bind(DiagnosticModule, 'Diagnostic', ['emit'])
+  const m = bind(DiagnosticModule, 'Diagnostic', ['emit', 'fatal'])
   return {
+    /** Expected / best-effort — validates whitelist, never prints. */
     emit: (operation, fields) => m.emit(operation, toList(fields)),
+    /** Unexpected — prints once then kills process (gated under node:test). */
+    fatal: (operation, fields) => m.fatal(operation, toList(fields)),
   }
 })()
 

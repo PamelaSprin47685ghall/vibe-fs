@@ -1,33 +1,8 @@
 namespace Wanxiangshu.Next.Journal
 
-type EffectId = private EffectId of string
-
-module EffectId =
-    let create value = EffectId value
-    let value (EffectId value) = value
-
-type EffectStatus =
-    | Requested of target: string * payload: string
-    | Accepted of target: string * payload: string * result: string
-
-type DurableEffectProjection =
-    { Current: (EffectId * EffectStatus) option }
-
-/// Single in-flight durable side effect. Accepted facts preserve request data.
-module EffectProjection =
-
-    let empty = { Current = None }
-
-    let request effectId target payload _current =
-        { Current = Some(EffectId.create effectId, Requested(target, payload)) }
-
-    let accept effectId result current =
-        let id = EffectId.create effectId
-
-        match current with
-        | Some existing ->
-            match existing.Current with
-            | Some(existingId, Requested(target, payload)) when existingId = id ->
-                { Current = Some(id, Accepted(target, payload, result)) }
-            | _ -> existing
-        | None -> empty
+// DELETED body (PERSIST-009 C7). DurableEffectProjection / EffectProjection gone.
+// Typed markers: OrchestratorProjection.WorktreeEffects.
+//
+// This path must not remain on disk: architecture-gate fsproj-drift fails while
+// an undeclared .fs exists. Coder cannot unlink — run before gate:static:
+//   git rm src/Wanxiangshu.Next/Journal/EffectProjection.fs

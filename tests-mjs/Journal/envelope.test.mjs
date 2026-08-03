@@ -209,6 +209,8 @@ test('PERSIST_005_replaced_fact_names_produce_the_migration_message_not_a_codec_
     'OrchestratorCandidateRegistered',
     'OrchestratorRebased',
     'OrchestratorPublishClaimed',
+    'DurableEffectRequested',
+    'DurableEffectAccepted',
   ]
 
   for (const name of retired) {
@@ -283,7 +285,6 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
     'Blog',
     'BloggerCycles',
     'Companion',
-    'Effects',
     'Enforcement',
     'Fallback',
     'Handles',

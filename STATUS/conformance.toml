@@ -2305,17 +2305,24 @@ id = "PERSIST-009"
 title = "Durable Effect 协议"
 ssot = "SSOT/11.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
+  "src/Wanxiangshu.Next/Kernel/Fact.fs",
   "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu.Next/Journal/OrchestratorProjection.fs",
+  "src/Wanxiangshu.Next/Application/Orchestration/Orchestrator.fs",
+  "src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs",
 ]
 tests = [
   "tests-mjs/Orchestrator/job.test.mjs",
+  "tests-mjs/Journal/envelope.test.mjs",
 ]
-canaries = []
-evidence = ""
+canaries = [
+  "orchestrator-restart-publish",
+]
+evidence = "docs/evidence/0.5.2/PERSIST-009-EFFECTS.txt"
 
 [[clause]]
 id = "PERSIST-010"

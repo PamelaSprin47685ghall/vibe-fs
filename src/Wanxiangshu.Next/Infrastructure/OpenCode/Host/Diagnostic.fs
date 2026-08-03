@@ -3,13 +3,14 @@ namespace Wanxiangshu.Next.OpenCode
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// CTX-014: the single diagnostic emit for HOST-007.
+/// CTX-014 / HOST-007 runtime diagnostics — two severities only:
 ///
-/// Every diagnostic the plugin logs must carry only the allowed fields; the
-/// forbidden set is structural here, so a field named `context_ratio` or
-/// `estimated_tokens_remaining` cannot be emitted without failing this module
-/// (fail closed, and the failure is a programming error — a log line must never
-/// become a recovery decision).
+///   emit  — expected / best-effort. No console. Never a recovery decision.
+///   fatal — unexpected invariant break. Print once, then kill the process.
+///
+/// A log line must never become a recovery protocol (HOST-007). Classification
+/// is at the call site: if the world can still continue, call `emit` (or nothing);
+/// if the plugin is out of contract, call `fatal`.
 module Diagnostic =
 
     /// CTX-014 允许字段清单。新增字段必须同时登记到白名单与
@@ -45,16 +46,22 @@ module Diagnostic =
               "estimated_tokens_remaining"
               "compression_needed" ]
 
-    [<Emit("console.warn($0)")>]
-    let private warn (message: string) : unit = jsNative
+    [<Emit("console.error($0)")>]
+    let private error (message: string) : unit = jsNative
 
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
-    /// Emit one diagnostic. `operation` names the HOST-007 event; `fields` are
-    /// validated against the whitelist and serialised as one JSON object, so a
-    /// structured consumer can read them and a human gets one line.
-    let emit (operation: string) (fields: (string * string) list) : unit =
+    /// Kill this process hard. Gated off under node:test and WANXIANGSHU_NO_FATAL_EXIT=1
+    /// so unit/canary harnesses can assert the fatal path without dying.
+    [<Emit("""(() => {
+      if (process.env.WANXIANGSHU_NO_FATAL_EXIT === '1') return;
+      if (process.env.NODE_TEST_CONTEXT != null && process.env.NODE_TEST_CONTEXT !== '') return;
+      try { process.kill(process.pid, 'SIGKILL'); } catch (_) { process.exit(1); }
+    })()""")>]
+    let private killSelf () : unit = jsNative
+
+    let private validate (fields: (string * string) list) : unit =
         let illegal =
             fields
             |> List.map fst
@@ -63,12 +70,20 @@ module Diagnostic =
         if not (List.isEmpty illegal) then
             failwith (sprintf "CTX-014: 诊断字段不在白名单: %A" illegal)
 
-        let payload =
-            createObj (
-                Array.ofList (
-                    ("operation", box operation)
-                    :: (fields |> List.map (fun (name, value) -> name, box value))
-                )
+    let private payload (operation: string) (fields: (string * string) list) : obj =
+        createObj (
+            Array.ofList (
+                ("operation", box operation)
+                :: (fields |> List.map (fun (name, value) -> name, box value))
             )
+        )
 
-        warn (stringify payload)
+    /// Expected / best-effort. Validates CTX-014 whitelist; never prints.
+    let emit (operation: string) (fields: (string * string) list) : unit =
+        validate fields
+
+    /// Unexpected invariant break. Print one JSON line, then kill the process.
+    let fatal (operation: string) (fields: (string * string) list) : unit =
+        validate fields
+        error (stringify (payload operation fields))
+        killSelf ()

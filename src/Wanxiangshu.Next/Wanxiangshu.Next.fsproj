@@ -70,7 +70,6 @@
     <Compile Include="Journal/LinkageProjection.fs"/>
     <Compile Include="Journal/OrchestratorProjection.fs"/>
     <Compile Include="Journal/SessionAssociation.fs"/>
-    <Compile Include="Journal/EffectProjection.fs"/>
     <Compile Include="Journal/ReviewProjection.fs"/>
     <Compile Include="Journal/EnforcementProjection.fs"/>
     <Compile Include="Journal/BloggerCycleProjection.fs"/>

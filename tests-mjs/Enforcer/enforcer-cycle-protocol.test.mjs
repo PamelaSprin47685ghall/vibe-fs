@@ -70,13 +70,15 @@ const withHarness = async (fn) => {
   })
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
 
-  const warns = []
-  const origWarn = console.warn
-  console.warn = (line) => {
+  // Expected paths are silent (no console). Unexpected paths print via console.error
+  // then would kill the process — under node:test the kill is gated off.
+  const fatals = []
+  const origError = console.error
+  console.error = (line) => {
     try {
-      warns.push(JSON.parse(String(line)))
+      fatals.push(JSON.parse(String(line)))
     } catch {
-      warns.push({ raw: String(line) })
+      fatals.push({ raw: String(line) })
     }
   }
 
@@ -87,11 +89,11 @@ const withHarness = async (fn) => {
       blog,
       main,
       ctx,
-      warns,
-      lastWarn: () => warns.at(-1),
+      fatals,
+      lastFatal: () => fatals.at(-1),
     })
   } finally {
-    console.warn = origWarn
+    console.error = origError
     created.dispose()
     rmSync(dir, { recursive: true, force: true })
   }
@@ -200,7 +202,7 @@ test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
 // ── empty text cycle → real one-shot InteractionRepair ──────────────────────
 
 test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
-  await withHarness(async ({ journal, scope, blog, warns, lastWarn }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(
       scope,
       journal,
@@ -212,14 +214,12 @@ test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
     assert.equal(repairSpent(scope), true)
     assert.equal(runtimeTag(scope), 'InFlight', 'repair must not clear InFlight')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
-    assert.equal(lastWarn()?.operation, 'enforcer-cycle-repair')
-    assert.match(lastWarn()?.result ?? '', /empty after canonicalisation/)
-    assert.ok(warns.some((w) => w.operation === 'enforcer-cycle-repair'))
+    assert.equal(fatals.length, 0, 'expected repair is silent')
   })
 })
 
 test('ENFORCER_061_second_empty_text_exhausts_repair_and_idles', async () => {
-  await withHarness(async ({ journal, scope, blog, lastWarn }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     await handleContinuation(scope, journal, blog, completedBlog('asst-1', 'c1', { text: '' }))
     const out = await handleContinuation(
       scope,
@@ -232,67 +232,57 @@ test('ENFORCER_061_second_empty_text_exhausts_repair_and_idles', async () => {
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(repairSpent(scope), false, 'onFail resets spent only after final fail')
-    assert.equal(lastWarn()?.operation, 'enforcer-cycle-failed')
-    assert.match(lastWarn()?.result ?? '', /protocol-repair-exhausted/)
+    assert.equal(fatals.length, 0, 'protocol exhaustion is expected best-effort')
   })
 })
 
 // ── no blog pure prose (ENFORCER-060) ───────────────────────────────────────
 
 test('ENFORCER_060_pure_prose_injects_repair_once', async () => {
-  await withHarness(async ({ journal, scope, blog, lastWarn }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(scope, journal, blog, pureProse('asst-p', 'I refuse tools'))
 
     assert.equal(hasRepairMessage(out), true)
     assert.equal(repairSpent(scope), true)
     assert.equal(runtimeTag(scope), 'InFlight')
-    assert.equal(lastWarn()?.operation, 'enforcer-cycle-repair')
-    assert.match(lastWarn()?.result ?? '', /ENFORCER-060/)
+    assert.equal(fatals.length, 0)
   })
 })
 
 test('ENFORCER_060_pure_prose_second_failure_idles_not_busy_forever', async () => {
-  await withHarness(async ({ journal, scope, blog, lastWarn }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     await handleContinuation(scope, journal, blog, pureProse('asst-p1', 'no tools'))
     const out = await handleContinuation(scope, journal, blog, pureProse('asst-p2', 'still no'))
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
-    assert.match(lastWarn()?.result ?? '', /protocol-repair-exhausted/)
+    assert.equal(fatals.length, 0)
   })
 })
 
 test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
-  await withHarness(async ({ journal, scope, blog, warns }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(scope, journal, blog, pendingBlog('asst-pend', 'cp'))
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(repairSpent(scope), false)
     assert.equal(runtimeTag(scope), 'InFlight')
-    assert.equal(
-      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
-      false,
-      'pending/running blog must wait for Host re-entry',
-    )
+    assert.equal(fatals.length, 0)
   })
 })
 
 test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () => {
   // Host creates empty assistant before provider on every outbound transform,
   // including resume-after-restart. That is not ENFORCER-060 pure-prose terminal.
-  await withHarness(async ({ journal, scope, blog, warns }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(scope, journal, blog, outboundShell('asst-outbound'))
 
     assert.equal(hasRepairMessage(out), false, 'must not inject Protocol repair on outbound shell')
     assert.equal(repairSpent(scope), false)
     assert.equal(runtimeTag(scope), 'InFlight', 'keep live request; session content remains')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
-    assert.equal(
-      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
-      false,
-    )
-    // Rebuild may replace messages; must not append a repair user turn.
+    assert.equal(fatals.length, 0)
     assert.equal(
       listItems(out).some((m) => m?.info?.source === 'interaction-repair'),
       false,
@@ -304,7 +294,7 @@ test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => 
   // opencode SessionProcessor.cleanup: hanging tool → status=error + interrupted,
   // assistant time.completed. Transform msgs still end on that historical tail
   // (new outbound assistant is NOT in msgs). Must not ENFORCER-060.
-  await withHarness(async ({ journal, scope, blog, warns, lastWarn }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(
       scope,
       journal,
@@ -313,12 +303,7 @@ test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => 
     )
 
     assert.equal(hasRepairMessage(out), false, 'interrupted blog ≠ missing blog call')
-    assert.equal(
-      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
-      false,
-    )
-    assert.equal(lastWarn()?.operation, 'enforcer-cycle-failed')
-    assert.match(lastWarn()?.result ?? '', /interrupted/)
+    assert.equal(fatals.length, 0, 'Host abort cleanup is expected — silent best-effort')
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
   })
@@ -326,7 +311,7 @@ test('ENFORCER_060_host_interrupted_blog_is_not_pure_prose_repair', async () => 
 
 test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async () => {
   // Resume after kill: transform sees prior interrupted blog assistant as last.
-  await withHarness(async ({ journal, scope, blog, warns }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(
       scope,
       journal,
@@ -338,10 +323,7 @@ test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async
     )
 
     assert.equal(hasRepairMessage(out), false)
-    assert.equal(
-      warns.some((w) => w.operation === 'enforcer-cycle-repair'),
-      false,
-    )
+    assert.equal(fatals.length, 0)
     assert.equal(runtimeTag(scope), 'Idle')
   })
 })
@@ -349,7 +331,7 @@ test('ENFORCER_060_historical_interrupted_tail_on_resume_does_not_repair', async
 test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', async () => {
   // Restart cleared tools/runtime; session transcript may still hold a completed
   // prose assistant. No live/open request → do not invent InteractionRepair.
-  await withHarness(async ({ journal, scope, blog, warns }) => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(runtimeTag(scope), 'Idle')
 
@@ -358,17 +340,14 @@ test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', a
     assert.equal(hasRepairMessage(out), false)
     assert.equal(repairSpent(scope), false)
     assert.equal(runtimeTag(scope), 'Idle')
-    assert.equal(
-      warns.some((w) => w.operation === 'enforcer-cycle-repair' || w.operation === 'enforcer-cycle-failed'),
-      false,
-    )
+    assert.equal(fatals.length, 0)
   })
 })
 
 // ── stale cycle after abandon (out-of-sync closed) ──────────────────────────
 
-test('ENFORCER_stale_cycle_after_abandon_emits_precise_reason', async () => {
-  await withHarness(async ({ journal, scope, blog, lastWarn }) => {
+test('ENFORCER_stale_cycle_after_abandon_is_silent_best_effort', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
     // Spend repair then exhaust → Idle, no open.
     await handleContinuation(scope, journal, blog, completedBlog('a1', 'c1', { text: '' }))
     await handleContinuation(scope, journal, blog, completedBlog('a2', 'c2', { text: '' }))
@@ -384,11 +363,10 @@ test('ENFORCER_stale_cycle_after_abandon_emits_precise_reason', async () => {
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(runtimeTag(scope), 'Idle')
-    assert.equal(lastWarn()?.operation, 'enforcer-cycle-failed')
-    assert.equal(lastWarn()?.result, 'stale-cycle-after-abandon')
-    assert.notEqual(lastWarn()?.result, 'missing CurrentRequest')
+    assert.equal(fatals.length, 0, 'stale after abandon is expected race — silent')
   })
 })
+
 
 // ── resolveCycleContext does not clobber live InFlight ──────────────────────
 

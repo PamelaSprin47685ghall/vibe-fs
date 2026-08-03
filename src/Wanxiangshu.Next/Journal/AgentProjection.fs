@@ -3,7 +3,7 @@ namespace Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel.Identity
 
-/// The nine bounded projections one session owns (PERSIST-008).
+/// Bounded projections one session owns (PERSIST-008).
 ///
 /// Each is `option` because a session acquires state only when a fact concerning
 /// it arrives. "No fact yet" and "an empty projection" are different claims and
@@ -30,7 +30,6 @@ type SessionAgentProjection =
         ReviewRequirements: ReviewRequirementProjection option
         Fallback: FallbackProjection option
         PromptAuthority: PromptAuthority.PromptAuthorityProjection option
-        Effects: DurableEffectProjection option
         /// ENFORCER-044/045/154: committed Blogger enforcement cycles for this
         /// session's Companion. Per-session because a cycle belongs to one
         /// main session's Companion, keyed by the Blogger provider run.
@@ -73,7 +72,6 @@ module AgentProjection =
           ReviewRequirements = None
           Fallback = None
           PromptAuthority = None
-          Effects = None
           Enforcement = None
           BloggerCycles = None }
 

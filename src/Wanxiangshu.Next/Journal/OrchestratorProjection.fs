@@ -78,11 +78,25 @@ type ManagerJobProjection =
         Progress: JobProgress
     }
 
+/// PERSIST-009 worktree create: Requested → Created markers, keyed by the
+/// deterministic `WorktreeIdentity` (`manager/<job>`). Not a program counter —
+/// physical evidence of an external side effect's claim window.
+[<RequireQualifiedAccess>]
+type WorktreeEffectStatus =
+    | Requested of {| ManagerJobId: ManagerJobId; WorktreePath: WorktreePath |}
+    | Created of {| ManagerJobId: ManagerJobId; WorktreePath: WorktreePath |}
+
 /// PERSIST-008: keyed lookup, no history scan. Terminal jobs stay in the map so
 /// re-folding a Published fact is recognised as a duplicate rather than
 /// resurrecting a fresh entry; `activeJobs` filters them out.
+///
+/// `WorktreeEffects` is the PERSIST-009 claim window for git worktree add:
+/// Requested-without-Created is "not happened" for retry; Created proves the
+/// branch exists. Reconcile remains OrchestratorSweep + `git worktree list
+/// --porcelain` (owned set = activeJobs identities).
 type OrchestratorProjection =
-    { Jobs: Map<ManagerJobId, ManagerJobProjection> }
+    { Jobs: Map<ManagerJobId, ManagerJobProjection>
+      WorktreeEffects: Map<WorktreeIdentity, WorktreeEffectStatus> }
 
 /// ORCH-007: exactly one action per job, derived from its last fact.
 type JobRecoveryAction =
@@ -112,9 +126,53 @@ type JobRecoveryAction =
 
 module OrchestratorProjection =
 
-    let empty = { Jobs = Map.empty }
+    let empty =
+        { Jobs = Map.empty
+          WorktreeEffects = Map.empty }
 
     let tryFind (jobId: ManagerJobId) (projection: OrchestratorProjection) = Map.tryFind jobId projection.Jobs
+
+    let tryWorktreeEffect (identity: WorktreeIdentity) (projection: OrchestratorProjection) =
+        Map.tryFind identity projection.WorktreeEffects
+
+    /// PERSIST-009: claim before `git worktree add`. Idempotent — a second
+    /// request for the same identity keeps the first marker (including Created).
+    /// Accept→Requested regression is refused: once Created, request is a no-op.
+    let requestWorktree
+        (identity: WorktreeIdentity)
+        (path: WorktreePath)
+        (jobId: ManagerJobId)
+        (projection: OrchestratorProjection)
+        =
+        match Map.tryFind identity projection.WorktreeEffects with
+        | Some _ -> projection
+        | None ->
+            { projection with
+                WorktreeEffects =
+                    Map.add
+                        identity
+                        (WorktreeEffectStatus.Requested
+                            {| ManagerJobId = jobId
+                               WorktreePath = path |})
+                        projection.WorktreeEffects }
+
+    /// PERSIST-009: physical create succeeded. Idempotent on duplicate accept.
+    let acceptWorktree
+        (identity: WorktreeIdentity)
+        (path: WorktreePath)
+        (jobId: ManagerJobId)
+        (projection: OrchestratorProjection)
+        =
+        let created =
+            WorktreeEffectStatus.Created
+                {| ManagerJobId = jobId
+                   WorktreePath = path |}
+
+        match Map.tryFind identity projection.WorktreeEffects with
+        | Some(WorktreeEffectStatus.Created _) -> projection
+        | _ ->
+            { projection with
+                WorktreeEffects = Map.add identity created projection.WorktreeEffects }
 
     /// The job a Manager session is running, for callers that hold only the
     /// session id.
