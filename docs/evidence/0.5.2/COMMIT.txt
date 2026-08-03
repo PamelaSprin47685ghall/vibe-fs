@@ -4,7 +4,7 @@ short: 17358c38
 date_utc: 2026-08-03T18:12:02Z
 branch: master
 subject: fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
-dirty_before_evidence_commit: no (worktree clean at evidence generation)
+dirty_before_evidence_commit: dcb23fa9462905e67d66f1d1f665ae3726dadd7b
 tag: none (tag after evidence commit + reconfirm clean)
 IMPLEMENTING: 0
 CONFORMANT: 192/192
@@ -14,4 +14,4 @@ verification_commits:
   - 4b4bd25a test(loop): LOOP-001/002/007/008/010 criterion layer-0 assertions
   - 21c1a9df fix(blogger): Parked survives onReactivate; CAS commitCycle on ingest cursor
   - 17358c38 fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
-prior_evidence_commit: da3193b9 (superseded; C14 was red)
+prior_evidence_commit: dcb23fa9462905e67d66f1d1f665ae3726dadd7b
