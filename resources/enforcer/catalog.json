@@ -1,0 +1,965 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "enforcement-a01",
+      "field": "primitive-obsession",
+      "family": "A",
+      "scoreWhen": "A domain concept such as an account ID, order ID, money amount, path, digest, or capability crosses a meaningful boundary as an undifferentiated string, number, or boolean.",
+      "nudge": "A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.",
+      "catalogOrdinal": 1
+    },
+    {
+      "id": "enforcement-a02",
+      "field": "boolean-blindness",
+      "family": "A",
+      "scoreWhen": "Multiple booleans encode independent meanings, modes, permissions, or lifecycle states and allow ambiguous call sites or invalid combinations.",
+      "nudge": "Boolean flags are hiding distinct domain meanings. Replace them with named cases or explicit types.",
+      "catalogOrdinal": 2
+    },
+    {
+      "id": "enforcement-a03",
+      "field": "null-ambiguity",
+      "family": "A",
+      "scoreWhen": "`null`, missing, empty, or optional values conflate different outcomes such as absent, unauthorized, failed, not loaded, or not applicable.",
+      "nudge": "A nullable value is carrying several meanings. Model the outcomes as explicit alternatives.",
+      "catalogOrdinal": 3
+    },
+    {
+      "id": "enforcement-a04",
+      "field": "illegal-state-representable",
+      "family": "A",
+      "scoreWhen": "Nullable fields and flags allow combinations that cannot exist in the real domain.",
+      "nudge": "Illegal domain states are representable. Encode each valid state explicitly and attach only the data meaningful in that state.",
+      "catalogOrdinal": 4
+    },
+    {
+      "id": "enforcement-a05",
+      "field": "catch-all-swallows-future",
+      "family": "A",
+      "scoreWhen": "A wildcard, default branch, generic fallback, or broad catch silently absorbs future domain cases that should require explicit handling.",
+      "nudge": "A catch-all branch is hiding future cases. Make the match exhaustive so new states create a visible failure.",
+      "catalogOrdinal": 5
+    },
+    {
+      "id": "enforcement-a06",
+      "field": "expected-failure-as-exception",
+      "family": "A",
+      "scoreWhen": "A foreseeable business outcome such as not found, unauthorized, insufficient balance, or invalid transition is represented by an exception.",
+      "nudge": "An expected business outcome is being treated as an exception. Return a typed result that forces callers to handle it.",
+      "catalogOrdinal": 6
+    },
+    {
+      "id": "enforcement-a07",
+      "field": "stringly-typed-error",
+      "family": "A",
+      "scoreWhen": "Callers interpret error strings, localized text, message fragments, or regular expressions to determine program behavior.",
+      "nudge": "Program logic is parsing error prose. Replace the string contract with a closed typed error value.",
+      "catalogOrdinal": 7
+    },
+    {
+      "id": "enforcement-a08",
+      "field": "weak-boundary-parsing",
+      "family": "A",
+      "scoreWhen": "Untrusted or cross-language data remains weakly typed after entering the system, forcing downstream code to repeatedly infer its shape.",
+      "nudge": "Boundary data was not normalized early enough. Parse and validate it once into a strong internal type.",
+      "catalogOrdinal": 8
+    },
+    {
+      "id": "enforcement-a09",
+      "field": "type-erosion-at-boundary",
+      "family": "A",
+      "scoreWhen": "`any`, unchecked casts, reflection, dynamic property access, or unboxing escape the designated adapter boundary and enter domain logic.",
+      "nudge": "Type information is being discarded beyond the adapter boundary. Contain dynamic decoding and expose a typed contract.",
+      "catalogOrdinal": 9
+    },
+    {
+      "id": "enforcement-a10",
+      "field": "runtime-checked-builder",
+      "family": "A",
+      "scoreWhen": "A complex object is built through setters or fluent mutation and only validated after construction, allowing incomplete intermediate states.",
+      "nudge": "Construction correctness is deferred to runtime. Encode the required construction stages or use one validated constructor.",
+      "catalogOrdinal": 10
+    },
+    {
+      "id": "enforcement-b01",
+      "field": "program-counter-state",
+      "family": "B",
+      "scoreWhen": "Stage, phase, lease, generation, next-action, current-step, owner, or equivalent fields encode where the program should execute next rather than a real-world fact.",
+      "nudge": "Control flow has been reified as mutable program-counter state. Replace it with structured control flow and local continuations.",
+      "catalogOrdinal": 11
+    },
+    {
+      "id": "enforcement-b02",
+      "field": "rule-spaghetti",
+      "family": "B",
+      "scoreWhen": "A rule set is expressed through nested conditionals, temporary flags, mutation, and early exits such that the reader must simulate execution to recover the rule.",
+      "nudge": "The business rule is buried in control flow. Rewrite it so the rule can be read directly from the code.",
+      "catalogOrdinal": 12
+    },
+    {
+      "id": "enforcement-b03",
+      "field": "missing-rule-combinator",
+      "family": "B",
+      "scoreWhen": "Three or more rules with the same input/output shape are manually chained instead of composed through a reusable validation or policy combinator.",
+      "nudge": "Repeated rule composition is being written by hand. Introduce a small combinator that exposes the shared rule algebra.",
+      "catalogOrdinal": 13
+    },
+    {
+      "id": "enforcement-b04",
+      "field": "wrong-rule-composition",
+      "family": "B",
+      "scoreWhen": "Dependent rules collect meaningless downstream errors instead of short-circuiting, or independent rules stop early instead of returning the full error set.",
+      "nudge": "The rule composition strategy is wrong. Short-circuit dependent checks and accumulate independent failures.",
+      "catalogOrdinal": 14
+    },
+    {
+      "id": "enforcement-b05",
+      "field": "implicit-control-flow",
+      "family": "B",
+      "scoreWhen": "Critical ordering depends on callbacks, registration order, hidden lifecycle hooks, global initialization, or undocumented framework conventions.",
+      "nudge": "Essential control flow is implicit. Make the ordering and ownership explicit in ordinary program structure.",
+      "catalogOrdinal": 15
+    },
+    {
+      "id": "enforcement-b06",
+      "field": "callback-pyramid",
+      "family": "B",
+      "scoreWhen": "Nested callbacks or promise chains obscure resource scope, cancellation, error propagation, or the linear story of the operation.",
+      "nudge": "Nested continuations are obscuring the operation. Flatten the flow with structured async control and scoped resources.",
+      "catalogOrdinal": 16
+    },
+    {
+      "id": "enforcement-b07",
+      "field": "exception-driven-control-flow",
+      "family": "B",
+      "scoreWhen": "Exceptions are intentionally thrown and caught to express ordinary branching, iteration, absence, or expected retries.",
+      "nudge": "Exceptions are being used as ordinary control flow. Replace them with explicit branches or typed results.",
+      "catalogOrdinal": 17
+    },
+    {
+      "id": "enforcement-b08",
+      "field": "duplicated-control-flow",
+      "family": "B",
+      "scoreWhen": "The same workflow, retry sequence, validation order, or state transition algorithm is independently implemented in multiple places.",
+      "nudge": "The same control algorithm has multiple owners. Establish one canonical implementation and route all callers through it.",
+      "catalogOrdinal": 18
+    },
+    {
+      "id": "enforcement-b09",
+      "field": "non-exhaustive-transition",
+      "family": "B",
+      "scoreWhen": "A finite state transition can silently ignore or generically accept a state/event pair that should be explicitly legal or illegal.",
+      "nudge": "State transitions are not exhaustive. Enumerate the legal cases and reject impossible transitions explicitly.",
+      "catalogOrdinal": 19
+    },
+    {
+      "id": "enforcement-b10",
+      "field": "phase-flag-accumulation",
+      "family": "B",
+      "scoreWhen": "New flags are repeatedly added to patch interactions between lifecycle phases, producing combinatorial behavior.",
+      "nudge": "Lifecycle flags are accumulating into an implicit state machine. Replace the flag product with a smaller explicit model or structured flow.",
+      "catalogOrdinal": 20
+    },
+    {
+      "id": "enforcement-c01",
+      "field": "boundary-collapse",
+      "family": "C",
+      "scoreWhen": "Modules with different invariants or lifecycles directly share internals, mutate each other’s state, or bypass explicit translation at the boundary.",
+      "nudge": "A context boundary has collapsed. Restore a clear interface and pass only the facts that genuinely cross it.",
+      "catalogOrdinal": 21
+    },
+    {
+      "id": "enforcement-c02",
+      "field": "context-model-leak",
+      "family": "C",
+      "scoreWhen": "One shared model is reused across authentication, ordering, sessions, persistence, UI, or other contexts that assign it different meanings.",
+      "nudge": "One model is serving incompatible bounded contexts. Give each context its own concept and translate explicitly.",
+      "catalogOrdinal": 22
+    },
+    {
+      "id": "enforcement-c03",
+      "field": "cross-layer-internal-import",
+      "family": "C",
+      "scoreWhen": "A higher or unrelated layer imports internal implementation members rather than a declared public boundary.",
+      "nudge": "A layer is reaching through another layer’s boundary. Depend on the public contract, not its internals.",
+      "catalogOrdinal": 23
+    },
+    {
+      "id": "enforcement-c04",
+      "field": "cyclic-dependency",
+      "family": "C",
+      "scoreWhen": "Module, package, service, or project dependencies form a cycle or require mutual initialization.",
+      "nudge": "The dependency graph is cyclic. Identify the missing boundary or fact flow and restore one-way dependencies.",
+      "catalogOrdinal": 24
+    },
+    {
+      "id": "enforcement-c05",
+      "field": "god-module",
+      "family": "C",
+      "scoreWhen": "One module owns several unrelated side-effect boundaries, policies, resources, or domains merely because they are currently convenient to colocate.",
+      "nudge": "One module owns unrelated responsibilities. Split it along real domain or side-effect boundaries, not arbitrary file size.",
+      "catalogOrdinal": 25
+    },
+    {
+      "id": "enforcement-c06",
+      "field": "mixed-side-effect-boundaries",
+      "family": "C",
+      "scoreWhen": "A single function or module simultaneously owns unrelated effects such as storage, network, process control, UI, Git, and policy decisions.",
+      "nudge": "Unrelated side-effect boundaries are mixed together. Isolate each effect behind a narrow port and keep policy pure.",
+      "catalogOrdinal": 26
+    },
+    {
+      "id": "enforcement-c07",
+      "field": "framework-tax",
+      "family": "C",
+      "scoreWhen": "Configuration, lifecycle hooks, dependency injection ceremony, generated layers, or framework conventions exceed the essential complexity of the problem.",
+      "nudge": "Framework ceremony is larger than the problem. Remove the framework tax and expose the underlying operation directly.",
+      "catalogOrdinal": 27
+    },
+    {
+      "id": "enforcement-c08",
+      "field": "pattern-sprawl",
+      "family": "C",
+      "scoreWhen": "Class hierarchies, factories, visitors, strategies, or interfaces simulate behavior that sealed data, pattern matching, and first-class functions could express directly.",
+      "nudge": "Design-pattern scaffolding is obscuring a simpler algebraic model. Prefer closed data and direct composition.",
+      "catalogOrdinal": 28
+    },
+    {
+      "id": "enforcement-c09",
+      "field": "premature-unification",
+      "family": "C",
+      "scoreWhen": "Similar-looking code or concepts with different lifecycles, invariants, or reasons to change are unified before they represent the same knowledge.",
+      "nudge": "Similarity was mistaken for shared knowledge. Separate concepts that change for different reasons.",
+      "catalogOrdinal": 29
+    },
+    {
+      "id": "enforcement-c10",
+      "field": "duplicated-truth",
+      "family": "C",
+      "scoreWhen": "The same fact has multiple authoritative representations that can drift or already disagree.",
+      "nudge": "One fact has multiple sources of truth. Choose a single canonical representation and derive the others.",
+      "catalogOrdinal": 30
+    },
+    {
+      "id": "enforcement-d01",
+      "field": "in-place-mutation",
+      "family": "D",
+      "scoreWhen": "Shared or externally visible state is overwritten in place, destroying the explicit transition from the previous value to the next value.",
+      "nudge": "Shared state is being mutated in place. Compute a new value or record an explicit transition instead.",
+      "catalogOrdinal": 31
+    },
+    {
+      "id": "enforcement-d02",
+      "field": "mutable-public-state",
+      "family": "D",
+      "scoreWhen": "Callers can directly modify fields that should be protected by invariants or domain behavior.",
+      "nudge": "Public mutable fields bypass the object’s rules. Encapsulate the state and expose invariant-preserving operations.",
+      "catalogOrdinal": 32
+    },
+    {
+      "id": "enforcement-d03",
+      "field": "clone-and-mutate-derived",
+      "family": "D",
+      "scoreWhen": "A new domain value is created by cloning a mutable prototype and patching selected fields.",
+      "nudge": "A derived value is being made through clone-and-mutate. Construct the intended immutable value directly.",
+      "catalogOrdinal": 33
+    },
+    {
+      "id": "enforcement-d04",
+      "field": "impure-core",
+      "family": "D",
+      "scoreWhen": "Core business decisions directly read clocks, random sources, databases, networks, environment state, or mutable globals.",
+      "nudge": "Business policy is entangled with effects. Move effects to the shell and pass explicit values into a pure core.",
+      "catalogOrdinal": 34
+    },
+    {
+      "id": "enforcement-d05",
+      "field": "time-source-in-logic",
+      "family": "D",
+      "scoreWhen": "Domain logic reads the current clock internally instead of receiving an explicit time value or clock port.",
+      "nudge": "Time is an implicit dependency. Inject the relevant instant or clock so behavior is deterministic and testable.",
+      "catalogOrdinal": 35
+    },
+    {
+      "id": "enforcement-d06",
+      "field": "random-source-in-logic",
+      "family": "D",
+      "scoreWhen": "Domain logic generates randomness internally and cannot be replayed from explicit input.",
+      "nudge": "Randomness is hidden inside policy. Inject a seed or random source and preserve replayability.",
+      "catalogOrdinal": 36
+    },
+    {
+      "id": "enforcement-d07",
+      "field": "command-event-confusion",
+      "family": "D",
+      "scoreWhen": "An intention is stored as though it already happened, or an immutable fact is later revalidated and rejected using today’s rules.",
+      "nudge": "Commands and events are being conflated. Validate intentions now, then record completed facts as immutable history.",
+      "catalogOrdinal": 37
+    },
+    {
+      "id": "enforcement-d08",
+      "field": "fragment-event-as-data",
+      "family": "D",
+      "scoreWhen": "Partial stream events, deltas, update ordering, or transport fragments are assembled into business facts instead of reading a complete snapshot.",
+      "nudge": "Transport fragments are being treated as domain data. Use events only as wake-up signals and read the complete authoritative snapshot.",
+      "catalogOrdinal": 38
+    },
+    {
+      "id": "enforcement-d09",
+      "field": "snapshot-as-truth",
+      "family": "D",
+      "scoreWhen": "A cache, projection, snapshot, or summary is treated as the original fact source rather than a derived bookmark.",
+      "nudge": "A derived snapshot is being treated as truth. Recover from the authoritative facts and rebuild the projection.",
+      "catalogOrdinal": 39
+    },
+    {
+      "id": "enforcement-d10",
+      "field": "overwrite-history",
+      "family": "D",
+      "scoreWhen": "Previously committed facts are edited or deleted to represent correction instead of appending a compensating or superseding fact.",
+      "nudge": "History is being rewritten. Preserve the original fact and append an explicit correction or replacement.",
+      "catalogOrdinal": 40
+    },
+    {
+      "id": "enforcement-e01",
+      "field": "memory-before-disk",
+      "family": "E",
+      "scoreWhen": "Authoritative in-memory state is changed before the durable fact that justifies the change is committed.",
+      "nudge": "Memory was updated before durability. Commit the fact first, then derive runtime state from it.",
+      "catalogOrdinal": 41
+    },
+    {
+      "id": "enforcement-e02",
+      "field": "blob-after-event",
+      "family": "E",
+      "scoreWhen": "A journal event referencing large content is appended before the referenced blob is durably written.",
+      "nudge": "A durable event can point to missing content. Write and verify the blob before appending the reference.",
+      "catalogOrdinal": 42
+    },
+    {
+      "id": "enforcement-e03",
+      "field": "partial-write-assumption",
+      "family": "E",
+      "scoreWhen": "Recovery logic assumes an append or effect may be partially committed despite the storage contract defining committed versus unknown outcomes.",
+      "nudge": "Recovery is inventing a partial-write state. Follow the storage contract’s explicit committed and unknown outcomes.",
+      "catalogOrdinal": 43
+    },
+    {
+      "id": "enforcement-e04",
+      "field": "unversioned-schema",
+      "family": "E",
+      "scoreWhen": "A durable event, file, wire shape, or cache format changes without an explicit schema version and compatibility rule.",
+      "nudge": "A persistent contract changed without versioning. Add an explicit version and deterministic compatibility policy.",
+      "catalogOrdinal": 44
+    },
+    {
+      "id": "enforcement-e05",
+      "field": "guessed-migration",
+      "family": "E",
+      "scoreWhen": "Old durable data is heuristically interpreted or silently upgraded without a specified migration.",
+      "nudge": "An old schema is being guessed into a new one. Use an explicit migration or fail closed.",
+      "catalogOrdinal": 45
+    },
+    {
+      "id": "enforcement-e06",
+      "field": "log-as-recovery-protocol",
+      "family": "E",
+      "scoreWhen": "Diagnostic logs, log messages, or log ordering are used to decide what durable business work occurred.",
+      "nudge": "Diagnostic logs are being used as recovery facts. Recover from the journal and authoritative external state instead.",
+      "catalogOrdinal": 46
+    },
+    {
+      "id": "enforcement-e07",
+      "field": "recovery-by-filesystem-state",
+      "family": "E",
+      "scoreWhen": "Recovery infers workflow progress from incidental files, directories, temporary artifacts, or working-tree shape instead of durable lifecycle facts.",
+      "nudge": "Recovery is guessing progress from filesystem residue. Record the lifecycle fact explicitly and recover from it.",
+      "catalogOrdinal": 47
+    },
+    {
+      "id": "enforcement-e08",
+      "field": "truncation-skips-damaged",
+      "family": "E",
+      "scoreWhen": "Recovery skips corruption in the middle of durable history and continues applying later facts.",
+      "nudge": "Recovery is continuing past corrupted history. Only a final incomplete record may be truncated; interior corruption must fail closed.",
+      "catalogOrdinal": 48
+    },
+    {
+      "id": "enforcement-e09",
+      "field": "optimistic-retry-assumption",
+      "family": "E",
+      "scoreWhen": "An external effect is retried because its result is unknown, without an idempotency identity or at-most-once recovery contract.",
+      "nudge": "An unknown external effect is being retried optimistically. Establish idempotency or an explicit at-most-once protocol.",
+      "catalogOrdinal": 49
+    },
+    {
+      "id": "enforcement-e10",
+      "field": "retry-not-idempotent",
+      "family": "E",
+      "scoreWhen": "A retryable operation can duplicate writes, prompts, publications, charges, processes, or resource creation.",
+      "nudge": "A retryable effect is not idempotent. Add a stable identity and prove repeated execution is safe.",
+      "catalogOrdinal": 50
+    },
+    {
+      "id": "enforcement-f01",
+      "field": "serial-when-parallel",
+      "family": "F",
+      "scoreWhen": "Independent tool calls, reads, validations, or investigations are performed sequentially without a dependency requiring the order.",
+      "nudge": "Independent work is being serialized. Run it concurrently with a clear bound and deterministic result ordering.",
+      "catalogOrdinal": 51
+    },
+    {
+      "id": "enforcement-f02",
+      "field": "unbounded-fanout",
+      "family": "F",
+      "scoreWhen": "Tasks, requests, subprocesses, agents, or file operations are spawned without a finite concurrency bound.",
+      "nudge": "Concurrency is unbounded. Use a bounded map or semaphore and define cancellation behavior.",
+      "catalogOrdinal": 52
+    },
+    {
+      "id": "enforcement-f03",
+      "field": "shared-mutable-concurrency",
+      "family": "F",
+      "scoreWhen": "Concurrent workers coordinate by mutating shared state protected by ad hoc locks rather than owning state or exchanging messages.",
+      "nudge": "Concurrent workers share mutable state. Prefer ownership, message passing, or a single serialized writer.",
+      "catalogOrdinal": 53
+    },
+    {
+      "id": "enforcement-f04",
+      "field": "blocking-event-loop",
+      "family": "F",
+      "scoreWhen": "A synchronous wait, blocking process, filesystem call, sleep, or CPU-heavy loop runs on an event-loop or hook thread.",
+      "nudge": "Blocking work is running on the event loop. Move it behind an asynchronous boundary or worker.",
+      "catalogOrdinal": 54
+    },
+    {
+      "id": "enforcement-f05",
+      "field": "cancellation-not-propagated",
+      "family": "F",
+      "scoreWhen": "A cancellation token or abort signal stops at an outer layer while inner network, process, tool, or child work continues.",
+      "nudge": "Cancellation does not reach owned work. Propagate the cancellation signal through every resource boundary.",
+      "catalogOrdinal": 55
+    },
+    {
+      "id": "enforcement-f06",
+      "field": "permit-leak",
+      "family": "F",
+      "scoreWhen": "A semaphore, gate, lock, lease, or capacity permit can be lost on exceptions, cancellation, or early return.",
+      "nudge": "A concurrency permit can leak. Acquire it through a scoped construct that guarantees release.",
+      "catalogOrdinal": 56
+    },
+    {
+      "id": "enforcement-f07",
+      "field": "resource-not-scoped",
+      "family": "F",
+      "scoreWhen": "Files, processes, streams, sessions, subscriptions, worktrees, or handles are not tied to a deterministic lifetime.",
+      "nudge": "A resource lacks scoped ownership. Make acquisition and disposal part of one structured lifetime.",
+      "catalogOrdinal": 57
+    },
+    {
+      "id": "enforcement-f08",
+      "field": "race-first-wins-semantics",
+      "family": "F",
+      "scoreWhen": "Scheduling order or the first completing concurrent call determines a domain result even though the calls may carry different information.",
+      "nudge": "A scheduler race is deciding business semantics. Collect the complete set and merge it deterministically.",
+      "catalogOrdinal": 58
+    },
+    {
+      "id": "enforcement-f09",
+      "field": "lost-update",
+      "family": "F",
+      "scoreWhen": "Concurrent writers perform read-modify-write without version checking, compare-and-swap, serialization, or another conflict protocol.",
+      "nudge": "Concurrent updates can overwrite each other. Add a versioned compare-and-swap or a single writer.",
+      "catalogOrdinal": 59
+    },
+    {
+      "id": "enforcement-f10",
+      "field": "sleep-based-synchronization",
+      "family": "F",
+      "scoreWhen": "Fixed sleeps or delays are used to wait for readiness, completion, ordering, or propagation.",
+      "nudge": "A fixed sleep is standing in for causality. Wait for an explicit signal or observable state transition.",
+      "catalogOrdinal": 60
+    },
+    {
+      "id": "enforcement-g01",
+      "field": "ignored-tdd",
+      "family": "G",
+      "scoreWhen": "Production behavior is implemented or changed before a failing behavioral test demonstrates the required outcome.",
+      "nudge": "TDD order was skipped. Add a failing behavioral test before changing the implementation.",
+      "catalogOrdinal": 61
+    },
+    {
+      "id": "enforcement-g02",
+      "field": "missing-regression-test",
+      "family": "G",
+      "scoreWhen": "A defect is fixed without a test that fails on the old behavior and passes on the corrected behavior.",
+      "nudge": "A bug fix lacks a regression test. Capture the failure before considering the fix complete.",
+      "catalogOrdinal": 62
+    },
+    {
+      "id": "enforcement-g03",
+      "field": "test-implementation-coupled",
+      "family": "G",
+      "scoreWhen": "A test asserts private structure, call counts, helper layout, internal fields, or incidental algorithm choices instead of observable behavior.",
+      "nudge": "A test is coupled to implementation details. Assert the public behavior and durable contract instead.",
+      "catalogOrdinal": 63
+    },
+    {
+      "id": "enforcement-g04",
+      "field": "weakened-test-to-pass",
+      "family": "G",
+      "scoreWhen": "Assertions, cases, fixtures, or expected outcomes are removed or weakened primarily to make a failing test pass.",
+      "nudge": "The test was weakened instead of fixing the defect. Restore the behavioral expectation and repair the implementation.",
+      "catalogOrdinal": 64
+    },
+    {
+      "id": "enforcement-g05",
+      "field": "flaky-test-tolerated",
+      "family": "G",
+      "scoreWhen": "A nondeterministic test is accepted, quarantined indefinitely, or treated as harmless.",
+      "nudge": "A flaky test is being tolerated. Find and remove the nondeterminism before relying on the suite.",
+      "catalogOrdinal": 65
+    },
+    {
+      "id": "enforcement-g06",
+      "field": "repeat-until-pass",
+      "family": "G",
+      "scoreWhen": "A test or command is rerun until it happens to succeed, and the successful repetition is treated as verification.",
+      "nudge": "Repetition is hiding a nondeterministic failure. Make one run deterministic instead of retrying until green.",
+      "catalogOrdinal": 66
+    },
+    {
+      "id": "enforcement-g07",
+      "field": "time-dependent-test",
+      "family": "G",
+      "scoreWhen": "A test depends on real current time, wall-clock delays, time zones, or timing luck.",
+      "nudge": "A test depends on real time. Inject time and make the scenario deterministic.",
+      "catalogOrdinal": 67
+    },
+    {
+      "id": "enforcement-g08",
+      "field": "order-dependent-test",
+      "family": "G",
+      "scoreWhen": "A test passes only after another test, depends on global residue, or changes behavior with suite ordering.",
+      "nudge": "A test depends on execution order. Give every test isolated, explicit setup and cleanup.",
+      "catalogOrdinal": 68
+    },
+    {
+      "id": "enforcement-g09",
+      "field": "failure-path-untested",
+      "family": "G",
+      "scoreWhen": "New error handling, cancellation, rollback, retry, malformed input, or recovery behavior has no direct test.",
+      "nudge": "A newly introduced failure path is untested. Add a test that exercises the actual failure and its observable result.",
+      "catalogOrdinal": 69
+    },
+    {
+      "id": "enforcement-g10",
+      "field": "contract-test-missing",
+      "family": "G",
+      "scoreWhen": "A Host, provider, storage, process, network, plugin, or language boundary is changed without a contract-level test.",
+      "nudge": "A boundary contract changed without a contract test. Verify the exact input, output, identity, and failure semantics.",
+      "catalogOrdinal": 70
+    },
+    {
+      "id": "enforcement-h01",
+      "field": "unverified-completion-claim",
+      "family": "H",
+      "scoreWhen": "Work is declared complete without running the relevant tests, checks, build, reproduction, or observable verification.",
+      "nudge": "Completion was claimed without verification. Run the relevant behavioral checks and report the actual result.",
+      "catalogOrdinal": 71
+    },
+    {
+      "id": "enforcement-h02",
+      "field": "ephemeral-verification",
+      "family": "H",
+      "scoreWhen": "A one-off shell command, temporary script, manual probe, or debug print is the only proof and is not converted into a durable test or gate.",
+      "nudge": "Verification exists only as an ephemeral probe. Preserve it as a repeatable test, script, or canary.",
+      "catalogOrdinal": 72
+    },
+    {
+      "id": "enforcement-h03",
+      "field": "false-gate",
+      "family": "H",
+      "scoreWhen": "A gate can remain green because it scans the wrong path, matches nothing, ignores failures, or checks a condition that cannot fail.",
+      "nudge": "A quality gate can pass without checking the intended property. Add a self-test that proves the gate turns red.",
+      "catalogOrdinal": 73
+    },
+    {
+      "id": "enforcement-h04",
+      "field": "coverage-theater",
+      "family": "H",
+      "scoreWhen": "A test or metric increases coverage but does not assert meaningful behavior, identities, values, or failure outcomes.",
+      "nudge": "Coverage is being mistaken for verification. Add assertions that would fail under a realistic defect.",
+      "catalogOrdinal": 74
+    },
+    {
+      "id": "enforcement-h05",
+      "field": "property-test-missing",
+      "family": "H",
+      "scoreWhen": "A parser, serializer, fold, state transition, merge, normalization, round trip, or algebraic operation is tested only with a few examples despite clear general invariants.",
+      "nudge": "A general invariant is covered only by examples. Add property-based tests for the full input space.",
+      "catalogOrdinal": 75
+    },
+    {
+      "id": "enforcement-h06",
+      "field": "behavioral-boundary-untested",
+      "family": "H",
+      "scoreWhen": "A public behavior is tested only through private helpers and never through the real supported entry point.",
+      "nudge": "The behavior is verified only below its contract boundary. Test it through the real public entry point.",
+      "catalogOrdinal": 76
+    },
+    {
+      "id": "enforcement-h07",
+      "field": "canary-skipped",
+      "family": "H",
+      "scoreWhen": "A behavior that depends on undocumented Host or provider ordering is changed without a real integration canary.",
+      "nudge": "An undocumented Host assumption lacks a canary. Prove it against the real boundary before release.",
+      "catalogOrdinal": 77
+    },
+    {
+      "id": "enforcement-h08",
+      "field": "release-ladder-skipped",
+      "family": "H",
+      "scoreWhen": "Validation jumps directly to a high-level test or release without passing the required lower-level pure, contract, replay, and canary stages.",
+      "nudge": "The verification ladder was skipped. Pass each lower-level gate before promoting the change.",
+      "catalogOrdinal": 78
+    },
+    {
+      "id": "enforcement-h09",
+      "field": "timeout-inflated-to-pass",
+      "family": "H",
+      "scoreWhen": "A timeout or retry budget is increased mainly to turn a failing test or hanging operation green.",
+      "nudge": "A larger timeout is masking the failure. Fix the missing causal signal or resource leak instead.",
+      "catalogOrdinal": 79
+    },
+    {
+      "id": "enforcement-h10",
+      "field": "mock-hidden-state",
+      "family": "H",
+      "scoreWhen": "A mock changes responses using an invisible cursor, mutable scenario state, request count, or time rather than provider-visible request content.",
+      "nudge": "The mock depends on hidden state. Make each response a pure function of the visible request.",
+      "catalogOrdinal": 80
+    },
+    {
+      "id": "enforcement-i01",
+      "field": "guessed-not-verified",
+      "family": "I",
+      "scoreWhen": "Behavior, API shape, file content, Host semantics, or failure cause is asserted without reading the source or running a direct check.",
+      "nudge": "A material claim was guessed rather than verified. Inspect the authoritative source or run a targeted experiment.",
+      "catalogOrdinal": 81
+    },
+    {
+      "id": "enforcement-i02",
+      "field": "blind-edit",
+      "family": "I",
+      "scoreWhen": "Code is changed before locating the true owner, reading surrounding contracts, or understanding the affected call path.",
+      "nudge": "The implementation was edited before the governing context was understood. Read the owner and boundary contracts first.",
+      "catalogOrdinal": 82
+    },
+    {
+      "id": "enforcement-i03",
+      "field": "tool-error-ignored",
+      "family": "I",
+      "scoreWhen": "A tool, command, test, patch, search, or process reports an error that is skipped or treated as irrelevant without resolution.",
+      "nudge": "A tool error was ignored. Resolve or explicitly account for it before proceeding.",
+      "catalogOrdinal": 83
+    },
+    {
+      "id": "enforcement-i04",
+      "field": "serial-investigation",
+      "family": "I",
+      "scoreWhen": "Independent searches, file reads, source inspections, or diagnostics are performed one by one despite having no dependency.",
+      "nudge": "Independent investigation is unnecessarily serial. Run the reads and searches concurrently, then synthesize the evidence.",
+      "catalogOrdinal": 84
+    },
+    {
+      "id": "enforcement-i05",
+      "field": "wholesale-rewrite",
+      "family": "I",
+      "scoreWhen": "A broad rewrite, generated replacement, or large delete-and-recreate operation is chosen instead of a precise change preserving known-good structure.",
+      "nudge": "A wholesale rewrite is replacing a targeted repair. Make the smallest structurally correct change.",
+      "catalogOrdinal": 85
+    },
+    {
+      "id": "enforcement-i06",
+      "field": "dirty-hack",
+      "family": "I",
+      "scoreWhen": "A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary.",
+      "nudge": "A workaround is hiding the root cause. Repair the governing abstraction or invariant instead.",
+      "catalogOrdinal": 86
+    },
+    {
+      "id": "enforcement-i07",
+      "field": "guess-based-fix",
+      "family": "I",
+      "scoreWhen": "Changes are tried speculatively until symptoms disappear without a causal explanation or regression test.",
+      "nudge": "The fix is based on trial and error. Establish the cause, then encode it in a regression test.",
+      "catalogOrdinal": 87
+    },
+    {
+      "id": "enforcement-i08",
+      "field": "premature-optimization",
+      "family": "I",
+      "scoreWhen": "Complexity is introduced for performance before a measured bottleneck or explicit resource constraint exists.",
+      "nudge": "Optimization was introduced without evidence of a bottleneck. Keep the simple design until measurement justifies complexity.",
+      "catalogOrdinal": 88
+    },
+    {
+      "id": "enforcement-i09",
+      "field": "big-batch-intent",
+      "family": "I",
+      "scoreWhen": "A large ambiguous task is handed to one operation or agent instead of decomposing independent, reviewable units.",
+      "nudge": "The work was bundled into one oversized intent. Split it into explicit independent outcomes and execute them with bounded concurrency.",
+      "catalogOrdinal": 89
+    },
+    {
+      "id": "enforcement-i10",
+      "field": "half-finished-refactor",
+      "family": "I",
+      "scoreWhen": "Old and new structures coexist without a completed migration, leaving duplicated ownership, temporary adapters, or inconsistent conventions.",
+      "nudge": "A refactor stopped halfway. Finish the ownership transfer and remove the obsolete path.",
+      "catalogOrdinal": 90
+    },
+    {
+      "id": "enforcement-j01",
+      "field": "scope-creep",
+      "family": "J",
+      "scoreWhen": "The implementation expands into unrelated behavior, cleanup, migration, or redesign not required by the current task or governing architecture.",
+      "nudge": "The change has expanded beyond its justified scope. Separate unrelated work and keep this delivery focused.",
+      "catalogOrdinal": 91
+    },
+    {
+      "id": "enforcement-j02",
+      "field": "leftover-scaffolding",
+      "family": "J",
+      "scoreWhen": "Temporary files, experimental branches, probes, fixtures, flags, scripts, or migration scaffolding remain in the delivered result without a permanent role.",
+      "nudge": "Temporary scaffolding remains in the delivery. Remove it or promote it into a maintained tool with a clear owner.",
+      "catalogOrdinal": 92
+    },
+    {
+      "id": "enforcement-j03",
+      "field": "legacy-cruft-retained",
+      "family": "J",
+      "scoreWhen": "Obsolete code, aliases, compatibility branches, or old names are kept despite an explicit clean-break policy.",
+      "nudge": "Obsolete compatibility code is being retained. Complete the clean break and remove the old surface.",
+      "catalogOrdinal": 93
+    },
+    {
+      "id": "enforcement-j04",
+      "field": "dead-code-delivered",
+      "family": "J",
+      "scoreWhen": "Unreachable, unused, superseded, or unreferenced production code is left behind.",
+      "nudge": "Dead production code remains. Delete it and let version control preserve history.",
+      "catalogOrdinal": 94
+    },
+    {
+      "id": "enforcement-j05",
+      "field": "todo-bomb",
+      "family": "J",
+      "scoreWhen": "A TODO, FIXME, placeholder, unimplemented branch, or temporary panic defers work required for correctness.",
+      "nudge": "Required correctness has been deferred to a TODO. Finish the behavior or explicitly reject the incomplete change.",
+      "catalogOrdinal": 95
+    },
+    {
+      "id": "enforcement-j06",
+      "field": "commented-out-code",
+      "family": "J",
+      "scoreWhen": "Old implementation code is retained in comments instead of being removed.",
+      "nudge": "Commented-out code is being used as storage. Delete it and rely on version control.",
+      "catalogOrdinal": 96
+    },
+    {
+      "id": "enforcement-j07",
+      "field": "debug-print-left",
+      "family": "J",
+      "scoreWhen": "Temporary logging, tracing, dumps, breakpoints, or debug output remains in production paths.",
+      "nudge": "Temporary debugging output remains. Remove it or convert it into intentional structured diagnostics.",
+      "catalogOrdinal": 97
+    },
+    {
+      "id": "enforcement-j08",
+      "field": "secret-in-code",
+      "family": "J",
+      "scoreWhen": "A password, token, private key, credential, or sensitive value is embedded in source, fixtures, logs, prompts, or committed configuration.",
+      "nudge": "Sensitive material appears in code or committed data. Remove and rotate it, then use the approved secret boundary.",
+      "catalogOrdinal": 98
+    },
+    {
+      "id": "enforcement-j09",
+      "field": "destructive-without-authorization",
+      "family": "J",
+      "scoreWhen": "Data, files, branches, worktrees, resources, or external state are deleted or overwritten without explicit authority and a verified target.",
+      "nudge": "A destructive action lacks explicit authorization or target verification. Stop and establish both before proceeding.",
+      "catalogOrdinal": 99
+    },
+    {
+      "id": "enforcement-j10",
+      "field": "dependency-bloat",
+      "family": "J",
+      "scoreWhen": "A new dependency, plugin, service, or framework is added for behavior that the existing platform or a small local implementation already provides safely.",
+      "nudge": "A dependency was added without proportional value. Use the existing platform or a smaller direct implementation.",
+      "catalogOrdinal": 100
+    },
+    {
+      "id": "enforcement-k01",
+      "field": "unrecorded-lesson",
+      "family": "K",
+      "scoreWhen": "A reusable engineering lesson, debugging discovery, provider quirk, or recovery principle emerges but is not recorded durably.",
+      "nudge": "A reusable lesson emerged but was not recorded. Capture it with the skill-creator tool so it survives this session.",
+      "catalogOrdinal": 101
+    },
+    {
+      "id": "enforcement-k02",
+      "field": "repeated-known-mistake",
+      "family": "K",
+      "scoreWhen": "Current work repeats a mistake, failed approach, or violated constraint already present in the work log or project guidance.",
+      "nudge": "The work is repeating a previously recorded mistake. Re-read the existing lesson and change the approach.",
+      "catalogOrdinal": 102
+    },
+    {
+      "id": "enforcement-k03",
+      "field": "unrecorded-decision",
+      "family": "K",
+      "scoreWhen": "A material architecture choice, rejected alternative, compatibility decision, or operational tradeoff is made without a durable decision record.",
+      "nudge": "A material decision lacks a durable record. Document the choice, rationale, rejected alternatives, and consequences.",
+      "catalogOrdinal": 103
+    },
+    {
+      "id": "enforcement-k04",
+      "field": "missing-invariant-documentation",
+      "family": "K",
+      "scoreWhen": "A non-obvious invariant is essential to correctness but exists only in implementation details or tribal knowledge.",
+      "nudge": "A critical invariant is undocumented. State it at the owning contract and add a mechanical guard where possible.",
+      "catalogOrdinal": 104
+    },
+    {
+      "id": "enforcement-k05",
+      "field": "stale-documentation",
+      "family": "K",
+      "scoreWhen": "Code or behavior changes while authoritative documentation, schemas, examples, or diagrams continue to describe the old contract.",
+      "nudge": "The implementation and authoritative documentation disagree. Update the owning specification in the same change.",
+      "catalogOrdinal": 105
+    },
+    {
+      "id": "enforcement-k06",
+      "field": "facade-hides-mess",
+      "family": "K",
+      "scoreWhen": "A new facade or wrapper makes an unhealthy architecture look clean while leaving duplicated ownership or boundary violations underneath.",
+      "nudge": "A facade is concealing unresolved architecture. Repair the underlying ownership and dependency structure.",
+      "catalogOrdinal": 106
+    },
+    {
+      "id": "enforcement-k07",
+      "field": "manual-toil-repeat",
+      "family": "K",
+      "scoreWhen": "A repeated mechanical procedure is performed manually again despite being deterministic and suitable for a script, generator, or reusable skill.",
+      "nudge": "Repeated mechanical work remains manual. Automate it and preserve the procedure as a maintained tool.",
+      "catalogOrdinal": 107
+    },
+    {
+      "id": "enforcement-k08",
+      "field": "spike-not-cleaned",
+      "family": "K",
+      "scoreWhen": "Experimental code or a proof of concept is promoted without replacing shortcuts, hard-coded assumptions, and missing contracts.",
+      "nudge": "A spike is being shipped as production design. Rebuild it around explicit contracts and remove experimental shortcuts.",
+      "catalogOrdinal": 108
+    },
+    {
+      "id": "enforcement-k09",
+      "field": "compatibility-cruft",
+      "family": "K",
+      "scoreWhen": "Compatibility layers, aliases, duplicate formats, or dual paths are added without a real external compatibility requirement.",
+      "nudge": "Compatibility machinery lacks a justified external contract. Remove the duplicate path and keep one canonical interface.",
+      "catalogOrdinal": 109
+    },
+    {
+      "id": "enforcement-k10",
+      "field": "missing-architecture-gate",
+      "family": "K",
+      "scoreWhen": "A critical boundary or forbidden dependency relies only on team discipline even though a static architecture gate could enforce it.",
+      "nudge": "An architecture boundary relies on memory alone. Add a static gate that fails when the boundary is crossed.",
+      "catalogOrdinal": 110
+    },
+    {
+      "id": "enforcement-l01",
+      "field": "misleading-name",
+      "family": "L",
+      "scoreWhen": "A name suggests stronger guarantees, different ownership, broader scope, or a different domain meaning than the implementation provides.",
+      "nudge": "A name misrepresents the concept or guarantee. Rename it to match the actual domain fact.",
+      "catalogOrdinal": 111
+    },
+    {
+      "id": "enforcement-l02",
+      "field": "abbreviation-anxiety",
+      "family": "L",
+      "scoreWhen": "Unfamiliar, overloaded, or unnecessary abbreviations force readers to decode names repeatedly.",
+      "nudge": "Abbreviations are increasing cognitive load. Use the full domain term unless the abbreviation is genuinely universal here.",
+      "catalogOrdinal": 112
+    },
+    {
+      "id": "enforcement-l03",
+      "field": "math-flavored-name",
+      "family": "L",
+      "scoreWhen": "Mathematical symbols or abstract single-letter names are used without a real algebraic model and make ordinary domain code harder to read.",
+      "nudge": "Mathematical naming is obscuring an ordinary domain concept. Use names that expose the actual meaning.",
+      "catalogOrdinal": 113
+    },
+    {
+      "id": "enforcement-l04",
+      "field": "generic-helper-bucket",
+      "family": "L",
+      "scoreWhen": "Files or modules named helpers, utils, common, core, service, primitives, or misc collect unrelated operations without one governing concept.",
+      "nudge": "A generic helper bucket is hiding missing ownership. Move each operation to the domain or boundary that owns it.",
+      "catalogOrdinal": 114
+    },
+    {
+      "id": "enforcement-l05",
+      "field": "translator-layer-bloat",
+      "family": "L",
+      "scoreWhen": "Translator, broker, governor, coordinator, manager, adapter, or mediator layers merely forward calls without enforcing a real boundary or transformation.",
+      "nudge": "A forwarding layer adds ceremony without a concept. Remove it or give it a genuine invariant and ownership boundary.",
+      "catalogOrdinal": 115
+    },
+    {
+      "id": "enforcement-l06",
+      "field": "implicit-convention-magic",
+      "family": "L",
+      "scoreWhen": "Correctness depends on file names, registration order, reflection, annotations, directory placement, or framework discovery that is not mechanically visible at the call site.",
+      "nudge": "Correctness depends on hidden convention. Replace it with an explicit typed registration or contract.",
+      "catalogOrdinal": 116
+    },
+    {
+      "id": "enforcement-l07",
+      "field": "comment-theater",
+      "family": "L",
+      "scoreWhen": "Comments narrate obvious syntax, apologize for complexity, or describe intent that should be expressed through names and structure.",
+      "nudge": "Comments are compensating for unclear code. Improve the structure and keep comments only for durable non-obvious constraints.",
+      "catalogOrdinal": 117
+    },
+    {
+      "id": "enforcement-l08",
+      "field": "status-announcement-noise",
+      "family": "L",
+      "scoreWhen": "Production output, code comments, logs, or agent messages repeatedly announce routine progress without conveying a decision, result, failure, or required action.",
+      "nudge": "Status announcements are adding noise. Report only decisions, meaningful progress, failures, and actionable results.",
+      "catalogOrdinal": 118
+    },
+    {
+      "id": "enforcement-l09",
+      "field": "domain-language-drift",
+      "family": "L",
+      "scoreWhen": "Several names refer to the same concept, or one name is used for several different concepts across modules.",
+      "nudge": "Domain language is drifting. Choose one term per concept and separate concepts that currently share a name.",
+      "catalogOrdinal": 119
+    },
+    {
+      "id": "enforcement-l10",
+      "field": "incidental-complexity-dominates",
+      "family": "L",
+      "scoreWhen": "Configuration, glue, wrappers, lifecycle management, serialization ceremony, or framework rituals occupy more attention than the actual domain problem.",
+      "nudge": "Incidental complexity is dominating the design. Remove ceremony until the essential domain concepts become the visible structure.",
+      "catalogOrdinal": 120
+    }
+  ]
+}

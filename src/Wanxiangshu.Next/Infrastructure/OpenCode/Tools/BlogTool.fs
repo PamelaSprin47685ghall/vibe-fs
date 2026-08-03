@@ -2,16 +2,15 @@ namespace Wanxiangshu.Next.OpenCode
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Next.Domain
-open Wanxiangshu.Next.Domain.EnforcerCatalogData
+open Wanxiangshu.Next.Infrastructure.Resources
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Session
 
 /// SSOT/15 — the `blog` tool (ENFORCER-010/020/040/041/061).
 ///
 /// Provider schema: `text` (required), `evidence` (optional), plus the 120
-/// canonical rule fields (optional 0..9 integers) generated from the one
-/// catalog (ENFORCER-170). Execute never suspends (ENFORCER-040).
+/// canonical rule fields (optional 0..9 integers) from resources/enforcer/catalog.json
+/// (ENFORCER-170). Execute never suspends (ENFORCER-040).
 ///
 /// ENFORCER-061: empty/missing canonical text returns a readable error so the
 /// Host tool-loop can repair once. Valid entry still returns fixed "OK".
@@ -33,7 +32,7 @@ module BlogTool =
     /// ENFORCER-170: the provider-visible argument schema is derived from the
     /// catalog — FieldName, ScoreWhen description, optional 0..9.
     let ruleArguments (factory: HostToolFactory) : (string * HostSchema) list =
-        rules
+        EnforcerCatalogResource.rules
         |> List.map (fun rule ->
             rule.FieldName,
             // Host schema has no bounded int; the 0..9 contract is enforced by
@@ -47,7 +46,7 @@ module BlogTool =
         let catalogDescription =
             sprintf
                 "Record one work-log entry and score engineering practices 0..9 (%d rules; missing = 0)."
-                (List.length rules)
+                (List.length EnforcerCatalogResource.rules)
 
         { Name = "blog"
           Description = catalogDescription

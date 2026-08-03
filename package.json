@@ -28,9 +28,8 @@
     "gate:budget": "node scripts/budget-gate.mjs",
     "gate:surface": "node scripts/surface-inventory.mjs",
     "gate:conformance": "node scripts/conformance-gate.mjs --check",
-    "gate:generated": "node scripts/enforcer-catalog-gen.mjs --check",
     "gate:role-matrix": "node scripts/role-matrix-gate.mjs",
-    "gate:static": "npm run gate:layout && npm run gate:ssot && npm run gate:conformance && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface && npm run gate:generated && npm run gate:role-matrix",
+    "gate:static": "npm run gate:layout && npm run gate:ssot && npm run gate:conformance && npm run gate:architecture && npm run gate:docs && npm run gate:toml && npm run gate:budget && npm run gate:surface && npm run gate:role-matrix",
     "gate:layout": "node scripts/repository-layout-gate.mjs",
 
     "build": "node scripts/clean-fable-output.mjs build && dotnet fable precompile src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj -o build/next",

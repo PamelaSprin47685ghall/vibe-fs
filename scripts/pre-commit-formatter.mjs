@@ -49,10 +49,6 @@ function scanFiles(dir) {
             result.push(...scanFiles(fullPath));
         } else if (entry.isFile()) {
             const ext = path.extname(entry.name).toLowerCase();
-            // Generated artifacts are byte-for-byte owned by their generator
-            // (gate:generated compares them); formatting them here would break
-            // that sync. See EnforcerCatalog.gen.fs.
-            if (entry.name.endsWith('.gen.fs')) continue;
             if (ext === '.fs' || ext === '.fsi' || ext === '.xml' || ext === '.fsproj') {
                 result.push(fullPath);
             }
@@ -118,11 +114,6 @@ async function run() {
     const xmlFiles = [];
 
     for (const file of allFiles) {
-        // Generated artifacts are byte-for-byte owned by their generator
-        // (gate:generated compares them); formatting them here would break
-        // that sync. Applied to BOTH scan paths: the --all scan excludes them
-        // in scanFiles, and the staged-file path excludes them here.
-        if (file.endsWith('.gen.fs')) continue;
         const ext = path.extname(file).toLowerCase();
         if (ext === '.fs' || ext === '.fsi') {
             fsFiles.push(file);

@@ -185,7 +185,7 @@ const [
   prod('Domain/StrengthPredictor'),
   prod('Domain/StrengthController'),
   prod('Domain/StrengthValue'),
-  prod('Domain/EnforcerCatalog.gen'),
+  prod('Infrastructure/Resources/EnforcerCatalogResource'),
   prod('Domain/EnforcerCodec'),
   prod('Domain/EnforcerThrottle'),
   prod('Domain/EnforcerNudge'),
@@ -3045,7 +3045,7 @@ const tier = (name) => {
 // ── SSOT/15: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
 
 export const enforcer = (() => {
-  const catalog = bind(EnforcerCatalogModule, 'EnforcerCatalogData', ['rules'])
+  const catalog = bind(EnforcerCatalogModule, 'EnforcerCatalogResource', ['rules'])
   const codec = bind(EnforcerCodecModule, 'EnforcerCodec', [
     'CanonicalBlogCall',
     'normalizeFieldName',
@@ -3080,7 +3080,7 @@ export const enforcer = (() => {
   const catalogRules = listItems(catalog.rules)
 
   return {
-    /** 全部 120 项规则（生成自 RFC/enforcer-nudge.md，ENFORCER-170）。 */
+    /** 全部 120 项规则（resources/enforcer/catalog.json，ENFORCER-170）。 */
     rules: catalogRules,
     ruleCount: catalogRules.length,
     fieldNames: () => catalogRules.map((r) => r.FieldName),

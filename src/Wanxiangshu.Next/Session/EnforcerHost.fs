@@ -5,8 +5,8 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Next.Domain
-open Wanxiangshu.Next.Domain.EnforcerCatalogData
 open Wanxiangshu.Next.Host
+open Wanxiangshu.Next.Infrastructure.Resources
 open Wanxiangshu.Next.Journal
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Kernel.Fact
@@ -187,8 +187,7 @@ module EnforcerHost =
         match lastAssistantStep rawMessages with
         | None -> None
         | Some(messageId, parts, completed) ->
-            let catalog =
-                rules |> List.map (fun rule -> rule.FieldName, rule.RuleId, rule.CatalogOrdinal)
+            let catalog = EnforcerCatalog.triples EnforcerCatalogResource.rules
 
             let calls =
                 parts

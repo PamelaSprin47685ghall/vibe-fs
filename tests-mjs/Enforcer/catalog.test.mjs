@@ -1,8 +1,8 @@
-// tests-mjs/Enforcer/catalog.test.mjs — RFC/enforcer-nudge.md ENFORCER-170/171/172, ENFORCER-190.
+// tests-mjs/Enforcer/catalog.test.mjs — ENFORCER-170/171/172, ENFORCER-190.
 //
-// The Rule Catalog is the single source of truth, generated from RFC/enforcer-nudge.md.
+// The Rule Catalog is resources/enforcer/catalog.json (runtime data, ENFORCER-170).
 // ENFORCER-190 (pure tests) items 1, 15:
-//   1. Catalog generation is stable.
+//   1. Catalog load is stable.
 //   15. A catalog update does not change old NudgeAnchored bytes (the nudge text
 //       is fixed per rule; the catalog is append-only in spirit).
 
@@ -67,10 +67,9 @@ test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
 })
 
 test('ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
-  // Regression for the L10 corruption: the generator once swallowed the entire
+  // Regression for the L10 corruption: an earlier extract once swallowed the entire
   // implementation-order chapter into ENF-L10's Nudge (measured >8,000 chars).
-  // The last rule's Nudge must be exactly the SSOT text — no trailing chapter
-  // prose, no "在修改生产语义前" content.
+  // The last rule's Nudge must stay short and exact.
   const l10 = enforcer.rules.find((r) => r.FieldName === 'incidental-complexity-dominates')
   assert.equal(
     l10.Nudge,

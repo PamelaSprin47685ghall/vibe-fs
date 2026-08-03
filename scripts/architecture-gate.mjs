@@ -120,6 +120,10 @@ const HOST_INTEROP_ALLOWLIST = new Map([
   ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
   ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
   ['src/Wanxiangshu.Next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
+  [
+    'src/Wanxiangshu.Next/Infrastructure/Resources/EnforcerCatalogResource.fs',
+    'runtime catalog JSON load at the package resource boundary (import.meta.url)',
+  ],
   ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagerConfig.fs', 'Host configuration adapter'],
   ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
   ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
@@ -512,15 +516,8 @@ for (const file of productionFiles) {
 }
 
 // ── gate: no sleeping ───────────────────────────────────────────────────────
-// `*.gen.fs` files are generated DATA (e.g. the 120-rule Enforcer catalog, whose
-// prose legitimately mentions "sleep-based-synchronization" as a rule name).
-// They contain no executable logic, so the sleep-token and interop scans do not
-// apply to them.
-
-const isGeneratedFs = (path) => path.endsWith('.gen.fs')
 
 for (const file of allFiles.filter(isFs)) {
-  if (isGeneratedFs(file)) continue
   const text = read(file)
   for (const token of SLEEP_TOKENS) {
     if (containsToken(text, token)) {
@@ -542,7 +539,6 @@ for (const file of allFiles) {
 // ── gate: Host/Fable interop confined to adapters and codecs ────────────────
 
 for (const file of productionFiles.filter(isFs)) {
-  if (isGeneratedFs(file)) continue
   const text = read(file)
   const hasInterop = HOST_INTEROP_MARKERS.some((marker) => text.includes(marker)) || DYNAMIC_ACCESS.test(text)
   if (!hasInterop) continue

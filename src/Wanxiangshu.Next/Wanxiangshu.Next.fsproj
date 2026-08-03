@@ -29,7 +29,7 @@
     <Compile Include="Domain/StrengthPredictor.fs"/>
     <Compile Include="Domain/StrengthController.fs"/>
     <Compile Include="Domain/StrengthValue.fs"/>
-    <Compile Include="Domain/EnforcerCatalog.gen.fs"/>
+    <Compile Include="Domain/EnforcerCatalog.fs"/>
     <Compile Include="Domain/EnforcerCodec.fs"/>
     <Compile Include="Domain/EnforcerThrottle.fs"/>
     <Compile Include="Domain/EnforcerNudge.fs"/>
@@ -115,6 +115,7 @@
     <Compile Include="Process/PtyApi.fs"/>
     <Compile Include="Application/Orchestration/Orchestrator.Types.fs"/>
     <Compile Include="Application/Orchestration/Orchestrator.Prompts.fs"/>
+    <Compile Include="Infrastructure/Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Infrastructure/Git/Orchestrator.IntegrationGate.fs"/>
     <Compile Include="Infrastructure/Git/Orchestrator.WorktreeResource.fs"/>
     <Compile Include="Application/Orchestration/Orchestrator.ManagerJob.fs"/>
