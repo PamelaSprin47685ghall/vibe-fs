@@ -73,7 +73,8 @@ TOML data body 单 LF、join 最小 wire（status/agent/work_record）。
 0.5.2 收敛：按 `STATUS/0.5.2-convergence.md` 执行 C0–C15。
 
 SSOT/14 Strength、SSOT/16 Student&Teacher 与 ENFORCER nudge/throttle 已迁出 Active
-SSOT 至 `RFC/`，不属于 0.5.2 产品合同。Active 子集为 SSOT/01–13 + SSOT/15 Blogger 工具化。
+SSOT 至 `RFC/`，不属于 0.5.2 产品合同。Active 子集为 SSOT/01–13 + SSOT/15 Blogger 工具化 +
+SSOT/17 LOOP（退化循环检测与强杀）。
 
 ### 本轮已闭合：PrefixCoverage 推进与 prefix-probe
 
@@ -156,7 +157,12 @@ src/Wanxiangshu.Next/
 
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
-- Active IMPLEMENTING = 0；Active CONFORMANT = 181/181
+- Active IMPLEMENTING = 5（LOOP-001/002/007/008/010）；Active CONFORMANT = 187/192
+- LOOP：SSOT/17 已注册进 conformance 账本（`17.md` 入 ACTIVE_SSOT，LOOP 前缀已入
+  ssot-lint 与 gate 正则）；生产三件套 `Domain/LoopDetector.fs`、`Host/LoopSensor.fs`、
+  `TurnCompletionProgram.fs` 已实现，层 1/2 测试 `tests-mjs/Domain/loop-detector.test.mjs`、
+  `loop-sensor.test.mjs` 覆盖 LOOP-003/004/005/006/009/011（CONFORMANT layer 2）；
+  LOOP-001/002/007/008/010 暂无判据，标 implementing；canary 未建，不发明
 - C9：layer-2 已闭合；identity canary（transform id = tool messageID）仅保留为 Host
   升级门禁可选加强项
 - C10：Context recovery X-A–X-D 第四层 canary 剧本未建，仍待产出
@@ -172,7 +178,8 @@ src/Wanxiangshu.Next/
   绿前 不 tag（C15 阻塞）
 - C15：tag `v0.5.2` — 阻塞于 C14 e2e
 
-IMPLEMENTING 条款：无（Active 账本已清）。
+IMPLEMENTING 条款：LOOP-001 / LOOP-002 / LOOP-007 / LOOP-008 / LOOP-010（生产已实现，
+判据未产出；见 SSOT/17 与 `STATUS/conformance.toml`）。
 
 历史项：
 

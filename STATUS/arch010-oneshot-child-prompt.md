@@ -1,6 +1,7 @@
 # 计划：One-shot / subagent 首 prompt 对齐 ARCH-010
 
-状态：计划（未改代码）
+状态：已实施（commit `892bbcd7`）
+验证：`OneShotAgentTool` 首 prompt 已改走 `ForkChildPayload.relay`（assignment + optional parent LWR + requirements=[] + payload=None）；surface inventory `OneShotAgentTool.fs#SendAgentOwnerRoot` 已标 `CanonicalPayload` 并引用 canonical writer。§3 计划清单的对应项已落地；§4 裁决 4.1（复用 ForkChildPayload）与 4.4（无 LWR 时 instruction-only TOML）已按计划执行。门禁验证由发布流程执行。
 范围：Inspector / Coder one-shot 子会话首 prompt；顺带盘点其他 subagent 合成面
 条款：`ARCH-010` / `SSOT/13`、`EXEC-006`、`COMPANION-003`、`AGENT-012`
 关联：`STATUS/lifecycle-work-record.md`（LWR 已收口）；本项是 LWR wire 的漏网生产点

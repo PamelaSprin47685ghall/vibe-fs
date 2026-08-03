@@ -14,10 +14,10 @@ const MD_OUT = join(STATUS_DIR, 'conformance.md')
 
 const ACTIVE_SSOT = [
   '01.md', '02.md', '03.md', '04.md', '05.md', '06.md', '07.md', '08.md',
-  '09.md', '10.md', '11.md', '12.md', '13.md', '15.md'
+  '09.md', '10.md', '11.md', '12.md', '13.md', '15.md', '17.md'
 ]
 
-const CLAUSE_RE = /^(#{2,4})\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]\s*(.*)$/m
+const CLAUSE_RE = /^(#{2,4})\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER|LOOP)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]\s*(.*)$/m
 
 const PREFIX_DEFAULT_MODULE = {
   ARCH: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
@@ -32,7 +32,8 @@ const PREFIX_DEFAULT_MODULE = {
   VERIFY: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
   PERSIST: 'src/Wanxiangshu.Next/Journal/Fold.fs',
   CTX: 'src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs',
-  ENFORCER: 'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs'
+  ENFORCER: 'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
+  LOOP: 'src/Wanxiangshu.Next/Domain/LoopDetector.fs'
 }
 
 const TEST_DIRS = ['tests-mjs', 'testkit/opencode/tests']

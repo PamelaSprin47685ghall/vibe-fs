@@ -11,7 +11,7 @@ const MD_OUT = 'STATUS/conformance.md'
 
 const ACTIVE_SSOT = [
   '01.md', '02.md', '03.md', '04.md', '05.md', '06.md', '07.md', '08.md',
-  '09.md', '10.md', '11.md', '12.md', '13.md', '15.md'
+  '09.md', '10.md', '11.md', '12.md', '13.md', '15.md', '17.md'
 ]
 
 const VALID_STATUSES = new Set(['conformant', 'implementing', 'blocked'])
@@ -81,7 +81,7 @@ function extractClauseIdsFromSsot () {
   for (const file of ACTIVE_SSOT) {
     const text = readFileSync(join(SSOT_DIR, file), 'utf8')
     for (const line of text.split('\n')) {
-      const m = line.match(/^#{2,4}\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]/)
+      const m = line.match(/^#{2,4}\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER|LOOP)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]/)
       if (m) ids.add(m[1])
     }
   }
