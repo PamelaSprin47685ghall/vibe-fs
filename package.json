@@ -13,7 +13,8 @@
     }
   },
   "files": [
-    "build"
+    "build",
+    "resources"
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",

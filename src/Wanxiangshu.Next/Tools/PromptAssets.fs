@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Loads role system prompts from next/prompts/*.md.
+/// Loads role system prompts from resources/prompts/*-system.md.
 /// These are AgentConfig.prompt values (host system prompt), not user messages.
 module PromptAssets =
 
@@ -26,12 +26,35 @@ module PromptAssets =
     [<Emit("import.meta.url")>]
     let private importMetaUrl: string = jsNative
 
-    let private promptsDir () =
-        // Compiled to build/next/Tools/*.js → sibling ../prompts
-        pathJoin (dirname (fileURLToPath importMetaUrl), "../prompts")
+    let private here () = dirname (fileURLToPath importMetaUrl)
+
+    let private promptAt (root: string) (fileName: string) =
+        pathJoin (pathJoin (pathJoin (root, "resources"), "prompts"), fileName)
+
+    /// Walk up from compiled JS until resources/prompts/<file> exists.
+    let private resolvePromptPath (fileName: string) : string =
+        let rec walk (dir: string) (budget: int) =
+            if budget <= 0 then
+                None
+            else
+                let candidate = promptAt dir fileName
+
+                if existsSync candidate then
+                    Some candidate
+                else
+                    walk (dirname dir) (budget - 1)
+
+        match walk (here ()) 12 with
+        | Some path -> path
+        | None ->
+            raise (
+                InvalidOperationException(
+                    sprintf "system prompt not found from %s (expected resources/prompts/%s)" (here ()) fileName
+                )
+            )
 
     let private load (fileName: string) : string =
-        let full = pathJoin (promptsDir (), fileName)
+        let full = resolvePromptPath fileName
 
         if not (existsSync full) then
             raise (InvalidOperationException(sprintf "Missing system prompt asset: %s" full))
