@@ -12,6 +12,7 @@ import {
   fold,
   frameEpochId,
   prefixEpochId,
+  promptKey,
   providerRun,
   sessionId,
   stream,
@@ -142,6 +143,68 @@ test('C5_same_request_materialize_is_idempotent', () => {
     materialize({ requestId: 'req-idem', n: 1 }),
   ])
   assert.equal(s.BloggerCycles.OpenByRequestId.size, 1)
+})
+
+test('C5_materialize_prompt_key_fill_in_after_send', () => {
+  // Pre-send PromptKey=None; post-send same context + Some PromptKey is the
+  // RequestId ownership binding. Must not reject as "different context".
+  const base = materialize({ requestId: 'req-key', n: 1 })
+  const withKey = next(
+    fact('BloggerRequestMaterialized', {
+      RequestId: bloggerRequestId('req-key'),
+      MainSessionId: session,
+      BloggerSessionId: blogger,
+      RequestKind: 'main',
+      ContextRef: blobRef('blob-ctx-1'),
+      ContextDigest: blobDigest('sha-ctx-1'),
+      ObservedPrefixEpochId: prefixEpochId(0),
+      PreviousIngestedThroughSequence: 0n,
+      NextIngestedThroughSequence: 1n,
+      FrameEpochId: frameEpochId(0),
+      SelectedFrameDigests: toList([]),
+      PromptKey: promptKey('pk-blog-1'),
+    }),
+  )
+  const s = foldOk([base, withKey])
+  const open = [...s.BloggerCycles.OpenByRequestId.values()][0]
+  assert.ok(open.PromptKey, 'PromptKey filled in on open request')
+})
+
+test('C5_materialize_prompt_key_cannot_rebind', () => {
+  const first = next(
+    fact('BloggerRequestMaterialized', {
+      RequestId: bloggerRequestId('req-rebind'),
+      MainSessionId: session,
+      BloggerSessionId: blogger,
+      RequestKind: 'main',
+      ContextRef: blobRef('blob-ctx-1'),
+      ContextDigest: blobDigest('sha-ctx-1'),
+      ObservedPrefixEpochId: prefixEpochId(0),
+      PreviousIngestedThroughSequence: 0n,
+      NextIngestedThroughSequence: 1n,
+      FrameEpochId: frameEpochId(0),
+      SelectedFrameDigests: toList([]),
+      PromptKey: promptKey('pk-a'),
+    }),
+  )
+  const second = next(
+    fact('BloggerRequestMaterialized', {
+      RequestId: bloggerRequestId('req-rebind'),
+      MainSessionId: session,
+      BloggerSessionId: blogger,
+      RequestKind: 'main',
+      ContextRef: blobRef('blob-ctx-1'),
+      ContextDigest: blobDigest('sha-ctx-1'),
+      ObservedPrefixEpochId: prefixEpochId(0),
+      PreviousIngestedThroughSequence: 0n,
+      NextIngestedThroughSequence: 1n,
+      FrameEpochId: frameEpochId(0),
+      SelectedFrameDigests: toList([]),
+      PromptKey: promptKey('pk-b'),
+    }),
+  )
+  const error = foldErr([first, second])
+  assert.ok(error, 'PromptKey rebind must fail')
 })
 
 test('C5_duplicate_request_materialize_different_context_rejected', () => {

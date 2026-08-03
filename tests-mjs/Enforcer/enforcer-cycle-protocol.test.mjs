@@ -7,6 +7,7 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -20,9 +21,12 @@ import {
   bloggerRequestContext,
   parkedTransform,
   bloggerRuntime,
+  fold,
 } from '../domain.mjs'
 
-const { AgentJournalModule_appendAgent } = await import('../../build/next/Journal/AgentJournal.js')
+const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
+  '../../build/next/Journal/AgentJournal.js'
+)
 const { StreamId } = await import('../../build/next/Journal/Envelope.js')
 const {
   handleContinuation,
@@ -34,6 +38,9 @@ const BlogTool = await import('../../build/next/Infrastructure/OpenCode/Tools/Bl
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'
 const streamSession = (sid) => new StreamId(1, sid)
+const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
+/** HostDigest.sha256Hex(toml) — required by commit path DeltaDigest check. */
+const digestForToml = (toml) => sha256Hex(toml)
 
 const withHarness = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'enforcer-cycle-'))
@@ -56,18 +63,24 @@ const withHarness = async (fn) => {
   assert.equal(caseOf(link), 'Ok')
 
   const scope = parkedTransform.scope()
+  const toml = 'work'
   const ctx = bloggerRequestContext.main({
     requestId: 'req-1',
     mainSession: MAIN,
     bloggerSession: BLOG,
-    toml: 'work',
+    toml,
     previousIngested: 0,
     nextIngested: 1,
     previousCutoff: 0,
     nextCutoff: 1,
     nextDigest: 'd1',
-    deltaDigest: 'sha-work',
+    deltaDigest: digestForToml(toml),
   })
+  // InFlight + CurrentRequest: owned cycle. Without InFlight cell, commit still
+  // peeks CurrentRequest, but runtime transitions need a real cell.
+  const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx)
+  assert.equal(started.ok, true)
+  parkedTransform.setRuntime(scope, BLOG, started.state)
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
 
   // Expected paths are silent (no console). Unexpected paths print via console.error
@@ -249,9 +262,9 @@ test('ENFORCER_061_second_empty_text_exhausts_repair_and_fatals', async () => {
   })
 })
 
-test('ENFORCER_061_historical_empty_blog_tail_is_not_live_repair', async () => {
-  // Finished assistant (time.completed set) with empty blog is historical noise,
-  // not a live tool-loop. Must not mark RepairSpent / inject repair.
+test('ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ignore', async () => {
+  // Real Host sets time.completed before the next transform. Ownership is
+  // live CurrentRequest, not the completed flag. Empty text still AABB once.
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     const out = await handleContinuation(
       scope,
@@ -260,9 +273,28 @@ test('ENFORCER_061_historical_empty_blog_tail_is_not_live_repair', async () => {
       historicalBlog('asst-hist', 'c-hist', { text: '' }),
     )
 
+    assert.equal(hasRepairMessage(out), true, 'owned empty cycle must repair once')
+    assert.equal(repairSpent(scope), true)
+    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(fatals.length, 0)
+  })
+})
+
+test('ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    parkedTransform.clearCurrentRequest(scope, BLOG)
+    parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
+
+    const out = await handleContinuation(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-orphan-hist', 'c-hist', { text: '' }),
+    )
+
     assert.equal(hasRepairMessage(out), false)
     assert.equal(repairSpent(scope), false)
-    assert.equal(runtimeTag(scope), 'InFlight', 'live request kept; historical tail ignored')
+    assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(fatals.length, 0)
   })
 })
@@ -421,6 +453,9 @@ test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
       nextDigest: 'd1',
       deltaDigest: 'sha-NOT-matching-toml',
     })
+    const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, bad)
+    assert.equal(started.ok, true)
+    parkedTransform.setRuntime(scope, BLOG, started.state)
     parkedTransform.setCurrentRequest(scope, BLOG, bad)
 
     await handleContinuation(scope, journal, blog, liveBlog('asst-bad', 'c-bad', { text: 'entry' }))
@@ -431,6 +466,153 @@ test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
     assert.equal(runtimeTag(scope), 'Idle')
   })
 })
+
+// ── P0: Host completed-assistant must still commit when we own the cycle ───
+
+/**
+ * Owned commit with no further XTrace material reaches ParkTransform.
+ * Production parks until main offers (ENFORCER-050); that wait is Host-event
+ * driven. In unit tests there is no main transform, so swap ParkTransform for
+ * an immediate settle (same outcome as cancel / quiet catch-up: resumed=false).
+ * Time-independent: no sleep, no poll, no 10m timer.
+ */
+const runOwnedCommit = async (scope, journal, blog, messages) => {
+  const original = scope.ParkTransform.bind(scope)
+  scope.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
+  try {
+    return await handleContinuation(scope, journal, blog, messages)
+  } finally {
+    scope.ParkTransform = original
+  }
+}
+
+test('ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage', async () => {
+  // Manager real Host trajectory (processor.cleanup):
+  //   tool status=completed AND assistant.time.completed set
+  // before the next loop transform reloads msgs. Old code treated that as a
+  // historical tail and resumeWithContext'd the same 200 KiB forever.
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    const out = await runOwnedCommit(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-mgr-1', 'call-mgr-1', { text: 'recorded first window' }),
+    )
+
+    assert.equal(fatals.length, 0, JSON.stringify(fatals))
+    assert.equal(hasRepairMessage(out), false)
+
+    const snap = AgentJournalModule_snapshot(journal)
+    const session = fold.session(snap, MAIN)
+    assert.ok(session?.Blog, 'Blog projection must exist after commit')
+    assert.equal(
+      Number(session.Blog.Coverage.IngestedThroughSequence),
+      1,
+      'RecordCoverage must advance from staged next_ingest',
+    )
+    assert.equal(session.Blog.Coverage.CoverableTurnCutoffExclusive, 1)
+    assert.equal(session.Enforcement?.ByProviderRun?.size ?? 0, 1, 'enforcement receipt by ProviderRun')
+    assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined, 'CurrentRequest cleared on commit')
+    // After cancel of empty park, cell stays Parked (caught-up, waiting material).
+    assert.equal(runtimeTag(scope), 'Parked')
+  })
+})
+
+test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    parkedTransform.clearCurrentRequest(scope, BLOG)
+    parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
+
+    await handleContinuation(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-unowned', 'call-u1', { text: 'should not commit' }),
+    )
+
+    assert.equal(fatals.length, 0)
+    const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+    assert.equal(session?.Blog, undefined, 'unowned completed blog must not invent BlogEntryCommitted')
+    assert.equal(runtimeTag(scope), 'Idle')
+  })
+})
+
+test('ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    await runOwnedCommit(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-idem', 'call-idem', { text: 'once' }),
+    )
+    assert.equal(fatals.length, 0)
+
+    // Replay same ProviderRun (Host re-transform / restart). Must not double-commit.
+    // alreadyEntry short-circuits before park when no further material.
+    await handleContinuation(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-idem', 'call-idem', { text: 'once' }),
+    )
+
+    assert.equal(fatals.length, 0)
+    const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+    assert.equal(Number(session.Blog.Coverage.IngestedThroughSequence), 1)
+    assert.equal(session.Enforcement.ByProviderRun.size, 1)
+  })
+})
+
+test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', async () => {
+  // Two sequential Host-completed cycles with staged next_ingest windows.
+  // Fingerprint of the bug: every request restarts at prev=0.
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    await runOwnedCommit(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-w1', 'call-w1', { text: 'window-one' }),
+    )
+    assert.equal(fatals.length, 0)
+
+    const afterFirst = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+    assert.equal(Number(afterFirst.Blog.Coverage.IngestedThroughSequence), 1)
+
+    const toml2 = 'window-two'
+    const ctx2 = bloggerRequestContext.main({
+      requestId: 'req-2',
+      mainSession: MAIN,
+      bloggerSession: BLOG,
+      toml: toml2,
+      previousIngested: 1,
+      nextIngested: 2,
+      previousCutoff: 1,
+      nextCutoff: 2,
+      nextDigest: 'd2',
+      deltaDigest: digestForToml(toml2),
+    })
+    const started2 = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx2)
+    assert.equal(started2.ok, true)
+    parkedTransform.setRuntime(scope, BLOG, started2.state)
+    parkedTransform.setCurrentRequest(scope, BLOG, ctx2)
+
+    await runOwnedCommit(
+      scope,
+      journal,
+      blog,
+      historicalBlog('asst-w2', 'call-w2', { text: 'window-two-body' }),
+    )
+
+    assert.equal(fatals.length, 0, JSON.stringify(fatals))
+    const afterSecond = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+    assert.equal(Number(afterSecond.Blog.Coverage.IngestedThroughSequence), 2)
+    assert.equal(afterSecond.Blog.Coverage.CoverableTurnCutoffExclusive, 2)
+    assert.equal(afterSecond.Enforcement.ByProviderRun.size, 2, 'two distinct ProviderRuns')
+    // Previous of second must not be origin.
+    assert.notEqual(Number(afterSecond.Blog.Coverage.IngestedThroughSequence), 0)
+  })
+})
+
 
 
 // ── resolveCycleContext does not clobber live InFlight ──────────────────────

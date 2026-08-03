@@ -3173,8 +3173,10 @@ export const bloggerRequestContext = (() => {
         MainSessionId: sessionId(mainSession),
         BloggerSessionId: sessionId(bloggerSession),
         Toml: toml ?? '[[new_work_to_record]]\nuser = "work"',
-        PreviousIngestedThroughSequence: previousIngested,
-        NextIngestedThroughSequence: nextIngested,
+        // Fable int64 is bigint; a JS number 0 compares unequal to 0n and
+        // BlogProjection.applyEntry rejects as IngestCursorMismatch.
+        PreviousIngestedThroughSequence: BigInt(previousIngested),
+        NextIngestedThroughSequence: BigInt(nextIngested),
         PreviousCoverableTurnCutoffExclusive: previousCutoff,
         NextCoverableTurnCutoffExclusive: nextCutoff,
         NextCoveredPrefixDigest: nextDigest,

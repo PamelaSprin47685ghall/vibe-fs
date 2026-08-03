@@ -61,8 +61,21 @@ module BloggerCycleProjection =
         : Result<BloggerCycleProjectionState, string> =
         match Map.tryFind openReq.RequestId state.OpenByRequestId with
         | Some existing when existing.ContextDigest = openReq.ContextDigest ->
-            // Idempotent: restart / double materialize of the same logical request.
-            Ok state
+            // Same semantic context. Allow PromptKey fill-in after physical send
+            // (materialize is pre-send with None; send returns PromptKey).
+            // Never clear a bound key, never replace one key with another.
+            match existing.PromptKey, openReq.PromptKey with
+            | None, Some _ ->
+                Ok
+                    { state with
+                        OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId }
+            | Some bound, Some next when bound <> next ->
+                Error(
+                    sprintf
+                        "BloggerRequestMaterialized request %s already bound to a different PromptKey"
+                        (BloggerRequestId.value openReq.RequestId)
+                )
+            | _ -> Ok state
         | Some _ ->
             Error(
                 sprintf

@@ -85,9 +85,14 @@ module BloggerCoordinator =
                     chunk
             )
 
-    /// C5: durable materialization BEFORE physical send. Context blob is the
-    /// irrecomputable semantic input; recovery reads this + Host snapshot + receipts.
-    let private materializeRequest (journal: AgentJournal) (ctx: BloggerRequestContext) : Result<unit, string> =
+    /// C5: durable materialization. Context blob is the irrecomputable semantic
+    /// input. Pre-send PromptKey=None; after physical send, re-append with the
+    /// same ContextDigest + Some PromptKey so commit can prove ownership.
+    let private materializeRequest
+        (journal: AgentJournal)
+        (ctx: BloggerRequestContext)
+        (promptKey: PromptKey option)
+        : Result<unit, string> =
         let requestId = BloggerRequestContext.requestId ctx
         let mainSessionId = BloggerRequestContext.mainSessionId ctx
         let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
@@ -126,7 +131,14 @@ module BloggerCoordinator =
 
         // One open request per Blogger. Restart / re-offer with a new RequestId
         // must supersede a stale open slot (fold rejects two opens on one session).
+        // PromptKey fill-in reuses the existing open context blob/digest.
         let projections = AgentJournal.snapshot journal
+
+        let existingOpen =
+            projections.AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+            |> Option.bind (fun s -> s.BloggerCycles)
+            |> Option.bind (fun cycles -> Map.tryFind requestId cycles.OpenByRequestId)
 
         let staleOpen =
             projections.AgentProjections.Sessions
@@ -148,23 +160,34 @@ module BloggerCoordinator =
         |> function
             | Error e -> Error e
             | Ok() ->
-                match journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
+                let writeContext () =
+                    match existingOpen with
+                    | Some openReq when openReq.PromptKey.IsNone && promptKey.IsSome ->
+                        // Fill-in: keep the frozen pre-send blob/digest.
+                        Ok(openReq.ContextRef, openReq.ContextDigest)
+                    | Some openReq when openReq.PromptKey = promptKey -> Ok(openReq.ContextRef, openReq.ContextDigest)
+                    | _ ->
+                        match journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
+                        | Error error -> Error error
+                        | Ok blob -> Ok(blob.BlobRef, blob.BlobDigest)
+
+                match writeContext () with
                 | Error error -> Error error
-                | Ok blob ->
+                | Ok(contextRef, contextDigest) ->
                     let fact =
                         AgentFact.BloggerRequestMaterialized
                             {| RequestId = requestId
                                MainSessionId = mainSessionId
                                BloggerSessionId = bloggerSessionId
                                RequestKind = kind
-                               ContextRef = blob.BlobRef
-                               ContextDigest = blob.BlobDigest
+                               ContextRef = contextRef
+                               ContextDigest = contextDigest
                                ObservedPrefixEpochId = epoch
                                PreviousIngestedThroughSequence = prevSeq
                                NextIngestedThroughSequence = nextSeq
                                FrameEpochId = frameEpoch
                                SelectedFrameDigests = selectedDigests
-                               PromptKey = None |}
+                               PromptKey = promptKey |}
 
                     match AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
                     | Error failure -> Error(JournalAppendFailure.describe failure)
@@ -230,7 +253,8 @@ module BloggerCoordinator =
                     forceSealRuntime scope key
                     return DecisionEffect.Sealed
                 else
-                    match materializeRequest j ctx with
+                    // Pre-send: freeze semantic context with PromptKey=None.
+                    match materializeRequest j ctx None with
                     | Error reason -> return DecisionEffect.MaterializeFailed reason
                     | Ok() ->
                         // Re-check after materialize: main may complete during blob write.
@@ -246,10 +270,26 @@ module BloggerCoordinator =
                             let! sent = host.StartFromContext(ctx)
 
                             match sent with
-                            | Ok _ ->
-                                match ctx with
-                                | BloggerRequestContext.Squash _ -> return DecisionEffect.StartedSquash
-                                | BloggerRequestContext.Main _ -> return DecisionEffect.Started
+                            | Ok promptKey ->
+                                // Post-send: bind PromptKey on the open request so commit
+                                // can prove this RequestId owns the assistant parent.
+                                // Detached accept may still leave parent unresolved until
+                                // PhysicalAccepted; binding the key itself is durable now.
+                                match materializeRequest j ctx (Some promptKey) with
+                                | Error reason ->
+                                    abandonRequest journal ctx reason
+
+                                    match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                                    | Ok failed -> scope.SetBloggerRuntime(key, failed)
+                                    | Error _ -> ()
+
+                                    scope.ClearCurrentRequest key
+                                    host.InvalidateBloggerCache()
+                                    return DecisionEffect.StartFailed reason
+                                | Ok() ->
+                                    match ctx with
+                                    | BloggerRequestContext.Squash _ -> return DecisionEffect.StartedSquash
+                                    | BloggerRequestContext.Main _ -> return DecisionEffect.Started
                             | Error reason ->
                                 abandonRequest journal ctx reason
 
