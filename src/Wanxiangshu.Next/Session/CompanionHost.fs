@@ -220,7 +220,8 @@ type CompanionHost
 
     interface IDisposable with
         member this.Dispose() =
-            // Best-effort teardown: drop the blogger child and record the
-            // durable unlink on the same session stream.
-            if bloggerTask.IsSome then
+            // C6: cancel in-memory child cache even if CloseBloggerAsync races.
+            this.InvalidateBloggerCache()
+
+            if bloggerTask.IsSome || bloggerId.IsSome then
                 this.CloseBloggerAsync() |> ignore

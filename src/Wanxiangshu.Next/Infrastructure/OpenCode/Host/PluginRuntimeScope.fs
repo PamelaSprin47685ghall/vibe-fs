@@ -269,6 +269,18 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member this.DisposeSession(sessionId: string) =
         lock toolRuntimeGate (fun () -> toolRuntime |> Option.iter (fun owner -> owner.DisposeSession sessionId))
 
+        // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
+        // deleted, cancel the linked Blogger's parked waiter + request slots too.
+        let linkedBloggerKeys =
+            match this.Companions.TryGetValue sessionId with
+            | true, companion ->
+                match companion.BloggerSession with
+                | Some bloggerId -> [ SessionId.value bloggerId ]
+                | None -> []
+            | false, _ ->
+                // sessionId may itself be a Blogger child being deleted.
+                [ sessionId ]
+
         match this.Companions.TryGetValue sessionId with
         | true, companion ->
             this.Companions.Remove sessionId |> ignore
@@ -283,16 +295,21 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
 
-        // ENFORCER-162: a deleted session must not keep a waiter/context parked.
-        (this :> IParkedTransformHost).CancelParked sessionId
-        lock parkedGate (fun () ->
-            bloggerRuntime.[sessionId] <- BloggerRuntime.onDispose BloggerRuntime.empty
-            bloggerRuntime.Remove sessionId |> ignore)
+        // Always cancel the deleted id; also cancel linked Blogger keys.
+        let cancelKeys =
+            (sessionId :: linkedBloggerKeys) |> List.distinct
 
-        this.AttemptPlans.Keys
-        |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))
-        |> Seq.toList
-        |> List.iter (fun key -> this.AttemptPlans.Remove key |> ignore)
+        for key in cancelKeys do
+            (this :> IParkedTransformHost).CancelParked key
+
+            lock parkedGate (fun () ->
+                bloggerRuntime.[key] <- BloggerRuntime.onDispose BloggerRuntime.empty
+                bloggerRuntime.Remove key |> ignore)
+
+            this.AttemptPlans.Keys
+            |> Seq.filter (fun planKey -> planKey.StartsWith(key + "\u001f", StringComparison.Ordinal))
+            |> Seq.toList
+            |> List.iter (fun planKey -> this.AttemptPlans.Remove planKey |> ignore)
 
     member this.Dispose() =
         if not disposed then

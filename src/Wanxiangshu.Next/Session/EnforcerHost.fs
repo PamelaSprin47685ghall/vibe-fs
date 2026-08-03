@@ -468,10 +468,21 @@ module EnforcerHost =
                         frameBodies
                         delta
 
+                // C6: rebuild frames/instruction are synthetic projections, not new
+                // user authority. New Work delta is marked physical for diagnostics;
+                // HOST-010 still binds authority pre-transform.
                 plan.Messages
                 |> List.map (fun msg ->
                     createObj
-                        [ "info", box (createObj [ "id", box msg.MessageId; "role", box msg.Role ])
+                        [ "info",
+                          box (
+                              createObj
+                                  [ "id", box msg.MessageId
+                                    "role", box msg.Role
+                                    "synthetic", box (not msg.IsPhysical)
+                                    "source",
+                                    box (if msg.IsPhysical then "physical-delta" else "synthetic-projection") ]
+                          )
                           "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
 
     /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
