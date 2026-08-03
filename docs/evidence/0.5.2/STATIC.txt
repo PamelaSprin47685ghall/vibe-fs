@@ -1,0 +1,27 @@
+# 0.5.2 lightweight C12 snapshot — STATIC (gate:static)
+
+command: npm run gate:static
+exit_code: 0
+captured_at_utc: 2026-08-03T10:11:39Z
+commit: cc5a82064307b568be049cd3f0b60a2e950621cc
+
+## Gate chain (all OK)
+
+gate:layout        OK — 206 source files under src/Wanxiangshu.Next/
+gate:ssot          OK — 179 条款，522 处引用，16 个文件
+gate:conformance   OK — 181 clauses, active=181, toml=181
+gate:architecture  OK — 206 production + 69 test files
+gate:docs          clean (strip-doc-bold)
+gate:toml          clean — 19 file(s)
+gate:budget        OK — 29 budget(s), 108 file(s), no scattered literals
+gate:surface       OK — 8 surface(s): 4 canonical, 4 verbatim-forward, 0 awaiting N5
+gate:generated     OK — EnforcerCatalog.gen.fs in sync (120 rules)
+gate:role-matrix   ok (10 roles × 2 tiers, single catalog, no residual legacy sets)
+
+## Scope note
+
+Lightweight C12 evidence only. Does NOT substitute:
+- npm run build
+- npm run test:mjs / test:harness
+- npm run test:e2e:p0:three (C14)
+- isolated tarball install/import

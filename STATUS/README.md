@@ -12,12 +12,16 @@
   - `npm run test:harness` 通过（285 / 285）
   - `manager-companion-canary.mjs` 独立重跑通过
   - `npm pack` 产出 `wanxiangshu-0.5.2.tgz`（404 files, 1.8 MB packed）
-- 证据：`docs/evidence/0.5.2-baseline/`
+- 证据：`docs/evidence/0.5.2-baseline/`；本轮轻量 C12 快照 `docs/evidence/0.5.2/`
+  （`COMMIT.txt` / `STATIC.txt` / `PACKAGE-CONTENTS.txt`，commit `cc5a8206`，gate:static
+  绿，`npm pack --dry-run` 407 files / 1.8 MB；非完整 C12，不替代 build / unit / harness / P0）
 - 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成；C11 partial 已升 7 条 layer-2）
 
 ## 当前产品状态
 
-0.5.2 收敛中。本会话完成 C0–C8（C8 最小诚实范围）+ C11 partial（7 条 layer-2 升 CONFORMANT）：
+0.5.2 收敛中。C0–C8 与 C11 已闭合：Active IMPLEMENTING=0（commit `cc5a8206`），
+本轮闭合 PROMPT-007 / HOST-010 / HOST-011 / EXEC-009 layer 2 四条；轻量 C12 快照
+（COMMIT / STATIC / PACKAGE-CONTENTS）已落 `docs/evidence/0.5.2/`：
 
 - C0：建立 0.5.2 baseline，跑通 `test:release` 并记录证据。
 - C1：把 Strength / StudentTeacher / Enforcer nudge throttle 迁出 Active SSOT 到 `RFC/`，
@@ -97,7 +101,8 @@ host-transform-capability 全绿。
 
 ## 已知未闭合项
 
-0.5.2 尚未发布。C11 余项已闭合（layer 2 单测 + EXEC-009 canary 断言已写入）：
+0.5.2 尚未发布。Active IMPLEMENTING=0（commit `cc5a8206`）；C11 余项已闭合
+（layer 2 单测 + EXEC-009 canary 断言已写入）：
 
 - 已 CONFORMANT（本轮）：`PROMPT-007`（`AwaitMode.Detached` + fire-and-forget 测试）、
   `HOST-010`（`bindableRun` 正/负用例）、`HOST-011`（`ToolHostCodec.decodeContext`）、
@@ -151,15 +156,16 @@ src/Wanxiangshu.Next/
 
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
-1. C5–C8：已完成（见上「本会话完成」；C8 = gate 禁词 + 账本诚实，无 Orchestrator 重写）
-2. C9：`HOST-010/011` layer-2 单测已闭合；identity canary（transform id = tool messageID）
-   仍可作为 Host 升级门禁加强项
-3. C10：Context recovery X-A–X-D 第四层证据
-4. C11 余项：已闭合（见上「已知未闭合项」）；`EXEC-009` layer-4 绿跑归 DevOps
-5. C12：运行环境与发布包
-6. C13：全仓反向审计
-7. C14：RC 验证
-8. C15：0.5.2 发布
+- Active IMPLEMENTING = 0（commit `cc5a8206`）
+- C9：layer-2 已闭合；identity canary（transform id = tool messageID）仅保留为 Host
+  升级门禁可选加强项
+- C10：Context recovery X-A–X-D 第四层 canary 剧本未建，仍待产出
+- C11：已闭合（IMPLEMENTING=0）
+- C12：轻量快照（COMMIT / STATIC / PACKAGE-CONTENTS）已捕获；剩余 NODE-MATRIX、
+  真实 pack + sha256、隔离环境 INSTALL / IMPORT
+- C13：全仓反向审计
+- C14：完整 RC（gate:static → build → unit → harness → P0×3）；绿前不 tag
+- C15：tag `v0.5.2` + dirty=0 + 证据 pin——未开始
 
 IMPLEMENTING 条款：无（Active 账本已清）。
 
