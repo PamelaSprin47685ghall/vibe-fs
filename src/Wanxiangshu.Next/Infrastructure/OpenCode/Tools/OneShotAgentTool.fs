@@ -81,8 +81,7 @@ module OneShotAgentTool =
                     // EXEC-006: parent → child keeps Opening.
                     let parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
-                    let fullPrompt =
-                        ForkChildPayload.relay request.Prompt parentWorkRecord [] None
+                    let fullPrompt = ForkChildPayload.relay request.Prompt parentWorkRecord [] None
 
                     match!
                         scope.Sessions.CreateChildSession(

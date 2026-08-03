@@ -25,7 +25,7 @@ type BloggerRuntimeCell =
         /// FALLBACK-008 / item 15: at most one repair per logical request.
         RepairSpent: bool
         /// Handle is CompletedAwaitingJoin/Retired but main received a new Authority Root:
-        /// Blogger may run again until the next HandleCompleted seals it.
+        /// Blogger may drain until catch-up; host forceSeals when durable sealed and no material.
         ReactivatedAfterSeal: bool
     }
 
@@ -65,8 +65,8 @@ module BloggerRuntime =
             PendingOffer = None
             RepairSpent = false }
 
-    /// Main-session material arrived. InFlight never writes PendingOffer (XTrace keeps it).
-    /// Parked writes PendingOffer and stays Parked until the continuation takes it.
+    /// Main-session material arrived. InFlight never queues (XTrace keeps backlog).
+    /// Parked: Decision.Offer only — physical PendingOffer is the host dictionary.
     /// Sealed ignores all material until onReactivate.
     let onMaterial
         (cell: BloggerRuntimeCell)
@@ -83,10 +83,11 @@ module BloggerRuntime =
             )
         | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
         | BloggerRuntimeState.Parked ->
+            // Host dictionary is sole PendingOffer authority (ENFORCER-050 physical slot).
             Ok(
                 { cell with
                     State = BloggerRuntimeState.Parked
-                    PendingOffer = Some ctx
+                    PendingOffer = None
                     RepairSpent = false },
                 Decision.Offer ctx
             )

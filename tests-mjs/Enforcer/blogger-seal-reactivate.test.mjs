@@ -83,3 +83,24 @@ test('BLOGGER_RUNTIME_InFlight_survives_onSeal_flag_clear_only', () => {
   assert.equal(bloggerRuntime.reactivatedOf(sealedSoft), false)
   assert.equal(bloggerRuntime.blocksNewRequest(true, sealedSoft), false)
 })
+
+test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
+  // Durable handle sealed + ReactivatedAfterSeal lets one drain window through;
+  // once caught up, host forceSeal must permanently re-block.
+  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.forceSeal(bloggerRuntime.idle))
+  assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
+
+  const started = bloggerRuntime.onMaterial(reactivated, ctx())
+  assert.equal(started.decision, 'Start')
+  const committed = bloggerRuntime.onCycleCommitted(started.state)
+  assert.equal(committed.ok, true)
+  assert.equal(bloggerRuntime.stateOf(committed.state), 'Parked')
+  // Flag still true after commit — host must forceSeal when tryRefresh returns None.
+  assert.equal(bloggerRuntime.reactivatedOf(committed.state), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, committed.state), false)
+
+  const sealed = bloggerRuntime.forceSeal(committed.state)
+  assert.equal(bloggerRuntime.stateOf(sealed), 'Sealed')
+  assert.equal(bloggerRuntime.reactivatedOf(sealed), false)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true)
+})

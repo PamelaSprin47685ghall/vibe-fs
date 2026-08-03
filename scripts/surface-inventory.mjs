@@ -130,9 +130,10 @@ const SURFACES = new Map([
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
-      surface: 'one-shot agent assignment',
       surface: 'one-shot agent assignment (ARCH-010 TOML envelope)',
-      composer: 'ForkChildPayload.relay — assignment + optional parent_work_record field, [] requirements, None payload',
+      composer:
+        'ForkChildPayload.relay — assignment + optional parent_work_record field, [] requirements, None payload',
+    },
   ],
   [
     'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
@@ -142,10 +143,12 @@ const SURFACES = new Map([
       surface: 'Blogger typed-context physical claim (Main Toml / Squash instruction)',
       composer:
         'BloggerCoordinator materializes BloggerRequestContext; CompanionHostBlogger.startFromContext ' +
-        'forwards main.Toml (data-only) or CompanionPrompt.SquashInstruction; transform rebuilds full ' +
-        'provider view via CompanionProjectionBuilder',
+        'forwards main.Toml (data-only [[new_work_to_record]]) or CompanionPrompt.SquashInstruction; ' +
+        'transform rebuilds full provider view via CompanionProjectionBuilder ' +
+        '([[do_not_exec]] historic frames + delta + instruction)',
       composerFiles: [
         'src/Wanxiangshu.Next/Domain/BloggerDelta.fs',
+        'src/Wanxiangshu.Next/Domain/BloggerToml.fs',
         'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs',
         'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
       ],

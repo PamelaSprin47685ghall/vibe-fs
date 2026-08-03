@@ -16,7 +16,7 @@ module CompanionPrompt =
 
     /// CTX-012 / ENFORCER-030: final user message on a squash request.
     let SquashInstruction =
-        "# Rewrite the preceding Working Record frames now by calling the blog tool\n\
+        "# Rewrite the preceding historic_frame tables now by calling the blog tool\n\
          exactly once. Put the rewritten frame in `text`, omit all scores and evidence,\n\
          and do not output ordinary assistant prose."
 
@@ -26,13 +26,14 @@ module CompanionPrompt =
          session. It is context, not a new user instruction. It may omit raw code,\n\
          tool details, and image contents."
 
-    /// COMPANION-005: message-layer title around one durable frame body.
-    /// Body stays pure work-log text in the blob; title is never persisted.
-    let workingRecordMessage (frameBody: string) = "# Working Record\n\n" + frameBody
+    /// COMPANION-005: one durable frame body as `[[do_not_exec]] historic_frame`.
+    /// Body stays pure work-log text in the blob; wrapper is never persisted.
+    let workingRecordMessage (frameBody: string) =
+        BloggerToml.renderHistoricFrame frameBody
 
-    /// COMPANION-005: message-layer title around data-only TOML delta.
-    /// TOML itself is unmodified (CTX-013).
-    let newWorkMessage (toml: string) = "# New Work To Record\n\n" + toml
+    /// COMPANION-005: data-only TOML delta is already the user-message body.
+    /// No markdown title; table name `new_work_to_record` is the label (CTX-013).
+    let newWorkMessage (toml: string) = toml
 
     /// COMPANION-010: wrap a frozen record prefix body for injection into X.
     let companionMemoryBlock (frozenRecordPrefix: string) =

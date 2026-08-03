@@ -976,7 +976,10 @@ export const executorSummarize = (() => {
 export const bloggerToml = (() => {
   const m = bind(BloggerTomlModule, 'BloggerToml', [
     'TruncationMarker',
+    'DoNotExecTable',
+    'NewWorkTable',
     'renderItem',
+    'renderHistoricFrame',
     'renderWith',
     'render',
   ])
@@ -986,7 +989,10 @@ export const bloggerToml = (() => {
 
   return {
     truncationMarker: m.TruncationMarker,
+    doNotExecTable: m.DoNotExecTable,
+    newWorkTable: m.NewWorkTable,
     renderItem: (item) => m.renderItem(item),
+    renderHistoricFrame: (body) => m.renderHistoricFrame(body),
     renderWith: (instructions, items) => m.renderWith(toList(instructions), toList(items)),
     render: (items) => m.render(toList(items)),
 
@@ -3166,7 +3172,7 @@ export const bloggerRequestContext = (() => {
         RequestId: bloggerRequestId(requestId),
         MainSessionId: sessionId(mainSession),
         BloggerSessionId: sessionId(bloggerSession),
-        Toml: toml ?? '[[message]]\nrole = "user"\ntext = "work"',
+        Toml: toml ?? '[[new_work_to_record]]\nuser = "work"',
         PreviousIngestedThroughSequence: previousIngested,
         NextIngestedThroughSequence: nextIngested,
         PreviousCoverableTurnCutoffExclusive: previousCutoff,

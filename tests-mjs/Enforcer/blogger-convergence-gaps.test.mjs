@@ -184,16 +184,36 @@ test('C0_park_only_after_KnownCommitted', () => {
   const host = prodText('src/Wanxiangshu.Next/Session/EnforcerHost.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
-  // Gate: invalid/failed/unknown paths must not fall through into ParkTransform.
-  // Production: KnownCommitted sets committed; other outcomes return rawMessages before park.
-  const gated =
-    /KnownCommitted/.test(host) &&
-    (/if not committed then[\s\S]{0,160}return rawMessages[\s\S]{0,2000}ParkTransform/.test(host) ||
-      /if not committed then[\s\S]{0,160}return \[\][\s\S]{0,2000}ParkTransform/.test(host))
-  assert.equal(
-    gated,
-    true,
-    'ParkTransform is not gated on successful commit — invalid/failed cycles must not park',
+  // Gate: invalid/failed/unknown paths return before park. The drain branch sits
+  // between `if not committed then` and ParkTransform, so distance is large.
+  const notCommitted = host.indexOf('if not committed then')
+  const park = host.indexOf('ParkTransform', notCommitted)
+  assert.ok(notCommitted >= 0 && park > notCommitted, 'ParkTransform must follow not-committed gate')
+  const between = host.slice(notCommitted, park)
+  assert.match(between, /return rawMessages|return \[\]/,
+    'not-committed path must return before ParkTransform')
+  assert.match(host, /KnownCommitted/, 'KnownCommitted is the only park-enabling commit outcome')
+})
+
+test('C0_commit_drains_via_tryRefresh_before_park', () => {
+  // One external wake may need many ≤200 KiB cycles. After BlogEntryCommitted the
+  // continuation must re-chunk from durable coverage (tryRefresh) and continue
+  // without waiting for a new main-session wake. Stale PendingOffer is not enough.
+  const host = prodText('src/Wanxiangshu.Next/Session/EnforcerHost.fs')
+  const refresh = host.lastIndexOf('tryRefreshMainContextFromJournal', host.indexOf('ParkTransform'))
+  const park = host.indexOf('ParkTransform')
+  assert.ok(refresh >= 0 && park > refresh,
+    'post-commit path must tryRefresh (catch-up drain) before ParkTransform')
+  assert.match(
+    host,
+    /resumeCatchUp|Catch-up drain/,
+    'already-committed / catch-up arm must re-chunk from coverage',
+  )
+  // Stale PendingOffer must not be preferred over re-chunk.
+  assert.match(
+    host,
+    /TryTakePendingOffer key \|> ignore[\s\S]{0,400}tryRefreshMainContextFromJournal/,
+    'PendingOffer is discarded; next window always re-chunks from coverage',
   )
 })
 

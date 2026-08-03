@@ -18,9 +18,8 @@
  *  - a parallel coder session completes while the Blogger transform is parked
  *    (C-04 / ENFORCER-161);
  *  - the resumed transform injects the cumulative delta as a synthetic user
- *    message (ENFORCER-051) — the resumed request's last user message starts
- *    with the delta TOML marker `[[message]]` and the request carries more
- *    content than the parked one;
+ *    message (ENFORCER-051) — the resumed request carries `[[new_work_to_record]]`
+ *    delta tables and more content than the parked one;
  *  - dispose leaves no journal writes behind (C-09).
  */
 import assert from 'node:assert/strict';
@@ -204,10 +203,8 @@ try {
     `Blogger must have exactly one tool (blog): ${JSON.stringify(firstTools)}`,
   );
 
-  // Request shape (COMPANION-005 / ENFORCER-030): first request has no Working
-  // Record frames — just New Work + final instruction. The system prompt must
-  // not prohibit tools. Check only USER messages (the system prompt documents
-  // the headings, so a substring check on the full transcript would be a false positive).
+  // Request shape (COMPANION-005 / ENFORCER-030): first request has no historic
+  // frames — just [[new_work_to_record]] delta + final instruction.
   const userTexts = (firstBlogRequest?.messages ?? [])
     .filter((m) => m?.role === 'user')
     .map((m) => {
@@ -216,12 +213,12 @@ try {
     })
     .join('\n');
   assert.ok(
-    !userTexts.includes('# Working Record'),
-    `first request has no Working Record frames: ${JSON.stringify(userTexts.slice(0, 200))}`,
+    !userTexts.includes('[[do_not_exec]]'),
+    `first request has no historic frames: ${JSON.stringify(userTexts.slice(0, 200))}`,
   );
   assert.ok(
-    userTexts.includes('# New Work To Record'),
-    `first request has New Work To Record delta: ${JSON.stringify(userTexts.slice(0, 200))}`,
+    userTexts.includes('[[new_work_to_record]]'),
+    `first request has new_work_to_record delta: ${JSON.stringify(userTexts.slice(0, 200))}`,
   );
   const firstLastUser = lastUserText(firstBlogRequest);
   assert.ok(
@@ -234,7 +231,7 @@ try {
   );
   // TOML is data-only: no instruction comment inside the delta.
   const tomlSection = userTexts.slice(
-    userTexts.indexOf('# New Work To Record'),
+    userTexts.indexOf('[[new_work_to_record]]'),
     userTexts.indexOf('# Write the dense work-log continuation now'),
   );
   assert.ok(
@@ -306,17 +303,17 @@ try {
   );
 
   // ENFORCER-051: the resumed request is rebuilt from durable frames via
-  // CompanionProjectionBuilder — Working Record frames + New Work delta +
-  // exactly-once instruction. It must NOT contain the raw physical transcript
-  // (old tool call, "OK" tool result, bare TOML from turn 1).
+  // CompanionProjectionBuilder — [[do_not_exec]] historic frames + new_work
+  // delta + exactly-once instruction. It must NOT contain the raw physical
+  // transcript (old tool call, "OK" tool result, bare TOML from turn 1).
   const resumedTexts = requestTexts(secondBlogRequest);
   assert.ok(
-    resumedTexts.includes('# Working Record'),
-    `resumed request has Working Record frames: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
+    resumedTexts.includes('[[do_not_exec]]') && resumedTexts.includes('historic_frame'),
+    `resumed request has historic frames: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
   );
   assert.ok(
-    resumedTexts.includes('# New Work To Record'),
-    `resumed request has New Work To Record delta: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
+    resumedTexts.includes('[[new_work_to_record]]'),
+    `resumed request has new_work_to_record delta: ${JSON.stringify(resumedTexts.slice(0, 200))}`,
   );
   const resumedLastUser = lastUserText(secondBlogRequest);
   assert.ok(
@@ -330,24 +327,23 @@ try {
     !resumedTexts.includes('"OK"'),
     `resumed request must NOT contain old "OK" tool result: ${JSON.stringify(resumedTexts.slice(-200))}`,
   );
-  // The committed cycle text appears inside the Working Record frame — that is
-  // the correct carrier. It must NOT appear as raw transcript (old tool call
-  // or bare text in a message without the Working Record heading).
+  // The committed cycle text appears inside the historic_frame — that is the
+  // correct carrier. It must NOT appear as raw transcript outside do_not_exec.
   const resumedMessages = secondBlogRequest?.messages ?? [];
   const cycleTextOutsideFrame = resumedMessages.filter((m) => {
     const c = m?.content ?? '';
     const text = Array.isArray(c) ? c.map((p) => p?.text ?? '').join('') : String(c);
-    return text.includes('cycle one text') && !text.startsWith('# Working Record');
+    return text.includes('cycle one text') && !text.startsWith('[[do_not_exec]]');
   });
   assert.equal(
     cycleTextOutsideFrame.length,
     0,
-    `cycle text must only appear inside the Working Record frame: ${JSON.stringify(cycleTextOutsideFrame.map((m) => (m?.content ?? '').slice(0, 100)))}`,
+    `cycle text must only appear inside the historic frame: ${JSON.stringify(cycleTextOutsideFrame.map((m) => (m?.content ?? '').slice(0, 100)))}`,
   );
 
   // The new delta must not repeat already-covered content.
   const newWorkSection = resumedTexts.slice(
-    resumedTexts.indexOf('# New Work To Record'),
+    resumedTexts.indexOf('[[new_work_to_record]]'),
     resumedTexts.indexOf('# Write the dense work-log continuation now'),
   );
   assert.ok(
@@ -404,8 +400,8 @@ try {
   if (thirdBlogRequest && thirdBlogRequest !== secondBlogRequest) {
     const thirdTexts = requestTexts(thirdBlogRequest);
     assert.ok(
-      thirdTexts.includes('Third coder turn.') || thirdTexts.includes('# New Work To Record'),
-      'third blogger request must carry batched third material in New Work, not a concurrent InFlight override',
+      thirdTexts.includes('Third coder turn.') || thirdTexts.includes('[[new_work_to_record]]'),
+      'third blogger request must carry batched third material in new_work_to_record, not a concurrent InFlight override',
     );
     assert.ok(
       !thirdTexts.includes('First coder turn.'),

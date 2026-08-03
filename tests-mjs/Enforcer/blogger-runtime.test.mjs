@@ -39,8 +39,9 @@ test('ENFORCER_047_parked_plus_material_offers_without_leaving_parked', () => {
   const r = rt.onMaterial(rt.parked, main2())
   assert.equal(r.ok, true)
   assert.equal(r.decision, 'Offer')
-  assert.equal(rt.stateOf(r.state), 'Parked', 'PendingOffer must not flip state to InFlight')
-  assert.equal(ctx.toml(r.pending), 'more')
+  assert.equal(rt.stateOf(r.state), 'Parked', 'Offer must not flip state to InFlight')
+  // Physical PendingOffer is the host dictionary; cell never dual-writes it.
+  assert.equal(r.pending, undefined)
   assert.equal(rt.inFlightContext(r.state), undefined)
 })
 
@@ -98,12 +99,10 @@ test('ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
   assert.notEqual(ctx.toml(rt.inFlightContext(b.state)), 'more')
 })
 
-test('ENFORCER_047_pending_offer_is_consumed_once', () => {
+test('ENFORCER_047_parked_offer_leaves_cell_pending_empty', () => {
   const offered = rt.onMaterial(rt.parked, main2())
+  assert.equal(offered.decision, 'Offer')
   const taken = rt.tryTakePending(offered.state)
   assert.equal(taken.ok, true)
-  assert.equal(ctx.toml(taken.pending), 'more')
-  const again = rt.tryTakePending(taken.state)
-  assert.equal(again.ok, true)
-  assert.equal(again.pending, undefined)
+  assert.equal(taken.pending, undefined, 'host dictionary is sole PendingOffer authority')
 })

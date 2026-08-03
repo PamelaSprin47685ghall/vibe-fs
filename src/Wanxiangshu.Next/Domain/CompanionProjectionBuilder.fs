@@ -34,8 +34,8 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Normal -> CompanionPrompt.NormalInstruction
         | CompanionRequestKind.Squash _ -> CompanionPrompt.SquashInstruction
 
-    /// Normal: Working Record frames + New Work delta + normal instruction LAST.
-    /// Squash: oldest k Working Record frames + squash instruction LAST (no delta).
+    /// Normal: [[do_not_exec]] historic frames + [[new_work_to_record]] delta + instruction LAST.
+    /// Squash: oldest k historic frames + squash instruction LAST (no delta).
     let build
         (sha256: string -> string)
         (bloggerSessionId: SessionId)
@@ -75,7 +75,7 @@ module CompanionProjectionBuilder =
         // Instruction is always last (HOST-010 parent binding).
         { Messages = frameMessages @ deltaMessages @ [ instruction ] }
 
-    /// First-turn shape: New Work + instruction, no Working Record frames.
+    /// First-turn shape: delta + instruction, no historic frames.
     let isFirstTurnShape (plan: CompanionProjectionPlan) =
         match plan.Messages with
         | [ delta; instruction ] ->

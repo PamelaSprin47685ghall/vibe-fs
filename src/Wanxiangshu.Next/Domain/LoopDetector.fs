@@ -34,14 +34,16 @@ module LoopDetector =
         | Loop
 
     type Evaluation =
-        { State: State
-          IsLoop: bool
-          /// N_eff of the mixed 4-gram distribution.
-          EffectiveCharacterCount: float
-          /// HHI = 1 / N_eff.
-          Hhi: float
-          /// Number of 4-grams processed (not raw characters).
-          Step: int }
+        {
+            State: State
+            IsLoop: bool
+            /// N_eff of the mixed 4-gram distribution.
+            EffectiveCharacterCount: float
+            /// HHI = 1 / N_eff.
+            Hhi: float
+            /// Number of 4-grams processed (not raw characters).
+            Step: int
+        }
 
     type Detector =
         { mutable Step: int

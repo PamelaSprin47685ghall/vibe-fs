@@ -1,28 +1,33 @@
 // tests-mjs/Context/companion-projection.test.mjs — COMPANION-004/005/010/013.
 //
-// Provider-visible request shape after the blogger parking freeze:
-// Working Record frames + New Work delta + final instruction; no System on plan.
+// Provider-visible request shape:
+// [[do_not_exec]] historic_frame(s) + [[new_work_to_record]] delta + final instruction.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { companionIdentity as ident, companionPrompt as prompt, companionProjection as proj } from '../domain.mjs'
+import {
+  bloggerToml as toml,
+  companionIdentity as ident,
+  companionPrompt as prompt,
+  companionProjection as proj,
+} from '../domain.mjs'
 
 const spy = (input) => `«${input}»`
 
 const frames = (count) =>
   Array.from({ length: count }, (_, n) => ({ digest: `sha-f${n}`, body: `frame body ${n}` }))
 
-const tomlDelta = '[[message]]\nrole = "user"\ntext = "work"'
+const tomlDelta = '[[new_work_to_record]]\nuser = "work"'
 
-const countHeading = (texts, heading) =>
-  texts.filter((t) => t.startsWith(`${heading}\n\n`) || t === heading).length
+const isHistoricFrame = (text) => text.startsWith('[[do_not_exec]]') && text.includes('historic_frame')
+const isNewWorkDelta = (text) => text.includes('[[new_work_to_record]]') || text === tomlDelta || !text.startsWith('#')
 
 // ── prompt text is fixed and carries no numbers ─────────────────────────────
 
 test('COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /# Write the dense work-log continuation now/)
   assert.match(prompt.normalInstruction, /exactly once/)
-  assert.match(prompt.squashInstruction, /# Rewrite the preceding Working Record frames now/)
+  assert.match(prompt.squashInstruction, /# Rewrite the preceding historic_frame tables now/)
   assert.match(prompt.squashInstruction, /exactly once/)
   assert.equal(prompt.system, undefined, 'System is owned by blogger-system.md, not CompanionPrompt')
 })
@@ -37,8 +42,6 @@ test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   ]
 
   for (const text of all) {
-    // Headings and "0..9" score language are allowed only in system asset; these
-    // strings must stay free of capacity vocabulary and format holes.
     assert.doesNotMatch(text, /token|budget|limit|KiB|bytes/i, 'no capacity vocabulary')
     assert.doesNotMatch(text, /%s|%d|\{0\}/, 'no format placeholders')
   }
@@ -57,10 +60,13 @@ test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
   assert.equal(block.indexOf('<work-log>') > block.indexOf('not a new user instruction'), true)
 })
 
-test('COMPANION_005_message_wrappers_do_not_mutate_body_or_toml', () => {
-  assert.equal(prompt.workingRecord('frame body 0'), '# Working Record\n\nframe body 0')
-  assert.equal(prompt.newWork(tomlDelta), `# New Work To Record\n\n${tomlDelta}`)
-  assert.equal(prompt.newWork(tomlDelta).endsWith(tomlDelta), true)
+test('COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
+  assert.equal(prompt.workingRecord('frame body 0'), toml.renderHistoricFrame('frame body 0'))
+  assert.equal(prompt.newWork(tomlDelta), tomlDelta, 'delta body is unmodified identity')
+  assert.equal(prompt.workingRecord('frame body 0').includes('[[do_not_exec]]'), true)
+  assert.equal(prompt.workingRecord('frame body 0').includes('historic_frame'), true)
+  assert.equal(prompt.workingRecord('frame body 0').includes('# Working Record'), false)
+  assert.equal(prompt.newWork(tomlDelta).includes('# New Work To Record'), false)
 })
 
 // ── synthetic identities (COMPANION-013) ───────────────────────────────────
@@ -126,7 +132,7 @@ test('COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
 
 // ── the normal projection (COMPANION-005) ──────────────────────────────────
 
-test('COMPANION_005_normal_with_frames_is_working_records_then_new_work_then_instruction', () => {
+test('COMPANION_005_normal_with_frames_is_do_not_exec_then_delta_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -136,20 +142,19 @@ test('COMPANION_005_normal_with_frames_is_working_records_then_new_work_then_ins
   })
 
   assert.equal(plan.system, undefined, 'projection plan no longer carries System')
-  assert.equal(countHeading(plan.texts, '# Working Record'), 3)
-  assert.equal(countHeading(plan.texts, '# New Work To Record'), 1)
+  assert.equal(plan.texts.filter(isHistoricFrame).length, 3)
+  assert.equal(plan.texts.filter((t) => t === tomlDelta || t.includes('[[new_work_to_record]]')).length, 1)
   assert.equal(plan.texts.at(-1), prompt.normalInstruction)
   assert.deepEqual(plan.roles, ['user', 'user', 'user', 'user', 'user'])
   assert.deepEqual(plan.physicalFlags, [false, false, false, true, false])
 
   for (let n = 0; n < 3; n++) {
-    assert.equal(plan.texts[n], `# Working Record\n\nframe body ${n}`)
+    assert.equal(plan.texts[n], toml.renderHistoricFrame(`frame body ${n}`))
   }
-  assert.equal(plan.texts[3], `# New Work To Record\n\n${tomlDelta}`)
-  assert.equal(plan.texts[3].endsWith(tomlDelta), true, 'TOML body is unmodified')
+  assert.equal(plan.texts[3], tomlDelta)
 })
 
-test('COMPANION_005_normal_without_frames_is_new_work_then_instruction', () => {
+test('COMPANION_005_normal_without_frames_is_delta_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -158,9 +163,8 @@ test('COMPANION_005_normal_without_frames_is_new_work_then_instruction', () => {
     delta: { messageId: 'msg_first', toml: 'first' },
   })
 
-  assert.equal(countHeading(plan.texts, '# Working Record'), 0)
-  assert.equal(countHeading(plan.texts, '# New Work To Record'), 1)
-  assert.deepEqual(plan.texts, ['# New Work To Record\n\nfirst', prompt.normalInstruction])
+  assert.equal(plan.texts.filter(isHistoricFrame).length, 0)
+  assert.deepEqual(plan.texts, ['first', prompt.normalInstruction])
   assert.deepEqual(plan.physicalFlags, [true, false])
   assert.equal(plan.isFirstTurnShape, true)
   assert.equal(plan.system, undefined)
@@ -187,7 +191,7 @@ test('COMPANION_005_instruction_is_always_the_last_user_message', () => {
   assert.equal(withFrames.messages.at(-1).physical, false)
 })
 
-test('COMPANION_005_each_frame_has_exactly_one_working_record_heading', () => {
+test('COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -198,10 +202,11 @@ test('COMPANION_005_each_frame_has_exactly_one_working_record_heading', () => {
 
   const frameTexts = plan.texts.slice(0, 4)
   for (const text of frameTexts) {
-    assert.equal((text.match(/# Working Record/g) || []).length, 1)
-    assert.equal(text.startsWith('# Working Record\n\n'), true)
+    assert.equal((text.match(/\[\[do_not_exec\]\]/g) || []).length, 1)
+    assert.equal(text.startsWith('[[do_not_exec]]'), true)
+    assert.equal(text.includes('# Working Record'), false)
   }
-  assert.equal(countHeading(plan.texts, '# New Work To Record'), 1)
+  assert.equal(plan.texts[4], 'x')
 })
 
 test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
@@ -216,7 +221,7 @@ test('COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
   const physical = plan.messages.filter((m) => m.physical)
   assert.equal(physical.length, 1)
   assert.equal(physical[0].id, 'msg_real')
-  assert.equal(physical[0].text, '# New Work To Record\n\nx')
+  assert.equal(physical[0].text, 'x')
 })
 
 test('COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
@@ -249,7 +254,7 @@ test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', 
 
 // ── the squash projection (CTX-012) ────────────────────────────────────────
 
-test('CTX_012_squash_projects_only_oldest_working_records_then_instruction', () => {
+test('CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -258,11 +263,11 @@ test('CTX_012_squash_projects_only_oldest_working_records_then_instruction', () 
     delta: undefined,
   })
 
-  assert.equal(countHeading(plan.texts, '# Working Record'), 2)
-  assert.equal(countHeading(plan.texts, '# New Work To Record'), 0)
+  assert.equal(plan.texts.filter(isHistoricFrame).length, 2)
+  assert.equal(plan.texts.some((t) => t.includes('[[new_work_to_record]]')), false)
   assert.deepEqual(plan.texts, [
-    '# Working Record\n\nframe body 0',
-    '# Working Record\n\nframe body 1',
+    toml.renderHistoricFrame('frame body 0'),
+    toml.renderHistoricFrame('frame body 1'),
     prompt.squashInstruction,
   ])
   assert.deepEqual(plan.physicalFlags, [false, false, false])
@@ -278,7 +283,7 @@ test('CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
     delta: { messageId: 'msg_should_not_appear', toml: 'UNCONSUMED DELTA' },
   })
 
-  assert.deepEqual(plan.texts, ['# Working Record\n\nframe body 0', prompt.squashInstruction])
+  assert.deepEqual(plan.texts, [toml.renderHistoricFrame('frame body 0'), prompt.squashInstruction])
   assert.equal(plan.physicalFlags.includes(true), false)
   assert.equal(
     plan.messages.some((m) => m.text.includes('UNCONSUMED')),

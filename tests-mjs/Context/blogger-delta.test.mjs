@@ -137,9 +137,9 @@ test('CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () =>
   assert.equal(chunk.toml.includes('\n\n'), false, 'data body has no decorative blank lines')
 
   const parsed = parseToml(chunk.toml)
-  assert.equal(parsed.message.length, 1)
-  assert.equal(parsed.message[0].role, 'user')
-  assert.equal(parsed.message[0].truncated, undefined, 'the whole part fits, so no truncation flag')
+  assert.equal(parsed.new_work_to_record.length, 1)
+  assert.equal(typeof parsed.new_work_to_record[0].user, 'string')
+  assert.equal(parsed.new_work_to_record[0].truncated, undefined, 'the whole part fits, so no truncation flag')
   assert.equal('messages' in parsed, false, 'the payload is Blogger TOML data, not a JSON envelope')
 })
 
@@ -269,9 +269,13 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   // line, which moved the arithmetic by one byte — precisely the kind of change a
   // `bytes <= limit` assertion passes through silently.
   const parsed = parseToml(chunk.toml)
-  assert.equal(parsed.message.length, 1)
-  assert.equal(parsed.message[0].truncated, true)
-  assert.equal(parsed.message[0].text.includes(toml.truncationMarker), true, 'the marker survives parsing as data')
+  assert.equal(parsed.new_work_to_record.length, 1)
+  assert.equal(parsed.new_work_to_record[0].truncated, true)
+  assert.equal(
+    parsed.new_work_to_record[0].user.includes(toml.truncationMarker),
+    true,
+    'the marker survives parsing as data',
+  )
 
   // Every retained CJK character is whole: the count of them is an integer number
   // of 3-byte sequences, which a byte-level cut could not guarantee.
@@ -306,8 +310,8 @@ test('CTX_013_images_become_markers_carrying_no_content', () => {
   const chunk = delta.nextChunk({ limit: 8192, cursor: origin, messages })
 
   assert.deepEqual(chunk.kinds, ['TextPart', 'ImageOmitted'])
-  assert.equal(chunk.toml.includes('[[media_omitted]]'), true)
-  assert.equal(chunk.toml.includes('media_type = "image/png"'), true)
+  assert.equal(chunk.toml.includes('[[new_work_to_record]]'), true)
+  assert.equal(chunk.toml.includes('media_omitted = "image/png"'), true)
 
   // The digest exists in the semantic projection for CTX-011's cutoff proof. It
   // must NOT cross into the delta: there it would be a fact about the image the
@@ -325,7 +329,8 @@ test('CTX_013_non_image_media_uses_the_media_marker', () => {
   const chunk = delta.nextChunk({ limit: 8192, cursor: origin, messages })
 
   assert.deepEqual(chunk.kinds, ['MediaOmitted', 'MediaOmitted'])
-  assert.equal(chunk.toml.includes('media_type = "application/pdf"'), true)
+  assert.equal(chunk.toml.includes('media_omitted = "application/pdf"'), true)
+  assert.equal(chunk.toml.includes('media_omitted = "untyped"'), true)
 })
 
 test('CTX_013_an_image_only_turn_is_consumed_and_advances_coverage', () => {

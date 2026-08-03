@@ -454,30 +454,39 @@ TerminalOutputCaptured
 - Host compaction/reanchor：只重置 PrefixCoverage/epoch，不重置 XTrace 或 RecordCoverage。
 - 200 KiB 计量仍在最终 provider-visible bytes；normal delta 已无重复 instruction，预算自然减少。
 
-建议 Blogger delta schema：
+建议 Blogger delta schema（CTX-013，已落地）：
 
 ```toml
-[[message]]
-role = "user"
-text = "..."
+[[new_work_to_record]]
+user = "..."
 
-[[reasoning]]
-text = "..."
+[[new_work_to_record]]
+reasoning = "..."
 
-[[tool_call]]
-name = "read"
+[[new_work_to_record]]
+assistant = "..."
+
+[[new_work_to_record]]
+tool_call = "read"
 arguments = "..."
 
-[[tool_result]]
-text = "..."
+[[new_work_to_record]]
+tool_result = "..."
 
-[[media_omitted]]
-media_type = "image/png"
+[[new_work_to_record]]
+media_omitted = "image/png"
 ```
 
-实际 renderer 输出时上述 table 之间不插空行。字段只在存在时输出；`truncated = true` 仅在发生截断时输出。
+历史 frame 消息层：
 
-删除通用：`turn`、`kind`、空 `tool`、`truncated = false`。顺序由 table 出现顺序表达；role 仅 message 需要。
+```toml
+[[do_not_exec]]
+historic_frame = "..."
+```
+
+实际 renderer 输出时 table 之间不插空行。字段只在存在时输出；`truncated = true` 仅在发生截断时输出。
+
+删除：`turn`、`kind`、独立 `[[message]]`/`[[tool_call]]` 表、markdown `# Working Record` / `# New Work To Record` 包装。顺序由 table 出现顺序表达；text 的 role 作为字段名。
 
 ### SSOT/13.md — ARCH-010 详细合同和工具面
 
