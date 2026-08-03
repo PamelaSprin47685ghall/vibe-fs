@@ -84,6 +84,7 @@ module BloggerCoordinator =
                 | Error _ -> ()
 
                 scope.ClearCurrentRequest key
+                host.InvalidateBloggerCache()
                 return DecisionEffect.StartFailed reason
         }
 

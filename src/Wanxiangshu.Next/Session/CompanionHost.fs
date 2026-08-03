@@ -132,6 +132,15 @@ type CompanionHost
     member this.StartFromContext(ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
         CompanionHostBlogger.startFromContext this.BloggerDeps ctx
 
+    /// C4: send failure / dead child must drop cached SessionId and Ensure task.
+    /// Next material creates a fresh Blogger; never keep Parked after fail.
+    member this.InvalidateBloggerCache() : unit =
+        lock gate (fun () ->
+            bloggerTask <- None
+            bloggerId <- None
+            bloggerFailed <- true
+            companion.RecordBloggerClosed())
+
     /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
     member this.ArmRecoverySlot() = companion.ArmRecoverySlot()
 

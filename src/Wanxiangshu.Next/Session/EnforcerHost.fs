@@ -36,6 +36,12 @@ module EnforcerHost =
     /// one code constant for how long a transform may stay suspended.
     let ParkedTransformLifetime = StrengthPolicy.Strength.ParkedTransformLifetime
 
+    /// C4: commit-path UTF-8 safety bounds (not nudge/throttle).
+    let MaxBlogTextBytes = 512 * 1024
+    let MaxEvidenceBytes = 128 * 1024
+    let MaxSerializedScoresBytes = 64 * 1024
+    let MaxMergedToolCalls = 32
+
     /// Raw part object → completed `blog` call arguments.
     ///
     /// ENFORCER-041: identity comes from the part itself here (the transform
@@ -179,6 +185,8 @@ module EnforcerHost =
             Error "blog cycle has no provable provider run (ENFORCER-043)"
         elif List.isEmpty calls then
             Error "blog cycle has no completed blog calls (ENFORCER-043)"
+        elif List.length calls > MaxMergedToolCalls then
+            Error(sprintf "blog cycle exceeds MaxMergedToolCalls=%d" MaxMergedToolCalls)
         else
             let callIds = calls |> List.map (fun (_, callId, _) -> callId)
 
@@ -190,8 +198,21 @@ module EnforcerHost =
 
                 if not (EnforcerCycle.isValidCycle merged) then
                     Error "blog cycle merged text is empty after canonicalisation (ENFORCER-043)"
+                elif SyntheticToml.byteCount merged.MergedText > MaxBlogTextBytes then
+                    Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
+                elif SyntheticToml.byteCount merged.MergedEvidence > MaxEvidenceBytes then
+                    Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
                 else
-                    Ok(merged, callIds)
+                    let scoresBytes =
+                        if Map.isEmpty merged.MergedScores then
+                            0
+                        else
+                            SyntheticToml.byteCount (CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
+
+                    if scoresBytes > MaxSerializedScoresBytes then
+                        Error(sprintf "blog cycle scores exceed MaxSerializedScoresBytes=%d" MaxSerializedScoresBytes)
+                    else
+                        Ok(merged, callIds)
 
     /// Commit one cycle: blobs first, then the single BlogEntryCommitted
     /// append (PERSIST-009 shape: durable effect → fact). The fold refuses a
@@ -558,28 +579,43 @@ module EnforcerHost =
                                     "enforcer-squash-commit-failed"
                                     [ "session_id", key; "result", reason ]
                         | Some(BloggerRequestContext.Main main) ->
-                            match
-                                commitCycle
-                                    durable
-                                    mainSessionId
-                                    bloggerSessionId
-                                    providerRun
-                                    toolCallIds
-                                    merged
-                                    (Some main)
-                            with
-                            | Ok _ ->
-                                committed <- true
+                            // C4/C5: hard digest check on staged context.
+                            let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
 
-                                match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
-                                | Ok cell -> scope.SetBloggerRuntime(key, cell)
-                                | Error _ -> ()
-
-                                scope.ClearCurrentRequest key
-                            | Error reason ->
+                            if tomlDigest <> main.DeltaDigest then
                                 Diagnostic.emit
                                     "enforcer-cycle-commit-failed"
-                                    [ "session_id", key; "result", reason ]
+                                    [ "session_id", key; "result", "delta digest mismatch" ]
+                            elif main.NextIngestedThroughSequence <= main.PreviousIngestedThroughSequence then
+                                Diagnostic.emit
+                                    "enforcer-cycle-commit-failed"
+                                    [ "session_id", key; "result", "coverage did not advance" ]
+                            else
+                                match
+                                    commitCycle
+                                        durable
+                                        mainSessionId
+                                        bloggerSessionId
+                                        providerRun
+                                        toolCallIds
+                                        merged
+                                        (Some main)
+                                with
+                                | Ok _ ->
+                                    committed <- true
+
+                                    // C4: Main Entry success clears Blogger owner fallback failures.
+                                    AgentJournal.recordDerivedFallbackSuccess (Some durable) mainSessionId
+
+                                    match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
+                                    | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                                    | Error _ -> ()
+
+                                    scope.ClearCurrentRequest key
+                                | Error reason ->
+                                    Diagnostic.emit
+                                        "enforcer-cycle-commit-failed"
+                                        [ "session_id", key; "result", reason ]
                         | None ->
                             Diagnostic.emit
                                 "enforcer-cycle-commit-failed"
@@ -608,7 +644,14 @@ module EnforcerHost =
                             let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
 
                             if not resumed then
-                                return rawMessages
+                                // C4/item 16: timeout/cancel must not release raw transcript.
+                                match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
+                                | Ok cell -> scope.SetBloggerRuntime(key, cell)
+                                | Error _ -> scope.SetBloggerRuntime(key, BloggerRuntime.empty)
+
+                                scope.ClearCurrentRequest key
+                                scope.TryTakePendingOffer key |> ignore
+                                return []
                             else
                                 match scope.TryTakePendingOffer key with
                                 | Some ctx ->
