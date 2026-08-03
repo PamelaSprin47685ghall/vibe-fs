@@ -665,10 +665,10 @@ STATUS/conformance.md
 新增建议：
 
 ```text
-src/Wanxiangshu.Next/Domain/XTrace.fs
-src/Wanxiangshu.Next/Domain/LifecycleWorkRecord.fs
-src/Wanxiangshu.Next/Journal/XTraceProjection.fs
-src/Wanxiangshu.Next/Journal/LifecycleWorkRecordProjection.fs
+src/Wanxiangshu/Domain/XTrace.fs
+src/Wanxiangshu/Domain/LifecycleWorkRecord.fs
+src/Wanxiangshu/Journal/XTraceProjection.fs
+src/Wanxiangshu/Journal/LifecycleWorkRecordProjection.fs
 ```
 
 或将现有 `ProviderProjection.fs` 提升为 XTrace owner，但必须保证名字与职责清楚，不能让 Blogger 和 terminal 各自继续构造一套 part。
@@ -681,13 +681,13 @@ src/Wanxiangshu.Next/Journal/LifecycleWorkRecordProjection.fs
 - materializer 输入只接受 projection state，不访问 Host；
 - internal provenance 与 LLM-visible text 分层。
 
-更新 `Wanxiangshu.Next.fsproj` 编译顺序：Domain types → Journal projection → Session materializer → Infrastructure adapters。
+更新 `Wanxiangshu.fsproj` 编译顺序：Domain types → Journal projection → Session materializer → Infrastructure adapters。
 
 测试：
 
 ```text
-tests-mjs/Context/x-trace.test.mjs
-tests-mjs/Context/lifecycle-work-record.test.mjs
+tests/unit/Context/x-trace.test.mjs
+tests/unit/Context/lifecycle-work-record.test.mjs
 ```
 
 至少覆盖 exact bytes、reasoning、空 segment 省略、gap 无重复、determinism。
@@ -772,7 +772,7 @@ Session/CompanionHostBlogger.fs
 Session/Companion.fs
 Journal/BlogProjection.fs
 Journal/CompanionJournalPort.fs
-src/Wanxiangshu.Next/prompts/blogger-system.md
+src/Wanxiangshu/prompts/blogger-system.md
 ```
 
 动作：
@@ -1098,18 +1098,18 @@ prompts/reviewer-system.md                使用 work_record + authoritative req
 重点更新：
 
 ```text
-tests-mjs/Context/blog-projection.test.mjs
-tests-mjs/Context/blogger-delta.test.mjs
-tests-mjs/Context/blogger-toml.test.mjs
-tests-mjs/Context/companion-projection.test.mjs
-tests-mjs/Context/fold-context-recovery.test.mjs
-tests-mjs/Context/prefix-epoch.test.mjs
-tests-mjs/Context/probe-selection.test.mjs
-tests-mjs/Context/synthetic-toml.test.mjs
-tests-mjs/Execution/fork-child-payload.test.mjs
-tests-mjs/Execution/handle.test.mjs
-tests-mjs/Plugin/manager-tool-contract.test.mjs
-tests-mjs/Prompt/send-format.test.mjs
+tests/unit/Context/blog-projection.test.mjs
+tests/unit/Context/blogger-delta.test.mjs
+tests/unit/Context/blogger-toml.test.mjs
+tests/unit/Context/companion-projection.test.mjs
+tests/unit/Context/fold-context-recovery.test.mjs
+tests/unit/Context/prefix-epoch.test.mjs
+tests/unit/Context/probe-selection.test.mjs
+tests/unit/Context/synthetic-toml.test.mjs
+tests/unit/Execution/fork-child-payload.test.mjs
+tests/unit/Execution/handle.test.mjs
+tests/unit/Plugin/manager-tool-contract.test.mjs
+tests/unit/Prompt/send-format.test.mjs
 ```
 
 删除所有以旧行为为成功条件的断言，例如：
@@ -1211,19 +1211,19 @@ npm run test:release
 
 ```bash
 # 旧术语/旧 wire 清零
-grep -RInE 'A\(X\)|B\(X\)|session-wide A|formal_record|formalRecord|FinalText|BlogFrameKind\.Seed|withSeed|prefer B, else A' SSOT src tests-mjs testkit
+grep -RInE 'A\(X\)|B\(X\)|session-wide A|formal_record|formalRecord|FinalText|BlogFrameKind\.Seed|withSeed|prefer B, else A' SSOT src tests/unit testkit
 
 # join surface 不泄漏内部字段
 node scripts/surface-inventory.mjs
 
 # TOML layout golden
-node tests-mjs/runner.mjs --match synthetic-toml
-node tests-mjs/runner.mjs --match blogger-toml
+node tests/unit/runner.mjs --match synthetic-toml
+node tests/unit/runner.mjs --match blogger-toml
 
 # LWR/coverage 定向测试
-node tests-mjs/runner.mjs --match lifecycle-work-record
-node tests-mjs/runner.mjs --match x-trace
-node tests-mjs/runner.mjs --match probe-selection
+node tests/unit/runner.mjs --match lifecycle-work-record
+node tests/unit/runner.mjs --match x-trace
+node tests/unit/runner.mjs --match probe-selection
 ```
 
 如果 runner 不支持 `--match`，用仓库现有单文件调用约定替换；不要为了文档命令新造第二个 test runner。

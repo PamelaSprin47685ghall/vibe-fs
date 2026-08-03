@@ -21,8 +21,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, extname } from 'node:path'
 import { walk } from './repo-scan.mjs'
 
-const PRODUCTION_ROOT = 'src/Wanxiangshu.Next'
-const TESTS_ROOT = 'tests-mjs'
+const PRODUCTION_ROOT = 'src/Wanxiangshu'
+const TESTS_ROOT = 'tests/unit'
 const SOURCE_EXTENSIONS = ['.fs', '.fsproj']
 
 // VERIFY-008: layers 1-3 are `.mjs` importing `dist`. The test tree is
@@ -82,9 +82,9 @@ const FORBIDDEN_SSE_TOKENS = [
 ]
 
 const SESSION_STATUS_ALLOWLIST = [
-  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/HostEventCodec.fs',
-  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Signals/HostSignalAdapter.fs',
-  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Codec/HostEventCodec.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Signals/HostSignalAdapter.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs',
 ]
 
 // spec/17 LOOP-002 (17.md:34-59): the loop sensor is the single sanctioned
@@ -94,7 +94,7 @@ const SESSION_STATUS_ALLOWLIST = [
 // be decoded independently by LoopEventCodec, as a second codec channel beside
 // HostEventCodec. No other production file may touch the token.
 const LOOP_SSE_ALLOWLIST = [
-  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/LoopEventCodec.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Codec/LoopEventCodec.fs',
 ]
 
 const SLEEP_TOKENS = ['sleepJs', 'sleep']
@@ -104,9 +104,9 @@ const SLEEP_TOKENS = ['sleepJs', 'sleep']
 const MECHANICAL_SUFFIXES = ['Helpers', 'Primitives', 'Fields', 'Emit', 'Service', 'Core']
 
 const MECHANICAL_ALLOWLIST = new Map([
-  ['src/Wanxiangshu.Next/Session/AgentRoleIdentity.fs', 'semantic boundary pending deeper split'],
-  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginHostInterop.fs', 'semantic boundary pending deeper split'],
-  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/TerminalPolicy.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu/Session/AgentRoleIdentity.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginHostInterop.fs', 'semantic boundary pending deeper split'],
+  ['src/Wanxiangshu/Infrastructure/OpenCode/Host/TerminalPolicy.fs', 'semantic boundary pending deeper split'],
 ])
 
 // ── Host boundary ───────────────────────────────────────────────────────────
@@ -117,22 +117,22 @@ const HOST_INTEROP_NAME =
   /(Host|Port|Codec|Adapter|Boot|Runtime|Writer|Node|Plugin|Supervisor|Backend|Projection|Transform|Signal|Json|Git|Flow|Pty|Tool|Subscribe|Canonical|Process)/i
 
 const HOST_INTEROP_ALLOWLIST = new Map([
-  ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
-  ['src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
-  ['src/Wanxiangshu.Next/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
+  ['src/Wanxiangshu/Infrastructure/Git/Orchestrator.IntegrationGate.fs', 'external lockfile host adapter'],
+  ['src/Wanxiangshu/Infrastructure/Git/Orchestrator.WorktreeResource.fs', 'external worktree/ValueTask adapter'],
+  ['src/Wanxiangshu/Tools/PromptAssets.fs', 'prompt asset construction at the Host boundary'],
   [
-    'src/Wanxiangshu.Next/Infrastructure/Resources/EnforcerCatalogResource.fs',
+    'src/Wanxiangshu/Infrastructure/Resources/EnforcerCatalogResource.fs',
     'runtime catalog JSON load at the package resource boundary (import.meta.url)',
   ],
-  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagerConfig.fs', 'Host configuration adapter'],
-  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
-  ['src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
+  ['src/Wanxiangshu/Infrastructure/OpenCode/Host/ManagerConfig.fs', 'Host configuration adapter'],
+  ['src/Wanxiangshu/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs', 'Host-final opencode.json adapter'],
+  ['src/Wanxiangshu/Infrastructure/OpenCode/Host/Diagnostic.fs', 'HOST-007 diagnostic emit at the console boundary (CTX-014 field whitelist)'],
   [
-    'src/Wanxiangshu.Next/Kernel/Flow.fs',
+    'src/Wanxiangshu/Kernel/Flow.fs',
     'JS runtime primitives (ValueTask await, deferred Task, Promise.all) — not OpenCode Host objects',
   ],
   [
-    'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
+    'src/Wanxiangshu/Session/BloggerCoordinator.fs',
     'C5: createObj context payload for durable request materialization blob (CanonicalJson boundary)',
   ],
   // BloggerCrashRecovery no longer scrapes JSON; it calls EnforcerHost.tryReloadRequestContext.
@@ -142,7 +142,7 @@ const HOST_INTEROP_ALLOWLIST = new Map([
 // raw obj", so these directories never earn the filename-pattern excuse — an
 // entry must be explicit and reasoned. Without this, next/Kernel/Flow.fs passed
 // only because "Flow" happens to appear in HOST_INTEROP_NAME.
-const PURE_CORE_DIRS = ['src/Wanxiangshu.Next/Kernel/', 'src/Wanxiangshu.Next/Domain/']
+const PURE_CORE_DIRS = ['src/Wanxiangshu/Kernel/', 'src/Wanxiangshu/Domain/']
 
 // ── single writer ───────────────────────────────────────────────────────────
 //
@@ -290,21 +290,21 @@ const DSL_PROGRAMS = [
 // The F# version asserted types exist at COMPILE time; this one asserts each
 // entrypoint is a callable export in `dist` at RUN time. Weaker about
 // signatures, stronger about reachability — a function the build drops now fails.
-const GUIDE_CONTRACT_PATH = 'tests-mjs/guide-contract.test.mjs'
+const GUIDE_CONTRACT_PATH = 'tests/unit/guide-contract.test.mjs'
 
 // ── layering ────────────────────────────────────────────────────────────────
 
-const LOWER_LAYER_DIRS = ['src/Wanxiangshu.Next/Kernel/', 'src/Wanxiangshu.Next/Domain/']
+const LOWER_LAYER_DIRS = ['src/Wanxiangshu/Kernel/', 'src/Wanxiangshu/Domain/']
 
 const UPPER_LAYER_NAMESPACES = [
-  'Wanxiangshu.Next.OpenCode',
-  'Wanxiangshu.Next.Session',
-  'Wanxiangshu.Next.Process',
-  'Wanxiangshu.Next.Journal',
-  'Wanxiangshu.Next.Orchestrator',
-  'Wanxiangshu.Next.Review',
-  'Wanxiangshu.Next.Agent',
-  'Wanxiangshu.Next.Tools',
+  'Wanxiangshu.OpenCode',
+  'Wanxiangshu.Session',
+  'Wanxiangshu.Process',
+  'Wanxiangshu.Journal',
+  'Wanxiangshu.Orchestrator',
+  'Wanxiangshu.Review',
+  'Wanxiangshu.Agent',
+  'Wanxiangshu.Tools',
 ]
 
 const DUPLICATE_ALGORITHM_OWNERS = [
@@ -356,7 +356,7 @@ const SINGLE_CONSTRUCTOR_TYPES = [
   {
     type: 'AttemptExecutionProfile',
     clause: 'PROMPT-008',
-    owner: 'src/Wanxiangshu.Next/Domain/PromptAuthority.fs',
+    owner: 'src/Wanxiangshu/Domain/PromptAuthority.fs',
     fields: ['SystemPromptId =', 'ToolCapabilitySet ='],
     builder: 'buildAttemptExecutionProfile',
   },
@@ -369,9 +369,9 @@ const SINGLE_CONSTRUCTOR_TYPES = [
 // Each tier gets the criterion that belongs to it — see the gate below for why one criterion over
 // both files would now be satisfiable by the wrong file.
 const RUNNER_TIERS = [
-  { path: 'tests-mjs/runner.mjs', budget: 'UNIT_VERDICT_SILENCE_MS', enforcement: ['Watchdog'] },
+  { path: 'tests/unit/runner.mjs', budget: 'UNIT_VERDICT_SILENCE_MS', enforcement: ['Watchdog'] },
   {
-    path: 'tests-mjs/run-inner.mjs',
+    path: 'tests/unit/run-inner.mjs',
     budget: 'PER_TEST_TIMEOUT_MS',
     enforcement: ['AbortSignal.timeout', 'timeout:'],
   },
@@ -390,7 +390,7 @@ const RUNNER_TIERS = [
 // would flag the implementation of the very thing it mandates.
 const UNBOUNDED_FANOUT = {
   clause: 'ARCH-009',
-  owner: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
+  owner: 'src/Wanxiangshu/Kernel/Flow.fs',
   patterns: ['Promise.all', 'Task.WhenAll', 'Task.WaitAll'],
 }
 
@@ -427,8 +427,8 @@ const read = (path) => {
 const HOST_SOURCE_PATH = /(?:\.\.\/opencode|packages)\/[\w.-]+(?:\/[\w.-]+)*\/src\//
 
 const referencesLegacySrc = (text) => {
-  if (text.includes('open Wanxiangshu.') && !text.includes('open Wanxiangshu.Next')) return true
-
+  // Pre-0.5.3 guarded against open Wanxiangshu.* outside Wanxiangshu.Next.
+  // After rename, production namespaces are Wanxiangshu.*; only ../src path probes remain.
   const withoutHostCitations = text.replace(new RegExp(HOST_SOURCE_PATH.source, 'g'), '')
   return (
     withoutHostCitations.includes('../src') ||
@@ -467,7 +467,7 @@ for (const file of allFiles) {
 
 // ── gate: project references ────────────────────────────────────────────────
 
-const PRODUCTION_FSPROJ = 'src/Wanxiangshu.Next/Wanxiangshu.Next.fsproj'
+const PRODUCTION_FSPROJ = 'src/Wanxiangshu/Wanxiangshu.fsproj'
 
 if (!existsSync(PRODUCTION_FSPROJ)) {
   fail('project-reference', `${PRODUCTION_FSPROJ} does not exist`)
@@ -658,7 +658,7 @@ for (const { builder, file, names } of DSL_PROGRAMS) {
   if (builder === 'process') {
     const hasCallsite = productionFiles.some(
       (candidate) =>
-        norm(candidate).startsWith('src/Wanxiangshu.Next/Process/') &&
+        norm(candidate).startsWith('src/Wanxiangshu/Process/') &&
         (read(candidate).includes('process {') || read(candidate).includes('``process`` {')),
     )
     if (!hasCallsite) {
@@ -785,7 +785,7 @@ for (const { type, clause, owner, fields, builder } of SINGLE_CONSTRUCTOR_TYPES)
 // correct tree while passing on any file that happened to mention 1024: it matched the presence of
 // digits, not the presence of a bound.
 //
-// Then it was "`tests-mjs/runner.mjs` names `PER_TEST_TIMEOUT_MS`". W4 split the runner in two and
+// Then it was "`tests/unit/runner.mjs` names `PER_TEST_TIMEOUT_MS`". W4 split the runner in two and
 // the per-test bound moved to the tier that can enforce it; the parent now enforces a
 // verdict-silence window, which is the PRIMARY criterion VERIFY-004 demands. The gate failed it for
 // not carrying a bound that is no longer its job — the criterion had quietly become a claim about
@@ -806,7 +806,7 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
   if (!source.includes(budget)) {
     fail(
       'test-runner',
-      `${path}: must consume ${budget} from testkit/opencode/time-budget.js ` +
+      `${path}: must consume ${budget} from tests/e2e/time-budget.js ` +
         `(VERIFY-004: 兜底值必须集中定义)`,
     )
   }
@@ -837,7 +837,7 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
 
   // BloggerRuntime must have production call sites beyond its own module.
   const runtimeCallers = productionCallers(/BloggerRuntime\.(onMaterial|onCycleCommitted|onSquashCommitted|onFail)\b/).filter(
-    (path) => !path.endsWith('src/Wanxiangshu.Next/Session/BloggerRuntimeState.fs'),
+    (path) => !path.endsWith('src/Wanxiangshu/Session/BloggerRuntimeState.fs'),
   )
   if (runtimeCallers.length === 0) {
     fail('blogger-convergence', 'BloggerRuntime transitions have no production call site')
@@ -855,21 +855,21 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
     if (containsToken(text, 'BloggerNeedsReset')) {
       fail('blogger-convergence', `${file}: BloggerNeedsReset must stay deleted`)
     }
-    if (/SubscribeTerminal/.test(text) && norm(file).endsWith('src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs')) {
+    if (/SubscribeTerminal/.test(text) && norm(file).endsWith('src/Wanxiangshu/Session/CompanionHostBlogger.fs')) {
       fail('blogger-convergence', `${file}: Squash/Normal path must not SubscribeTerminal`)
     }
     if (/Extract the TOML from the raw messages/.test(text) || /"first"; toml/.test(text)) {
       fail('blogger-convergence', `${file}: raw user TOML extraction is forbidden`)
     }
-    if (/\| EnforcementCycleCommitted\b/.test(text) && norm(file).endsWith('src/Wanxiangshu.Next/Kernel/Fact.fs')) {
+    if (/\| EnforcementCycleCommitted\b/.test(text) && norm(file).endsWith('src/Wanxiangshu/Kernel/Fact.fs')) {
       fail('blogger-convergence', `${file}: EnforcementCycleCommitted fact must stay deleted`)
     }
   }
 
   // Dual slots without dual storage:
   // PendingOffer = dictionary; CurrentRequest = InFlight payload (no currentRequest dict).
-  const scopeText = existsSync('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
-    ? read('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+  const scopeText = existsSync('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+    ? read('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
     : ''
   if (scopeText.includes('parkedOffer')) {
     fail('blogger-convergence', 'PluginRuntimeScope must not use a single parkedOffer dictionary')
@@ -903,17 +903,17 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
 // A silently empty scan would make every gate above vacuously pass.
 
 const SCANNER_WITNESSES = [
-  'src/Wanxiangshu.Next/Kernel/Flow.fs',
-  'src/Wanxiangshu.Next/Journal/Writer.fs',
-  'src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/Plugin.fs',
-  'src/Wanxiangshu.Next/Tools/StaticTools.fs',
+  'src/Wanxiangshu/Kernel/Flow.fs',
+  'src/Wanxiangshu/Journal/Writer.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/Plugin.fs',
+  'src/Wanxiangshu/Tools/StaticTools.fs',
 ]
 
 // The test side needs its own witnesses now that it is scanned with a different
 // extension list. `TEST_EXTENSIONS` drifting to `.fs`, or the tree moving, would
 // otherwise yield an empty `testFiles` — and every gate over `allFiles` would
 // silently stop covering tests while still reporting OK.
-const TEST_SCANNER_WITNESSES = ['tests-mjs/runner.mjs', 'tests-mjs/domain.mjs', GUIDE_CONTRACT_PATH]
+const TEST_SCANNER_WITNESSES = ['tests/unit/runner.mjs', 'tests/unit/domain.mjs', GUIDE_CONTRACT_PATH]
 
 if (productionFiles.length < 10) {
   fail('scanner', `recursive scan returned only ${productionFiles.length} production files`)

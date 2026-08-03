@@ -34,20 +34,21 @@
 
 import { readFileSync } from 'node:fs'
 import { walk } from './repo-scan.mjs'
-import * as budget from '../testkit/opencode/time-budget.js'
+import * as budget from '../tests/e2e/time-budget.js'
 
-const BUDGET_MODULE = 'testkit/opencode/time-budget.js'
+const BUDGET_MODULE = 'tests/e2e/time-budget.js'
 
-// tests-mjs/fixtures/ holds deliberately hung test doubles whose literals are the subject
+// tests/unit/fixtures/ holds deliberately hung test doubles whose literals are the subject
 // under test rather than a budget the harness obeys. It does not exist yet; naming it here
 // keeps the exclusion from being written under pressure later, when the temptation would be
 // to widen it instead.
-const FIXTURE_ROOT = 'tests-mjs/fixtures/'
+const FIXTURE_ROOT = 'tests/unit/fixtures/'
 
 const SCOPE = [
-  { root: 'testkit', extensions: ['.js', '.mjs'] },
+  { root: 'tests/e2e', extensions: ['.js', '.mjs'] },
+  { root: 'tests/support', extensions: ['.js', '.mjs'] },
   { root: 'scripts', extensions: ['.mjs'] },
-  { root: 'tests-mjs/runner.mjs', extensions: ['.mjs'] },
+  { root: 'tests/unit/runner.mjs', extensions: ['.mjs'] },
 ]
 
 const THRESHOLD_MS = budget.LITERAL_BUDGET_THRESHOLD_MS

@@ -3,7 +3,7 @@
 ## 0.5.3 正规化进度
 
 - 已完成：enforcer JSON（resources/enforcer/catalog.json）、prompts → resources/prompts、单 package manifest、gitignore/根白名单、宝典 → docs/decisions/kolmogorov.md、Directory.Build.props 单一化、scripts 公共命令面收敛、RFC → docs/rfcs、spec 骨架（README + coverage.toml）
-- 未做：SSOT 全量改名、STATUS 删除、tests 树合并、Wanxiangshu.Next 改名、dist 输出、README 终稿
+- 未做：SSOT 全量改名、STATUS 删除、tests 树合并、Wanxiangshu 改名、dist 输出、README 终稿
 
 ## 当前基线
 
@@ -96,14 +96,14 @@ nudge/throttle 在 `docs/rfcs/`，不属于当前产品合同。
 
 ## 源码地图
 
-生产源码唯一根：`src/Wanxiangshu.Next/`（`Wanxiangshu.Next.fsproj` 编译全部）。三口径：
+生产源码唯一根：`src/Wanxiangshu/`（`Wanxiangshu.fsproj` 编译全部）。三口径：
 
 - 208 生产 `.fs` 源文件（`find … -name '*.fs'`）
 - 209 gate source files（208 `.fs` + 1 `.fsproj`；`gate:layout` / `gate:architecture` 的 `SOURCE_EXTENSIONS`）
 - 212 Fable 编译单元（project + references；含工程外引用，≠ 生产 `.fs` 数）
 
 ```text
-src/Wanxiangshu.Next/
+src/Wanxiangshu/
 ├── Kernel/                       领域内核：身份、角色、Flow、事实、结果
 ├── Domain/                       纯领域：PromptAuthority/Review/Recovery/Projection/Enforcer
 ├── Journal/                      持久化：Envelope/Writer/Fold/各 Projection
@@ -124,7 +124,7 @@ src/Wanxiangshu.Next/
 ├── Host/                         HostDigest
 ├── Tools/                        文件/静态工具与 prompt 资产
 ├── prompts/                      Agent system prompts
-└── Wanxiangshu.Next.fsproj
+└── Wanxiangshu.fsproj
 ```
 
 布局纪律由 `scripts/repository-layout-gate.mjs`（gate:static 第一段）机器验证：

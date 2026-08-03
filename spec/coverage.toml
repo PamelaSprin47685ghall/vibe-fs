@@ -3,8 +3,8 @@
 
 [ARCH-001]
 tests = [
-  "tests-mjs/guide-contract.test.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/guide-contract.test.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [ARCH-002]
@@ -12,17 +12,17 @@ tests = []
 
 [ARCH-003]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
 ]
 
 [ARCH-004]
 tests = [
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib.mjs",
-  "testkit/opencode/tests/gate-mutation-cases.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib.mjs",
+  "tests/e2e/tests/gate-mutation-cases.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [ARCH-005]
@@ -36,23 +36,23 @@ tests = []
 
 [ARCH-008]
 tests = [
-  "tests-mjs/domain.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ARCH-009]
 tests = [
-  "tests-mjs/Kernel/parallel.test.mjs",
+  "tests/unit/Kernel/parallel.test.mjs",
 ]
 
 [ARCH-010]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/blogger-toml.test.mjs",
-  "tests-mjs/Context/synthetic-toml.test.mjs",
-  "tests-mjs/Execution/fork-child-payload.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-arch010-cases.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/blogger-toml.test.mjs",
+  "tests/unit/Context/synthetic-toml.test.mjs",
+  "tests/unit/Execution/fork-child-payload.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-arch010-cases.mjs",
 ]
 
 [ARCH-010-LWR]
@@ -60,22 +60,22 @@ tests = []
 
 [ARCH-010-TOOL-BOUND]
 tests = [
-  "tests-mjs/Context/tool-result-bound.test.mjs",
+  "tests/unit/Context/tool-result-bound.test.mjs",
 ]
 
 [AGENT-001]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 
 [AGENT-002]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [AGENT-003]
@@ -83,132 +83,132 @@ tests = []
 
 [AGENT-004]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 
 [AGENT-005]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-006]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-007]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 
 [AGENT-008]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-009]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-010]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 
 [AGENT-011]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-012]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-013]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-014]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [AGENT-015]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [PROMPT-001]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PROMPT-002]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PROMPT-003]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
 ]
 
 [PROMPT-004]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 
 [PROMPT-005]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PROMPT-006]
 tests = [
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PROMPT-007]
 tests = [
-  "tests-mjs/Prompt/fire-and-forget.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
+  "tests/unit/Prompt/fire-and-forget.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
 ]
 
 [PROMPT-008]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-mutation-cases.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-mutation-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [PROMPT-009]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 
 [PROMPT-010]
@@ -216,87 +216,87 @@ tests = []
 
 [PROMPT-011]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [FALLBACK-001]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.meta.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.meta.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [FALLBACK-002]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [FALLBACK-003]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 
 [FALLBACK-004]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 
 [FALLBACK-005]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [FALLBACK-006]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 
 [FALLBACK-007]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.meta.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.meta.test.mjs",
 ]
 
 [FALLBACK-008]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 
 [FALLBACK-009]
 tests = [
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
 ]
 
 [FALLBACK-010]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 
 [FALLBACK-011]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 
 [FALLBACK-012]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 
 [REVIEW-001]
@@ -304,58 +304,58 @@ tests = []
 
 [REVIEW-002]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
 ]
 
 [REVIEW-003]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-forest-cases.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-forest-cases.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [REVIEW-010]
 tests = [
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [REVIEW-004]
 tests = [
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 
 [REVIEW-005]
 tests = [
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 
 [REVIEW-006]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [REVIEW-007]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 
 [REVIEW-008]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 
 [REVIEW-009]
@@ -369,41 +369,41 @@ tests = []
 
 [ORCH-003]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 
 [ORCH-004]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 
 [ORCH-005]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/guide-contract.test.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/guide-contract.test.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
 ]
 
 [ORCH-006]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 
 [ORCH-007]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Orchestrator/runtime.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/runtime.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ORCH-008]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 
 [HOST-001]
 tests = [
-  "tests-mjs/Verify/host001-fragment-events.test.mjs",
+  "tests/unit/Verify/host001-fragment-events.test.mjs",
 ]
 
 [HOST-002]
@@ -414,238 +414,238 @@ tests = []
 
 [HOST-004]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 
 [HOST-005]
 tests = [
-  "tests-mjs/Context/x-trace-fold.test.mjs",
-  "tests-mjs/Context/x-trace.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/x-trace-fold.test.mjs",
+  "tests/unit/Context/x-trace.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [HOST-006]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/host-compaction-policy.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/host-compaction-policy.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [HOST-007]
 tests = [
-  "tests-mjs/Context/terminal-validity.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
 ]
 
 [HOST-008]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
 ]
 
 [HOST-009]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 
 [HOST-010]
 tests = [
-  "tests-mjs/Review/seal-bind.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Review/seal-bind.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [HOST-011]
 tests = [
-  "tests-mjs/Plugin/tool-host-codec.test.mjs",
+  "tests/unit/Plugin/tool-host-codec.test.mjs",
 ]
 
 [HOST-012]
 tests = [
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [COMPANION-001]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
 ]
 
 [COMPANION-002]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [COMPANION-003]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/blogger-toml.test.mjs",
-  "tests-mjs/Context/lifecycle-work-record.test.mjs",
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/Context/x-trace-capture-hardening.test.mjs",
-  "tests-mjs/Context/x-trace-capture.test.mjs",
-  "tests-mjs/Context/x-trace-fold.test.mjs",
-  "tests-mjs/Context/x-trace.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/blogger-toml.test.mjs",
+  "tests/unit/Context/lifecycle-work-record.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/Context/x-trace-capture-hardening.test.mjs",
+  "tests/unit/Context/x-trace-capture.test.mjs",
+  "tests/unit/Context/x-trace-fold.test.mjs",
+  "tests/unit/Context/x-trace.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [COMPANION-004]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [COMPANION-005]
 tests = [
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [COMPANION-006]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
 ]
 
 [COMPANION-007]
 tests = [
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/x-trace-capture-hardening.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/x-trace-capture-hardening.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [COMPANION-008]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
 ]
 
 [COMPANION-009]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/host-compaction-policy.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/host-compaction-policy.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
 ]
 
 [COMPANION-010]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
 ]
 
 [COMPANION-011]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
 ]
 
 [COMPANION-012]
 tests = [
-  "tests-mjs/Context/x-trace-capture.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
+  "tests/unit/Context/x-trace-capture.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
 ]
 
 [COMPANION-013]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [EXEC-001]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
 ]
 
 [EXEC-002]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 
 [EXEC-003]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [EXEC-004]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 
 [EXEC-005]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [EXEC-006]
 tests = [
-  "tests-mjs/Context/lifecycle-work-record.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/lifecycle-work-record.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [EXEC-007]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
 ]
 
 [EXEC-008]
 tests = [
-  "tests-mjs/Context/lifecycle-work-record.test.mjs",
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/lifecycle-work-record.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [EXEC-009]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [EXEC-010]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [EXEC-011]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [EXEC-012]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
 ]
 
 [EXEC-013]
@@ -659,209 +659,209 @@ tests = []
 
 [VERIFY-001]
 tests = [
-  "testkit/opencode/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
 ]
 
 [VERIFY-002]
 tests = [
-  "tests-mjs/Kernel/parallel.test.mjs",
-  "testkit/opencode/tests/degradation-list.mjs",
+  "tests/unit/Kernel/parallel.test.mjs",
+  "tests/e2e/tests/degradation-list.mjs",
 ]
 
 [VERIFY-003]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
-  "testkit/opencode/tests/gate-forest-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib-cases.mjs",
-  "testkit/opencode/tests/gate-mutation-cases.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
+  "tests/e2e/tests/gate-forest-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib-cases.mjs",
+  "tests/e2e/tests/gate-mutation-cases.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [VERIFY-004]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Verify/degradation-list.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/fixtures/overrun-then-pass.fixture.mjs",
-  "tests-mjs/runner.mjs",
-  "tests-mjs/verdict-feed.mjs",
-  "tests-mjs/verdict-feed.test.mjs",
-  "testkit/opencode/tests/degradation-list.mjs",
-  "testkit/opencode/tests/gate-budget-cases.mjs",
-  "testkit/opencode/tests/gate-degradation-cases.mjs",
-  "testkit/opencode/tests/gate-forest-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib-cases.mjs",
-  "testkit/opencode/tests/gate-path-criterion-cases.mjs",
-  "testkit/opencode/tests/gate-readiness-cases.mjs",
-  "testkit/opencode/tests/gate-single-source-cases.mjs",
-  "testkit/opencode/tests/gate-timeout-cases.mjs",
-  "testkit/opencode/tests/gate-unit-runner-cases.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Verify/degradation-list.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/fixtures/overrun-then-pass.fixture.mjs",
+  "tests/unit/runner.mjs",
+  "tests/unit/verdict-feed.mjs",
+  "tests/unit/verdict-feed.test.mjs",
+  "tests/e2e/tests/degradation-list.mjs",
+  "tests/e2e/tests/gate-budget-cases.mjs",
+  "tests/e2e/tests/gate-degradation-cases.mjs",
+  "tests/e2e/tests/gate-forest-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib-cases.mjs",
+  "tests/e2e/tests/gate-path-criterion-cases.mjs",
+  "tests/e2e/tests/gate-readiness-cases.mjs",
+  "tests/e2e/tests/gate-single-source-cases.mjs",
+  "tests/e2e/tests/gate-timeout-cases.mjs",
+  "tests/e2e/tests/gate-unit-runner-cases.mjs",
 ]
 
 [VERIFY-005]
 tests = [
-  "tests-mjs/Verify/degradation-list.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Verify/degradation-list.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 
 [VERIFY-006]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/Verify/degradation-list.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/Verify/degradation-list.test.mjs",
 ]
 
 [VERIFY-007]
 tests = [
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
 ]
 
 [VERIFY-008]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.meta.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.meta.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 
 [PERSIST-001]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PERSIST-002]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 
 [PERSIST-003]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
 ]
 
 [PERSIST-004]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PERSIST-005]
 tests = [
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.meta.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.meta.test.mjs",
 ]
 
 [PERSIST-006]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PERSIST-007]
 tests = [
-  "tests-mjs/domain.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [PERSIST-008]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 
 [PERSIST-009]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
 ]
 
 [PERSIST-010]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/x-trace-capture-hardening.test.mjs",
-  "tests-mjs/Context/x-trace-fold.test.mjs",
-  "tests-mjs/Context/x-trace.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/x-trace-capture-hardening.test.mjs",
+  "tests/unit/Context/x-trace-fold.test.mjs",
+  "tests/unit/Context/x-trace.test.mjs",
 ]
 
 [CTX-001]
 tests = [
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/guide-contract.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/guide-contract.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 
 [CTX-002]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 
 [CTX-003]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [CTX-004]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [CTX-005]
 tests = [
-  "tests-mjs/Context/host-compaction-policy.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
+  "tests/unit/Context/host-compaction-policy.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
 ]
 
 [CTX-006]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
 ]
 
 [CTX-007]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [CTX-008]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
 ]
 
 [CTX-009]
@@ -869,55 +869,55 @@ tests = []
 
 [CTX-010]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
 ]
 
 [CTX-011]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [CTX-012]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [CTX-013]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/blogger-toml.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/blogger-toml.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [CTX-014]
 tests = [
-  "tests-mjs/Context/ctx014.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/ctx014.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ENFORCER-001]
@@ -934,8 +934,8 @@ tests = []
 
 [ENFORCER-010]
 tests = [
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 
 [ENFORCER-011]
@@ -943,7 +943,7 @@ tests = []
 
 [ENFORCER-020]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
 ]
 
 [ENFORCER-021]
@@ -951,25 +951,25 @@ tests = []
 
 [ENFORCER-022]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ENFORCER-023]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ENFORCER-024]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ENFORCER-025]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
 ]
 
 [ENFORCER-026]
@@ -977,8 +977,8 @@ tests = []
 
 [ENFORCER-030]
 tests = [
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 
 [ENFORCER-040]
@@ -986,18 +986,18 @@ tests = []
 
 [ENFORCER-041]
 tests = [
-  "tests-mjs/Enforcer/cycle-nudge.test.mjs",
+  "tests/unit/Enforcer/cycle-nudge.test.mjs",
 ]
 
 [ENFORCER-042]
 tests = [
-  "tests-mjs/Enforcer/cycle-nudge.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/cycle-nudge.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ENFORCER-043]
 tests = [
-  "tests-mjs/Enforcer/cycle-nudge.test.mjs",
+  "tests/unit/Enforcer/cycle-nudge.test.mjs",
 ]
 
 [ENFORCER-044]
@@ -1005,7 +1005,7 @@ tests = []
 
 [ENFORCER-045]
 tests = [
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
 ]
 
 [ENFORCER-046]
@@ -1013,13 +1013,13 @@ tests = []
 
 [ENFORCER-047]
 tests = [
-  "tests-mjs/Enforcer/blogger-runtime.test.mjs",
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/blogger-runtime.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 
 [ENFORCER-050]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 
 [ENFORCER-051]
@@ -1066,18 +1066,18 @@ tests = []
 
 [ENFORCER-160]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 
 [ENFORCER-161]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 
 [ENFORCER-162]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 
 [ENFORCER-163]
@@ -1085,58 +1085,58 @@ tests = []
 
 [LOOP-001]
 tests = [
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 
 [LOOP-002]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 
 [LOOP-003]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 
 [LOOP-004]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 
 [LOOP-005]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 
 [LOOP-006]
 tests = [
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 
 [LOOP-007]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 
 [LOOP-008]
 tests = [
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 
 [LOOP-009]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 
 [LOOP-010]
 tests = [
-  "tests-mjs/Context/ctx014.test.mjs",
+  "tests/unit/Context/ctx014.test.mjs",
 ]
 
 [LOOP-011]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]

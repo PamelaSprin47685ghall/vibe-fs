@@ -12,11 +12,11 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/guide-contract.test.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/guide-contract.test.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -30,7 +30,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = []
 canaries = []
@@ -45,10 +45,10 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -62,15 +62,15 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib.mjs",
-  "testkit/opencode/tests/gate-mutation-cases.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib.mjs",
+  "tests/e2e/tests/gate-mutation-cases.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -84,7 +84,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = []
 canaries = []
@@ -99,7 +99,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = []
 canaries = []
@@ -114,7 +114,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = []
 canaries = []
@@ -129,10 +129,10 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/domain.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -146,10 +146,10 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Kernel/parallel.test.mjs",
+  "tests/unit/Kernel/parallel.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -163,16 +163,16 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/blogger-toml.test.mjs",
-  "tests-mjs/Context/synthetic-toml.test.mjs",
-  "tests-mjs/Execution/fork-child-payload.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-arch010-cases.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/blogger-toml.test.mjs",
+  "tests/unit/Context/synthetic-toml.test.mjs",
+  "tests/unit/Execution/fork-child-payload.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-arch010-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -186,7 +186,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = []
 canaries = []
@@ -201,11 +201,11 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Domain/ToolResultBound.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
+  "src/Wanxiangshu/Domain/ToolResultBound.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
 ]
 tests = [
-  "tests-mjs/Context/tool-result-bound.test.mjs",
+  "tests/unit/Context/tool-result-bound.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -219,13 +219,13 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -239,12 +239,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -258,7 +258,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = []
 canaries = []
@@ -273,12 +273,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -292,10 +292,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -309,10 +309,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -326,14 +326,14 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ToolRegistry.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs",
-  "src/Wanxiangshu.Next/Domain/PromptAuthority.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs",
+  "src/Wanxiangshu/Domain/PromptAuthority.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 canaries = []
 evidence = ""
@@ -347,10 +347,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -364,10 +364,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -381,12 +381,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -400,10 +400,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -417,10 +417,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -434,10 +434,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -451,10 +451,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -468,10 +468,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -485,12 +485,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -504,15 +504,15 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -526,11 +526,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -544,13 +544,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Domain/PromptAuthority.fs",
-  "src/Wanxiangshu.Next/Application/Prompting/PromptIngress.fs",
-  "src/Wanxiangshu.Next/Domain/PromptAuthorityRun.fs",
+  "src/Wanxiangshu/Domain/PromptAuthority.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptIngress.fs",
+  "src/Wanxiangshu/Domain/PromptAuthorityRun.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -564,12 +564,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -583,11 +583,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcherSend.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcherSend.fs",
 ]
 tests = [
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -601,14 +601,14 @@ status = "conformant"
 required_layer = 2
 verified_commit = "6373c4b0"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcherSend.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSessionNudge.fs",
-  "src/Wanxiangshu.Next/Session/HostForkBusyNudge.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcherSend.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSessionNudge.fs",
+  "src/Wanxiangshu/Session/HostForkBusyNudge.fs",
 ]
 tests = [
-  "tests-mjs/Prompt/fire-and-forget.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
+  "tests/unit/Prompt/fire-and-forget.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -622,16 +622,16 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-mutation-cases.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-mutation-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -645,11 +645,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Domain/PromptAuthorityRun.fs",
-  "src/Wanxiangshu.Next/Application/Prompting/PromptIngress.fs",
+  "src/Wanxiangshu/Domain/PromptAuthorityRun.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptIngress.fs",
 ]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -663,7 +663,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = []
 canaries = []
@@ -678,12 +678,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs",
 ]
 tests = [
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -697,12 +697,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.meta.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.meta.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -716,15 +716,15 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/fallback-aabb-trace-canary.mjs",
+  "tests/e2e/tests/fallback-aabb-trace-canary.mjs",
 ]
 evidence = ""
 
@@ -737,13 +737,13 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/fallback-canary.mjs",
+  "tests/e2e/tests/fallback-canary.mjs",
 ]
 evidence = ""
 
@@ -756,14 +756,14 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Prompt/send-format.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Prompt/send-format.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -777,11 +777,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -795,10 +795,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -812,11 +812,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.meta.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.meta.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -830,13 +830,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -850,11 +850,11 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -868,10 +868,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -885,11 +885,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -903,13 +903,13 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/FallbackController.fs",
+  "src/Wanxiangshu/Session/FallbackController.fs",
 ]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -923,7 +923,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = []
 canaries = []
@@ -938,13 +938,13 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -958,20 +958,20 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Prompt/authority.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-forest-cases.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Prompt/authority.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-forest-cases.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
+  "tests/e2e/tests/reviewer-verdict-canary.mjs",
 ]
 evidence = ""
 
@@ -984,15 +984,15 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
+  "tests/e2e/tests/reviewer-verdict-canary.mjs",
 ]
 evidence = ""
 
@@ -1005,10 +1005,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1022,10 +1022,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1039,12 +1039,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1058,11 +1058,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1076,11 +1076,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1094,7 +1094,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/ReviewController.fs",
+  "src/Wanxiangshu/Session/ReviewController.fs",
 ]
 tests = []
 canaries = []
@@ -1109,7 +1109,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = []
 canaries = []
@@ -1124,7 +1124,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = []
 canaries = []
@@ -1139,10 +1139,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1156,10 +1156,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1173,12 +1173,12 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/guide-contract.test.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/guide-contract.test.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1192,10 +1192,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1209,12 +1209,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Orchestrator/runtime.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/runtime.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1228,10 +1228,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs",
+  "src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1245,10 +1245,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = [
-  "tests-mjs/Verify/host001-fragment-events.test.mjs",
+  "tests/unit/Verify/host001-fragment-events.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1262,7 +1262,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = []
 canaries = []
@@ -1277,7 +1277,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = []
 canaries = []
@@ -1292,10 +1292,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1309,14 +1309,14 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LifecycleWorkRecord.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/XTraceCapture.fs",
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Domain/LifecycleWorkRecord.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XTraceCapture.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Context/x-trace-fold.test.mjs",
-  "tests-mjs/Context/x-trace.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/x-trace-fold.test.mjs",
+  "tests/unit/Context/x-trace.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1330,16 +1330,16 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/host-compaction-policy.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/host-compaction-policy.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1353,10 +1353,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = [
-  "tests-mjs/Context/terminal-validity.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1370,13 +1370,13 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1390,13 +1390,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginHostInterop.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/Plugin.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginHostInterop.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Plugin/Plugin.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1410,17 +1410,17 @@ status = "conformant"
 required_layer = 4
 verified_commit = "f66bbdc7"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/ReviewSeal.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/SessionSnapshotPort.fs",
+  "src/Wanxiangshu/Application/Reconciliation/ReviewSeal.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/SessionSnapshotPort.fs",
 ]
 tests = [
-  "tests-mjs/Review/seal-bind.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Review/seal-bind.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/reviewer-verdict-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = ""
 
@@ -1433,13 +1433,13 @@ status = "conformant"
 required_layer = 4
 verified_commit = "f66bbdc7"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/tool-host-codec.test.mjs",
+  "tests/unit/Plugin/tool-host-codec.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -1452,11 +1452,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
 ]
 tests = [
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1470,10 +1470,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1487,12 +1487,12 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1506,21 +1506,21 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/blogger-toml.test.mjs",
-  "tests-mjs/Context/lifecycle-work-record.test.mjs",
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/Context/x-trace-capture-hardening.test.mjs",
-  "tests-mjs/Context/x-trace-capture.test.mjs",
-  "tests-mjs/Context/x-trace-fold.test.mjs",
-  "tests-mjs/Context/x-trace.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/blogger-toml.test.mjs",
+  "tests/unit/Context/lifecycle-work-record.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/Context/x-trace-capture-hardening.test.mjs",
+  "tests/unit/Context/x-trace-capture.test.mjs",
+  "tests/unit/Context/x-trace-fold.test.mjs",
+  "tests/unit/Context/x-trace.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
+  "tests/e2e/tests/reviewer-verdict-canary.mjs",
 ]
 evidence = ""
 
@@ -1533,12 +1533,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1552,18 +1552,18 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -1576,10 +1576,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1593,12 +1593,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/x-trace-capture-hardening.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/x-trace-capture-hardening.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1612,16 +1612,16 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -1634,16 +1634,16 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/host-compaction-policy.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/host-compaction-policy.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1657,11 +1657,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1675,11 +1675,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1693,12 +1693,12 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/x-trace-capture.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
+  "tests/unit/Context/x-trace-capture.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1712,15 +1712,15 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Domain/CompanionIdentity.fs",
-  "src/Wanxiangshu.Next/Session/CompanionHost.fs",
+  "src/Wanxiangshu/Domain/CompanionIdentity.fs",
+  "src/Wanxiangshu/Session/CompanionHost.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1734,10 +1734,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1751,11 +1751,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1769,10 +1769,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1786,15 +1786,15 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
+  "tests/e2e/tests/reviewer-verdict-canary.mjs",
 ]
 evidence = ""
 
@@ -1807,12 +1807,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1826,13 +1826,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Context/lifecycle-work-record.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/lifecycle-work-record.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1846,10 +1846,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1863,12 +1863,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Context/lifecycle-work-record.test.mjs",
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/lifecycle-work-record.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1882,20 +1882,20 @@ status = "conformant"
 required_layer = 2
 verified_commit = "cb3457db"
 owner = [
-  "src/Wanxiangshu.Next/Journal/LinkageProjection.fs",
-  "src/Wanxiangshu.Next/Session/HandleController.fs",
-  "src/Wanxiangshu.Next/Session/HandleCompletionCodec.fs",
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
-  "src/Wanxiangshu.Next/Session/HostForkRunLifecycle.fs",
-  "src/Wanxiangshu.Next/Session/HostForkRestart.fs",
+  "src/Wanxiangshu/Journal/LinkageProjection.fs",
+  "src/Wanxiangshu/Session/HandleController.fs",
+  "src/Wanxiangshu/Session/HandleCompletionCodec.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRunLifecycle.fs",
+  "src/Wanxiangshu/Session/HostForkRestart.fs",
 ]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-restart-canary.mjs",
+  "tests/e2e/tests/host-restart-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/EXEC-009-DURABLE-JOIN.txt"
 
@@ -1908,11 +1908,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1926,12 +1926,12 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Execution/handle.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1945,10 +1945,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = [
-  "tests-mjs/Execution/handle.test.mjs",
+  "tests/unit/Execution/handle.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -1962,7 +1962,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = []
 canaries = []
@@ -1977,7 +1977,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = []
 canaries = []
@@ -1992,7 +1992,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/HostForkRuntime.fs",
+  "src/Wanxiangshu/Session/HostForkRuntime.fs",
 ]
 tests = []
 canaries = []
@@ -2007,10 +2007,10 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "testkit/opencode/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2024,14 +2024,14 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Kernel/parallel.test.mjs",
-  "testkit/opencode/tests/degradation-list.mjs",
+  "tests/unit/Kernel/parallel.test.mjs",
+  "tests/e2e/tests/degradation-list.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/fallback-aabb-trace-canary.mjs",
+  "tests/e2e/tests/fallback-aabb-trace-canary.mjs",
 ]
 evidence = ""
 
@@ -2044,19 +2044,19 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
-  "testkit/opencode/tests/gate-forest-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib-cases.mjs",
-  "testkit/opencode/tests/gate-mutation-cases.mjs",
-  "testkit/opencode/tests/gate-runtime-key-cases.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
-  "testkit/opencode/tests/gate-schema-cases.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
+  "tests/e2e/tests/gate-forest-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib-cases.mjs",
+  "tests/e2e/tests/gate-mutation-cases.mjs",
+  "tests/e2e/tests/gate-runtime-key-cases.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
+  "tests/e2e/tests/gate-schema-cases.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2070,26 +2070,26 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Verify/degradation-list.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/fixtures/overrun-then-pass.fixture.mjs",
-  "tests-mjs/runner.mjs",
-  "tests-mjs/verdict-feed.mjs",
-  "tests-mjs/verdict-feed.test.mjs",
-  "testkit/opencode/tests/degradation-list.mjs",
-  "testkit/opencode/tests/gate-budget-cases.mjs",
-  "testkit/opencode/tests/gate-degradation-cases.mjs",
-  "testkit/opencode/tests/gate-forest-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib-cases.mjs",
-  "testkit/opencode/tests/gate-path-criterion-cases.mjs",
-  "testkit/opencode/tests/gate-readiness-cases.mjs",
-  "testkit/opencode/tests/gate-single-source-cases.mjs",
-  "testkit/opencode/tests/gate-timeout-cases.mjs",
-  "testkit/opencode/tests/gate-unit-runner-cases.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Verify/degradation-list.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/fixtures/overrun-then-pass.fixture.mjs",
+  "tests/unit/runner.mjs",
+  "tests/unit/verdict-feed.mjs",
+  "tests/unit/verdict-feed.test.mjs",
+  "tests/e2e/tests/degradation-list.mjs",
+  "tests/e2e/tests/gate-budget-cases.mjs",
+  "tests/e2e/tests/gate-degradation-cases.mjs",
+  "tests/e2e/tests/gate-forest-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib-cases.mjs",
+  "tests/e2e/tests/gate-path-criterion-cases.mjs",
+  "tests/e2e/tests/gate-readiness-cases.mjs",
+  "tests/e2e/tests/gate-single-source-cases.mjs",
+  "tests/e2e/tests/gate-timeout-cases.mjs",
+  "tests/e2e/tests/gate-unit-runner-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2103,12 +2103,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Verify/degradation-list.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Verify/degradation-list.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2122,12 +2122,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/Verify/degradation-list.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/Verify/degradation-list.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2141,12 +2141,12 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Verify/host012-tool-part.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-projection-cases.mjs",
+  "tests/unit/Verify/host012-tool-part.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-projection-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2160,14 +2160,14 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Flow.fs",
+  "src/Wanxiangshu/Kernel/Flow.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.meta.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.meta.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2181,12 +2181,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2200,13 +2200,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2220,10 +2220,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2237,13 +2237,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2257,13 +2257,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/domain.meta.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/domain.meta.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2277,13 +2277,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Journal/boot.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "tests-mjs/Plugin/plugin-fixture.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Journal/boot.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Plugin/plugin-fixture.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2297,10 +2297,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/domain.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2314,15 +2314,15 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Context/session-association.test.mjs",
-  "tests-mjs/Fallback/cursor.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
-  "tests-mjs/Review/witness.test.mjs",
-  "tests-mjs/domain.mjs",
-  "tests-mjs/guide-contract.test.mjs",
+  "tests/unit/Context/session-association.test.mjs",
+  "tests/unit/Fallback/cursor.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
+  "tests/unit/Review/witness.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/unit/guide-contract.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2336,18 +2336,18 @@ status = "conformant"
 required_layer = 2
 verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Kernel/Fact.fs",
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
-  "src/Wanxiangshu.Next/Journal/OrchestratorProjection.fs",
-  "src/Wanxiangshu.Next/Application/Orchestration/Orchestrator.fs",
-  "src/Wanxiangshu.Next/Infrastructure/Git/Orchestrator.WorktreeResource.fs",
+  "src/Wanxiangshu/Kernel/Fact.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/OrchestratorProjection.fs",
+  "src/Wanxiangshu/Application/Orchestration/Orchestrator.fs",
+  "src/Wanxiangshu/Infrastructure/Git/Orchestrator.WorktreeResource.fs",
 ]
 tests = [
-  "tests-mjs/Orchestrator/job.test.mjs",
-  "tests-mjs/Journal/envelope.test.mjs",
+  "tests/unit/Orchestrator/job.test.mjs",
+  "tests/unit/Journal/envelope.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/orchestrator-restart-publish-canary.mjs",
+  "tests/e2e/tests/orchestrator-restart-publish-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/PERSIST-009-EFFECTS.txt"
 
@@ -2360,15 +2360,15 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Journal/Fold.fs",
+  "src/Wanxiangshu/Journal/Fold.fs",
 ]
 tests = [
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/x-trace-capture-hardening.test.mjs",
-  "tests-mjs/Context/x-trace-fold.test.mjs",
-  "tests-mjs/Context/x-trace.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/x-trace-capture-hardening.test.mjs",
+  "tests/unit/Context/x-trace-fold.test.mjs",
+  "tests/unit/Context/x-trace.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2382,15 +2382,15 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/guide-contract.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/guide-contract.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/CONTEXT-RECOVERY.txt"
 
@@ -2403,15 +2403,15 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Plugin/host-hooks.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
+  "tests/unit/Plugin/host-hooks.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/CONTEXT-RECOVERY.txt"
 
@@ -2424,11 +2424,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2442,12 +2442,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2461,13 +2461,13 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/host-compaction-policy.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
+  "tests/unit/Context/host-compaction-policy.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2481,16 +2481,16 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-delivery-cases.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-delivery-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/CONTEXT-RECOVERY.txt"
 
@@ -2503,16 +2503,16 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/CONTEXT-RECOVERY.txt"
 
@@ -2525,10 +2525,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2542,7 +2542,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = []
 canaries = []
@@ -2557,17 +2557,17 @@ status = "conformant"
 required_layer = 3
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-cold-boundary-cases.mjs",
-  "testkit/opencode/tests/gate-forest-lib.mjs",
-  "testkit/opencode/tests/gate-scenario-runtime-cases.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-cold-boundary-cases.mjs",
+  "tests/e2e/tests/gate-forest-lib.mjs",
+  "tests/e2e/tests/gate-scenario-runtime-cases.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2581,21 +2581,21 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/CONTEXT-RECOVERY.txt"
 
@@ -2608,23 +2608,23 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/attempt-plan.test.mjs",
-  "tests-mjs/Context/blog-projection.test.mjs",
-  "tests-mjs/Context/companion-projection.test.mjs",
-  "tests-mjs/Context/fold-context-recovery.test.mjs",
-  "tests-mjs/Context/prefix-epoch.test.mjs",
-  "tests-mjs/Context/probe-selection.test.mjs",
-  "tests-mjs/Context/recovery-slot.test.mjs",
-  "tests-mjs/Context/terminal-validity.test.mjs",
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/attempt-plan.test.mjs",
+  "tests/unit/Context/blog-projection.test.mjs",
+  "tests/unit/Context/companion-projection.test.mjs",
+  "tests/unit/Context/fold-context-recovery.test.mjs",
+  "tests/unit/Context/prefix-epoch.test.mjs",
+  "tests/unit/Context/probe-selection.test.mjs",
+  "tests/unit/Context/recovery-slot.test.mjs",
+  "tests/unit/Context/terminal-validity.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/x-recovery-canary.mjs",
+  "tests/e2e/tests/x-recovery-canary.mjs",
 ]
 evidence = "docs/evidence/0.5.2/CONTEXT-RECOVERY.txt"
 
@@ -2637,12 +2637,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/blogger-delta.test.mjs",
-  "tests-mjs/Context/blogger-toml.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/blogger-delta.test.mjs",
+  "tests/unit/Context/blogger-toml.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2656,11 +2656,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs",
+  "src/Wanxiangshu/Application/Reconciliation/XWire.fs",
 ]
 tests = [
-  "tests-mjs/Context/ctx014.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Context/ctx014.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2674,7 +2674,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2689,7 +2689,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2704,7 +2704,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2719,7 +2719,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2734,14 +2734,14 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/blogger-convergence-gaps.test.mjs",
-  "tests-mjs/Plugin/manager-tool-contract.test.mjs",
+  "tests/unit/Enforcer/blogger-convergence-gaps.test.mjs",
+  "tests/unit/Plugin/manager-tool-contract.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -2754,7 +2754,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2769,10 +2769,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2786,7 +2786,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2801,11 +2801,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2819,11 +2819,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2837,14 +2837,14 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -2857,10 +2857,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/codec.test.mjs",
+  "tests/unit/Enforcer/codec.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2874,7 +2874,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2889,14 +2889,14 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/domain.mjs",
-  "testkit/opencode/tests/gate-source-cases.mjs",
+  "tests/unit/domain.mjs",
+  "tests/e2e/tests/gate-source-cases.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -2909,7 +2909,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2924,13 +2924,13 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/cycle-nudge.test.mjs",
+  "tests/unit/Enforcer/cycle-nudge.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -2943,11 +2943,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/cycle-nudge.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/cycle-nudge.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2961,10 +2961,10 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/cycle-nudge.test.mjs",
+  "tests/unit/Enforcer/cycle-nudge.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -2978,7 +2978,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -2993,13 +2993,13 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Journal/blog-entry-committed.test.mjs",
+  "tests/unit/Journal/blog-entry-committed.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -3012,7 +3012,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3027,11 +3027,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/blogger-runtime.test.mjs",
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/blogger-runtime.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3045,14 +3045,14 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/companion-canary.mjs",
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/companion-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -3065,11 +3065,11 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -3082,7 +3082,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3097,7 +3097,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3112,7 +3112,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3127,7 +3127,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3142,7 +3142,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3157,7 +3157,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3172,7 +3172,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3187,7 +3187,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3202,7 +3202,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3217,7 +3217,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3232,7 +3232,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3247,11 +3247,11 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -3264,7 +3264,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3279,11 +3279,11 @@ status = "conformant"
 required_layer = 2
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
-  "tests-mjs/domain.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
+  "tests/unit/domain.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3297,13 +3297,13 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -3316,13 +3316,13 @@ status = "conformant"
 required_layer = 4
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = [
-  "tests-mjs/Enforcer/parked-transform.test.mjs",
+  "tests/unit/Enforcer/parked-transform.test.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "tests/e2e/tests/host-transform-capability-canary.mjs",
 ]
 evidence = ""
 
@@ -3335,7 +3335,7 @@ status = "conformant"
 required_layer = 0
 verified_commit = "151fee58"
 owner = [
-  "src/Wanxiangshu.Next/Session/BloggerCoordinator.fs",
+  "src/Wanxiangshu/Session/BloggerCoordinator.fs",
 ]
 tests = []
 canaries = []
@@ -3350,12 +3350,12 @@ status = "conformant"
 required_layer = 0
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3369,13 +3369,13 @@ status = "conformant"
 required_layer = 0
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3389,12 +3389,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3408,12 +3408,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3427,12 +3427,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3446,12 +3446,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3465,13 +3465,13 @@ status = "conformant"
 required_layer = 0
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3485,12 +3485,12 @@ status = "conformant"
 required_layer = 0
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3504,12 +3504,12 @@ status = "conformant"
 required_layer = 2
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3523,12 +3523,12 @@ status = "conformant"
 required_layer = 0
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Context/ctx014.test.mjs",
+  "tests/unit/Context/ctx014.test.mjs",
 ]
 canaries = []
 evidence = ""
@@ -3542,13 +3542,13 @@ status = "conformant"
 required_layer = 2
 verified_commit = "d6ef20a6"
 owner = [
-  "src/Wanxiangshu.Next/Domain/LoopDetector.fs",
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/LoopSensor.fs",
-  "src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs",
+  "src/Wanxiangshu/Domain/LoopDetector.fs",
+  "src/Wanxiangshu/Infrastructure/OpenCode/Host/LoopSensor.fs",
+  "src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs",
 ]
 tests = [
-  "tests-mjs/Domain/loop-detector.test.mjs",
-  "tests-mjs/Domain/loop-sensor.test.mjs",
+  "tests/unit/Domain/loop-detector.test.mjs",
+  "tests/unit/Domain/loop-sensor.test.mjs",
 ]
 canaries = []
 evidence = ""

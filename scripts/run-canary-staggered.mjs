@@ -8,15 +8,15 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { terminateTree } from "../testkit/process-lifecycle.js";
-import { recordSpawn, recordExit, RUN_ID } from "../testkit/spawn-ledger.js";
+import { terminateTree } from "../tests/support/process-lifecycle.js";
+import { recordSpawn, recordExit, RUN_ID } from "../tests/support/spawn-ledger.js";
 import {
   CANARY_READY_MS,
   CANARY_TIMEOUT_MS,
   READINESS_STAGE_MS,
-} from "../testkit/opencode/time-budget.js";
-import { ReadinessLadder, READINESS_STAGES } from "../testkit/opencode/readiness.js";
-import { CANARY_TESTS, CANARY_SUFFIX, CANARY_MAX_PARALLEL } from "../testkit/opencode/canary-manifest.js";
+} from "../tests/e2e/time-budget.js";
+import { ReadinessLadder, READINESS_STAGES } from "../tests/e2e/readiness.js";
+import { CANARY_TESTS, CANARY_SUFFIX, CANARY_MAX_PARALLEL } from "../tests/e2e/canary-manifest.js";
 
 function parsePositiveInt(value, fallback, name) {
   if (value === undefined || value === null || value === '') return fallback;

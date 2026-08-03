@@ -19,7 +19,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { walk } from './repo-scan.mjs'
 
-const SCENARIO_ROOT = 'testkit/opencode/scripts'
+const SCENARIO_ROOT = 'tests/e2e/scripts'
 const INDENT = '  '
 
 /** `[[turn.step]]` nests one level deeper than `[[turn]]`. */

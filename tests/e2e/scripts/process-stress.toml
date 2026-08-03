@@ -1,0 +1,520 @@
+# EXEC-011: the process deadline is min(3 × estimate, administrator ceiling), and a
+# timeout SIGKILLs the whole tree then WAITS for the real onExit (EXEC-015).
+#
+# The estimate below is 0.2s, so the effective deadline is 0.6s while the command
+# traps TERM and sleeps 1000s — the only way it can finish is SIGKILL.
+
+scenario = "process-stress"
+description = "EXEC-011 timeout kills the process tree; completion waits for real onExit"
+pass = "Process stress canary passed."
+
+setup = { strict = true }
+session = { agent = "fast-inspector", bind = ["inspector-title", "fast-inspector"] }
+prompt = { agent = "fast-inspector", text = "Run the command and report if it timed out." }
+
+must = ["inspector.1"]
+
+flow = [
+  { wait = "title" },
+  { wait = "inspector.0" },
+  { wait = "inspector.1" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+# One turn, two provider steps. The JSON form wrote these as two edges at
+# `lane.turn = 1` and `lane.turn = 2` — an ordinal the author maintained by hand. They
+# are one user message: step 0 calls the tool, the Host appends the result, step 1
+# answers. `step` is the count of assistant messages after the last user message, so
+# the numbering is now a property of the request.
+
+[[turn]]
+id = "inspector"
+lane = "fast-inspector"
+user = "Run the command and report if it timed out."
+tools = ["executor"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "sh -lc 'trap \"\" TERM; sleep 1000'", estimated_running_secs = 0.2, estimated_output_bytes = 1024, estimated_mem_usage = "medium" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "timeout observed." }
+
+# The Host titles a session on its own after the first real turn
+# (../opencode/packages/opencode/src/session/prompt.ts:235), prepending its marker at
+# messages[0] and appending the conversation after it. `turnOf` reads the LAST user
+# message, so a title request reports the same turn and step as the chat request it
+# follows — which is why `kind` is part of the runtime key rather than derived.
+
+[[turn]]
+id = "title"
+lane = "inspector-title"
+kind = "title"
+user = "Run the command and report if it timed out."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+# COMPANION-002: every Managed Work Session gets exactly one Companion, so a scenario with a
+# work session must say what its Blogger replies — otherwise production sends a request the
+# forest cannot answer and the run fail-stops.
+#
+# Measured in K9: four scenarios were missing this, and all four were red before the rewrite
+# for exactly this reason. No lane, because the prompt is composed from the delta alone
+# (`src/Wanxiangshu/Session/CompanionHostBlogger.fs:77`) and is identical across sessions.
+#
+# The declared text is the sentence all three production shapes share — delta (:77),
+# post-restart re-anchor (:72) and condense (:118) — so one turn answers whichever fires.
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", "enf-primitive-obsessin" = 7 } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", "enf-primitive-obsessin" = 7 } }
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 3
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 4
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 5
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 6
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 7
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 8
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 9
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 10
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 11
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 12
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 13
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 14
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 15
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 16
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 17
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 18
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 19
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 20
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 21
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 22
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 23
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 24
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 25
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 26
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 27
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 28
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 29
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 30
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 31
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 32
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 33
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 34
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 35
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 36
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 37
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 38
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 39
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 40
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 41
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 42
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 43
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 44
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 45
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 46
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 47
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 48
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 49
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 50
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 51
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 52
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 53
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 54
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 55
+reason = "frame-commit"

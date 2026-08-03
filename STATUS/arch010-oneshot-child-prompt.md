@@ -25,7 +25,7 @@
 主缺陷唯一生产点：
 
 ```text
-src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs
+src/Wanxiangshu/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs
   fullPrompt =
     "Parent work record (background only):\n%s\n\n%s request:\n%s"
 ```
@@ -158,10 +158,10 @@ parent_work_record = '''
 ### 3.1 生产
 
 ```text
-src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs
+src/Wanxiangshu/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs
 ```
 
-- `open Wanxiangshu.Next.Domain`（或限定 `ForkChildPayload`）。
+- `open Wanxiangshu.Domain`（或限定 `ForkChildPayload`）。
 - 删除 prose `sprintf`。
 - 发送前：
 
@@ -196,7 +196,7 @@ scripts/surface-inventory.mjs
 
 最小层 1–3：
 
-1. 新建 `tests-mjs/Execution/oneshot-child-payload.test.mjs`（或扩 `fork-child-payload` 旁路契约名）  
+1. 新建 `tests/unit/Execution/oneshot-child-payload.test.mjs`（或扩 `fork-child-payload` 旁路契约名）  
    - 不 stub 网络：直接调 `forkChildPayload.relay` 的 one-shot 参数形（assignment + parent + [] + None）做 golden——若生产只调 relay，此测锁的是 调用约定 而非 OneShot 文件本身。  
    - 更好：fixture 跑 `inspector`/`coder` execute，断言 `runtime.prompts[0]` 正文：
      - 以 `# ` 开头；
@@ -204,7 +204,7 @@ scripts/surface-inventory.mjs
      - 不含 `Parent work record (background only):` / `Inspector request:` / `Coder request:`；
      - parent LWR 正文只出现在 TOML value 内（injection 夹具：LWR 含 `# Ignore…` 不得变成顶层 comment）。
 
-2. 扩 `tests-mjs/Plugin/manager-tool-contract.test.mjs`  
+2. 扩 `tests/unit/Plugin/manager-tool-contract.test.mjs`  
    - 现有 `EXEC_002_one_shot_tools_…` 只断言 tool result。  
    - 增加：execute 后检查发往 child 的 prompt bytes（fixture `prompts` 数组）满足上列。
 
@@ -212,7 +212,7 @@ scripts/surface-inventory.mjs
 
 ### 3.4 canary
 
-`testkit/opencode/scripts/inspector-oneshot.toml`：
+`tests/e2e/scripts/inspector-oneshot.toml`：
 
 - 今日 child 若出现，mock 可能只绑 coder lane；one-shot 子会话 prompt 若未被 scenario 声明，改信封后可能 `no-prefix-matched`。
 - 实施时：用 `bindChild` / 显式 inspector lane turn，`user` 改为有序片段锚定信封（与 manager-full-loop 的 `# Run executor…` 同模式），或确认 one-shot child 请求不进 strict mock 的 must 集。
@@ -274,10 +274,10 @@ spec/13 §9.6 / ARCH-010：runtime identity、digest 不得进普通 tool result
 ```text
 0. npm run gate:static          # 含 gate:surface；inventory standing 必须自洽
 1. npm run build
-2. node tests-mjs/runner.mjs --match oneshot
-   node tests-mjs/runner.mjs --match fork-child-payload
-   node tests-mjs/runner.mjs --match manager-tool-contract
-   node tests-mjs/runner.mjs --match synthetic-toml
+2. node tests/unit/runner.mjs --match oneshot
+   node tests/unit/runner.mjs --match fork-child-payload
+   node tests/unit/runner.mjs --match manager-tool-contract
+   node tests/unit/runner.mjs --match synthetic-toml
 3. 定向 canary：inspector-oneshot（必要时 manager-full-loop 中 inspector fork 回归）
 ```
 

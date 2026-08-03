@@ -20,23 +20,23 @@ const ACTIVE_SSOT = [
 const CLAUSE_RE = /^(#{2,4})\s+((?:ARCH|AGENT|PROMPT|FALLBACK|REVIEW|ORCH|HOST|COMPANION|EXEC|VERIFY|PERSIST|CTX|ENFORCER|LOOP)-\d{3}(?:[A-Z0-9_-]+)?)\s*[:：]\s*(.*)$/m
 
 const PREFIX_DEFAULT_MODULE = {
-  ARCH: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
-  AGENT: 'src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs',
-  PROMPT: 'src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs',
-  FALLBACK: 'src/Wanxiangshu.Next/Session/FallbackController.fs',
-  REVIEW: 'src/Wanxiangshu.Next/Session/ReviewController.fs',
-  ORCH: 'src/Wanxiangshu.Next/Application/Orchestration/OrchestratorProgram.fs',
-  HOST: 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs',
-  COMPANION: 'src/Wanxiangshu.Next/Session/CompanionHost.fs',
-  EXEC: 'src/Wanxiangshu.Next/Session/HostForkRuntime.fs',
-  VERIFY: 'src/Wanxiangshu.Next/Kernel/Flow.fs',
-  PERSIST: 'src/Wanxiangshu.Next/Journal/Fold.fs',
-  CTX: 'src/Wanxiangshu.Next/Application/Reconciliation/XWire.fs',
-  ENFORCER: 'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
-  LOOP: 'src/Wanxiangshu.Next/Domain/LoopDetector.fs'
+  ARCH: 'src/Wanxiangshu/Kernel/Flow.fs',
+  AGENT: 'src/Wanxiangshu/Domain/ManagedAgentCatalog.fs',
+  PROMPT: 'src/Wanxiangshu/Application/Prompting/PromptDispatcher.fs',
+  FALLBACK: 'src/Wanxiangshu/Session/FallbackController.fs',
+  REVIEW: 'src/Wanxiangshu/Session/ReviewController.fs',
+  ORCH: 'src/Wanxiangshu/Application/Orchestration/OrchestratorProgram.fs',
+  HOST: 'src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs',
+  COMPANION: 'src/Wanxiangshu/Session/CompanionHost.fs',
+  EXEC: 'src/Wanxiangshu/Session/HostForkRuntime.fs',
+  VERIFY: 'src/Wanxiangshu/Kernel/Flow.fs',
+  PERSIST: 'src/Wanxiangshu/Journal/Fold.fs',
+  CTX: 'src/Wanxiangshu/Application/Reconciliation/XWire.fs',
+  ENFORCER: 'src/Wanxiangshu/Session/BloggerCoordinator.fs',
+  LOOP: 'src/Wanxiangshu/Domain/LoopDetector.fs'
 }
 
-const TEST_DIRS = ['tests-mjs', 'testkit/opencode/tests']
+const TEST_DIRS = ['tests/unit', 'tests/e2e/tests']
 
 function scanClauses () {
   const clauses = []
@@ -72,8 +72,8 @@ function parseExistingConformance () {
       const location = m[3].trim().replace(/`/g, '')
       const owners = location.split(/[\s,;]+/).filter(Boolean).map(f => {
         if (f.startsWith('src/')) return f
-        if (f.endsWith('.fs')) return 'src/Wanxiangshu.Next/' + f.replace(/^src\//, '')
-        return 'src/Wanxiangshu.Next/' + f
+        if (f.endsWith('.fs')) return 'src/Wanxiangshu/' + f.replace(/^src\//, '')
+        return 'src/Wanxiangshu/' + f
       })
       rows.set(id, { status, owners })
     }
@@ -107,7 +107,7 @@ function searchReferences (clauses) {
     for (const c of clauses) {
       if (reFor(c.id).test(text)) {
         if (p.includes('-canary.mjs')) refs.get(c.id).canaries.push(p)
-        else if (p.includes('gate-') && p.includes('testkit')) refs.get(c.id).harness.push(p)
+        else if (p.includes('gate-') && p.includes('tests/e2e')) refs.get(c.id).harness.push(p)
         else refs.get(c.id).tests.push(p)
       }
     }

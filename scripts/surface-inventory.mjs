@@ -126,7 +126,7 @@ const SYSTEM_PROMPT_MARKERS = Object.freeze(['PromptAssets', 'systemPromptOf', '
  */
 const SURFACES = new Map([
   [
-    'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
@@ -136,7 +136,7 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu/Session/CompanionHostBlogger.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
@@ -147,16 +147,16 @@ const SURFACES = new Map([
         'transform rebuilds full provider view via CompanionProjectionBuilder ' +
         '([[do_not_exec]] historic frames + delta + instruction)',
       composerFiles: [
-        'src/Wanxiangshu.Next/Domain/BloggerDelta.fs',
-        'src/Wanxiangshu.Next/Domain/BloggerToml.fs',
-        'src/Wanxiangshu.Next/Session/CompanionHostBlogger.fs',
-        'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
+        'src/Wanxiangshu/Domain/BloggerDelta.fs',
+        'src/Wanxiangshu/Domain/BloggerToml.fs',
+        'src/Wanxiangshu/Session/CompanionHostBlogger.fs',
+        'src/Wanxiangshu/Session/BloggerCoordinator.fs',
       ],
       typedPayload: 'BloggerMainRequestContext.Toml',
     },
   ],
   [
-    'src/Wanxiangshu.Next/Session/HostForkRunLifecycle.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu/Session/HostForkRunLifecycle.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -165,7 +165,7 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/Session/HostForkAgentOwner.fs#SendAgentOwnerRoot',
+    'src/Wanxiangshu/Session/HostForkAgentOwner.fs#SendAgentOwnerRoot',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -174,7 +174,7 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/Session/HostForkRuntimeFork.fs#sendFirstPrompt',
+    'src/Wanxiangshu/Session/HostForkRuntimeFork.fs#sendFirstPrompt',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
@@ -183,17 +183,17 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSessionNudge.fs#SendContinuation',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSessionNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
       surface: 'continuation nudge (provider retry, manager and reviewer review guards)',
       composer: 'RuntimeNudge.providerRetry / managerReviewGuard / reviewerVerdictGuard',
-      composerFiles: ['src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs', 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostReviewGuard.fs'],
+      composerFiles: ['src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs', 'src/Wanxiangshu/Infrastructure/OpenCode/Host/HostReviewGuard.fs'],
     },
   ],
   [
-    'src/Wanxiangshu.Next/Session/HostForkBusyNudge.fs#SendContinuation',
+    'src/Wanxiangshu/Session/HostForkBusyNudge.fs#SendContinuation',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'VerbatimForward',
@@ -202,19 +202,19 @@ const SURFACES = new Map([
     },
   ],
   [
-    'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSessionNudge.fs#SendInteractionRepair',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Host/HostSessionNudge.fs#SendInteractionRepair',
     {
       class: 'RuntimeSyntheticToml',
       standing: 'CanonicalPayload',
       surface: 'interaction repair (missing final report)',
       composer: 'RuntimeNudge.missingFinalReport',
-      composerFiles: ['src/Wanxiangshu.Next/Application/Reconciliation/TurnCompletionProgram.fs'],
+      composerFiles: ['src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs'],
     },
   ],
 ]);
 
 /** Production `.fs` files, absolute paths. */
-const productionFiles = () => walk(`${REPO_ROOT}src/Wanxiangshu.Next`, ['.fs']);
+const productionFiles = () => walk(`${REPO_ROOT}src/Wanxiangshu`, ['.fs']);
 
 const relative = (file) => file.slice(REPO_ROOT.length);
 
@@ -416,7 +416,7 @@ export function auditSurfaces(files = productionFiles()) {
  * `ToolRegistry.fs` lives inside the tools directory (confirmed: `Infrastructure/OpenCode/Tools/`),
  * so one walk covers both it and the individual tool files.
  */
-const TOOLS_DIR = `${REPO_ROOT}src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools`;
+const TOOLS_DIR = `${REPO_ROOT}src/Wanxiangshu/Infrastructure/OpenCode/Tools`;
 
 const TOOL_RETURN_FILES = () => walk(TOOLS_DIR, ['.fs']);
 

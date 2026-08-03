@@ -8,13 +8,14 @@
 import { walk, countLiteral, readLines } from './repo-scan.mjs'
 
 const SCOPES = {
-  src: { root: 'src/Wanxiangshu.Next', extensions: ['.fs'] },
+  src: { root: 'src/Wanxiangshu', extensions: ['.fs'] },
   // VERIFY-008: layers 1-3 are `.mjs`. Left pointing at the deleted `tests-next`
   // this scope would return 0 for every symbol, which reads as "extinct" — the
   // most dangerous possible failure for an extinction audit.
-  tests: { root: 'tests-mjs', extensions: ['.mjs'] },
-  testkit: { root: 'testkit', extensions: ['.mjs', '.js'] },
-  scripts: { root: 'testkit/opencode/scripts', extensions: ['.json', '.toml'] },
+  tests: { root: 'tests/unit', extensions: ['.mjs'] },
+  testkit: { root: 'tests/e2e', extensions: ['.mjs', '.js'] },
+  support: { root: 'tests/support', extensions: ['.mjs', '.js'] },
+  scripts: { root: 'tests/e2e/scripts', extensions: ['.json', '.toml'] },
 }
 
 // target: allowed residue per scope. Absent scope means 0.
@@ -40,7 +41,7 @@ const SCOPES = {
 // The tradeoff is that a genuine violation inside these two files goes unseen
 // here. Acceptable because each holds nothing but the codec and its rejection
 // list, or the test over it; the architecture and ssot gates still read both.
-const LEGACY_NAME_SENTINELS = ['src/Wanxiangshu.Next/Journal/FactCodec.fs', 'tests-mjs/Journal/envelope.test.mjs']
+const LEGACY_NAME_SENTINELS = ['src/Wanxiangshu/Journal/FactCodec.fs', 'tests/unit/Journal/envelope.test.mjs']
 
 const EXTINCTION = [
   { symbol: 'PostPromptFireAndForget', clause: 'PROMPT-007' },
@@ -123,11 +124,11 @@ const SINGLE_WRITER = [
     fact: 'FallbackCursorAdvanced',
     clause: 'FALLBACK-003',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/FallbackProjection.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/FallbackProjection.fs',
     ],
     appendHelpers: ['recordFallbackFailure'],
   },
@@ -135,11 +136,11 @@ const SINGLE_WRITER = [
     fact: 'FallbackExhausted',
     clause: 'FALLBACK-005',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/FallbackProjection.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/FallbackProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -147,11 +148,11 @@ const SINGLE_WRITER = [
     fact: 'ConfirmedReviewWitness',
     clause: 'REVIEW-006',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/ReviewProjection.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/ReviewProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -159,11 +160,11 @@ const SINGLE_WRITER = [
     fact: 'ProviderInputSealed',
     clause: 'REVIEW-010',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/ReviewProjection.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/ReviewProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -171,11 +172,11 @@ const SINGLE_WRITER = [
     fact: 'PluginPromptClaimed',
     clause: 'PROMPT-005',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/PromptAuthorityLedger.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/PromptAuthorityLedger.fs',
     ],
     appendHelpers: [],
   },
@@ -183,11 +184,11 @@ const SINGLE_WRITER = [
     fact: 'PluginPromptPhysicalAccepted',
     clause: 'PROMPT-005',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/PromptAuthorityLedger.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/PromptAuthorityLedger.fs',
     ],
     appendHelpers: [],
   },
@@ -195,11 +196,11 @@ const SINGLE_WRITER = [
     fact: 'HandleRetired',
     clause: 'EXEC-009',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/LinkageProjection.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/LinkageProjection.fs',
     ],
     appendHelpers: [],
   },
@@ -207,11 +208,11 @@ const SINGLE_WRITER = [
     fact: 'PublishClaimed',
     clause: 'ORCH-005',
     declarationFiles: [
-      'src/Wanxiangshu.Next/Kernel/Fact.fs',
-      'src/Wanxiangshu.Next/Journal/FactCodec.fs',
-      'src/Wanxiangshu.Next/Journal/Fold.fs',
-      'src/Wanxiangshu.Next/Journal/AgentJournal.fs',
-      'src/Wanxiangshu.Next/Journal/OrchestratorProjection.fs',
+      'src/Wanxiangshu/Kernel/Fact.fs',
+      'src/Wanxiangshu/Journal/FactCodec.fs',
+      'src/Wanxiangshu/Journal/Fold.fs',
+      'src/Wanxiangshu/Journal/AgentJournal.fs',
+      'src/Wanxiangshu/Journal/OrchestratorProjection.fs',
     ],
     appendHelpers: [],
   },

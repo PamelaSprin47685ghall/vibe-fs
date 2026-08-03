@@ -72,9 +72,9 @@ wanxiangshu
 ## 开发布局
 
 ```text
-src/Wanxiangshu.Next/     生产 Agent DSL（唯一源码根）
-tests-mjs/                第 1–3 层测试（mjs，import dist）
-testkit/opencode/         独立 OpenCode harness
+src/Wanxiangshu/     生产 Agent DSL（唯一源码根）
+tests/unit/                第 1–3 层测试（mjs，import dist）
+tests/e2e/         独立 OpenCode harness
 spec/                     产品语义（唯一规范，条款 ID 寻址）
 STATUS/                   当前状态（README、合规表、blockers）
 ```

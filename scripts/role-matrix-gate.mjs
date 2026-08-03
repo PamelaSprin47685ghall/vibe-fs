@@ -15,11 +15,11 @@ const fail = (message) => violations.push(message)
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-const ROLES_FS = 'src/Wanxiangshu.Next/Kernel/Roles.fs'
-const CATALOG_FS = 'src/Wanxiangshu.Next/Domain/ManagedAgentCatalog.fs'
-const PROMPT_AUTH_FS = 'src/Wanxiangshu.Next/Domain/PromptAuthority.fs'
-const MANAGED_AGENT_FS = 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs'
-const MANAGED_CONFIG_FS = 'src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs'
+const ROLES_FS = 'src/Wanxiangshu/Kernel/Roles.fs'
+const CATALOG_FS = 'src/Wanxiangshu/Domain/ManagedAgentCatalog.fs'
+const PROMPT_AUTH_FS = 'src/Wanxiangshu/Domain/PromptAuthority.fs'
+const MANAGED_AGENT_FS = 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs'
+const MANAGED_CONFIG_FS = 'src/Wanxiangshu/Infrastructure/OpenCode/Host/ManagedAgentConfig.fs'
 
 // AGENT-002 fixed matrix (spec/02). Order is presentation only; membership is the check.
 const EXPECTED_ROLES = [
