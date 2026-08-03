@@ -1,6 +1,6 @@
 # 活跃 Blocker 账本（当前为空）
 
-0.5.2 收敛进行中，当前无活跃 blocker。
+0.5.2 已发布，当前无活跃 blocker。
 
 历史 blocker 归档见：
 
