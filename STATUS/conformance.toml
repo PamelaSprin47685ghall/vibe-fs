@@ -1408,7 +1408,7 @@ ssot = "SSOT/07.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 4
-verified_commit = "6373c4b0"
+verified_commit = "f66bbdc7"
 owner = [
   "src/Wanxiangshu.Next/Application/Reconciliation/ReviewSeal.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/SessionSnapshotPort.fs",
@@ -1419,7 +1419,8 @@ tests = [
   "tests-mjs/domain.mjs",
 ]
 canaries = [
-  "testkit/opencode/tests/host-transform-capability-canary.mjs",
+  "testkit/opencode/tests/reviewer-verdict-canary.mjs",
+  "testkit/opencode/tests/x-recovery-canary.mjs",
 ]
 evidence = ""
 
@@ -1430,7 +1431,7 @@ ssot = "SSOT/07.md"
 lifecycle = "active"
 status = "conformant"
 required_layer = 4
-verified_commit = "6373c4b0"
+verified_commit = "f66bbdc7"
 owner = [
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
 ]

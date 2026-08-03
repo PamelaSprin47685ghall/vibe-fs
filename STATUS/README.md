@@ -86,7 +86,7 @@ nudge/throttle 在 `RFC/`，不属于当前产品合同。
 
 - X 恢复链：生产接线已闭合；X-A–X-D layer-4 canary 已交付（`x-recovery-canary.mjs` 四场景）
 - `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
-- HOST-010/011：layer-4 绑定 `host-transform-capability-canary.mjs`（transform/tool identity）
+- HOST-010：可观测代理 = Reviewer 链 seal/verdict 等式（`reviewer-verdict-canary`）+ X 链 `SolvingProviderRun`（`x-recovery-canary`）；HOST-011：ToolCallIds + BlogEntryCommitted.ProviderRun（`host-transform-capability-canary`）
 - 未来功能（Strength shadow / Enforcer nudge / Student&Teacher）见 `RFC/`
 
 ## 源码地图
