@@ -12,7 +12,8 @@
 - C6 partial: fail-closed `loadEffectiveFrames`; `CompanionIdentity.newWorkMessageId`.
 - Further: durable `BloggerRequestMaterialized` + cycle receipts; CommitUnknown tri-state;
 one-shot repair; crash-window recovery gate; provenance markers; main→blogger teardown.
-Still open: layer-4 multi-race canaries (keep PARTIAL).
+layer-4: host-transform-capability (+ third-turn single-flight + materialize) and companion-canary green.
+Conformance COMPANION-005/008, CTX-006/007/012, ENFORCER-010 restored to CONFORMANT.
 
 
 ## 0.5.0 — 正式版

@@ -7,10 +7,13 @@
 
 | 级别 | 缺口 | 评估 | 处置 |
 |------|------|------|------|
-| MEDIUM | layer-4 竞态/Squash/invalid canary | 第 1–3 层与 crash classify 已绿；三轮 canary 森林未扩 | C7 |
-| LOW | crash window C 全量 re-commit | 启动恢复 InFlight + CurrentRequest；真正 re-canonical 提交依赖后续 transform 再入 | 观察 |
+Blogger 垂直切片（清单 C0–C7）生产链已闭合。
 
-已闭合：C0–C6 主链；durable materialize/receipt/冻结 epoch；CommitUnknown+repair；crash windows A/B/D/E 启动恢复；provenance 标记；main dispose 清 blogger waiter。
+layer-4 证据：`host-transform-capability-canary`（park/resume、single-flight 第三 turn、`BloggerRequestMaterialized`、BlogEntryCommitted）、`companion-canary`（同 child 两轮）。
+
+| LOW | crash window C 全量 re-commit | 启动恢复 InFlight + CurrentRequest；真正 re-canonical 提交依赖后续 transform 再入 | 观察 |
+| LOW | 全森林三轮 release 并发 | 单 canary 绿；`test:e2e:p0:three` 未在本轮强制跑满 | 发布前跑 |
+
 
 ## Enforcer 接线 security_review 观察项（2026-08，f854c092 + 0255a6b4）
 
