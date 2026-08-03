@@ -13,11 +13,11 @@
   - `manager-companion-canary.mjs` 独立重跑通过
   - `npm pack` 产出 `wanxiangshu-0.5.2.tgz`（404 files, 1.8 MB packed）
 - 证据：`docs/evidence/0.5.2-baseline/`
-- 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成，机器默认状态尚未经 C11 审计）
+- 合规表：[`STATUS/conformance.md`](STATUS/conformance.md)（由 `STATUS/conformance.toml` 生成；C11 partial 已升 7 条 layer-2）
 
 ## 当前产品状态
 
-0.5.2 收敛中。本会话完成 C0–C8（C8 最小诚实范围）：
+0.5.2 收敛中。本会话完成 C0–C8（C8 最小诚实范围）+ C11 partial（7 条 layer-2 升 CONFORMANT）：
 
 - C0：建立 0.5.2 baseline，跑通 `test:release` 并记录证据。
 - C1：把 Strength / StudentTeacher / Enforcer nudge throttle 迁出 Active SSOT 到 `RFC/`，
@@ -97,17 +97,16 @@ host-transform-capability 全绿。
 
 ## 已知未闭合项
 
-0.5.2 尚未发布。`STATUS/conformance.toml` 由脚本从 Active SSOT 与测试引用自动生成，状态
-`conformant` 是机器默认值，尚未经 C11 人工审计。已知缺少第 4 层证据或实现未闭合的条款
-包括：
+0.5.2 尚未发布。C11 partial 已把有 layer-2 单测证明的 IMPLEMENTING 升为 CONFORMANT
+（`verified_commit=db6693f5`）。仍缺证据或实现未闭合的条款：
 
-- IMPLEMENTING（诚实未升 CONFORMANT）：`PROMPT-004/006/007/009`、`AGENT-007`、
-  `HOST-005/009/010/011`、`COMPANION-013`、`EXEC-009`
+- IMPLEMENTING（勿升 CONFORMANT）：`PROMPT-007`（无 `AwaitMode.Detached` / 无测试）、
+  `HOST-010`（弱测试，缺 transform→run 绑定 canary）、`HOST-011`（`tests=[]`）、
+  `EXEC-009`（layer 2 已钉 `cb3457db`；缺 layer-4 canary）
+- 已 CONFORMANT（C11 partial，layer 2）：`AGENT-007`、`PROMPT-004/006/009`、
+  `HOST-005/009`、`COMPANION-013`（`verified_commit=db6693f5`）
 - `PERSIST-009`：已 CONFORMANT（layer 2，`db6693f5`）；worktree 路径无独立 fault-injection
   canary（依赖 fold 单测 + publish canary）
-- `EXEC-009`：durable join 已接线（`cb3457db`/`99fcb06f`），`HandleProjection.joinable`
-  已有生产调用点（`HostForkRuntime.Join`）；conformance 仍为 IMPLEMENTING（layer 2，
-  `verified_commit=cb3457db`），layer-4 canary 未建——CONFORMANT 升级待 DevOps 绿测后执行。
 - X 恢复链：生产接线已闭合，但 X-A–X-D canary 剧本未建，第 4 层证据未产出。
 - `EnforcerCodec` / `EnforcerCycle` / `EnforcerHost` 仍携带 `ScoreVectorRef`、`MergedScores`、
   nudge/throttle 路径；0.5.2 Active 子集仅保留 text/evidence。
@@ -153,23 +152,22 @@ src/Wanxiangshu.Next/
 0.5.2 剩余收敛项（见 `STATUS/0.5.2-convergence.md`）：
 
 1. C5–C8：已完成（见上「本会话完成」；C8 = gate 禁词 + 账本诚实，无 Orchestrator 重写）
-2. C9：Host/Review/Cold boundary 证据——当前下一步
+2. C9：Host/Review/Cold boundary 证据——`HOST-010/011` identity canary
 3. C10：Context recovery X-A–X-D 第四层证据
-4. C11：测试与 clause coverage 补齐；人工审计 `STATUS/conformance.toml`（钉 IMPLEMENTING
-   行；`EXEC-009` layer-4 canary 后升 CONFORMANT）
+4. C11 余项：`PROMPT-007` / `HOST-010` / `HOST-011` / `EXEC-009` layer-4；
+   勿在证据不足时升 CONFORMANT
 5. C12：运行环境与发布包
 6. C13：全仓反向审计
 7. C14：RC 验证
 8. C15：0.5.2 发布
 
-仍为 IMPLEMENTING 的条款（C11 责任，勿在证据不足时升 CONFORMANT）：
+仍为 IMPLEMENTING 的条款（勿在证据不足时升 CONFORMANT）：
 
 | 条款 | 备注 |
 |------|------|
-| `PROMPT-004/006/007/009` | 部分实现/测试在；C11 逐条核 |
-| `AGENT-007` | 双层 gate 在；layer 证据待审 |
-| `HOST-005/009/010/011` | transform/run 绑定等；C9 证据 |
-| `COMPANION-013` | synthetic 稳定身份 |
+| `PROMPT-007` | 无 `AwaitMode.Detached`；`tests=[]` |
+| `HOST-010` | 实现在；弱测试（envelope/domain）；需 binding canary |
+| `HOST-011` | `tests=[]`；需 tool-identity canary |
 | `EXEC-009` | layer 2 已钉 `cb3457db`；缺 layer-4 canary |
 
 历史项：

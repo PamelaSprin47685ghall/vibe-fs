@@ -116,12 +116,12 @@ function searchReferences (clauses) {
 
 // 0.5.2 已知未闭合项：机器生成阶段不能谎称 CONFORMANT。
 // C11 人工审计后应逐条收敛到 conformant/blocked。
+// C11 partial: only keep clauses still lacking code+test proof.
+// Promoted to conformant (layer 2 unit): AGENT-007, PROMPT-004/006/009,
+// HOST-005/009, COMPANION-013. PERSIST-009 already conformant outside this set.
 const KNOWN_IMPLEMENTING = new Set([
-  'PROMPT-004', 'PROMPT-006', 'PROMPT-007', 'PROMPT-009',
-  'AGENT-007',
-  'HOST-005', 'HOST-009', 'HOST-010', 'HOST-011',
-  'PERSIST-009',
-  'COMPANION-013',
+  'PROMPT-007',
+  'HOST-010', 'HOST-011',
   'EXEC-009'
 ])
 

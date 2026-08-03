@@ -322,11 +322,13 @@ id = "AGENT-007"
 title = "工具权限双层 fail-closed"
 ssot = "SSOT/02.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ToolRegistry.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs",
+  "src/Wanxiangshu.Next/Domain/PromptAuthority.fs",
 ]
 tests = [
   "tests-mjs/Plugin/host-hooks.test.mjs",
@@ -538,11 +540,13 @@ id = "PROMPT-004"
 title = "来源类型"
 ssot = "SSOT/03.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu.Next/Domain/PromptAuthority.fs",
+  "src/Wanxiangshu.Next/Application/Prompting/PromptIngress.fs",
+  "src/Wanxiangshu.Next/Domain/PromptAuthorityRun.fs",
 ]
 tests = [
   "tests-mjs/Plugin/host-hooks.test.mjs",
@@ -575,11 +579,11 @@ id = "PROMPT-006"
 title = "发送格式"
 ssot = "SSOT/03.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcherSend.fs",
 ]
 tests = [
   "tests-mjs/Prompt/send-format.test.mjs",
@@ -631,11 +635,12 @@ id = "PROMPT-009"
 title = "来源解析优先级"
 ssot = "SSOT/03.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Application/Prompting/PromptDispatcher.fs",
+  "src/Wanxiangshu.Next/Domain/PromptAuthorityRun.fs",
+  "src/Wanxiangshu.Next/Application/Prompting/PromptIngress.fs",
 ]
 tests = [
   "tests-mjs/Prompt/authority.test.mjs",
@@ -1294,11 +1299,13 @@ id = "HOST-005"
 title = "XTrace 分段与 durable cursor"
 ssot = "SSOT/07.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
-  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu.Next/Domain/LifecycleWorkRecord.fs",
+  "src/Wanxiangshu.Next/Application/Reconciliation/XTraceCapture.fs",
+  "src/Wanxiangshu.Next/Journal/Fold.fs",
 ]
 tests = [
   "tests-mjs/Context/x-trace-fold.test.mjs",
@@ -1373,11 +1380,13 @@ id = "HOST-009"
 title = "Host 生命周期"
 ssot = "SSOT/07.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginHostInterop.fs",
   "src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/HostSignalBootstrap.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Plugin/Plugin.fs",
 ]
 tests = [
   "tests-mjs/Plugin/host-hooks.test.mjs",
@@ -1684,10 +1693,11 @@ id = "COMPANION-013"
 title = "Synthetic 稳定身份"
 ssot = "SSOT/08.md"
 lifecycle = "active"
-status = "implementing"
+status = "conformant"
 required_layer = 2
-verified_commit = "151fee58"
+verified_commit = "db6693f5"
 owner = [
+  "src/Wanxiangshu.Next/Domain/CompanionIdentity.fs",
   "src/Wanxiangshu.Next/Session/CompanionHost.fs",
 ]
 tests = [
