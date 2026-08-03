@@ -53,7 +53,7 @@ user = "Produce the second projection for Orchestrator X."
 [[turn]]
 id = "primary-blogger"
 internal = true
-user = "[["
+user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
   respond = { type = "text", text = "Blogger paragraph." }

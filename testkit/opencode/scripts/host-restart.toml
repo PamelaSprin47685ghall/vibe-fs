@@ -171,7 +171,7 @@ user = "# Report child-a2."
 [[turn]]
 id = "blogger"
 internal = true
-user = "[["
+user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
   respond = { type = "text", text = "Session background." }

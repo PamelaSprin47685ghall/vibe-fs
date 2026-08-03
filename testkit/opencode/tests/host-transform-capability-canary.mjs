@@ -111,7 +111,7 @@ async function waitForCount(scenario, predicate, minCount, reason) {
       scenario.watchdog?.advance({ reason, lane: 'provider', blocking: true });
       return;
     }
-    await scenario.events.awaitEvent(() => true, ENFORCER_POLL_SLICE_MS).catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, ENFORCER_POLL_SLICE_MS));
   }
   assert.fail(`${reason}: condition not reached within ${WATCHDOG_TIMEOUT_MS}ms`);
 }

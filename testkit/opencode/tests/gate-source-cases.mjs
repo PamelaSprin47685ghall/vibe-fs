@@ -511,12 +511,11 @@ user = "go on"
       // reviewer-restart) had no declaration and all four fail-stopped on the Blogger
       // request. A missing declaration is silent at load time and fatal at run time, which
       // is precisely the asymmetry a load-time gate should remove.
-      // LWR sparse schema: normal/reset deltas are data-only TOML whose first table
-      // is whatever the first semantic part is (`[[message]]`, `[[tool_result]]`,
-      // `[[media_omitted]]`, …). The production-stable prefix is therefore `[[`.
-      // Reset no longer has a separate English reanchor shape (same projector).
+      // LWR sparse schema: the final user message of a Blogger request is the
+      // exactly-once instruction (COMPANION-005 / ENFORCER-030). The production-stable
+      // prefix is the instruction heading.
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('user = "[["'),
+        (file) => !readFileSync(file, 'utf8').includes('# Write the dense work-log continuation now'),
       );
 
       assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);

@@ -297,6 +297,7 @@ export const budgetCases = [
         STABILITY_SCENARIO_TIMEOUT_MS: 30000,
         STABILITY_GATE_WINDOW_MS: 300000,
         STABILITY_MIN_RUN_MS: 5000,
+        ENFORCER_POLL_SLICE_MS: 500,
       };
 
       const actual = Object.fromEntries(
