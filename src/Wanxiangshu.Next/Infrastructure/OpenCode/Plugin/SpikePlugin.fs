@@ -85,10 +85,10 @@ module SpikePlugin =
                         // COMPANION-003/007: keep the XTrace in step with the
                         // provider-visible semantic projection at the transform
                         // boundary — BEFORE the Companion rewrite and X-wire run,
-                        // so `Companion.Submit` maps the ingest cursor against the
-                        // trace that now exists (not the previous round's mirror)
-                        // and the XTrace never absorbs synthetic heads (Companion
-                        // memory / prefix replacement) as raw parts.
+                        // so the ingest cursor maps against the trace that now
+                        // exists (not the previous round's mirror) and the XTrace
+                        // never absorbs synthetic heads (Companion memory / prefix
+                        // replacement) as raw parts.
                         // Idempotent by (turn, part) provenance; a lagging trace
                         // would stall BlogEntryCommitted.
                         match projectionSessionIdOpt with

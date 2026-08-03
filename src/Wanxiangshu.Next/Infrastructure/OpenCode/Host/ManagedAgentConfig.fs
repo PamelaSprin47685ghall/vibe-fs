@@ -7,7 +7,7 @@ open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Tools
 
-/// 0.5.0 config gate: validate Host-final opencode.json agent inventory.
+/// managed agent config gate: validate Host-final opencode.json agent inventory.
 /// Does not invent missing agents, fill models, or read model env vars.
 module ManagedAgentConfig =
 
