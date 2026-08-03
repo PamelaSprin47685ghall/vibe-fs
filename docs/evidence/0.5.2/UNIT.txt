@@ -1,77 +1,37 @@
-### UNIT.txt — C14 RC (test:unit / test:mjs)
-HEAD: da3193b9
-Date: 2026-08-03T10:24:22Z
+### UNIT.txt — C15 test:unit
+HEAD: 17358c38 (17358c386fdc2ef08bad4c27dc957e3d14231863)
+Date: 2026-08-03T18:12:02Z
 exit_code: 0
+result: 737 passed / 0 failed
 
-7:> node tests-mjs/runner.mjs
-70:✔ CTX_013_canonical_args_pass_through_without_re_sorting (0.22151ms)
-115:✔ PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed (0.602412ms)
-118:✔ PERSIST_010_a_non_sequential_prefix_epoch_fails_the_fold_closed (0.369941ms)
-119:✔ CTX_011_a_retreating_cutoff_fails_the_fold_closed (0.22215ms)
-127:✔ HOST_006_a_setting_that_cannot_be_written_fails_startup_with_its_reason (0.457631ms)
-128:✔ HOST_006_startup_probe_passes_when_settings_are_off_and_the_first_turn_is_clean (0.15468ms)
-158:✔ CTX_010_a_failed_probe_leaves_no_trace_to_undo (0.343271ms)
-172:✔ COMPANION_011_a_digest_mismatch_fails_closed (0.26999ms)
-180:✔ FALLBACK_012_only_a_failure_advance_arms_the_next_slot (0.229901ms)
-187:✔ CTX_007_a_failed_squash_fails_the_slot_without_sending_the_main_request (0.476311ms)
-188:✔ FALLBACK_011_only_a_business_main_success_clears_the_failure_count (0.888572ms)
-191:✔ CTX_007_a_failed_main_fails_the_slot_for_every_kind (0.182601ms)
-193:✔ CTX_008_only_a_failed_slot_advances_the_cursor (0.14211ms)
-194:✔ FALLBACK_012_the_next_slot_is_armed_exactly_when_this_one_failed (0.098391ms)
-196:✔ FALLBACK_012_at_least_one_real_failure_separates_any_two_squashes (0.148911ms)
-243:✔ CTX_005_validity_does_not_depend_on_failure_cause (0.12075ms)
-317:✔ ENFORCER_023_invalid_values_are_zero_not_failed (0.25046ms)
-343:✔ ENFORCER_060_pure_prose_second_failure_idles_not_busy_forever (1.735163ms)
-357:✔ ENFORCER_160_a_timed_out_park_resolves_false_fail_closed (201.003048ms)
-427:✔ FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget (0.13564ms)
-431:✔ FALLBACK_005_the_verdict_is_taken_after_the_failure_so_the_twelfth_is_final (0.861472ms)
-443:✔ FALLBACK_010_the_domain_count_is_reachable_only_through_a_confirmed_failure (0.13373ms)
-475:✔ PERSIST_003_commit_unknown_triggers_fail_closed_reconcile (0.967562ms)
-531:✔ ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case (0.149651ms)
-584:✔ HOST_011_missing_call_id_is_none_fail_closed (0.167511ms)
-585:✔ HOST_011_missing_message_id_is_none_fail_closed (0.10447ms)
-667:✔ STRENGTH_024_K1_selected_when_V1_passes_threshold_alone (0.14535ms)
-696:✔ VERIFY_004_a_section_with_no_fenced_block_at_all_fails_closed (0.158721ms)
-697:✔ VERIFY_004_an_item_with_no_id_and_an_id_with_no_item_both_fail_closed (0.30042ms)
-704:✔ a bare Date lacks the offset that F# comparison depends on (0.12064ms)
-710:✔ fold.apply rejects a single envelope passed where a sequence was meant (0.413341ms)
-711:✔ facts are built by case name, and an unknown name fails loudly (0.16159ms)
-716:✔ journal.deserialize reports a decode failure as data, not an exception (0.181ms)
-720:✔ cursor.effectiveAgent accepts a plain object as the F# record (0.096121ms)
-729:✔ VERIFY_005_the_Flow_kernel_publishes_run_fail_attempt_and_bounded_parallelism (0.379291ms)
-739:ℹ tests 702
-741:ℹ pass 702
-742:ℹ fail 0
-748:runner: 702 passed, 0 failed (authoritative; the spec reporter undercounts on timeout)
-
-## Tail
-✔ fallback cursor exposes offsets as case names, not ordinals (0.35134ms)
-✔ cursor.effectiveAgent accepts a plain object as the F# record (0.096121ms)
-✔ the facade resolves exactly one versioned fable-library directory (0.11905ms)
-✔ the AgentFact union is non-empty, so case resolution is meaningful (0.06321ms)
-✔ no facade member is undefined (0.206671ms)
-✔ member resolution prefers a real export over the escaped spelling (0.13516ms)
-✔ VERIFY_005_AgentProgram_publishes_its_flow_entrypoints (1.089453ms)
-✔ VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints (0.261411ms)
-✔ VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint (0.18583ms)
-✔ VERIFY_005_ProcessRunner_publishes_its_run_entrypoints (3.745628ms)
-✔ VERIFY_005_the_Flow_kernel_publishes_run_fail_attempt_and_bounded_parallelism (0.379291ms)
-✔ VERIFY_005_the_journal_publishes_boot_append_and_snapshot (0.460141ms)
-✔ VERIFY_005_the_outcome_kernel_publishes_the_two_commit_results (0.179ms)
-✔ VERIFY_008_the_published_plugin_entrypoint_loads (27.597608ms)
-✔ VERIFY_008_every_emitted_module_actually_loads (7.274115ms)
-✔ VERIFY_008_the_contract_and_the_facade_read_the_same_build (0.285301ms)
-✔ VERIFY_004_a_verdict_renews_the_silence_window (1.192453ms)
-✔ VERIFY_004_bytes_moving_is_recorded_and_does_not_renew (0.14152ms)
-✔ VERIFY_004_scheduling_noise_is_not_fed_at_all (0.154771ms)
-✔ VERIFY_004_a_verdict_without_a_name_or_file_still_carries_attribution (0.16222ms)
-ℹ tests 702
+Tail of runner:
+✔ fallback cursor exposes offsets as case names, not ordinals (0.410056ms)
+✔ cursor.effectiveAgent accepts a plain object as the F# record (0.131753ms)
+✔ the facade resolves exactly one versioned fable-library directory (0.741518ms)
+✔ the AgentFact union is non-empty, so case resolution is meaningful (0.098932ms)
+✔ no facade member is undefined (0.342102ms)
+✔ member resolution prefers a real export over the escaped spelling (0.176024ms)
+✔ VERIFY_005_AgentProgram_publishes_its_flow_entrypoints (1.207077ms)
+✔ VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints (0.277161ms)
+✔ VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint (0.18974ms)
+✔ VERIFY_005_ProcessRunner_publishes_its_run_entrypoints (2.770572ms)
+✔ VERIFY_005_the_Flow_kernel_publishes_run_fail_attempt_and_bounded_parallelism (0.369041ms)
+✔ VERIFY_005_the_journal_publishes_boot_append_and_snapshot (0.42295ms)
+✔ VERIFY_005_the_outcome_kernel_publishes_the_two_commit_results (0.204727ms)
+✔ VERIFY_008_the_published_plugin_entrypoint_loads (29.83267ms)
+✔ VERIFY_008_every_emitted_module_actually_loads (7.949086ms)
+✔ VERIFY_008_the_contract_and_the_facade_read_the_same_build (0.311054ms)
+✔ VERIFY_004_a_verdict_renews_the_silence_window (1.487734ms)
+✔ VERIFY_004_bytes_moving_is_recorded_and_does_not_renew (0.246716ms)
+✔ VERIFY_004_scheduling_noise_is_not_fed_at_all (0.155567ms)
+✔ VERIFY_004_a_verdict_without_a_name_or_file_still_carries_attribution (0.241706ms)
+ℹ tests 737
 ℹ suites 0
-ℹ pass 702
+ℹ pass 737
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1503.615648
+ℹ duration_ms 1503.07256
 
-runner: 702 passed, 0 failed (authoritative; the spec reporter undercounts on timeout)
+runner: 737 passed, 0 failed (authoritative; the spec reporter undercounts on timeout)

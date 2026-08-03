@@ -1,0 +1,25 @@
+### SSOT-MIGRATION-MAP.txt — C1 layering (0.5.2)
+gate_commit: 17358c38
+date_utc: 2026-08-03T18:12:02Z
+
+## Rule (STATUS/0.5.2-convergence.md §3)
+SSOT/  = current release product contract only
+RFC/   = approved future design, not current product
+STATUS/ = implementation state, not product semantics
+
+## Migrations
+| Former Active | Destination | Notes |
+|---------------|-------------|-------|
+| SSOT/14 Strength | RFC/strength.md | Entire file; Domain/Strength* remain in tree as non-wired core where present; not product contract |
+| SSOT/16 Student&Teacher | RFC/student-teacher.md | Entire file |
+| SSOT/15 Enforcer throttle/nudge/supervision loop | RFC/enforcer-nudge.md | Blogger tool cycle (blog, projection, Entry/Squash, Park/Resume, repair, recovery, limits, teardown) stays Active SSOT/15 |
+| SSOT/17 LOOP | Active (new) | LOOP-001…011 all CONFORMANT @ d6ef20a6 |
+
+## RFC tree
+RFC/strength.md (3263 lines)
+RFC/student-teacher.md (2654 lines)
+RFC/enforcer-nudge.md (1746 lines; also feeds EnforcerCatalog.gen.fs)
+
+## Active product surface (0.5.2)
+SSOT/01–13 + SSOT/15 Blogger subset + SSOT/17 LOOP + SSOT/99 glossary
+conformance.toml: 192 active clauses, 100% CONFORMANT

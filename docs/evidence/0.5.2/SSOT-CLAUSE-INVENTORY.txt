@@ -1,0 +1,45 @@
+### SSOT-CLAUSE-INVENTORY.txt
+source: STATUS/conformance.toml (generated ledger; gate:conformance enforces)
+date_utc: 2026-08-03T18:12:02Z
+gate_commit: 17358c38
+
+## Totals
+active_clauses: 192
+conformant: 192
+implementing: 0
+other_statuses: 0
+
+## By Active SSOT file
+SSOT/01.md (ARCH): 12
+SSOT/02.md (AGENT): 15
+SSOT/03.md (PROMPT): 11
+SSOT/04.md (FALLBACK): 12
+SSOT/05.md (REVIEW): 10
+SSOT/06.md (ORCH): 8
+SSOT/07.md (HOST): 12
+SSOT/08.md (COMPANION): 13
+SSOT/09.md (EXEC): 15
+SSOT/10.md (VERIFY): 8
+SSOT/11.md (PERSIST): 10
+SSOT/12.md (CTX): 14
+SSOT/15.md (ENFORCER/Blogger Active subset): 41
+SSOT/17.md (LOOP): 11
+Sum: 192
+
+## By required_layer
+0 (static/structure): 54
+2 (adapter/codec/unit): 100
+3 (fake host / harness): 20
+4 (real Host canary): 18
+
+## Active SSOT files (SSOT/00 index)
+01–13, 15 (Blogger tool-cycle Active), 17 (LOOP), 99 (glossary)
+Not Active: SSOT/14 → RFC/strength.md; SSOT/16 → RFC/student-teacher.md;
+Enforcer nudge/throttle → RFC/enforcer-nudge.md
+
+## verified_commit distribution (top)
+151fee58: 169
+d6ef20a6: 11 (LOOP-001…011)
+db6693f5: 8
+6373c4b0: 3
+cb3457db: 1

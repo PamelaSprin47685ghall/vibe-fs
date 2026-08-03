@@ -1,0 +1,31 @@
+### CONTEXT-RECOVERY.txt — X recovery chain (SSOT/12)
+gate_commit: 17358c38
+date_utc: 2026-08-03T18:12:02Z
+
+## Production wiring (closed)
+XWire.applyTransform  — SpikePlugin.fs:127 (transform, after Companion rewrite, before ReviewSeal)
+XWire.reconcileAttempt — HostSignalBootstrap.fs:99 (onTurn after EnsureRecoveryDone/ArmRecovery)
+AttemptPlanner.plan — XWire.fs + CompanionTransform.fs (WorkMain may carry probe; Blogger squash never)
+
+## Domain modules (layer 1–3 covered)
+Domain/XTrace.fs, XPrefixProjection.fs, PrefixProbeSelection.fs, PrefixCandidate.fs, AttemptPlanner.fs, RecoverySlot.fs
+Journal/XTraceProjection.fs, PrefixEpochProjection.fs, BlogProjection coverage
+
+## tests-mjs/Context (representative)
+x-trace*, probe-selection, prefix-epoch, recovery-slot, attempt-plan, fold-context-recovery, ctx014
+All unit suite green at 737/0 on this gate_commit.
+
+## Cold boundary
+BOUNDARY_KINDS includes prefix-probe. fallback.toml + fallback-aabb-trace.toml declare
+continue.0 reason=prefix-probe after CoverableTurnCutoffExclusive advance enables
+hasMaterial → UsePrefixProbe. C15 three-round: fallback + fallback-aabb-trace PASS ×3.
+
+## Layer-4 X-A…X-D dedicated scenarios
+Not present as named x-a…x-d canaries. Production path exercised via fallback / host-restart
+and full P0 forest. Dedicated X-A–X-D crash-window scripts remain optional strengthening
+(STATUS notes historical gap); CTX clauses currently required_layer 2–3 with tests[].
+
+## Invariants verified by domain + canary forest
+- No capacity estimation (CTX-001)
+- Recovery only after real failure (CTX-002)
+- Probe attempt-local; promote only on Completed + valid terminal (CTX-010/012)

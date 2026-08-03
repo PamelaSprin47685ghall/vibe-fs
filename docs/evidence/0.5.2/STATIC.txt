@@ -1,6 +1,6 @@
-### STATIC.txt — C14 RC gate:static
-HEAD: da3193b9 (da3193b956fc238fafaaecac82f986b58d375649)
-Date: 2026-08-03T10:23:49Z
+### STATIC.txt — C15 gate:static
+HEAD: 17358c38 (17358c386fdc2ef08bad4c27dc957e3d14231863)
+Date: 2026-08-03T18:12:02Z
 exit_code: 0
 
 
@@ -11,22 +11,22 @@ exit_code: 0
 > wanxiangshu@0.5.2 gate:layout
 > node scripts/repository-layout-gate.mjs
 
-repository-layout-gate: OK — 206 source files under src/Wanxiangshu.Next/
+repository-layout-gate: OK — 209 source files under src/Wanxiangshu.Next/
 
 > wanxiangshu@0.5.2 gate:ssot
 > node scripts/ssot-lint.mjs
 
-ssot-lint: OK — 179 条款，522 处引用，16 个文件
+ssot-lint: OK — 190 条款，573 处引用，17 个文件
 
 > wanxiangshu@0.5.2 gate:conformance
 > node scripts/conformance-gate.mjs --check
 
-conformance-gate: OK — 181 clauses, active=181, toml=181
+conformance-gate: OK — 192 clauses, active=192, toml=192
 
 > wanxiangshu@0.5.2 gate:architecture
 > node scripts/architecture-gate.mjs
 
-architecture-gate: OK — 206 production + 69 test files
+architecture-gate: OK — 209 production + 72 test files
 
 > wanxiangshu@0.5.2 gate:docs
 > node scripts/strip-doc-bold.mjs
@@ -46,7 +46,7 @@ budget-gate: OK — 29 budget(s), 108 file(s), no scattered literals
 > wanxiangshu@0.5.2 gate:surface
 > node scripts/surface-inventory.mjs
 
-surface-inventory: OK — 8 surface(s): 4 canonical, 4 verbatim-forward, 0 awaiting N5; system prompt and human raw structurally excluded; 15 tool file(s) audited for TOML returns
+surface-inventory: OK — 8 surface(s): 5 canonical, 3 verbatim-forward, 0 awaiting N5; system prompt and human raw structurally excluded; 15 tool file(s) audited for TOML returns
 
 > wanxiangshu@0.5.2 gate:generated
 > node scripts/enforcer-catalog-gen.mjs --check

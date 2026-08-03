@@ -1,13 +1,13 @@
 ### ACTIVE-NONCONFORMANT-SCAN.txt
-HEAD: 5334c576
-Date: 2026-08-03T10:22:26Z
+HEAD: 17358c38
+Date: 2026-08-03T18:12:02Z
 
 ## conformance-gate --check
-conformance-gate: OK — 181 clauses, active=181, toml=181
+conformance-gate: OK — 192 clauses, active=192, toml=192
 
 ## status counts (conformance.toml)
 {
-  "conformant": 181
+  "conformant": 192
 }
-total 181
+total 192
 IMPLEMENTING=0 NONCONFORMANT=0 PARTIAL=0 — all active CONFORMANT

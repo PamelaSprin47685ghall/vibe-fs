@@ -1,0 +1,24 @@
+### CONFORMANCE.txt
+gate_commit: 17358c38
+date_utc: 2026-08-03T18:12:02Z
+source: STATUS/conformance.toml + scripts/conformance-gate.mjs --check
+
+## Gate
+conformance-gate: OK — 192 clauses, active=192, toml=192
+
+## Status counts
+conformant: 192
+implementing: 0
+partial: 0
+pure_core_only: 0
+not_implemented: 0
+unverified: 0
+contradicts: 0
+
+## LOOP transition (this freeze)
+LOOP-001/002/007/008/010 (and LOOP-003…006/009/011) all status=conformant
+verified_commit=d6ef20a6
+tests: tests-mjs/Domain/loop-sensor.test.mjs, loop-detector.test.mjs, tests-mjs/Context/ctx014.test.mjs
+
+## Markdown
+STATUS/conformance.md is generated from conformance.toml; gate fails on hand edit drift.

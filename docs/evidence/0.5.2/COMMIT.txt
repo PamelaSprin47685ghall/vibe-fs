@@ -1,10 +1,17 @@
-### COMMIT.txt — C13/C14 evidence capture point
-source_commit: da3193b956fc238fafaaecac82f986b58d375649
-short: da3193b9
-date_utc: 2026-08-03T10:34:52Z
+### COMMIT.txt — C15 evidence capture point
+source_commit: 17358c386fdc2ef08bad4c27dc957e3d14231863
+short: 17358c38
+date_utc: 2026-08-03T18:12:02Z
 branch: master
-subject: feat(docs): add various evidence files for version 0.5.2 compliance and status
-dirty_before_evidence_commit: yes (evidence files only + optional STATUS)
-tag: none (C15 deferred — C14 e2e not green)
+subject: fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
+dirty_before_evidence_commit: no (worktree clean at evidence generation)
+tag: none (tag after evidence commit + reconfirm clean)
 IMPLEMENTING: 0
-CONFORMANT: 181/181
+CONFORMANT: 192/192
+verification_commits:
+  - bcc99217 docs(status): SSOT docs format + LOOP conformant ledger + README drift fix
+  - ff68d962 fix(companion): remove AppendSquash legacy port and version-bound errors
+  - 4b4bd25a test(loop): LOOP-001/002/007/008/010 criterion layer-0 assertions
+  - 21c1a9df fix(blogger): Parked survives onReactivate; CAS commitCycle on ingest cursor
+  - 17358c38 fix(canary): blogger epoch 0-25 + continue prefix-probe; arch010 field name
+prior_evidence_commit: da3193b9 (superseded; C14 was red)
