@@ -16,9 +16,10 @@ module internal ParkedTransformInterop =
 
 /// Parking + dual request slots (ENFORCER-047/050/160).
 ///
-/// CurrentRequest = the InFlight cycle's typed context (commit authority).
-/// PendingOffer = the next Main material staged only while Parked.
-/// The two must never share one dictionary slot.
+/// CurrentRequest = BloggerRuntimeState.InFlight payload (sole authority).
+/// PendingOffer = the next Main material staged only while Parked (own slot).
+/// Never reintroduce a parallel CurrentRequest dictionary — that dual-write
+/// drifted into "missing CurrentRequest" while InFlight still held context.
 type IParkedTransformHost =
     abstract ParkTransform: string * TimeSpan -> Task<bool>
     abstract ResumeParked: string -> bool

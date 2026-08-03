@@ -48,9 +48,9 @@ module AgentRoleIdentity =
 
     /// The canonical role label persisted in durable facts.
     ///
-    /// Delegates to the one labeller (`PromptAuthority.roleLabel`) rather than
-    /// lowercasing `ToString()`. A DU-name spelling is a compiler artefact: renaming
-    /// a case would silently change the durable string, and every `roleOfString`
-    /// read of an older journal would then answer `None`.
+    /// Delegates to `ManagedAgentCatalog.roleLabel` rather than lowercasing
+    /// `ToString()`. A DU-name spelling is a compiler artefact: renaming a case
+    /// would silently change the durable string, and every `roleOfString` read of
+    /// an older journal would then answer `None`.
     let roleName (role: AgentRole) : string =
-        Wanxiangshu.Next.Domain.PromptAuthority.roleLabel (toRole role)
+        Wanxiangshu.Next.Domain.ManagedAgentCatalog.roleLabel (toRole role)

@@ -54,6 +54,7 @@
     <Compile Include="Domain/XPrefixProjection.fs"/>
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
+    <Compile Include="Domain/ManagedAgentCatalog.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/AttemptPlanner.fs"/>

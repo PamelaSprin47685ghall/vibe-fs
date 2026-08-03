@@ -85,74 +85,12 @@ module BloggerCrashRecovery =
               RepairSpent = false }
         )
 
+    /// C5: one reload path — EnforcerHost.tryReloadRequestContext (full cutoff/digest).
     let private tryReloadMainContext
         (journal: AgentJournal)
         (openReq: OpenBloggerRequest)
         : BloggerRequestContext option =
-        match journal.Writer.BlobWriter.Read openReq.ContextRef with
-        | Error _ -> None
-        | Ok json ->
-            // Materialize blob is CanonicalJson of createObj fields. Pull toml if Main.
-            // Minimal parse without full schema: look for "toml" string field.
-            let toml =
-                let marker = "\"toml\":"
-                let idx = json.IndexOf(marker)
-
-                if idx < 0 then
-                    ""
-                else
-                    let start = idx + marker.Length
-                    // value is JSON string; strip quotes crudely for recovery only.
-                    let rest = json.Substring(start).TrimStart()
-
-                    if rest.StartsWith("\"") then
-                        let sb = System.Text.StringBuilder()
-                        let mutable i = 1
-                        let mutable done' = false
-
-                        while i < rest.Length && not done' do
-                            let c = rest.[i]
-
-                            if c = '\\' && i + 1 < rest.Length then
-                                sb.Append(rest.[i + 1]) |> ignore
-                                i <- i + 2
-                            elif c = '"' then
-                                done' <- true
-                            else
-                                sb.Append(c) |> ignore
-                                i <- i + 1
-
-                        sb.ToString()
-                    else
-                        ""
-
-            if openReq.RequestKind = "squash" then
-                Some(
-                    BloggerRequestContext.Squash
-                        { RequestId = openReq.RequestId
-                          MainSessionId = openReq.MainSessionId
-                          BloggerSessionId = openReq.BloggerSessionId
-                          FrameEpochId = openReq.FrameEpochId
-                          CoveredFrameCount = List.length openReq.SelectedFrameDigests
-                          FrameDigests = openReq.SelectedFrameDigests
-                          ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                )
-            else
-                Some(
-                    BloggerRequestContext.Main
-                        { RequestId = openReq.RequestId
-                          MainSessionId = openReq.MainSessionId
-                          BloggerSessionId = openReq.BloggerSessionId
-                          Toml = toml
-                          PreviousIngestedThroughSequence = openReq.PreviousIngestedThroughSequence
-                          NextIngestedThroughSequence = openReq.NextIngestedThroughSequence
-                          PreviousCoverableTurnCutoffExclusive = 0
-                          NextCoverableTurnCutoffExclusive = 0
-                          NextCoveredPrefixDigest = ""
-                          FrameEpochId = openReq.FrameEpochId
-                          DeltaDigest = openReq.ContextDigest
-                          ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                )
+        EnforcerHost.tryReloadRequestContext journal openReq
 
     /// Startup pass: walk open materializations + receipts.
     let reconcile

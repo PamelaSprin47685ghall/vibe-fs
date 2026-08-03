@@ -195,61 +195,11 @@ module PromptAuthority =
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | _ -> None
 
-    let roleLabel (role: Role) =
-        match role with
-        | Role.Manager -> "manager"
-        | Role.Orchestrator -> "orchestrator"
-        | Role.Coder -> "coder"
-        | Role.Inspector -> "inspector"
-        | Role.DevOps -> "devops"
-        | Role.Browser -> "browser"
-        | Role.Meditator -> "meditator"
-        | Role.Reviewer -> "reviewer"
-        | Role.Executor -> "executor"
-        | Role.Blogger -> "blogger"
-
-    let tryParseRole (value: string) =
-        match value.ToLowerInvariant() with
-        | "manager" -> Some Role.Manager
-        | "orchestrator" -> Some Role.Orchestrator
-        | "coder" -> Some Role.Coder
-        | "inspector" -> Some Role.Inspector
-        | "devops" -> Some Role.DevOps
-        | "browser" -> Some Role.Browser
-        | "meditator" -> Some Role.Meditator
-        | "reviewer" -> Some Role.Reviewer
-        | "executor" -> Some Role.Executor
-        | "blogger" -> Some Role.Blogger
-        | _ -> None
-
-    let tierLabel (tier: AgentTier) =
-        match tier with
-        | AgentTier.Fast -> "Fast"
-        | AgentTier.Deep -> "Deep"
-
-    let tryParseTier (value: string) =
-        match value.ToLowerInvariant() with
-        | "fast" -> Some AgentTier.Fast
-        | "deep" -> Some AgentTier.Deep
-        | _ -> None
-
-    /// AGENT-004: these are illegal, with no alias and no autocompletion.
-    let private legacyAgentNames =
-        set
-            [ "orchestrator"
-              "manager"
-              "build"
-              "plan"
-              "coder"
-              "inspector"
-              "devops"
-              "browser"
-              "meditator"
-              "reviewer"
-              "blogger"
-              "executor"
-              "fast"
-              "deep" ]
+    /// Labels and tier/role tables live in `ManagedAgentCatalog` (AGENT-001…004).
+    let roleLabel = ManagedAgentCatalog.roleLabel
+    let tryParseRole = ManagedAgentCatalog.tryParseRole
+    let tierLabel = ManagedAgentCatalog.tierLabel
+    let tryParseTier = ManagedAgentCatalog.tryParseTier
 
     /// Why a managed agent name was refused.
     ///
@@ -273,10 +223,8 @@ module PromptAuthority =
 
     /// AGENT-002 and AGENT-003: parse `fast-ROLE` / `deep-ROLE` and derive the peer.
     ///
-    /// The ONE parser for this format. `ManagedAgent.parse` delegates here rather
-    /// than repeating it: the previous pair had two copies of the legacy-rejection
-    /// list, two role tables, two tier tables and two peer derivations, and nothing
-    /// kept them in step — a role added to one would be rejected by the other.
+    /// The ONE parser for this format. Labels, legacy set, and peer derivation all
+    /// come from `ManagedAgentCatalog`; `ManagedAgent.parse` only adds visibility.
     let parseAgentNameTyped (value: string) : Result<ParsedAgentName, AgentNameRejection> =
         if String.IsNullOrWhiteSpace value then
             Error(AgentNameRejection.Malformed value)
@@ -284,14 +232,7 @@ module PromptAuthority =
             let trimmed = value.Trim()
             let lower = trimmed.ToLowerInvariant()
 
-            if
-                legacyAgentNames.Contains lower
-                || lower.Contains("_")
-                || lower.EndsWith("-fast")
-                || lower.EndsWith("-deep")
-                || lower.StartsWith("fast_")
-                || lower.StartsWith("deep_")
-            then
+            if ManagedAgentCatalog.isLegacyAgentName lower then
                 Error(AgentNameRejection.LegacyAgentName trimmed)
             else
                 let parts = trimmed.Split([| '-' |], 2)
@@ -299,24 +240,15 @@ module PromptAuthority =
                 if parts.Length <> 2 then
                     Error(AgentNameRejection.Malformed trimmed)
                 else
-                    match tryParseTier parts.[0], tryParseRole parts.[1] with
+                    match ManagedAgentCatalog.tryParseTier parts.[0], ManagedAgentCatalog.tryParseRole parts.[1] with
                     | None, _
                     | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
                     | Some tier, Some role ->
-                        let peerTier =
-                            match tier with
-                            | AgentTier.Fast -> AgentTier.Deep
-                            | AgentTier.Deep -> AgentTier.Fast
-
                         Ok
                             { Name = trimmed
                               Role = role
                               Tier = tier
-                              // The wire spelling is lowercase; `tierLabel` is the
-                              // journal's capitalised form and is deliberately NOT
-                              // reused here — a Host agent name and a durable fact
-                              // label are different strings for different readers.
-                              PeerName = sprintf "%s-%s" ((tierLabel peerTier).ToLowerInvariant()) (roleLabel role) }
+                              PeerName = ManagedAgentCatalog.peerNameOf tier role }
 
     /// String-error form, for the fact-fold and claim paths that only report.
     let parseAgentName (value: string) : Result<string * Role * AgentTier * string, string> =
@@ -324,7 +256,7 @@ module PromptAuthority =
         |> Result.map (fun parsed -> parsed.Name, parsed.Role, parsed.Tier, parsed.PeerName)
         |> Result.mapError (fun rejection ->
             match rejection with
-            | AgentNameRejection.LegacyAgentName name -> sprintf "Legacy agent name '%s' is not supported." name
+            | AgentNameRejection.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
             | AgentNameRejection.UnknownManagedAgent _ -> "Unknown tier or role. Use fast-* or deep-*."
             | AgentNameRejection.Malformed _ -> "Expected fast-ROLE or deep-ROLE.")
 

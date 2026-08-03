@@ -193,6 +193,24 @@ canaries = []
 evidence = ""
 
 [[clause]]
+id = "ARCH-010-TOOL-BOUND"
+title = "自定义 tool result 抢先截断（留尾）"
+ssot = "SSOT/01.md"
+lifecycle = "active"
+status = "conformant"
+required_layer = 0
+verified_commit = "151fee58"
+owner = [
+  "src/Wanxiangshu.Next/Domain/ToolResultBound.fs",
+  "src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs",
+]
+tests = [
+  "tests-mjs/Context/tool-result-bound.test.mjs",
+]
+canaries = []
+evidence = ""
+
+[[clause]]
 id = "AGENT-001"
 title = "Canonical Role 与 Agent Tier"
 ssot = "SSOT/02.md"

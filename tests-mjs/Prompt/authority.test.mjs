@@ -140,7 +140,10 @@ test('AGENT_004_005_bare_legacy_agent_names_are_refused', () => {
   for (const bare of ['coder', 'manager', 'reviewer', 'orchestrator']) {
     const built = rootFor(bare)
     assert.equal(built.ok, false, `'${bare}' must not produce a profile`)
-    assert.equal(built.error, `Legacy agent name '${bare}' is not supported.`)
+    assert.equal(
+      built.error,
+      `Legacy agent name '${bare}' is not supported. Managed agents require explicit fast-/deep- names.`,
+    )
   }
 
   // Typed rejections, so a caller can branch on the reason without parsing prose.
@@ -595,5 +598,8 @@ test('PROMPT_002_agent_owner_root_claims_reject_bare_legacy_names_too', () => {
   // reintroduce the undefined fallback pair one layer up.
   const claim = authorityRun.claimAgentOwnerRoot(promptKey('pk_b'), SESSION, 'pd', 'manager')
   assert.equal(claim.ok, false)
-  assert.equal(claim.error, "Legacy agent name 'manager' is not supported.")
+  assert.equal(
+    claim.error,
+    "Legacy agent name 'manager' is not supported. Managed agents require explicit fast-/deep- names.",
+  )
 })

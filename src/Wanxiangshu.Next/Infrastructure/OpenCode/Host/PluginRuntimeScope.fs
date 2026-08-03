@@ -33,9 +33,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// dictionary entry is the guard that makes the invariant structural).
     let parkedGate = obj ()
     let parked = Dictionary<string, ParkedTransform>()
-    // ENFORCER-047/050: two physical slots — never share one dictionary.
-    // CurrentRequest = InFlight cycle authority; PendingOffer = Parked next material.
-    let currentRequest = Dictionary<string, BloggerRequestContext>()
+    // ENFORCER-047/050: dual slots without dual storage.
+    // CurrentRequest = BloggerRuntimeState.InFlight payload (sole authority).
+    // PendingOffer = separate dictionary for the next Main material while Parked.
+    // A second dictionary mirroring InFlight dual-wrote and drifted into
+    // "missing CurrentRequest" while the cell still held typed context.
     let pendingOffer = Dictionary<string, BloggerRequestContext>()
     let bloggerRuntime = Dictionary<string, BloggerRuntimeCell>()
 
@@ -183,9 +185,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     parked.Remove sessionId |> ignore
                 | false, _ -> ()
 
-                currentRequest.Remove sessionId |> ignore
                 pendingOffer.Remove sessionId |> ignore
                 // Park cancel/timeout leaves the logical Blogger idle, not disposed.
+                // CurrentRequest is InFlight payload — empty cell clears it.
                 match bloggerRuntime.TryGetValue sessionId with
                 | true, cell when cell.State = BloggerRuntimeState.Disposed -> bloggerRuntime.[sessionId] <- cell
                 | _ -> bloggerRuntime.[sessionId] <- BloggerRuntime.empty)
@@ -193,17 +195,42 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)
 
+        // ENFORCER-047: CurrentRequest IS the InFlight payload. No parallel dict.
         member this.SetCurrentRequest(sessionId: string, context: BloggerRequestContext) : unit =
-            lock parkedGate (fun () -> currentRequest.[sessionId] <- context)
+            lock parkedGate (fun () ->
+                let cell = this.GetBloggerRuntimeUnlocked sessionId
+
+                match cell.State with
+                | BloggerRuntimeState.Disposed -> ()
+                | BloggerRuntimeState.InFlight _ ->
+                    bloggerRuntime.[sessionId] <-
+                        { cell with
+                            State = BloggerRuntimeState.InFlight context }
+                | BloggerRuntimeState.Idle
+                | BloggerRuntimeState.Parked ->
+                    // Materialize / recovery may re-arm before onCycleCommitted flips state.
+                    bloggerRuntime.[sessionId] <-
+                        { State = BloggerRuntimeState.InFlight context
+                          PendingOffer = cell.PendingOffer
+                          RepairSpent = cell.RepairSpent })
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
-            lock parkedGate (fun () ->
-                match currentRequest.TryGetValue sessionId with
-                | true, context -> Some context
-                | false, _ -> None)
+            lock parkedGate (fun () -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
 
         member this.ClearCurrentRequest(sessionId: string) : unit =
-            lock parkedGate (fun () -> currentRequest.Remove sessionId |> ignore)
+            // Success path already moved the cell to Parked/Idle via onCycleCommitted/onFail.
+            // If still InFlight (abandon / timeout without transition), drop to Idle.
+            lock parkedGate (fun () ->
+                match bloggerRuntime.TryGetValue sessionId with
+                | true, cell ->
+                    match cell.State with
+                    | BloggerRuntimeState.InFlight _ ->
+                        bloggerRuntime.[sessionId] <-
+                            { State = BloggerRuntimeState.Idle
+                              PendingOffer = cell.PendingOffer
+                              RepairSpent = false }
+                    | _ -> ()
+                | false, _ -> ())
 
         member this.SetPendingOffer(sessionId: string, context: BloggerRequestContext) : bool =
             lock parkedGate (fun () ->
@@ -340,7 +367,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     entry.TryCancel()
 
                 parked.Clear()
-                currentRequest.Clear()
                 pendingOffer.Clear()
                 bloggerRuntime.Clear())
 

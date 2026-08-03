@@ -3,7 +3,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bloggerRequestContext as ctx, parkedTransform } from '../domain.mjs'
+import { bloggerRequestContext as ctx, bloggerRuntime, parkedTransform } from '../domain.mjs'
 
 const SHORT_LIFETIME_MS = 200
 const main = (toml = 'delta-1') => ctx.main({ toml })
@@ -123,4 +123,36 @@ test('ENFORCER_161_sessions_are_independent_under_the_same_scope', async () => {
 
   parkedTransform.cancelParked(scope, 'ses-a')
   assert.equal(await a, false)
+})
+
+test('ENFORCER_047_CurrentRequest_is_InFlight_payload_not_a_parallel_dict', () => {
+  // Dual-write root cause of enforcer-cycle-failed / missing CurrentRequest:
+  // a separate dictionary could be cleared while InFlight still held context.
+  // Set/peek/clear must go through the InFlight payload only.
+  const scope = parkedTransform.scope()
+  const key = 'ses-blogger'
+  const request = main('coverage-delta')
+
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
+
+  parkedTransform.setCurrentRequest(scope, key, request)
+  const peeked = parkedTransform.peekCurrentRequest(scope, key)
+  assert.equal(peeked?.kind, 'Main')
+  assert.equal(peeked?.toml, 'coverage-delta')
+  assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'InFlight')
+
+  // Commit success path: onCycleCommitted → Parked, then ClearCurrentRequest is a no-op on Parked.
+  const committed = bloggerRuntime.onCycleCommitted(parkedTransform.getRuntime(scope, key))
+  assert.equal(committed.ok, true)
+  parkedTransform.setRuntime(scope, key, committed.state)
+  parkedTransform.clearCurrentRequest(scope, key)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
+  assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'Parked')
+
+  // Fail path: Clear while still InFlight drops to Idle.
+  parkedTransform.setCurrentRequest(scope, key, main('fail-me'))
+  assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'InFlight')
+  parkedTransform.clearCurrentRequest(scope, key)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
+  assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'Idle')
 })

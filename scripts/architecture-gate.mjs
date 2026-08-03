@@ -114,10 +114,7 @@ const HOST_INTEROP_ALLOWLIST = new Map([
     'src/Wanxiangshu.Next/Session/BloggerCoordinator.fs',
     'C5: createObj context payload for durable request materialization blob (CanonicalJson boundary)',
   ],
-  [
-    'src/Wanxiangshu.Next/Application/Reconciliation/BloggerCrashRecovery.fs',
-    'C5: StringBuilder + blob JSON field scrape to reload Toml into typed context on restart',
-  ],
+  // BloggerCrashRecovery no longer scrapes JSON; it calls EnforcerHost.tryReloadRequestContext.
 ])
 
 // Kernel and Domain are the pure core. VERIFY-005 hard-blocks "Kernel 引用 Host
@@ -837,15 +834,25 @@ for (const { path, budget, enforcement } of RUNNER_TIERS) {
     }
   }
 
-  // Dual slots: CurrentRequest and PendingOffer must both exist; parkedOffer alone is banned.
+  // Dual slots without dual storage:
+  // PendingOffer = dictionary; CurrentRequest = InFlight payload (no currentRequest dict).
   const scopeText = existsSync('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
     ? read('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
     : ''
-  if (scopeText.includes('parkedOffer') && !scopeText.includes('currentRequest')) {
+  if (scopeText.includes('parkedOffer')) {
     fail('blogger-convergence', 'PluginRuntimeScope must not use a single parkedOffer dictionary')
   }
-  if (!scopeText.includes('currentRequest') || !scopeText.includes('pendingOffer')) {
-    fail('blogger-convergence', 'PluginRuntimeScope must hold currentRequest and pendingOffer slots')
+  if (!scopeText.includes('pendingOffer')) {
+    fail('blogger-convergence', 'PluginRuntimeScope must hold a pendingOffer slot')
+  }
+  if (/let currentRequest\b/.test(scopeText) || /Dictionary<string, BloggerRequestContext>\(\)\s*\n\s*let pendingOffer/.test(scopeText)) {
+    fail(
+      'blogger-convergence',
+      'PluginRuntimeScope must not dual-write CurrentRequest in a dictionary; InFlight payload is sole authority',
+    )
+  }
+  if (!/TryPeekCurrentRequest[\s\S]{0,400}inFlightContext/.test(scopeText) && !/BloggerRuntime\.inFlightContext/.test(scopeText)) {
+    fail('blogger-convergence', 'TryPeekCurrentRequest must read BloggerRuntime.inFlightContext')
   }
 
   // ADOPTED motion must not remain active PENDING.

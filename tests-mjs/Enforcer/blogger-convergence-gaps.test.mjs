@@ -72,15 +72,39 @@ test('C0_BloggerRuntimeState_is_the_only_busy_definition', () => {
 })
 
 test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
-  // Staged offer dictionary currently doubles as both "current cycle context"
-  // and "next parked offer" — the race C0 forbids.
+  // Dual slots without dual storage: PendingOffer is a dictionary;
+  // CurrentRequest is the InFlight payload. A parallel currentRequest dict
+  // dual-wrote and drifted into "missing CurrentRequest".
   const scope = prodText('src/Wanxiangshu.Next/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
-  const usesSingleOfferDict =
-    /parkedOffer/.test(scope) && !/currentRequest/.test(scope) && !/pendingOffer/.test(scope)
+  assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
+  assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
   assert.equal(
-    usesSingleOfferDict,
+    /\blet currentRequest\b/.test(scope),
     false,
-    'CurrentRequest and PendingOffer must be two physical slots; a single parkedOffer dictionary is forbidden',
+    'CurrentRequest must not be a second dictionary; InFlight payload is sole authority',
+  )
+  assert.match(
+    scope,
+    /BloggerRuntime\.inFlightContext|inFlightContext \(this\.GetBloggerRuntimeUnlocked/,
+    'TryPeekCurrentRequest must read InFlight payload',
+  )
+})
+
+test('C0_commit_resolves_context_from_inflight_or_durable_open', () => {
+  const host = prodText('src/Wanxiangshu.Next/Session/EnforcerHost.fs')
+  assert.match(host, /resolveCycleContext/, 'commit must resolve cycle context via one helper')
+  assert.match(host, /tryReloadRequestContext/, 'durable open materialization must reload full typed context')
+  assert.match(
+    host,
+    /let currentCtx = resolveCycleContext/,
+    'handleContinuation must not only TryPeekCurrentRequest without durable fallback',
+  )
+  assert.equal(
+    /PreviousCoverableTurnCutoffExclusive = 0\s*\n\s*NextCoverableTurnCutoffExclusive = 0/.test(
+      prodText('src/Wanxiangshu.Next/Application/Reconciliation/BloggerCrashRecovery.fs'),
+    ),
+    false,
+    'crash recovery must not zero cutoff/digest when reloading Main context',
   )
 })
 

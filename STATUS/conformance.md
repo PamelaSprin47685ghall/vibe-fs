@@ -15,6 +15,7 @@
 | ARCH-009 | active | CONFORMANT | 0 | 151fee58 | src/Wanxiangshu.Next/Kernel/Flow.fs | tests-mjs/Kernel/parallel.test.mjs |  |  |
 | ARCH-010 | active | CONFORMANT | 0 | 151fee58 | src/Wanxiangshu.Next/Kernel/Flow.fs | tests-mjs/Context/blogger-delta.test.mjs, tests-mjs/Context/blogger-toml.test.mjs, tests-mjs/Context/synthetic-toml.test.mjs, tests-mjs/Execution/fork-child-payload.test.mjs, tests-mjs/Review/witness.test.mjs, tests-mjs/domain.mjs, testkit/opencode/tests/gate-arch010-cases.mjs |  |  |
 | ARCH-010-LWR | active | CONFORMANT | 0 | 151fee58 | src/Wanxiangshu.Next/Kernel/Flow.fs |  |  |  |
+| ARCH-010-TOOL-BOUND | active | CONFORMANT | 0 | 151fee58 | src/Wanxiangshu.Next/Domain/ToolResultBound.fs, src/Wanxiangshu.Next/Infrastructure/OpenCode/Codec/ToolHostCodec.fs | tests-mjs/Context/tool-result-bound.test.mjs |  |  |
 | AGENT-001 | active | CONFORMANT | 3 | 151fee58 | src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs | tests-mjs/Context/attempt-plan.test.mjs, tests-mjs/Plugin/manager-tool-contract.test.mjs, tests-mjs/domain.mjs, testkit/opencode/tests/gate-cold-boundary-cases.mjs |  |  |
 | AGENT-002 | active | CONFORMANT | 2 | 151fee58 | src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs | tests-mjs/Plugin/host-hooks.test.mjs, tests-mjs/Plugin/manager-tool-contract.test.mjs, tests-mjs/domain.mjs |  |  |
 | AGENT-003 | active | CONFORMANT | 0 | 151fee58 | src/Wanxiangshu.Next/Infrastructure/OpenCode/Tools/ManagedAgent.fs |  |  |  |

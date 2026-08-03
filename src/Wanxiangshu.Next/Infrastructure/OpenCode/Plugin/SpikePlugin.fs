@@ -139,6 +139,10 @@ module SpikePlugin =
 
                                 match SessionAssociationProjection.tryMainSessionOf sid associations with
                                 | Some _ ->
+                                    // ENFORCER-154: crash-window recovery before commit
+                                    // so durable open materialization can re-arm InFlight.
+                                    do! scope.EnsureRecoveryDone()
+
                                     let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
                                     let! messages = EnforcerHost.handleContinuation scope journal sid bloggerMessages

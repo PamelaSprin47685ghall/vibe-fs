@@ -529,6 +529,165 @@ module EnforcerHost =
                         Messages = coveredMessages }
             )
 
+    /// C5: inverse of BloggerCoordinator.materializeRequest blob.
+    /// Full typed context — never leave cutoff/digest at zero defaults.
+    let tryReloadRequestContext
+        (journal: AgentJournal)
+        (openReq: OpenBloggerRequest)
+        : BloggerRequestContext option =
+        match journal.Writer.BlobWriter.Read openReq.ContextRef with
+        | Error _ -> None
+        | Ok json ->
+            try
+                let raw = Fable.Core.JS.JSON.parse json
+
+                let hasKey (key: string) : bool =
+                    emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
+
+                let asString (key: string) : string =
+                    if not (hasKey key) then
+                        ""
+                    else
+                        let value = raw?(key)
+
+                        if isNull value then
+                            ""
+                        elif emitJsExpr value "typeof $0 === 'string'" then
+                            unbox<string> value
+                        elif emitJsExpr value "typeof $0 === 'number'" then
+                            string (unbox<float> value)
+                        else
+                            ""
+
+                let asInt64 (key: string) : int64 option =
+                    if not (hasKey key) then
+                        None
+                    else
+                        let value = raw?(key)
+
+                        if isNull value then
+                            None
+                        elif emitJsExpr value "typeof $0 === 'number'" then
+                            Some(int64 (unbox<float> value))
+                        elif emitJsExpr value "typeof $0 === 'bigint'" then
+                            Some(int64 (unbox<float> (emitJsExpr value "Number($0)")))
+                        elif emitJsExpr value "typeof $0 === 'string'" then
+                            let text = unbox<string> value
+
+                            if String.IsNullOrWhiteSpace text then
+                                None
+                            else
+                                Some(int64 (float text))
+                        else
+                            None
+
+                let asInt (key: string) : int option =
+                    if not (hasKey key) then
+                        None
+                    else
+                        let value = raw?(key)
+
+                        if isNull value then
+                            None
+                        elif emitJsExpr value "typeof $0 === 'number'" then
+                            Some(int (unbox<float> value))
+                        elif emitJsExpr value "typeof $0 === 'string'" then
+                            let text = unbox<string> value
+
+                            if String.IsNullOrWhiteSpace text then
+                                None
+                            else
+                                Some(int (float text))
+                        else
+                            None
+
+                if openReq.RequestKind = "squash" then
+                    let covered =
+                        asInt "covered_frame_count"
+                        |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
+
+                    Some(
+                        BloggerRequestContext.Squash
+                            { RequestId = openReq.RequestId
+                              MainSessionId = openReq.MainSessionId
+                              BloggerSessionId = openReq.BloggerSessionId
+                              FrameEpochId = openReq.FrameEpochId
+                              CoveredFrameCount = covered
+                              FrameDigests = openReq.SelectedFrameDigests
+                              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+                    )
+                else
+                    let toml = asString "toml"
+                    let deltaDigestRaw = asString "delta_digest"
+
+                    let deltaDigest =
+                        if String.IsNullOrWhiteSpace deltaDigestRaw then
+                            if String.IsNullOrWhiteSpace toml then
+                                openReq.ContextDigest
+                            else
+                                BlobDigest.create (HostDigest.sha256Hex toml)
+                        else
+                            BlobDigest.create deltaDigestRaw
+
+                    let prevIngest =
+                        asInt64 "prev_ingest"
+                        |> Option.defaultValue openReq.PreviousIngestedThroughSequence
+
+                    let nextIngest =
+                        asInt64 "next_ingest"
+                        |> Option.defaultValue openReq.NextIngestedThroughSequence
+
+                    Some(
+                        BloggerRequestContext.Main
+                            { RequestId = openReq.RequestId
+                              MainSessionId = openReq.MainSessionId
+                              BloggerSessionId = openReq.BloggerSessionId
+                              Toml = toml
+                              PreviousIngestedThroughSequence = prevIngest
+                              NextIngestedThroughSequence = nextIngest
+                              PreviousCoverableTurnCutoffExclusive = asInt "prev_cutoff" |> Option.defaultValue 0
+                              NextCoverableTurnCutoffExclusive = asInt "next_cutoff" |> Option.defaultValue 0
+                              NextCoveredPrefixDigest = asString "next_prefix_digest"
+                              FrameEpochId = openReq.FrameEpochId
+                              DeltaDigest = deltaDigest
+                              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
+                    )
+            with _ ->
+                None
+
+    /// ENFORCER-045/050/154: commit authority for the in-flight cycle.
+    /// Order: live InFlight payload → durable open materialization (heal InFlight).
+    let resolveCycleContext
+        (scope: IParkedTransformHost)
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        : BloggerRequestContext option =
+        let key = SessionId.value bloggerSessionId
+
+        match scope.TryPeekCurrentRequest key with
+        | Some ctx -> Some ctx
+        | None ->
+            let openReq =
+                (AgentJournal.snapshot journal).AgentProjections.Sessions
+                |> Map.tryFind mainSessionId
+                |> Option.bind (fun session -> session.BloggerCycles)
+                |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
+
+            match openReq with
+            | None -> None
+            | Some req ->
+                match tryReloadRequestContext journal req with
+                | None -> None
+                | Some ctx ->
+                    match scope.GetBloggerRuntime(key).State with
+                    | BloggerRuntimeState.Disposed -> None
+                    | _ ->
+                        // Completed blog calls prove the physical cycle is live.
+                        // SetCurrentRequest alone re-arms InFlight (single authority).
+                        scope.SetCurrentRequest(key, ctx)
+                        Some ctx
+
     /// Public: build the staged offer context from the same delta the coordinator
     /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
     let internal mainContextFromChunk
@@ -656,7 +815,8 @@ module EnforcerHost =
                 // must NOT consume the staged offer again. The offer belongs to
                 // the NEXT cycle's coverage advance, not this one's.
                 let key = SessionId.value bloggerSessionId
-                let currentCtx = scope.TryPeekCurrentRequest key
+                // ENFORCER-045/154: live InFlight first; else durable open materialization.
+                let currentCtx = resolveCycleContext scope durable mainSessionId bloggerSessionId
 
                 let snapshot = AgentJournal.snapshot durable
 

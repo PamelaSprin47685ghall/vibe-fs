@@ -3,6 +3,7 @@ namespace Wanxiangshu.Next.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Next.Domain
 open Wanxiangshu.Next.Kernel
 open Wanxiangshu.Next.Tools
 
@@ -23,21 +24,6 @@ module ManagedAgentConfig =
         | DuplicatePairModel of fast: string * deep: string * model: string
         | LegacyAgentPresent of string
         | InvalidManagedAgent of string * detail: string
-
-    let private legacyHostNames =
-        set
-            [ "orchestrator"
-              "manager"
-              "build"
-              "plan"
-              "coder"
-              "inspector"
-              "devops"
-              "browser"
-              "meditator"
-              "reviewer"
-              "blogger"
-              "executor" ]
 
     let private readModel (agentObj: obj) : string option =
         if isNull agentObj then
@@ -89,10 +75,7 @@ module ManagedAgentConfig =
                 fast
                 deep
                 model
-        | LegacyAgentPresent name ->
-            sprintf
-                "Legacy agent name '%s' is present in opencode.json. Wanxiangshu 0.5.0 only accepts fast-* / deep-* managed agents."
-                name
+        | LegacyAgentPresent name -> ManagedAgentCatalog.formatLegacyNameInConfig name
         | InvalidManagedAgent(name, detail) -> sprintf "Invalid managed agent '%s': %s" name detail
 
     let validate (config: obj) : Result<ManagedAgentInventory, string> =
@@ -105,7 +88,7 @@ module ManagedAgentConfig =
                 Error(formatError MissingAgentMap)
             else
                 let legacyHit =
-                    legacyHostNames
+                    ManagedAgentCatalog.legacyAgentNames
                     |> Seq.tryFind (fun name ->
                         match agentEntry agents name with
                         | Some _ -> true
