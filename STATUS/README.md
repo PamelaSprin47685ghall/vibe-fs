@@ -3,7 +3,7 @@
 ## 当前基线
 
 - 分支：`master`
-- 最后验证 commit：`4807b9bb`（PrefixCoverage 从 staged context 推进；fallback prefix-probe 闭合）
+- 最后验证 commit：`8d817db8`（PrefixCoverage 从 staged context 推进；fallback prefix-probe 闭合）
 - 本轮验证：build + 616 unit + fallback / fallback-aabb-trace / host-transform-capability 全绿
 
 ## 当前产品状态
