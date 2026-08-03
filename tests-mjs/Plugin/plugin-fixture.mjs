@@ -39,7 +39,7 @@ const { SessionIdModule_create, PhysicalUserMessageIdModule_create } = await imp
 )
 const { TerminalOutcome } = await import('../../build/next/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../build/next/Kernel/Outcome.js')
-const { recordCompletion } = await import('../../build/next/Session/HandleController.js')
+const { HandleController_recordCompletion: recordCompletion } = await import('../../build/next/Session/HandleController.js')
 
 /**
  * The smallest SDK client double: mint child ids, accept prompts. The id list is
