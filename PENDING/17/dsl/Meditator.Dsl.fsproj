@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <OtherFlags>--nowarn:1182 --nowarn:3520</OtherFlags>
+  </PropertyGroup>
+  <!-- 编译顺序即依赖顺序（各文件头注释标注）：Meditation → Boundary → Budget → Ledger →
+       Obligation → Oracle → Ensure → Stop → Report → Kernel → Methods.* -->
+  <ItemGroup>
+    <Compile Include="Meditation.fs"/>
+    <Compile Include="Boundary.fs"/>
+    <Compile Include="Budget.fs"/>
+    <Compile Include="Ledger.fs"/>
+    <Compile Include="Obligation.fs"/>
+    <Compile Include="Oracle.fs"/>
+    <Compile Include="Ensure.fs"/>
+    <Compile Include="Stop.fs"/>
+    <Compile Include="Report.fs"/>
+    <Compile Include="Kernel.fs"/>
+    <Compile Include="Methods.Gates.fs"/>
+    <Compile Include="Methods.Hypothesis.fs"/>
+    <Compile Include="Methods.Warrants.fs"/>
+    <Compile Include="Methods.Transforms.fs"/>
+    <Compile Include="Methods.Search.fs"/>
+    <Compile Include="Methods.Structure.fs"/>
+    <Compile Include="Methods.Synthesis.fs"/>
+  </ItemGroup>
+</Project>

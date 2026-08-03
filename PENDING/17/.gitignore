@@ -1,0 +1,17 @@
+# .NET / F# build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Repomix packed output (regenerable)
+repomix-output.xml
+
+# Node (in case of Fable/npm tooling)
+node_modules/
+
+# OS / editor noise
+.DS_Store
+*.swp
+*.tmp

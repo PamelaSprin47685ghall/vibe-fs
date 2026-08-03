@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <OtherFlags>--nowarn:1182 --nowarn:3520</OtherFlags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0"/>
+    <PackageReference Include="xunit" Version="2.9.2"/>
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 其他 5：测试构建强制 dsl 以 Debug 编译（IVT 存在，测试可访问 internal）——
+         无论外层 -c Release。生产发布单独 dotnet build -c Release dsl：无 IVT，权柄不出生产程序集。 -->
+    <ProjectReference Include="../Meditator.Dsl.fsproj" AdditionalProperties="Configuration=Debug"/>
+  </ItemGroup>
+  <!-- 编译顺序即依赖顺序 -->
+  <ItemGroup>
+    <Compile Include="TestUtil.fs"/>
+    <Compile Include="Scenario.fs"/>
+    <Compile Include="Tests.ClaimTest.fs"/>
+    <Compile Include="Tests.Properties.fs"/>
+    <Compile Include="Tests.Counterexamples.fs"/>
+    <Compile Include="Tests.GraphReachability.fs"/>
+    <Compile Include="Tests.Crash.fs"/>
+    <Compile Include="Tests.Entry.fs"/>
+    <Compile Include="Program.fs"/>
+  </ItemGroup>
+</Project>
