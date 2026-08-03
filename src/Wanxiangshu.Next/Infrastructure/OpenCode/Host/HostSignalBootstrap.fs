@@ -279,8 +279,24 @@ module HostSignalBootstrap =
                   AgentRole = Some role
                   Directory = directory }
 
+        let onAuthorityRoot (mainSessionId: SessionId) =
+            match journal with
+            | None -> ()
+            | Some durable ->
+                let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
+
+                match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
+                | None -> ()
+                | Some bloggerId ->
+                    BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId
+
         let chatMessageHook =
-            PromptIngress.createHook journal bindUserMessage bindContinuationMessage registerOwned
+            PromptIngress.createHook
+                journal
+                bindUserMessage
+                bindContinuationMessage
+                registerOwned
+                (Some onAuthorityRoot)
 
         let cancelSignals (ids: SessionId seq) =
             ids |> Seq.iter (fun id -> signalRouter.UnregisterOwned id)

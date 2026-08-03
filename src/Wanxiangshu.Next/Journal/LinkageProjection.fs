@@ -177,6 +177,16 @@ module HandleProjection =
             else
                 None)
 
+    /// Fork-child main is sealed for Blogger once joinable or retired.
+    /// Human root (no handle) is never sealed by this rule.
+    let lifecycleSealsBlogger (lifecycle: HandleLifecycle) : bool =
+        match lifecycle with
+        | CompletedAwaitingJoin _
+        | Retired -> true
+        | Active -> false
+
+    let recordSealsBlogger (record: HandleRecord) : bool = lifecycleSealsBlogger record.Lifecycle
+
     /// Every child session this parent has ever linked.
     ///
     /// Replaces the old `LinkedChildren` map. That map was keyed by child and held

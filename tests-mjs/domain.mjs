@@ -2152,6 +2152,8 @@ export const handleProjection = (() => {
     'activeHandles',
     'tryFindByChildSession',
     'linkedChildren',
+    'lifecycleSealsBlogger',
+    'recordSealsBlogger',
   ])
 
   /**
@@ -2189,6 +2191,8 @@ export const handleProjection = (() => {
     tryFindByChildSession: (child, current) => unwrapOption(m.tryFindByChildSession(child, current)),
     linkedChildren: (current) => listItems(m.linkedChildren(current)),
     lifecycleOf: (record) => caseOf(record.Lifecycle),
+    lifecycleSealsBlogger: (lifecycle) => m.lifecycleSealsBlogger(lifecycle),
+    recordSealsBlogger: (record) => m.recordSealsBlogger(record),
 
     /** One handle record as comparable text. */
     read: (record) => {
@@ -3027,8 +3031,13 @@ export const bloggerRuntime = (() => {
     'onSquashCommitted',
     'onFail',
     'markRepairSpent',
+    'onSeal',
+    'forceSeal',
+    'onReactivate',
     'onDispose',
     'inFlightContext',
+    'isSealed',
+    'blocksNewRequest',
     'tryPeekInFlight',
     'tryTakeInFlight',
     'tryTakePending',
@@ -3038,6 +3047,7 @@ export const bloggerRuntime = (() => {
   return {
     idle: m.ofState(stateCase('Idle', [])),
     parked: m.ofState(stateCase('Parked', [])),
+    sealed: m.ofState(stateCase('Sealed', [])),
     disposed: m.ofState(stateCase('Disposed', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
@@ -3051,29 +3061,51 @@ export const bloggerRuntime = (() => {
         decision: caseOf(pair[1]),
         pending: unwrapOption(pair[0].PendingOffer),
         repairSpent: pair[0].RepairSpent,
+        reactivated: pair[0].ReactivatedAfterSeal,
       }
     },
     onCycleCommitted: (cell) => {
       const r = resultOf(m.onCycleCommitted(cell))
       return r.ok
-        ? { ok: true, state: r.value, repairSpent: r.value.RepairSpent }
+        ? {
+            ok: true,
+            state: r.value,
+            repairSpent: r.value.RepairSpent,
+            reactivated: r.value.ReactivatedAfterSeal,
+          }
         : { ok: false, error: caseOf(r.error) }
     },
     onSquashCommitted: (cell, pendingMain) => {
       const r = resultOf(m.onSquashCommitted(cell, pendingMain === undefined ? undefined : pendingMain))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
-      return { ok: true, state: pair[0], decision: caseOf(pair[1]), repairSpent: pair[0].RepairSpent }
+      return {
+        ok: true,
+        state: pair[0],
+        decision: caseOf(pair[1]),
+        repairSpent: pair[0].RepairSpent,
+        reactivated: pair[0].ReactivatedAfterSeal,
+      }
     },
     onFail: (cell) => {
       const r = resultOf(m.onFail(cell))
       return r.ok
-        ? { ok: true, state: r.value, repairSpent: r.value.RepairSpent }
+        ? {
+            ok: true,
+            state: r.value,
+            repairSpent: r.value.RepairSpent,
+            reactivated: r.value.ReactivatedAfterSeal,
+          }
         : { ok: false, error: caseOf(r.error) }
     },
     markRepairSpent: (cell) => m.markRepairSpent(cell),
+    onSeal: (cell) => m.onSeal(cell),
+    forceSeal: (cell) => m.forceSeal(cell),
+    onReactivate: (cell) => m.onReactivate(cell),
     onDispose: (cell) => m.onDispose(cell),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
+    isSealed: (cell) => m.isSealed(cell),
+    blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),
     tryTakeInFlight: (cell) => {
       const r = resultOf(m.tryTakeInFlight(cell))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
@@ -3088,6 +3120,7 @@ export const bloggerRuntime = (() => {
     },
     stateOf: (cell) => caseOf(cell.State),
     repairSpentOf: (cell) => cell.RepairSpent,
+    reactivatedOf: (cell) => cell.ReactivatedAfterSeal,
   }
 })()
 

@@ -84,6 +84,13 @@ module AgentProjection =
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
         Map.tryFind sessionId projection.Sessions
 
+    /// Fork-child main is sealed for Blogger when its handle is joinable/retired.
+    /// Human root (no handle) → false.
+    let mainSealedForBlogger (mainSessionId: SessionId) (projection: AgentProjectionSet) : bool =
+        match Map.tryFind mainSessionId projection.HandleByChildSession with
+        | Some record -> HandleProjection.recordSealsBlogger record
+        | None -> false
+
     let private sessionOrEmpty sessionId projection =
         Map.tryFind sessionId projection.Sessions |> Option.defaultValue emptySession
 

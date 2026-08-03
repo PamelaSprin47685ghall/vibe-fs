@@ -40,6 +40,14 @@ module TerminalPolicy =
     let isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
         (tryLinkedChild journal sessionKey).IsSome
 
+    /// Fork child whose handle is CompletedAwaitingJoin or Retired: Blogger must
+    /// not Start/Offer. Human root (no handle) → false.
+    let mainSealedForBlogger (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
+        match journal with
+        | None -> false
+        | Some j ->
+            AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
+
     /// Manager Guard applies to any manager that still owns the review loop for its
     /// worktree. Manager children of Orchestrator remain linked to the family root,
     /// so parent linkage alone must not suppress the guard.

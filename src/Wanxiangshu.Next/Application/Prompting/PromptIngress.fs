@@ -43,6 +43,7 @@ module PromptIngress =
         (bindUserMessage: string -> string -> unit)
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
+        (onAuthorityRoot: (SessionId -> unit) option)
         (message: PromptIngressCodec.DecodedMessage)
         =
         // PROMPT-005: accepting a prompt is a durable act. Without a journal there
@@ -60,6 +61,8 @@ module PromptIngress =
             let acceptedRoot () =
                 bindUserMessage sessionKey messageKey
                 registerOwned sessionKey
+                // New Authority Root may reopen Blogger after a prior join/return seal.
+                onAuthorityRoot |> Option.iter (fun f -> f sessionId)
 
             // COMPANION-003: ONLY a HumanRoot's first prompt is captured as the
             // OpeningPromptRaw here. An AgentOwnerRoot (a forked child's first
@@ -117,7 +120,8 @@ module PromptIngress =
         (bindUserMessage: string -> string -> unit)
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
+        (onAuthorityRoot: (SessionId -> unit) option)
         =
         fun (input: obj) (output: obj) ->
             PromptIngressCodec.decode input output
-            |> handle journal bindUserMessage bindContinuationMessage registerOwned
+            |> handle journal bindUserMessage bindContinuationMessage registerOwned onAuthorityRoot

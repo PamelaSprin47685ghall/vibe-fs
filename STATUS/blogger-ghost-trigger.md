@@ -1,6 +1,6 @@
 # Blogger 幽灵触发 — 修订计划
 
-状态：计划（待实施）  
+状态：已实施（worktree-01）  
 取代：先前「调查-only / dispose-on-idle」叙事  
 用户裁决（2026-08-03）：
 
@@ -44,6 +44,9 @@ Human root 没有 join。
   - 可选加强：ActiveLogicalRun 结束且不再接受非 continuation 的 Authority（易过度，默认不做）
 默认实施：Human root 只靠 rule B（coverage 致命）+ 既有 deleted 清理；
 Fork child 强制 rule A（CompletedAwaitingJoin | Retired → 禁新 Y 请求）。
+**再 prompt 解封**：新 Authority Root（Human/AgentOwner）经 PromptIngress → `reactivateAfterNewRoot`，
+`ReactivatedAfterSeal=true`，即使 durable handle 仍 joinable/retired 也可再 Start，直到下一次 HandleCompleted 再封。
+
 ```
 
 若产品要坚持 Human root 也有「事做完停 Y」：必须另立 **显式 durable 事实**（例如 `WorkSessionSealed`），禁止猜 idle。本计划 **不发明** 该事实，除非你后续点名。
