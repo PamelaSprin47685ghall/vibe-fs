@@ -1,82 +1,141 @@
-# 万象术
+# Wanxiangshu
 
-OpenCode Agent DSL 插件。模型侧工具面由角色静态装配；实现侧使用 F# Structured Flow、per-runtime NDJSON 领域事实、completion mailbox、Companion 投影和 Git 发布端口。
+OpenCode managed multi-agent orchestration plugin.
 
-当前版本：`0.5.2`（0.5.2 全 SSOT 收敛） — 唯一产品语义见 [`spec/00.md`](spec/00.md)。模型由 OpenCode `agent` inventory 解析；公开身份必须是精确的 `fast-*` / `deep-*`。
+Proprietary commercial software. See [LICENSE](LICENSE).
 
-产品语义：[`spec/00.md`](spec/00.md)。实现状态与合规表：[`STATUS/conformance.md`](STATUS/conformance.md)。当前状态：[`STATUS/README.md`](STATUS/README.md)。
+## 用户指南
 
-## 当前边界
+### 产品简介
 
-本仓库已完成 SSOT 休克-退火迁移（退火三于 2026-08-02 完成：P0×3 + `test:release` 全绿）。生产代码与测试整体迁移到 `spec/` 条款；当前进度见 [`STATUS/README.md`](STATUS/README.md)，合规表由 [`STATUS/conformance.md`](STATUS/conformance.md) 从 `STATUS/conformance.toml` 生成。
+万象术（Wanxiangshu）是 OpenCode 的结构化多 Agent 编排插件：Orchestrator / Manager 调度，Coder / Inspector / DevOps / Reviewer 等角色分工，Companion Blogger 提供认知上下文，Fallback 与 Review 有明确写入口与证据链。
 
-休克开始前的最后一次完整机器反馈保存在 [`docs/archive/shock-anneal-2026/evidence/pre-shock/`](docs/archive/shock-anneal-2026/evidence/pre-shock/)。该基线的绿灯证明的是旧实现，不是 SSOT 合规——`STATUS/conformance.md` 记录各条款当前状态（Active SSOT 192/192 CONFORMANT，零 `PURE_CORE_ONLY`；spec/14 Strength 与 spec/16 Student&Teacher 已迁入 [`docs/rfcs/strength.md`](docs/rfcs/strength.md) / [`docs/rfcs/student-teacher.md`](docs/rfcs/student-teacher.md)，不再是 Active 规范）。
-
-TestKit 以 `ProviderSemanticProjection` 完整前缀匹配确定性剧本边；同一前缀幂等返回同一响应，分叉只能来自不同可见 user 内容（VERIFY-003、VERIFY-007）。P0 保持并行，release gate 恰好 3 轮；每个场景使用 2 秒 causal-progress Watchdog（VERIFY-004）。
-
-## 角色模型
+公开入口：
 
 ```text
-Orchestrator (fork/join)
-  └── Manager (fork/join/list)
-        ├── Coder (file tools + opaque inspector)
-        ├── Inspector (read/glob/grep/executor)
-        ├── DevOps (fork-pty/executor/read/glob/grep/inspector/coder/join/list)
-        ├── Browser
-        ├── Meditator
-        └── Reviewer (PERFECT/REVISE)
-```
-
-Coder 可读写代码并调用不透明的 `inspector` 调查具体必要的事实；其 schema 不含 `executor` 或终端能力，Coder prompt 也不暴露 Inspector 的内部执行权限。Coder 不应把 Inspector 当作常规验证代理，所需测试仍交接给 DevOps 或 Reviewer。
-
-DevOps 是终端操作员：独占 `fork-pty`，可 `executor`，可用 `read/glob/grep/inspector` 取证，文件修改只能通过同步 `coder` 工具委派，禁止直接 write/edit。
-
-Companion Blogger 仅是认知上下文；它不能决定调度、Review、Git 或进程事实。角色和精确权限以 SSOT 为准。
-
-## 核心不变量
-
-条款 ID 为规范位置；此处只是索引，冲突时以 `spec/` 为准。
-
-1. Busy existing agent 的 `fork` 是同 child fire-and-forget nudge；不得创建 prompt queue（EXEC-002）。
-2. completion 先写 mailbox；`join()` 消费任意可用 completion，消费后写 `HandleRetired` tombstone（EXEC-004、EXEC-009）。
-3. 进程 deadline = `min(3 × estimated_running_secs, 管理员 hard limit)`；进程资源只由拥有者清理（EXEC-011）。
-4. Review 必须由同一 Git tree 的两个不同 ProviderRunIdentity / ToolCallId `PERFECT` 确认，且第二次的 provider input seal 必须证明包含第一次 challenge（REVIEW-003、REVIEW-010）。
-5. Fallback 属于 Logical Run。Offset 按 A/A/B/B 无界循环，成功不重置 Offset 只清零 `ConsecutiveFailureCount`；自动恢复预算默认 12 连续失败后写 `FallbackExhausted`（FALLBACK-002、FALLBACK-004、FALLBACK-005）。
-6. Host 事件只负责唤醒；唯一的 `FallbackCursorAdvanced` 写入口是 FallbackController（FALLBACK-003）。
-7. 插件 Prompt 必须经 PromptDispatcher；发送时 `Model=None`，未知来源 fail-closed（PROMPT-005、PROMPT-006）。
-8. Git tree 读取失败必须 fail closed（ORCH-008）。
-9. PTY completion 只由 backend `onExit` 触发；Signal/Close 不提前完成（EXEC-015）。
-
-## 构建与测试
-
-```bash
-npm run build
-npm run test
-npm run test:harness
-npm run test:e2e:three
-```
-
-先运行当前改动的最小目标测试；只有该阶段的契约已证明后才运行更广的套件。TestKit 每个 scenario 必须独占 workspace、HOME/XDG、Provider、端口、Journal、spool、进程组、diagnostics 和 expectation store。
-
-Journal 位于 Git common directory 的私有 `wanxiangshu-next/runtimes` 路径；TestKit 不在受测 workspace 创建 `node_modules` 或 `.wanxiangshu-next`。
-
-## 生产入口
-
-```text
-wanxiangshu
+import "wanxiangshu"
 → dist/Infrastructure/OpenCode/Plugin/Plugin.js
 ```
 
-`package.json` 的 `main` 与 `exports["."]` 指向该入口。
+### 系统要求
 
-## 开发布局
+- Node.js `>= 20`
+- OpenCode Host 提供 `@opencode-ai/plugin`（peer 语义；开发依赖见 `package.json`）
+- 构建源码时：.NET SDK（见 `global.json`）与 `dotnet tool restore`（Fable / Fantomas）
 
-```text
-src/Wanxiangshu/     生产 Agent DSL（唯一源码根）
-tests/unit/                第 1–3 层测试（mjs，import dist）
-tests/e2e/         独立 OpenCode harness
-spec/                     产品语义（唯一规范，条款 ID 寻址）
-STATUS/                   当前状态（README、合规表、blockers）
+### 安装
+
+本包为 `private: true` 商业软件。从私有 registry 或交付的 tarball 安装：
+
+```bash
+npm install ./wanxiangshu-0.5.3.tgz
+# 或私有源
+npm install wanxiangshu --registry <your-registry>
 ```
 
-旧实现不作为生产依赖。历史代码仅可作逐符号行为证据；禁止整版本 checkout 或无审查覆盖。
+在 OpenCode 中注册插件（以 Host 文档为准），使插件入口指向包的 `main` / `exports["."]`。
+
+### 配置与快速开始
+
+1. 确保 OpenCode 可解析 peer 插件 API。
+2. 安装本包后，按 Host 的 plugin 配置挂载 `wanxiangshu`。
+3. 角色与工具面由插件静态装配；精确权限与语义以 [`spec/`](spec/) 条款为准。
+
+最小心智模型：
+
+```text
+Orchestrator
+  └── Manager
+        ├── Coder
+        ├── Inspector
+        ├── DevOps
+        ├── Browser / Meditator
+        └── Reviewer
+```
+
+### 运行时数据
+
+领域事实写入 Git common directory 下私有 `wanxiangshu-next/runtimes` 路径的 journal（per-runtime NDJSON），不在业务 workspace 强行创建 `node_modules` 或插件私有目录。
+
+journal 格式与事实名默认冻结；升级前请阅读 [CHANGELOG](CHANGELOG.md)。
+
+### 商业许可与支持
+
+使用、复制、修改与分发受 [LICENSE](LICENSE) 约束。商业支持与授权请联系版权方。
+
+---
+
+## 贡献者指南
+
+面向内部维护者与未来可能的贡献者。工程按可复现、可审查的标准建设；法律上仍为闭源商业软件。
+
+### 仓库结构
+
+```text
+src/Wanxiangshu/   生产 F# 源码（唯一源码根）
+resources/         运行时静态资源（prompts、enforcer catalog）
+spec/              绑定规范 + conformance 账本
+docs/              解释性文档、RFC、归档
+tests/unit/        第 1–3 层测试（mjs，import dist）
+tests/e2e/         OpenCode harness 与 canary
+tests/support/     测试支撑
+scripts/           构建与门禁入口
+dist/              Fable 输出（不提交；npm pack 包含）
+```
+
+### 开发环境
+
+```bash
+npm ci
+dotnet tool restore
+```
+
+可选：`global.json` 固定 SDK；`dotnet-tools.json` 固定 Fable / Fantomas。
+
+### 常用命令
+
+```bash
+npm run build          # Fable → dist/
+npm test               # unit（tests/unit）
+npm run test:harness   # harness 自检
+npm run test:e2e       # canary 单轮
+npm run check          # gate:static + build + test + harness
+npm run check:release  # check + e2e×3 + npm pack --dry-run
+npm run lint           # Fantomas / XML 格式化（提交前）
+```
+
+内部 `gate:*` 脚本由 `gate:static` 聚合，日常优先用 `check` / `check:release`。
+
+### 构建与测试分层
+
+| 层 | 命令 | 含义 |
+|----|------|------|
+| 0 静态 | `npm run gate:static` | layout / ssot / conformance / architecture / … |
+| 1–3 unit | `npm test` | 纯函数、契约、Fake Host 轨迹 |
+| harness | `npm run test:harness` | mock 森林与隔离自检 |
+| e2e | `npm run test:e2e` | 真实场景 canary |
+| 发布 | `npm run check:release` | 全链 + 三轮 e2e + pack dry-run |
+
+`test` 在 `dist` 陈旧时 fail closed：先 `npm run build`。
+
+### 规范与资源
+
+- 产品语义：[`spec/00.md`](spec/00.md) 导航，条款 ID 寻址
+- 合规账本：[`spec/conformance.toml`](spec/conformance.toml)（生成 [`spec/conformance.md`](spec/conformance.md)）
+- 运行时资源：[`resources/prompts/`](resources/prompts/)、[`resources/enforcer/catalog.json`](resources/enforcer/catalog.json)
+- 架构 DNA 与工程纪律：[`AGENTS.md`](AGENTS.md)、[`docs/decisions/kolmogorov.md`](docs/decisions/kolmogorov.md)
+- 未来设计：[`docs/rfcs/`](docs/rfcs/)
+
+### 提交与发布
+
+1. `npm run lint`
+2. `npm run check`（改动涉及 e2e 则 `test:e2e` 或 `check:release`）
+3. 优先 stage 具体文件；保留 hooks，不用 `--no-verify`
+4. 版本与用户可见变化写入 [CHANGELOG](CHANGELOG.md)
+5. 发布前：`npm run check:release`，再 `npm pack`；tarball 应仅含 `dist/` + `resources/` 及 manifest 元数据
+
+更多：[`docs/development.md`](docs/development.md)、[`docs/releasing.md`](docs/releasing.md)、[`docs/architecture.md`](docs/architecture.md)。
+
+### 许可证
+
+本项目为专有商业软件（proprietary）。`package.json` 中 `private: true`，`license` 为 `SEE LICENSE IN LICENSE`。

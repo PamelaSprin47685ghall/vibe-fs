@@ -2,9 +2,20 @@
 
 ## Unreleased
 
+## 0.5.3
+
+No runtime behavior changes.
+
+Repository normalization: single package manifest, resources/ layout,
+spec/ clause docs, dist/ build output, unified tests/ tree, Wanxiangshu
+project rename (drop .Next), data-driven enforcer catalog.
+
+STATUS ledger retired into `spec/conformance.toml` / `spec/conformance.md`.
+Temporary STATUS work files archived or removed.
+
 ## 0.5.2 — 全 SSOT 收敛
 
-- 收敛目标：Active SSOT 全部 CONFORMANT；`STATUS/conformance.toml` 成为逐条款机器账本。
+- 收敛目标：Active SSOT 全部 CONFORMANT；`spec/conformance.toml` 成为逐条款机器账本。
 - 规范：spec/14 Strength、spec/16 Student&Teacher、ENFORCER nudge/throttle/规则目录迁出到 `RFC/`，spec/15 仅保留 0.5.1 已交付的 Blogger 工具化子集。
 - 版本：全仓文案从 `0.5.0-rc.1` / `0.5.1` 统一到 `0.5.2`。
 
