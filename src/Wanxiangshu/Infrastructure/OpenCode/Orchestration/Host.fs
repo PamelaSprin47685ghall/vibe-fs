@@ -81,7 +81,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let awaitChild (agentId: string) =
         task {
-            match! runtime.AwaitAgent agentId with
+            match! runtime.AwaitAgent(agentId, ?timeoutMs = Some ExecutorSummarize.AwaitAgentTimeoutMs) with
             | Error error -> return Error error
             | Ok run -> return outcomeOf run
         }
