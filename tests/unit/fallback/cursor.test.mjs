@@ -387,6 +387,32 @@ test('FALLBACK_004_recording_success_clears_the_dedupe_window_too', () => {
   assert.equal(again.ok, true)
 })
 
+test('ENFORCER_063_success_clears_failures_after_multiple_advances_without_touching_offset', () => {
+  // BlogEntryCommitted is BloggerMain business success: zero the budget, park the
+  // offset. Multi-failure path proves the clear is not a one-shot edge case.
+  let current = fallbackProjection.forAuthority(RUN, ROOT)
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const applied = fallbackProjection.applyAdvance(
+      identityFor(`run_${attempt}`),
+      (attempt - 1) % 4,
+      attempt % 4,
+      attempt,
+      current,
+    )
+    assert.equal(applied.ok, true, applied.ok ? '' : `advance ${attempt}: ${applied.error}`)
+    current = applied.value
+  }
+
+  const before = fallbackProjection.read(current)
+  assert.equal(before.failures, 3)
+  assert.equal(before.offset, 3)
+
+  const after = fallbackProjection.recordSuccess(current)
+  const state = fallbackProjection.read(after)
+  assert.equal(state.failures, 0)
+  assert.equal(state.offset, before.offset)
+})
+
 test('FALLBACK_005_exhaustion_is_stored_rather_than_re_derived_from_the_count', () => {
   // The fold must be able to refuse a late advance without knowing the configured
   // budget, so the terminal state is durable rather than computed.
