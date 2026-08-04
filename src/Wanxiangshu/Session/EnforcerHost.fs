@@ -187,7 +187,7 @@ module EnforcerHost =
         match lastAssistantStep rawMessages with
         | None -> None
         | Some(messageId, parts, completed) ->
-            let catalog = EnforcerCatalog.triples EnforcerCatalogResource.rules
+            let catalog = EnforcerCatalog.triples (RuntimeResources.current().EnforcerRules)
 
             let calls =
                 parts

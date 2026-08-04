@@ -106,7 +106,11 @@ const [
   StrengthPredictorModule,
   StrengthControllerModule,
   StrengthValueModule,
-  EnforcerCatalogModule,
+  RuntimeResourcesModule,
+  EnforcerCatalogResourceModule,
+  PackageResourcesModule,
+  PromptResourcesModule,
+  EnforcerCatalogDomainModule,
   EnforcerCodecModule,
   EnforcerThrottleModule,
   EnforcerNudgeModule,
@@ -185,7 +189,11 @@ const [
   prod('Domain/StrengthPredictor'),
   prod('Domain/StrengthController'),
   prod('Domain/StrengthValue'),
+  prod('Infrastructure/Resources/RuntimeResources'),
   prod('Infrastructure/Resources/EnforcerCatalogResource'),
+  prod('Infrastructure/Resources/PackageResources'),
+  prod('Infrastructure/Resources/PromptResources'),
+  prod('Domain/EnforcerCatalog'),
   prod('Domain/EnforcerCodec'),
   prod('Domain/EnforcerThrottle'),
   prod('Domain/EnforcerNudge'),
@@ -3042,10 +3050,80 @@ const tier = (name) => {
   throw new Error(`unknown tier: ${name}`)
 }
 
+// ── Runtime package resources (install once before EnforcerHost / BlogTool / StaticTools) ──
+
+/** Process-local holder: same contract as SpikePlugin init (RuntimeResources.install load). */
+export const runtimeResources = (() => {
+  const api = bind(RuntimeResourcesModule, 'RuntimeResources', ['load', 'install', 'current'])
+  return {
+    load: () => api.load(),
+    install: (resources) => api.install(resources),
+    /** Plugin-init equivalent for unit tests that drive EnforcerHost without SpikePlugin. */
+    installFromPackage: () => api.install(api.load()),
+    current: () => api.current(),
+  }
+})()
+
+/** Fixed package-relative read: `resources/<relative>` via import.meta.url. */
+export const packageResources = (() => {
+  const api = bind(PackageResourcesModule, 'PackageResources', ['readText'])
+  return {
+    readText: (relativeResourcePath) => api.readText(relativeResourcePath),
+  }
+})()
+
+/** Explicit prompt catalog load (10 role system prompts). */
+export const promptResources = (() => {
+  const api = bind(PromptResourcesModule, 'PromptResources', ['load'])
+  return {
+    load: () => api.load(),
+  }
+})()
+
+/** Package enforcer catalog.json load + domain validation fail-fast. */
+export const enforcerCatalogResource = (() => {
+  const api = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', ['load'])
+  return {
+    load: () => listItems(api.load()),
+  }
+})()
+
+/**
+ * ENFORCER-170 pure catalog validation + EnforcerRule construction.
+ * Domain never reads files; tests hand rules via `rule(...)`.
+ */
+export const enforcerCatalog = (() => {
+  const api = bind(EnforcerCatalogDomainModule, 'EnforcerCatalog', ['validate', 'triples'])
+  const Rule = EnforcerCatalogDomainModule.EnforcerRule
+  if (typeof Rule !== 'function') {
+    throw new Error('Domain/EnforcerCatalog exports no EnforcerRule constructor')
+  }
+  return {
+    /** Construct one EnforcerRule record (Fable class). */
+    rule: ({
+      ruleId = 'enforcement-x01',
+      fieldName = 'sample-field',
+      family = 'X',
+      scoreWhen = 'score when',
+      nudge = 'nudge text',
+      catalogOrdinal = 1,
+    } = {}) => new Rule(ruleId, fieldName, family, scoreWhen, nudge, catalogOrdinal),
+    /**
+     * Result over schemaVersion + rules list.
+     * Ok value is a JS array of EnforcerRule (listItems on F# list).
+     */
+    validate: (schemaVersion, rules) => {
+      const result = resultOf(api.validate(schemaVersion, toList(rules)))
+      return result.ok ? { ok: true, value: listItems(result.value) } : result
+    },
+    triples: (rules) => listItems(api.triples(toList(rules))),
+  }
+})()
+
 // ── spec/15: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
 
 export const enforcer = (() => {
-  const catalog = bind(EnforcerCatalogModule, 'EnforcerCatalogResource', ['rules'])
+  const catalog = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', ['load'])
   const codec = bind(EnforcerCodecModule, 'EnforcerCodec', [
     'CanonicalBlogCall',
     'normalizeFieldName',
@@ -3077,10 +3155,11 @@ export const enforcer = (() => {
   ])
   const cycle = bind(EnforcerCycleModule, 'EnforcerCycle', ['MergedCycle', 'mergeCalls', 'isValidCycle'])
 
-  const catalogRules = listItems(catalog.rules)
+  // Explicit load: module import no longer reads package resources (0.5.3).
+  const catalogRules = listItems(catalog.load())
 
   return {
-    /** 全部 120 项规则（resources/enforcer/catalog.json，ENFORCER-170）。 */
+    /** 已加载的 Enforcer 规则（resources/enforcer/catalog.json，ENFORCER-170）。 */
     rules: catalogRules,
     ruleCount: catalogRules.length,
     fieldNames: () => catalogRules.map((r) => r.FieldName),

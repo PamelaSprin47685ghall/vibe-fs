@@ -31,8 +31,11 @@ module BlogTool =
 
     /// ENFORCER-170: the provider-visible argument schema is derived from the
     /// catalog — FieldName, ScoreWhen description, optional 0..9.
+    let private enforcerRules () =
+        RuntimeResources.current().EnforcerRules
+
     let ruleArguments (factory: HostToolFactory) : (string * HostSchema) list =
-        EnforcerCatalogResource.rules
+        enforcerRules ()
         |> List.map (fun rule ->
             rule.FieldName,
             // Host schema has no bounded int; the 0..9 contract is enforced by
@@ -46,7 +49,7 @@ module BlogTool =
         let catalogDescription =
             sprintf
                 "Record one work-log entry and score engineering practices 0..9 (%d rules; missing = 0)."
-                (List.length EnforcerCatalogResource.rules)
+                (List.length (enforcerRules ()))
 
         { Name = "blog"
           Description = catalogDescription

@@ -12,8 +12,6 @@ type EnforcerRule =
 
 module EnforcerCatalog =
 
-    let private RequiredRuleCount = 120
-
     let private isNonEmpty (s: string) = not (isNull s) && s.Trim().Length > 0
 
     let private duplicates (keys: string list) =
@@ -21,14 +19,14 @@ module EnforcerCatalog =
         |> List.groupBy id
         |> List.choose (fun (k, group) -> if List.length group > 1 then Some k else None)
 
-    /// schemaVersion=1, exactly 120 rules, unique id/field, ordinals 1..120, non-empty ScoreWhen/Nudge.
+    /// schemaVersion=1, non-empty rules, unique id/field, ordinals 1..N, non-empty ScoreWhen/Nudge.
     let validate (schemaVersion: int) (rules: EnforcerRule list) : Result<EnforcerRule list, string> =
+        let n = List.length rules
+
         if schemaVersion <> 1 then
             Error(sprintf "enforcer catalog schemaVersion must be 1, got %d" schemaVersion)
-        elif List.length rules <> RequiredRuleCount then
-            Error(
-                sprintf "enforcer catalog must contain exactly %d rules, got %d" RequiredRuleCount (List.length rules)
-            )
+        elif n = 0 then
+            Error "enforcer catalog must contain at least one rule"
         else
             let idDupes = rules |> List.map (fun r -> r.RuleId) |> duplicates
             let fieldDupes = rules |> List.map (fun r -> r.FieldName) |> duplicates
@@ -40,10 +38,10 @@ module EnforcerCatalog =
             else
                 let ordered = rules |> List.sortBy (fun r -> r.CatalogOrdinal)
                 let ordinals = ordered |> List.map (fun r -> r.CatalogOrdinal)
-                let expected = [ 1..RequiredRuleCount ]
+                let expected = [ 1..n ]
 
                 if ordinals <> expected then
-                    Error "enforcer catalog catalogOrdinal must be contiguous 1..120"
+                    Error(sprintf "enforcer catalog catalogOrdinal must be contiguous 1..%d" n)
                 else
                     match
                         ordered

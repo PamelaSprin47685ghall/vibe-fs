@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Thoth.Json
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
@@ -112,39 +113,41 @@ module StaticTools =
     let reviewerVerdictSchemaJson =
         """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
 
+    let private prompts () = RuntimeResources.current().Prompts
+
     let managerAgentConfig () : obj =
-        primaryAgent Role.Manager (Some PromptAssets.managerSystemPrompt)
+        primaryAgent Role.Manager (Some (prompts ()).ManagerSystemPrompt)
 
     let orchestratorAgentConfig () : obj =
-        primaryAgent Role.Orchestrator (Some PromptAssets.orchestratorSystemPrompt)
+        primaryAgent Role.Orchestrator (Some (prompts ()).OrchestratorSystemPrompt)
 
     let coderAgentConfig () : obj =
-        primaryAgent Role.Coder (Some PromptAssets.coderSystemPrompt)
+        primaryAgent Role.Coder (Some (prompts ()).CoderSystemPrompt)
 
     let reviewerAgentConfig () : obj =
-        primaryAgent Role.Reviewer (Some PromptAssets.reviewerSystemPrompt)
+        primaryAgent Role.Reviewer (Some (prompts ()).ReviewerSystemPrompt)
 
     /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
     /// System prompt for B-record distillation with blog tool protocol.
     let bloggerAgentConfig () : obj =
-        primaryAgent Role.Blogger (Some PromptAssets.bloggerSystemPrompt)
+        primaryAgent Role.Blogger (Some (prompts ()).BloggerSystemPrompt)
 
     /// AgentRole.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
     let executorAgentConfig () : obj =
-        primaryAgent Role.Executor (Some PromptAssets.executorSystemPrompt)
+        primaryAgent Role.Executor (Some (prompts ()).ExecutorSystemPrompt)
 
     let meditatorAgentConfig () : obj =
-        primaryAgent Role.Meditator (Some PromptAssets.meditatorSystemPrompt)
+        primaryAgent Role.Meditator (Some (prompts ()).MeditatorSystemPrompt)
 
     let browserAgentConfig () : obj =
-        primaryAgent Role.Browser (Some PromptAssets.browserSystemPrompt)
+        primaryAgent Role.Browser (Some (prompts ()).BrowserSystemPrompt)
 
     let inspectorAgentConfig () : obj =
-        primaryAgent Role.Inspector (Some PromptAssets.inspectorSystemPrompt)
+        primaryAgent Role.Inspector (Some (prompts ()).InspectorSystemPrompt)
 
     let devopsAgentConfig () : obj =
-        primaryAgent Role.DevOps (Some PromptAssets.devopsSystemPrompt)
+        primaryAgent Role.DevOps (Some (prompts ()).DevopsSystemPrompt)
 
     let executorTool () : Tool =
         { Name = "executor"

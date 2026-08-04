@@ -9,6 +9,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -18,6 +19,9 @@ module SpikePlugin =
 
     let initSpikePlugin (input: obj) : Task<obj> =
         task {
+            // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
+            RuntimeResources.install (RuntimeResources.load ())
+
             let portOpt = OpenCodePort.create input
 
             let journal =

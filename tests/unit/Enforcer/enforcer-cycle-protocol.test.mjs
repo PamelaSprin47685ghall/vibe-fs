@@ -22,7 +22,12 @@ import {
   parkedTransform,
   bloggerRuntime,
   fold,
+  runtimeResources,
 } from '../domain.mjs'
+
+// EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
+// Production installs at SpikePlugin.init; this suite drives Host without init.
+runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
   '../../../dist/Journal/AgentJournal.js'
