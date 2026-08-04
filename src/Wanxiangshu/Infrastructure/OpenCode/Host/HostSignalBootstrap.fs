@@ -107,8 +107,10 @@ module HostSignalBootstrap =
                         scope.VerdictSessions
                         scope.NudgeSent
                         scope.ManagerGuardNudges
+                        scope.JoinGuardNudges
                         scope.SessionParents
                         scope.DisposeExecutorRuntime
+                        scope.HasLivePty
                         scope.AbortedSessions
                         (Some scope.LoopSensor)
                         turn
@@ -189,7 +191,9 @@ module HostSignalBootstrap =
         let onSignal (signal: HostSignal) =
             match signal with
             | SessionIdle sessionId ->
-                // LOOP-005: a settled idle ends the attempt; next stream starts clean.
+                // LOOP-005: idle ends the attempt → fresh detector for the next stream.
+                // LoopKillArmed must stay until TurnCompletionProgram bridges TurnAborted
+                // (ResetDetector deliberately does not clear it; LOOP-006).
                 scope.LoopSensor.ResetDetector sessionId
                 reconciler.Signal signal
             | ProviderRetry _

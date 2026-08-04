@@ -29,7 +29,7 @@ import {
 import * as PromptDispatcher from '../../../dist/Application/Prompting/PromptDispatcher.js'
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-// Slow prior: need enough 4-grams of a single character to climb past HHI=0.03.
+// Slow prior: enough single-character 4-grams to pull N_eff under 140.
 const loopText = (character = 'x') => character.repeat(4000)
 
 const rawDelta = (session, field, text) => ({
@@ -164,6 +164,31 @@ test('LOOP_006_unowned_session_never_aborts', async () => {
 
   assert.deepEqual(aborts, [])
   assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
+})
+
+test('LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
+  // Production SessionIdle calls ResetDetector BEFORE reconcile/TurnAborted.
+  // If ResetDetector cleared LoopKillArmed, the AABB bridge would always miss.
+  const aborts = []
+  const sensor = loopSensor.create({
+    owned: ['ses_idle'],
+    abort: (sid) => {
+      aborts.push(sid)
+    },
+  })
+
+  loopSensor.observe(sensor, loopSensor.textDelta('ses_idle', loopText('i')))
+  await wait(50)
+  assert.deepEqual(aborts, ['ses_idle'])
+  assert.equal(loopSensor.isArmed(sensor, 'ses_idle'), true)
+
+  loopSensor.resetDetector(sensor, 'ses_idle')
+  assert.equal(loopSensor.isArmed(sensor, 'ses_idle'), true, 'armed must survive idle reset')
+
+  // Still armed → further deltas must not re-abort.
+  loopSensor.observe(sensor, loopSensor.textDelta('ses_idle', loopText('i')))
+  await wait(30)
+  assert.deepEqual(aborts, ['ses_idle'])
 })
 
 test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {

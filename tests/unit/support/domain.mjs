@@ -3178,8 +3178,8 @@ export const diagnostic = (() => {
 // ── spec/17: LOOP detector + text-delta codec ────────────────────────────────
 
 /**
- * LOOP-003…005: pure O(1) exponential-mixture character diversity detector.
- * One fresh detector per attempt; tests never touch Host abort wiring.
+ * LOOP-003…005: pure O(1) exponential-mixture 4-gram diversity detector.
+ * Whitespace is ignored; physical gate is N_eff. Host abort stays out.
  */
 export const loopDetector = (() => {
   const m = bind(LoopDetectorModule, 'LoopDetector', [
@@ -3188,6 +3188,7 @@ export const loopDetector = (() => {
     'K',
     'NormalEffectiveCount',
     'NormalHhi',
+    'GarbageEffectiveCount',
     'LoopHhi',
     'LoopEffectiveThreshold',
     'create',
@@ -3210,6 +3211,7 @@ export const loopDetector = (() => {
     k: m.K,
     normalEffectiveCount: m.NormalEffectiveCount,
     normalHhi: m.NormalHhi,
+    garbageEffectiveCount: m.GarbageEffectiveCount,
     loopHhi: m.LoopHhi,
     loopEffectiveThreshold: m.LoopEffectiveThreshold,
     create: () => m.create(),
@@ -3322,14 +3324,18 @@ export const runtimeNudge = (() => {
   const m = bind(RuntimeNudgeModule, 'RuntimeNudge', [
     'providerRetry',
     'loopContinue',
+    'backgroundJoinGuard',
     'ProviderRetryInstructions',
     'LoopContinueInstructions',
+    'BackgroundJoinGuardInstructions',
   ])
   return {
     providerRetry: m.providerRetry,
     loopContinue: m.loopContinue,
+    backgroundJoinGuard: m.backgroundJoinGuard,
     providerRetryInstructions: listItems(m.ProviderRetryInstructions),
     loopContinueInstructions: listItems(m.LoopContinueInstructions),
+    backgroundJoinGuardInstructions: listItems(m.BackgroundJoinGuardInstructions),
   }
 })()
 

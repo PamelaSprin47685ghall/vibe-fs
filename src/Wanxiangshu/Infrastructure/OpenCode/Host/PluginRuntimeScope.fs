@@ -15,6 +15,8 @@ type ISessionRuntimeOwner =
     inherit IDisposable
     abstract DisposeSession: string -> unit
     abstract DisposeExecutorRuntime: string -> unit
+    /// EXEC-016: live PTY still tracked for this parent session (DevOps).
+    abstract HasLivePty: string -> bool
 
 /// Explicit lifetime root for one plugin instance. Collections here are either
 /// physical resources, display caches, or bounded per-call deduplication.
@@ -82,6 +84,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val VerdictSessions = SharedState.VerdictSessions
     member val NudgeSent = HashSet<string>()
     member val ManagerGuardNudges = HashSet<string>()
+    member val JoinGuardNudges = HashSet<string>()
     member val AbortedSessions = HashSet<string>()
     member val RecoveryArming = Dictionary<string, SlotArming>()
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
@@ -331,6 +334,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member _.DisposeExecutorRuntime(sessionId: string) =
         lock toolRuntimeGate (fun () ->
             toolRuntime |> Option.iter (fun owner -> owner.DisposeExecutorRuntime sessionId))
+
+    /// EXEC-016: live PTY probe for DevOps join guard.
+    member _.HasLivePty(sessionId: string) : bool =
+        lock toolRuntimeGate (fun () ->
+            match toolRuntime with
+            | Some owner -> owner.HasLivePty sessionId
+            | None -> false)
 
     member this.DisposeSession(sessionId: string) =
         lock toolRuntimeGate (fun () -> toolRuntime |> Option.iter (fun owner -> owner.DisposeSession sessionId))

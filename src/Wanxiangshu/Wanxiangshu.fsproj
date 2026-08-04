@@ -184,6 +184,7 @@
     <Compile Include="Application/Reconciliation/CompanionTransform.fs"/>
     <Compile Include="Application/Reconciliation/ReviewSeal.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostReviewGuard.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/HostJoinGuard.fs"/>
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
     <Compile Include="Application/Reconciliation/ReviewerGuardState.fs"/>

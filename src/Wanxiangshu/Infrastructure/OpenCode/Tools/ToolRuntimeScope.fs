@@ -288,6 +288,15 @@ type ToolRuntimeScope
                 runtime.Cancel()
             | false, _ -> ())
 
+    /// EXEC-016: live PTY on the parent fork runtime (not Executor runtime).
+    member _.HasLivePty(sessionId: string) : bool =
+        lock gate (fun () ->
+            match runtimes.TryGetValue sessionId with
+            | true, runtime when not runtime.IsCancelled ->
+                let _, ptys = runtime.List()
+                not (List.isEmpty ptys)
+            | _ -> false)
+
     member this.DisposeSession(sessionId: string) =
         lock gate (fun () ->
             match runtimes.TryGetValue sessionId with
@@ -315,6 +324,7 @@ type ToolRuntimeScope
     interface ISessionRuntimeOwner with
         member this.DisposeSession sessionId = this.DisposeSession sessionId
         member this.DisposeExecutorRuntime sessionId = this.DisposeExecutorRuntime sessionId
+        member this.HasLivePty sessionId = this.HasLivePty sessionId
 
     interface IDisposable with
         member this.Dispose() = this.Dispose()

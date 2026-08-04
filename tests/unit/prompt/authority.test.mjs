@@ -241,6 +241,7 @@ test('PROMPT_003_every_continuation_kind_is_representable_and_none_is_a_root', (
   // feature is broken" rather than "the name is unknown".
   const kinds = [
     'InteractionRepair',
+    'JoinGuard',
     'ManagerGuard',
     'ReviewerGuard',
     'ReviewConfirmation',

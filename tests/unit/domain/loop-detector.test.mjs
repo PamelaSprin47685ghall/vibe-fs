@@ -1,7 +1,7 @@
 // tests/unit/Domain/loop-detector.test.mjs — LOOP-003/004/005/011 pure detector.
 //
-// Final design: sliding 4-grams, slow exp mixture, normal-code prior (N_eff=64),
-// LOOP when HHI ≥ 0.03. Layer 1 only.
+// Final design: ignore whitespace, sliding 4-grams, slow exp mixture,
+// normal-code prior (N_eff=256), LOOP when N_eff ≤ 140. Layer 1 only.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -11,10 +11,17 @@ test('LOOP_004_constants_match_the_clause', () => {
   assert.equal(loopDetector.ngramSize, 4)
   assert.equal(loopDetector.hashBuckets, 4096)
   assert.equal(loopDetector.k, 3)
-  assert.equal(loopDetector.normalEffectiveCount, 64)
-  assert.ok(Math.abs(loopDetector.normalHhi - 1 / 64) < 1e-12)
-  assert.equal(loopDetector.loopHhi, 0.03)
-  assert.ok(Math.abs(loopDetector.loopEffectiveThreshold - 1 / 0.03) < 1e-9)
+  assert.equal(loopDetector.normalEffectiveCount, 256)
+  assert.ok(Math.abs(loopDetector.normalHhi - 1 / 256) < 1e-12)
+  assert.equal(loopDetector.garbageEffectiveCount, 24)
+  assert.equal(loopDetector.loopEffectiveThreshold, 140)
+  assert.ok(Math.abs(loopDetector.loopHhi - 1 / 140) < 1e-12)
+  assert.ok(
+    Math.abs(
+      loopDetector.loopEffectiveThreshold -
+        (loopDetector.normalEffectiveCount + loopDetector.garbageEffectiveCount) / 2,
+    ) < 1e-12,
+  )
 })
 
 test('LOOP_003_fresh_detector_is_innocent_normal_code_prior', () => {
@@ -24,8 +31,8 @@ test('LOOP_003_fresh_detector_is_innocent_normal_code_prior', () => {
   assert.equal(result.state, 'Normal')
   assert.equal(result.isLoop, false)
   assert.equal(result.step, 0)
-  assert.ok(Math.abs(result.effective - 64) < 1e-6, `n_eff=${result.effective}`)
-  assert.ok(Math.abs(result.hhi - 1 / 64) < 1e-9, `hhi=${result.hhi}`)
+  assert.ok(Math.abs(result.effective - 256) < 1e-6, `n_eff=${result.effective}`)
+  assert.ok(Math.abs(result.hhi - 1 / 256) < 1e-9, `hhi=${result.hhi}`)
 })
 
 test('LOOP_003_fewer_than_four_characters_keeps_prior', () => {
@@ -35,32 +42,47 @@ test('LOOP_003_fewer_than_four_characters_keeps_prior', () => {
   assert.equal(result.state, 'Normal')
   assert.equal(result.isLoop, false)
   assert.equal(result.step, 0)
-  assert.ok(Math.abs(result.effective - 64) < 1e-6)
+  assert.ok(Math.abs(result.effective - 256) < 1e-6)
+})
+
+test('LOOP_003_whitespace_is_ignored_and_does_not_advance', () => {
+  const detector = loopDetector.create()
+  const result = loopDetector.pushText(detector, ' \n\t\r'.repeat(500))
+
+  assert.equal(result.step, 0)
+  assert.equal(result.isLoop, false)
+  assert.equal(result.state, 'Normal')
+  assert.ok(Math.abs(result.effective - 256) < 1e-6)
 })
 
 test('LOOP_003_single_character_long_run_is_loop', () => {
-  // A pure single-character stream collapses 4-grams to one bucket → HHI→1.
-  // Prior dilutes slowly; need enough grams to overcome N_eff=64 seed.
+  // Pure single-character stream collapses 4-grams to one bucket → HHI→1.
+  // Prior dilutes slowly; need enough grams to overcome N_eff=256 seed.
   const detector = loopDetector.create()
   const result = loopDetector.pushText(detector, 'x'.repeat(4000))
 
   assert.equal(result.isLoop, true, `n_eff=${result.effective} hhi=${result.hhi}`)
   assert.equal(result.state, 'Loop')
-  assert.ok(result.hhi >= loopDetector.loopHhi)
   assert.ok(result.effective <= loopDetector.loopEffectiveThreshold)
+  assert.ok(result.hhi >= loopDetector.loopHhi)
 })
 
 test('LOOP_003_diverse_alphabet_stays_normal', () => {
-  // Cycle a large alphabet so 4-grams stay diverse under the slow kernel.
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-  const body = alphabet.repeat(80)
+  // Pseudo-random alnum stream keeps N_eff hundreds under the slow kernel.
+  // Periodic alphabets (period 62 etc.) correctly trip N_eff≤140 — not diverse.
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}();,.='
+  let body = ''
+  for (let i = 0; i < 4000; i++) {
+    const x = Math.sin(i * 12.9898) * 43758.5453
+    body += alphabet[Math.floor((x - Math.floor(x)) * alphabet.length)]
+  }
   const detector = loopDetector.create()
   const result = loopDetector.pushText(detector, body)
 
   assert.equal(result.isLoop, false, `n_eff=${result.effective} hhi=${result.hhi}`)
   assert.equal(result.state, 'Normal')
-  assert.ok(result.hhi < loopDetector.loopHhi)
   assert.ok(result.effective > loopDetector.loopEffectiveThreshold)
+  assert.ok(result.hhi < loopDetector.loopHhi)
 })
 
 test('LOOP_005_streaming_matches_batch_push', () => {
@@ -81,13 +103,19 @@ test('LOOP_005_streaming_matches_batch_push', () => {
   assert.ok(Math.abs(streamResult.hhi - batchResult.hhi) < 1e-12)
 })
 
-test('LOOP_005_whitespace_and_punctuation_count_as_characters', () => {
-  const detector = loopDetector.create()
-  // Pure whitespace collapses diversity just like a single character.
-  const result = loopDetector.pushText(detector, ' \n\t,'.repeat(1000))
+test('LOOP_005_whitespace_does_not_form_grams_or_dilute_prior', () => {
+  const withSpaces = loopDetector.create()
+  const withoutSpaces = loopDetector.create()
 
-  assert.ok(result.step > 0)
-  assert.equal(result.isLoop, true, `n_eff=${result.effective}`)
+  const spaced = 'a b c d e f g h'
+  const compact = 'abcdefgh'
+
+  const spacedResult = loopDetector.pushText(withSpaces, spaced)
+  const compactResult = loopDetector.pushText(withoutSpaces, compact)
+
+  assert.equal(spacedResult.step, compactResult.step)
+  assert.ok(Math.abs(spacedResult.effective - compactResult.effective) < 1e-9)
+  assert.ok(Math.abs(spacedResult.hhi - compactResult.hhi) < 1e-12)
 })
 
 test('LOOP_009_text_delta_decodes_fail_closed', () => {

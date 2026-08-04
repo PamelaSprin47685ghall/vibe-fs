@@ -76,3 +76,42 @@ module TerminalPolicy =
             | None ->
                 not (sessionParents.ContainsKey sessionKey)
                 && not (isLinkedChild journal sessionKey)
+
+    /// EXEC-016: join-capable role still owns unconsumed background work.
+    ///
+    /// Pure projection predicate + optional live-PTY probe. Executor private
+    /// runtimes never participate (EXEC-014).
+    let outstandingBackground
+        (journal: AgentJournal option)
+        (hasLivePty: string -> bool)
+        (role: AgentRole option)
+        (sessionId: SessionId)
+        : bool =
+        match role with
+        | Some AgentRole.Manager ->
+            match journal with
+            | None -> false
+            | Some durable ->
+                AgentJournal.handleProjection durable sessionId
+                |> HandleProjection.listable
+                |> List.isEmpty
+                |> not
+        | Some AgentRole.DevOps ->
+            let durableOutstanding =
+                match journal with
+                | None -> false
+                | Some durable ->
+                    AgentJournal.handleProjection durable sessionId
+                    |> HandleProjection.listable
+                    |> List.isEmpty
+                    |> not
+
+            durableOutstanding || hasLivePty (SessionId.value sessionId)
+        | Some AgentRole.Orchestrator ->
+            match journal with
+            | None -> false
+            | Some durable ->
+                OrchestratorProjection.activeJobs (AgentJournal.snapshot durable).AgentProjections.Orchestrator
+                |> List.isEmpty
+                |> not
+        | _ -> false

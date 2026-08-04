@@ -44,6 +44,12 @@ module RuntimeNudge =
 
     let loopContinue = SyntheticToml.document LoopContinueInstructions []
 
+    /// EXEC-016: join-capable role tried to finish while resources remain unjoined.
+    let BackgroundJoinGuardInstructions =
+        [ "Background work is still outstanding."
+          "Call join to collect completed results before finishing."
+          "Use list when you need the current resource view." ]
+
     /// REVIEW-003: the Manager tried to finish without a confirmed double PERFECT.
     let ManagerReviewGuardInstructions =
         [ "Review is required before completion."
@@ -63,6 +69,7 @@ module RuntimeNudge =
     let MissingFinalReportInstructions = [ "" ]
 
     let providerRetry = SyntheticToml.document ProviderRetryInstructions []
+    let backgroundJoinGuard = SyntheticToml.document BackgroundJoinGuardInstructions []
     let managerReviewGuard = SyntheticToml.document ManagerReviewGuardInstructions []
 
     let reviewerVerdictGuard =

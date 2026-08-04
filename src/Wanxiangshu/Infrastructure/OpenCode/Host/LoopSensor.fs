@@ -36,11 +36,11 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
             detectors.Remove key |> ignore
             armed.Remove key |> ignore)
 
+    /// LOOP-005: discard detector state for the next attempt.
+    /// Does NOT clear LoopKillArmed — LOOP-006 needs the mark to survive until
+    /// TurnAborted is classified (SessionIdle resets the detector before reconcile).
     member _.ResetDetector(sessionId: SessionId) =
-        lock gate (fun () ->
-            let key = keyOf sessionId
-            detectors.[key] <- LoopDetector.create ()
-            armed.Remove key |> ignore)
+        lock gate (fun () -> detectors.[keyOf sessionId] <- LoopDetector.create ())
 
     member private this.DetectorFor(sessionId: SessionId) =
         let key = keyOf sessionId

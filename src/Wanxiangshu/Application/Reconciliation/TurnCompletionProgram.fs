@@ -135,8 +135,10 @@ module TurnCompletionProgram =
         (verdictSessions: HashSet<string>)
         (nudgeSent: HashSet<string>)
         (managerGuardNudges: HashSet<string>)
+        (joinGuardNudges: HashSet<string>)
         (sessionParents: Dictionary<string, string>)
         (disposeExecutorRuntime: string -> unit)
+        (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
         (loopSensor: LoopSensor option)
         (turn: ReconciledTurn)
@@ -324,24 +326,35 @@ module TurnCompletionProgram =
                 AsyncSupport.completedTask ()
         | TurnFailed error -> continueAfterOrdinaryFailure sessionPort eventPort journal turn error
         | TurnCompleted ->
+            // EXEC-016 first: join-capable roles with outstanding background work
+            // must join before Review Guard / terminal Completed.
+            let joinOutstanding =
+                TerminalPolicy.outstandingBackground journal hasLivePty turn.AgentRole turn.SessionId
+
             // REVIEW-003/007 synchronize before completion: a reviewer awaiting
             // PERFECT confirmation and a manager whose current tree lacks a witness
             // are still running. Reporting Completed here lets join/AwaitManager return
             // before confirmation, racing publish and worktree release.
             let managerGuard =
-                match turn.AgentRole with
-                | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
-                    Some(HostReviewGuard.missingTree journal gitTreePort sessionKey)
-                | _ -> None
+                if joinOutstanding then
+                    None
+                else
+                    match turn.AgentRole with
+                    | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
+                        Some(HostReviewGuard.missingTree journal gitTreePort sessionKey)
+                    | _ -> None
 
             let completionDeferred =
-                match managerGuard with
-                | Some(HostReviewGuard.ReviewGuardMissing _)
-                | Some(HostReviewGuard.ReviewGuardUnavailable _) -> true
-                | _ ->
-                    turn.AgentRole = Some AgentRole.Reviewer
-                    && not reviewerAlreadyConfirmed
-                    && ReviewerGuardState.pendingConfirmation journal sessionKey
+                if joinOutstanding then
+                    true
+                else
+                    match managerGuard with
+                    | Some(HostReviewGuard.ReviewGuardMissing _)
+                    | Some(HostReviewGuard.ReviewGuardUnavailable _) -> true
+                    | _ ->
+                        turn.AgentRole = Some AgentRole.Reviewer
+                        && not reviewerAlreadyConfirmed
+                        && ReviewerGuardState.pendingConfirmation journal sessionKey
 
             let wasAborted, terminalValid =
                 if completionDeferred then
@@ -355,6 +368,17 @@ module TurnCompletionProgram =
 
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
                 AsyncSupport.completedTask ()
+            elif joinOutstanding then
+                task {
+                    let! outcome = HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
+
+                    match outcome with
+                    | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                        |> ignore
+                    | _ -> ()
+                }
+                :> Task
             else
                 match turn.AgentRole with
                 // REVIEW-003: a first PERFECT must enter its causal confirmation

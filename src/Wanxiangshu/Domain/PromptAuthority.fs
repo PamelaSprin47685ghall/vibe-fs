@@ -19,6 +19,7 @@ module PromptAuthority =
     /// that could produce it.
     type ContinuationKind =
         | InteractionRepair
+        | JoinGuard
         | ManagerGuard
         | ReviewerGuard
         | ReviewConfirmation
@@ -177,6 +178,7 @@ module PromptAuthority =
         | AuthorityRoot HumanRoot -> "HumanRoot"
         | AuthorityRoot AgentOwnerRoot -> "AgentOwnerRoot"
         | Continuation InteractionRepair -> "InteractionRepair"
+        | Continuation JoinGuard -> "JoinGuard"
         | Continuation ManagerGuard -> "ManagerGuard"
         | Continuation ReviewerGuard -> "ReviewerGuard"
         | Continuation ReviewConfirmation -> "ReviewConfirmation"
@@ -188,6 +190,7 @@ module PromptAuthority =
     let tryParseContinuationKind (value: string) =
         match value with
         | "InteractionRepair" -> Some InteractionRepair
+        | "JoinGuard" -> Some JoinGuard
         | "ManagerGuard" -> Some ManagerGuard
         | "ReviewerGuard" -> Some ReviewerGuard
         | "ReviewConfirmation" -> Some ReviewConfirmation

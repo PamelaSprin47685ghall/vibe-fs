@@ -2,8 +2,9 @@ namespace Wanxiangshu.Domain
 
 /// LOOP-003…005: low 4-gram-diversity loop detector.
 ///
-/// Sliding 4-grams + three slow exponential kernels + normal-code prior
-/// (innocent until proven looping). Fixed hash buckets keep memory O(1).
+/// Drop space/tab/CR/LF, then sliding 4-grams + three slow exponential kernels
+/// + normal-code prior (innocent until proven looping). Fixed hash buckets keep
+/// memory O(1). Physical threshold lives in N_eff space.
 ///
 /// Pure: no Host, no Journal, no side effects. One fresh detector per provider
 /// attempt (LOOP-005 lifecycle).
@@ -14,19 +15,25 @@ module LoopDetector =
     let NgramSize = 4
     let HashBuckets = 4096
 
-    /// Half-lives 8 / 64 / 512 (in 4-grams): λ = 2^(-1/half_life).
+    /// Half-lives 8 / 64 / 512 (filtered 4-grams): λ = 2^(-1/half_life).
     let Lambda = [| 0.9170040432; 0.9892280132; 0.9986471129 |]
     let Coef = [| 0.15; 0.25; 0.60 |]
 
-    /// Normal-code prior: N_eff = 64 ⇒ HHI = 1/64.
-    let NormalEffectiveCount = 64.0
+    /// Normal-code prior after ignoring whitespace: N_eff = 256 ⇒ HHI = 1/256.
+    let NormalEffectiveCount = 256.0
     let NormalHhi = 1.0 / NormalEffectiveCount
 
-    /// LOOP when HHI ≥ this (N_eff ≲ 33.333). Unified code threshold.
-    let LoopHhi = 0.03
-    let LoopEffectiveThreshold = 1.0 / LoopHhi
+    /// Typical short-loop garbage baseline: ~24 non-whitespace chars.
+    let GarbageEffectiveCount = 24.0
+
+    /// Half-garbage midpoint in N_eff space: (256 + 24) / 2.
+    let LoopEffectiveThreshold = (NormalEffectiveCount + GarbageEffectiveCount) / 2.0
+    let LoopHhi = 1.0 / LoopEffectiveThreshold
 
     let Epsilon = 1e-300
+
+    let isIgnored (ch: char) =
+        ch = ' ' || ch = '\t' || ch = '\r' || ch = '\n'
 
     [<RequireQualifiedAccess>]
     type State =
@@ -114,7 +121,8 @@ module LoopDetector =
                 max (squared / z2) Epsilon
 
         let effective = 1.0 / hhi
-        let isLoop = hhi >= LoopHhi
+        // Physical gate is N_eff (LOOP-003); HHI form is the reciprocal rewrite.
+        let isLoop = effective <= LoopEffectiveThreshold
 
         { State = if isLoop then State.Loop else State.Normal
           IsLoop = isLoop
@@ -141,31 +149,34 @@ module LoopDetector =
         detector.LastStep.[bucket] <- detector.Step
 
     let pushCharacter (detector: Detector) (ch: char) : Evaluation =
-        if detector.PrefixLength < NgramSize then
-            detector.Prefix.[detector.PrefixLength] <- ch
-            detector.PrefixLength <- detector.PrefixLength + 1
-        else
-            // Slide: drop oldest, shift left, append.
-            for i = 0 to NgramSize - 2 do
-                detector.Prefix.[i] <- detector.Prefix.[i + 1]
-
-            detector.Prefix.[NgramSize - 1] <- ch
-
-        if detector.PrefixLength < NgramSize then
-            // Innocent prior until the first 4-gram exists.
-            { State = State.Normal
-              IsLoop = false
-              EffectiveCharacterCount = NormalEffectiveCount
-              Hhi = NormalHhi
-              Step = detector.Step }
-        else
-            let bucket =
-                bucketOfGram detector.Prefix.[0] detector.Prefix.[1] detector.Prefix.[2] detector.Prefix.[3]
-
-            updateGram detector bucket
+        if isIgnored ch then
             evaluate detector
+        else
+            if detector.PrefixLength < NgramSize then
+                detector.Prefix.[detector.PrefixLength] <- ch
+                detector.PrefixLength <- detector.PrefixLength + 1
+            else
+                // Slide: drop oldest, shift left, append.
+                for i = 0 to NgramSize - 2 do
+                    detector.Prefix.[i] <- detector.Prefix.[i + 1]
 
-    /// Push every UTF-16 code unit. Whitespace and punctuation count (LOOP-004).
+                detector.Prefix.[NgramSize - 1] <- ch
+
+            if detector.PrefixLength < NgramSize then
+                // Innocent prior until the first filtered 4-gram exists.
+                { State = State.Normal
+                  IsLoop = false
+                  EffectiveCharacterCount = NormalEffectiveCount
+                  Hhi = NormalHhi
+                  Step = detector.Step }
+            else
+                let bucket =
+                    bucketOfGram detector.Prefix.[0] detector.Prefix.[1] detector.Prefix.[2] detector.Prefix.[3]
+
+                updateGram detector bucket
+                evaluate detector
+
+    /// Push UTF-16 code units. Space/tab/CR/LF are ignored (LOOP-003/004).
     let pushText (detector: Detector) (text: string) : Evaluation =
         if isNull text || text.Length = 0 then
             evaluate detector
