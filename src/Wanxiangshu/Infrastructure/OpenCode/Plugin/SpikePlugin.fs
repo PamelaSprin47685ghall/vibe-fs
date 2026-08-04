@@ -62,8 +62,7 @@ module SpikePlugin =
                 if SharedState.RootWorkspace.IsNone then
                     SharedState.RootWorkspace <- workspaceDirectory
 
-                let wired =
-                    HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
+                let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
                 // PROMPT-011: the pending-claim pass must NOT run here, inside the
                 // plugin constructor. The Host awaits the constructor before its

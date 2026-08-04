@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
@@ -104,6 +105,14 @@ module HostSignalSubscribe =
             with ex ->
                 Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
+    /// A silent SSE link is an out-of-contract signal channel: reconnecting in
+    /// a loop cannot restore a half-open connection and only manufactures
+    /// noise, so one timeout kills the process via Diagnostic.fatal (SIGKILL).
+    /// TUI-embedded mode never subscribes (the probe refuses), so a timeout
+    /// here means a genuinely dead link, not a misconfiguration.
+    let private onHeartbeatTimeout (silentMs: int) : unit =
+        Diagnostic.fatal "sse-heartbeat-timeout" [ "duration", string silentMs ]
+
     let private subscribeGlobalEvent
         (client: obj)
         (onSignalEvent: obj -> unit)
@@ -133,9 +142,9 @@ module HostSignalSubscribe =
                               "heartbeatTimer", box null ]
 
                     emitJsExpr
-                        (globalApi, onEvent, state, HeartbeatIntervalMs, HeartbeatTimeoutMs)
+                        (globalApi, onEvent, state, HeartbeatIntervalMs, HeartbeatTimeoutMs, onHeartbeatTimeout)
                         """
-                        ((globalApi, onEvent, state, heartbeatMs, timeoutMs) => {
+                        ((globalApi, onEvent, state, heartbeatMs, timeoutMs, onHeartbeatTimeout) => {
                           (async () => {
                             let attempt = 0;
                             while (!state.disposed) {
@@ -163,7 +172,6 @@ module HostSignalSubscribe =
                                   }
                                 }
                               } catch (err) {
-                                // Preserve heartbeat timeout reason if we forced abort.
                                 if (!state.lastError) {
                                   state.lastError = err && err.message ? err.message : String(err);
                                 }
@@ -186,15 +194,22 @@ module HostSignalSubscribe =
                             if (state.disposed) return;
                             const silent = Date.now() - state.lastEventMs;
                             if (silent > timeoutMs && state.connAbort && !state.connAbort.signal.aborted) {
-                              const msg = 'heartbeat timeout after ' + silent + 'ms';
-                              state.lastError = msg;
-                              console.warn('OPENCODE-SIGNAL-SSE', msg);
-                              try { state.connAbort.abort(); } catch (_) {}
+                              // Heartbeat is the causal watchdog for this SSE link: a
+                              // half-open TCP connection emits neither close/error nor
+                              // bytes. Detection is not a retry signal — a dead link
+                              // cannot be reconnected into existence, and a reconnect
+                              // loop over a dead link only manufactures noise. One
+                              // timeout reports and kills the process (Diagnostic.fatal);
+                              // the clearInterval guards the gated (test) fatal path
+                              // from re-firing every tick.
+                              onHeartbeatTimeout(silent);
+                              clearInterval(hb);
+                              return;
                             }
                           }, heartbeatMs);
                           if (typeof hb.unref === 'function') hb.unref();
                           state.heartbeatTimer = hb;
-                        })($0, $1, $2, $3, $4)
+                        })($0, $1, $2, $3, $4, $5)
                         """
 
                     Ok
@@ -203,39 +218,115 @@ module HostSignalSubscribe =
                 with ex ->
                     Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
+    let private serverUrlOf (input: obj) : string option =
+        if isNull input then
+            None
+        else
+            let value: obj = input?serverUrl
+
+            if isNull value then
+                None
+            else
+                let url = string value
+
+                if String.IsNullOrWhiteSpace url then None else Some url
+
+    /// Probe timeout for the SSE reachability check. A dead fallback port
+    /// refuses instantly (ECONNREFUSED); this bound only covers a half-open
+    /// network that silently drops the connection.
+    let private ServerProbeTimeoutMs = 3_000
+
+    /// Probes whether a real HTTP listener answers behind `serverUrl`.
+    ///
+    /// The SDK's `global.event` streams through the GLOBAL fetch — never the
+    /// in-process custom fetch the Host injects for every other client call
+    /// (`../opencode/packages/sdk/js/src/gen/core/serverSentEvents.gen.ts`) — so
+    /// in embedded (TUI) mode, where `Server.url` stays undefined and the
+    /// plugin input carries the Host's dead fallback address, a subscription
+    /// connects to nothing and the SDK retries forever without yielding; the
+    /// heartbeat watchdog then trips a reconnect every ~45s. The one reliable
+    /// discriminator is a live request: a real listener answers the health
+    /// endpoint, the fallback refuses.
+    [<Emit("""((url, path, timeoutMs) => new Promise((resolve) => {
+          const c = new AbortController();
+          const t = setTimeout(() => { try { c.abort(); } catch {} }, timeoutMs);
+          let target = null;
+          try { target = new URL(path, url).toString(); } catch {}
+          if (target === null) { clearTimeout(t); resolve(false); return; }
+          fetch(target, { signal: c.signal, method: 'GET' })
+            .then((r) => { clearTimeout(t); resolve(r.ok); })
+            .catch(() => { clearTimeout(t); resolve(false); });
+        }))($0, $1, $2)""")>]
+    let private probeServer (url: string) (path: string) (timeoutMs: int) : Task<bool> = jsNative
+
     let trySubscribe
         (input: obj)
         (onSignalEvent: obj -> unit)
-        : Result<HostSignalSubscription option * string, string> =
-        let listenTarget =
-            if isNull input then
-                None
-            elif not (isNull input?events) then
-                Some input?events
-            else
-                let client = input?client
-
-                if not (isNull client) && not (isNull client?events) then
-                    Some client?events
-                else
+        : Task<Result<HostSignalSubscription option * string, string>> =
+        task {
+            let listenTarget =
+                if isNull input then
                     None
+                elif not (isNull input?events) then
+                    Some input?events
+                else
+                    let client = input?client
 
-        let client = if isNull input then null else input?client
+                    if not (isNull client) && not (isNull client?events) then
+                        Some client?events
+                    else
+                        None
 
-        // Global SSE carries sessions from manager worktrees whose directory
-        // differs from this plugin instance. Prefer it whenever available;
-        // fall back to the directory-scoped listener for older hosts without
-        // /global/event.
-        match subscribeGlobalEvent client onSignalEvent with
-        | Ok sub ->
-            logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
-            Ok(Some sub, "global.event")
-        | Error globalError ->
-            match listenTarget with
-            | Some events ->
-                match subscribeListen events onSignalEvent with
-                | Error err -> Error err
-                | Ok localSub ->
-                    logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
-                    Ok(Some localSub, "events.listen")
-            | None -> Error globalError
+            let client = if isNull input then null else input?client
+
+            // Global SSE carries sessions from manager worktrees whose
+            // directory differs from this plugin instance. Prefer it whenever a
+            // real listener answers; fall back to the directory-scoped listener
+            // for older hosts without /global/event, and hard-fail only when no
+            // transport remains at all.
+            let subscribeGlobalOrLocal () =
+                match subscribeGlobalEvent client onSignalEvent with
+                | Ok sub ->
+                    logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
+                    Ok(Some sub, "global.event")
+                | Error globalError ->
+                    match listenTarget with
+                    | Some events ->
+                        match subscribeListen events onSignalEvent with
+                        | Error err -> Error err
+                        | Ok localSub ->
+                            logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                            Ok(Some localSub, "events.listen")
+                    | None -> Error globalError
+
+            // Embedded (TUI) mode: no listener answers the server URL, so the
+            // SDK SSE path cannot deliver. Local signals already arrive through
+            // the Host `event` hook (ObserveLocal); the legacy events.listen is
+            // a bonus, not a requirement — degrade silently.
+            let subscribeListenOrDegrade (sourceLabel: string) =
+                match listenTarget with
+                | Some events ->
+                    match subscribeListen events onSignalEvent with
+                    | Ok localSub ->
+                        logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                        Ok(Some localSub, "events.listen")
+                    | Error _ ->
+                        logInfo "OPENCODE-SIGNAL-SOURCE" sourceLabel
+                        Ok(None, sourceLabel)
+                | None ->
+                    logInfo "OPENCODE-SIGNAL-SOURCE" sourceLabel
+                    Ok(None, sourceLabel)
+
+            match serverUrlOf input with
+            | None ->
+                // Legacy hosts without the serverUrl field keep the legacy
+                // verdict (hard error when no transport remains).
+                return subscribeGlobalOrLocal ()
+            | Some url ->
+                let! reachable = probeServer url "/global/health" ServerProbeTimeoutMs
+
+                if reachable then
+                    return subscribeGlobalOrLocal ()
+                else
+                    return subscribeListenOrDegrade "local-event-hook"
+        }

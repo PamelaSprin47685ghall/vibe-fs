@@ -134,6 +134,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/CanonicalJson.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/Projection.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Events.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedTerminalBus.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignal.fs"/>
@@ -168,7 +169,6 @@
     <Compile Include="Session/BloggerRuntimeState.fs"/>
     <Compile Include="Session/ParkedTransform.fs"/>
     <Compile Include="Session/BloggerAbandon.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/LoopSensor.fs"/>
     <Compile Include="Session/EnforcerHost.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
