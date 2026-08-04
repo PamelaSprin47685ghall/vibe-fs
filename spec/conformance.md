@@ -1,6 +1,6 @@
-# STATUS/conformance — 条款合规表
+# spec/conformance — 条款合规表
 
-> 本文件由 `scripts/conformance-gate.mjs` 从 `STATUS/conformance.toml` 生成，请勿手动编辑。
+> 本文件由 `scripts/conformance-gate.mjs` 从 `spec/conformance.toml` 生成，请勿手动编辑。
 
 | 条款 | 生命周期 | 状态 | 最低证据层 | verified_commit | owner | tests | canaries | 证据路径 |
 |------|---------|------|------------|-----------------|-------|-------|----------|----------|

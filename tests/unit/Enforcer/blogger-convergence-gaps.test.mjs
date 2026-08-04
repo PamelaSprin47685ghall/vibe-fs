@@ -248,7 +248,7 @@ test('C0_adopted_blogger_motion_is_not_active_PENDING', () => {
 })
 
 test('C7_blogger_slice_conformance_rows_are_CONFORMANT', () => {
-  const conf = read('STATUS/conformance.md')
+  const conf = read('spec/conformance.md')
   for (const clause of [
     'COMPANION-005',
     'COMPANION-008',

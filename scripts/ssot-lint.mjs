@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// spec/STATUS 纯文本规范检查。
+// spec/ 纯文本规范检查。
 // 休克期唯一允许的规范反馈通道：不编译、不运行测试，只验证规范文本自身一致。
 //
 // 检查项：
@@ -7,7 +7,7 @@
 //   2. 无悬空引用（正文引用的 ID 必须有定义）
 //   3. 前缀归属正确（ID 前缀必须出现在 spec/00 索引指定的文件里）
 //   4. 词汇表 spec/99 指向的条款存在
-//   5. 禁止 SSOT 出现 STATUS 专属状态词（规范不描述实现进度）
+//   5. 禁止条款正文出现实现状态词（状态只在 spec/conformance）
 //
 // 用法：node scripts/ssot-lint.mjs
 
@@ -41,7 +41,7 @@ const PREFIX_ALTERNATION = Object.keys(PREFIX_OWNER).join('|')
 const CLAUSE_RE = new RegExp(`\\b(${PREFIX_ALTERNATION})-(\\d{3})\\b`, 'g')
 const DEFINITION_RE = new RegExp(`^##\\s+((?:${PREFIX_ALTERNATION})-\\d{3})\\b`, 'gm')
 
-/** SSOT 是规范，不是状态报告。这些词属于 STATUS/。 */
+/** SSOT 是规范，不是状态报告。这些词属于实现状态账本（spec/conformance），不得出现在条款正文。 */
 const STATUS_ONLY_WORDS = ['NOT_IMPLEMENTED', 'PARTIAL', 'CONTRADICTS', 'UNVERIFIED', 'CONFORMANT']
 
 const failures = []
@@ -85,7 +85,7 @@ for (const file of files) {
     }
     for (const word of STATUS_ONLY_WORDS) {
       if (content.includes(word)) {
-        fail(file, index + 1, `SSOT 不得出现实现状态词 "${word}"（属于 STATUS/conformance.md）`)
+        fail(file, index + 1, `SSOT 不得出现实现状态词 "${word}"（属于 spec/conformance.md）`)
       }
     }
   })

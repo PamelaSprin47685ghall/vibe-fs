@@ -16,7 +16,18 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { walk } from './repo-scan.mjs'
 
-const ROOTS = ['SSOT', 'STATUS', 'AGENTS.md', 'README.md']
+// Active prose only. Historical evidence/archive retains original markup.
+const ROOTS = [
+  'spec',
+  'docs/architecture.md',
+  'docs/development.md',
+  'docs/releasing.md',
+  'docs/decisions',
+  'docs/rfcs',
+  'AGENTS.md',
+  'README.md',
+  'CHANGELOG.md',
+]
 
 const RULES = [
   { name: 'bold', pattern: /\*\*(?=\S)([^*]+?)(?<=\S)\*\*/g, replacement: '$1' },

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Verify STATUS/conformance.toml is the single source of truth for clause status.
-// Run with --check to validate without writing STATUS/conformance.md.
+// Verify spec/conformance.toml is the single source of truth for clause status.
+// Run with --check to validate without writing spec/conformance.md.
 
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const SSOT_DIR = 'spec'
-const TOML = 'STATUS/conformance.toml'
-const MD_OUT = 'STATUS/conformance.md'
+const TOML = 'spec/conformance.toml'
+const MD_OUT = 'spec/conformance.md'
 
 const ACTIVE_SSOT = [
   '01.md', '02.md', '03.md', '04.md', '05.md', '06.md', '07.md', '08.md',
@@ -94,9 +94,9 @@ function exists (p) {
 
 function generateMarkdown (clauses) {
   const lines = [
-    '# STATUS/conformance — 条款合规表',
+    '# spec/conformance — 条款合规表',
     '',
-    '> 本文件由 `scripts/conformance-gate.mjs` 从 `STATUS/conformance.toml` 生成，请勿手动编辑。',
+    '> 本文件由 `scripts/conformance-gate.mjs` 从 `spec/conformance.toml` 生成，请勿手动编辑。',
     '',
     '| 条款 | 生命周期 | 状态 | 最低证据层 | verified_commit | owner | tests | canaries | 证据路径 |',
     '|------|---------|------|------------|-----------------|-------|-------|----------|----------|'

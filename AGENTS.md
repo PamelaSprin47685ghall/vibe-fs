@@ -67,13 +67,13 @@ assistant message 在 transform 之前已经创建并持久化。
 | Host hook、事件、reconcile | spec/07 | conformance Host 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
 | Companion、Blogger、projection、epoch | spec/08 + spec/12 | conformance Companion 段 |
 | 上下文恢复、Blogger delta、X prefix probe、Y squash | spec/12（`CTX-`） | conformance CTX 段 |
-| compaction、`/compact`、reanchor | spec/07 + spec/12 | `STATUS/blockers/README.md` + `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md` |
+| compaction、`/compact`、reanchor | spec/07 + spec/12 | `docs/archive/blockers-closed.md` + `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md` |
 | fork/join/list、PTY、进程 | spec/09 | conformance Execution 段 |
 | 测试、门禁、canary 剧本 | spec/10 | conformance Verify 段 |
 | Journal、事实、持久化 | spec/11 | — |
 | 运行时合成 TOML 记法 | spec/13（`ARCH-010`） | conformance ARCH-010 行 + `tests/unit/Context/synthetic-toml.test.mjs` |
-| Strength / Enforcer nudge / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `STATUS/README.md`「已知说明」段 |
-| 任何生产代码改动 | spec/01（架构 DNA） | `STATUS/conformance.md`（由 `STATUS/conformance.toml` 生成） |
+| Strength / Enforcer nudge / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `docs/rfcs/` 各文件 Status 字段 |
+| 任何生产代码改动 | spec/01（架构 DNA） | `spec/conformance.md`（由 `spec/conformance.toml` 生成） |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
 
 `spec/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
@@ -111,9 +111,8 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 | 位置 | 性质 |
 |------|------|
 | `spec/` | 唯一产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以此为准。`spec/00.md` 导航，`spec/99.md` 词汇表 |
-| `STATUS/conformance.md` | 条款 vs 代码合规表，由 `scripts/conformance-gate.mjs` 从 `STATUS/conformance.toml` 生成（勿手改）。当前 Active 192/192 CONFORMANT |
-| `STATUS/README.md` | 当前基线：分支、最后验证 commit、产品状态、源码地图、下一步 |
-| `STATUS/blockers/README.md` | 活跃 blocker 账本。HOST-006 已闭合（运行时探测已接线）；V2 runner `compactAfterOverflow` 观察项留给上游（ARCH-003） |
+| `spec/conformance.md` | 条款 vs 代码合规表，由 `scripts/conformance-gate.mjs` 从 `spec/conformance.toml` 生成（勿手改）。Active 账本 |
+| `docs/archive/blockers-closed.md` | 已闭合 Host/SSOT 例外记录（非活跃 blocker 账本） |
 | `docs/archive/shock-anneal-2026/` | 休克—退火迁移最终报告（`FINAL-REPORT.md`）+ 原始机器证据（`evidence/`） |
 | `docs/evidence/` | 发布验证证据（按版本目录） |
 | `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
@@ -125,13 +124,13 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 
 `spec/` 只描述应该如何，不描述当前如何。实现状态词
 （`CONFORMANT` / `PARTIAL` / `CONTRADICTS` / `UNVERIFIED` / `NOT_IMPLEMENTED` / `PURE_CORE_ONLY`）
-只出现在 `STATUS/`。
+只出现在 `spec/conformance.toml` / 生成的 `spec/conformance.md`。
 `node scripts/ssot-lint.mjs` 强制这一分离，并检查条款 ID 唯一性与悬空引用。
 新增条款前缀必须同时注册进 `scripts/ssot-lint.mjs` 的前缀表，否则该前缀的全部引用被判悬空。
 
 ### 发现条款本身有问题
 
-不要顺手改条款让它符合代码。走 SSOT 例外协议：写 blocker（`STATUS/blockers/`）、用
+不要顺手改条款让它符合代码。走 SSOT 例外协议：写 blocker 记录（`docs/archive/` 或 issue）、用
 `../opencode` 源码行号证明是 Host 能力或逻辑矛盾而非实现困难、再改 SSOT、记 supersedes、
 重新冻结。
 
@@ -144,7 +143,7 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 休克—退火迁移已收口（最终报告 `docs/archive/shock-anneal-2026/FINAL-REPORT.md`）。
 0.5.2 已发布（tag `v0.5.2`）：gate:static → build → unit（737）→ harness（285）→
 P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMANT。
-`STATUS/conformance.toml` 是逐条款机器账本，`STATUS/conformance.md` 由
+`spec/conformance.toml` 是逐条款机器账本，`spec/conformance.md` 由
 `scripts/conformance-gate.mjs` 生成。
 
 ### 当前开发阶段
@@ -201,7 +200,7 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 推论：`transform` hook 里做不了恢复决策，因为它看不到 attempt 结局。
 没有已提交的探针时，X 看到的就是原始历史——这是 spec/12 的正确行为，不是降级。
 
-手工 `/compact` 无法阻断（SSOT 例外 1，见 `STATUS/blockers/README.md`）。
+手工 `/compact` 无法阻断（SSOT 例外 1，见 `docs/archive/blockers-closed.md`）。
 解法是两层：预防层关掉 `auto`/`prune`/`autocontinue` 并在首轮启动探测，
 收容层把任何观察到的 compaction 转成 `ContextReanchored` 重锚。
 

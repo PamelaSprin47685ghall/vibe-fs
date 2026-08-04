@@ -1,13 +1,14 @@
 # Spec
 
-Authoritative product contracts for Wanxiangshu.
+Binding product rules for Wanxiangshu. Clause IDs are the address system.
 
 | Path | Role |
 |------|------|
-| `00.md` | Navigation index |
-| `01.md`–`13.md`, `15.md`, `17.md` | Active clause documents |
-| `99.md` | Glossary |
-| `coverage.toml` | 0.5.3 transitional clause→test map (skeleton) |
+| `00.md` … `17.md`, `99.md` | Clause documents (active product contract) |
+| `conformance.toml` | Per-clause machine ledger (status, owners, tests) |
+| `conformance.md` | Generated table from the ledger (do not hand-edit) |
+| `coverage.toml` | Transitional id → tests map derived from the ledger |
 
-Clause status ledger remains `STATUS/conformance.toml` until STATUS retirement.
-Implementation status words never appear in clause docs (`npm run gate:ssot`).
+`docs/rfcs/` holds approved-but-undelivered designs (Strength, Student&Teacher, Enforcer nudge). Those are not product contract.
+
+Status words (`CONFORMANT`, `PARTIAL`, …) belong only in the ledger, never in clause prose.

@@ -1,5 +1,5 @@
-# Generated from STATUS/conformance.toml — transitional
-# Full ledger remains authoritative until SSOT rename
+# Generated from spec/conformance.toml — transitional coverage map
+# Full ledger: spec/conformance.toml
 
 [ARCH-001]
 tests = [

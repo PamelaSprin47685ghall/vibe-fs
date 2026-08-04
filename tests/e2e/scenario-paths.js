@@ -14,8 +14,8 @@ const PLUGIN_FILE_BY_VARIANT = {
 };
 
 const PLUGIN_SEARCH_ROOTS = [
-  (root) => path.resolve(root, path.join('build', 'next', 'Infrastructure', 'OpenCode', 'Plugin')),
-  (root) => path.resolve(root, path.join('..', 'build', 'next', 'Infrastructure', 'OpenCode', 'Plugin')),
+  (root) => path.resolve(root, path.join('dist', 'Infrastructure', 'OpenCode', 'Plugin')),
+  (root) => path.resolve(root, path.join('..', 'dist', 'Infrastructure', 'OpenCode', 'Plugin')),
 ];
 
 export function resolvePluginPath(variant) {
@@ -25,5 +25,5 @@ export function resolvePluginPath(variant) {
     const candidate = path.join(make(cwd), file);
     if (fs.existsSync(candidate)) return candidate;
   }
-  return path.resolve(cwd, path.join('build', 'next', 'Infrastructure', 'OpenCode', 'Plugin', file));
+  return path.resolve(cwd, path.join('dist', 'Infrastructure', 'OpenCode', 'Plugin', file));
 }
