@@ -18,6 +18,7 @@ module JoinTool =
         | ForkError.NothingToJoin -> "NOTHING_TO_JOIN"
         | ForkError.Cancelled -> "CANCELLED"
         | ForkError.Empty -> "EMPTY"
+        | ForkError.Abandoned(id, reason) -> "ABANDONED:" + id + ":" + reason
         | ForkError.NotFound id -> "NOT_FOUND:" + id
         | ForkError.TimedOut -> "TIMED_OUT"
         | ForkError.TerminalMaterializationFailed id -> "TERMINAL_MATERIALIZATION_FAILED:" + id

@@ -65,9 +65,10 @@ module Fold =
     let private handleOutcome factName projection result =
         match result with
         | Ok updated -> Ok updated
-        // Replaying a completion or a retirement is expected; the tombstone
-        // makes both idempotent.
+        // Replaying a completion, abandon, or retirement is expected; durable
+        // terminals make those idempotent.
         | Error AlreadyCompleted
+        | Error AlreadyAbandoned
         | Error HandleIsRetired -> Ok projection
         | Error UnknownHandle -> reject factName "handle completion or retirement for a handle that was never linked"
         | Error NotCompleted -> reject factName "join retired a handle that had no completion (EXEC-004)"
@@ -490,6 +491,23 @@ module Fold =
                 projection
             |> handleOutcome "HandleRetired" projection
             |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+
+        | AgentFact.HandleAbandoned payload ->
+            AgentProjection.tryUpdate
+                payload.ParentSessionId
+                (fun session ->
+                    HandleProjection.abandon
+                        payload.Handle
+                        payload.Reason
+                        (Option.defaultValue HandleProjection.empty session.Handles)
+                    |> Result.map (fun updated -> { session with Handles = Some updated }))
+                projection
+            |> handleOutcome "HandleAbandoned" projection
+            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+
+        // HostTurnObserved is a durable observation inbox fact. CompletionReactor
+        // (later batch) consumes it; LinkageProjection has no fold effect yet.
+        | AgentFact.HostTurnObserved _ -> Ok projection
 
         // ── orchestrator ────────────────────────────────────────────────────
 

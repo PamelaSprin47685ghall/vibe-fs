@@ -13,14 +13,15 @@ type HandleConsumeRejection =
     /// Journal append failed (includes CommitUnknown). Must not deliver.
     | AppendFailed of string
 
-/// EXEC-009: the only writer of `HandleLinked`, `HandleCompleted` and
-/// `HandleRetired`.
+/// EXEC-009: the only writer of `HandleLinked`, `HandleCompleted`,
+/// `HandleAbandoned` and `HandleRetired`.
 ///
-/// One lifecycle, one writer. The three facts are a single ordered progression —
-/// `Active → CompletedAwaitingJoin → Retired` — and `HandleProjection` rejects any
-/// out-of-order transition. Spreading the appends across the fork path, the
-/// completion path and the cancel path meant three modules each knew part of that
-/// order, and none of them could see whether the other two agreed.
+/// One lifecycle, one writer. Progressions are
+/// `Active → CompletedAwaitingJoin → Retired` or `Active|CompletedAwaitingJoin →
+/// Abandoned`. `HandleProjection` rejects any out-of-order transition. Spreading
+/// the appends across the fork path, the completion path and the cancel path
+/// meant three modules each knew part of that order, and none of them could see
+/// whether the other two agreed.
 module HandleController =
 
     /// An agent child's handle IS its runtime agent id.
@@ -97,6 +98,33 @@ module HandleController =
                            CompletionRef = completionRef
                            CompletionDigest = completionDigest |}))
 
+    /// EXEC-009: durable abandon. Single-assignment via fold CAS.
+    ///
+    /// Does not write a completion cell and does not retire. Join must see
+    /// Abandoned as non-joinable and return an explicit abandon outcome.
+    ///
+    /// Call only for irreversible loss (parent cancel, deadline, host session
+    /// gone). Never from loop-kill interrupt, provider-retry wake, or any path
+    /// that may continue the same handle (LOOP-006 continueAfterLoopKill).
+    let recordAbandon
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (agentId: string)
+        (reason: HandleAbandonReason)
+        (abandonedAt: System.DateTimeOffset)
+        : Result<unit, string> =
+        match journal with
+        | None -> Ok()
+        | Some durable ->
+            append
+                durable
+                parentId
+                (AgentFact.HandleAbandoned
+                    {| ParentSessionId = parentId
+                       Handle = agentHandle agentId
+                       Reason = reason
+                       AbandonedAt = abandonedAt |})
+
     /// EXEC-004/EXEC-009: `join` consumed the completion, so write the tombstone.
     ///
     /// Retirement is what makes a consumed completion unreturnable. Without it the
@@ -129,6 +157,7 @@ module HandleController =
         match HandleProjection.tryFind handle projection with
         | None -> Error(NotJoinable UnknownHandle)
         | Some { Lifecycle = Retired } -> Error AlreadyRetired
+        | Some { Lifecycle = Abandoned _ } -> Error(NotJoinable AlreadyAbandoned)
         | Some { Lifecycle = Active } -> Error(NotJoinable NotCompleted)
         | Some record ->
             match
@@ -150,25 +179,24 @@ module HandleController =
                 | Some { Lifecycle = Retired } -> Error AlreadyRetired
                 | _ -> Error(AppendFailed(JournalAppendFailure.describe failure))
 
-    /// Parent cancel: claim the cell as `Cancelled` (no blob), then retire.
+    /// Parent cancel: durable `HandleAbandoned` (ParentCancelled) per owned agent.
     ///
-    /// Both facts, in this order, per child. Writing only the tombstone would skip
-    /// the state EXEC-005's `list` reports and make the transition unauditable;
-    /// writing only the completion would leave the handle joinable after its parent
-    /// is gone. Each child is retired individually — EXEC-009 requires parent cancel
-    /// to cancel every owned resource one by one, so there is deliberately no bulk
-    /// "retire all children" fact.
+    /// Replaces the previous `Cancelled` completion + retire pair so abandon is an
+    /// explicit durable terminal that is not joinable. Each child is abandoned
+    /// individually — EXEC-009 requires parent cancel to cancel every owned resource
+    /// one by one, so there is deliberately no bulk "abandon all children" fact.
     let cancelChildren
         (journal: AgentJournal option)
         (parentId: SessionId)
         (agentIds: string list)
         : Result<unit, string> =
+        let abandonedAt = System.DateTimeOffset.UtcNow
+
         let rec loop ids =
             match ids with
             | [] -> Ok()
             | agentId :: rest ->
-                recordCompletion journal parentId agentId HandleCompletionKind.Cancelled None
-                |> Result.bind (fun () -> retire journal parentId agentId)
+                recordAbandon journal parentId agentId HandleAbandonReason.ParentCancelled abandonedAt
                 |> Result.bind (fun () -> loop rest)
 
         loop agentIds

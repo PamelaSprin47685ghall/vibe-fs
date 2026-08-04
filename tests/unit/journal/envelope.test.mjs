@@ -237,7 +237,15 @@ test('PERSIST_005_a_current_fact_is_not_mistaken_for_a_legacy_one', () => {
   assert.equal(journal.containsLegacyFallbackFields(line), false)
   assert.equal(journal.deserialize(line).ok, true)
 
-  for (const current of ['HandleLinked', 'HandleCompleted', 'HandleRetired', 'CandidateReady', 'PublishClaimed']) {
+  for (const current of [
+    'HandleLinked',
+    'HandleCompleted',
+    'HandleAbandoned',
+    'HandleRetired',
+    'HostTurnObserved',
+    'CandidateReady',
+    'PublishClaimed',
+  ]) {
     assert.equal(
       journal.containsLegacyFallbackFields(JSON.stringify({ Fact: ['Agent', [current, {}]] })),
       false,

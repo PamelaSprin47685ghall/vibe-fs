@@ -126,6 +126,7 @@ module HostForkRestart =
             for record in records do
                 match record.Lifecycle, HandleId.tryAgent record.Handle with
                 | HandleLifecycle.Retired, _
+                | HandleLifecycle.Abandoned _, _
                 | _, None -> ()
                 | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
                     let agentId = AgentHandleId.value agentHandle

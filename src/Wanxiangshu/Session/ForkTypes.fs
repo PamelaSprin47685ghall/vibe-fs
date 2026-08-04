@@ -41,6 +41,8 @@ type ForkError =
     | Empty
     | NothingToJoin
     | Cancelled
+    /// EXEC-009: durable HandleAbandoned — not joinable, not a hang.
+    | Abandoned of agentId: string * reason: string
     | NotFound of agentId: string
     /// Join budget exhausted; durable projection still had no joinable handle.
     | TimedOut

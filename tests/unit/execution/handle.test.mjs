@@ -133,6 +133,7 @@ test('EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
     completion: undefined,
     completionRef: undefined,
     completionDigest: undefined,
+    abandonReason: undefined,
   })
 })
 
@@ -339,6 +340,7 @@ test('EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
     completion: undefined,
     completionRef: undefined,
     completionDigest: undefined,
+    abandonReason: undefined,
   })
   assert.deepEqual(views(handles), { listable: [], joinable: [], active: [] })
 })
@@ -548,6 +550,7 @@ test('EXEC_001_fork_creates_a_child_run', () => {
     completion: undefined,
     completionRef: undefined,
     completionDigest: undefined,
+    abandonReason: undefined,
   })
 
   const completed = completeOn(active, { kind: 'Terminal' })
@@ -605,6 +608,7 @@ test('EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
     completion: 'Terminal',
     completionRef: 'blobs/completion-h1',
     completionDigest: 'sha-completion-h1',
+    abandonReason: undefined,
   })
   assert.deepEqual(views(completed).joinable, ['agent:h1'])
 })
@@ -640,6 +644,7 @@ test('EXEC_009_fold_replays_completion_blob_refs', () => {
     completion: 'Terminal',
     completionRef: 'blobs/completion-h1',
     completionDigest: 'sha-completion-h1',
+    abandonReason: undefined,
   })
 })
 

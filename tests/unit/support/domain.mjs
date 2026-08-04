@@ -142,6 +142,7 @@ const [
   TurnBindingModule,
   ForkRuntimeModule,
   ForkTypesModule,
+  HostSignalSubscribeModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -233,6 +234,7 @@ const [
   prod('Application/Reconciliation/TurnBinding'),
   prod('Session/ForkRuntime'),
   prod('Session/ForkTypes'),
+  prod('Infrastructure/OpenCode/Signals/HostSignalSubscribe'),
 ])
     
 
@@ -460,6 +462,7 @@ const buildStream = unionCase(EnvelopeModule.StreamId, 'StreamId')
 const buildVerdict = unionCase(FactModule.ReviewGuardVerdict, 'ReviewGuardVerdict')
 const buildAbandonReason = unionCase(FactModule.PromptAbandonReason, 'PromptAbandonReason')
 const buildCompletionKind = unionCase(FactModule.HandleCompletionKind, 'HandleCompletionKind')
+const buildHandleAbandonReason = unionCase(FactModule.HandleAbandonReason, 'HandleAbandonReason')
 
 export const agentFactCaseNames = () => caseNames(FactModule.AgentFact)
 
@@ -597,6 +600,14 @@ export const abandonReason = {
 
 export const completionKind = {
   of: (name) => buildCompletionKind(name),
+}
+
+/** EXEC-009 HandleAbandoned reason (fieldless DU cases). */
+export const handleAbandonReason = {
+  of: (name) => buildHandleAbandonReason(name),
+  parentCancelled: () => buildHandleAbandonReason('ParentCancelled'),
+  deadlineExceeded: () => buildHandleAbandonReason('DeadlineExceeded'),
+  hostSessionGone: () => buildHandleAbandonReason('HostSessionGone'),
 }
 
 /** Build an AgentFact by case name with an anonymous-record payload. */
@@ -2197,9 +2208,11 @@ export const handleProjection = (() => {
     'empty',
     'link',
     'complete',
+    'abandon',
     'retire',
     'tryFind',
     'isRetired',
+    'isAbandoned',
     'listable',
     'joinable',
     'activeHandles',
@@ -2235,9 +2248,12 @@ export const handleProjection = (() => {
     complete: (handle, completion, current) =>
       decided(m.complete(handle, typeof completion === 'string' ? completionOf(completion) : completion, current)),
     completionOf,
+    abandon: (handle, reason, current) =>
+      decided(m.abandon(handle, typeof reason === 'string' ? buildHandleAbandonReason(reason) : reason, current)),
     retire: (handle, current) => decided(m.retire(handle, current)),
     tryFind: (handle, current) => unwrapOption(m.tryFind(handle, current)),
     isRetired: (handle, current) => m.isRetired(handle, current),
+    isAbandoned: (handle, current) => m.isAbandoned(handle, current),
     listable: (current) => listItems(m.listable(current)),
     joinable: (current) => listItems(m.joinable(current)),
     activeHandles: (current) => listItems(m.activeHandles(current)),
@@ -2253,11 +2269,14 @@ export const handleProjection = (() => {
       let completion
       let completionRef
       let completionDigest
+      let abandonReason
       if (lifecycle === 'CompletedAwaitingJoin') {
         const cell = payloadOf(record.Lifecycle)
         completion = caseOf(cell.Kind)
         completionRef = isSome(cell.CompletionRef) ? idValue.blobRef(cell.CompletionRef) : undefined
         completionDigest = isSome(cell.CompletionDigest) ? idValue.blobDigest(cell.CompletionDigest) : undefined
+      } else if (lifecycle === 'Abandoned') {
+        abandonReason = caseOf(payloadOf(record.Lifecycle))
       }
       return {
         handle: handleId.describe(record.Handle),
@@ -2270,6 +2289,7 @@ export const handleProjection = (() => {
         completion,
         completionRef,
         completionDigest,
+        abandonReason,
       }
     },
   }
@@ -2283,9 +2303,40 @@ export const handleProjection = (() => {
  *  mailbox is notification-only; these are the production exports C6 added.
  *  There is no `tryJoin` on the projection — reality uses `joinable` + consume. */
 export const handleController = (() => {
-  const m = bind(HandleControllerModule, 'HandleController', ['consume'])
+  const m = bind(HandleControllerModule, 'HandleController', [
+    'link',
+    'recordCompletion',
+    'recordAbandon',
+    'retire',
+    'consume',
+  ])
 
+  // Fable erases `option`: Some x = x, None = undefined. Controllers take
+  // `AgentJournal option`; pass the instance directly.
   return {
+    link: (journal, parentId, agentId, childSessionId, targetAgent, role) =>
+      resultOf(m.link(journal, parentId, agentId, childSessionId, targetAgent, role)),
+    recordCompletion: (journal, parentId, agentId, kind, body) =>
+      resultOf(
+        m.recordCompletion(
+          journal,
+          parentId,
+          agentId,
+          typeof kind === 'string' ? buildCompletionKind(kind) : kind,
+          body === undefined ? undefined : body,
+        ),
+      ),
+    recordAbandon: (journal, parentId, agentId, reason, abandonedAt) =>
+      resultOf(
+        m.recordAbandon(
+          journal,
+          parentId,
+          agentId,
+          typeof reason === 'string' ? buildHandleAbandonReason(reason) : reason,
+          abandonedAt,
+        ),
+      ),
+    retire: (journal, parentId, agentId) => resultOf(m.retire(journal, parentId, agentId)),
     consume: (journal, parentId, handle) => {
       const value = resultOf(m.consume(journal, parentId, handle))
       return value.ok ? { ok: true, record: value.value } : { ok: false, error: caseOf(value.error) }
@@ -2693,6 +2744,7 @@ const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
   'revision',
   'snapshotWithRevision',
   'awaitChangeFrom',
+  'handleProjection',
 ])
 
 export const agentJournal = {
@@ -2710,6 +2762,7 @@ export const agentJournal = {
   snapshotWithRevision: (journal) => AgentJournalCreate.snapshotWithRevision(journal),
   /** Module-level awaitChangeFrom (fromRevision, journal) → Task/Promise. */
   awaitChangeFrom: (fromRevision, journal) => AgentJournalCreate.awaitChangeFrom(fromRevision, journal),
+  handleProjection: (journal, parentId) => AgentJournalCreate.handleProjection(journal, parentId),
 }
 
 export const rootKind = {
@@ -3061,9 +3114,10 @@ export const hostSignalSubscribe = (() => {
   const sourcePath = join(BUILD_ROOT, 'Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
   return {
     source: () => readFileSync(sourcePath, 'utf8'),
+    trySubscribe: bind(HostSignalSubscribeModule, 'HostSignalSubscribe', ['trySubscribe']).trySubscribe,
     reconnectMarkers: ['2 **', '10000', 'stream ended normally'],
     heartbeatMarkers: [
-      'heartbeat timeout after',
+      'onHeartbeatTimeout',
       'hb.unref',
       'setInterval',
       'clearInterval',

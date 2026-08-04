@@ -102,7 +102,6 @@ type InjectedSessionPort
                     ()
                 | None -> ()
 
-                eventPort.NotifyTerminal childId (Aborted "Parent session aborted") |> ignore
                 ()
         }
 
@@ -157,7 +156,6 @@ type InjectedSessionPort
                     ()
                 | None -> ()
 
-                eventPort.NotifyTerminal sessionId (Aborted "Session aborted") |> ignore
                 return Ok()
             }
 

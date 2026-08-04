@@ -60,8 +60,42 @@ module FactCodec =
         pre050Markers
         |> Array.exists (fun marker -> json.IndexOf(marker, StringComparison.Ordinal) >= 0)
 
+    /// PERSIST-001: the fact's own bytes must not depend on the machine that
+    /// reads them. Embedded DateTimeOffset fields (RuntimeStarted.StartedAt,
+    /// HandleAbandoned.AbandonedAt, HostTurnObserved.ObservedAt) share the
+    /// envelope-`ObservedAt` hazard: the DECODER attaches the reader's local
+    /// offset, so a fact serialized as `+00:00`, decoded and re-serialized on a
+    /// `TZ=Asia/Shanghai` host would render `+08:00` for the same instant, and a
+    /// byte comparison of two replicas would report a difference that is not one.
+    /// Mirror `Envelope.serialize`: pin to offset zero before encoding, and on
+    /// read so the decoded value also carries `+00:00`.
+    /// `ToOffset TimeSpan.Zero` rather than `ToUniversalTime()`: Fable's
+    /// `toUniversalTime` leaves the emitted value's `offset` field `undefined`.
+    /// Keep this step in sync with any new fact case that embeds a DateTimeOffset.
+    let private pinToUtc (fact: Fact) : Fact =
+        match fact with
+        | Runtime(RuntimeStarted started) ->
+            Runtime(
+                RuntimeStarted
+                    {| started with
+                        StartedAt = started.StartedAt.ToOffset TimeSpan.Zero |}
+            )
+        | Agent(AgentFact.HandleAbandoned payload) ->
+            Agent(
+                AgentFact.HandleAbandoned
+                    {| payload with
+                        AbandonedAt = payload.AbandonedAt.ToOffset TimeSpan.Zero |}
+            )
+        | Agent(AgentFact.HostTurnObserved payload) ->
+            Agent(
+                AgentFact.HostTurnObserved
+                    {| payload with
+                        ObservedAt = payload.ObservedAt.ToOffset TimeSpan.Zero |}
+            )
+        | other -> other
+
     let serializeFact (fact: Fact) : string =
-        Encode.Auto.toString (0, fact, extra = extra)
+        Encode.Auto.toString (0, pinToUtc fact, extra = extra)
 
     /// 0.5.1 → 0.5.2: `HandleCompleted` gained `CompletionRef` / `CompletionDigest`.
     /// Old lines lack both keys; inject null so Decode maps them to `None`.
@@ -126,3 +160,4 @@ module FactCodec =
             Error pre050MigrationMessage
         else
             Decode.Auto.fromString<Fact> (migrateHandleCompleted json, extra = extra)
+            |> Result.map pinToUtc

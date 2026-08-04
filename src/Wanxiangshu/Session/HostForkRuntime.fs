@@ -123,12 +123,15 @@ type HostForkRuntime
     member internal _.OpenReviewBarrier = defaultArg openReviewBarrier false
     member internal _.TreeHashFor = defaultArg treeHashFor (fun _ -> None)
 
+    /// EXEC-009: retired OR abandoned ids must never re-fork under the same handle.
     member _.IsRetiredHandle(agentId: string) =
         journal
         |> Option.map (fun durable ->
-            HandleProjection.isRetired
-                (HandleController.agentHandle agentId)
-                (AgentJournal.handleProjection durable parentId))
+            let projection = AgentJournal.handleProjection durable parentId
+            let handle = HandleController.agentHandle agentId
+
+            HandleProjection.isRetired handle projection
+            || HandleProjection.isAbandoned handle projection)
 
     member this.AwaitRecovery() =
         task {
@@ -211,53 +214,75 @@ type HostForkRuntime
         let isPty runId =
             lock gate (fun () -> ptyRuns.Contains runId)
 
-        let tryConsumeDurable (durable: AgentJournal) : Result<RunCompletion, string> option =
-            let joinable =
-                HandleProjection.joinable (AgentJournal.handleProjection durable parentId)
+        let tryConsumeDurable (durable: AgentJournal) : Result<RunCompletion, ForkError> option =
+            let projection = AgentJournal.handleProjection durable parentId
 
-            let rec attempt records =
-                match records with
-                | [] -> None
-                | record :: rest ->
-                    match HandleId.tryAgent record.Handle with
-                    | None -> attempt rest
-                    | Some agentHandleId ->
+            // EXEC-009: Abandoned is durable and not joinable. Surface it before
+            // waiting so Join does not hang or misreport Completed.
+            let abandoned =
+                HandleProjection.linkedChildren projection
+                |> List.tryPick (fun record ->
+                    match record.Lifecycle, HandleId.tryAgent record.Handle with
+                    | HandleLifecycle.Abandoned reason, Some agentHandleId ->
                         let agentId = AgentHandleId.value agentHandleId
 
-                        match HandleCompletionCodec.tryRead durable record agentId with
-                        | Error err -> Some(Error err)
-                        | Ok None ->
-                            // Cancelled / 0.5.1 line without blob: still CAS-retire so
-                            // the handle cannot be joined twice after a hollow complete.
-                            match HandleController.consume durable parentId record.Handle with
-                            | Ok _ ->
-                                Some(
-                                    Ok
-                                        { RunId = "run-" + agentId
-                                          AgentId = agentId
-                                          AgentName = record.TargetAgent
-                                          Role = AgentRoleIdentity.ofRole record.CanonicalRole
-                                          Outcome =
-                                            AgentCompletion.aborted
-                                                agentId
-                                                ("run-" + agentId)
-                                                (Some(AgentRoleIdentity.ofRole record.CanonicalRole))
-                                                (Some record.ChildSessionId)
-                                                "CANCELLED"
-                                                "handle completed without durable payload"
-                                          CompletedAt = System.DateTimeOffset.UtcNow }
-                                )
-                            | Error AlreadyRetired -> attempt rest
-                            | Error(NotJoinable _) -> attempt rest
-                            | Error(AppendFailed err) -> Some(Error err)
-                        | Ok(Some completion) ->
-                            match HandleController.consume durable parentId record.Handle with
-                            | Ok _ -> Some(Ok completion)
-                            | Error AlreadyRetired -> attempt rest
-                            | Error(NotJoinable _) -> attempt rest
-                            | Error(AppendFailed err) -> Some(Error err)
+                        let reasonText =
+                            match reason with
+                            | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
+                            | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
+                            | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
 
-            attempt joinable
+                        Some(Error(ForkError.Abandoned(agentId, reasonText)))
+                    | _ -> None)
+
+            match abandoned with
+            | Some result -> Some result
+            | None ->
+                let joinable = HandleProjection.joinable projection
+
+                let rec attempt records =
+                    match records with
+                    | [] -> None
+                    | record :: rest ->
+                        match HandleId.tryAgent record.Handle with
+                        | None -> attempt rest
+                        | Some agentHandleId ->
+                            let agentId = AgentHandleId.value agentHandleId
+
+                            match HandleCompletionCodec.tryRead durable record agentId with
+                            | Error err -> Some(Error(ForkError.NotFound err))
+                            | Ok None ->
+                                // Cancelled / 0.5.1 line without blob: still CAS-retire so
+                                // the handle cannot be joined twice after a hollow complete.
+                                match HandleController.consume durable parentId record.Handle with
+                                | Ok _ ->
+                                    Some(
+                                        Ok
+                                            { RunId = "run-" + agentId
+                                              AgentId = agentId
+                                              AgentName = record.TargetAgent
+                                              Role = AgentRoleIdentity.ofRole record.CanonicalRole
+                                              Outcome =
+                                                AgentCompletion.aborted
+                                                    agentId
+                                                    ("run-" + agentId)
+                                                    (Some(AgentRoleIdentity.ofRole record.CanonicalRole))
+                                                    (Some record.ChildSessionId)
+                                                    "CANCELLED"
+                                                    "handle completed without durable payload"
+                                              CompletedAt = System.DateTimeOffset.UtcNow }
+                                    )
+                                | Error AlreadyRetired -> attempt rest
+                                | Error(NotJoinable _) -> attempt rest
+                                | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+                            | Ok(Some completion) ->
+                                match HandleController.consume durable parentId record.Handle with
+                                | Ok _ -> Some(Ok completion)
+                                | Error AlreadyRetired -> attempt rest
+                                | Error(NotJoinable _) -> attempt rest
+                                | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+
+                attempt joinable
 
         /// Race journal revision wake vs mailbox completion (PTY + agent notify).
         /// Choice1 = durable change (re-loop); Choice2 = mailbox result.
@@ -287,9 +312,7 @@ type HostForkRuntime
                 match journal with
                 | Some durable ->
                     match tryConsumeDurable durable with
-                    | Some(Ok completion) -> return Ok completion
-                    | Some(Error err) ->
-                        return Error(ForkError.NotFound(sprintf "join could not consume handle: %s" err))
+                    | Some result -> return result
                     | None ->
                         if remainingMs <= 0 then
                             return Error ForkError.TimedOut
@@ -298,9 +321,7 @@ type HostForkRuntime
                             let _, fromRev = durable.SnapshotWithRevision
 
                             match tryConsumeDurable durable with
-                            | Some(Ok completion) -> return Ok completion
-                            | Some(Error err) ->
-                                return Error(ForkError.NotFound(sprintf "join could not consume handle: %s" err))
+                            | Some result -> return result
                             | None ->
                                 let started = DateTimeOffset.UtcNow
                                 let! raced = raceChangeAndMailbox durable fromRev remainingMs
@@ -319,14 +340,7 @@ type HostForkRuntime
                                     return! loop next
                                 | Choice2Of2(Error ForkError.TimedOut) ->
                                     match tryConsumeDurable durable with
-                                    | Some(Ok completion) -> return Ok completion
-                                    | Some(Error err) ->
-                                        return
-                                            Error(
-                                                ForkError.NotFound(
-                                                    sprintf "join could not consume handle after timeout: %s" err
-                                                )
-                                            )
+                                    | Some result -> return result
                                     | None -> return Error ForkError.TimedOut
                                 | Choice2Of2(Error e) -> return Error e
                 | None ->

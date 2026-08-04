@@ -46,6 +46,22 @@ module Fact =
         | SendFailure
         | Cancelled
 
+    /// EXEC-009: why a handle left Active/CompletedAwaitingJoin without a joinable
+    /// completion cell. Distinct from `HandleCompletionKind.Cancelled`, which still
+    /// lands in `CompletedAwaitingJoin` and may be joined as an empty body.
+    ///
+    /// Only irreversible loss. Never encode loop-detect interrupt, Host abort that
+    /// will continue (LOOP-006), ProviderRetry, or any wake that keeps the run Active.
+    /// Interrupt ≠ terminal; abandon is terminal without join.
+    [<RequireQualifiedAccess>]
+    type HandleAbandonReason =
+        /// Parent cancelled the owned resource (cancelChildren).
+        | ParentCancelled
+        /// Management/process deadline elapsed without a settled completion.
+        | DeadlineExceeded
+        /// Child Host session is gone and cannot be recovered.
+        | HostSessionGone
+
     [<RequireQualifiedAccess>]
     type AgentFact =
 
@@ -255,6 +271,22 @@ module Fact =
         | HandleRetired of
             {| ParentSessionId: SessionId
                Handle: HandleId |}
+
+        /// EXEC-009: handle left the join protocol without a joinable completion.
+        /// Single-assignment into `HandleLifecycle.Abandoned`; not joinable; no reverse.
+        | HandleAbandoned of
+            {| ParentSessionId: SessionId
+               Handle: HandleId
+               Reason: HandleAbandonReason
+               AbandonedAt: DateTimeOffset |}
+
+        /// Durable observation that a Host turn reached a terminal snapshot.
+        /// Idempotent identity = SessionId + ProviderRun (when present). Wake only;
+        /// business completion still derives from full snapshot (ARCH-002).
+        | HostTurnObserved of
+            {| SessionId: SessionId
+               ProviderRun: ProviderRunIdentity option
+               ObservedAt: DateTimeOffset |}
 
         // ── Orchestrator (ORCH-006) ─────────────────────────────────────────
         // Each fact determines exactly one recovery action (ORCH-007). The old

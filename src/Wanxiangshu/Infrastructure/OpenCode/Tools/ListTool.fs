@@ -33,7 +33,8 @@ module ListTool =
                 runtimeRecord
                 |> Option.map (fun record -> record.Status.ToString().ToLowerInvariant())
                 |> Option.defaultValue "running"
-            | HandleLifecycle.Retired -> invalidArg "handle" "retired handle is not listable"
+            | HandleLifecycle.Abandoned _
+            | HandleLifecycle.Retired -> invalidArg "handle" "retired or abandoned handle is not listable"
 
         let baseFields =
             [ "kind", tString "agent"
@@ -45,6 +46,7 @@ module ListTool =
                   match handle.Lifecycle with
                   | HandleLifecycle.CompletedAwaitingJoin _ -> true
                   | HandleLifecycle.Active -> runtimeRecord |> Option.exists (fun record -> record.HasPendingCompletion)
+                  | HandleLifecycle.Abandoned _
                   | HandleLifecycle.Retired -> false
               ) ]
 

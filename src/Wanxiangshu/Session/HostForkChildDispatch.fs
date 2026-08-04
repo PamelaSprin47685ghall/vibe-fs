@@ -138,7 +138,7 @@ module HostForkChildDispatch =
             | None -> return Ok()
         }
 
-    /// Cancel parent: fail pending runs, retire child handles, clear maps.
+    /// Cancel parent: fail pending runs, abandon child handles, clear maps.
     ///
     /// `cancelSignals` is invoked with parentId :: childIds so the signal router
     /// ignores further idle/retry events for the torn-down sessions. Unregistering
@@ -182,13 +182,13 @@ module HostForkChildDispatch =
         let childIds = owned |> List.map snd |> List.distinct
         cancelSignals (parentId :: childIds)
 
-        // EXEC-009: retire before aborting. A crash mid-Cancel must not leave a
-        // session aborted but still joinable, which is what makes a restart restore
-        // a dead child. A leaked abort is recoverable; a leaked live handle is not.
+        // EXEC-009: durable abandon before aborting. A crash mid-Cancel must not
+        // leave a session aborted but still Active/joinable. A leaked abort is
+        // recoverable; a leaked live handle is not.
         match HandleController.cancelChildren journal parentId (owned |> List.map fst) with
         | Error err ->
-            // Journal failure during retirement is a durable-state bug; surface it.
-            async { return raise (InvalidOperationException(sprintf "Parent handle retirement failed: %s" err)) }
+            // Journal failure during abandon is a durable-state bug; surface it.
+            async { return raise (InvalidOperationException(sprintf "Parent handle abandon failed: %s" err)) }
         | Ok() ->
             async {
                 do! Async.AwaitTask(ptyPort.CloseAll())

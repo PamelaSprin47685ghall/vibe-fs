@@ -44,6 +44,18 @@ test('HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, proj)), true)
 })
 
+test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
+  let proj = handleProjection.empty
+  const h = handleId.agent('agent-ab')
+  const child = sessionId('ses-child-ab')
+  const linked = handleProjection.link(h, child, 'fast-coder', roles.Coder, proj)
+  assert.equal(linked.ok, true)
+  proj = linked.value
+  const abandoned = handleProjection.abandon(h, 'ParentCancelled', proj)
+  assert.equal(abandoned.ok, true)
+  assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, abandoned.value)), true)
+})
+
 test('BLOGGER_RUNTIME_Sealed_ignores_material_until_reactivate', () => {
   const sealed = bloggerRuntime.forceSeal(bloggerRuntime.idle)
   assert.equal(bloggerRuntime.stateOf(sealed), 'Sealed')

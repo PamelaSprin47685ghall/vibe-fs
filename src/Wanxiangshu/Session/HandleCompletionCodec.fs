@@ -157,4 +157,5 @@ module HandleCompletionCodec =
             | Some _, None
             | None, Some _ -> Error "completion blob ref/digest pair is incomplete"
         | HandleLifecycle.Active
+        | HandleLifecycle.Abandoned _
         | HandleLifecycle.Retired -> Ok None
