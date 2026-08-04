@@ -2865,6 +2865,7 @@ export const reconcileSupervisor = (() => {
 
   const kickFn = fableInstanceMethod(ReconcileSupervisorModule, 'Supervisor', 'Kick')
   const bindUserFn = fableInstanceMethod(ReconcileSupervisorModule, 'Supervisor', 'BindUserMessage')
+  const clearSessionFn = fableInstanceMethod(ReconcileSupervisorModule, 'Supervisor', 'ClearSession')
 
   const textPart = (text) => new MessagePart(0, [text])
 
@@ -2897,12 +2898,19 @@ export const reconcileSupervisor = (() => {
     /**
      * `reads` is a queue of Result shapes: `{ ok: true, messages }` or `{ ok: false, error }`.
      * Each GetMessages call consumes one entry (last entry repeats if exhausted).
+     * Optional `onRead` fires once per GetMessages (for re-kick budget tests).
      */
-    createSnapshot: (reads) => {
+    createSnapshot: (reads, onRead) => {
       const queue = [...reads]
       let last = queue[queue.length - 1]
+      let readCount = 0
       return {
+        get readCount() {
+          return readCount
+        },
         GetMessages(_sessionId) {
+          readCount += 1
+          if (typeof onRead === 'function') onRead(readCount)
           const next = queue.length > 0 ? queue.shift() : last
           last = next
           if (next.ok) {
@@ -2926,15 +2934,45 @@ export const reconcileSupervisor = (() => {
         parts: [textPart('done')],
       }),
     ],
-    create: ({ snapshot, binding, onTurn, onDeleted, projection, onSnapshot } = {}) => {
+    /** In-progress assistant: finish=tool-calls → TurnInProgress (incomplete material). */
+    inProgressTranscript: (userId = 'user-1', assistantId = 'asst-ip') => [
+      message({ id: userId, role: 'user', completed: true, parts: [textPart('assignment')] }),
+      message({
+        id: assistantId,
+        role: 'assistant',
+        finish: 'tool-calls',
+        completed: false,
+        parentId: userId,
+        parts: [textPart('working')],
+      }),
+    ],
+    create: ({
+      snapshot,
+      binding,
+      onTurn,
+      onDeleted,
+      projection,
+      onSnapshot,
+      reKickDelaysMs,
+    } = {}) => {
       if (snapshot === undefined || binding === undefined || onTurn === undefined) {
         throw new Error('reconcileSupervisor.create requires snapshot, binding, onTurn')
       }
-      return new Supervisor(snapshot, binding, onTurn, onDeleted, projection, onSnapshot)
+      // Fable optional ctor arg: undefined → None → production delays.
+      return new Supervisor(
+        snapshot,
+        binding,
+        onTurn,
+        onDeleted,
+        projection,
+        onSnapshot,
+        reKickDelaysMs,
+      )
     },
     bindUserMessage: (supervisor, session, physical, agentRole) =>
       bindUserFn(supervisor, session, physical, agentRole),
     kick: (supervisor, session) => kickFn(supervisor, session),
+    clearSession: (supervisor, session) => clearSessionFn(supervisor, session),
   }
 })()
 

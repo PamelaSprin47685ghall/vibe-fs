@@ -12,12 +12,22 @@ open Wanxiangshu.Journal
 
 /// Per-session single-flight reconcile supervisor.
 /// Idle/retry signals only set a dirty latch; truth comes from the full-message
-/// snapshot API. At most three causal yields per kick.
+/// snapshot API. At most three causal yields per kick (HOST-004).
+/// When a pass ends without a terminal outcome but saw incomplete turn material,
+/// schedule a finite delayed re-Kick (real timer, not microtask) so a late
+/// transcript can still be discovered without a second Host signal.
 module ReconcileSupervisor =
 
     type private ReconcileState =
-        { mutable Dirty: bool
-          mutable Running: bool }
+        {
+            mutable Dirty: bool
+            mutable Running: bool
+            /// Count of incomplete-terminal delayed re-kicks already scheduled
+            /// for this session. Reset when a terminal outcome is published.
+            mutable IncompleteRekickCount: int
+            /// At most one pending delayed re-Kick timer per session.
+            mutable RekickHandle: obj option
+        }
 
     /// One real event-loop turn so snapshot I/O can materialize the transcript
     /// (HOST-004 still caps at three causal attempts; this is only the yield).
@@ -25,8 +35,27 @@ module ReconcileSupervisor =
     let private causalYield () : Task<unit> =
         emitJsExpr () "new Promise(res => setTimeout(res, 0))"
 
+    /// Production finite backoff for incomplete-terminal re-Kick (ms).
+    /// Index = prior count; length = max delayed re-kicks per incomplete episode.
+    let private productionIncompleteRekickDelaysMs = [| 50; 100; 250; 500; 1000 |]
+
+    [<Emit("setTimeout($0, $1)")>]
+    let private setTimeoutJs (fn: unit -> unit) (ms: float) : obj = jsNative
+
+    [<Emit("clearTimeout($0)")>]
+    let private clearTimeoutJs (handle: obj) : unit = jsNative
+
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
+
+    let private isTerminalOutcome (outcome: TurnOutcome) =
+        match outcome with
+        | TurnCompleted
+        | TurnAborted _
+        | TurnFailed _ -> true
+        | TurnInProgress
+        | TurnNeedsContinuation _
+        | TurnUnknown -> false
 
     type Supervisor
         (
@@ -52,14 +81,26 @@ module ReconcileSupervisor =
             /// Invoked at most once per pass, with the last snapshot actually read. The
             /// attempt loop may read up to three times; observing each read would ask
             /// the same question of three nearly identical snapshots.
-            ?onSnapshot: SessionId -> SessionMessage list -> Task
+            ?onSnapshot: SessionId -> SessionMessage list -> Task,
+            /// Optional incomplete-terminal re-Kick delays (ms). Defaults to
+            /// productionIncompleteRekickDelaysMs. Tests inject short arrays so the
+            /// full budget stays under PER_TEST_TIMEOUT_MS.
+            ?incompleteRekickDelaysMs: int array
         ) as this =
 
         let gate = obj ()
         let states = Dictionary<string, ReconcileState>()
+        /// Terminal outcomes only. Non-terminal publishes use `provisional` so a
+        /// later terminal with the same run identity is not sealed out.
         let consumed = Dictionary<string, string>()
+        /// Non-terminal publish tokens (session → consume key). Once per incomplete
+        /// episode so delayed re-Kicks do not spam interaction repair.
+        let provisional = Dictionary<string, string>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
+
+        let incompleteRekickDelaysMs =
+            defaultArg incompleteRekickDelaysMs productionIncompleteRekickDelaysMs
 
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
@@ -68,7 +109,12 @@ module ReconcileSupervisor =
             match states.TryGetValue(key) with
             | true, state -> state
             | false, _ ->
-                let created = { Dirty = false; Running = false }
+                let created =
+                    { Dirty = false
+                      Running = false
+                      IncompleteRekickCount = 0
+                      RekickHandle = None }
+
                 states.[key] <- created
                 created
 
@@ -81,16 +127,44 @@ module ReconcileSupervisor =
                    ProviderRunIdentity.value turn.ProviderRun |]
             )
 
-        let alreadyConsumed (turn: ReconciledTurn) =
+        let cancelRekickHandle (state: ReconcileState) =
+            match state.RekickHandle with
+            | Some handle ->
+                clearTimeoutJs handle
+                state.RekickHandle <- None
+            | None -> ()
+
+        let resetIncompleteEpisode (sessionKey: string) =
+            match states.TryGetValue(sessionKey) with
+            | true, state ->
+                cancelRekickHandle state
+                state.IncompleteRekickCount <- 0
+            | false, _ -> ()
+
+            provisional.Remove(sessionKey) |> ignore
+
+        let alreadyPublished (turn: ReconciledTurn) =
             let key = SessionId.value turn.SessionId
             let token = consumeKey turn
 
-            match consumed.TryGetValue(key) with
-            | true, previous when previous = token -> true
-            | _ -> false
+            if isTerminalOutcome turn.Outcome then
+                match consumed.TryGetValue(key) with
+                | true, previous when previous = token -> true
+                | _ -> false
+            else
+                match provisional.TryGetValue(key) with
+                | true, previous when previous = token -> true
+                | _ -> false
 
-        let markConsumed (turn: ReconciledTurn) =
-            consumed.[SessionId.value turn.SessionId] <- consumeKey turn
+        let markPublished (turn: ReconciledTurn) =
+            let key = SessionId.value turn.SessionId
+            let token = consumeKey turn
+
+            if isTerminalOutcome turn.Outcome then
+                consumed.[key] <- token
+                provisional.Remove(key) |> ignore
+            else
+                provisional.[key] <- token
 
         let beginPass (sessionId: SessionId) =
             lock gate (fun () ->
@@ -105,6 +179,54 @@ module ReconcileSupervisor =
 
         let isCleared (sessionId: SessionId) =
             lock gate (fun () -> not (states.ContainsKey(SessionId.value sessionId)))
+
+        /// Schedule one delayed re-Kick for incomplete terminal materialization.
+        /// Overwrites any prior pending timer for this session. No-op if cleared
+        /// or budget exhausted.
+        let scheduleIncompleteRekick (sessionId: SessionId) =
+            let key = SessionId.value sessionId
+
+            let schedule =
+                lock gate (fun () ->
+                    match states.TryGetValue(key) with
+                    | false, _ -> None
+                    | true, state ->
+                        if state.IncompleteRekickCount >= incompleteRekickDelaysMs.Length then
+                            None
+                        else
+                            cancelRekickHandle state
+                            let index = state.IncompleteRekickCount
+                            let delay = incompleteRekickDelaysMs.[index]
+                            state.IncompleteRekickCount <- index + 1
+                            let countAfter = state.IncompleteRekickCount
+
+                            let handle =
+                                setTimeoutJs
+                                    (fun () ->
+                                        let stillAlive =
+                                            lock gate (fun () ->
+                                                match states.TryGetValue(key) with
+                                                | true, s ->
+                                                    s.RekickHandle <- None
+                                                    true
+                                                | false, _ -> false)
+
+                                        // Fresh Kick = fresh HOST-004 budget of 3 causal
+                                        // rereads. Never recreate state after ClearSession.
+                                        if stillAlive then
+                                            this.Kick(sessionId))
+                                    (float delay)
+
+                            state.RekickHandle <- Some handle
+                            Some(delay, countAfter))
+
+            match schedule with
+            | Some(delay, countAfter) ->
+                Diagnostic.emit
+                    "reconcile-incomplete-rekick"
+                    [ "session_id", key
+                      "result", sprintf "scheduled delay-ms=%d count=%d" delay countAfter ]
+            | None -> ()
 
         let rec runLoop (sessionId: SessionId) : Task =
             task {
@@ -123,6 +245,8 @@ module ReconcileSupervisor =
                                 binding.ActiveRunBinding(sessionId, ?projection = resolveProjection sessionId)
 
                             let mutable turnFound: ReconciledTurn option = None
+                            let mutable hadActiveRun = false
+                            let mutable incompleteMaterial = false
 
                             // HOST-006: the last snapshot this pass actually read.
                             //
@@ -147,6 +271,7 @@ module ReconcileSupervisor =
                                     logError "RECONCILE-SNAPSHOT" (sprintf "pass snapshot failed: %s" (string err))
                                 | Ok messages -> lastSnapshot <- Some messages
                             | Some activeRun ->
+                                hadActiveRun <- true
                                 let mutable continuationCandidate: ReconciledTurn option = None
                                 let mutable attempt = 0
                                 // Transient snapshot errors must not consume the HOST-004
@@ -204,18 +329,26 @@ module ReconcileSupervisor =
                                 if turnFound.IsNone then
                                     turnFound <- continuationCandidate
 
+                                incompleteMaterial <-
+                                    match turnFound with
+                                    | None -> true
+                                    | Some turn -> not (isTerminalOutcome turn.Outcome)
+
                             match turnFound with
                             | Some turn ->
                                 let publish =
                                     lock gate (fun () ->
-                                        if alreadyConsumed turn then
+                                        if alreadyPublished turn then
                                             false
                                         else
-                                            markConsumed turn
+                                            markPublished turn
                                             true)
 
                                 if publish then
                                     do! onTurn turn
+
+                                if isTerminalOutcome turn.Outcome then
+                                    lock gate (fun () -> resetIncompleteEpisode key)
                             | None -> ()
 
                             // HOST-006 containment, after the turn.
@@ -230,6 +363,8 @@ module ReconcileSupervisor =
                             | Some messages -> do! observeSnapshot sessionId messages
                             | None -> ()
 
+                            let mutable scheduleRekick = false
+
                             cont <-
                                 lock gate (fun () ->
                                     match states.TryGetValue(key) with
@@ -243,7 +378,16 @@ module ReconcileSupervisor =
                                     | true, state ->
                                         state.Running <- false
                                         releaseOnExit <- false
+
+                                        if hadActiveRun && incompleteMaterial then
+                                            scheduleRekick <- true
+                                        elif hadActiveRun && not incompleteMaterial then
+                                            resetIncompleteEpisode key
+
                                         false)
+
+                            if scheduleRekick then
+                                scheduleIncompleteRekick sessionId
                 finally
                     // Only the exceptional path still owns Running here. A
                     // normal release may already have allowed a new run to
@@ -309,7 +453,13 @@ module ReconcileSupervisor =
         member _.ClearSession(sessionId: SessionId) : unit =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
+
+                match states.TryGetValue(key) with
+                | true, state -> cancelRekickHandle state
+                | false, _ -> ()
+
                 states.Remove(key) |> ignore
                 consumed.Remove(key) |> ignore
+                provisional.Remove(key) |> ignore
                 binding.ClearSession(sessionId)
                 onDeleted (sessionId))
