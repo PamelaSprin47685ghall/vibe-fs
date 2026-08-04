@@ -143,6 +143,7 @@ const [
   ForkRuntimeModule,
   ForkTypesModule,
   HostSignalSubscribeModule,
+  ManagedAgentConfigModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -235,6 +236,7 @@ const [
   prod('Session/ForkRuntime'),
   prod('Session/ForkTypes'),
   prod('Infrastructure/OpenCode/Signals/HostSignalSubscribe'),
+  prod('Infrastructure/OpenCode/Host/ManagedAgentConfig'),
 ])
     
 
@@ -3516,6 +3518,26 @@ export const runtimeResources = (() => {
     /** Plugin-init equivalent for unit tests that drive EnforcerHost without SpikePlugin. */
     installFromPackage: () => api.install(api.load()),
     current: () => api.current(),
+  }
+})()
+
+/**
+ * AGENT-002/007: Host-final agent config gate. `configureFromHostConfig` is the
+ * plugin's `config` hook body: it validates the 20 managed agents and applies
+ * Wanxiangshu-owned `mode` / `permission` / `prompt` fields onto the Host's
+ * live config object (never model bindings). Tests observe the writes on the
+ * same object the Host's Agent.state will read.
+ */
+export const managedAgentConfig = (() => {
+  const api = bind(ManagedAgentConfigModule, 'ManagedAgentConfig', ['validate', 'configureFromHostConfig'])
+  return {
+    validate: (config) => resultOf(api.validate(config)),
+    /**
+     * Runs the full config-hook path (validate + owned-field apply) and returns
+     * the gate result. The config object is mutated in place, exactly as the
+     * Host's `config` hook contract requires.
+     */
+    configure: (config) => resultOf(api.configureFromHostConfig(config)),
   }
 })()
 

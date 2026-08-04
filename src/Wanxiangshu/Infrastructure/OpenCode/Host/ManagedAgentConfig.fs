@@ -141,6 +141,11 @@ module ManagedAgentConfig =
 
     /// Apply Wanxiangshu-owned non-model fields onto Host agent entries.
     /// Never creates missing agents, never writes/overwrites model.
+    ///
+    /// Walks the full required 20-name inventory (not just validated bindings):
+    /// AGENT-007's first layer is fail-closed, so a validation failure elsewhere
+    /// in the config must not silently drop every permission write. Missing
+    /// agents stay untouched (no invented agents).
     let applyOwnedFields (config: obj) (inventory: ManagedAgentInventory) : unit =
         if isNull config then
             ()
@@ -150,31 +155,37 @@ module ManagedAgentConfig =
             if isNull agents then
                 ()
             else
-                for KeyValue(name, binding) in inventory.Bindings do
-                    match agentEntry agents name with
-                    | None -> ()
-                    | Some entry ->
-                        let role = binding.Agent.Role
+                let keys: string array = emitJsExpr agents "Object.keys($0)"
 
-                        let owned =
-                            match role with
-                            | Role.Manager -> StaticTools.managerAgentConfig ()
-                            | Role.Orchestrator -> StaticTools.orchestratorAgentConfig ()
-                            | Role.Coder -> StaticTools.coderAgentConfig ()
-                            | Role.Inspector -> StaticTools.inspectorAgentConfig ()
-                            | Role.DevOps -> StaticTools.devopsAgentConfig ()
-                            | Role.Browser -> StaticTools.browserAgentConfig ()
-                            | Role.Meditator -> StaticTools.meditatorAgentConfig ()
-                            | Role.Reviewer -> StaticTools.reviewerAgentConfig ()
-                            | Role.Blogger -> StaticTools.bloggerAgentConfig ()
-                            | Role.Executor -> StaticTools.executorAgentConfig ()
+                for name in ManagedAgent.requiredNames do
+                    if Array.contains name keys then
+                        match Map.tryFind name inventory.Bindings with
+                        | None -> ()
+                        | Some binding ->
+                            match agentEntry agents name with
+                            | None -> ()
+                            | Some entry ->
+                                let role = binding.Agent.Role
 
-                        // Copy Wanxiangshu-owned keys without touching model.
-                        entry?mode <- owned?mode
-                        entry?permission <- owned?permission
+                                let owned =
+                                    match role with
+                                    | Role.Manager -> StaticTools.managerAgentConfig ()
+                                    | Role.Orchestrator -> StaticTools.orchestratorAgentConfig ()
+                                    | Role.Coder -> StaticTools.coderAgentConfig ()
+                                    | Role.Inspector -> StaticTools.inspectorAgentConfig ()
+                                    | Role.DevOps -> StaticTools.devopsAgentConfig ()
+                                    | Role.Browser -> StaticTools.browserAgentConfig ()
+                                    | Role.Meditator -> StaticTools.meditatorAgentConfig ()
+                                    | Role.Reviewer -> StaticTools.reviewerAgentConfig ()
+                                    | Role.Blogger -> StaticTools.bloggerAgentConfig ()
+                                    | Role.Executor -> StaticTools.executorAgentConfig ()
 
-                        if not (isNull owned?prompt) then
-                            entry?prompt <- owned?prompt
+                                // Copy Wanxiangshu-owned keys without touching model.
+                                entry?mode <- owned?mode
+                                entry?permission <- owned?permission
+
+                                if not (isNull owned?prompt) then
+                                    entry?prompt <- owned?prompt
 
                 config?compaction <- createObj [ "auto" ==> false ]
 
@@ -197,9 +208,29 @@ module ManagedAgentConfig =
 
     let private loggedSource = ref false
 
+    /// Best-effort bindings for the Error path: role knowledge only, no model
+    /// validation (the model checks are what failed). Enough to write owned
+    /// fields so AGENT-007's fail-closed first layer survives a gate error.
+    let private roleBindings (agents: obj) : Map<string, ManagedAgentBinding> =
+        let mutable bindings = Map.empty
+
+        for name in ManagedAgent.requiredNames do
+            match agentEntry agents name, ManagedAgent.tryParse name with
+            | Some _, Some managed -> bindings <- Map.add name { Agent = managed; Model = "" } bindings
+            | _ -> ()
+
+        bindings
+
     let configureFromHostConfig (config: obj) : Result<ManagedAgentInventory, string> =
         match validate config with
-        | Error err -> Error err
+        | Error err ->
+            // AGENT-007 fail-closed: a validation failure elsewhere in the config
+            // (e.g. a duplicate model pair) must not silently drop every
+            // permission/mode/prompt write. Apply what the config itself names;
+            // the Host logs the gate error and keeps running.
+            let agents = if isNull config then null else config?agent
+            applyOwnedFields config { Bindings = if isNull agents then Map.empty else roleBindings agents }
+            Error err
         | Ok inventory ->
             applyOwnedFields config inventory
 
