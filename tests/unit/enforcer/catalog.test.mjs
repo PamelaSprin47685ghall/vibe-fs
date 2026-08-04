@@ -52,7 +52,7 @@ test('ENFORCER_170_all_twelve_families_present_with_ten_rules_each', () => {
 })
 
 test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
-  // Spot-check a few known field names from docs/rfcs/enforcer-nudge.md / resources/enforcer/catalog.json.
+  // Spot-check a few known field names from docs/decisions/enforcer-catalog.md / resources/enforcer/catalog.json.
   const fields = new Set(enforcer.fieldNames())
   for (const expected of [
     'primitive-obsession',

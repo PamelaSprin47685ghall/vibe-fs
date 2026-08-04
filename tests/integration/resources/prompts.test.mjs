@@ -5,11 +5,11 @@
 //
 // Not discovered by tests/unit/runner.mjs. Run standalone:
 //   node --test tests/integration/resources/prompts.test.mjs
-// (requires dist/ built; import through tests/unit/domain.mjs facade)
+// (requires dist/ built; import through tests/unit/support/domain.mjs facade)
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { promptResources, runtimeResources } from '../../unit/domain.mjs'
+import { promptResources, runtimeResources } from '../../unit/support/domain.mjs'
 
 const PROMPT_FIELDS = [
   'ManagerSystemPrompt',

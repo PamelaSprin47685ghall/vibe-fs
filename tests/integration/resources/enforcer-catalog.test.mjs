@@ -5,11 +5,11 @@
 //
 // Not discovered by tests/unit/runner.mjs. Run standalone:
 //   node --test tests/integration/resources/enforcer-catalog.test.mjs
-// (requires dist/ built; import through tests/unit/domain.mjs facade)
+// (requires dist/ built; import through tests/unit/support/domain.mjs facade)
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { enforcerCatalogResource, packageResources, enforcerCatalog } from '../../unit/domain.mjs'
+import { enforcerCatalogResource, packageResources, enforcerCatalog } from '../../unit/support/domain.mjs'
 
 test('ENFORCER_resource_packaged_catalog_loads_with_contiguous_ordinals', () => {
   const rules = enforcerCatalogResource.load()

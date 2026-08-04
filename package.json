@@ -26,11 +26,11 @@
     "lint": "npm run format:check && node scripts/check.mjs",
     "test": "node tests/unit/run.mjs",
     "test:unit": "node tests/unit/run.mjs",
-    "test:harness": "node tests/integration/harness/run.mjs",
+    "test:integration": "node tests/integration/run.mjs",
+    "test:package": "node tests/integration/package/run.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
-    "test:e2e:three": "node tests/e2e/run.mjs --repeat 3",
-    "check": "npm run lint && npm run build && npm test && npm run test:harness",
-    "check:release": "npm run check && npm run test:e2e:three && npm pack --dry-run"
+    "check": "npm run lint && npm run build && npm test && npm run test:integration",
+    "check:release": "npm run check && npm run test:e2e -- --repeat 3 && npm run test:package && npm pack --dry-run"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.17.4"
