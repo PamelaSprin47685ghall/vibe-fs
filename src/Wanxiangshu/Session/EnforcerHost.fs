@@ -58,11 +58,19 @@ module EnforcerHost =
         | StopPhysicalRun of messages: obj list * reason: string
 
     /// Prefer non-empty preferred; else fallback. Never invent a blank list when
-    /// either side has content. Callers that still see [] must not replaceInPlace.
+    /// either side has content. Both empty is an invariant break: blanking Host
+    /// transcript yields provider 400 (messages cannot be empty).
     let private ensureNonEmpty (preferred: obj list) (fallback: obj list) : obj list =
-        if not (List.isEmpty preferred) then preferred
-        elif not (List.isEmpty fallback) then fallback
-        else preferred
+        if not (List.isEmpty preferred) then
+            preferred
+        elif not (List.isEmpty fallback) then
+            fallback
+        else
+            Diagnostic.fatal
+                "enforcer-empty-projection"
+                [ "result", "ensureNonEmpty: both preferred and fallback are empty" ]
+
+            preferred
 
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
         ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)

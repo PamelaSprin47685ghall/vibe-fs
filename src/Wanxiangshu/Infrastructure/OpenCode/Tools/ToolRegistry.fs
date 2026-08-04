@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Collections.Generic
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -13,6 +14,22 @@ type ToolRegistration =
       Runtime: ToolRuntimeScope }
 
 module ToolRegistry =
+
+    /// AGENT-007 role gate, plus request-scoped `blog` (CurrentRequest / InFlight).
+    /// sessionId is the tool call's Host session; parkedHost is optional for tests.
+    let rolePredicate (specName: string) (parkedHost: IParkedTransformHost option) (sessionId: string) : Role -> bool =
+        match specName with
+        | "fork" -> fun r -> r = Role.Manager
+        | "fork-manager" -> fun r -> r = Role.Orchestrator
+        | "fork-pty" -> fun r -> r = Role.DevOps
+        | "join" -> fun r -> Roles.isAllowed r ToolPermission.Join
+        | "list" -> fun r -> Roles.isAllowed r ToolPermission.List
+        | "verdict" -> fun r -> Roles.isAllowed r ToolPermission.Verdict
+        | "executor" -> fun r -> Roles.isAllowed r ToolPermission.Exec
+        | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
+        | "coder" -> fun r -> r = Role.DevOps
+        | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
+        | _ -> fun _ -> false
 
     let create
         (toolModule: obj)
@@ -63,51 +80,47 @@ module ToolRegistry =
               InspectorTool.spec factory runtime
               CoderTool.spec factory runtime
               // ENFORCER-010: Blogger's tool set is exactly { blog }.
-              // parkedHost gates request-scoped execute (CurrentRequest ∧ InFlight).
+              // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               BlogTool.spec factory runtime parkedHost ]
 
-        let rolePredicate spec =
-            match spec.Name with
-            | "fork" -> fun r -> r = Role.Manager
-            | "fork-manager" -> fun r -> r = Role.Orchestrator
-            | "fork-pty" -> fun r -> r = Role.DevOps
-            | "join" -> fun r -> Roles.isAllowed r ToolPermission.Join
-            | "list" -> fun r -> Roles.isAllowed r ToolPermission.List
-            | "verdict" -> fun r -> Roles.isAllowed r ToolPermission.Verdict
-            | "executor" -> fun r -> Roles.isAllowed r ToolPermission.Exec
-            | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
-            | "coder" -> fun r -> r = Role.DevOps
-            | "blog" -> fun r -> r = Role.Blogger
-            | _ -> fun _ -> false
-
-        // AGENT-007 layer two. Both layers read the same CanonicalRole, so a tool
-        // the schema admitted is exactly a tool the gate admits.
-        let gateExecute spec allowed =
+        // Role-gated tools: agent permission schema and this execute gate agree on
+        // CanonicalRole. blog is request-scoped on top of Role=Blogger: no live
+        // CurrentRequest must not complete as a soft tool error (Host step loop).
+        let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
             let tString = ToolHostCodec.TString
 
-            fun args ctx ->
+            let denyRole (role: Role) =
+                ToolHostCodec.tomlObject
+                    [ "error", tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+
+            let stopBlogNoLiveCycle (ctx: HostToolContext) =
                 task {
+                    Diagnostic.emit "blog-gate" [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
+
+                    if not (String.IsNullOrWhiteSpace ctx.SessionId) then
+                        let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
+                        ()
+
+                    return raise (InvalidOperationException(BlogTool.NoLiveCycleError))
+                }
+
+            fun args (ctx: HostToolContext) ->
+                task {
+                    let allowed = rolePredicate spec.Name parkedHost ctx.SessionId
+
                     match runtime.RoleFor ctx with
                     | Some role when allowed role -> return! original args ctx
-                    | Some role ->
-                        return
-                            ToolHostCodec.tomlObject
-                                [ "error", tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+                    | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
+                    | Some role -> return denyRole role
                     | None ->
                         match! runtime.EnsureRoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
-                        | Some role ->
-                            return
-                                ToolHostCodec.tomlObject
-                                    [ "error",
-                                      tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+                        | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
+                        | Some role -> return denyRole role
                         | None ->
-                            // AGENT-007: an unresolved Role means an empty tool set. The
-                            // previous version exempted `inspector` here on the grounds
-                            // that it is read-only and broadly permitted — the exemption
-                            // the clause names explicitly. Read-only or not, executing
-                            // under an unknown role is an unauthorised execution.
+                            // AGENT-007: an unresolved Role means an empty tool set.
+                            // Executing under an unknown role is unauthorised.
                             return
                                 ToolHostCodec.tomlObject
                                     [ "error",
@@ -119,10 +132,7 @@ module ToolRegistry =
                 }
 
         let specs =
-            baseSpecs
-            |> List.map (fun spec ->
-                { spec with
-                    Execute = gateExecute spec (rolePredicate spec) })
+            baseSpecs |> List.map (fun spec -> { spec with Execute = gateExecute spec })
 
         { Tools = ToolHostCodec.registry factory specs
           Runtime = runtime }
