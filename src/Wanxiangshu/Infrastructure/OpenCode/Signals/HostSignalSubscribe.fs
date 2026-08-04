@@ -14,19 +14,15 @@ module HostSignalSubscribe =
 
     /// Snapshot of the global SSE transport (or local listen stub).
     type SignalHealth =
-        {
-            IsConnected: bool
-            LastEventReceived: DateTimeOffset option
-            LastError: string option
-            ReconnectAttempts: int
-        }
+        { IsConnected: bool
+          LastEventReceived: DateTimeOffset option
+          LastError: string option
+          ReconnectAttempts: int }
 
     /// Disposable subscription plus a cheap health probe for downstream recovery.
     type HostSignalSubscription =
-        {
-            Health: unit -> SignalHealth
-            Dispose: unit -> unit
-        }
+        { Health: unit -> SignalHealth
+          Dispose: unit -> unit }
 
     /// Heartbeat interval: check silence every 15s.
     let private HeartbeatIntervalMs = 15_000
@@ -41,12 +37,10 @@ module HostSignalSubscribe =
     let private logInfo (prefix: string) (message: string) : unit = jsNative
 
     let private alwaysHealthy () : SignalHealth =
-        {
-            IsConnected = true
-            LastEventReceived = None
-            LastError = None
-            ReconnectAttempts = 0
-        }
+        { IsConnected = true
+          LastEventReceived = None
+          LastError = None
+          ReconnectAttempts = 0 }
 
     let private readHealth (state: obj) : SignalHealth =
         let disposed: bool = unbox state?disposed
@@ -61,18 +55,12 @@ module HostSignalSubscribe =
             else
                 None
 
-        let error =
-            if isNull lastError then
-                None
-            else
-                Some(string lastError)
+        let error = if isNull lastError then None else Some(string lastError)
 
-        {
-            IsConnected = connected && not disposed
-            LastEventReceived = lastEvent
-            LastError = error
-            ReconnectAttempts = attempts
-        }
+        { IsConnected = connected && not disposed
+          LastEventReceived = lastEvent
+          LastError = error
+          ReconnectAttempts = attempts }
 
     let private disposeState (state: obj) : unit =
         if not (unbox state?disposed) then
@@ -111,14 +99,15 @@ module HostSignalSubscribe =
                     Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned no subscription"
                 else
                     Ok
-                        {
-                            Health = alwaysHealthy
-                            Dispose = fun () -> invokeDisposer subscription
-                        }
+                        { Health = alwaysHealthy
+                          Dispose = fun () -> invokeDisposer subscription }
             with ex ->
                 Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    let private subscribeGlobalEvent (client: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription, string> =
+    let private subscribeGlobalEvent
+        (client: obj)
+        (onSignalEvent: obj -> unit)
+        : Result<HostSignalSubscription, string> =
         if isNull client then
             Error "OPENCODE-SIGNAL-SUBSCRIBE: no client for global event"
         else
@@ -135,15 +124,13 @@ module HostSignalSubscribe =
                     // heartbeat timeout (no events yet is not immediately fatal).
                     let state =
                         createObj
-                            [
-                                "disposed", box false
-                                "connected", box false
-                                "lastEventMs", box (float (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
-                                "lastError", box null
-                                "reconnectAttempts", box 0
-                                "connAbort", box null
-                                "heartbeatTimer", box null
-                            ]
+                            [ "disposed", box false
+                              "connected", box false
+                              "lastEventMs", box (float (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
+                              "lastError", box null
+                              "reconnectAttempts", box 0
+                              "connAbort", box null
+                              "heartbeatTimer", box null ]
 
                     emitJsExpr
                         (globalApi, onEvent, state, HeartbeatIntervalMs, HeartbeatTimeoutMs)
@@ -211,14 +198,15 @@ module HostSignalSubscribe =
                         """
 
                     Ok
-                        {
-                            Health = fun () -> readHealth state
-                            Dispose = fun () -> disposeState state
-                        }
+                        { Health = fun () -> readHealth state
+                          Dispose = fun () -> disposeState state }
                 with ex ->
                     Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    let trySubscribe (input: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription option * string, string> =
+    let trySubscribe
+        (input: obj)
+        (onSignalEvent: obj -> unit)
+        : Result<HostSignalSubscription option * string, string> =
         let listenTarget =
             if isNull input then
                 None

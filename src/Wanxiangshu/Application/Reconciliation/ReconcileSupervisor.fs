@@ -18,10 +18,8 @@ open Wanxiangshu.Journal
 module ReconcileSupervisor =
 
     type private ReconcileState =
-        {
-            mutable Dirty: bool
-            mutable Running: bool
-        }
+        { mutable Dirty: bool
+          mutable Running: bool }
 
     /// Fable-safe timer delay. Not `Task.Delay`: Fable does not export it, and a
     /// module-level Promise would fire once at load if written as a value.
@@ -103,11 +101,9 @@ module ReconcileSupervisor =
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
 
-        let backoffDelaysMs =
-            defaultArg backoffDelaysMs productionBackoffDelaysMs
+        let backoffDelaysMs = defaultArg backoffDelaysMs productionBackoffDelaysMs
 
-        let maxBudgetMs =
-            defaultArg maxBudgetMs productionMaxBudgetMs
+        let maxBudgetMs = defaultArg maxBudgetMs productionMaxBudgetMs
 
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
@@ -116,9 +112,7 @@ module ReconcileSupervisor =
             match states.TryGetValue(key) with
             | true, state -> state
             | false, _ ->
-                let created =
-                    { Dirty = false
-                      Running = false }
+                let created = { Dirty = false; Running = false }
 
                 states.[key] <- created
                 created
@@ -246,8 +240,7 @@ module ReconcileSupervisor =
 
                                         match TurnReconcile.reconcile messages activeRun with
                                         | None ->
-                                            let delay =
-                                                pickDelay backoffDelaysMs backoffIndex budgetRemaining
+                                            let delay = pickDelay backoffDelaysMs backoffIndex budgetRemaining
 
                                             if delay > 0 && not (isCleared sessionId) then
                                                 do! delayMs delay
@@ -272,8 +265,7 @@ module ReconcileSupervisor =
                                                 // durable fallback.
                                                 continuationCandidate <- Some turn
 
-                                                let delay =
-                                                    pickDelay backoffDelaysMs backoffIndex budgetRemaining
+                                                let delay = pickDelay backoffDelaysMs backoffIndex budgetRemaining
 
                                                 if delay > 0 && not (isCleared sessionId) then
                                                     do! delayMs delay
@@ -286,8 +278,7 @@ module ReconcileSupervisor =
                                                 // from a stale snapshot.
                                                 continuationCandidate <- None
 
-                                                let delay =
-                                                    pickDelay backoffDelaysMs backoffIndex budgetRemaining
+                                                let delay = pickDelay backoffDelaysMs backoffIndex budgetRemaining
 
                                                 if delay > 0 && not (isCleared sessionId) then
                                                     do! delayMs delay

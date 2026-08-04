@@ -7,15 +7,13 @@ open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 
 type PendingHostRun =
-    {
-        Token: obj
-        AgentId: string
-        ChildId: SessionId
-        Role: AgentRole
-        Source: TaskCompletionSource<AgentCompletionOutcome>
-        mutable Subscription: IDisposable option
-        mutable Finished: bool
-    }
+    { Token: obj
+      AgentId: string
+      ChildId: SessionId
+      Role: AgentRole
+      Source: TaskCompletionSource<AgentCompletionOutcome>
+      mutable Subscription: IDisposable option
+      mutable Finished: bool }
 
 module HostPendingRun =
     let completionSource () =
