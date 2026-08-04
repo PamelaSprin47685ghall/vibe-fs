@@ -1,2 +1,0 @@
-2b30301cba1fc714a8edc44af8619755ae74050a
-refactor/ssot-shock-anneal

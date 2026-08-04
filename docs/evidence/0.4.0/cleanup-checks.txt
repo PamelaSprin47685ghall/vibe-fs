@@ -1,5 +1,0 @@
-Dispose / leak checks (final gate):
-- gate-testkit ProcessHost leak probe: pass
-- pty-stress-canary / process-stress-canary dispose paths: pass (×3)
-- tests-next PtyLifecycle / SessionPortLifecycle parent cancel: pass
-No residual tarball dirty in worktree after mv to evidence staging.

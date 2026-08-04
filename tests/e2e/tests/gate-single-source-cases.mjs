@@ -343,8 +343,8 @@ export const singleSourceCases = [
       // Measured while writing this file: counting commas and adding one reported the real defect
       // as `CANARY_TESTS, which holds 17` — the registry ends with a trailing comma, so the two
       // 17s agreed and the drift looked like a match. A gate whose message states a false number
-      // about the tree is the failure this file exists to remove, one level up
-      // (`docs/archive/shock-anneal-2026/FINAL-REPORT.md` §6.8, from `design-script-forest.md`).
+      // about the tree is the failure this file exists to remove, one level up (a green check that
+      // restates a wrong count is worse than no check).
       const holds = (source) => {
         const problems = rejects(source, 'restates the size of');
         return problems[0].replace(/^.*which holds (\d+).*$/, '$1');

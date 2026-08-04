@@ -1,1 +1,0 @@
-architecture-gate: OK — 166 production + 79 test files

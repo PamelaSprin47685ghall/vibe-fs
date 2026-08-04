@@ -235,15 +235,11 @@ test('C0_no_EnforcementCycleCommitted_fact', () => {
 // ── status / pending ────────────────────────────────────────────────────────
 
 test('C0_adopted_blogger_motion_is_not_active_PENDING', () => {
+  // Adopted motion is git history only; no active PENDING/ parking file.
   assert.equal(
     existsSync(join(ROOT, 'PENDING/blogger-prompt-shape-and-parking.md')),
     false,
     'ADOPTED motion must leave active PENDING/',
-  )
-  assert.equal(
-    existsSync(join(ROOT, 'docs/archive/shock-anneal-2026/blogger-prompt-shape-and-parking.md')),
-    true,
-    'ADOPTED motion must live under docs/archive/',
   )
 })
 

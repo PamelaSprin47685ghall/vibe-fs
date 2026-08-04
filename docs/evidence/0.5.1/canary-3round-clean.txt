@@ -1,4 +1,0 @@
-1098:--- Canary Iteration 1/3 ---
-1138:--- Canary Iteration 2/3 ---
-1178:--- Canary Iteration 3/3 ---
-1219:All staggered parallel canary tests passed cleanly across 3 iteration(s).

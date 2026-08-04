@@ -1,7 +1,0 @@
-import-ok object [
-  'PluginConfig',
-  'PluginConfig_$reflection',
-  'Plugin_defaultExport',
-  'Plugin_initPlugin',
-  'default'
-]

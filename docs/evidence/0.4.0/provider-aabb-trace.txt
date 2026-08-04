@@ -1,9 +1,0 @@
-provider-visible same-run AABB
-models=["test-model","test-model","test-model-b","test-model-b"]
-fallbackFailures=4
-requests=5
-1 model=test-model user="Prove same-run provider AABB trajectory."
-2 model=test-model user="Prove same-run provider AABB trajectory."
-3 model=test-model user="Continue after provider failure."
-4 model=test-model-b user="Continue after provider failure."
-5 model=test-model-b user="Continue after provider failure."

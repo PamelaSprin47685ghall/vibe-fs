@@ -1,8 +1,0 @@
-### STATIC.txt — gate:static on final tip single-anchor
-HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
-Date: 2026-08-03T20:46:10Z
-command: npm run gate:static
-exit_code: 0
-layout: 209 sources · ssot 190 · conformance 192 · architecture 209+72
-docs/toml/budget/surface/generated/role-matrix: OK
-production_fs_count: 208 · gate_source_file_count: 209

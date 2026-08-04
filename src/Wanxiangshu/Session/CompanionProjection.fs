@@ -9,8 +9,8 @@ open Fable.Core.JsInterop
 /// return value (`plugin/index.ts:284-293`) and the Host then reads its original
 /// `msgs` binding (`prompt.ts:1262`), so `output.messages = rewritten` is silently
 /// ignored: the provider receives the untouched transcript while every assertion
-/// passes. Confirmed against Host source — `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md`
-/// item 1.
+/// passes. Confirmed against Host source (`plugin/index.ts` discard + `prompt.ts`
+/// original `msgs` binding).
 ///
 /// What used to live here was the whole context-estimation layer: a token estimator, a
 /// reserved-output budget, an effective-context-limit calculation, and

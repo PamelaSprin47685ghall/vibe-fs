@@ -25,12 +25,12 @@
  *    one fixed order only proves that order works. So nothing here may be read as a designed
  *    sequence, and no canary may be given a position on the assumption that another ran first.
  *
- * 2. AN EMPTY OR MISSING DIRECTORY IS AN ERROR, NOT AN EMPTY SUITE. Returning `[]` would let the
- *    release gate run three iterations over zero canaries and report success — 「一个能对错误实现
- *    给出绿灯的验证装置，比没有验证装置更危险」(`docs/archive/shock-anneal-2026/FINAL-REPORT.md` §6.8, from `design-script-forest.md`). The refusal
- *    names the absolute directory and the suffix it looked for, because the two ways this fails
- *    (the directory moved, the convention changed) need different fixes and the message is the
- *    only thing that tells them apart.
+  * 2. AN EMPTY OR MISSING DIRECTORY IS AN ERROR, NOT AN EMPTY SUITE. Returning `[]` would let the
+  *    release gate run three iterations over zero canaries and report success — a harness that
+  *    greens on a missing suite is more dangerous than no harness. The refusal names the absolute
+  *    directory and the suffix it looked for, because the two ways this fails (the directory
+  *    moved, the convention changed) need different fixes and the message is the only thing that
+  *    tells them apart.
  *
  * 3. A FILE THAT CLAIMS TO BE A CANARY MUST MATCH THE CONVENTION, and that is checked rather than
  *    assumed. `foo_canary.mjs` and `foo-canary.test.mjs` would both silently not register — the

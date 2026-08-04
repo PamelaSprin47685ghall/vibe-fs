@@ -1,6 +1,0 @@
-### IMPORT.txt — require/import from isolated install
-HEAD_at_run: ffa168c7
-Date: 2026-08-03T20:46:10Z
-exit_code: 0
-main: node_modules/wanxiangshu/next/Infrastructure/OpenCode/Plugin/Plugin.js
-cjs_exports: 6 keys · esm_exports: 5 keys

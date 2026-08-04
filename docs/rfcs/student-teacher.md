@@ -1,25 +1,17 @@
 # RFC/student-teacher — Student & Teacher：主动学习与 SKILL 编译
 
 Status: proposed
+Product contract: no
+Runtime status: inactive
+Target version: undecided
 
-> 合入说明（2026-08-02）：本文档由 `PENDING/16-Student-Teacher方案.md` 原样合入（正文未改）。
-> 原稿「状态：APPROVED AS FINAL ARCHITECTURE」随合入更新为「已合入规范」；实现仍受
-> Host canary（第二十三节 LEARN-082…088 清单）门禁。本文档为 Student/Teacher/QA/SKILL
-> 语义的规范主体。
-
----
-
-
-状态：未来设计（已批准但未启用）
-实现门禁：IMPLEMENT ONLY AFTER HOST CANARIES —— 实现只能在 Host canary（第二十三节清单）通过后启动
-文件：`docs/rfcs/student-teacher.md`
-条款前缀：`LEARN-`
+条款前缀：`LEARN-`。默认关闭：用户未选择 Student 时不触发。核心产物：`.agent/skills/.../SKILL.md`。
 
 ---
 
 # 修订说明（RC1 → Final）
 
-本稿经一次精确修订后批准为最终架构。架构先定稿、实现仍受 Host canary 门禁，因此不必等代码完成。本次修订的四条核心裁决：
+本稿经一次精确修订后定稿架构边界。实现仍受 Host canary 门禁。本次修订的四条核心裁决：
 
 1. 每个自然语言输入先进入 QA，再产生外部效果。
 2. 用户目标、全部追问、全部回答、最终综合都必须存在于 QA。
@@ -27,10 +19,6 @@ Status: proposed
 4. 删除所有未经证明的实现细节与文档展示噪音。
 
 同时：删除“每轮成对提交”与结构化痕迹（分隔线、角色标签）；确立 Teacher 为叶子内部 Teacher Satellite 的最终裁决（LEARN-027）；区分 Teacher 复用 / Replacement / fail closed 三路恢复（LEARN-030）；收紧最终 return 的“先删除、后完成”顺序（LEARN-024）。实施细节（精确路径、错误名、Agent 命名、canary 数量、写入机制、tier 映射、编译工具组合）降为实施建议。
-
-目标版本：首个生产版本
-默认状态：Student Agent 可选；用户未选择 Student 时完全不触发
-核心产物：`.agent/skills/.../SKILL.md`
 
 ---
 

@@ -10,8 +10,9 @@ Repository normalization: single package manifest, resources/ layout,
 spec/ clause docs, dist/ build output, unified tests/ tree, Wanxiangshu
 project rename (drop .Next), data-driven enforcer catalog.
 
-STATUS ledger retired into `spec/conformance.toml` / `spec/conformance.md`.
-Temporary STATUS work files archived or removed.
+Implementation-status ledger lives under `spec/conformance.toml` /
+`spec/conformance.md` pending the next cleanup that removes those ledgers.
+Temporary status work files removed.
 
 ## 0.5.2 — 全 SSOT 收敛
 

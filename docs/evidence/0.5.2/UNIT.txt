@@ -1,6 +1,0 @@
-### UNIT.txt — test:unit on final tip
-HEAD_at_run: ffa168c7 (ffa168c78fe36e9faa6f6587dd7b71a87ba046e5)
-Date: 2026-08-03T20:46:10Z
-command: npm run test:unit
-exit_code: 0
-result: 737 passed, 0 failed
