@@ -11,7 +11,10 @@
 // the input as an agent name and forks a second child.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   blobDigest,
   blobRef,
@@ -406,6 +409,80 @@ test('EXEC_011_a_nonsense_estimate_falls_back_to_the_hard_limit', () => {
 
   // And the fallback is still capped, so a small ceiling still wins.
   assert.equal(processEstimate.effectiveDeadlineMs(0, 15_000), 15_000)
+})
+
+test('EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
+  // After SIGKILL, wait must not use MaxTimerWaitMs (~24.8d) or unbounded Exit.Task.
+  // KillAckGraceMs is the management bound; TimedOut + ExitCode=-1 when close never comes.
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+  const waitSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessWait.fs'), 'utf8')
+
+  assert.match(waitSrc, /let KillAckGraceMs = /, 'named kill-ack constant required')
+  assert.match(waitSrc, /waitSegment KillAckGraceMs/, 'post-kill wait uses kill-ack, not MaxTimerWaitMs')
+  assert.doesNotMatch(
+    waitSrc,
+    /killSent then[\s\S]{0,80}waitSegment Deadline\.MaxTimerWaitMs/,
+    'post-kill must not wait MaxTimerWaitMs',
+  )
+  assert.match(
+    waitSrc,
+    /ExitCode = -1[\s\S]{0,40}TimedOut = true/,
+    'kill-ack expiry returns TimedOut with unknown exit code, not fake success',
+  )
+  assert.match(waitSrc, /killAckExpired/, 'kill-ack expiry exits the wait loop')
+})
+
+test('EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
+  // OneShotAgentTool must not await completion.Task unbounded.
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+  const oneshot = readFileSync(
+    join(root, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/OneShotAgentTool.fs'),
+    'utf8',
+  )
+
+  assert.match(oneshot, /CompletionTimeoutMs\s*=\s*600_000/, 'named completion deadline')
+  assert.match(oneshot, /PtyTiming\.raceExit/, 'completion races a timer, not bare Task')
+  assert.doesNotMatch(
+    oneshot,
+    /let! output = completion\.Task\s*$/m,
+    'must not bare-await completion.Task without race',
+  )
+  assert.match(
+    oneshot,
+    /AbortSession childId/,
+    'timeout path aborts the child session',
+  )
+  assert.match(
+    oneshot,
+    /timed out after/,
+    'timeout returns Error with timeout message, not hang',
+  )
+})
+
+test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
+  // Definition: stopPhysicalRun (messages) (fallback) (reason).
+  // Call sites must pass (rawMessages, fallback, reason), not swapped.
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+  const host = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerHost.fs'), 'utf8')
+
+  assert.match(
+    host,
+    /let private stopPhysicalRun \(messages: obj list\) \(fallback: obj list\) \(reason: string\)/,
+    'definition order is messages, fallback, reason',
+  )
+  // All production call sites: first arg is rawMessages (or same on both sides).
+  const calls = [...host.matchAll(/stopPhysicalRun\s+(\w+)\s+(\w+)\s+/g)].map((m) => [
+    m[1],
+    m[2],
+  ])
+  assert.ok(calls.length >= 3, `expected call sites, got ${calls.length}`)
+  for (const [first, second] of calls) {
+    assert.equal(
+      first,
+      'rawMessages',
+      `stopPhysicalRun first arg must be rawMessages, got ${first} ${second}`,
+    )
+  }
 })
 
 test('EXEC_012_the_output_threshold_is_tripled_and_saturates_instead_of_overflowing', () => {

@@ -16,14 +16,16 @@ module PromptIngress =
         | Ok _ -> true
         | Error _ -> false
 
-    /// PROMPT-004 resolution order: what the journal already knows, then — only
-    /// for a message the journal has never seen — an explicit managed agent makes
-    /// it a HumanRoot.
+    /// PROMPT-004 / PROMPT-009: start from what the journal already knows.
     ///
-    /// The order matters in one direction only. A message with a known origin must
-    /// never be reclassified by its `agent` field, because a continuation the
-    /// plugin itself sent also carries one, and treating that as a HumanRoot would
-    /// start a new Logical Run inside the run it was continuing.
+    /// UnknownOrigin + ExplicitAgent alone must NOT become HumanRoot while a
+    /// Logical Run is active: plugin continuations also carry an agent; if their
+    /// PromptKey is lost, promoting them would open a new Logical Run and reset
+    /// the fallback cursor inside the run they continued.
+    ///
+    /// Positive proof for HumanRoot at this boundary: ExplicitAgent is a valid
+    /// managed name AND there is no ActiveLogicalRun yet (first external prompt
+    /// on the session). Mid-run unknowns stay UnknownOrigin (fail-closed).
     let private resolveOrigin
         (runtime: PromptDispatcher.Runtime)
         (sessionId: SessionId)
@@ -32,8 +34,8 @@ module PromptIngress =
         =
         match runtime.ResolveOrigin physicalMessageId message.PromptKey message.IsHostCompaction sessionId with
         | PromptAuthority.PromptOrigin.UnknownOrigin ->
-            match message.ExplicitAgent with
-            | Some agent when isValidAgent agent ->
+            match message.ExplicitAgent, runtime.ActiveProfile sessionId with
+            | Some agent, None when isValidAgent agent ->
                 PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
             | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
         | resolved -> resolved

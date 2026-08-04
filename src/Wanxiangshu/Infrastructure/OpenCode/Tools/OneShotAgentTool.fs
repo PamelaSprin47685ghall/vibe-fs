@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Domain
+open Wanxiangshu.Process
 
 /// Complete lifecycle for synchronous one-shot Coder/Inspector tools: create,
 /// subscribe-before-send, await one terminal, then physically abort/dispose.
@@ -17,6 +18,11 @@ module OneShotAgentTool =
           Managed: ManagedAgent
           ParentBackgroundDigest: string option
           Output: string }
+
+    /// Same management bound as ExecutorSummarize / HostForkRuntime join budget.
+    /// Unbounded `completion.Task` hung callers when the child never went terminal.
+    [<Literal>]
+    let CompletionTimeoutMs = 600_000
 
     let promptFrom (args: HostToolArguments) =
         match args.OptionalText "prompt", args.OptionalTexts "prompts" with
@@ -148,14 +154,28 @@ module OneShotAgentTool =
                                 succeed "aborted: parent cancelled")
 
                         try
-                            let! output = completion.Task
+                            // Bound the wait: race completion against a management timer.
+                            // On timeout abort the child and return Error — never hang.
+                            let outputTask = completion.Task
 
-                            return
-                                Ok
-                                    { ChildId = SessionId.value childId
-                                      Managed = managed
-                                      ParentBackgroundDigest = parentWorkRecord |> Option.map ToolHostCodec.digest
-                                      Output = output }
+                            let! finished = PtyTiming.raceExit (outputTask :> Task) CompletionTimeoutMs
+
+                            if not finished then
+                                if abortTask.IsNone then
+                                    abortTask <- Some(scope.Sessions.AbortSession childId)
+
+                                finish (fun () -> ())
+
+                                return Error(sprintf "%s timed out after %d ms" roleLabel CompletionTimeoutMs)
+                            else
+                                let! output = outputTask
+
+                                return
+                                    Ok
+                                        { ChildId = SessionId.value childId
+                                          Managed = managed
+                                          ParentBackgroundDigest = parentWorkRecord |> Option.map ToolHostCodec.digest
+                                          Output = output }
                         finally
                             detachAbort ()
 

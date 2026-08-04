@@ -10,7 +10,10 @@
 // same situation, asserted the other way round.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   authority,
   authorityRun,
@@ -555,6 +558,44 @@ test('PROMPT_004_a_human_root_is_never_inferred_by_a_pure_function', () => {
     authorityRun.resolveKnownOrigin(physicalUser('msg_new'), promptKey('pk_any'), false, projection),
     'UnknownOrigin',
     'an active HumanRoot must not make later unknown messages look like roots',
+  )
+})
+
+test('PROMPT_004_ingress_does_not_promote_UnknownOrigin_to_HumanRoot_while_run_active', () => {
+  // Structural lock on PromptIngress.resolveOrigin: mid-run, ExplicitAgent alone
+  // must not open a new HumanRoot (plugin continuation without PromptKey would
+  // reset the fallback cursor). First external prompt (no ActiveLogicalRun) may
+  // still become HumanRoot when the agent name is valid.
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+  const ingress = readFileSync(join(root, 'src/Wanxiangshu/Application/Prompting/PromptIngress.fs'), 'utf8')
+
+  assert.match(
+    ingress,
+    /ActiveProfile sessionId/,
+    'HumanRoot promotion must gate on ActiveLogicalRun absence',
+  )
+  assert.match(
+    ingress,
+    /Some agent, None when isValidAgent agent/,
+    'HumanRoot only when ExplicitAgent valid AND no active run',
+  )
+  // Fail-closed arm: mid-run / missing agent stays UnknownOrigin.
+  assert.match(
+    ingress,
+    /\| _ -> PromptAuthority\.PromptOrigin\.UnknownOrigin/,
+    'non-first-prompt UnknownOrigin must stay UnknownOrigin',
+  )
+  // Forbid the old fail-open: UnknownOrigin + valid agent alone → HumanRoot
+  // without consulting ActiveProfile.
+  assert.doesNotMatch(
+    ingress,
+    /match message\.ExplicitAgent with[\s\S]{0,120}Some agent when isValidAgent agent[\s\S]{0,80}HumanRoot/,
+    'must not promote on ExplicitAgent alone without ActiveProfile gate',
+  )
+  assert.match(
+    ingress,
+    /ExplicitAgent, runtime\.ActiveProfile/,
+    'promotion pairs ExplicitAgent with ActiveProfile (None = first prompt only)',
   )
 })
 
