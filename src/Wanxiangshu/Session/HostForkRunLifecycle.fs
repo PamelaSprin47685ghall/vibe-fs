@@ -158,21 +158,16 @@ module HostForkRunLifecycle =
         // second channel.
         let completedWorkRecord = workRecord
 
-        // Only the first matching terminal may claim the run. Duplicate idle/
-        // abort from dual event streams must not SetResult twice.
-        // Ready=false no longer drops: buffer TerminalOutcome until markReady.
+        // First matching terminal claims the run immediately. No Ready gate:
+        // install/recovery/restart windows must not buffer-and-lose completion.
+        // Token + Finished prevent stale or double SetResult.
         let claimed, subscriptionToDispose =
             lock gate (fun () ->
                 match pendingRuns.TryGetValue run.AgentId with
                 | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
-                    if run.Ready then
-                        run.Finished <- true
-                        pendingRuns.Remove run.AgentId |> ignore
-                        true, run.Subscription
-                    else
-                        run.BufferedTerminal <- Some outcome
-                        run.BufferedWorkRecord <- completedWorkRecord
-                        false, None
+                    run.Finished <- true
+                    pendingRuns.Remove run.AgentId |> ignore
+                    true, run.Subscription
                 | _ -> false, None)
 
         if claimed then
@@ -196,10 +191,7 @@ module HostForkRunLifecycle =
               Role = role
               Source = HostPendingRun.completionSource ()
               Subscription = None
-              Ready = false
-              Finished = false
-              BufferedTerminal = None
-              BufferedWorkRecord = None }
+              Finished = false }
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
@@ -234,47 +226,17 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (error: string)
         =
-        lock gate (fun () ->
-            run.Ready <- true
-            run.BufferedTerminal <- None
-            run.BufferedWorkRecord <- None)
-
         complete gate pendingRuns journal parentId sessions run (TerminalOutcome.Failed error) None
 
-    /// Ready gate: if a terminal was buffered before Ready, flush it now.
+    /// Terminal outcomes are always accepted by complete. Call sites keep
+    /// MarkReady for API shape; body is intentionally a no-op.
     let markReady
-        (gate: obj)
-        (pendingRuns: Dictionary<string, PendingHostRun>)
-        (journal: AgentJournal option)
-        (parentId: SessionId)
-        (sessions: ISessionHostPort)
-        (run: PendingHostRun)
-        (workRecord: string option)
+        (_gate: obj)
+        (_pendingRuns: Dictionary<string, PendingHostRun>)
+        (_journal: AgentJournal option)
+        (_parentId: SessionId)
+        (_sessions: ISessionHostPort)
+        (_run: PendingHostRun)
+        (_workRecord: string option)
         =
-        let flush =
-            lock gate (fun () ->
-                match pendingRuns.TryGetValue run.AgentId with
-                | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
-                    match run.BufferedTerminal with
-                    | Some outcome ->
-                        let bufferedWork = run.BufferedWorkRecord
-                        run.Finished <- true
-                        run.BufferedTerminal <- None
-                        run.BufferedWorkRecord <- None
-                        pendingRuns.Remove run.AgentId |> ignore
-                        Some(outcome, bufferedWork, run.Subscription)
-                    | None ->
-                        run.Ready <- true
-                        None
-                | _ -> None)
-
-        match flush with
-        | Some(outcome, bufferedWork, subscription) ->
-            // Prefer the work record captured with the terminal; fall back to markReady's.
-            let wr =
-                match bufferedWork with
-                | Some _ as w -> w
-                | None -> workRecord
-
-            deliverCompletion journal parentId run outcome wr subscription
-        | None -> ()
+        ()

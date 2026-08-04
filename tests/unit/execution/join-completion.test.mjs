@@ -1,4 +1,4 @@
-// Join completion reliability (Part 1): Ready buffer, sticky terminal, Join deadline.
+// Join completion reliability (Part 1): immediate terminal claim, sticky terminal, Join deadline.
 
 import assert from 'node:assert/strict'
 import { readdirSync } from 'node:fs'
@@ -148,17 +148,17 @@ test('EXEC_join_mailbox_completion_before_deadline_returns_ok', async () => {
   assert.equal(result.fields[0].AgentId, 'agent-x')
 })
 
-// ── Ready buffer ─────────────────────────────────────────────────────────────
+// ── Immediate terminal claim (no Ready gate) ────────────────────────────────
 
-test('EXEC_join_complete_before_Ready_buffers_then_markReady_sets_Source', async () => {
+test('EXEC_join_complete_claims_run_immediately_without_Ready', async () => {
   const { Dictionary, comparer } = await loadDictionary()
   // Fable Dictionary (MutableMap) requires an iterable AND a comparer for hash access;
   // the Map-backed shim needs neither.
   const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
   const gate = {}
-  const agentId = 'agent-buffer'
-  const child = sessionId('ses_buffer_child')
-  const parent = sessionId('ses_buffer_parent')
+  const agentId = 'agent-immediate'
+  const child = sessionId('ses_immediate_child')
+  const parent = sessionId('ses_immediate_parent')
   const source = pendingRunLifecycle.completionSource()
   const run = {
     Token: {},
@@ -167,10 +167,7 @@ test('EXEC_join_complete_before_Ready_buffers_then_markReady_sets_Source', async
     Role: roles.of('Coder'),
     Source: source,
     Subscription: undefined,
-    Ready: false,
     Finished: false,
-    BufferedTerminal: undefined,
-    BufferedWorkRecord: undefined,
   }
 
   if (typeof pendingRuns.set_Item === 'function') pendingRuns.set_Item(agentId, run)
@@ -199,19 +196,17 @@ test('EXEC_join_complete_before_Ready_buffers_then_markReady_sets_Source', async
     }
   }
 
-  const outcome = hostEventPort.failed('terminal-before-ready')
+  const outcome = hostEventPort.failed('terminal-before-prompt')
   pendingRunLifecycle.complete(gate, pendingRuns, undefined, parent, null, run, outcome, undefined)
 
-  assert.equal(run.Finished, false, 'not Finished while not Ready')
-  assert.ok(run.BufferedTerminal != null, 'terminal must be buffered, not dropped')
-  assert.equal(source.get_Task()?.IsCompleted ?? false, false)
-
-  pendingRunLifecycle.markReady(gate, pendingRuns, undefined, parent, null, run, undefined)
+  assert.equal(run.Finished, true, 'terminal claims run immediately')
 
   const agentOutcome = await Promise.race([
     source.get_Task(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Source never completed')), 1000)),
   ])
   assert.equal(caseOf(agentOutcome), 'AgentFailed')
-  assert.equal(run.Finished, true)
+
+  // markReady is a no-op after immediate claim; must not throw or re-deliver.
+  pendingRunLifecycle.markReady(gate, pendingRuns, undefined, parent, null, run, undefined)
 })

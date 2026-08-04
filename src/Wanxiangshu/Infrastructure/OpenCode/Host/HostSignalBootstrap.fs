@@ -219,7 +219,13 @@ module HostSignalBootstrap =
         let subscription =
             match HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal with
             | Error err -> raise (InvalidOperationException err)
-            | Ok(sub, _source) -> sub
+            | Ok(sub, _source) ->
+                // TrackSubscription only needs IDisposable; Health stays on the
+                // subscription record for future recovery consumers.
+                sub
+                |> Option.map (fun s ->
+                    { new IDisposable with
+                        member _.Dispose() = s.Dispose() })
 
         do scope.TrackSubscription subscription
 

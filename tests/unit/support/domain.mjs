@@ -2842,8 +2842,9 @@ export const hostEventPort = (() => {
 })()
 
 /**
- * ReconcileSupervisor: per-session single-flight reconcile with HOST-004 causal
- * reread budget. Snapshot Error does not consume attempt; errorCount is separate.
+ * ReconcileSupervisor: per-session single-flight reconcile with timer-backoff
+ * reread until terminal, wall-clock budget, or session clear. Snapshot Error
+ * retries with backoff (does not permanently end the pass).
  */
 export const reconcileSupervisor = (() => {
   const Supervisor = ReconcileSupervisorModule.Supervisor
@@ -2898,7 +2899,7 @@ export const reconcileSupervisor = (() => {
     /**
      * `reads` is a queue of Result shapes: `{ ok: true, messages }` or `{ ok: false, error }`.
      * Each GetMessages call consumes one entry (last entry repeats if exhausted).
-     * Optional `onRead` fires once per GetMessages (for re-kick budget tests).
+     * Optional `onRead` fires once per GetMessages (for budget tests).
      */
     createSnapshot: (reads, onRead) => {
       const queue = [...reads]
@@ -2953,12 +2954,16 @@ export const reconcileSupervisor = (() => {
       onDeleted,
       projection,
       onSnapshot,
+      backoffDelaysMs,
+      // Alias kept for callers that still name the injected sequence reKickDelaysMs.
       reKickDelaysMs,
+      maxBudgetMs,
     } = {}) => {
       if (snapshot === undefined || binding === undefined || onTurn === undefined) {
         throw new Error('reconcileSupervisor.create requires snapshot, binding, onTurn')
       }
-      // Fable optional ctor arg: undefined → None → production delays.
+      const delays = backoffDelaysMs ?? reKickDelaysMs
+      // Fable optional ctor args: undefined → None → production defaults.
       return new Supervisor(
         snapshot,
         binding,
@@ -2966,7 +2971,8 @@ export const reconcileSupervisor = (() => {
         onDeleted,
         projection,
         onSnapshot,
-        reKickDelaysMs,
+        delays,
+        maxBudgetMs,
       )
     },
     bindUserMessage: (supervisor, session, physical, agentRole) =>
@@ -3050,18 +3056,26 @@ export const executorSummarizeRuntime = (() => {
   }
 })()
 
-/** Structural markers for HostSignalSubscribe reconnect loop (emitJsExpr body). */
+/** Structural markers for HostSignalSubscribe reconnect + heartbeat (emitJsExpr body). */
 export const hostSignalSubscribe = (() => {
   const sourcePath = join(BUILD_ROOT, 'Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
   return {
     source: () => readFileSync(sourcePath, 'utf8'),
     reconnectMarkers: ['2 **', '10000', 'stream ended normally'],
+    heartbeatMarkers: [
+      'heartbeat timeout after',
+      'hb.unref',
+      'setInterval',
+      'clearInterval',
+      'state.connAbort',
+      'state.lastEventMs',
+    ],
   }
 })()
 
 /**
- * HostForkRunLifecycle Ready buffer: complete-before-Ready stores outcome;
- * markReady flushes into Source.
+ * HostForkRunLifecycle: complete claims the run immediately (no Ready gate).
+ * markReady is a no-op kept for call-site API shape.
  *
  * Top-level lets compile to NON-curried multi-arg JS functions (length 7–9).
  * Call them with all arguments at once — do not curried-reduce.

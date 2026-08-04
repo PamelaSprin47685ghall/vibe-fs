@@ -5,20 +5,98 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 /// Subscribes coarse host signals from exactly one source per plugin instance:
-/// local events.listen is preferred; if unavailable, global SSE is used.
+/// global SSE preferred; local events.listen as fallback for older hosts.
 /// Both unavailable is a hard failure — no dual delivery, no silent degradation.
+///
+/// Global SSE: supervised reconnect + heartbeat. Half-open TCP (no error, no end)
+/// is detected by silence timeout; errors surface via console.warn and Health.
 module HostSignalSubscribe =
+
+    /// Snapshot of the global SSE transport (or local listen stub).
+    type SignalHealth =
+        {
+            IsConnected: bool
+            LastEventReceived: DateTimeOffset option
+            LastError: string option
+            ReconnectAttempts: int
+        }
+
+    /// Disposable subscription plus a cheap health probe for downstream recovery.
+    type HostSignalSubscription =
+        {
+            Health: unit -> SignalHealth
+            Dispose: unit -> unit
+        }
+
+    /// Heartbeat interval: check silence every 15s.
+    let private HeartbeatIntervalMs = 15_000
+
+    /// No event within 30s → connection treated as dead; force reconnect.
+    let private HeartbeatTimeoutMs = 30_000
 
     [<Emit("$0()")>]
     let private invokeDisposer (value: obj) : unit = jsNative
 
-    [<Emit("new AbortController()")>]
-    let private newAbortController () : obj = jsNative
-
     [<Emit("console.info($0, $1)")>]
     let private logInfo (prefix: string) (message: string) : unit = jsNative
 
-    let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<IDisposable, string> =
+    let private alwaysHealthy () : SignalHealth =
+        {
+            IsConnected = true
+            LastEventReceived = None
+            LastError = None
+            ReconnectAttempts = 0
+        }
+
+    let private readHealth (state: obj) : SignalHealth =
+        let disposed: bool = unbox state?disposed
+        let connected: bool = unbox state?connected
+        let lastMs: float = unbox state?lastEventMs
+        let lastError: obj = state?lastError
+        let attempts: int = unbox state?reconnectAttempts
+
+        let lastEvent =
+            if lastMs > 0.0 then
+                Some(DateTimeOffset.FromUnixTimeMilliseconds(int64 lastMs))
+            else
+                None
+
+        let error =
+            if isNull lastError then
+                None
+            else
+                Some(string lastError)
+
+        {
+            IsConnected = connected && not disposed
+            LastEventReceived = lastEvent
+            LastError = error
+            ReconnectAttempts = attempts
+        }
+
+    let private disposeState (state: obj) : unit =
+        if not (unbox state?disposed) then
+            state?disposed <- true
+
+            let timer = state?heartbeatTimer
+
+            if not (isNull timer) then
+                emitJsExpr timer "clearInterval($0)"
+                state?heartbeatTimer <- null
+
+            let connAbort = state?connAbort
+
+            if not (isNull connAbort) then
+                try
+                    connAbort?abort ()
+                with _ ->
+                    ()
+
+                state?connAbort <- null
+
+            state?connected <- false
+
+    let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription, string> =
         let listen = events?listen
 
         if isNull listen then
@@ -32,14 +110,15 @@ module HostSignalSubscribe =
                 if isNull subscription then
                     Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned no subscription"
                 else
-                    Ok(
-                        { new IDisposable with
-                            member _.Dispose() = invokeDisposer subscription }
-                    )
+                    Ok
+                        {
+                            Health = alwaysHealthy
+                            Dispose = fun () -> invokeDisposer subscription
+                        }
             with ex ->
                 Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    let private subscribeGlobalEvent (client: obj) (onSignalEvent: obj -> unit) : Result<IDisposable, string> =
+    let private subscribeGlobalEvent (client: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription, string> =
         if isNull client then
             Error "OPENCODE-SIGNAL-SUBSCRIBE: no client for global event"
         else
@@ -49,56 +128,97 @@ module HostSignalSubscribe =
                 Error "OPENCODE-SIGNAL-SUBSCRIBE: /global/event unavailable"
             else
                 try
-                    let abortCtrl = newAbortController ()
-
                     let onEvent = box onSignalEvent
 
-                    let options =
-                        createObj [ "signal", abortCtrl?signal; "onSseEvent", box onSignalEvent ]
+                    // Mutable transport state shared with the emitJsExpr loop.
+                    // lastEventMs seeded at subscribe time → 30s grace before first
+                    // heartbeat timeout (no events yet is not immediately fatal).
+                    let state =
+                        createObj
+                            [
+                                "disposed", box false
+                                "connected", box false
+                                "lastEventMs", box (float (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
+                                "lastError", box null
+                                "reconnectAttempts", box 0
+                                "connAbort", box null
+                                "heartbeatTimer", box null
+                            ]
 
                     emitJsExpr
-                        (globalApi, options, onEvent, abortCtrl)
+                        (globalApi, onEvent, state, HeartbeatIntervalMs, HeartbeatTimeoutMs)
                         """
-                        ((globalApi, options, onEvent, abortCtrl) => {
+                        ((globalApi, onEvent, state, heartbeatMs, timeoutMs) => {
                           (async () => {
                             let attempt = 0;
-                            while (!abortCtrl.signal.aborted) {
+                            while (!state.disposed) {
+                              const connAbort = new AbortController();
+                              state.connAbort = connAbort;
+                              state.connected = true;
+                              // Grace period for this connection: silence clock starts now.
+                              state.lastEventMs = Date.now();
+                              const options = { signal: connAbort.signal, onSseEvent: onEvent };
                               try {
                                 const result = await globalApi.event(options);
                                 const stream = result && result.stream ? result.stream : result;
                                 if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
-                                  console.info('OPENCODE-SIGNAL-SSE', 'stream unavailable');
+                                  state.lastError = 'stream unavailable';
+                                  console.warn('OPENCODE-SIGNAL-SSE', 'stream unavailable');
                                 } else {
                                   for await (const data of stream) {
-                                    if (abortCtrl.signal.aborted) break;
+                                    if (state.disposed || connAbort.signal.aborted) break;
+                                    state.lastEventMs = Date.now();
+                                    state.lastError = null;
                                     onEvent(data);
                                   }
-                                  console.info('OPENCODE-SIGNAL-SSE', 'stream ended normally');
+                                  if (!state.disposed && !connAbort.signal.aborted) {
+                                    console.info('OPENCODE-SIGNAL-SSE', 'stream ended normally');
+                                  }
                                 }
                               } catch (err) {
-                                console.info('OPENCODE-SIGNAL-SSE', 'stream ended or failed: ' + (err && err.message ? err.message : String(err)));
+                                // Preserve heartbeat timeout reason if we forced abort.
+                                if (!state.lastError) {
+                                  state.lastError = err && err.message ? err.message : String(err);
+                                }
+                                if (!state.disposed) {
+                                  console.warn('OPENCODE-SIGNAL-SSE', 'stream ended or failed: ' + state.lastError);
+                                }
                               }
-                              if (abortCtrl.signal.aborted) break;
+                              state.connected = false;
+                              state.connAbort = null;
+                              if (state.disposed) break;
                               const delay = Math.min(1000 * 2 ** attempt, 10000);
                               await new Promise(r => setTimeout(r, delay));
+                              if (state.disposed) break;
                               attempt++;
+                              state.reconnectAttempts = attempt;
                             }
                           })();
-                        })($0, $1, $2, $3)
+
+                          const hb = setInterval(() => {
+                            if (state.disposed) return;
+                            const silent = Date.now() - state.lastEventMs;
+                            if (silent > timeoutMs && state.connAbort && !state.connAbort.signal.aborted) {
+                              const msg = 'heartbeat timeout after ' + silent + 'ms';
+                              state.lastError = msg;
+                              console.warn('OPENCODE-SIGNAL-SSE', msg);
+                              try { state.connAbort.abort(); } catch (_) {}
+                            }
+                          }, heartbeatMs);
+                          if (typeof hb.unref === 'function') hb.unref();
+                          state.heartbeatTimer = hb;
+                        })($0, $1, $2, $3, $4)
                         """
 
-                    Ok(
-                        { new IDisposable with
-                            member _.Dispose() =
-                                try
-                                    abortCtrl?abort ()
-                                with _ ->
-                                    () }
-                    )
+                    Ok
+                        {
+                            Health = fun () -> readHealth state
+                            Dispose = fun () -> disposeState state
+                        }
                 with ex ->
                     Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
-    let trySubscribe (input: obj) (onSignalEvent: obj -> unit) : Result<IDisposable option * string, string> =
+    let trySubscribe (input: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription option * string, string> =
         let listenTarget =
             if isNull input then
                 None

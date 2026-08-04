@@ -12,38 +12,33 @@ open Wanxiangshu.Journal
 
 /// Per-session single-flight reconcile supervisor.
 /// Idle/retry signals only set a dirty latch; truth comes from the full-message
-/// snapshot API. At most three causal yields per kick (HOST-004).
-/// When a pass ends without a terminal outcome but saw incomplete turn material,
-/// schedule a finite delayed re-Kick (real timer, not microtask) so a late
-/// transcript can still be discovered without a second Host signal.
+/// snapshot API. An active-run pass rereads with real timer backoff until a
+/// terminal outcome appears, the wall-clock budget is exhausted, or the session
+/// is cleared — so a late transcript does not require a second Host signal.
 module ReconcileSupervisor =
 
     type private ReconcileState =
         {
             mutable Dirty: bool
             mutable Running: bool
-            /// Count of incomplete-terminal delayed re-kicks already scheduled
-            /// for this session. Reset when a terminal outcome is published.
-            mutable IncompleteRekickCount: int
-            /// At most one pending delayed re-Kick timer per session.
-            mutable RekickHandle: obj option
         }
 
-    /// One real event-loop turn so snapshot I/O can materialize the transcript
-    /// (HOST-004 still caps at three causal attempts; this is only the yield).
-    /// Function form: a module-level Promise value would fire setTimeout once at load.
-    let private causalYield () : Task<unit> =
-        emitJsExpr () "new Promise(res => setTimeout(res, 0))"
+    /// Fable-safe timer delay. Not `Task.Delay`: Fable does not export it, and a
+    /// module-level Promise would fire once at load if written as a value.
+    let private delayMs (ms: int) : Task<unit> =
+        if ms <= 0 then
+            Task.FromResult(())
+        else
+            emitJsExpr ms "new Promise(res => setTimeout(res, $0))"
 
-    /// Production finite backoff for incomplete-terminal re-Kick (ms).
-    /// Index = prior count; length = max delayed re-kicks per incomplete episode.
-    let private productionIncompleteRekickDelaysMs = [| 50; 100; 250; 500; 1000 |]
+    /// Production backoff between snapshot rereads while terminal material is
+    /// still invisible (ms). After the last entry the delay stays at 5s until
+    /// the wall-clock budget is exhausted.
+    let private productionBackoffDelaysMs =
+        [| 50; 100; 250; 500; 1000; 2000; 3000; 5000 |]
 
-    [<Emit("setTimeout($0, $1)")>]
-    let private setTimeoutJs (fn: unit -> unit) (ms: float) : obj = jsNative
-
-    [<Emit("clearTimeout($0)")>]
-    let private clearTimeoutJs (handle: obj) : unit = jsNative
+    /// Wall-clock upper bound for one active-run materialization pass (ms).
+    let private productionMaxBudgetMs = 30_000
 
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
@@ -56,6 +51,13 @@ module ReconcileSupervisor =
         | TurnInProgress
         | TurnNeedsContinuation _
         | TurnUnknown -> false
+
+    let private pickDelay (sequence: int array) (index: int) (budgetRemaining: int) =
+        if sequence.Length = 0 || budgetRemaining <= 0 then
+            0
+        else
+            let raw = sequence.[min index (sequence.Length - 1)]
+            min raw budgetRemaining
 
     type Supervisor
         (
@@ -78,14 +80,16 @@ module ReconcileSupervisor =
             /// compaction pseudo-run belongs to no Logical Run of ours, so it would
             /// never reach a turn-shaped callback.
             ///
-            /// Invoked at most once per pass, with the last snapshot actually read. The
-            /// attempt loop may read up to three times; observing each read would ask
-            /// the same question of three nearly identical snapshots.
+            /// Invoked at most once per pass, with the last snapshot actually read.
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
-            /// Optional incomplete-terminal re-Kick delays (ms). Defaults to
-            /// productionIncompleteRekickDelaysMs. Tests inject short arrays so the
-            /// full budget stays under PER_TEST_TIMEOUT_MS.
-            ?incompleteRekickDelaysMs: int array
+            /// Optional backoff delays (ms) for active-run rereads. Defaults to
+            /// productionBackoffDelaysMs. Tests inject short arrays so the full
+            /// budget stays under PER_TEST_TIMEOUT_MS.
+            ?backoffDelaysMs: int array,
+            /// Optional wall-clock budget (ms) for one active-run pass. Defaults
+            /// to productionMaxBudgetMs. Tests inject a small value so always-
+            /// incomplete scripts end without waiting the production 30s.
+            ?maxBudgetMs: int
         ) as this =
 
         let gate = obj ()
@@ -94,13 +98,16 @@ module ReconcileSupervisor =
         /// later terminal with the same run identity is not sealed out.
         let consumed = Dictionary<string, string>()
         /// Non-terminal publish tokens (session → consume key). Once per incomplete
-        /// episode so delayed re-Kicks do not spam interaction repair.
+        /// episode so trailing passes do not spam interaction repair.
         let provisional = Dictionary<string, string>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
 
-        let incompleteRekickDelaysMs =
-            defaultArg incompleteRekickDelaysMs productionIncompleteRekickDelaysMs
+        let backoffDelaysMs =
+            defaultArg backoffDelaysMs productionBackoffDelaysMs
+
+        let maxBudgetMs =
+            defaultArg maxBudgetMs productionMaxBudgetMs
 
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
@@ -111,9 +118,7 @@ module ReconcileSupervisor =
             | false, _ ->
                 let created =
                     { Dirty = false
-                      Running = false
-                      IncompleteRekickCount = 0
-                      RekickHandle = None }
+                      Running = false }
 
                 states.[key] <- created
                 created
@@ -127,20 +132,7 @@ module ReconcileSupervisor =
                    ProviderRunIdentity.value turn.ProviderRun |]
             )
 
-        let cancelRekickHandle (state: ReconcileState) =
-            match state.RekickHandle with
-            | Some handle ->
-                clearTimeoutJs handle
-                state.RekickHandle <- None
-            | None -> ()
-
-        let resetIncompleteEpisode (sessionKey: string) =
-            match states.TryGetValue(sessionKey) with
-            | true, state ->
-                cancelRekickHandle state
-                state.IncompleteRekickCount <- 0
-            | false, _ -> ()
-
+        let clearProvisional (sessionKey: string) =
             provisional.Remove(sessionKey) |> ignore
 
         let alreadyPublished (turn: ReconciledTurn) =
@@ -180,54 +172,6 @@ module ReconcileSupervisor =
         let isCleared (sessionId: SessionId) =
             lock gate (fun () -> not (states.ContainsKey(SessionId.value sessionId)))
 
-        /// Schedule one delayed re-Kick for incomplete terminal materialization.
-        /// Overwrites any prior pending timer for this session. No-op if cleared
-        /// or budget exhausted.
-        let scheduleIncompleteRekick (sessionId: SessionId) =
-            let key = SessionId.value sessionId
-
-            let schedule =
-                lock gate (fun () ->
-                    match states.TryGetValue(key) with
-                    | false, _ -> None
-                    | true, state ->
-                        if state.IncompleteRekickCount >= incompleteRekickDelaysMs.Length then
-                            None
-                        else
-                            cancelRekickHandle state
-                            let index = state.IncompleteRekickCount
-                            let delay = incompleteRekickDelaysMs.[index]
-                            state.IncompleteRekickCount <- index + 1
-                            let countAfter = state.IncompleteRekickCount
-
-                            let handle =
-                                setTimeoutJs
-                                    (fun () ->
-                                        let stillAlive =
-                                            lock gate (fun () ->
-                                                match states.TryGetValue(key) with
-                                                | true, s ->
-                                                    s.RekickHandle <- None
-                                                    true
-                                                | false, _ -> false)
-
-                                        // Fresh Kick = fresh HOST-004 budget of 3 causal
-                                        // rereads. Never recreate state after ClearSession.
-                                        if stillAlive then
-                                            this.Kick(sessionId))
-                                    (float delay)
-
-                            state.RekickHandle <- Some handle
-                            Some(delay, countAfter))
-
-            match schedule with
-            | Some(delay, countAfter) ->
-                Diagnostic.emit
-                    "reconcile-incomplete-rekick"
-                    [ "session_id", key
-                      "result", sprintf "scheduled delay-ms=%d count=%d" delay countAfter ]
-            | None -> ()
-
         let rec runLoop (sessionId: SessionId) : Task =
             task {
                 let key = SessionId.value sessionId
@@ -245,14 +189,12 @@ module ReconcileSupervisor =
                                 binding.ActiveRunBinding(sessionId, ?projection = resolveProjection sessionId)
 
                             let mutable turnFound: ReconciledTurn option = None
-                            let mutable hadActiveRun = false
-                            let mutable incompleteMaterial = false
 
                             // HOST-006: the last snapshot this pass actually read.
                             //
                             // Captured rather than re-fetched, so observing costs no extra
-                            // I/O. The attempt loop may read up to three times; the last
-                            // one is the freshest view and the only one worth observing.
+                            // I/O. The backoff loop may read many times; the last one is
+                            // the freshest view and the only one worth observing.
                             let mutable lastSnapshot: SessionMessage list option = None
 
                             match active with
@@ -271,68 +213,90 @@ module ReconcileSupervisor =
                                     logError "RECONCILE-SNAPSHOT" (sprintf "pass snapshot failed: %s" (string err))
                                 | Ok messages -> lastSnapshot <- Some messages
                             | Some activeRun ->
-                                hadActiveRun <- true
                                 let mutable continuationCandidate: ReconciledTurn option = None
-                                let mutable attempt = 0
-                                // Transient snapshot errors must not consume the HOST-004
-                                // causal reread budget. Cap consecutive errors separately.
-                                let mutable errorCount = 0
+                                let mutable budgetRemaining = maxBudgetMs
+                                let mutable backoffIndex = 0
+                                let mutable terminalFound = false
 
-                                while attempt < 3 && turnFound.IsNone do
-                                    if isCleared sessionId then
-                                        attempt <- 3
-                                    else
-                                        let! snapshotResult = snapshot.GetMessages sessionId
+                                while not terminalFound && budgetRemaining > 0 && not (isCleared sessionId) do
+                                    let! snapshotResult = snapshot.GetMessages sessionId
 
-                                        match snapshotResult with
-                                        | Error err ->
-                                            logError
-                                                "RECONCILE-SNAPSHOT"
-                                                (sprintf "attempt snapshot failed: %s" (string err))
+                                    match snapshotResult with
+                                    | Error err ->
+                                        logError
+                                            "RECONCILE-SNAPSHOT"
+                                            (sprintf "attempt snapshot failed: %s" (string err))
 
-                                            errorCount <- errorCount + 1
+                                        // Snapshot errors do not end the pass: retry with
+                                        // backoff until budget or clear. Do not reset the
+                                        // index — consecutive errors escalate the delay.
+                                        let delay = pickDelay backoffDelaysMs backoffIndex budgetRemaining
 
-                                            if errorCount >= 3 then
-                                                attempt <- 3
-                                        | Ok messages ->
-                                            errorCount <- 0
-                                            attempt <- attempt + 1
-                                            lastSnapshot <- Some messages
+                                        if delay > 0 && not (isCleared sessionId) then
+                                            do! delayMs delay
+                                            budgetRemaining <- budgetRemaining - delay
 
-                                            match TurnReconcile.reconcile messages activeRun with
-                                            | None -> ()
-                                            | Some turn ->
-                                                match turn.Outcome with
-                                                | TurnCompleted
-                                                | TurnAborted _
-                                                | TurnFailed _ ->
-                                                    turnFound <- Some turn
-                                                    continuationCandidate <- None
-                                                | TurnInProgress
-                                                | TurnNeedsContinuation _ ->
-                                                    // Empty/reasoning/contains-XML/tool-call-only
-                                                    // snapshots can briefly precede the final parts
-                                                    // becoming visible. Keep the candidate but use all
-                                                    // causal rereads before deciding to continue the
-                                                    // same Logical Run. Continuation is interaction
-                                                    // repair, never durable fallback.
-                                                    continuationCandidate <- Some turn
-                                                | TurnUnknown ->
-                                                    // A later explicit Unknown invalidates an earlier
-                                                    // provisional candidate; fail closed rather than send
-                                                    // from a stale snapshot.
-                                                    continuationCandidate <- None
+                                        backoffIndex <- backoffIndex + 1
+                                    | Ok messages ->
+                                        // Successful I/O resets escalation so a late
+                                        // transcript is probed at the short end of the
+                                        // sequence after a prior error streak.
+                                        backoffIndex <- 0
+                                        lastSnapshot <- Some messages
 
-                                        if attempt < 3 && turnFound.IsNone then
-                                            do! causalYield ()
+                                        match TurnReconcile.reconcile messages activeRun with
+                                        | None ->
+                                            let delay =
+                                                pickDelay backoffDelaysMs backoffIndex budgetRemaining
+
+                                            if delay > 0 && not (isCleared sessionId) then
+                                                do! delayMs delay
+                                                budgetRemaining <- budgetRemaining - delay
+
+                                            backoffIndex <- backoffIndex + 1
+                                        | Some turn ->
+                                            match turn.Outcome with
+                                            | TurnCompleted
+                                            | TurnAborted _
+                                            | TurnFailed _ ->
+                                                turnFound <- Some turn
+                                                continuationCandidate <- None
+                                                terminalFound <- true
+                                            | TurnInProgress
+                                            | TurnNeedsContinuation _ ->
+                                                // Empty/reasoning/contains-XML/tool-call-only
+                                                // snapshots can briefly precede the final parts
+                                                // becoming visible. Keep the candidate and keep
+                                                // rereading until terminal, budget, or clear.
+                                                // Continuation is interaction repair, never
+                                                // durable fallback.
+                                                continuationCandidate <- Some turn
+
+                                                let delay =
+                                                    pickDelay backoffDelaysMs backoffIndex budgetRemaining
+
+                                                if delay > 0 && not (isCleared sessionId) then
+                                                    do! delayMs delay
+                                                    budgetRemaining <- budgetRemaining - delay
+
+                                                backoffIndex <- backoffIndex + 1
+                                            | TurnUnknown ->
+                                                // A later explicit Unknown invalidates an earlier
+                                                // provisional candidate; fail closed rather than send
+                                                // from a stale snapshot.
+                                                continuationCandidate <- None
+
+                                                let delay =
+                                                    pickDelay backoffDelaysMs backoffIndex budgetRemaining
+
+                                                if delay > 0 && not (isCleared sessionId) then
+                                                    do! delayMs delay
+                                                    budgetRemaining <- budgetRemaining - delay
+
+                                                backoffIndex <- backoffIndex + 1
 
                                 if turnFound.IsNone then
                                     turnFound <- continuationCandidate
-
-                                incompleteMaterial <-
-                                    match turnFound with
-                                    | None -> true
-                                    | Some turn -> not (isTerminalOutcome turn.Outcome)
 
                             match turnFound with
                             | Some turn ->
@@ -348,7 +312,7 @@ module ReconcileSupervisor =
                                     do! onTurn turn
 
                                 if isTerminalOutcome turn.Outcome then
-                                    lock gate (fun () -> resetIncompleteEpisode key)
+                                    lock gate (fun () -> clearProvisional key)
                             | None -> ()
 
                             // HOST-006 containment, after the turn.
@@ -363,8 +327,6 @@ module ReconcileSupervisor =
                             | Some messages -> do! observeSnapshot sessionId messages
                             | None -> ()
 
-                            let mutable scheduleRekick = false
-
                             cont <-
                                 lock gate (fun () ->
                                     match states.TryGetValue(key) with
@@ -378,16 +340,7 @@ module ReconcileSupervisor =
                                     | true, state ->
                                         state.Running <- false
                                         releaseOnExit <- false
-
-                                        if hadActiveRun && incompleteMaterial then
-                                            scheduleRekick <- true
-                                        elif hadActiveRun && not incompleteMaterial then
-                                            resetIncompleteEpisode key
-
                                         false)
-
-                            if scheduleRekick then
-                                scheduleIncompleteRekick sessionId
                 finally
                     // Only the exceptional path still owns Running here. A
                     // normal release may already have allowed a new run to
@@ -453,11 +406,6 @@ module ReconcileSupervisor =
         member _.ClearSession(sessionId: SessionId) : unit =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
-
-                match states.TryGetValue(key) with
-                | true, state -> cancelRekickHandle state
-                | false, _ -> ()
-
                 states.Remove(key) |> ignore
                 consumed.Remove(key) |> ignore
                 provisional.Remove(key) |> ignore

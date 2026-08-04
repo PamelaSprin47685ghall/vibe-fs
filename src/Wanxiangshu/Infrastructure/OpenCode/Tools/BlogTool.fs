@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
 /// spec/15 — the `blog` tool (ENFORCER-010/020/040/041/061).
@@ -18,7 +19,8 @@ open Wanxiangshu.Session
 ///
 /// Request-scoped capability: Role=Blogger is necessary but not sufficient.
 /// Execute requires live CurrentRequest (InFlight) for the session; otherwise
-/// returns a terminating protocol error (never "OK").
+/// AbortSession (protocol stop) then return the rejection body — never soft-OK
+/// that lets Host continue the tool-call step loop.
 module BlogTool =
 
     /// ENFORCER-061: tool-visible rejection for empty canonical text.
@@ -82,6 +84,13 @@ module BlogTool =
                         Diagnostic.emit
                             "blog-execute"
                             [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
+
+                        // Soft error TOML alone is a completed tool call: Host continues
+                        // the provider step loop and the model may call blog forever.
+                        // AbortSession matches StopPhysicalRun (SpikePlugin transform path).
+                        if not (String.IsNullOrWhiteSpace ctx.SessionId) then
+                            let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
+                            ()
 
                         return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString NoLiveCycleError ]
                     else
