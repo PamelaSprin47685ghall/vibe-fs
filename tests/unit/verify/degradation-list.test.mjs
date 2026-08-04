@@ -18,7 +18,7 @@ import {
   DEGRADATIONS,
   SSOT_ORIGIN,
   parseDegradations,
-} from '../../e2e/tests/degradation-list.mjs'
+} from '../../e2e/support/degradation-list.mjs'
 
 /**
  * The thirteen items as they stand in spec/10.md today.

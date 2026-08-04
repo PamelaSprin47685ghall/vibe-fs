@@ -7,7 +7,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PER_TEST_TIMEOUT_MS } from '../../../e2e/time-budget.js'
+import { PER_TEST_TIMEOUT_MS } from '../../../e2e/support/time-budget.js'
 
 test('A overruns its bound', async () => {
   // 1.5× the injected bound: overruns at whatever scale the gate injects, and the margin keeps

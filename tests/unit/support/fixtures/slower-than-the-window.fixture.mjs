@@ -13,7 +13,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PER_TEST_TIMEOUT_MS } from '../../../e2e/time-budget.js'
+import { PER_TEST_TIMEOUT_MS } from '../../../e2e/support/time-budget.js'
 
 const SLICE_MS = Math.floor(PER_TEST_TIMEOUT_MS * 0.8)
 

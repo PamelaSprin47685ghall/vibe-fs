@@ -50,8 +50,8 @@ import { statSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { Watchdog } from '../e2e/watchdog.js'
-import { UNIT_VERDICT_SILENCE_MS } from '../e2e/time-budget.js'
+import { Watchdog } from '../e2e/support/watchdog.js'
+import { UNIT_VERDICT_SILENCE_MS } from '../e2e/support/time-budget.js'
 import { walk } from '../../scripts/lib/walk.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
 

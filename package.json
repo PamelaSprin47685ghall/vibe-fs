@@ -26,9 +26,9 @@
     "lint": "npm run format:check && node scripts/check.mjs",
     "test": "node tests/unit/run.mjs",
     "test:unit": "node tests/unit/run.mjs",
-    "test:harness": "node tests/e2e/tests/gate-testkit.mjs",
-    "test:e2e": "node scripts/run-canary-staggered.mjs",
-    "test:e2e:three": "CANARY_REPEAT=3 node scripts/run-canary-staggered.mjs",
+    "test:harness": "node tests/integration/harness/run.mjs",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "test:e2e:three": "node tests/e2e/run.mjs --repeat 3",
     "check": "npm run lint && npm run build && npm test && npm run test:harness",
     "check:release": "npm run check && npm run test:e2e:three && npm pack --dry-run"
   },
