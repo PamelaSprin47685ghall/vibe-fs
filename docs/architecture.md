@@ -5,8 +5,8 @@ Binding rules live in [`spec/`](../spec/). This page is orientation only.
 ## Layers
 
 - Kernel / Domain: pure rules, facts, projections — no Host I/O.
-- Application: orchestration, prompting, reconciliation programs.
-- Infrastructure: OpenCode hooks, Git, codecs, resource loaders.
+- Application: orchestration, prompting, reconciliation programs (e.g. `Application/Orchestration/Program.fs`).
+- Infrastructure: OpenCode hooks and adapters (`Infrastructure/OpenCode/Orchestration/`), Git, codecs, resource loaders (`Infrastructure/Resources/`).
 - Session / Process: runtime cells, fallback, review, PTY ownership.
 
 ## DNA (spec/01)
@@ -31,4 +31,5 @@ Failure-driven only (CTX-001 / CTX-002). No token budget estimation; no preempti
 ## Package surface
 
 - Entry: `dist/Infrastructure/OpenCode/Plugin/Plugin.js`
-- Assets: `resources/prompts/*`, `resources/enforcer/catalog.json`
+- Assets: `resources/prompts/*-system.md`, `resources/enforcer/catalog.json`
+- Resource load: `Infrastructure/Resources/` (`PackageResources`, `PromptResources`, `EnforcerCatalogResource`, `RuntimeResources`) at plugin start

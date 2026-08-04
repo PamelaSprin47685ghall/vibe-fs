@@ -485,10 +485,10 @@ user = "go"
   {
     name: 'VERIFY-003 parentSession is retired, not a reachability input',
     fn: () => {
-      // Measured dead twice over. Its only source was
-      // `__testkitHeaders['x-parent-session-id']` — harness bookkeeping the provider
-      // never sees — and `matchesExpectation` resolved it through `sessionBindings`,
-      // where all 16 scenarios declaring a parent had never bound it. So the comparison
+      // Measured dead twice over. Its only source was a retired legacy parent-session
+      // header (`x-parent-session-id` under harness bookkeeping the provider never
+      // sees) and `matchesExpectation` resolved it through `sessionBindings`, where
+      // all 16 scenarios declaring a parent had never bound it. So the comparison
       // short-circuited and never ran, in every scenario, for its whole life.
       rejects(
         `scenario = "p"

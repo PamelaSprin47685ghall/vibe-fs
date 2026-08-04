@@ -1,8 +1,8 @@
 /**
- * production.js — the testkit's facade onto production renderers.
+ * production.js — the harness's facade onto production renderers.
  *
  * `tests/unit/domain.mjs` exists because crossing the Fable boundary by hand is a silent-failure
- * machine, and testkit needs the same protection for the same reason. It cannot import `domain.mjs`
+ * machine, and the harness needs the same protection for the same reason. It cannot import `domain.mjs`
  * itself: that facade is the contract surface for layer 1–3 tests and is shaped around them.
  *
  * ── the trap this file exists to make unreachable ───────────────────────────

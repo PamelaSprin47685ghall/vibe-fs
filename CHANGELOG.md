@@ -4,14 +4,12 @@
 
 ## 0.5.3
 
-No runtime behavior changes.
-
-Repository normalization: single package manifest, resources/ layout,
-spec/ clause docs, dist/ build output, unified tests/ tree, Wanxiangshu
-project rename (drop .Next), data-driven enforcer catalog.
-
-Temporary status work files removed. Implementation-status ledgers retired
-from the repository surface (no longer tracked under `spec/`).
+- No runtime protocol changes.
+- Normalized source, resource, specification, test, and build layouts.
+- Replaced the generated Enforcer catalog with packaged runtime data.
+- Packaging now uses the repository root and includes resources directly.
+- Removed migration evidence, generated conformance ledgers, and legacy gates.
+- Renamed internal files and test directories without changing public behavior.
 
 ## 0.5.2 — 全 SSOT 收敛
 

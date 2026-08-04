@@ -8,7 +8,7 @@
  * worst available outcome, and it fails UPWARD: canaries go green.
  *
  * These cases exist because that exact failure was reached and measured. Package
- * K1's first plan was "delete testkit's normaliser, call production's projection
+ * K1's first plan was "delete harness's normaliser, call production's projection
  * directly". Production `Projection.decodeRequest` dispatches on a part's `type`
  * field, and an OpenAI HTTP message has no `parts` array at all:
  *
@@ -231,7 +231,7 @@ export const projectionCases = [
   // ── the guard against re-introducing a second normaliser ────────────────
 
   {
-    name: 'VERIFY-007 testkit asks production, it does not re-implement',
+    name: 'VERIFY-007 harness asks production, it does not re-implement',
     fn: async () => {
       const production = await import('../../../dist/Domain/ProviderProjection.js');
       const adapter = await import('../../e2e/support/provider-wire.js');

@@ -28,10 +28,10 @@
  * together, not by name: it is `let`/`var` AND it starts at zero. Neither alone is enough — a
  * `const` zero cardinality is still a claim about a population, and a `let` seeded at 16 is
  * still a maintained number. Measured on this tree: the exclusion is what separates this rule
- * from the nine counters in `scenario-runner.js`, `gate-testkit.mjs`, `reaper.mjs` and
+ * from the nine counters in `scenario-runner.js`, `harness/run.mjs`, `reaper.mjs` and
  * `strip-doc-bold.mjs`, all of which are `let … = 0`.
  *
- * Like `gate-path-criterion-cases.mjs` and unlike `budget-gate.mjs`, this scan does not mask
+ * Like `path-criterion-cases.mjs` and unlike former budget gates, this scan does not mask
  * comments or strings: under-reporting IS the degradation being removed, so the two error
  * directions are not symmetric. The cost is that this file's own fixtures assemble their
  * declarations from parts instead of spelling them (see `declarationSource`).
@@ -223,7 +223,7 @@ const listSource = (declarator, name, entries, trailingComma = true) =>
  *
  * The removal is not housekeeping. VERIFY-004's leak check names 临时目录 among the things a scenario
  * must leave empty, and these cases build one per fixture: 17 per run, measured. The sibling case
- * files do not remove theirs — 35 more per `gate-testkit` run, against 848 already on this machine's
+ * files do not remove theirs — 35 more per harness run, against 848 already on this machine's
  * `/tmp` when this was written — and a gate that leaks the resource it audits is in no position to
  * report a leak. Out of scope to fix theirs here; in scope not to add to it.
  */

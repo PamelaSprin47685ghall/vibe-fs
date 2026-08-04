@@ -2,30 +2,50 @@
 
 ## Preflight
 
+From a clean Git tree (`git status` empty):
+
 ```bash
-npm run lint
+npm ci
+dotnet tool restore
 npm run check:release
 ```
 
-`check:release` = `lint` (`format:check` + `scripts/check.mjs`) → `build` → unit → harness → e2e × 3 → `npm pack --dry-run`.
+`check:release` runs:
 
-If e2e × 3 is too long for a dry run: `npm run test:e2e` once, then full three-round before tag.
+```text
+check  →  test:e2e -- --repeat 3  →  test:package  →  npm pack --dry-run
+```
+
+where `check` = lint → build → unit → integration.
+
+Do not tag or pack while the working tree is dirty.
 
 ## Package
 
+Pack from the repository root. No staging package directory.
+
 ```bash
-npm run build
-npm pack
+npm pack --pack-destination artifacts/package
 ```
 
-Tarball should include `dist/`, `resources/`, and package metadata only — not `tests/`, `spec/`, or `scripts/`.
+The tarball contains:
+
+- `dist/`
+- `resources/`
+- npm metadata automatically included (`package.json`, `README.md`, `LICENSE`)
+
+It must not contain `src/`, `tests/`, `scripts/`, `spec/`, `docs/`, or `artifacts/`.
+
+Release verification logs and pack outputs belong in CI artifacts or release attachments, not in the git tree.
 
 ## Version checklist
 
 1. Bump `package.json` `version`
-2. [CHANGELOG.md](../CHANGELOG.md) user-facing entry
-3. Tag `vX.Y.Z` after green `check:release`
-4. Attach tarball / CI artifacts outside the git tree when needed
+2. Add a user-facing entry in [CHANGELOG.md](../CHANGELOG.md)
+3. Confirm `git status` is empty
+4. Run `npm ci` → `dotnet tool restore` → `npm run check:release`
+5. `npm pack --pack-destination artifacts/package`
+6. Tag `vX.Y.Z` only after the above is green
 
 ## Non-goals for patch normalization releases
 

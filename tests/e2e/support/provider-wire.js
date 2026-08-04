@@ -225,7 +225,7 @@ export { fixtureKey, isAppendOnlyPrefix, renderSemantic, renderWire, sealDigest,
  * ARCH-004 / COMPANION-009: is `next` an append-only continuation of `previous`.
  *
  * Takes the two WIRE projections, because the seal barrier is about bytes the
- * provider already saw. Replaces testkit's own `isProviderVisiblePrefix`, which
+ * provider already saw. Replaces harness's own `isProviderVisiblePrefix`, which
  * hand-compared `JSON.stringify` of tools and then of each message — two
  * comparison rules that could disagree with production's.
  */

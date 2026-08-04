@@ -1,6 +1,6 @@
 /**
  * Script forest contract tests (AGENTS.md KISS-N11).
- * File name kept for gate-testkit discovery; semantics are prefix/content forest.
+ * File name kept for harness discovery; semantics are prefix/content forest.
  */
 import { assertEq, assertTrue, postJson } from './lib.mjs';
 import { StrictMockProvider } from '../../e2e/support/strict-mock-provider.js';
