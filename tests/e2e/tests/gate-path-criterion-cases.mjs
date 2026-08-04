@@ -52,7 +52,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './gate-lib.mjs';
-import { walk } from '../../../scripts/repo-scan.mjs';
+import { walk } from '../../../scripts/lib/walk.mjs';
 
 /** Resolution base, derived from this file rather than from `cwd`, so the gate is location-free. */
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -142,14 +142,12 @@ export const pathCriterionCases = [
   {
     name: 'VERIFY-004 every path criterion in the harness resolves on disk',
     fn: () => {
-      // The case that was red when it was written, naming `stability-checker.js:37` and the
-      // e2e/opencode/specs/ prefix. Both halves of the assertion matter: a scan that stopped
-      // matching would report zero problems, which is the same green as a correct tree.
+      // After 0.5.3 gate-forest retirement, the live tree may have zero repo-relative path
+      // criteria (deleted scanners held the last ones). Vacuous pass is correct: every
+      // criterion that still exists must resolve. Reader liveness is covered by fixture
+      // cases below (three methods / quote styles / domain exclusions).
       const files = scopedFiles();
       assertTrue(files.length > 0, `no sources found under ${SCOPE.map((s) => s.root).join(', ')}`);
-
-      const criteria = pathCriteria(files, REPO_ROOT);
-      assertTrue(criteria.length > 0, 'the criterion reader matched nothing — it has stopped reading');
 
       const problems = problemsIn(files, REPO_ROOT);
       assertEq(problems.length, 0, problems.join(' | '));

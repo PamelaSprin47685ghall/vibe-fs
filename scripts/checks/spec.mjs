@@ -7,7 +7,7 @@
 //   3. Prefix ownership (PREFIX_OWNER)
 //   4. spec/00.md navigates all active files and prefixes
 //
-// Usage: node scripts/spec-check.mjs
+// Usage: node scripts/checks/spec.mjs
 
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'

@@ -52,7 +52,7 @@ import { fileURLToPath } from 'node:url'
 
 import { Watchdog } from '../e2e/watchdog.js'
 import { UNIT_VERDICT_SILENCE_MS } from '../e2e/time-budget.js'
-import { walk } from '../../scripts/repo-scan.mjs'
+import { walk } from '../../scripts/lib/walk.mjs'
 import { classifyVerdict } from './verdict-feed.mjs'
 
 const TESTS_ROOT = 'tests/unit'

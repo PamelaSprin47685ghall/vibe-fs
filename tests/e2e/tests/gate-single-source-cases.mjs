@@ -41,7 +41,7 @@ import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './gate-lib.mjs';
-import { walk } from '../../../scripts/repo-scan.mjs';
+import { walk } from '../../../scripts/lib/walk.mjs';
 import { CANARY_DIR, CANARY_SUFFIX, CANARY_TESTS, nonConformingCanaryNames, readCanaryTests } from '../canary-manifest.js';
 
 /** Resolution base, derived from this file rather than from `cwd`, so the gate is location-free. */

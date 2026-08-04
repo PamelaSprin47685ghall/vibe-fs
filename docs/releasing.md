@@ -7,7 +7,7 @@ npm run lint
 npm run check:release
 ```
 
-`check:release` = `gate:static` → `build` → unit → harness → e2e × 3 → `npm pack --dry-run`.
+`check:release` = `lint` (`format:check` + `scripts/check.mjs`) → `build` → unit → harness → e2e × 3 → `npm pack --dry-run`.
 
 If e2e × 3 is too long for a dry run: `npm run test:e2e` once, then full three-round before tag.
 

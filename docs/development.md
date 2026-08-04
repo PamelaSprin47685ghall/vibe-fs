@@ -27,12 +27,13 @@ npm test
 | `npm test` | unit |
 | `npm run test:harness` | harness |
 | `npm run test:e2e` | canary (set `CANARY_REPEAT` for multi-round) |
-| `npm run check` | static + build + unit + harness |
-| `npm run lint` | format F# / XML before commit |
+| `npm run check` | lint + build + unit + harness |
+| `npm run lint` | fantomas check + `scripts/check.mjs` (spec + architecture) |
 
-## Layout gate
+## Architecture checks
 
-Root files are allowlisted (`scripts/repository-layout-gate.mjs`). Do not drop sources at repo root.
+`node scripts/check.mjs` runs `scripts/checks/spec.mjs` then `scripts/checks/architecture.mjs`.
+Production F# lives only under `src/Wanxiangshu/`.
 
 ## Further reading
 

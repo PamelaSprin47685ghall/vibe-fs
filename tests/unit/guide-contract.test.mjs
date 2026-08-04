@@ -21,7 +21,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { walk } from '../../scripts/repo-scan.mjs'
+import { walk } from '../../scripts/lib/walk.mjs'
 import { introspect } from './domain.mjs'
 
 // Repo-relative, because `walk` takes a path and `introspect.buildRoot` is the

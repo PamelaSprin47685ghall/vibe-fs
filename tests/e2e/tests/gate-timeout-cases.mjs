@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './gate-lib.mjs';
 import { EventProbe } from '../event-probe.js';
 import { WAIT_FACT_WINDOW_MS, WATCHDOG_TIMEOUT_MS } from '../time-budget.js';
-import { walk } from '../../../scripts/repo-scan.mjs';
+import { walk } from '../../../scripts/lib/walk.mjs';
 
 const execFileAsync = promisify(execFile);
 const watchdogUrl = new URL('../watchdog.js', import.meta.url).href;

@@ -50,7 +50,7 @@
  * derivation itself does not have.
  */
 
-import { walk } from '../../scripts/repo-scan.mjs';
+import { walk } from '../../scripts/lib/walk.mjs';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
