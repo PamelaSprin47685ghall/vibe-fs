@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import { assertEq, assertTrue } from './lib.mjs';
 import { PER_TEST_TIMEOUT_MS, SUITE_BACKSTOP_MS, UNIT_VERDICT_SILENCE_MS } from '../../e2e/support/time-budget.js';
+import { harnessProgress } from './progress.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const RUNNER = 'tests/unit/run.mjs';
@@ -57,7 +58,11 @@ const runFixture = (fixture, budgetEnv = {}) =>
       stderr += chunk;
     });
 
-    child.on('exit', (code, signal) => resolve({ code, signal, stdout, stderr, elapsedMs: Date.now() - started }));
+    // Child exit ends the observation; raw stdout/stderr must not renew the suite dog.
+    child.on('exit', (code, signal) => {
+      harnessProgress(`unit-runner-fixture:${fixture}`);
+      resolve({ code, signal, stdout, stderr, elapsedMs: Date.now() - started });
+    });
   });
 
 // 时间尺度注入（依赖注入的预算，不是新语义）：同一套监督语义在半尺度上跑。判据全部由

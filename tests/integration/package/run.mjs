@@ -1,11 +1,16 @@
-// tests/integration/package/run.mjs — sequential package integration suite.
+// tests/integration/package/run.mjs — sequential package integration under 3s silence.
 //
 //   node tests/integration/package/run.mjs
 // Requires dist/ built (npm run build) before pack/install/import checks.
+//
+// Silence = WATCHDOG_TIMEOUT_MS, same dog as e2e canary. Sequential: pack/install share
+// npm cache; concurrent npm pack is not under test.
 
-import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js'
+import { superviseNodeTest } from '../../e2e/support/supervise-node-test.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -16,22 +21,15 @@ const suites = [
   'resources.test.mjs',
 ]
 
-let failed = 0
 for (const name of suites) {
   const file = path.join(here, name)
   console.log(`\n=== package: ${name} ===`)
-  const result = spawnSync(process.execPath, ['--test', file], {
-    cwd: path.resolve(here, '../../..'),
-    stdio: 'inherit',
-    env: process.env,
+  await superviseNodeTest({
+    files: [file],
+    label: `tests/integration/package/${name}`,
+    silenceMs: WATCHDOG_TIMEOUT_MS,
+    logPrefix: `package:${name}`,
   })
-  if (result.status !== 0) {
-    failed = result.status === null ? 1 : result.status
-    console.error(`package suite failed: ${name} (exit ${failed})`)
-  }
 }
 
-if (failed !== 0) {
-  process.exit(failed)
-}
 console.log('\npackage integration: all suites passed')

@@ -5,32 +5,42 @@
 //        → package/run.mjs → harness/run.mjs
 // Any non-zero exit stops with exit 1.
 // package suite remains independently invocable via test:package.
+//
+// Silence = WATCHDOG_TIMEOUT_MS (3s), same dog as e2e canary. package/harness own
+// the same 3s criterion inside their entrypoints.
 
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { WATCHDOG_TIMEOUT_MS } from '../e2e/support/time-budget.js'
+import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../..')
 
-/** @type {{ label: string, args: string[] }[]} */
-const steps = [
+/** node:test files supervised via the shared verdict-silence helper. */
+const nodeTestSteps = [
   {
     label: 'resources/prompts.test.mjs',
-    args: ['--test', path.join(here, 'resources/prompts.test.mjs')],
+    files: [path.join(here, 'resources/prompts.test.mjs')],
   },
   {
     label: 'resources/enforcer-catalog.test.mjs',
-    args: ['--test', path.join(here, 'resources/enforcer-catalog.test.mjs')],
+    files: [path.join(here, 'resources/enforcer-catalog.test.mjs')],
   },
   {
     label: 'journal/boot.test.mjs',
-    args: ['--test', path.join(here, 'journal/boot.test.mjs')],
+    files: [path.join(here, 'journal/boot.test.mjs')],
   },
   {
     label: 'plugin/manager-tool-contract.test.mjs',
-    args: ['--test', path.join(here, 'plugin/manager-tool-contract.test.mjs')],
+    files: [path.join(here, 'plugin/manager-tool-contract.test.mjs')],
   },
+]
+
+/** Child entrypoints that already own their silence criterion. */
+const childSteps = [
   {
     label: 'package/run.mjs',
     args: [path.join(here, 'package/run.mjs')],
@@ -41,8 +51,17 @@ const steps = [
   },
 ]
 
-let failed = 0
-for (const step of steps) {
+for (const step of nodeTestSteps) {
+  console.log(`\n=== integration: ${step.label} ===`)
+  await superviseNodeTest({
+    files: step.files,
+    label: `tests/integration/${step.label}`,
+    silenceMs: WATCHDOG_TIMEOUT_MS,
+    logPrefix: `integration:${step.label}`,
+  })
+}
+
+for (const step of childSteps) {
   console.log(`\n=== integration: ${step.label} ===`)
   const result = spawnSync(process.execPath, step.args, {
     cwd: root,
@@ -50,7 +69,7 @@ for (const step of steps) {
     env: process.env,
   })
   if (result.status !== 0) {
-    failed = result.status === null ? 1 : result.status
+    const failed = result.status === null ? 1 : result.status
     console.error(`integration suite failed: ${step.label} (exit ${failed})`)
     process.exit(failed)
   }

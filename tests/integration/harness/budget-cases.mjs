@@ -79,6 +79,10 @@ export const budgetCases = [
         'the silence window is the primary criterion; the suite ceiling is only 兜底 (VERIFY-004)',
       );
       assertTrue(
+        budget.UNIT_VERDICT_SILENCE_MS === budget.WATCHDOG_TIMEOUT_MS,
+        'every suite dog starves on the same 3s window as e2e canary',
+      );
+      assertTrue(
         budget.LITERAL_BUDGET_THRESHOLD_MS <= budget.WATCHDOG_TIMEOUT_MS,
         'the gate threshold must not exceed the tightest budget, or that budget itself would read as a poll slice',
       );

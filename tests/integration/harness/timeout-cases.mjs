@@ -286,9 +286,11 @@ async function runTimerDoesNotHoldEventLoop() {
  * having exited 1.
  */
 async function runWaitFactRenewsOnlyOnObservation() {
-  // 时间尺度注入：同一「只认观察」语义在半尺度上跑。缩放后仍满足轮询切片（500ms）< 窗口
-  // （1000ms）的构造性不等式；值派生自 time-budget.js，经 budgetFromEnv 进子进程。
-  const scaledWatchdogMs = WATCHDOG_TIMEOUT_MS / 2;
+  // 时间尺度注入。套件狗固定 3s；整 case 必须落在 3s 内。
+  // 约束：FACT_POLL_SLICE_MS(500) < 注入窗口，否则狗在第一次 poll 中途就咬。
+  // 半尺度 1500 满足切片 < 窗口；silent(~1.5s)+appending(~1.1s) 并行槽下可拆，
+  // 但本 case 串行，故用 1000ms 窗口：silent ≤1s + append 6×250ms ≈1.5s < 3s。
+  const scaledWatchdogMs = 1000;
   const budgetEnv = { WATCHDOG_TIMEOUT_MS: String(scaledWatchdogMs) };
   const silentDir = tmpScenarioDir();
   execFileSync('git', ['-C', silentDir, 'init', '-q'], { encoding: 'utf8' });
@@ -320,10 +322,8 @@ async function runWaitFactRenewsOnlyOnObservation() {
   mkdirSync(journalDir, { recursive: true });
   const journalFile = join(journalDir, 'gate.ndjson');
   writeFileSync(journalFile, '');
-  // appendEvery 在父进程求值后插值进子脚本，故必须用注入尺度派生——用 WATCHDOG_TIMEOUT_MS
-  // 会让子进程的追加节奏停留在未缩放尺度上（实测：窗口已缩而间隔未缩，用例耗时不变）。
   const appendEvery = Math.floor(scaledWatchdogMs / 4);
-  const appendsBeforeFact = 12;
+  const appendsBeforeFact = 6;
   const appending = await runWatchdogChild(
     `import { appendFileSync } from 'node:fs';\n` +
       `let appended = 0;\n` +
@@ -335,7 +335,7 @@ async function runWaitFactRenewsOnlyOnObservation() {
       factBarrierScript(appendingDir, 'AwaitedFact', 'gate-wait-fact-appending') +
       `clearInterval(iv);\n` +
       `console.log('barrier returned after ' + appended + ' appends');\n`,
-    WAIT_FACT_WINDOW_MS,
+    WATCHDOG_TIMEOUT_MS,
     budgetEnv,
   );
   assertEq(

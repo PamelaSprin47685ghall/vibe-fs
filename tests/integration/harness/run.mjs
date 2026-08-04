@@ -4,6 +4,9 @@
  * Proves environment isolation, strict FIFO, SSE reconnect/event waits,
  * and diagnostics/leak checks using extracted harness APIs; no fixed sleeps.
  *
+ * Hang criterion: HARNESS_CASE_SILENCE_MS without a finished case (VERIFY-004).
+ * Case completion is the only blocking advance — not case start, not console output.
+ *
  * Run: node tests/integration/harness/run.mjs
  */
 
@@ -27,6 +30,9 @@ import { singleSourceCases } from './single-source-cases.mjs';
 import { projectionCases } from './projection-cases.mjs';
 import { runtimeKeyCases } from './runtime-key-cases.mjs';
 import { timeoutCases } from './timeout-cases.mjs';
+import { Watchdog } from '../../e2e/support/watchdog.js';
+import { WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js';
+import { bindHarnessFeed } from './progress.mjs';
 
 // The worker pool admits at most GATE_CASE_CONCURRENCY cases. Per-spawn environment
 // overrides, isolated temporary roots, listen(0), process groups, and ordered replay keep
@@ -37,6 +43,50 @@ import { timeoutCases } from './timeout-cases.mjs';
 // Concurrency counts are not durations and therefore do not belong in time-budget.js.
 const GATE_CASE_CONCURRENCY = 8;
 
+const allCases = [
+  ...cases,
+  pluginDependencyCase,
+  ...projectionCases,
+  ...runtimeKeyCases,
+  ...deliveryCases,
+  ...coldBoundaryCases,
+  ...schemaCases,
+  ...scenarioRuntimeCases,
+  ...forestLibCases,
+  ...sourceCases,
+  ...pathCriterionCases,
+  ...singleSourceCases,
+  ...timeoutCases,
+  ...budgetCases,
+  ...readinessCases,
+  ...unitRunnerCases,
+  ...arch010Cases,
+  ...forestCases,
+  ...mutationCases,
+  ...degradationCases,
+];
+
+console.log(
+  `Running tests/integration harness tests (${allCases.length} cases, ${GATE_CASE_CONCURRENCY} at a time, ` +
+    `${WATCHDOG_TIMEOUT_MS}ms case-silence window)...\n`,
+);
+
+const outstanding = new Set(allCases.map((c) => c.name));
+let finished = 0;
+
+const watchdog = new Watchdog({
+  timeoutMs: WATCHDOG_TIMEOUT_MS,
+  label: 'tests/integration/harness',
+  onTimeout: () => {
+    console.error(
+      `harness: ${outstanding.size} case(s) still open: ${[...outstanding].slice(0, 20).join(', ')}` +
+        (outstanding.size > 20 ? ` …(+${outstanding.size - 20})` : ''),
+    );
+    console.error(`harness: ${finished}/${allCases.length} finished before the silence`);
+  },
+});
+bindHarnessFeed((progress) => watchdog.advance(progress));
+
 async function runCase({ name, fn }) {
   const start = Date.now();
   try {
@@ -44,12 +94,13 @@ async function runCase({ name, fn }) {
     return { name, ok: true, ms: Date.now() - start };
   } catch (err) {
     return { name, ok: false, ms: Date.now() - start, err };
+  } finally {
+    outstanding.delete(name);
+    finished += 1;
+    // Case completion is the causal advance — not start, not log lines.
+    watchdog.advance({ reason: `case-complete:${name}`, lane: 'harness', blocking: true });
   }
 }
-
-const allCases = [...cases, pluginDependencyCase, ...projectionCases, ...runtimeKeyCases, ...deliveryCases, ...coldBoundaryCases, ...schemaCases, ...scenarioRuntimeCases, ...forestLibCases, ...sourceCases, ...pathCriterionCases, ...singleSourceCases, ...timeoutCases, ...budgetCases, ...readinessCases, ...unitRunnerCases, ...arch010Cases, ...forestCases, ...mutationCases, ...degradationCases];
-
-console.log(`Running tests/integration harness tests (${allCases.length} cases, ${GATE_CASE_CONCURRENCY} at a time)...\n`);
 
 const results = new Array(allCases.length);
 let next = 0;
@@ -59,7 +110,12 @@ const worker = async () => {
     results[index] = await runCase(allCases[index]);
   }
 };
-await Promise.all(Array.from({ length: GATE_CASE_CONCURRENCY }, worker));
+
+try {
+  await Promise.all(Array.from({ length: GATE_CASE_CONCURRENCY }, worker));
+} finally {
+  watchdog.stop();
+}
 
 let passed = 0;
 let failed = 0;

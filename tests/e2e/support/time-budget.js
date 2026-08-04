@@ -156,7 +156,7 @@ export const PER_TEST_TIMEOUT_MS = budgetFromEnv('PER_TEST_TIMEOUT_MS', 1000);
  *
  * The clause permits exactly this: 「wall-clock 上限可以作为兜底存在，但不得是唯一或首要的判据」.
  */
-export const SUITE_BACKSTOP_MS = 300000;
+export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
 
 /**
  * How long the unit suite may go without a test VERDICT before it is declared hung.

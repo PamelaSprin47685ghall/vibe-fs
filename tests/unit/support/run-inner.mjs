@@ -1,7 +1,7 @@
-// tests/unit/run-inner.mjs — the inner tier: node:test itself, semantics unchanged.
+// tests/unit/support/run-inner.mjs — the inner tier: node:test itself, semantics unchanged.
 //
-// Spawned by `runner.mjs`. Its only added job is to report every event to the parent over IPC so
-// the parent's watchdog can be fed by verdicts.
+// Spawned by the out-of-process supervisor (unit / integration / package). Its only added job is to
+// report every event to the parent over IPC so the parent's watchdog can be fed by verdicts.
 //
 // ── what is deliberately NOT changed here ───────────────────────────────────
 //
@@ -9,12 +9,15 @@
 //
 //   「超时即遗忘」  a timed-out test is failed and the runner continues; an abandoned test does not
 //                  later reject into an unrelated test's result
-//   in-process parallelism, which is what makes 25 files cost one `dist` module load
+//   in-process parallelism, which is what makes many files cost one `dist` module load
 //
 // Measured (Node v26.4.0): `timeout` here is a VERDICT line, not an abort line. A test that
 // overruns is failed at the deadline and then keeps running to completion, and a test that never
 // resolves while holding a live handle prevents the stream from ever emitting `end`. Neither is
 // fixable from inside this process — that is the parent's job, and it is why there is a parent.
+//
+// Per-test / suite budgets arrive as env overrides on the shared time-budget constants so package
+// and integration can use wider windows without forking this file.
 
 import { run } from 'node:test'
 import { spec } from 'node:test/reporters'
