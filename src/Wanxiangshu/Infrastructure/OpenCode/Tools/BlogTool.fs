@@ -19,8 +19,8 @@ open Wanxiangshu.Session
 ///
 /// Request-scoped capability: Role=Blogger is necessary but not sufficient.
 /// Execute requires live CurrentRequest (InFlight) for the session; otherwise
-/// AbortSession (protocol stop) then return the rejection body — never soft-OK
-/// that lets Host continue the tool-call step loop.
+/// AbortSession then throw InvalidOperationException — never soft error TOML
+/// (completed tool call lets Host continue the step loop).
 module BlogTool =
 
     /// ENFORCER-061: tool-visible rejection for empty canonical text.
@@ -87,12 +87,13 @@ module BlogTool =
 
                         // Soft error TOML alone is a completed tool call: Host continues
                         // the provider step loop and the model may call blog forever.
-                        // AbortSession matches StopPhysicalRun (SpikePlugin transform path).
+                        // AbortSession first (physical stop), then throw so Host sees
+                        // a failed tool call and stops the step loop.
                         if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                             let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
                             ()
 
-                        return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString NoLiveCycleError ]
+                        return raise (InvalidOperationException(NoLiveCycleError))
                     else
                         // ENFORCER-061 first gate: reject empty canonical text before "OK".
                         match tryCanonicalText (args.Text "text") with
