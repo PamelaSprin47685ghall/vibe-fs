@@ -90,6 +90,7 @@
     <Compile Include="Session/HandleController.fs"/>
     <Compile Include="Session/ChildRun.fs"/>
     <Compile Include="Session/ChildRunProjection.fs"/>
+    <Compile Include="Process/PtyTiming.fs"/>
     <Compile Include="Session/CompletionMailbox.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
@@ -105,7 +106,6 @@
     <Compile Include="Process/Spool.fs"/>
     <Compile Include="Process/ProcessOutput.fs"/>
     <Compile Include="Process/ProcessRunner.fs"/>
-    <Compile Include="Process/PtyTiming.fs"/>
     <Compile Include="Process/PtyTypes.fs"/>
     <Compile Include="Process/PtySession.fs"/>
     <Compile Include="Process/Pty.fs"/>

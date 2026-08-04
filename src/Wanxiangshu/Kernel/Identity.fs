@@ -31,6 +31,11 @@ module Identity =
     /// this; ordering across runtimes is by ObservedAt (PERSIST-001).
     type LocalSeq = private LocalSeq of int64
 
+    /// Process-local journal subscription cursor. Advances only on a successful
+    /// fold after append. Not a program counter: it names a durable position
+    /// observers can await (Join wake), not "where control goes next".
+    type JournalRevision = private JournalRevision of int64
+
     type LocalEpoch = int64
     type ObservedAt = DateTimeOffset
 
@@ -205,6 +210,13 @@ module Identity =
     module LocalSeq =
         let create (v: int64) = LocalSeq v
         let value (LocalSeq v) = v
+
+    module JournalRevision =
+        let create (v: int64) = JournalRevision v
+        let value (JournalRevision v) = v
+        let initial = JournalRevision 0L
+        let next (JournalRevision v) = JournalRevision(v + 1L)
+        let isAfter (JournalRevision a) (JournalRevision b) = a > b
 
     module LogicalRunId =
         let create (value: string) = LogicalRunId value

@@ -10,7 +10,8 @@ module ExecutorSummarizeRuntime =
 
     type IExecutorRuntime =
         abstract Fork: string * AgentRole * string * string option -> Task<Result<ForkResult, string>>
-        abstract Join: unit -> Task<Result<RunCompletion, ForkError>>
+        /// timeoutMs: None = HostForkRuntime.DefaultJoinTimeoutMs semantics via runtime.Join().
+        abstract Join: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
 
     /// AGENT-008: the Executor is internal, so its managed name is fixed here
     /// rather than chosen by a caller. This is the one legitimate place a name is
@@ -22,7 +23,10 @@ module ExecutorSummarizeRuntime =
             member _.Fork(agentId, role, prompt, payload) =
                 runtime.Fork(agentId, role, executorAgent, prompt, payload)
 
-            member _.Join() = runtime.Join() }
+            member _.Join(timeoutMs) =
+                match timeoutMs with
+                | Some ms -> runtime.Join(timeoutMs = ms)
+                | None -> runtime.Join() }
 
     let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
@@ -34,4 +38,7 @@ module ExecutorSummarizeRuntime =
 
                 task { return Ok(runtime.Fork(agentId, role, executorAgent, prompt = effectivePrompt)) }
 
-            member _.Join() = runtime.Join() }
+            member _.Join(timeoutMs) =
+                match timeoutMs with
+                | Some ms -> runtime.Join(timeoutMs = ms)
+                | None -> runtime.Join() }

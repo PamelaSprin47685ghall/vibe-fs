@@ -31,6 +31,13 @@ module Events =
         let lockObj = obj ()
         let lastCompletedRun = System.Collections.Generic.Dictionary<string, string>()
 
+        /// Last non-duplicate terminal per session. ARCH-002: sticky stores an
+        /// already-derived TerminalOutcome for wake/delivery reliability only —
+        /// not a second derivation of business facts. Late SubscribeTerminalListener
+        /// replays so InstallRun after Notify never loses completion.
+        let stickyTerminal =
+            System.Collections.Generic.Dictionary<string, TerminalOutcome>()
+
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
 
@@ -72,7 +79,15 @@ module Events =
 
         interface IEventObservationPort with
             member _.SubscribeTerminalListener(listener) =
-                lock lockObj (fun () -> listeners.Add(listener))
+                let stickyReplay =
+                    lock lockObj (fun () ->
+                        listeners.Add(listener)
+                        stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+
+                // Sessions.SubscribeTerminal filters by sessionId; replaying every
+                // sticky entry is correct — non-matching session ids are ignored.
+                for sessionKey, outcome in stickyReplay do
+                    listener (SessionId.create sessionKey) outcome
 
                 { new IDisposable with
                     member _.Dispose() =
@@ -80,7 +95,11 @@ module Events =
 
             member _.NotifyTerminal sessionId outcome =
                 if not (this.IsCompletedDuplicate(sessionId, outcome)) then
-                    let hasListeners = lock lockObj (fun () -> listeners.Count > 0)
+                    let hasListeners =
+                        lock lockObj (fun () ->
+                            stickyTerminal.[SessionId.value sessionId] <- outcome
+                            listeners.Count > 0)
+
                     notify sessionId outcome
                     hasListeners
                 else

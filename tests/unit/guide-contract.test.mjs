@@ -122,6 +122,9 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
     'AgentJournalModule_createFromBoot',
     'AgentJournalModule_appendAgent',
     'AgentJournalModule_snapshot',
+    'AgentJournalModule_revision',
+    'AgentJournalModule_snapshotWithRevision',
+    'AgentJournalModule_awaitChangeFrom',
     'AgentJournalModule_isPoisoned',
   ])
 

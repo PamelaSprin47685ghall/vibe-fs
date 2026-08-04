@@ -3,6 +3,7 @@ namespace Wanxiangshu.Session
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
@@ -169,7 +170,10 @@ type HostForkRuntime
     member this.FailRun(run: PendingHostRun, error: string) =
         HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error
 
-    member this.MarkReady(run: PendingHostRun) = HostForkRunLifecycle.markReady gate run
+    member this.MarkReady(run: PendingHostRun) =
+        let workRecord = childWorkRecordOf run.ChildId
+
+        HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run workRecord
 
     member this.Cancel() : unit =
         Async.StartImmediate(
@@ -198,7 +202,12 @@ type HostForkRuntime
     ///
     /// Consume = read blob → CAS `HandleRetired`. CommitUnknown / append failure
     /// must not deliver. Concurrent joins: single winner via journal gate.
-    member this.Join() : Task<Result<RunCompletion, ForkError>> =
+    ///
+    /// Join never waits forever: default budget 600s. On timeout, one final durable
+    /// consume is attempted; still empty → TimedOut.
+    member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
+        let budgetMs = defaultArg timeoutMs 600_000
+
         let isPty runId =
             lock gate (fun () -> ptyRuns.Contains runId)
 
@@ -250,7 +259,30 @@ type HostForkRuntime
 
             attempt joinable
 
-        let rec loop () : Task<Result<RunCompletion, ForkError>> =
+        /// Race journal revision wake vs mailbox completion (PTY + agent notify).
+        /// Choice1 = durable change (re-loop); Choice2 = mailbox result.
+        let raceChangeAndMailbox
+            (durable: AgentJournal)
+            (fromRev: JournalRevision)
+            (ms: int)
+            : Task<Choice<JournalChange, Result<RunCompletion, ForkError>>> =
+            task {
+                let changeTask =
+                    task {
+                        let! change = durable.AwaitChangeFrom fromRev
+                        return Choice1Of2 change
+                    }
+
+                let mailTask =
+                    task {
+                        let! joined = runtime.Join(timeoutMs = ms)
+                        return Choice2Of2 joined
+                    }
+
+                return! emitJsExpr (changeTask, mailTask) "Promise.race([$0, $1])"
+            }
+
+        let rec loop (remainingMs: int) : Task<Result<RunCompletion, ForkError>> =
             task {
                 match journal with
                 | Some durable ->
@@ -259,22 +291,55 @@ type HostForkRuntime
                     | Some(Error err) ->
                         return Error(ForkError.NotFound(sprintf "join could not consume handle: %s" err))
                     | None ->
-                        let! joined = runtime.Join()
+                        if remainingMs <= 0 then
+                            return Error ForkError.TimedOut
+                        else
+                            // Snapshot revision under gate, then recheck durable before waiting.
+                            let _, fromRev = durable.SnapshotWithRevision
 
-                        match joined with
-                        | Ok completion when isPty completion.RunId -> return Ok completion
-                        | Ok _ ->
-                            // Agent mailbox payload is notification only — re-loop.
-                            return! loop ()
-                        | Error e -> return Error e
+                            match tryConsumeDurable durable with
+                            | Some(Ok completion) -> return Ok completion
+                            | Some(Error err) ->
+                                return Error(ForkError.NotFound(sprintf "join could not consume handle: %s" err))
+                            | None ->
+                                let started = DateTimeOffset.UtcNow
+                                let! raced = raceChangeAndMailbox durable fromRev remainingMs
+
+                                let elapsed = int (DateTimeOffset.UtcNow - started).TotalMilliseconds
+
+                                let next = max 0 (remainingMs - max 0 elapsed)
+
+                                match raced with
+                                | Choice1Of2 _ ->
+                                    // Journal advanced — re-read projection (may still be None).
+                                    return! loop next
+                                | Choice2Of2(Ok completion) when isPty completion.RunId -> return Ok completion
+                                | Choice2Of2(Ok _) ->
+                                    // Agent mailbox payload is notification only — re-loop.
+                                    return! loop next
+                                | Choice2Of2(Error ForkError.TimedOut) ->
+                                    match tryConsumeDurable durable with
+                                    | Some(Ok completion) -> return Ok completion
+                                    | Some(Error err) ->
+                                        return
+                                            Error(
+                                                ForkError.NotFound(
+                                                    sprintf "join could not consume handle after timeout: %s" err
+                                                )
+                                            )
+                                    | None -> return Error ForkError.TimedOut
+                                | Choice2Of2(Error e) -> return Error e
                 | None ->
-                    let! joined = runtime.Join()
-                    return joined
+                    if remainingMs <= 0 then
+                        return Error ForkError.TimedOut
+                    else
+                        let! joined = runtime.Join(timeoutMs = remainingMs)
+                        return joined
             }
 
         task {
             do! this.AwaitRecovery()
-            return! loop ()
+            return! loop budgetMs
         }
 
     member this.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =

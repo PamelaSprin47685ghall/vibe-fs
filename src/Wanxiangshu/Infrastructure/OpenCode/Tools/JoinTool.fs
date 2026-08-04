@@ -19,6 +19,8 @@ module JoinTool =
         | ForkError.Cancelled -> "CANCELLED"
         | ForkError.Empty -> "EMPTY"
         | ForkError.NotFound id -> "NOT_FOUND:" + id
+        | ForkError.TimedOut -> "TIMED_OUT"
+        | ForkError.TerminalMaterializationFailed id -> "TERMINAL_MATERIALIZATION_FAILED:" + id
 
     let private encodeCompletion (runtime: HostForkRuntime) (completion: RunCompletion) =
         let isPty = runtime.IsPtyCompletion completion.RunId

@@ -1,9 +1,18 @@
 namespace Wanxiangshu.Journal
 
 open System
+open System.Collections.Generic
+open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Outcome
+
+/// One successful fold after append. Wake payload for revision subscribers.
+/// No retained history: only the latest change is kept for the recheck path.
+type JournalChange =
+    { Revision: JournalRevision
+      Envelope: Envelope }
 
 type JournalAppendFailure =
     /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
@@ -48,10 +57,17 @@ module JournalAppendFailure =
 ///
 /// PERSIST-008: `Snapshot` is integrated state, never a replay. Appending folds
 /// exactly one envelope into the projection it already holds.
+///
+/// Revision subscription: append+fsync → fold → revision advances → wake waiters.
+/// Correctness does not require every wake to be delivered: Join uses
+/// check → subscribe → recheck → await (see `AwaitChangeFrom`).
 type AgentJournal internal (writer: JournalWriter, initialProjection: ProjectionSet) =
     let gate = obj ()
     let mutable projection = initialProjection
     let mutable rejected: (EventId * FoldRejection) option = None
+    let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
+    let mutable lastChange: JournalChange option = None
+    let waiters = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
@@ -62,6 +78,13 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
     member _.IsPoisoned = lock gate (fun () -> writer.IsPoisoned || Option.isSome rejected)
 
     member _.Snapshot: ProjectionSet = lock gate (fun () -> projection)
+
+    /// Current revision under the same gate as Snapshot (Join handshake).
+    member _.Revision: JournalRevision = lock gate (fun () -> revision)
+
+    /// Projection and revision read under one lock so Join cannot observe a split.
+    member _.SnapshotWithRevision: ProjectionSet * JournalRevision =
+        lock gate (fun () -> projection, revision)
 
     /// FALLBACK-004: apply the success transition derived from a completed Host
     /// snapshot. This is an in-memory projection update, not a journal fact: only
@@ -84,6 +107,27 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
                                 { projection.AgentProjections with
                                     Sessions = Map.add sessionId updatedSession projection.AgentProjections.Sessions } })
 
+    /// Wait until a successful fold advances past `fromRevision`.
+    ///
+    /// Recheck under lock before registering: if already advanced and lastChange
+    /// exists, complete immediately (no full history replay).
+    member _.AwaitChangeFrom(fromRevision: JournalRevision) : Task<JournalChange> =
+        lock gate (fun () ->
+            if JournalRevision.isAfter revision fromRevision then
+                match lastChange with
+                | Some change -> Task.FromResult change
+                | None ->
+                    // Revision advanced without a process-local lastChange (boot
+                    // only). Wait for the next successful fold rather than hang
+                    // on a synthetic envelope.
+                    let tcs = TaskCompletionSource<JournalChange>()
+                    waiters.Add(fromRevision, tcs)
+                    tcs.Task
+            else
+                let tcs = TaskCompletionSource<JournalChange>()
+                waiters.Add(fromRevision, tcs)
+                tcs.Task)
+
     /// Append one fact and fold it.
     ///
     /// Deduplication is deliberately absent here. FALLBACK-003 names the
@@ -100,20 +144,52 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
         (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
         : Result<ProjectionSet, JournalAppendFailure> =
-        lock gate (fun () ->
-            match rejected with
-            | Some(eventId, rejection) -> Error(FactRejected(eventId, rejection))
-            | None ->
-                match writer.Append stream providerRun (Fact.Agent fact) with
-                | CommitUnknown(eventId, failure) -> Error(WriteUnknown(eventId, failure))
-                | Committed envelope ->
-                    match Fold.foldEnvelope projection envelope with
-                    | Ok updated ->
-                        projection <- updated
-                        Ok updated
-                    | Error rejection ->
-                        rejected <- Some(envelope.EventId, rejection)
-                        Error(FactRejected(envelope.EventId, rejection)))
+        let mutable notify: (TaskCompletionSource<JournalChange> * JournalChange) list = []
+
+        let result =
+            lock gate (fun () ->
+                match rejected with
+                | Some(eventId, rejection) -> Error(FactRejected(eventId, rejection))
+                | None ->
+                    match writer.Append stream providerRun (Fact.Agent fact) with
+                    | CommitUnknown(eventId, failure) -> Error(WriteUnknown(eventId, failure))
+                    | Committed envelope ->
+                        match Fold.foldEnvelope projection envelope with
+                        | Ok updated ->
+                            projection <- updated
+                            revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
+
+                            let change =
+                                { Revision = revision
+                                  Envelope = envelope }
+
+                            lastChange <- Some change
+
+                            let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
+                            let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
+
+                            for subRev, tcs in waiters do
+                                if JournalRevision.isAfter revision subRev then
+                                    ready.Add(tcs, change)
+                                else
+                                    kept.Add(subRev, tcs)
+
+                            waiters.Clear()
+
+                            for item in kept do
+                                waiters.Add item
+
+                            notify <- List.ofSeq ready
+                            Ok updated
+                        | Error rejection ->
+                            rejected <- Some(envelope.EventId, rejection)
+                            Error(FactRejected(envelope.EventId, rejection)))
+
+        // Fire outside the gate: listeners must not run under the journal lock.
+        for tcs, change in notify do
+            AsyncSupport.trySetResult tcs change |> ignore
+
+        result
 
     interface IDisposable with
         member _.Dispose() = (writer :> IDisposable).Dispose()
@@ -163,6 +239,13 @@ module AgentJournal =
         journal.AppendAgent stream providerRun fact
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
+
+    let revision (journal: AgentJournal) : JournalRevision = journal.Revision
+
+    let snapshotWithRevision (journal: AgentJournal) : ProjectionSet * JournalRevision = journal.SnapshotWithRevision
+
+    let awaitChangeFrom (fromRevision: JournalRevision) (journal: AgentJournal) : Task<JournalChange> =
+        journal.AwaitChangeFrom fromRevision
 
     /// FALLBACK-004: derive success from a valid completed turn without appending
     /// a fact. Missing journals, sessions, and fallback projections are all no-op.

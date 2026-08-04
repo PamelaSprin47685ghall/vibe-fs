@@ -149,9 +149,37 @@ module SpikePlugin =
 
                                     let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-                                    let! messages = EnforcerHost.handleContinuation scope journal sid bloggerMessages
+                                    let! outcome = EnforcerHost.handleContinuation scope journal sid bloggerMessages
 
-                                    HostMessageProjection.replaceMessagesInPlace outObj messages
+                                    match outcome with
+                                    | EnforcerHost.ContinuationOutcome.ProjectMessages messages ->
+                                        let projected =
+                                            if List.isEmpty messages then
+                                                Diagnostic.emit
+                                                    "enforcer-empty-project"
+                                                    [ "session_id", sessionId
+                                                      "result", "ProjectMessages empty; keep raw transcript" ]
+
+                                                bloggerMessages
+                                            else
+                                                messages
+
+                                        HostMessageProjection.replaceMessagesInPlace outObj projected
+                                    | EnforcerHost.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
+                                        let projected = if List.isEmpty messages then bloggerMessages else messages
+
+                                        HostMessageProjection.replaceMessagesInPlace outObj projected
+
+                                        Diagnostic.emit
+                                            "enforcer-stop-physical-run"
+                                            [ "session_id", sessionId; "result", reason ]
+
+                                        // Await abort so Host fiber interrupt is pending before
+                                        // transform returns → handle.process / provider skipped.
+                                        // Transform-initiated abort is not LoopSensor-armed → no
+                                        // ProviderRetryAttempt (TurnAborted only).
+                                        let! _ = sessionPort.AbortSession sid
+                                        ()
                                 | None -> ()
                             | None -> ()
                         | None -> ()

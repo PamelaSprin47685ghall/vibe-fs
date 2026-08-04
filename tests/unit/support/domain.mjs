@@ -134,6 +134,10 @@ const [
   ReviewSealModule,
   SessionSnapshotPortModule,
   ToolHostCodecModule,
+  CompletionMailboxModule,
+  HostForkRunLifecycleModule,
+  HostPendingRunModule,
+  EventsModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -217,6 +221,10 @@ const [
   prod('Application/Reconciliation/ReviewSeal'),
   prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
   prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
+  prod('Session/CompletionMailbox'),
+  prod('Session/HostForkRunLifecycle'),
+  prod('Session/HostPendingRun'),
+  prod('Infrastructure/OpenCode/Host/Events'),
 ])
     
 
@@ -522,12 +530,24 @@ export const prefixEpochId = (value) => Identity.PrefixEpochIdModule_create(BigI
 
 export const localSeq = (value) => Identity.LocalSeqModule_create(BigInt(value))
 
+export const journalRevision = {
+  create: (value) => Identity.JournalRevisionModule_create(BigInt(value)),
+  value: (rev) => Number(Identity.JournalRevisionModule_value(rev)),
+  /** Prefer create(0): Fable may emit `initial` as a value or getter. */
+  initial: () =>
+    Identity.JournalRevisionModule_initial ??
+    Identity.JournalRevisionModule_create(0n),
+  next: (rev) => Identity.JournalRevisionModule_next(rev),
+  isAfter: (a, b) => Identity.JournalRevisionModule_isAfter(a, b),
+}
+
 export const idValue = Object.fromEntries(
   Object.entries(Ids).map(([name, module]) => [name, module.value]),
 )
 idValue.localSeq = (id) => Identity.LocalSeqModule_value(id)
 idValue.frameEpoch = (id) => Identity.FrameEpochIdModule_value(id)
 idValue.prefixEpoch = (id) => Identity.PrefixEpochIdModule_value(id)
+idValue.journalRevision = (id) => Number(Identity.JournalRevisionModule_value(id))
 
 /** PROMPT-002: one-way promotion. There is deliberately no inverse. */
 export const promoteToAuthorityRoot = (physical) => Identity.PhysicalUserMessageIdModule_promoteToAuthorityRoot(physical)
@@ -2658,7 +2678,14 @@ export const toolHostCodec = (() => {
  * in guide-contract.test.mjs); `bind` resolves that spelling and throws if
  * the member disappears.
  */
-const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', ['create'])
+const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
+  'create',
+  'appendAgent',
+  'snapshot',
+  'revision',
+  'snapshotWithRevision',
+  'awaitChangeFrom',
+])
 
 export const agentJournal = {
   create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
@@ -2667,6 +2694,14 @@ export const agentJournal = {
       ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
       : result
   },
+  appendAgent: (streamId, providerRun, agentFactValue, journal) =>
+    resultOf(AgentJournalCreate.appendAgent(streamId, providerRun, agentFactValue, journal)),
+  snapshot: (journal) => AgentJournalCreate.snapshot(journal),
+  /** Module-level revision (AgentJournal.revision). */
+  revision: (journal) => AgentJournalCreate.revision(journal),
+  snapshotWithRevision: (journal) => AgentJournalCreate.snapshotWithRevision(journal),
+  /** Module-level awaitChangeFrom (fromRevision, journal) → Task/Promise. */
+  awaitChangeFrom: (fromRevision, journal) => AgentJournalCreate.awaitChangeFrom(fromRevision, journal),
 }
 
 export const rootKind = {
@@ -2707,6 +2742,124 @@ export const deadline = (() => {
     remainingMs: (clock, value) => m.remaining(clock, value),
     isExpired: (clock, value) => m.isExpired(clock, value),
     nextWaitMs: (clock, value) => m.nextWaitMs(clock, value),
+  }
+})()
+
+// ── join completion reliability (Part 1 hang fix) ────────────────────────────
+
+/**
+ * Discover a Fable instance-method export without hardcoding hash suffixes.
+ * Prefer `TypeName__Method…`; fall back to keys ending with `__Method` / `_Method`.
+ */
+const fableInstanceMethod = (mod, typeName, methodName) => {
+  const keys = Object.keys(mod)
+  const preferred = `${typeName}__${methodName}`
+  const found =
+    keys.find((k) => k === preferred || k.startsWith(`${preferred}_`) || k.startsWith(`${preferred}`)) ??
+    keys.find((k) => k.endsWith(`__${methodName}`) || k.endsWith(`_${methodName}`))
+  if (found === undefined || typeof mod[found] !== 'function') {
+    const near = keys.filter((k) => k.includes(typeName) || k.includes(methodName)).join(', ')
+    throw new Error(
+      `${typeName}__${methodName} missing (static form). Near: ${near || '(none)'}`,
+    )
+  }
+  return mod[found]
+}
+
+/** CompletionMailbox: queue + waiter + optional Join deadline. */
+export const completionMailbox = (() => {
+  // Class lives on the module as `CompletionMailbox` (type name = file root).
+  // Methods compile as non-curried module statics: `CompletionMailbox__Join_*(_, timeoutMs)`.
+  const Mailbox = CompletionMailboxModule.CompletionMailbox
+  if (Mailbox === undefined) {
+    throw new Error('Session/CompletionMailbox did not export CompletionMailbox')
+  }
+
+  const joinFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Join')
+  const publishFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Publish')
+  const cancelFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Cancel')
+  const pendingCountFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'get_PendingCount')
+  const isCancelledFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'get_IsCancelled')
+
+  return {
+    create: (hasActive = () => true) => new Mailbox({}, hasActive),
+    publish: (box, completion) => publishFn(box, completion),
+    // timeoutMs === undefined → no deadline (Fable optional is nullish).
+    join: (box, timeoutMs) => joinFn(box, timeoutMs),
+    cancel: (box) => cancelFn(box),
+    pendingCount: (box) => pendingCountFn(box),
+    isCancelled: (box) => isCancelledFn(box),
+  }
+})()
+
+/** HostEventPort sticky terminal + late-subscriber replay. */
+export const hostEventPort = (() => {
+  const Port =
+    EventsModule.HostEventPort ??
+    EventsModule.Events_HostEventPort ??
+    EventsModule.Events$HostEventPort
+  if (Port === undefined) {
+    const keys = Object.keys(EventsModule).filter((k) => k.includes('Host') || k.includes('Event') || k.includes('Port'))
+    throw new Error(`Events.HostEventPort missing. Near: ${keys.join(', ') || '(none)'}`)
+  }
+
+  const TerminalOutcome = EventsModule.TerminalOutcome
+  if (TerminalOutcome === undefined) {
+    throw new Error('Events.TerminalOutcome missing')
+  }
+
+  // Prototype methods exist on Events_HostEventPort; also accept static exports if present.
+  const callPort = (port, name, args) => {
+    const method =
+      port[name] ??
+      port[`IEventObservationPort_${name}`] ??
+      port[`IEventObservationPort__${name}`]
+    if (typeof method === 'function') {
+      return method.apply(port, args)
+    }
+    const staticFn = fableInstanceMethod(EventsModule, 'Events_HostEventPort', name)
+    return staticFn(port, ...args)
+  }
+
+  return {
+    create: () => new Port(),
+    subscribe: (port, listener) => callPort(port, 'SubscribeTerminalListener', [listener]),
+    notify: (port, sessionId, outcome) => callPort(port, 'NotifyTerminal', [sessionId, outcome]),
+    /** Failed outcome — enough for sticky/replay tests (no ProviderRun dual-instance dedupe). */
+    failed: (error = 'test-fail') => new TerminalOutcome(2, [error]),
+    aborted: (reason = 'test-abort') => new TerminalOutcome(1, [reason]),
+  }
+})()
+
+/**
+ * HostForkRunLifecycle Ready buffer: complete-before-Ready stores outcome;
+ * markReady flushes into Source.
+ *
+ * Top-level lets compile to NON-curried multi-arg JS functions (length 7–9).
+ * Call them with all arguments at once — do not curried-reduce.
+ */
+export const pendingRunLifecycle = (() => {
+  const life = bind(HostForkRunLifecycleModule, 'HostForkRunLifecycle', [
+    'complete',
+    'markReady',
+    'installRun',
+    'failRun',
+  ])
+  const pending = bind(HostPendingRunModule, 'HostPendingRun', ['completionSource'])
+
+  const callMulti = (fn, args) => {
+    if (typeof fn !== 'function') {
+      throw new Error('pendingRunLifecycle: member is not a function')
+    }
+    return fn(...args)
+  }
+
+  return {
+    completionSource: () => pending.completionSource(),
+    complete: (...args) => callMulti(life.complete, args),
+    markReady: (...args) => callMulti(life.markReady, args),
+    installRun: (...args) => callMulti(life.installRun, args),
+    failRun: (...args) => callMulti(life.failRun, args),
   }
 })()
 
@@ -3398,6 +3551,30 @@ export const bloggerRuntime = (() => {
     stateOf: (cell) => caseOf(cell.State),
     repairSpentOf: (cell) => cell.RepairSpent,
     reactivatedOf: (cell) => cell.ReactivatedAfterSeal,
+  }
+})()
+
+/**
+ * EnforcerHost.ContinuationOutcome facade (VERIFY-008).
+ * ProjectMessages = continue with non-empty provider view.
+ * StopPhysicalRun = project non-empty messages then AbortSession.
+ */
+export const enforcerContinuation = (() => {
+  return {
+    tag: (outcome) => caseOf(outcome),
+    isProject: (outcome) => caseOf(outcome) === 'ProjectMessages',
+    isStop: (outcome) => caseOf(outcome) === 'StopPhysicalRun',
+    messages: (outcome) => {
+      const tag = caseOf(outcome)
+      if (tag === 'ProjectMessages' || tag === 'StopPhysicalRun') {
+        return listItems(outcome.fields[0])
+      }
+      throw new Error(`enforcerContinuation.messages: unexpected '${tag}'`)
+    },
+    reason: (outcome) => {
+      if (caseOf(outcome) !== 'StopPhysicalRun') return undefined
+      return outcome.fields[1]
+    },
   }
 })()
 

@@ -153,7 +153,11 @@ type ForkRuntime
     ///   - Ok(RunCompletion) when a completion is available
     ///   - Error(NothingToJoin) when no agent or PTY is active
     ///   - Error(Cancelled) when the runtime has been cancelled
-    member _.Join() : Task<Result<RunCompletion, ForkError>> = mailbox.Join()
+    ///   - Error(TimedOut) when optional timeout elapses with no completion
+    member _.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
+        match timeoutMs with
+        | Some ms -> mailbox.Join(timeoutMs = ms)
+        | None -> mailbox.Join()
 
     // -----------------------------------------------------------------------
     // Public API — PublishCompletion (external completions, e.g. PTY)

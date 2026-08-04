@@ -65,6 +65,82 @@ module HostForkRunLifecycle =
         fun agentId childId (_role: AgentRole) agent prompt ->
             sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt
 
+    let private deliverCompletion
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (outcome: TerminalOutcome)
+        (workRecord: string option)
+        (subscriptionToDispose: IDisposable option)
+        =
+        subscriptionToDispose
+        |> Option.iter (fun subscription -> subscription.Dispose())
+
+        // EXEC-009: durable blob + HandleCompleted precede mailbox delivery.
+        // Join consumes from projection/blob; mailbox is wait-notification only.
+        let runId = "run-" + run.AgentId
+        let childId = run.ChildId
+
+        let completionKind, agentOutcome =
+            match outcome with
+            | Completed result when not result.IsValid ->
+                // EXEC-006: `IsValid` decides whether a completed run carries
+                // terminal output. The join wire then carries the materialised LWR.
+                HandleCompletionKind.SendFailure,
+                AgentCompletion.failed
+                    run.AgentId
+                    runId
+                    (Some run.Role)
+                    (Some childId)
+                    "MISSING_FINAL_REPORT"
+                    "completed with empty terminal output"
+            | Completed result ->
+                HandleCompletionKind.Terminal,
+                AgentCompletion.completed
+                    run.AgentId
+                    childId
+                    runId
+                    run.Role
+                    result.AuthorityRootUserMessageId
+                    // HOST-010/HOST-011: terminal provider run IS the assistant message.
+                    result.ProviderRun
+                    (workRecord |> Option.defaultValue "")
+                    result.Directory
+            | Aborted reason ->
+                HandleCompletionKind.SendFailure,
+                AgentCompletion.aborted run.AgentId runId (Some run.Role) (Some childId) "ABORTED" reason
+            | Failed error ->
+                let code =
+                    if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
+                        "MISSING_FINAL_REPORT"
+                    elif error = "cancelled" then
+                        "CANCELLED"
+                    else
+                        "ERROR"
+
+                HandleCompletionKind.SendFailure,
+                AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
+
+        let body = Some(HandleCompletionCodec.encodeOutcome runId agentOutcome)
+
+        let finalOutcome =
+            match journal with
+            | None -> agentOutcome
+            | Some _ ->
+                match HandleController.recordCompletion journal parentId run.AgentId completionKind body with
+                | Ok() -> agentOutcome
+                | Error error ->
+                    // Never leave Source unset: Join must unblock even when append fails.
+                    AgentCompletion.failed
+                        run.AgentId
+                        runId
+                        (Some run.Role)
+                        (Some childId)
+                        "PERSIST"
+                        (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
+
+        run.Source.SetResult finalOutcome
+
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -84,74 +160,23 @@ module HostForkRunLifecycle =
 
         // Only the first matching terminal may claim the run. Duplicate idle/
         // abort from dual event streams must not SetResult twice.
+        // Ready=false no longer drops: buffer TerminalOutcome until markReady.
         let claimed, subscriptionToDispose =
             lock gate (fun () ->
                 match pendingRuns.TryGetValue run.AgentId with
-                | true, current when obj.ReferenceEquals(current.Token, run.Token) && run.Ready && not run.Finished ->
-                    run.Finished <- true
-                    pendingRuns.Remove run.AgentId |> ignore
-                    true, run.Subscription
+                | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
+                    if run.Ready then
+                        run.Finished <- true
+                        pendingRuns.Remove run.AgentId |> ignore
+                        true, run.Subscription
+                    else
+                        run.BufferedTerminal <- Some outcome
+                        run.BufferedWorkRecord <- completedWorkRecord
+                        false, None
                 | _ -> false, None)
 
         if claimed then
-            subscriptionToDispose
-            |> Option.iter (fun subscription -> subscription.Dispose())
-
-            // EXEC-009: durable blob + HandleCompleted precede mailbox delivery.
-            // Join consumes from projection/blob; mailbox is wait-notification only.
-            let runId = "run-" + run.AgentId
-            let childId = run.ChildId
-
-            let completionKind, agentOutcome =
-                match outcome with
-                | Completed result when not result.IsValid ->
-                    // EXEC-006: `IsValid` decides whether a completed run carries
-                    // terminal output. The join wire then carries the materialised LWR.
-                    HandleCompletionKind.SendFailure,
-                    AgentCompletion.failed
-                        run.AgentId
-                        runId
-                        (Some run.Role)
-                        (Some childId)
-                        "MISSING_FINAL_REPORT"
-                        "completed with empty terminal output"
-                | Completed result ->
-                    HandleCompletionKind.Terminal,
-                    AgentCompletion.completed
-                        run.AgentId
-                        childId
-                        runId
-                        run.Role
-                        result.AuthorityRootUserMessageId
-                        // HOST-010/HOST-011: terminal provider run IS the assistant message.
-                        result.ProviderRun
-                        (completedWorkRecord |> Option.defaultValue "")
-                        result.Directory
-                | Aborted reason ->
-                    HandleCompletionKind.SendFailure,
-                    AgentCompletion.aborted run.AgentId runId (Some run.Role) (Some childId) "ABORTED" reason
-                | Failed error ->
-                    let code =
-                        if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
-                            "MISSING_FINAL_REPORT"
-                        elif error = "cancelled" then
-                            "CANCELLED"
-                        else
-                            "ERROR"
-
-                    HandleCompletionKind.SendFailure,
-                    AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
-
-            let body = Some(HandleCompletionCodec.encodeOutcome runId agentOutcome)
-
-            match journal with
-            | None -> ()
-            | Some _ ->
-                match HandleController.recordCompletion journal parentId run.AgentId completionKind body with
-                | Ok() -> ()
-                | Error error -> failwith (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
-
-            run.Source.SetResult agentOutcome
+            deliverCompletion journal parentId run outcome completedWorkRecord subscriptionToDispose
 
     let installRun
         (gate: obj)
@@ -172,7 +197,9 @@ module HostForkRunLifecycle =
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Ready = false
-              Finished = false }
+              Finished = false
+              BufferedTerminal = None
+              BufferedWorkRecord = None }
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
@@ -207,7 +234,47 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (error: string)
         =
-        lock gate (fun () -> run.Ready <- true)
+        lock gate (fun () ->
+            run.Ready <- true
+            run.BufferedTerminal <- None
+            run.BufferedWorkRecord <- None)
+
         complete gate pendingRuns journal parentId sessions run (TerminalOutcome.Failed error) None
 
-    let markReady (gate: obj) (run: PendingHostRun) = lock gate (fun () -> run.Ready <- true)
+    /// Ready gate: if a terminal was buffered before Ready, flush it now.
+    let markReady
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (sessions: ISessionHostPort)
+        (run: PendingHostRun)
+        (workRecord: string option)
+        =
+        let flush =
+            lock gate (fun () ->
+                match pendingRuns.TryGetValue run.AgentId with
+                | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
+                    match run.BufferedTerminal with
+                    | Some outcome ->
+                        let bufferedWork = run.BufferedWorkRecord
+                        run.Finished <- true
+                        run.BufferedTerminal <- None
+                        run.BufferedWorkRecord <- None
+                        pendingRuns.Remove run.AgentId |> ignore
+                        Some(outcome, bufferedWork, run.Subscription)
+                    | None ->
+                        run.Ready <- true
+                        None
+                | _ -> None)
+
+        match flush with
+        | Some(outcome, bufferedWork, subscription) ->
+            // Prefer the work record captured with the terminal; fall back to markReady's.
+            let wr =
+                match bufferedWork with
+                | Some _ as w -> w
+                | None -> workRecord
+
+            deliverCompletion journal parentId run outcome wr subscription
+        | None -> ()

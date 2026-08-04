@@ -74,3 +74,4 @@ module PluginHostInterop =
             snapshot
             cancelSignals
             eventPort
+            (Some(scope :> IParkedTransformHost))

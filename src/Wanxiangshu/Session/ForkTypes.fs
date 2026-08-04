@@ -42,6 +42,10 @@ type ForkError =
     | NothingToJoin
     | Cancelled
     | NotFound of agentId: string
+    /// Join budget exhausted; durable projection still had no joinable handle.
+    | TimedOut
+    /// Child appeared idle/terminal on the wire but handle materialization failed.
+    | TerminalMaterializationFailed of agentId: string
 
 type PtyRecord =
     { PtyId: string

@@ -190,9 +190,17 @@ test('C0_park_only_after_KnownCommitted', () => {
   const park = host.indexOf('ParkTransform', notCommitted)
   assert.ok(notCommitted >= 0 && park > notCommitted, 'ParkTransform must follow not-committed gate')
   const between = host.slice(notCommitted, park)
-  assert.match(between, /return rawMessages|return \[\]/,
-    'not-committed path must return before ParkTransform')
+  // Empty list is forbidden: Host blanks provider messages → 400 → tool loop.
+  assert.doesNotMatch(between, /return \[\]/,
+    'not-committed path must never return [] (blanks Host transcript)')
+  assert.match(between, /return project |return stop |return resumeCatchUp/,
+    'not-committed path must return ContinuationOutcome before ParkTransform')
   assert.match(host, /KnownCommitted/, 'KnownCommitted is the only park-enabling commit outcome')
+  // Whole file: no bare empty-list quiet-stop (StopPhysicalRun replaces it).
+  assert.doesNotMatch(host, /^\s*return \[\]\s*$/m,
+    'EnforcerHost must not return [] as quiet stop')
+  assert.match(host, /ContinuationOutcome|StopPhysicalRun/,
+    'continuation must express stop vs project explicitly')
 })
 
 test('C0_commit_drains_via_tryRefresh_before_park', () => {

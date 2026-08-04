@@ -212,11 +212,33 @@ const historicalTail = (...steps) => {
   return toList(msgs)
 }
 
-const hasRepairMessage = (messages) =>
-  listItems(messages).some((msg) => {
+/** handleContinuation returns ContinuationOutcome, never a bare message list. */
+const outcomeTag = (outcome) => caseOf(outcome)
+
+const messagesOf = (outcome) => {
+  const tag = outcomeTag(outcome)
+  if (tag === 'ProjectMessages' || tag === 'StopPhysicalRun') {
+    return listItems(outcome.fields[0])
+  }
+  throw new Error(`unexpected ContinuationOutcome '${tag}'`)
+}
+
+const stopReasonOf = (outcome) => {
+  assert.equal(outcomeTag(outcome), 'StopPhysicalRun', 'expected StopPhysicalRun')
+  return outcome.fields[1]
+}
+
+const hasRepairMessage = (outcome) =>
+  messagesOf(outcome).some((msg) => {
     const text = msg?.parts?.[0]?.text ?? ''
     return text.includes('Protocol repair') || text === RepairInstruction
   })
+
+const assertNonEmptyMessages = (outcome, label = 'messages') => {
+  const msgs = messagesOf(outcome)
+  assert.ok(msgs.length > 0, `${label} must be non-empty (empty blanks Host transcript)`)
+  return msgs
+}
 
 const runtimeTag = (scope) => caseOf(scope.GetBloggerRuntime(BLOG).State)
 const repairSpent = (scope) => scope.GetBloggerRuntime(BLOG).RepairSpent
@@ -237,6 +259,42 @@ test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
   const ok = BlogTool.tryCanonicalText('  work log  ')
   assert.equal(caseOf(ok), 'Ok')
   assert.equal(ok.fields[0], 'work log')
+})
+
+test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
+  // Request-scoped capability: Role=Blogger alone is insufficient.
+  assert.equal(typeof BlogTool.NoLiveCycleError, 'string')
+  assert.match(BlogTool.NoLiveCycleError, /no live CurrentRequest|not InFlight/i)
+
+  // Fable option: None ≈ null/undefined; Some host ≈ host reference.
+  assert.equal(BlogTool.hasLiveCycle(null, BLOG), false)
+  assert.equal(BlogTool.hasLiveCycle(undefined, BLOG), false)
+
+  await withHarness(async ({ scope }) => {
+    parkedTransform.clearCurrentRequest(scope, BLOG)
+    parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
+    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), false, 'Idle without CurrentRequest')
+
+    // withHarness starts InFlight + CurrentRequest before fn; re-arm.
+    const toml = 'work'
+    const ctx = bloggerRequestContext.main({
+      requestId: 'req-live-gate',
+      mainSession: MAIN,
+      bloggerSession: BLOG,
+      toml,
+      previousIngested: 0,
+      nextIngested: 1,
+      previousCutoff: 0,
+      nextCutoff: 1,
+      nextDigest: 'd1',
+      deltaDigest: digestForToml(toml),
+    })
+    const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx)
+    assert.equal(started.ok, true)
+    parkedTransform.setRuntime(scope, BLOG, started.state)
+    parkedTransform.setCurrentRequest(scope, BLOG, ctx)
+    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), true, 'InFlight CurrentRequest authorises blog')
+  })
 })
 
 // ── empty text cycle → real one-shot InteractionRepair (live tool-loop) ─────
@@ -350,8 +408,9 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
     assert.equal(runtimeTag(scope), 'InFlight', 'keep live request; session content remains')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 0)
+    assert.equal(outcomeTag(out), 'ProjectMessages')
     assert.equal(
-      listItems(out).some((m) => m?.info?.source === 'interaction-repair'),
+      messagesOf(out).some((m) => m?.info?.source === 'interaction-repair'),
       false,
     )
   })
@@ -506,6 +565,10 @@ test('ENFORCER_host_completed_blog_with_live_request_commits_and_advances_covera
 
     assert.equal(fatals.length, 0, JSON.stringify(fatals))
     assert.equal(hasRepairMessage(out), false)
+    // ParkTransform=false → catch-up complete → StopPhysicalRun, never [].
+    assert.equal(outcomeTag(out), 'StopPhysicalRun')
+    assertNonEmptyMessages(out, 'owned commit after park end')
+    assert.match(String(stopReasonOf(out)), /park-ended|catch-up|sealed/)
 
     const snap = AgentJournalModule_snapshot(journal)
     const session = fold.session(snap, MAIN)
@@ -528,7 +591,7 @@ test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', asy
     parkedTransform.clearCurrentRequest(scope, BLOG)
     parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
 
-    await handleContinuation(
+    const out = await handleContinuation(
       scope,
       journal,
       blog,
@@ -536,6 +599,11 @@ test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', asy
     )
 
     assert.equal(fatals.length, 0)
+    // Unowned completed blog must StopPhysicalRun — not silent ProjectMessages that
+    // feed the Host tool-call loop forever.
+    assert.equal(outcomeTag(out), 'StopPhysicalRun')
+    assertNonEmptyMessages(out, 'unowned completed blog stop payload')
+    assert.match(String(stopReasonOf(out)), /unowned-completed-blog/)
     const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
     assert.equal(session?.Blog, undefined, 'unowned completed blog must not invent BlogEntryCommitted')
     assert.equal(runtimeTag(scope), 'Idle')

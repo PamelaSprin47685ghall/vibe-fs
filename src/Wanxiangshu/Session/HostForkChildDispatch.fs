@@ -93,7 +93,8 @@ module HostForkChildDispatch =
 
                     return Error "Fork runtime is cancelled"
                 | _ ->
-                    HostForkRunLifecycle.markReady gate run
+                    HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
+
                     let payload = Option.defaultValue prompt enrichedPrompt
                     let! sent = sendChildPrompt agentId childId role agent payload
 

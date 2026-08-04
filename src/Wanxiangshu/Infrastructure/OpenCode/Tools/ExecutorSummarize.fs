@@ -41,6 +41,11 @@ module ExecutorSummarize =
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAborted payload -> raise (InvalidOperationException payload.Message)
 
+    /// Per-chunk join budget. Prevents a single hung summarizer from blocking the
+    /// whole map/reduce forever (Part 1: unblock; Part 2 owns richer partial text).
+    [<Literal>]
+    let AwaitAgentTimeoutMs = 600_000
+
     let awaitAgent (runtime: IExecutorRuntime) (agentId: string) (stash: Dictionary<string, RunCompletion>) =
         task {
             let fromStash =
@@ -56,18 +61,44 @@ module ExecutorSummarize =
             | None ->
                 let mutable result: RunCompletion = Unchecked.defaultof<_>
                 let mutable done' = false
+                let mutable remainingMs = AwaitAgentTimeoutMs
 
                 while not done' do
-                    let! joined = runtime.Join()
+                    if remainingMs <= 0 then
+                        result <-
+                            raise (
+                                InvalidOperationException(
+                                    sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                                )
+                            )
 
-                    match joined with
-                    | Error error ->
-                        result <- raise (InvalidOperationException(error.ToString()))
                         done' <- true
-                    | Ok completion when completion.AgentId = agentId ->
-                        result <- completion
-                        done' <- true
-                    | Ok completion -> lock stash (fun () -> stash.[completion.AgentId] <- completion)
+                    else
+                        let started = DateTimeOffset.UtcNow
+                        let! joined = runtime.Join(Some remainingMs)
+
+                        match joined with
+                        | Error ForkError.TimedOut ->
+                            result <-
+                                raise (
+                                    InvalidOperationException(
+                                        sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                                    )
+                                )
+
+                            done' <- true
+                        | Error error ->
+                            result <- raise (InvalidOperationException(error.ToString()))
+                            done' <- true
+                        | Ok completion when completion.AgentId = agentId ->
+                            result <- completion
+                            done' <- true
+                        | Ok completion ->
+                            lock stash (fun () -> stash.[completion.AgentId] <- completion)
+
+                            let elapsed = int (DateTimeOffset.UtcNow - started).TotalMilliseconds
+
+                            remainingMs <- max 0 (remainingMs - max 0 elapsed)
 
                 return result
         }

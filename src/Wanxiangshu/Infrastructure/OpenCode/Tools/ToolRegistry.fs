@@ -30,6 +30,7 @@ module ToolRegistry =
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
+        (parkedHost: IParkedTransformHost option)
         =
         let factory = ToolHostCodec.factory toolModule
 
@@ -62,7 +63,8 @@ module ToolRegistry =
               InspectorTool.spec factory runtime
               CoderTool.spec factory runtime
               // ENFORCER-010: Blogger's tool set is exactly { blog }.
-              BlogTool.spec factory runtime ]
+              // parkedHost gates request-scoped execute (CurrentRequest ∧ InFlight).
+              BlogTool.spec factory runtime parkedHost ]
 
         let rolePredicate spec =
             match spec.Name with

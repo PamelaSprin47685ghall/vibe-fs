@@ -7,14 +7,20 @@ open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 
 type PendingHostRun =
-    { Token: obj
-      AgentId: string
-      ChildId: SessionId
-      Role: AgentRole
-      Source: TaskCompletionSource<AgentCompletionOutcome>
-      mutable Subscription: IDisposable option
-      mutable Ready: bool
-      mutable Finished: bool }
+    {
+        Token: obj
+        AgentId: string
+        ChildId: SessionId
+        Role: AgentRole
+        Source: TaskCompletionSource<AgentCompletionOutcome>
+        mutable Subscription: IDisposable option
+        mutable Ready: bool
+        mutable Finished: bool
+        /// Terminal that arrived before Ready. Flushed by markReady; never dropped.
+        mutable BufferedTerminal: TerminalOutcome option
+        /// Work record paired with BufferedTerminal (LWR at complete time).
+        mutable BufferedWorkRecord: string option
+    }
 
 module HostPendingRun =
     let completionSource () =
