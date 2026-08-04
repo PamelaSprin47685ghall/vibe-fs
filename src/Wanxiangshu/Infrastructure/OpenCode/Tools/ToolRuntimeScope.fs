@@ -79,7 +79,7 @@ type ToolRuntimeScope
             cancelSignals = onCancelSignals,
             // REVIEW-007: this runtime is a Manager's own fork surface, so a
             // Reviewer it forks gets its barrier opened here (see
-             // `HostForkAgent.Fork`). The Orchestrator's runtime keeps this
+            // `HostForkAgent.Fork`). The Orchestrator's runtime keeps this
             // off; ORCH-006 opens barriers at the reverify site.
             openReviewBarrier = true,
             treeHashFor =
