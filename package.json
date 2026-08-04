@@ -45,27 +45,21 @@
     "check": "npm run gate:static && npm run build && npm test && npm run test:harness",
     "check:release": "npm run check && npm run test:e2e:three && npm pack --dry-run"
   },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.17.4"
+  },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.5.1",
-    "@modelcontextprotocol/sdk": "^1.10.2",
-    "@opencode-ai/plugin": "^1.17.4",
     "bun-pty": "^0.4.8",
-    "opencode-pty": "^0.3.4",
-    "proper-lockfile": "^4.1.2",
-    "smol-toml": "1.7.0",
-    "yaml": "^2.9.0"
+    "proper-lockfile": "^4.1.2"
   },
   "overrides": {
     "bun-pty": "$bun-pty"
   },
   "devDependencies": {
-    "eventsource": "^3.0.7"
-  },
-  "optionalDependencies": {
-    "@kreuzberg/tree-sitter-language-pack": "^1.8.1",
-    "es-module-lexer": "^2.1.0",
-    "highlight.js": "^11.11.1",
-    "tsx": "^4.22.4"
+    "@opencode-ai/plugin": "^1.17.4",
+    "eventsource": "^3.0.7",
+    "smol-toml": "1.7.0"
   },
   "directories": {
     "doc": "docs"
