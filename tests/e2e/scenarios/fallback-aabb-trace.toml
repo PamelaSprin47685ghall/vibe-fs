@@ -302,10 +302,23 @@ user = "# Write the dense work-log continuation now"
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", "enf-primitive-obsessin" = 7 } }
 
+[[turn]]
+id = "repair"
+internal = true
+user = "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
+
+  [[turn.step]]
+  respond = { type = "text", text = "repair unreachable: consumed by recovery" }
+
 [[epoch]]
 turn = "continue"
 step = 0
 reason = "prefix-probe"
+
+[[epoch]]
+turn = "repair"
+step = 0
+reason = "frame-commit"
 
 [[epoch]]
 turn = "blogger"

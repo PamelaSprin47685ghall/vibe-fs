@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Agent
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Process
 
 /// Runtime for managing child agent runs and PTY sessions.
 ///
@@ -210,17 +211,38 @@ type ForkRuntime
         lock lockObj (fun () -> agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
 
     /// Internal targeted completion handle. Model-visible join remains join-any.
-    member _.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =
+    /// Optional timeoutMs races the completion cell via PtyTiming.raceExit.
+    member _.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
         let completion =
             lock lockObj (fun () -> agents |> Map.tryFind agentId |> Option.map (fun run -> run.Completion.Await))
 
         match completion with
         | None -> Task.FromResult(Error(sprintf "Unknown agent id: %s" agentId))
         | Some pending ->
-            task {
-                let! value = pending
-                return Ok value
-            }
+            match timeoutMs with
+            | None ->
+                task {
+                    let! value = pending
+                    return Ok value
+                }
+            | Some ms when ms <= 0 -> Task.FromResult(Error(sprintf "await agent timed out: %s" agentId))
+            | Some ms ->
+                task {
+                    let! completedFirst = PtyTiming.raceExit (pending :> Task) ms
+
+                    if completedFirst then
+                        let! value = pending
+                        return Ok value
+                    else
+                        return Error(sprintf "await agent timed out: %s" agentId)
+                }
+
+    /// Cancel one agent run without tearing down the whole runtime mailbox.
+    member _.CancelAgent(agentId: string) : unit =
+        lock lockObj (fun () ->
+            match agents |> Map.tryFind agentId with
+            | Some run -> ChildRun.cancel run
+            | None -> ())
 
     // -----------------------------------------------------------------------
     // Public API — List

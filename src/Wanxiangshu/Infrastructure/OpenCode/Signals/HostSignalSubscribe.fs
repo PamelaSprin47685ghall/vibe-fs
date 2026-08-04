@@ -61,15 +61,28 @@ module HostSignalSubscribe =
                         """
                         ((globalApi, options, onEvent, abortCtrl) => {
                           (async () => {
-                            try {
-                              const result = await globalApi.event(options);
-                              const stream = result && result.stream ? result.stream : result;
-                              if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') return;
-                              for await (const data of stream) {
-                                if (abortCtrl.signal.aborted) break;
-                                onEvent(data);
+                            let attempt = 0;
+                            while (!abortCtrl.signal.aborted) {
+                              try {
+                                const result = await globalApi.event(options);
+                                const stream = result && result.stream ? result.stream : result;
+                                if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+                                  console.info('OPENCODE-SIGNAL-SSE', 'stream unavailable');
+                                } else {
+                                  for await (const data of stream) {
+                                    if (abortCtrl.signal.aborted) break;
+                                    onEvent(data);
+                                  }
+                                  console.info('OPENCODE-SIGNAL-SSE', 'stream ended normally');
+                                }
+                              } catch (err) {
+                                console.info('OPENCODE-SIGNAL-SSE', 'stream ended or failed: ' + (err && err.message ? err.message : String(err)));
                               }
-                            } catch (_) {}
+                              if (abortCtrl.signal.aborted) break;
+                              const delay = Math.min(1000 * 2 ** attempt, 10000);
+                              await new Promise(r => setTimeout(r, delay));
+                              attempt++;
+                            }
                           })();
                         })($0, $1, $2, $3)
                         """

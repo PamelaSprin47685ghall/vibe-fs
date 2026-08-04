@@ -138,6 +138,10 @@ const [
   HostForkRunLifecycleModule,
   HostPendingRunModule,
   EventsModule,
+  ReconcileSupervisorModule,
+  TurnBindingModule,
+  ForkRuntimeModule,
+  ForkTypesModule,
 ] = await Promise.all([
   prod('Kernel/Identity'),
   prod('Kernel/Roles'),
@@ -225,6 +229,10 @@ const [
   prod('Session/HostForkRunLifecycle'),
   prod('Session/HostPendingRun'),
   prod('Infrastructure/OpenCode/Host/Events'),
+  prod('Application/Reconciliation/ReconcileSupervisor'),
+  prod('Application/Reconciliation/TurnBinding'),
+  prod('Session/ForkRuntime'),
+  prod('Session/ForkTypes'),
 ])
     
 
@@ -2828,6 +2836,188 @@ export const hostEventPort = (() => {
     /** Failed outcome — enough for sticky/replay tests (no ProviderRun dual-instance dedupe). */
     failed: (error = 'test-fail') => new TerminalOutcome(2, [error]),
     aborted: (reason = 'test-abort') => new TerminalOutcome(1, [reason]),
+    /** Production sticky terminal capacity (Events.fs stickyCap). */
+    stickyCap: 256,
+  }
+})()
+
+/**
+ * ReconcileSupervisor: per-session single-flight reconcile with HOST-004 causal
+ * reread budget. Snapshot Error does not consume attempt; errorCount is separate.
+ */
+export const reconcileSupervisor = (() => {
+  const Supervisor = ReconcileSupervisorModule.Supervisor
+  if (Supervisor === undefined) {
+    throw new Error('ReconcileSupervisor.Supervisor missing')
+  }
+  const Store = TurnBindingModule.Store
+  if (Store === undefined) {
+    throw new Error('TurnBinding.Store missing')
+  }
+  const SessionMessage = SessionSnapshotPortModule.SessionMessage
+  if (SessionMessage === undefined) {
+    throw new Error('SessionSnapshotPort.SessionMessage missing')
+  }
+  const MessagePart = HostMessageCodecModule.MessagePart
+  if (MessagePart === undefined) {
+    throw new Error('HostMessageCodec.MessagePart missing')
+  }
+
+  const kickFn = fableInstanceMethod(ReconcileSupervisorModule, 'Supervisor', 'Kick')
+  const bindUserFn = fableInstanceMethod(ReconcileSupervisorModule, 'Supervisor', 'BindUserMessage')
+
+  const textPart = (text) => new MessagePart(0, [text])
+
+  const message = ({
+    id,
+    role,
+    finish = undefined,
+    errorName = undefined,
+    completed = false,
+    parts = [],
+    agent = undefined,
+    parentId = undefined,
+  }) =>
+    new SessionMessage(
+      id,
+      role,
+      agent,
+      finish,
+      errorName,
+      undefined,
+      parentId,
+      completed,
+      false,
+      undefined,
+      parts,
+    )
+
+  return {
+    createStore: () => new Store(),
+    /**
+     * `reads` is a queue of Result shapes: `{ ok: true, messages }` or `{ ok: false, error }`.
+     * Each GetMessages call consumes one entry (last entry repeats if exhausted).
+     */
+    createSnapshot: (reads) => {
+      const queue = [...reads]
+      let last = queue[queue.length - 1]
+      return {
+        GetMessages(_sessionId) {
+          const next = queue.length > 0 ? queue.shift() : last
+          last = next
+          if (next.ok) {
+            return Promise.resolve(okResult(toList(next.messages)))
+          }
+          return Promise.resolve(errorResult(next.error ?? 'snapshot-error'))
+        },
+      }
+    },
+    message,
+    textPart,
+    /** Terminal assistant turn: finish=stop + formal text (TurnCompleted). */
+    terminalTranscript: (userId = 'user-1', assistantId = 'asst-1') => [
+      message({ id: userId, role: 'user', completed: true, parts: [textPart('assignment')] }),
+      message({
+        id: assistantId,
+        role: 'assistant',
+        finish: 'stop',
+        completed: true,
+        parentId: userId,
+        parts: [textPart('done')],
+      }),
+    ],
+    create: ({ snapshot, binding, onTurn, onDeleted, projection, onSnapshot } = {}) => {
+      if (snapshot === undefined || binding === undefined || onTurn === undefined) {
+        throw new Error('reconcileSupervisor.create requires snapshot, binding, onTurn')
+      }
+      return new Supervisor(snapshot, binding, onTurn, onDeleted, projection, onSnapshot)
+    },
+    bindUserMessage: (supervisor, session, physical, agentRole) =>
+      bindUserFn(supervisor, session, physical, agentRole),
+    kick: (supervisor, session) => kickFn(supervisor, session),
+  }
+})()
+
+/** ForkRuntime: AwaitAgent deadline + CancelAgent surface. */
+export const forkRuntime = (() => {
+  const Runtime = ForkRuntimeModule.ForkRuntime
+  if (Runtime === undefined) {
+    throw new Error('Session/ForkRuntime did not export ForkRuntime')
+  }
+  const AgentRole = ForkTypesModule.AgentRole
+  if (AgentRole === undefined) {
+    throw new Error('Session/ForkTypes.AgentRole missing')
+  }
+
+  const forkFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'Fork')
+  const awaitFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'AwaitAgent')
+  const cancelFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'CancelAgent')
+  const joinFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'Join')
+
+  const roleOf = (name) => {
+    const value = AgentRole[name]
+    if (value === undefined) throw new Error(`unknown AgentRole '${name}'`)
+    return value
+  }
+
+  return {
+    role: roleOf,
+    /**
+     * `runner` is uncurried `(agentId, role, prompt) => Promise<AgentCompletionOutcome>`.
+     * Omit for default instant-ok runner.
+     */
+    create: (runner) => new Runtime(runner, undefined, undefined, true),
+    fork: (rt, agentId, role, agentName, prompt) => forkFn(rt, agentId, role, agentName, prompt, undefined),
+    awaitAgent: (rt, agentId, timeoutMs) => awaitFn(rt, agentId, timeoutMs),
+    cancelAgent: (rt, agentId) => cancelFn(rt, agentId),
+    join: (rt, timeoutMs) => joinFn(rt, timeoutMs),
+  }
+})()
+
+/**
+ * ExecutorSummarize map/reduce: summarizeSpool cancels owned children on failure.
+ * Fake IExecutorRuntime: Fork / Join / CancelAgent.
+ */
+export const executorSummarizeRuntime = (() => {
+  const summarizeSpool = member(ExecutorSummarize, 'ExecutorSummarize', 'summarizeSpool')
+  const ForkResult = ForkTypesModule.ForkResult
+  const ForkError = ForkTypesModule.ForkError
+  if (ForkResult === undefined || ForkError === undefined) {
+    throw new Error('ForkTypes ForkResult/ForkError missing')
+  }
+
+  return {
+    summarizeSpool: (runtime, spoolPath) => summarizeSpool(runtime, spoolPath),
+    /** Ok(ForkResult.Created agentId) */
+    forkOk: (agentId) => okResult(new ForkResult(0, [agentId])),
+    timedOut: () => errorResult(ForkError.TimedOut),
+    /**
+     * Fake IExecutorRuntime. `join` returns a Promise of Result each call.
+     * Default Join → TimedOut so awaitAgent fails after fork.
+     */
+    fake: ({ fork, join, cancel } = {}) => {
+      const cancelled = []
+      const runtime = {
+        Fork: (agentId, _role, _prompt, _payload) =>
+          Promise.resolve(typeof fork === 'function' ? fork(agentId) : okResult(new ForkResult(0, [agentId]))),
+        Join: (timeoutMs) =>
+          Promise.resolve(typeof join === 'function' ? join(timeoutMs) : errorResult(ForkError.TimedOut)),
+        CancelAgent: (agentId) => {
+          cancelled.push(agentId)
+          if (typeof cancel === 'function') cancel(agentId)
+        },
+      }
+      return { runtime, cancelled }
+    },
+  }
+})()
+
+/** Structural markers for HostSignalSubscribe reconnect loop (emitJsExpr body). */
+export const hostSignalSubscribe = (() => {
+  const sourcePath = join(BUILD_ROOT, 'Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
+  return {
+    source: () => readFileSync(sourcePath, 'utf8'),
+    reconnectMarkers: ['2 **', '10000', 'stream ended normally'],
   }
 })()
 

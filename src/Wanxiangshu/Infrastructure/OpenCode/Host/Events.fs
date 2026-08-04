@@ -35,8 +35,12 @@ module Events =
         /// already-derived TerminalOutcome for wake/delivery reliability only —
         /// not a second derivation of business facts. Late SubscribeTerminalListener
         /// replays so InstallRun after Notify never loses completion.
-        let stickyTerminal =
-            System.Collections.Generic.Dictionary<string, TerminalOutcome>()
+        ///
+        /// Cap 256 sessions by insert order: duplicate writes update the value
+        /// without re-enqueue so the queue cannot grow unbounded on churn.
+        let stickyTerminal = Dictionary<string, TerminalOutcome>()
+        let stickyOrder = Queue<string>()
+        let stickyCap = 256
 
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
@@ -97,7 +101,17 @@ module Events =
                 if not (this.IsCompletedDuplicate(sessionId, outcome)) then
                     let hasListeners =
                         lock lockObj (fun () ->
-                            stickyTerminal.[SessionId.value sessionId] <- outcome
+                            let key = SessionId.value sessionId
+                            let isNew = not (stickyTerminal.ContainsKey key)
+                            stickyTerminal.[key] <- outcome
+
+                            if isNew then
+                                stickyOrder.Enqueue key
+
+                                while stickyOrder.Count > stickyCap do
+                                    let evicted = stickyOrder.Dequeue()
+                                    stickyTerminal.Remove(evicted) |> ignore
+
                             listeners.Count > 0)
 
                     notify sessionId outcome

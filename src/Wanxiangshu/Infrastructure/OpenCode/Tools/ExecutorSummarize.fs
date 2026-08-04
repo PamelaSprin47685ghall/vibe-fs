@@ -106,6 +106,7 @@ module ExecutorSummarize =
     let runExecutorPrompt
         (runtime: IExecutorRuntime)
         (stash: Dictionary<string, RunCompletion>)
+        (forkedIds: ResizeArray<string>)
         (processId: string)
         (level: int)
         (startChunk: int)
@@ -115,6 +116,8 @@ module ExecutorSummarize =
         =
         task {
             let id = agentId processId level startChunk endChunk
+            // Track before fork so sibling cancel covers in-flight map/reduce agents.
+            forkedIds.Add id
             let! fork = runtime.Fork(id, AgentRole.Executor, prompt, payload)
 
             match fork with
@@ -127,6 +130,7 @@ module ExecutorSummarize =
     let summarizeChunk
         (runtime: IExecutorRuntime)
         (stash: Dictionary<string, RunCompletion>)
+        (forkedIds: ResizeArray<string>)
         (spoolPath: string)
         (chunk: byte[])
         (index: int)
@@ -137,11 +141,12 @@ module ExecutorSummarize =
 
         let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
-        runExecutorPrompt runtime stash rootDigest 0 index index prompt (Some content)
+        runExecutorPrompt runtime stash forkedIds rootDigest 0 index index prompt (Some content)
 
     let reduceBatch
         (runtime: IExecutorRuntime)
         (stash: Dictionary<string, RunCompletion>)
+        (forkedIds: ResizeArray<string>)
         (level: int)
         (batch: string list)
         =
@@ -151,7 +156,7 @@ module ExecutorSummarize =
 
         let batchDigest = HostDigest.sha256Hex (String.concat "\n" batch)
 
-        runExecutorPrompt runtime stash batchDigest level 0 (List.length batch - 1) prompt (Some combined)
+        runExecutorPrompt runtime stash forkedIds batchDigest level 0 (List.length batch - 1) prompt (Some combined)
 
     let private rippleInsert
         (reduceBatch: int -> string list -> Task<string>)
@@ -218,6 +223,12 @@ module ExecutorSummarize =
     let summarizeSpool (runtime: IExecutorRuntime) (spoolPath: string) =
         task {
             let stash = Dictionary<string, RunCompletion>()
+            let forkedIds = ResizeArray<string>()
+
+            let cancelOwned () =
+                for id in forkedIds do
+                    runtime.CancelAgent id
+
             let chunks = ResizeArray<int * byte[]>()
             let mutable index = 0
 
@@ -233,7 +244,7 @@ module ExecutorSummarize =
                 [| for (chunkIndex, chunk) in chunks do
                        task {
                            try
-                               let! summary = summarizeChunk runtime stash spoolPath chunk chunkIndex
+                               let! summary = summarizeChunk runtime stash forkedIds spoolPath chunk chunkIndex
                                return Choice1Of2(chunkIndex, summary)
                            with ex ->
                                return Choice2Of2(chunkIndex, chunk, ex.Message)
@@ -244,6 +255,10 @@ module ExecutorSummarize =
             for i in 0 .. mapTasks.Length - 1 do
                 let! result = mapTasks.[i]
                 mapped.[i] <- result
+
+                match result with
+                | Choice2Of2 _ -> cancelOwned ()
+                | Choice1Of2 _ -> ()
 
             let successes =
                 mapped
@@ -259,16 +274,19 @@ module ExecutorSummarize =
                     | Choice1Of2 _ -> None)
 
             let levels = ResizeArray<ResizeArray<string>>()
+            let reduce = reduceBatch runtime stash forkedIds
 
             try
                 for _, summary in successes do
-                    do! rippleInsert (reduceBatch runtime stash) levels summary
+                    do! rippleInsert reduce levels summary
 
-                let! reduced = foldLevels (reduceBatch runtime stash) levels
+                let! reduced = foldLevels reduce levels
 
                 if failures.Length = 0 then
                     return reduced
                 else
+                    cancelOwned ()
+
                     let lastChunk =
                         if chunks.Count = 0 then
                             [||]
@@ -283,6 +301,8 @@ module ExecutorSummarize =
                         return
                             sprintf "%s\n--- partial: map/reduce incomplete ---\n--- raw tail ---\n%s" reduced rawTail
             with ex ->
+                cancelOwned ()
+
                 let lastChunk =
                     if chunks.Count = 0 then
                         [||]

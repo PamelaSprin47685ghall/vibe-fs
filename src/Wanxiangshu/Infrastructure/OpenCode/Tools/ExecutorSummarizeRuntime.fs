@@ -12,6 +12,8 @@ module ExecutorSummarizeRuntime =
         abstract Fork: string * AgentRole * string * string option -> Task<Result<ForkResult, string>>
         /// timeoutMs: None = HostForkRuntime.DefaultJoinTimeoutMs semantics via runtime.Join().
         abstract Join: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
+        /// Cancel one owned map/reduce agent without tearing down the runtime.
+        abstract CancelAgent: agentId: string -> unit
 
     /// AGENT-008: the Executor is internal, so its managed name is fixed here
     /// rather than chosen by a caller. This is the one legitimate place a name is
@@ -26,7 +28,9 @@ module ExecutorSummarizeRuntime =
             member _.Join(timeoutMs) =
                 match timeoutMs with
                 | Some ms -> runtime.Join(timeoutMs = ms)
-                | None -> runtime.Join() }
+                | None -> runtime.Join()
+
+            member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }
 
     let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
@@ -41,4 +45,6 @@ module ExecutorSummarizeRuntime =
             member _.Join(timeoutMs) =
                 match timeoutMs with
                 | Some ms -> runtime.Join(timeoutMs = ms)
-                | None -> runtime.Join() }
+                | None -> runtime.Join()
+
+            member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }

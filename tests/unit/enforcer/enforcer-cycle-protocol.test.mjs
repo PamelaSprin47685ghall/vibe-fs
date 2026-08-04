@@ -446,16 +446,42 @@ test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', asy
   })
 })
 
-test('ENFORCER_060_completed_prose_without_inflight_is_best_effort_no_repair', async () => {
+test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () => {
   await withHarness(async ({ journal, scope, blog, fatals }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(runtimeTag(scope), 'Idle')
 
     const out = await handleContinuation(scope, journal, blog, pureProse('asst-orphan', 'old prose'))
 
+    // No live cycle → stop physical run; never inject Protocol repair (tool-loop bug closed).
     assert.equal(hasRepairMessage(out), false)
+    assert.equal(outcomeTag(out), 'StopPhysicalRun')
+    assertNonEmptyMessages(out, 'unowned completed prose stop payload')
+    assert.match(String(stopReasonOf(out)), /unowned/)
     assert.equal(repairSpent(scope), false)
     assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(fatals.length, 0)
+  })
+})
+
+test('ENFORCER_060_interrupted_blog_without_live_request_stops_no_repair', async () => {
+  await withHarness(async ({ journal, scope, blog, fatals }) => {
+    // P0 AbortSession residue: interrupted blog parts remain after stop, but CurrentRequest
+    // is gone. Must not re-derive durable open and inject # Protocol repair.
+    parkedTransform.clearCurrentRequest(scope, BLOG)
+    assert.equal(runtimeTag(scope), 'Idle')
+
+    const out = await handleContinuation(
+      scope,
+      journal,
+      blog,
+      interruptedBlog('asst-orphan-killed', 'hang'),
+    )
+
+    assert.equal(hasRepairMessage(out), false)
+    assert.equal(outcomeTag(out), 'StopPhysicalRun')
+    assertNonEmptyMessages(out, 'unowned interrupted blog stop payload')
+    assert.match(String(stopReasonOf(out)), /unowned/)
     assert.equal(fatals.length, 0)
   })
 })

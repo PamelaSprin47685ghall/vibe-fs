@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -18,8 +19,14 @@ module ReconcileSupervisor =
         { mutable Dirty: bool
           mutable Running: bool }
 
-    [<Emit("Promise.resolve()")>]
-    let private causalYield: Task<unit> = jsNative
+    /// One real event-loop turn so snapshot I/O can materialize the transcript
+    /// (HOST-004 still caps at three causal attempts; this is only the yield).
+    /// Function form: a module-level Promise value would fire setTimeout once at load.
+    let private causalYield () : Task<unit> =
+        emitJsExpr () "new Promise(res => setTimeout(res, 0))"
+
+    [<Emit("console.error($0, $1)")>]
+    let private logError (prefix: string) (message: string) : unit = jsNative
 
     type Supervisor
         (
@@ -136,23 +143,35 @@ module ReconcileSupervisor =
                                 let! snapshotResult = snapshot.GetMessages sessionId
 
                                 match snapshotResult with
-                                | Error _ -> ()
+                                | Error err ->
+                                    logError "RECONCILE-SNAPSHOT" (sprintf "pass snapshot failed: %s" (string err))
                                 | Ok messages -> lastSnapshot <- Some messages
                             | Some activeRun ->
                                 let mutable continuationCandidate: ReconciledTurn option = None
                                 let mutable attempt = 0
+                                // Transient snapshot errors must not consume the HOST-004
+                                // causal reread budget. Cap consecutive errors separately.
+                                let mutable errorCount = 0
 
                                 while attempt < 3 && turnFound.IsNone do
                                     if isCleared sessionId then
                                         attempt <- 3
                                     else
-                                        attempt <- attempt + 1
-
                                         let! snapshotResult = snapshot.GetMessages sessionId
 
                                         match snapshotResult with
-                                        | Error _ -> ()
+                                        | Error err ->
+                                            logError
+                                                "RECONCILE-SNAPSHOT"
+                                                (sprintf "attempt snapshot failed: %s" (string err))
+
+                                            errorCount <- errorCount + 1
+
+                                            if errorCount >= 3 then
+                                                attempt <- 3
                                         | Ok messages ->
+                                            errorCount <- 0
+                                            attempt <- attempt + 1
                                             lastSnapshot <- Some messages
 
                                             match TurnReconcile.reconcile messages activeRun with
@@ -180,7 +199,7 @@ module ReconcileSupervisor =
                                                     continuationCandidate <- None
 
                                         if attempt < 3 && turnFound.IsNone then
-                                            do! causalYield
+                                            do! causalYield ()
 
                                 if turnFound.IsNone then
                                     turnFound <- continuationCandidate

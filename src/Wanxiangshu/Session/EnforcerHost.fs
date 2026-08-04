@@ -1092,14 +1092,19 @@ module EnforcerHost =
                 // 2) abort cleanup: blog status=error+interrupted, assistant completed
                 //    → NOT pure prose; fail closed if still InFlight
                 // 3) outbound after prior success is non-empty extractCalls (other arm)
-                // 4) pure prose terminal (no blog parts at all) — ENFORCER-060 once
-                // 5) no live request — rebuild best-effort, never invent repair
+                // 4) pure prose terminal (no blog parts at all) — ENFORCER-060 once when live
+                // 5) no live request + interrupted/prose terminal → stop, never invent repair
                 let key = SessionId.value bloggerSessionId
 
                 let currentCtx =
                     match scope.TryPeekCurrentRequest key with
                     | Some c -> Some c
                     | None -> resolveCycleContext scope durable owner bloggerSessionId
+
+                // Repair injection requires LIVE InFlight authority only.
+                // Durable-re-derived currentCtx is for rebuild/fatal/abandon — never for aabbRepair.
+                // Abort residue (stop → Host interrupted blog) has no live cycle to repair.
+                let liveCtx = tryLiveCycleContext scope bloggerSessionId
 
                 let rebuild () =
                     match currentCtx with
@@ -1166,11 +1171,14 @@ module EnforcerHost =
                     return project rawMessages
                 elif hasFailedBlogAttempt rawMessages then
                     // Host cleanup after kill/abort: hanging blog → error+interrupted.
-                    match currentCtx with
+                    match liveCtx with
                     | Some ctx when not (scope.GetBloggerRuntime key).RepairSpent ->
                         return aabbRepair ctx "blog tool interrupted without completed call"
                     | Some _ -> return fatalEnd "blog tool interrupted; aabb exhausted"
-                    | None -> return project (rebuild ())
+                    | None ->
+                        // No live cycle: interrupted blog without authority is stop/abort residue,
+                        // not a repair opportunity. Stop, never inject # Protocol repair.
+                        return stop "unowned-interrupted-blog-without-CurrentRequest"
                 elif hasAnyBlogToolPart rawMessages then
                     return project (rebuild ())
                 elif not assistantCompleted then
@@ -1179,8 +1187,8 @@ module EnforcerHost =
                     // ENFORCER-060: completed assistant, zero blog parts → pure prose.
                     let cell = scope.GetBloggerRuntime key
 
-                    match currentCtx with
-                    | None -> return project (rebuild ())
+                    match liveCtx with
+                    | None -> return stop "unowned-completed-prose-without-CurrentRequest"
                     | Some ctx when not cell.RepairSpent ->
                         return aabbRepair ctx "no completed blog calls (ENFORCER-060)"
                     | Some _ -> return fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
@@ -1244,7 +1252,7 @@ module EnforcerHost =
                         scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
                         scope.TryTakePendingOffer key |> ignore
                         scope.CancelParked key
-                        stopPhysicalRun fallback rawMessages "main-sealed-blocks-request"
+                        stopPhysicalRun rawMessages fallback "main-sealed-blocks-request"
                     else
                         scope.TryTakePendingOffer key |> ignore
 
@@ -1275,7 +1283,7 @@ module EnforcerHost =
                                     | Error _ -> ()
                                 | _ -> ()
 
-                            stopPhysicalRun fallback rawMessages caughtUpReason
+                            stopPhysicalRun rawMessages fallback caughtUpReason
 
                 if alreadyEntry || alreadyReceipt then
                     // ENFORCER-154: same provider run already committed — drain remaining gap.

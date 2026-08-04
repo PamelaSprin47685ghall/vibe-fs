@@ -342,11 +342,43 @@ type HostForkRuntime
             return! loop budgetMs
         }
 
-    member this.AwaitAgent(agentId: string) : Task<Result<RunCompletion, string>> =
+    member this.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
         task {
             do! this.AwaitRecovery()
-            return! runtime.AwaitAgent agentId
+            return! runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
         }
+
+    /// Targeted cancel for one forked agent (Executor map/reduce sibling abort).
+    /// Completes the pending run cell and aborts the Host child so Join unblocks;
+    /// ForkRuntime CTS cancel alone cannot settle Source.Task.
+    member this.CancelAgent(agentId: string) : unit =
+        runtime.CancelAgent(agentId)
+
+        let pending, childId =
+            lock gate (fun () ->
+                let run =
+                    match pendingRuns.TryGetValue agentId with
+                    | true, r -> Some r
+                    | false, _ -> None
+
+                let child =
+                    match children.TryGetValue agentId with
+                    | true, id -> Some id
+                    | false, _ -> None
+
+                run, child)
+
+        match pending with
+        | Some run -> this.FailRun(run, "cancelled")
+        | None -> ()
+
+        match childId with
+        | Some id ->
+            sessions.AbortSession id
+            |> Async.AwaitTask
+            |> Async.Ignore
+            |> Async.StartImmediate
+        | None -> ()
 
     member _.List() = runtime.List()
 
