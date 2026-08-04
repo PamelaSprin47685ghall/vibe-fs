@@ -3,12 +3,8 @@
 
 # Generated output
 /artifacts/
-/build/
 /dist/
 /coverage/
-.fable/
-bin/
-obj/
 
 # Package output
 /*.tgz
@@ -24,11 +20,17 @@ obj/
 *.log
 npm-debug.log*
 
-# Editors and OS (minimal)
+# Editors and OS
+/.idea/
+/.vscode/
 .DS_Store
 Thumbs.db
 
-# Current runtime state
+# Local repository exports
+/repomix-output*.xml
+/repomix-output*.md
+
+# Runtime state
 /.wanxiangshu.ndjson
 /.wanxiangshu.ndjson.lock
 /.wanxiangshu-recovery/
