@@ -12,10 +12,10 @@ npm test
 ## Workflow
 
 ```text
-读条款 → 读 conformance → 读代码 → 改动 → lint → 最小测试 → 扩大范围
+读条款 → 读状态 → 读代码 → 改动 → lint → 最小测试 → 扩大范围
 ```
 
-- Spec: `spec/*.md` (clause IDs). Status only in `spec/conformance.toml`.
+- Spec: `spec/*.md` (clause IDs). Implementation status is not recorded in `spec/`.
 - Production source: `src/Wanxiangshu/` only.
 - Tests import `dist/`; never assert Fable private names outside `tests/unit/domain.mjs`.
 

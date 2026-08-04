@@ -1,14 +1,13 @@
-# Spec
+# Specification
 
-Binding product rules for Wanxiangshu. Clause IDs are the address system.
+spec/ contains the binding product contract.
 
-| Path | Role |
-|------|------|
-| `00.md` … `17.md`, `99.md` | Clause documents (active product contract) |
-| `conformance.toml` | Per-clause machine ledger (status, owners, tests) |
-| `conformance.md` | Generated table from the ledger (do not hand-edit) |
-| `coverage.toml` | Transitional id → tests map derived from the ledger |
+- Clause IDs are stable addresses.
+- 00.md is the navigation index.
+- 99.md is the glossary.
+- docs/rfcs contains non-binding future designs.
+- docs/decisions records accepted design decisions.
+- Tests refer to clauses directly in test names and assertions.
 
-`docs/rfcs/` holds approved-but-undelivered designs (Strength, Student&Teacher, Enforcer nudge). Those are not product contract.
-
-Status words (`CONFORMANT`, `PARTIAL`, …) belong only in the ledger, never in clause prose.
+spec/ does not track implementation status, commits, evidence paths,
+owners, milestones, or work progress.

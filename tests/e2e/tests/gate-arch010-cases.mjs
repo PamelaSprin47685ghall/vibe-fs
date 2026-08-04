@@ -152,7 +152,7 @@ export const arch010Cases = [
       // The case that makes the positive half mean something, and it exists because of a measured
       // near-miss: `ForkChildPayload.render` reads a plain JS array as an EMPTY F# list without
       // throwing, so a fixture passing `['Ship it.']` produced the NO-requirement payload. Every
-      // conformance assertion above still passed — over a shape the fixture did not intend.
+      // gate assertion above still passed — over a shape the fixture did not intend.
       //
       // So the fixtures are checked for the content they are supposed to carry. Without this, the
       // positive half could be validating four copies of the same document.

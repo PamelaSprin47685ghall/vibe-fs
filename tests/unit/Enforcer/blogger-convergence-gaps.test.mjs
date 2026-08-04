@@ -242,25 +242,3 @@ test('C0_adopted_blogger_motion_is_not_active_PENDING', () => {
     'ADOPTED motion must leave active PENDING/',
   )
 })
-
-test('C7_blogger_slice_conformance_rows_are_CONFORMANT', () => {
-  const conf = read('spec/conformance.md')
-  for (const clause of [
-    'COMPANION-005',
-    'COMPANION-008',
-    'CTX-006',
-    'CTX-007',
-    'CTX-012',
-  ]) {
-    const line = conf.split('\n').find((l) => l.includes(`${clause}:`) || l.startsWith(`| ${clause}`))
-    assert.ok(line, `missing conformance row for ${clause}`)
-    assert.match(
-      line,
-      /\| CONFORMANT \|/,
-      `${clause} must be CONFORMANT after layer-4 evidence:\n${line}`,
-    )
-  }
-  const enforcer = conf.split('\n').find((l) => l.startsWith('| ENFORCER-010'))
-  assert.ok(enforcer, 'missing ENFORCER-010 row')
-  assert.match(enforcer, /\| CONFORMANT \|/, `ENFORCER-010 must be CONFORMANT:\n${enforcer}`)
-})

@@ -10,13 +10,12 @@ Repository normalization: single package manifest, resources/ layout,
 spec/ clause docs, dist/ build output, unified tests/ tree, Wanxiangshu
 project rename (drop .Next), data-driven enforcer catalog.
 
-Implementation-status ledger lives under `spec/conformance.toml` /
-`spec/conformance.md` pending the next cleanup that removes those ledgers.
-Temporary status work files removed.
+Temporary status work files removed. Implementation-status ledgers retired
+from the repository surface (no longer tracked under `spec/`).
 
 ## 0.5.2 — 全 SSOT 收敛
 
-- 收敛目标：Active SSOT 全部 CONFORMANT；`spec/conformance.toml` 成为逐条款机器账本。
+- 收敛目标：Active 规范全部收敛。
 - 规范：spec/14 Strength、spec/16 Student&Teacher、ENFORCER nudge/throttle/规则目录迁出到 `RFC/`，spec/15 仅保留 0.5.1 已交付的 Blogger 工具化子集。
 - 版本：全仓文案从 `0.5.0-rc.1` / `0.5.1` 统一到 `0.5.2`。
 
@@ -46,7 +45,7 @@ Temporary status work files removed.
 - layer-4：`host-transform-capability-canary`（park/resume、第三 turn 单飞、materialize）
 - layer-4：`companion-canary`（同 child 两轮 blog tool）
 - 静态 `blogger-convergence` 防回退门禁
-- conformance：`COMPANION-005/008`、`CTX-006/007/012`、`ENFORCER-010` → CONFORMANT
+- 条款收敛：`COMPANION-005/008`、`CTX-006/007/012`、`ENFORCER-010`
 
 ## 0.5.0 — 正式版
 
@@ -59,7 +58,7 @@ Temporary status work files removed.
 - guard nudge seal 稳定性修复（ORCH-006/ARCH-004）：session worktree 目录绑定
 - 来源解析顺序（PROMPT-004/009）、发送格式（PROMPT-006）、fire-and-forget（PROMPT-007）
 - 工具权限双层 fail-closed（AGENT-007）
-- conformance 表 UNVERIFIED 清零（8 条批量段条款补第 1 层判据）
+- 未验证条款清零（8 条批量段条款补第 1 层判据）
 
 ## 0.5.0-rc.1 — docs freeze / RC development
 

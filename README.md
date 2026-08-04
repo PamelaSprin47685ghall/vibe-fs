@@ -74,7 +74,7 @@ journal 格式与事实名默认冻结；升级前请阅读 [CHANGELOG](CHANGELO
 ```text
 src/Wanxiangshu/   生产 F# 源码（唯一源码根）
 resources/         运行时静态资源（prompts、enforcer catalog）
-spec/              绑定规范 + conformance 账本
+spec/              绑定产品规范
 docs/              解释性文档、RFC、归档
 tests/unit/        第 1–3 层测试（mjs，import dist）
 tests/e2e/         OpenCode harness 与 canary
@@ -110,7 +110,7 @@ npm run lint           # Fantomas / XML 格式化（提交前）
 
 | 层 | 命令 | 含义 |
 |----|------|------|
-| 0 静态 | `npm run gate:static` | layout / ssot / conformance / architecture / … |
+| 0 静态 | `npm run gate:static` | layout / ssot / architecture / … |
 | 1–3 unit | `npm test` | 纯函数、契约、Fake Host 轨迹 |
 | harness | `npm run test:harness` | mock 森林与隔离自检 |
 | e2e | `npm run test:e2e` | 真实场景 canary |
@@ -121,7 +121,6 @@ npm run lint           # Fantomas / XML 格式化（提交前）
 ### 规范与资源
 
 - 产品语义：[`spec/00.md`](spec/00.md) 导航，条款 ID 寻址
-- 合规账本：[`spec/conformance.toml`](spec/conformance.toml)（生成 [`spec/conformance.md`](spec/conformance.md)）
 - 运行时资源：[`resources/prompts/`](resources/prompts/)、[`resources/enforcer/catalog.json`](resources/enforcer/catalog.json)
 - 架构 DNA 与工程纪律：[`AGENTS.md`](AGENTS.md)、[`docs/decisions/kolmogorov.md`](docs/decisions/kolmogorov.md)
 - 未来设计：[`docs/rfcs/`](docs/rfcs/)
