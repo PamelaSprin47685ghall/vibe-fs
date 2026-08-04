@@ -226,7 +226,7 @@ module XWire =
 
                                     let transformed = rawWithPrefix rawMessages prefixPlan
 
-                                    Wanxiangshu.Session.CompanionProjection.replaceMessagesInPlace output transformed
+                                    Wanxiangshu.Session.HostMessageProjection.replaceMessagesInPlace output transformed
 
                                     scope.RecordAttemptPlan sessionId providerRun plan
                                     scope.ClearRecovery sessionId

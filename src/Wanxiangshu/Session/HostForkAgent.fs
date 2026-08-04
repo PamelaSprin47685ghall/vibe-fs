@@ -11,7 +11,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Session.AgentRoleIdentity
 
 [<AutoOpen>]
-module HostForkRuntimeFork =
+module HostForkAgent =
 
     let private userPromptText (message: SessionMessage) =
         message.Parts

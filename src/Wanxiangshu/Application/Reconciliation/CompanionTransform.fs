@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Tools
 open Wanxiangshu.Domain
-open CompanionProjection
+open HostMessageProjection
 
 module CompanionTransform =
 

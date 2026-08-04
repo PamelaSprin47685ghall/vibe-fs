@@ -151,7 +151,7 @@ module SpikePlugin =
 
                                     let! messages = EnforcerHost.handleContinuation scope journal sid bloggerMessages
 
-                                    CompanionProjection.replaceMessagesInPlace outObj messages
+                                    HostMessageProjection.replaceMessagesInPlace outObj messages
                                 | None -> ()
                             | None -> ()
                         | None -> ()

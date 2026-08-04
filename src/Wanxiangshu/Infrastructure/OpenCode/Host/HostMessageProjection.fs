@@ -18,7 +18,7 @@ open Fable.Core.JsInterop
 /// to decide when to compress. CTX-001 forbids reading a window at all and CTX-002
 /// forbids predicting overflow, so none of it had a legal caller once the failure-driven
 /// protocol landed.
-module CompanionProjection =
+module HostMessageProjection =
 
     let replaceMessagesInPlace (rawOutObj: obj) (transformed: obj list) =
         emitJsExpr (rawOutObj?messages, List.toArray transformed) "$0.length = 0; $0.push(...$1);"
