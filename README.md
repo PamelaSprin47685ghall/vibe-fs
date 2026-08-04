@@ -1,47 +1,58 @@
 # Wanxiangshu
 
-OpenCode managed multi-agent orchestration plugin.
+OpenCode 上的结构化多 Agent 编排插件：Orchestrator / Manager 调度，Coder、Inspector、DevOps、Reviewer 等角色分工，Companion 提供会话级认知上下文，Fallback 与 Review 有明确写入口。
 
-Proprietary commercial software. See [LICENSE](LICENSE).
+Wanxiangshu is proprietary commercial software.
+Use, copying, modification, and distribution are governed by LICENSE.
 
 ## 用户指南
 
 ### 产品简介
 
-万象术（Wanxiangshu）是 OpenCode 的结构化多 Agent 编排插件：Orchestrator / Manager 调度，Coder / Inspector / DevOps / Reviewer 等角色分工，Companion Blogger 提供认知上下文，Fallback 与 Review 有明确写入口与证据链。
-
-公开入口：
+万象术（Wanxiangshu）作为 OpenCode 插件加载后，为 Host 会话提供多角色协作、任务分叉与汇合、审阅与恢复。公开入口：
 
 ```text
 import "wanxiangshu"
 → dist/Infrastructure/OpenCode/Plugin/Plugin.js
 ```
 
+`package.json` 的 `main` / `exports["."]` 指向同一路径。npm 包含 `dist/` 与 `resources/`，不含源码与测试树。
+
 ### 系统要求
 
-- Node.js `>= 20`
-- OpenCode Host 提供 `@opencode-ai/plugin`（peer 语义；开发依赖见 `package.json`）
-- 构建源码时：.NET SDK（见 `global.json`）与 `dotnet tool restore`（Fable / Fantomas）
+- Node.js `>= 20`（`engines.node`）
+- OpenCode Host，peer 依赖 `@opencode-ai/plugin`（`>= 1.17.4`）
+- 从源码构建时：.NET SDK（`global.json`）与 `dotnet tool restore`（Fable、Fantomas）
 
-### 安装
+`packageManager` = `npm@11.12.1`。安装依赖使用 `npm ci`（已提交 `package-lock.json`）。
 
-本包为 `private: true` 商业软件。从私有 registry 或交付的 tarball 安装：
+### 获取与安装
+
+`private: true` 商业软件，不从公共 npm 默认源分发。从 tarball 或私有 registry 安装：
 
 ```bash
 npm install ./wanxiangshu-0.5.3.tgz
-# 或私有源
-npm install wanxiangshu --registry <your-registry>
+# 或
+npm install wanxiangshu --registry <your-private-registry>
 ```
 
-在 OpenCode 中注册插件（以 Host 文档为准），使插件入口指向包的 `main` / `exports["."]`。
+版本以 `package.json` 的 `version` 为准（当前 **0.5.3**）。
 
-### 配置与快速开始
+### OpenCode 配置
 
-1. 确保 OpenCode 可解析 peer 插件 API。
-2. 安装本包后，按 Host 的 plugin 配置挂载 `wanxiangshu`。
-3. 角色与工具面由插件静态装配；精确权限与语义以 [`spec/`](spec/) 条款为准。
+1. 在可解析 peer 插件 API 的环境中安装本包。
+2. 按 Host 的 plugin 配置挂载入口（包名 `wanxiangshu` 或已安装包的 `main`）。
+3. 启动 Host。插件初始化时加载 `resources/` 下 system prompt 与 Enforcer catalog；资源缺失或非法则启动失败（fail fast），无代码内置副本兜底。
 
-最小心智模型：
+配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 `spec/` 为高级参考；安装与挂载不依赖阅读条款正文。
+
+### 快速开始
+
+```bash
+npm install ./wanxiangshu-0.5.3.tgz
+# 在 OpenCode 注册插件后启动会话
+# Orchestrator / Manager 发起任务；子角色按工具面分工
+```
 
 ```text
 Orchestrator
@@ -53,88 +64,180 @@ Orchestrator
         └── Reviewer
 ```
 
+Executor、Blogger 等由编排路径调用，不作为单独“安装角色”配置。
+
+### Agent 角色
+
+与 `spec/00.md` 一致（十个 system prompt 角色）：
+
+| 角色 | 典型工具面 | 说明 |
+|------|------------|------|
+| Orchestrator | `fork-manager`, `join` | 顶层编排 |
+| Manager | `fork-agent`, `join`, `list` | 任务分解与子会话 |
+| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector` | 源码修改 |
+| Inspector | `read`, `glob`, `grep`, `executor` | 只读调查 |
+| DevOps | `fork-pty`, `executor`, 检索与 `inspector` 等 | 进程与环境 |
+| Browser | 检索与网络相关工具 | 浏览类任务 |
+| Meditator | 检索与 `inspector` | 分析类任务 |
+| Reviewer | 检索、`inspector`、`verdict` | 审阅与裁决 |
+| Executor | 无工具 | 内部执行/摘要 |
+| Blogger | `blog` | Companion 叶子，写认知上下文 |
+
+每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `spec/02.md`。
+
 ### 运行时数据
 
-领域事实写入 Git common directory 下私有 `wanxiangshu-next/runtimes` 路径的 journal（per-runtime NDJSON），不在业务 workspace 强行创建 `node_modules` 或插件私有目录。
+- 领域事实写入 Git common directory 下插件私有 runtimes 路径中的 journal（按 runtime 的 NDJSON），不在业务 workspace 强制创建插件私有目录。
+- 随包资源：`resources/prompts/*-system.md`（manager / coder / devops / inspector / reviewer / browser / meditator / orchestrator / executor / blogger 十个 system prompt）；`resources/enforcer/catalog.json`。
+- journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
-journal 格式与事实名默认冻结；升级前请阅读 [CHANGELOG](CHANGELOG.md)。
+### 升级与兼容性
+
+- 0.5.3 无运行时协议变更：布局、资源打包与仓库整理为主，公开行为与 wire 语义与 0.5.2 产品合同一致。
+- 升级：安装新版本 → 确认 Node ≥ 20 与 Host peer → 重启 OpenCode。
+- 破坏性变更见 CHANGELOG；跳版本时按条目顺序阅读。
+
+### 故障排查
+
+| 现象 | 处理方向 |
+|------|----------|
+| 插件无法加载 / import 失败 | 确认 `dist/.../Plugin.js` 存在；tarball 须含 `dist/` 与 `resources/` |
+| 启动即失败（资源） | 检查十个 prompt 与 `enforcer/catalog.json` 完整合法 |
+| peer 依赖报错 | 安装与 Host 匹配的 `@opencode-ai/plugin` |
+| 行为与预期不符 | 对照 CHANGELOG 与 `spec/`；商业支持见下节 |
+
+源码排查见贡献者指南与 [docs/development.md](docs/development.md)。
 
 ### 商业许可与支持
 
-使用、复制、修改与分发受 [LICENSE](LICENSE) 约束。商业支持与授权请联系版权方。
+使用、复制、修改与分发受 [LICENSE](LICENSE) 约束。`license` 为 `SEE LICENSE IN LICENSE`，`publishConfig.access` 为 `restricted`。
+
+商业授权与支持请联系版权方。本 README 不承诺开源时间表。
 
 ---
 
 ## 贡献者指南
 
-面向内部维护者与未来可能的贡献者。工程按可复现、可审查的标准建设；法律上仍为闭源商业软件。
+面向维护者。法律上仍为专有商业软件。
 
 ### 仓库结构
 
 ```text
-src/Wanxiangshu/   生产 F# 源码（唯一源码根）
-resources/         运行时静态资源（prompts、enforcer catalog）
-spec/              绑定产品规范
-docs/              解释性文档、RFC、归档
-tests/unit/        第 1–3 层测试（mjs，import dist）
-tests/e2e/         OpenCode harness 与 canary
-tests/support/     测试支撑
-scripts/           构建与门禁入口
-dist/              Fable 输出（不提交；npm pack 包含）
+src/         生产源码
+resources/   随包运行时资源
+spec/        当前产品规范
+docs/        解释、决策和未来 RFC
+tests/       unit / integration / e2e
+scripts/     构建与少量仓库检查
+dist/        最终编译输出，不提交
+artifacts/   中间产物与本地发布产物，不提交
 ```
 
+- 生产 F# 唯一根：`src/Wanxiangshu/`
+- 规范导航 `spec/00.md`；词汇表 `spec/99.md`；`docs/rfcs/` 非绑定；`docs/decisions/` 已接受决策
+- 测试：`tests/unit/`、`tests/integration/`（resources / journal / plugin / package / harness）、`tests/e2e/`（`scenarios/` + `cases/`）
+- 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
+
 ### 开发环境
+
+Node.js ≥ 20，`npm@11.12.1`；.NET SDK（`global.json`）；本地工具 `.config/dotnet-tools.json`（Fable、Fantomas）。
+
+### 首次设置
 
 ```bash
 npm ci
 dotnet tool restore
+npm run build
+npm test
 ```
 
-可选：`global.json` 固定 SDK；`dotnet-tools.json` 固定 Fable / Fantomas。
+请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 [docs/development.md](docs/development.md)）。
 
 ### 常用命令
 
 ```bash
-npm run build          # Fable → dist/
-npm test               # unit（tests/unit）
-npm run test:harness   # harness 自检
-npm run test:e2e       # canary 单轮
-npm run check          # gate:static + build + test + harness
-npm run check:release  # check + e2e×3 + npm pack --dry-run
-npm run lint           # Fantomas / XML 格式化（提交前）
+npm ci
+dotnet tool restore
+npm run build
+npm test
+npm run test:integration
+npm run test:e2e
+npm run check
+npm run check:release
 ```
 
-内部 `gate:*` 脚本由 `gate:static` 聚合，日常优先用 `check` / `check:release`。
+| 命令 | 作用 |
+|------|------|
+| `npm run format` / `format:check` | Fantomas 写/检 F# |
+| `npm run lint` | `format:check` + `scripts/check.mjs` |
+| `npm run test:package` | tarball 内容、隔离安装、import、资源 |
+| `npm run test:e2e -- --repeat N` | e2e 多轮（发布链路内为 3 轮） |
 
-### 构建与测试分层
+### 测试分层
 
-| 层 | 命令 | 含义 |
+| 层 | 入口 | 范围 |
 |----|------|------|
-| 0 静态 | `npm run gate:static` | layout / ssot / architecture / … |
-| 1–3 unit | `npm test` | 纯函数、契约、Fake Host 轨迹 |
-| harness | `npm run test:harness` | mock 森林与隔离自检 |
-| e2e | `npm run test:e2e` | 真实场景 canary |
-| 发布 | `npm run check:release` | 全链 + 三轮 e2e + pack dry-run |
+| unit | `tests/unit/run.mjs`（`npm test`） | 对 `dist/` 的契约；经 `tests/unit/support/domain.mjs` |
+| integration | `tests/integration/run.mjs` | resources、journal、plugin、package、harness |
+| e2e | `tests/e2e/run.mjs` | `scenarios/` + `cases/`；`--repeat N` |
 
-`test` 在 `dist` 陈旧时 fail closed：先 `npm run build`。
+`dist/` 陈旧时 unit 拒绝运行。资源路径由包内 `dist/` 相对定位到 `resources/`，不依赖 `process.cwd()`。
 
-### 规范与资源
+### 规范、决策与 RFC
 
-- 产品语义：[`spec/00.md`](spec/00.md) 导航，条款 ID 寻址
-- 运行时资源：[`resources/prompts/`](resources/prompts/)、[`resources/enforcer/catalog.json`](resources/enforcer/catalog.json)
-- 架构 DNA 与工程纪律：[`AGENTS.md`](AGENTS.md)、[`docs/decisions/kolmogorov.md`](docs/decisions/kolmogorov.md)
-- 未来设计：[`docs/rfcs/`](docs/rfcs/)
+- **绑定合同**：`spec/`；条款 ID 稳定寻址；`spec/00.md` 导航。
+- **决策**：`docs/decisions/`（enforcer catalog、Kolmogorov 纪律等）。
+- **RFC**：`docs/rfcs/`（strength、student-teacher 等）— 非当前产品合同。
+- 测试直接引用条款 ID。规范不跟踪实现进度。
 
-### 提交与发布
+导读：[docs/architecture.md](docs/architecture.md)、`spec/01.md`。
 
-1. `npm run lint`
-2. `npm run check`（改动涉及 e2e 则 `test:e2e` 或 `check:release`）
-3. 优先 stage 具体文件；保留 hooks，不用 `--no-verify`
-4. 版本与用户可见变化写入 [CHANGELOG](CHANGELOG.md)
-5. 发布前：`npm run check:release`，再 `npm pack`；tarball 应仅含 `dist/` + `resources/` 及 manifest 元数据
+### 运行时资源
 
-更多：[`docs/development.md`](docs/development.md)、[`docs/releasing.md`](docs/releasing.md)、[`docs/architecture.md`](docs/architecture.md)。
+```text
+resources/prompts/
+  manager-system.md  coder-system.md  devops-system.md
+  inspector-system.md  reviewer-system.md  browser-system.md
+  meditator-system.md  orchestrator-system.md
+  executor-system.md  blogger-system.md
+resources/enforcer/catalog.json
+```
+
+加载：`Infrastructure/Resources/`（`PackageResources`、`PromptResources`、`EnforcerCatalogResource`、`RuntimeResources`）；插件初始化 load/install 一次。
+
+### 构建与打包
+
+- **构建**：`npm run build` → `scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
+- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`tests/`、`scripts/`、`spec/`、`docs/`、`artifacts/`。
+
+详见 [docs/releasing.md](docs/releasing.md)。
+
+### 提交要求
+
+1. 源码变更后通过 `format:check`（或先 `npm run format`）。
+2. 至少 `npm run check`（lint → build → unit → integration）。
+3. 触及 Host / e2e 时再跑 `test:e2e` 或 `check:release`。
+4. 优先 stage 具体路径；保留 hooks；不用 `--no-verify`。
+5. 用户可见变化写入 [CHANGELOG.md](CHANGELOG.md)。
+6. 不推送对 `main`/`master` 的破坏性历史改写；force push 等需显式许可。
+
+### 发布
+
+```bash
+npm ci
+dotnet tool restore
+npm run check:release
+npm pack --pack-destination artifacts/package
+```
+
+Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交进仓库。见 [docs/releasing.md](docs/releasing.md)。
+
+### 安全与保密
+
+源码与内部脚本默认不进 tarball。勿提交密钥与私有 registry 凭证。漏洞与授权走版权方私有渠道。
 
 ### 许可证
 
-本项目为专有商业软件（proprietary）。`package.json` 中 `private: true`，`license` 为 `SEE LICENSE IN LICENSE`。
+专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
+
+更多：[docs/development.md](docs/development.md) · [docs/releasing.md](docs/releasing.md) · [docs/architecture.md](docs/architecture.md) · [spec/00.md](spec/00.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE)
