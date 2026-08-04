@@ -26,8 +26,8 @@ import { assertEq, assertTrue } from './gate-lib.mjs';
 import { PER_TEST_TIMEOUT_MS, SUITE_BACKSTOP_MS, UNIT_VERDICT_SILENCE_MS } from '../time-budget.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const RUNNER = 'tests/unit/runner.mjs';
-const FIXTURE_DIR = 'tests/unit/fixtures';
+const RUNNER = 'tests/unit/run.mjs';
+const FIXTURE_DIR = 'tests/unit/support/fixtures';
 
 /**
  * Run the real runner over ONE fixture and report what happened.

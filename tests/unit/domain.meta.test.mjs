@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as domain from './domain.mjs'
+import * as domain from './support/domain.mjs'
 
 const {
   utcOffset,

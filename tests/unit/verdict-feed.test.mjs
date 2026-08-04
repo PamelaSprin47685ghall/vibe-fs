@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { classifyVerdict } from './verdict-feed.mjs'
+import { classifyVerdict } from './support/verdict-feed.mjs'
 
 const event = (type, data = {}) => ({ type, data })
 
