@@ -505,9 +505,13 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
 
 // ── HOST-013: the pair-programming thought marker (spec/07) ───────────────────
 
-/** HOST-013: the frozen provider-visible thought text and source identity. */
-const PAIR_PROGRAMMING_THOUGHT_TEXT = '让我遵循结对编程的理念，用中文进行对话式思考。'
-const PAIR_PROGRAMMING_THOUGHT_SOURCE = 'pair-programming-thought'
+// HOST-013: the frozen provider-visible thought text and source identity, read
+// from the build artifact so a rewording fails here instead of asserting stale
+// bytes (single point of definition, spec/07).
+import {
+  source as PAIR_PROGRAMMING_THOUGHT_SOURCE,
+  text as PAIR_PROGRAMMING_THOUGHT_TEXT,
+} from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js'
 
 /** HOST-013: count markers by their source identity, never by text (spec forbids text-only filtering). */
 const markerCount = (messages) =>
