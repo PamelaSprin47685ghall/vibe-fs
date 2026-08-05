@@ -43,8 +43,8 @@ tools = ["fork", "join", "list"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "first busy run: stay streaming until nudged" } }
 
-  # The second `fork` at the same agent. EXEC-002 makes this a nudge into the child that
-  # step 0 created, which is why no third lane appears anywhere below.
+  # The second `fork` carries the managed NAME again, so it forks a SECOND coder child
+  # (its first prompt, comment-prefixed, is declared as `coder-nudged` below).
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "nudge continue second run while first is busy" } }
 
