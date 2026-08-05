@@ -1,17 +1,21 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 
-/// Private mailbox surface: fork Executor + Join. Never Manager Join.
+/// Private mailbox surface: fork Executor + permit-gated Join. Never Manager Join.
 module ExecutorSummarizeRuntime =
+
+    /// Fresh FamilyRecoveryPermit per join (map/reduce mutates family → digest).
+    type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>
 
     type IExecutorRuntime =
         abstract Fork: string * AgentRole * string * string option -> Task<Result<ForkResult, string>>
-        /// timeoutMs: None = HostForkRuntime.DefaultJoinTimeoutMs semantics via runtime.Join().
-        abstract Join: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
+        /// Agent join: require fresh permit → HostForkRuntime.JoinWithPermit. No bare Join.
+        abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Cancel one owned map/reduce agent without tearing down the runtime.
         abstract CancelAgent: agentId: string -> unit
 
@@ -20,31 +24,40 @@ module ExecutorSummarizeRuntime =
     /// derived from a role — the role is a constant, not an inference.
     let private executorAgent = ManagedAgent.nameOf AgentTier.Fast Role.Executor
 
-    let asExecutorRuntime (runtime: HostForkRuntime) : IExecutorRuntime =
+    let asExecutorRuntime (runtime: HostForkRuntime) (requirePermit: RequirePermit) : IExecutorRuntime =
         { new IExecutorRuntime with
             member _.Fork(agentId, role, prompt, payload) =
                 runtime.Fork(agentId, role, executorAgent, prompt, payload)
 
-            member _.Join(timeoutMs) =
-                match timeoutMs with
-                | Some ms -> runtime.Join(timeoutMs = ms)
-                | None -> runtime.Join()
+            member _.JoinWithPermit(timeoutMs) =
+                task {
+                    match! requirePermit () with
+                    | Error msg -> return Error(ForkError.NotFound msg)
+                    | Ok permit ->
+                        match timeoutMs with
+                        | Some ms -> return! runtime.JoinWithPermit(permit, timeoutMs = ms)
+                        | None -> return! runtime.JoinWithPermit(permit)
+                }
 
             member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }
 
-    let ofForkRuntime (runtime: ForkRuntime) : IExecutorRuntime =
+    /// Pure ForkRuntime has no journal → cannot hold FamilyRecoveryPermit.
+    /// Fail closed; do not mint a synthetic permit for mailbox-only join.
+    let ofForkRuntime (_runtime: ForkRuntime) : IExecutorRuntime =
         { new IExecutorRuntime with
-            member _.Fork(agentId, role, prompt, payload) =
-                let effectivePrompt =
-                    match payload with
-                    | None -> prompt
-                    | Some p -> prompt + "\n\n" + p
+            member _.Fork(_agentId, _role, _prompt, _payload) =
+                task {
+                    return
+                        Error "ofForkRuntime cannot agent-join without FamilyRecoveryPermit; use HostForkRuntime path"
+                }
 
-                task { return Ok(runtime.Fork(agentId, role, executorAgent, prompt = effectivePrompt)) }
+            member _.JoinWithPermit(_timeoutMs) =
+                task {
+                    return
+                        Error(
+                            ForkError.NotFound
+                                "pure ForkRuntime has no journal; agent Join requires JoinWithPermit under FamilyRecoveryPermit"
+                        )
+                }
 
-            member _.Join(timeoutMs) =
-                match timeoutMs with
-                | Some ms -> runtime.Join(timeoutMs = ms)
-                | None -> runtime.Join()
-
-            member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }
+            member _.CancelAgent(_agentId) = () }

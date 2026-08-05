@@ -3202,7 +3202,8 @@ export const forkRuntime = (() => {
 
 /**
  * ExecutorSummarize map/reduce: summarizeSpool cancels owned children on failure.
- * Fake IExecutorRuntime: Fork / Join / CancelAgent.
+ * Fake IExecutorRuntime: Fork / JoinWithPermit(timeoutMs) / CancelAgent.
+ * JoinWithPermit is permit-gated in production (requirePermit → HostForkRuntime).
  */
 export const executorSummarizeRuntime = (() => {
   const summarizeSpool = member(ExecutorSummarize, 'ExecutorSummarize', 'summarizeSpool')
@@ -3218,15 +3219,15 @@ export const executorSummarizeRuntime = (() => {
     forkOk: (agentId) => okResult(new ForkResult(0, [agentId])),
     timedOut: () => errorResult(ForkError.TimedOut),
     /**
-     * Fake IExecutorRuntime. `join` returns a Promise of Result each call.
-     * Default Join → TimedOut so awaitAgent fails after fork.
+     * Fake IExecutorRuntime. JoinWithPermit returns a Promise of Result each call.
+     * Default → TimedOut so awaitAgent fails after fork.
      */
     fake: ({ fork, join, cancel } = {}) => {
       const cancelled = []
       const runtime = {
         Fork: (agentId, _role, _prompt, _payload) =>
           Promise.resolve(typeof fork === 'function' ? fork(agentId) : okResult(new ForkResult(0, [agentId]))),
-        Join: (timeoutMs) =>
+        JoinWithPermit: (timeoutMs) =>
           Promise.resolve(typeof join === 'function' ? join(timeoutMs) : errorResult(ForkError.TimedOut)),
         CancelAgent: (agentId) => {
           cancelled.push(agentId)

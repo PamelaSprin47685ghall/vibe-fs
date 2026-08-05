@@ -86,9 +86,57 @@ export const RULES = [
   {
     id: 'join-tool-no-bare-runtime-join',
     fileHint: 'JoinTool.fs',
-    // P0 §五 / §十: JoinTool must not call runtime.Join directly.
-    pattern: /runtime\.Join\s*\(/,
+    // P0 §五 / §十: JoinTool must not bare-call runtime.Join (JoinWithPermit / Join(permit ok elsewhere).
+    // Bare = runtime.Join( without leading permit argument.
+    pattern: /runtime\.Join\s*\(\s*(?!permit\b)/,
     label: 'JoinTool must not call runtime.Join; use joinAny + JoinInterpreter',
+  },
+  {
+    // P0 REVISE: production Tools agent-join must not bare-call runtime.Join(
+    // (JoinTool, ExecutorSummarize*, ExecutorTool). HostForkRuntime internal race
+    // mailbox + ForkRuntime/CompletionMailbox are the sole whitelist (fileHint null
+    // + basename allowlist below).
+    // Allow runtime.Join(permit, ...) (permit-gated IExecutorRuntime); forbid Join() / Join(timeoutMs=...).
+    id: 'tools-no-bare-runtime-join',
+    fileHint: null,
+    pattern: /runtime\.Join\s*\(\s*(?!permit\b)/,
+    label:
+      'production Tools agent-join must not bare-call runtime.Join(; use Join(permit) / JoinWithPermit / JoinInterpreter',
+  },
+  {
+    id: 'executor-tool-require-permit',
+    fileHint: 'ExecutorTool.fs',
+    pattern: /requirePermit|RequireFamilyRecovery|FamilyReady\s+permit|asExecutorRuntime/,
+    label: 'ExecutorTool must RequireFamilyRecovery / requirePermit / asExecutorRuntime',
+    positive: true,
+  },
+  {
+    id: 'executor-tool-empty-session-fail-closed',
+    fileHint: 'ExecutorTool.fs',
+    // Empty SessionId must not return true / skip recovery.
+    pattern: /IsNullOrWhiteSpace\s+context\.SessionId[\s\S]{0,80}return\s+true/,
+    label: 'ExecutorTool empty SessionId must fail closed (not return true)',
+  },
+  {
+    id: 'executor-summarize-join-with-permit',
+    fileHint: 'ExecutorSummarize.fs',
+    pattern: /JoinWithPermit/,
+    label: 'ExecutorSummarize awaitAgent must call runtime.JoinWithPermit',
+    positive: true,
+  },
+  {
+    id: 'executor-runtime-join-with-permit',
+    fileHint: 'ExecutorSummarizeRuntime.fs',
+    pattern: /JoinWithPermit|requirePermit/,
+    label: 'ExecutorSummarizeRuntime must wire JoinWithPermit + requirePermit',
+    positive: true,
+  },
+  {
+    id: 'join-with-permit-closure-digest',
+    fileHint: 'HostForkRuntime.fs',
+    pattern: /closureDigest|permitDigest|RecoveryClosureProjection\.discover/,
+    label: 'JoinWithPermit must re-check closureDigest via RecoveryClosureProjection.discover',
+    positive: true,
   },
   {
     id: 'host-fork-restart-false-finality',
@@ -142,6 +190,18 @@ const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
 ])
 
 /**
+ * Basename allowlist for tools-no-bare-runtime-join.
+ * Only interpreter / HostForkRuntime race mailbox / low-level mailbox may call runtime.Join(.
+ * Production Tools (JoinTool, ExecutorSummarize*, ExecutorTool) must not appear here.
+ */
+const BARE_RUNTIME_JOIN_ALLOWLIST = new Set([
+  'HostForkRuntime.fs',
+  'ForkRuntime.fs',
+  'CompletionMailbox.fs',
+  'JoinInterpreter.fs', // may mention Join only in comments; JoinWithPermit is the call
+])
+
+/**
  * Scan one file body. Multi-line rules see joined non-comment text; single-line
  * rules still report the first matching line number when possible.
  * @returns {{ id: string, file: string, line: number, label: string, text: string }[]}
@@ -185,6 +245,16 @@ export const scanText = (text, file = '<synthetic>') => {
           found = true
           break
         }
+        // Bare Join allowlist: HostForkRuntime race + mailbox internals only.
+        if (
+          rule.id === 'tools-no-bare-runtime-join' &&
+          BARE_RUNTIME_JOIN_ALLOWLIST.has(base)
+        ) {
+          found = true
+          break
+        }
+        // JoinWithPermit( is not bare Join(; line-level pattern is runtime.Join(
+        // which already excludes JoinWithPermit. Keep for clarity.
         hits.push({
           id: rule.id,
           file,
@@ -200,6 +270,12 @@ export const scanText = (text, file = '<synthetic>') => {
       if (
         rule.id === 'record-completion-single-owner' &&
         RECORD_COMPLETION_OWNER_BASENAMES.has(base)
+      ) {
+        continue
+      }
+      if (
+        rule.id === 'tools-no-bare-runtime-join' &&
+        BARE_RUNTIME_JOIN_ALLOWLIST.has(base)
       ) {
         continue
       }

@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open ToolHostCodec
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel.Identity
@@ -118,41 +119,47 @@ module ExecutorTool =
                               "stderr", TString stderr ]
                 | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                     try
-                        // P0-RECOVERY-JOIN-001: map/reduce Join requires FamilyReady on parent.
-                        let! recoveryOk =
-                            task {
-                                if String.IsNullOrWhiteSpace context.SessionId then
-                                    return true
-                                else
-                                    let root = SessionId.create context.SessionId
+                        // P0-RECOVERY-JOIN-001: map/reduce Join requires FamilyReady permit.
+                        // Empty SessionId fail closed (no skip). Fresh permit per JoinWithPermit
+                        // (map/reduce mutates family closure digest).
+                        if String.IsNullOrWhiteSpace context.SessionId then
+                            return error "Missing sessionID"
+                        else
+                            let root = SessionId.create context.SessionId
+
+                            let requirePermit () : Task<Result<FamilyRecoveryPermit, string>> =
+                                task {
                                     let! recovery = scope.RequireFamilyRecovery root
 
                                     match recovery with
-                                    | FamilyRecovery.FamilyBlocked _ -> return false
-                                    | FamilyRecovery.FamilyReady _ -> return true
-                            }
+                                    | FamilyRecovery.FamilyBlocked _ ->
+                                        return Error "RECOVERY_BLOCKED: family recovery incomplete before executor join"
+                                    | FamilyRecovery.FamilyReady permit -> return Ok permit
+                                }
 
-                        if not recoveryOk then
-                            return error "RECOVERY_BLOCKED: family recovery incomplete before executor summarize"
-                        else
-                            let runtime = scope.ExecutorRuntimeFor context
+                            match! requirePermit () with
+                            | Error msg -> return error msg
+                            | Ok _ ->
+                                let runtime = scope.ExecutorRuntimeFor context
 
-                            let! summary =
-                                ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
+                                let! summary =
+                                    ExecutorSummarize.summarizeSpool
+                                        (ExecutorSummarize.asExecutorRuntime runtime requirePermit)
+                                        spoolPath
 
-                            let instructions =
-                                if System.String.IsNullOrWhiteSpace summary then
-                                    []
-                                else
-                                    [ summary ]
+                                let instructions =
+                                    if System.String.IsNullOrWhiteSpace summary then
+                                        []
+                                    else
+                                        [ summary ]
 
-                            return
-                                tomlObjectWithInstructions
-                                    instructions
-                                    [ "exit_code", TInt exitCode
-                                      "spool_path", TString spoolPath
-                                      "total_bytes", TInt64 totalBytes
-                                      "chunk_count", TInt chunkCount ]
+                                return
+                                    tomlObjectWithInstructions
+                                        instructions
+                                        [ "exit_code", TInt exitCode
+                                          "spool_path", TString spoolPath
+                                          "total_bytes", TInt64 totalBytes
+                                          "chunk_count", TInt chunkCount ]
                     finally
                         Spool.delete spoolPath
         }

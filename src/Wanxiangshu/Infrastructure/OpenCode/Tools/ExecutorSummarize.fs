@@ -75,7 +75,8 @@ module ExecutorSummarize =
                         done' <- true
                     else
                         let started = DateTimeOffset.UtcNow
-                        let! joined = runtime.Join(Some remainingMs)
+                        // Fresh permit per join inside IExecutorRuntime.JoinWithPermit.
+                        let! joined = runtime.JoinWithPermit(Some remainingMs)
 
                         match joined with
                         | Error ForkError.TimedOut ->
@@ -220,6 +221,7 @@ module ExecutorSummarize =
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
     /// then reduces online. Map/reduce failures yield partial summary plus the
     /// last 200KB raw tail instead of dropping ProcessResult.
+    /// Agent joins go through IExecutorRuntime.JoinWithPermit (fresh permit each wait).
     let summarizeSpool (runtime: IExecutorRuntime) (spoolPath: string) =
         task {
             let stash = Dictionary<string, RunCompletion>()

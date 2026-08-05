@@ -211,13 +211,13 @@ type HostForkRuntime
         )
 
     /// P0-RECOVERY-JOIN-001: permit-gated join. Signature proves FamilyRecoveryPermit.
-    /// Consumes root + journalSequence; agent join requires journal (no fake empty permit for pure PTY).
-    /// closureDigest not re-checked: authorizeFamilyResume already bound digest into the private
-    /// permit token; re-discover would need a full RecoveryClosure recompute this path does not hold.
+    /// Consumes root + journalSequence + closureDigest (re-discover family closure from journal).
+    /// Agent join requires journal (no fake empty permit for pure PTY).
     /// Production JoinTool / JoinInterpreter must use this path — not bare Join.
     member this.JoinWithPermit(permit: FamilyRecoveryPermit, ?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         let root = FamilyRecoveryPermit.root permit
         let permitSeq = FamilyRecoveryPermit.journalSequence permit
+        let permitDigest = FamilyRecoveryPermit.closureDigest permit
 
         if root <> parentId then
             task {
@@ -262,7 +262,27 @@ type HostForkRuntime
                             )
                     }
                 else
-                    this.Join(?timeoutMs = timeoutMs)
+                    // Same pure discover as SessionRecoveryInterpreter AuthorizeResume path.
+                    let current =
+                        RecoveryClosureProjection.discover
+                            root
+                            (AgentJournal.snapshot durable).AgentProjections
+                            currentSeq
+
+                    if current.Digest <> permitDigest then
+                        task {
+                            return
+                                Error(
+                                    ForkError.NotFound(
+                                        sprintf
+                                            "family recovery permit closureDigest mismatch: permit=%s current=%s"
+                                            permitDigest
+                                            current.Digest
+                                    )
+                                )
+                        }
+                    else
+                        this.Join(?timeoutMs = timeoutMs)
 
     /// EXEC-009 / P0-RECOVERY-JOIN-001: projection-first join after family recovery.
     /// Prefer JoinWithPermit from production JoinTool (permit token required).

@@ -135,6 +135,49 @@ const NEGATIVES = [
     ].join('\n'),
   },
   {
+    id: 'tools-no-bare-runtime-join',
+    file: 'ExecutorSummarize.fs',
+    source: [
+      'module ExecutorSummarize',
+      'let awaitAgent runtime agentId stash =',
+      '    let! joined = runtime.Join(Some remainingMs)',
+    ].join('\n'),
+  },
+  {
+    id: 'tools-no-bare-runtime-join',
+    variant: 'executor-tool',
+    file: 'ExecutorTool.fs',
+    source: [
+      'module ExecutorTool',
+      'let execute scope context =',
+      '    match! runtime.Join() with',
+      '    | Ok c -> encode c',
+    ].join('\n'),
+  },
+  {
+    id: 'tools-no-bare-runtime-join',
+    variant: 'executor-summarize-runtime',
+    file: 'ExecutorSummarizeRuntime.fs',
+    source: [
+      'module ExecutorSummarizeRuntime',
+      'member _.Join(timeoutMs) =',
+      '    match timeoutMs with',
+      '    | Some ms -> runtime.Join(timeoutMs = ms)',
+      '    | None -> runtime.Join()',
+    ].join('\n'),
+  },
+  {
+    id: 'executor-tool-empty-session-fail-closed',
+    file: 'ExecutorTool.fs',
+    source: [
+      'module ExecutorTool',
+      'if String.IsNullOrWhiteSpace context.SessionId then',
+      '    return true',
+      'else',
+      '    let! recovery = scope.RequireFamilyRecovery root',
+    ].join('\n'),
+  },
+  {
     id: 'record-completion-single-owner',
     file: 'HostForkRunLifecycle.fs',
     source: [
@@ -156,6 +199,11 @@ test('P0_RECOVERY_JOIN_GATE_exports_rule_ids', () => {
   assert.ok(RULE_IDS.includes('join-tool-family-recovery'))
   assert.ok(RULE_IDS.includes('join-tool-no-bare-runtime-join'))
   assert.ok(RULE_IDS.includes('join-tool-join-program'))
+  assert.ok(RULE_IDS.includes('tools-no-bare-runtime-join'))
+  assert.ok(RULE_IDS.includes('executor-tool-require-permit'))
+  assert.ok(RULE_IDS.includes('executor-summarize-join-with-permit'))
+  assert.ok(RULE_IDS.includes('executor-runtime-join-with-permit'))
+  assert.ok(RULE_IDS.includes('join-with-permit-closure-digest'))
   assert.ok(RULE_IDS.includes('lifecycle-aborted-completion'))
   assert.ok(RULE_IDS.includes('record-completion-single-owner'))
   assert.equal(RULES.length, RULE_IDS.length)
@@ -253,16 +301,77 @@ test('P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
   assert.equal(scanText(def, 'HandleController.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
 })
 
+test('P0_RECOVERY_JOIN_GATE_bare_join_allowlist_host_fork_stays_green', () => {
+  const source = [
+    'module HostForkRuntime',
+    'let raceChangeAndMailbox durable fromRev ms =',
+    '    let! joined = runtime.Join(timeoutMs = ms)',
+    '    return Choice2Of2 joined',
+  ].join('\n')
+  const hits = scanText(source, 'HostForkRuntime.fs')
+  assert.ok(!hits.some((h) => h.id === 'tools-no-bare-runtime-join'))
+})
+
+test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
+  const tool = [
+    'module ExecutorTool',
+    'if String.IsNullOrWhiteSpace context.SessionId then',
+    '    return error "Missing sessionID"',
+    'else',
+    '    let requirePermit () =',
+    '        task {',
+    '            let! recovery = scope.RequireFamilyRecovery root',
+    '            match recovery with',
+    '            | FamilyReady permit -> return Ok permit',
+    '        }',
+    '    let! summary =',
+    '        ExecutorSummarize.summarizeSpool',
+    '            (ExecutorSummarize.asExecutorRuntime runtime requirePermit)',
+    '            spoolPath',
+  ].join('\n')
+  const summarize = [
+    'module ExecutorSummarize',
+    'let awaitAgent runtime agentId stash =',
+    '    let! joined = runtime.JoinWithPermit(Some remainingMs)',
+  ].join('\n')
+  const wrap = [
+    'module ExecutorSummarizeRuntime',
+    'let asExecutorRuntime runtime requirePermit =',
+    '    member _.JoinWithPermit(timeoutMs) =',
+    '        match! requirePermit () with',
+    '        | Ok permit -> runtime.JoinWithPermit(permit)',
+  ].join('\n')
+  const host = [
+    'module HostForkRuntime',
+    'member this.JoinWithPermit(permit) =',
+    '    let permitDigest = FamilyRecoveryPermit.closureDigest permit',
+    '    let current = RecoveryClosureProjection.discover root projections currentSeq',
+    '    if current.Digest <> permitDigest then Error mismatch',
+  ].join('\n')
+  assert.ok(!scanText(tool, 'ExecutorTool.fs').some((h) => h.id === 'executor-tool-empty-session-fail-closed'))
+  assert.ok(!scanText(tool, 'ExecutorTool.fs').some((h) => h.id === 'executor-tool-require-permit'))
+  assert.ok(!scanText(tool, 'ExecutorTool.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
+  assert.ok(!scanText(summarize, 'ExecutorSummarize.fs').some((h) => h.id === 'executor-summarize-join-with-permit'))
+  assert.ok(!scanText(summarize, 'ExecutorSummarize.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
+  assert.ok(!scanText(wrap, 'ExecutorSummarizeRuntime.fs').some((h) => h.id === 'executor-runtime-join-with-permit'))
+  assert.ok(!scanText(wrap, 'ExecutorSummarizeRuntime.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
+  assert.ok(!scanText(host, 'HostForkRuntime.fs').some((h) => h.id === 'join-with-permit-closure-digest'))
+})
+
 test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   const files = [
     'src/Wanxiangshu/Session/HostForkRunLifecycle.fs',
     'src/Wanxiangshu/Session/ForkRecovery.fs',
     'src/Wanxiangshu/Session/HostForkRestart.fs',
     'src/Wanxiangshu/Session/ForkRuntime.fs',
+    'src/Wanxiangshu/Session/HostForkRuntime.fs',
     'src/Wanxiangshu/Session/HandleController.fs',
     'src/Wanxiangshu/Application/Reconciliation/ChildRecoveryInterpreter.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarize.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs',
   ]
   const entries = files.map((rel) => ({
     file: rel,

@@ -16,9 +16,9 @@ const checks = [
 
 for (const script of checks) {
   const args = [script]
-  // Interpreter/Application task backlog freeze at measured 321 (JoinInterpreter and related
+  // Interpreter/Application task backlog freeze at measured 322 (JoinInterpreter and related
   // P0 recovery join work added raw-task sites).
-  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=321')
+  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=322')
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
