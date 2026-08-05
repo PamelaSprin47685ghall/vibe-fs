@@ -648,3 +648,978 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 # 关于文件行数
 
 本仓库曾经有文件不超过 300 行限制，现在作废。
+
+你说得对，我上一版把**失败后的污染机制**抬得太高了。
+
+未取消的输家协程和叶子 `process.exit` 最多会让一次失败变得更难看、更难诊断；它们不能解释为什么正常业务路径会出现丢完成、重复消费、错误恢复、错误 continuation 或偶发顺序差异。只要场景全绿，它们通常不会进入主因果链。
+
+当前更有力的根因证据是：
+
+* `spec/14` 明确要求 Program 是封闭 AST、业务程序是数据、每个 DSL 有唯一 Interpreter；
+* 但当前 `AgentProgram.fs` 甚至明确写着“functions, not a Flow AST”，内部仍直接执行 `task`；
+* `Application/Orchestration/Program.fs` 直接持有 Git、Manager、Journal 等端口并执行大量 `task`；
+* `ReconcileSupervisor.fs` 用 `Dirty + Running + cont + terminalFound + releaseOnExit` 控制后续路径；
+* `EnforcerHost.fs` 用 `commitUnknown + injectRepair + abandonThenCatchUp` 等 mutable 标志决定提交和恢复。
+
+这不是“DSL 完成度不够”，而是**规范所说的 DSL 尚未真正成为控制流所有者**。
+
+TASK 对目标形态的判断是正确的：Program 必须是数据，副作用由 Interpreter 执行，恢复只能由 Journal facts 和 Fold 重新构造 Program。
+
+不过我不能仅凭仓库静态内容断言**每一个** canary flaky 都来自这个根因，因为没有上传具体失败日志。但它确实是目前最应该优先消除、也最可能系统性产生 race 的机制。
+
+# 一、重新裁决：不是“先止血”或“先大修”
+
+正确方法是：
+
+```text
+禁止继续制造旧控制流
+        ↓
+建立最小 DSL 支点
+        ↓
+按一个纵切面完成：
+纯决策 → Program → Interpreter → 切生产入口 → 删除旧路径 → 收编 canary
+        ↓
+再迁下一个纵切面
+```
+
+也就是：
+
+> **止血不是在旧架构上修补，而是每次只修一条完整因果链，并让这条链永久退出旧架构。**
+
+不能采用以下两种极端。
+
+### 错误极端 A：先把 canary 全修绿
+
+这通常会产生：
+
+* 增加 sleep；
+* 增加 debounce；
+* 增加 `alreadyHandled`；
+* 增加 `ignoreNextEvent`；
+* 增加重试；
+* 增加 RuntimeState；
+* 增加“为防 race”的 bool。
+
+结果是 canary 暂时绿了，但 DSL 迁移更困难。
+
+### 错误极端 B：关闭所有功能，半年大爆改
+
+这会产生：
+
+* 长期大分支；
+* 新旧理解漂移；
+* 一次合并几百个文件；
+* 无法判断哪项改动破坏语义；
+* 最后只能靠 E2E 猜正确性。
+
+正确答案是**纵向 clean break**：每次只迁一个业务闭环，但该闭环必须一次迁透。
+
+---
+
+# 二、先划清三类“止血”
+
+今后每个紧急修改先归类。
+
+## A 类：允许立即做的结构性止血
+
+这些修改不会固化旧架构，而且本来就是目标设计的一部分：
+
+* 从 Journal/Fold 读取权威事实；
+* 以稳定 identity 做幂等；
+* durable CAS；
+* 每 Session 单解释器；
+* signal 只负责唤醒，不承载业务数据；
+* 无法证明时 fail closed；
+* 用 DU 替代行为型 bool；
+* 把纯决策从 Host 中抽出；
+* 确定性排序；
+* 将多个副作用收进一个领域指令的 Interpreter。
+
+这些可以叫止血，也可以叫 DSL 迁移的第一部分。
+
+## B 类：只允许作为临时隔离的止血
+
+例如：
+
+* 将某个高风险 canary 单独运行；
+* 暂时降低某个场景的并发度；
+* 将已知红测试放入明确的 known-red 清单；
+* 暂停该子系统的新功能；
+* 给旧入口加调用计数，确认是否还有流量。
+
+每项必须写明：
+
+```text
+owner
+对应缺陷
+删除它的 DSL cutover
+不得晚于哪个合并列车删除
+```
+
+这类措施不能算修复，也不能用于发布放行。
+
+## C 类：禁止的伪止血
+
+* 调大超时；
+* rerun-to-green；
+* 吞异常；
+* 无身份重试；
+* 增加 `Dirty2`、`AlreadyProcessed`、`RepairSent`；
+* 新旧实现都执行，取先成功的一个；
+* 在 Host 中增加更多分支来纠正另一个 Host 分支；
+* 用 facade 包旧 Flow 并称为 Program。
+
+---
+
+# 三、第一步：立即建立“不再恶化”的门禁
+
+这一步不是完成 DSL，而是封住新增债务。
+
+当前 `dsl-ownership.mjs` 支持一个总数 threshold，只能冻结总量。它不能阻止“删一个轻微违规、增加一个严重违规”。
+
+改为**逐文件、逐类别 ratchet**：
+
+```json
+{
+  "src/.../ReconcileSupervisor.fs": {
+    "raw-task": 3,
+    "mutable": 9,
+    "program-counter": 5
+  },
+  "src/.../EnforcerHost.fs": {
+    "raw-task": 2,
+    "mutable": 8,
+    "program-counter": 6
+  }
+}
+```
+
+规则如下：
+
+1. 新文件违规必须为零。
+2. 已有文件每一类违规不得增加。
+3. 删除过的违规不能重新加入。
+4. 修改某个 Program 文件时，该文件的违规必须至少减少一项，或者保持零。
+5. baseline 只能下降，不能在 PR 中调高。
+6. `Flow.lift/create` 在新增代码中零容忍。
+7. 每条门禁必须有负例 fixture，证明真的会红。
+
+这一门禁可以立即合并，因为它不需要先完成 DSL，也不会影响现有运行时。
+
+## 同时冻结以下区域
+
+在对应 DSL 迁移前，禁止新增业务行为：
+
+```text
+ReconcileSupervisor
+EnforcerHost
+BloggerRuntimeState
+Application/Orchestration/Program
+AgentProgram
+CompanionProgram
+```
+
+只允许：
+
+* 抽纯函数；
+* 增加领域类型；
+* 写 Program；
+* 写 Interpreter；
+* 删除旧逻辑；
+* 修复已经证明的正确性缺陷。
+
+---
+
+# 四、建立两个并行轨道
+
+## 轨道一：DSL 基础和纵切面迁移
+
+负责真正修复根因。
+
+## 轨道二：canary 因果归属
+
+不大修 harness，不追求让所有测试表面变绿，而是回答：
+
+```text
+这个失败属于哪个业务控制流？
+违反了哪条领域不变量？
+对应哪个 DSL cutover？
+```
+
+为每个 flaky 建一张卡：
+
+```text
+Canary:
+首次错误：
+最后一个确定事实：
+期待但缺失的事实：
+是否重复执行 effect：
+是否观察到错误顺序：
+当前旧控制流所有者：
+目标 Program：
+目标 Interpreter：
+迁移 PR：
+```
+
+例如不要记录：
+
+```text
+manager-full-loop 偶发超时
+```
+
+而要记录：
+
+```text
+Manager completion 已写入物理 transcript，
+但 Reconcile 未产生对应 TurnCompleted，
+或被另一次 pass 的 provisional 状态覆盖。
+Owner: ReconcileProgram cutover。
+```
+
+没有失败日志支持时标为“未归因”，不能凭感觉修改代码。
+
+---
+
+# 五、最合理的迁移顺序
+
+## Wave 0：合同、门禁和所有权
+
+先合并：
+
+1. 确认 `spec/14` 是 active contract。
+2. 给每个 DSL 指定唯一 owner。
+3. 建逐文件 ratchet。
+4. 建 known-red 清单，但 release 仍被 known-red 阻止。
+5. 建共享文件所有权。
+
+共享文件包括：
+
+```text
+Fact.fs
+FactCodec.fs
+Fold.fs
+Wanxiangshu.fsproj
+spec 索引
+package.json
+```
+
+这些文件一次只能由 Integration Owner 合并。
+
+---
+
+## Wave 1：最小 Program 内核
+
+只做最小机制，不做万能 Operation。
+
+需要：
+
+```fsharp
+type Program<'instruction, 'result> =
+    | Pure of 'result
+    | Suspend of 'instruction * (obj -> Program<'instruction, 'result>)
+```
+
+实际实现可以使用 GADT 模拟、Free monad 变体或每个领域独立 DU；重点不是具体技巧，而是满足：
+
+```text
+Program 不执行
+Program 不持有 Runtime
+Program 不持有 Host port
+Program 不追加 Journal
+Program 可以被 Trace Interpreter 检查
+```
+
+同时建立三个 Interpreter：
+
+```text
+Production Interpreter
+Model Interpreter
+Trace Interpreter
+```
+
+先证明四件事：
+
+1. 指令顺序可观察；
+2. 同输入生成同一 trace；
+3. Interpreter 错误映射稳定；
+4. 取消后不再产生新的 owned effect。
+
+这一步不要改大量生产入口。
+
+---
+
+## Wave 2：Orchestrator 作为 DSL 校准样板
+
+TASK 选择 Orchestrator 作为试点是合理的，因为顺序明确、Git 和 Journal 边界清晰。
+
+当前 Orchestrator 的所谓 `Program.fs` 实际直接执行：
+
+```text
+Git.GetTargetHead
+Git.Rebase
+Git.FfMerge
+Manager.AwaitManager
+AppendFact
+Worktree.Release
+```
+
+所以第一目标不是把这些函数换个名字，而是形成：
+
+```fsharp
+type OrchestratorInstruction<'next> =
+    | AwaitManager of ManagerJobId * (ManagerCompletion -> 'next)
+    | ReadTargetHead of TargetRef * (Result<CommitHash, GitError> -> 'next)
+    | Rebase of WorktreePath * TargetRef * (RebaseOutcome -> 'next)
+    | AppendFact of StreamId * AgentFact * (AppendOutcome -> 'next)
+    | AcquirePublishGate of GatePath * (GateHandle -> 'next)
+    | PublishFastForward of PublishClaim * (PublishOutcome -> 'next)
+    | ReleaseWorktree of WorktreeIdentity * (ReleaseOutcome -> 'next)
+```
+
+业务 Program：
+
+```fsharp
+orchestrator {
+    do! awaitManager job
+    do! reviewCurrentTree job
+    do! registerCandidate job
+    do! rebaseAgainstFrozenTarget job
+    do! reviewCurrentTree job
+    return! publishFastForward job
+}
+```
+
+纯决策：
+
+```text
+recoveryAction
+publish retry decision
+review acceptance
+target moved decision
+```
+
+生产 Interpreter 才持有 Git、Journal、Manager。
+
+### 这一纵切面的合并标准
+
+同一合并列车中完成：
+
+```text
+新 Program 上线
+唯一生产 Interpreter 上线
+原 OrchestratorProgram.run 断开
+旧 task helper 删除
+Trace 测试加入
+E2E 保持原行为
+```
+
+不允许先上新 Program、仍由它调用旧 `Program.run`。
+
+完成这个样板后，团队才有共同的“正确 DSL”参照物。
+
+---
+
+# 六、Wave 3：优先根治 Reconcile race
+
+这是最应该与 canary 止血穿插的区域。
+
+当前 Reconcile 同时存在四种“状态来源”：
+
+```text
+Host signal
+Dirty / Running 内存状态
+SDK snapshot
+Journal/Fold durable facts
+```
+
+这四者并不拥有相同语义，却共同决定后续程序路径。`Dirty` 和 `Running` 又在复制队列和调用栈事实，因此事件顺序一变化，就可能走不同分支。
+
+## 目标结构
+
+```text
+Host signal
+    ↓
+CoalescingQueue<SessionId>
+    ↓
+每 Session 恰好一个 Reconcile Interpreter
+    ↓
+读取最新权威 Fold + snapshot
+    ↓
+构造 ReconcileProgram
+    ↓
+解释到完成
+```
+
+Signal 只表达：
+
+```text
+“这个 Session 可能有新事实，请重新观察。”
+```
+
+Signal 不表达：
+
+```text
+“某个具体 turn 已经完成。”
+“下一步应该 continuation。”
+“上一次 pass 应该再跑一次。”
+```
+
+## ReconcileProgram 指令
+
+```text
+readActiveBinding
+readAuthoritativeSnapshot
+classifyTurn
+awaitCausalProgress
+commitCompletion
+sendInteractionRepair
+observeCompaction
+abortPhysicalRun
+```
+
+## 必须先抽出的纯类型
+
+```fsharp
+type ReconcileEvidence =
+    | NoActiveBinding
+    | SnapshotUnavailable of SnapshotError
+    | NoMatchingTurn
+    | ProvisionalTurn of ReconciledTurn
+    | TerminalTurn of ReconciledTurn
+    | ContradictoryEvidence of ReconcileContradiction
+
+type ReconcileDecision =
+    | ObserveOnly
+    | RetryWithin of RetryBudget
+    | PublishProvisional of ReconciledTurn
+    | CommitTerminal of ReconciledTurn
+    | SendRepair of RepairRequest
+    | FailClosed of ReconcileContradiction
+```
+
+## 删除什么
+
+```text
+Dirty
+Running
+releaseOnExit
+cont
+terminalFound
+continuationCandidate mutable
+turnFound mutable
+```
+
+重试预算可以作为局部有界值，但不能成为跨调用生命周期状态。
+
+## Canary 怎样随迁移收编
+
+原 canary 若断言：
+
+```text
+在 N 秒内看见某事件
+```
+
+迁移后优先断言：
+
+```text
+Trace 中出现 ReadSnapshot
+随后出现 CommitTerminal
+Journal 中只有一个 terminal fact
+同一个 completion 不会第二次发布
+```
+
+E2E 仍然保留，但它不再是唯一 oracle。
+
+---
+
+# 七、Wave 4：Join v2 与 Agent/Fork DSL 一次完成
+
+PENDING 的 1、3、5 必须作为同一个纵切面：
+
+* user 消息中断 join；
+* 批量返回积压结果；
+* work record 改为前置注释。
+
+它们共享同一个等待和消费语义，不能拆成三个临时实现。
+
+## 领域类型先行
+
+```fsharp
+type JoinWaitOutcome<'item> =
+    | ResultsAvailable of NonEmptyBatch<'item>
+    | InterruptedByUserMessage
+
+type JoinInstruction<'next> =
+    | ReadJoinableCompletions of BatchLimit * (Completion list -> 'next)
+    | AwaitCompletionSignal of (JoinWakeReason -> 'next)
+    | ConsumeCompletion of CompletionIdentity * (ConsumeOutcome -> 'next)
+```
+
+关键不变量：
+
+```text
+durable projection 是事实来源
+mailbox 只是 wake signal
+每个 completion 最多消费一次
+interrupt 与 completion 同时发生时重新读事实
+已有 completion 优先
+```
+
+Program 表达竞争语义：
+
+```fsharp
+join {
+    let! available = readJoinables MaxJoinBatch
+
+    match available with
+    | NonEmpty batch ->
+        return! consume batch
+    | Empty ->
+        let! wake = awaitWake ()
+
+        let! afterWake = readJoinables MaxJoinBatch
+
+        match afterWake, wake with
+        | NonEmpty batch, _ ->
+            return! consume batch
+        | Empty, UserInterrupted ->
+            return InterruptedByUserMessage
+        | Empty, CompletionMayBeAvailable ->
+            return! repeatWithin budget
+}
+```
+
+这里 race 的裁决在 Program 中清晰可读，而不是散落在 mailbox、Host、tool abort 和 runtime cancel 之间。
+
+### 同一 cutover 删除
+
+* 旧单项 Join 成功 wire；
+* tool abort → runtime cancel 的路径；
+* 旧 mailbox 数据源语义；
+* 无稳定顺序的 backlog drain；
+* 旧 `work_record` TOML 字段。
+
+PENDING 已经给出了完整验收矩阵，应直接作为该纵切面的完成定义。
+
+---
+
+# 八、Wave 5：Blogger 与 Enforcer 必须一起迁
+
+PENDING 4 和 6 与 TASK 的 Blogger/Enforcer clean break 是同一件事，不应先在旧 Host 上实现新功能。
+
+正确顺序：
+
+```text
+RecoveryEvidence
+→ CycleEvidence
+→ CycleResolution
+→ BloggerProgram
+→ Blogger Interpreter
+→ 单一 tip 事实
+→ RecentTips Fold
+→ nudge 后 AABB
+→ 删除旧状态
+```
+
+## 纯决策先行
+
+```fsharp
+type CycleResolution =
+    | CommitMain of MainCommit
+    | CommitSquashThenContinue of SquashCommit
+    | SendSingleInteractionRepair of RepairRequest
+    | PerformAabbRecovery of RecoveryContext
+    | AbandonStaleCycle of AbandonReason
+    | StopPhysicalRun of StopReason
+    | FailClosed of CycleProtocolError
+```
+
+```fsharp
+resolveCycle :
+    CycleEvidence
+    -> Result<CycleResolution, CycleProtocolError>
+```
+
+`EnforcerHost` 只能解释结果，不能再自己维护：
+
+```text
+committed
+commitUnknown
+injectRepair
+repairCtx
+abandonThenCatchUp
+```
+
+## nudge → AABB 必须由 Program 结构表达
+
+```fsharp
+blogger {
+    let! first = runCycle request
+
+    match first with
+    | Valid cycle ->
+        return! commit cycle
+
+    | PureTextTerminal evidence ->
+        do! sendSingleRepair evidence
+
+        let! second = awaitRepairOutcome evidence
+
+        match second with
+        | Valid cycle ->
+            return! commit cycle
+        | PureTextTerminal again ->
+            return! performAabb again
+        | ProviderFailure failure ->
+            return! recoverProviderFailure failure
+}
+```
+
+这样 `RepairSpent` 不需要存在。程序结构本身就证明只能 repair 一次。
+
+## Enforcer tip v2
+
+同一纵切面完成：
+
+* `tip` 必填；
+* enum 来自 catalog；
+* 每次只有一个 RuleId；
+* 删除 score vector；
+* Fold 持有最近 tip；
+* squash 不丢历史；
+* Blogger projection 能看到最近 tip；
+* 删除旧 120 字段路径。
+
+PENDING 对这一项要求 clean break，不能保留“新 tip + 旧 scores”双轨。
+
+---
+
+# 九、低耦合 PENDING 如何并行
+
+以下两项可以在前述大迁移期间由独立队伍完成：
+
+## sub-session 复用提示词
+
+只修改：
+
+* Manager prompt；
+* Orchestrator prompt；
+* ForkTool 描述；
+* reuse contract 测试。
+
+不得修改 Agent/Fork 控制流核心。
+
+## Coder `tdd = red | green`
+
+只修改：
+
+* 领域枚举；
+* CoderTool schema；
+* prompt；
+* tool codec；
+* contract 测试。
+
+不得趁机修改 Join、Reconcile 或 Journal 事实。
+
+它们可以较早合并，因为与核心控制流冲突小。
+
+---
+
+# 十、Projection 和伪 assistant 消息最后完成
+
+PENDING 8 不能直接在 transform 尾部 append。
+
+必须先完成 Projection owner：
+
+```text
+ProjectionSnapshot
+→ ProjectionIntent list
+→ conflict detection
+→ semantic projection
+→ wire projection
+→ input seal
+```
+
+然后把结对编程消息建模为：
+
+```fsharp
+InsertPairProgrammingThought of
+    anchor: MessageIdentity *
+    text: PairProgrammingThought
+```
+
+由 Projection Interpreter：
+
+* 找到最新 user/tool-result 锚点；
+* 保证同锚点幂等；
+* 计算稳定 synthetic identity；
+* 放入最终 seal；
+* 排除出 XTrace、Blogger delta 和 work record。
+
+PENDING 明确指出它会改变 provider bytes、prefix cache 和 review seal，所以放在 Projection 迁移完成后是正确顺序。
+
+---
+
+# 十一、程序员很多时的实际分工
+
+不要按“每人认领几个文件”分工，要按知识边界分工。
+
+```text
+团队 A：Program kernel + Trace 工具
+团队 B：Orchestrator DSL
+团队 C：Reconcile Domain/Program
+团队 D：Reconcile Interpreter + Host adapter
+团队 E：Join/Agent Domain/Program
+团队 F：Join Interpreter + wire
+团队 G：Blogger/Enforcer Domain
+团队 H：Blogger/Enforcer Interpreter
+团队 I：Projection DSL
+团队 J：CI 门禁、负例和模型测试
+团队 K：PENDING prompt/TDD 低耦合项
+团队 Z：Integration Owner
+```
+
+严格文件所有权：
+
+```text
+一个文件在一个合并列车中只有一个 owner
+共享事实只能由 Integration Owner 修改
+Program 团队不能修改 Infrastructure
+Interpreter 团队不能修改业务决策
+测试团队不得通过放宽断言换绿
+```
+
+大量程序员应并行完成：
+
+```text
+领域类型
+纯决策
+Program AST
+Trace Interpreter
+模型测试
+生产 Interpreter
+E2E adapter
+负例门禁
+```
+
+而不是十个人同时修改 `EnforcerHost.fs`。
+
+---
+
+# 十二、每个纵切面的保姆级施工模板
+
+以后每个 DSL 都严格执行以下十步。
+
+## 1. 写不变量
+
+例如：
+
+```text
+一个 completion 最多消费一次
+同一个 terminal turn 最多发布一次
+repair 最多发送一次
+没有 durable evidence 不得 commit
+```
+
+## 2. 写非法世界
+
+例如：
+
+```text
+completion 已消费但再次可见
+terminal fact 存在但状态仍 Running
+repair pending 同时 AABB
+两个互斥 commit 决策同时为 true
+```
+
+## 3. 建 Evidence DU
+
+只描述已知事实。
+
+## 4. 建 Decision DU
+
+只描述允许采取的动作。
+
+## 5. 写纯决策函数
+
+```text
+Evidence → Result<Decision, Error>
+```
+
+## 6. 建 Program AST
+
+将多个 Decision 组合成业务过程。
+
+## 7. 建 Trace Interpreter
+
+先证明顺序，不碰真实 Host。
+
+## 8. 建模型/排列测试
+
+枚举关键顺序：
+
+```text
+signal 在 snapshot 前
+signal 在 snapshot 后
+completion 与 interrupt 同时
+effect 成功但 fact 未写
+fact 已写但返回丢失
+restart 后重新构造 Program
+```
+
+不要依赖 sleep。
+
+## 9. 建生产 Interpreter 并切入口
+
+生产只能有一个 owner。
+
+## 10. 同一合并列车删除旧路径
+
+删除：
+
+```text
+旧 Flow 调用
+旧 coordinator
+旧 RuntimeState
+兼容 adapter
+迁移 flag
+旧测试 fixture
+```
+
+---
+
+# 十三、canary 在迁移期间如何管理
+
+不需要先重构整个测试运行器。
+
+建立三层状态：
+
+## Contract gate：始终阻塞
+
+* 编译；
+* spec；
+* Program ownership；
+* 纯决策；
+* Trace；
+* 属性测试；
+* 模型并发测试。
+
+## Slice canary：对应模块 cutover 后阻塞
+
+例如 Reconcile cutover 后：
+
+```text
+host-nudge
+host-restart
+reviewer-restart
+manager-full-loop
+```
+
+中归属于 Reconcile 的测试必须稳定通过。
+
+## Legacy canary：迁移前允许 known-red，但禁止发布
+
+known-red 必须精确到测试名，不能整个目录 skip：
+
+```json
+{
+  "test": "manager-full-loop",
+  "owner": "ReconcileProgram",
+  "observedInvariant": "terminal fact occasionally missing",
+  "removalCutover": "reconcile-dsl"
+}
+```
+
+规则：
+
+* unrelated PR 可以继续工作；
+* 对应 DSL PR 必须删除该 known-red；
+* release 时 known-red 数量必须为零；
+* 不允许通过 rerun 让它变绿；
+* 不允许把新失败加入清单而没有 owner 和 cutover。
+
+这就解决了“止血和大修矛盾”：主干不必被一个已归因 race 完全瘫痪，但团队也不能谎称它已经修复。
+
+---
+
+# 十四、两项争议工作的最终位置
+
+## 未取消的输家协程
+
+降为 **P3 测试卫生**。
+
+仅在以下情况下提前处理：
+
+* 它污染后续场景；
+* 它掩盖真正的第一错误；
+* 它占用端口或进程导致无法复现。
+
+否则等业务 race 根治后再清理。
+
+## 叶子 `process.exit`
+
+同样降为 **P3 诊断完整性**。
+
+只要它没有让第一错误丢失，就不应占据当前关键路径。
+
+最终仍值得清理，但不是 DSL 大修的前置条件，更不是 canary 根因。
+
+---
+
+# 十五、最终合并顺序
+
+```text
+M0  active contract + ownership + per-file ratchet
+M1  最小 Program/Trace 内核
+M2  Orchestrator 完整 clean break
+
+M3  Reconcile Evidence/Decision/Program
+M4  Reconcile Interpreter + 生产切换 + 删除 Dirty/Running
+M5  收编 Reconcile 所属 canary
+
+M6  Join v2 / Agent Program
+M7  Join Interpreter + batch wire + interrupt + 删除旧 Join
+M8  收编 Join 所属 canary
+
+M9  sub-session reuse
+M10 coder required TDD
+
+M11 Blogger/Enforcer Evidence/Decision/Program
+M12 Blogger/Enforcer Interpreter + tip fact migration
+M13 删除 BloggerRuntimeState 和旧 score-vector
+M14 收编 Blogger canary
+
+M15 Projection Program
+M16 pair-programming thought intent
+M17 Agent/Companion 其余路径迁移
+
+M18 删除 Flow、DomainFlow、旧 coordinator 和迁移豁免
+M19 全量 crash/restart/concurrency/release 验收
+M20 测试卫生：输家取消、叶子退出、诊断整理
+```
+
+其中 M3 和 M6 可以由不同团队提前准备纯领域类型和测试，但**生产切换按顺序进入主干**，避免同时切换两个高风险控制流所有者。
+
+# 最核心的一条施工纪律
+
+每次遇到 canary 红，不要先问：
+
+```text
+怎样让它不红？
+```
+
+先问：
+
+```text
+这个结果应该由哪个 Program 决定？
+决定所依据的 Evidence 是什么？
+哪个 Interpreter 执行了什么 effect？
+哪个 durable fact 证明 effect 已完成？
+当前为什么存在第二个控制流所有者？
+```
+
+回答不了这五个问题，就说明修复位置还没有找对。
+
+最终目标不是“全绿且代码看起来用了 CE”，而是：
+
+> 给定同一组 durable facts 和 authoritative snapshot，只能构造出一个合法 Program；该 Program 的 trace 明确、effect 身份稳定，任何事件到达顺序都不能创造第二种业务真相。
