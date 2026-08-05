@@ -4960,3 +4960,48 @@ export const verdictMailbox = (() => {
     nameOf: (verdict) => caseOf(verdict),
   }
 })()
+
+// ── Program kernel (FLOW-002 / FLOW-003 / FLOW-007) ───────────────────────────
+// Generic Program<'instruction,'result> + shared TraceInterpreter. Loaded via
+// prod() here (not the early Promise.all batch) so Fable shape stays confined
+// without reordering the load-bearing destructuring list above.
+const ProgramModule = await prod('Kernel/Program')
+const TraceInterpreterModule = await prod('Kernel/TraceInterpreter')
+
+export const programKernel = (() => {
+  const pureFn = member(ProgramModule, 'Program', 'pure')
+  const suspendFn = member(ProgramModule, 'Program', 'suspend')
+  const bindFn = member(ProgramModule, 'Program', 'bind')
+  const mapFn = member(ProgramModule, 'Program', 'map')
+  const builder =
+    ProgramModule.Program_program ??
+    ProgramModule.ProgramModule_program ??
+    ProgramModule.program
+  if (builder === undefined) {
+    throw new Error('Program.program builder missing')
+  }
+  const traceFn = member(TraceInterpreterModule, 'TraceInterpreter', 'trace')
+
+  /** Fable may emit multi-arg module lets curried or uncurried. */
+  const apply2 = (fn, a, b) => {
+    if (typeof fn !== 'function') throw new TypeError('programKernel: expected function')
+    if (fn.length >= 2) return fn(a, b)
+    const partial = fn(a)
+    return typeof partial === 'function' ? partial(b) : partial
+  }
+
+  return {
+    pure: (value) => pureFn(value),
+    suspend: (instruction, nextFn) => apply2(suspendFn, instruction, nextFn),
+    bind: (program, nextFn) => apply2(bindFn, program, nextFn),
+    map: (program, fn) => apply2(mapFn, program, fn),
+    /** Returns `[instructions, result]` with instructions as a JS array. */
+    trace: (program) => {
+      const pair = traceFn(program)
+      const instructions = pair?.[0] !== undefined ? listItems(pair[0]) : listItems(pair)
+      const result = pair?.[1]
+      return [instructions, result]
+    },
+    program: builder,
+  }
+})()

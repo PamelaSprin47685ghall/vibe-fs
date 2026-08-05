@@ -21,6 +21,8 @@
     <Compile Include="Kernel/AsyncSupport.fs"/>
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
+    <Compile Include="Kernel/Program.fs"/>
+    <Compile Include="Kernel/TraceInterpreter.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
     <Compile Include="Domain/TerminalValidity.fs"/>
     <Compile Include="Domain/PrefixCandidate.fs"/>
