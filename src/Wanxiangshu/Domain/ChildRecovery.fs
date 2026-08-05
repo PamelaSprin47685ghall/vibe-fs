@@ -20,32 +20,14 @@ module ChildRecovery =
     /// only Domain pure functions may mint. No Aborted-only path.
     type TerminalEvidence =
         private
-        | ProvenCompleted of
-            agentId: string *
-            handle: HandleId *
-            childSession: SessionId *
-            body: string
-        | ProvenFailed of
-            agentId: string *
-            handle: HandleId *
-            childSession: SessionId *
-            body: string
+        | ProvenCompleted of agentId: string * handle: HandleId * childSession: SessionId * body: string
+        | ProvenFailed of agentId: string * handle: HandleId * childSession: SessionId * body: string
 
     module TerminalEvidence =
-        let completed
-            (agentId: string)
-            (handle: HandleId)
-            (childSession: SessionId)
-            (body: string)
-            : TerminalEvidence =
+        let completed (agentId: string) (handle: HandleId) (childSession: SessionId) (body: string) : TerminalEvidence =
             ProvenCompleted(agentId, handle, childSession, body)
 
-        let failed
-            (agentId: string)
-            (handle: HandleId)
-            (childSession: SessionId)
-            (body: string)
-            : TerminalEvidence =
+        let failed (agentId: string) (handle: HandleId) (childSession: SessionId) (body: string) : TerminalEvidence =
             ProvenFailed(agentId, handle, childSession, body)
 
     /// Single-assignment completion cell proof. Private: only proveTerminal /
@@ -95,11 +77,9 @@ module ChildRecovery =
                       Finality = ChildFinality.Failed content
                       Kind = kind
                       Body = Some content }
-            | HandleCompletionKind.Cancelled, _ ->
-                Error "durable Cancelled is not joinable under P0-RECOVERY-JOIN-001"
+            | HandleCompletionKind.Cancelled, _ -> Error "durable Cancelled is not joinable under P0-RECOVERY-JOIN-001"
             | HandleCompletionKind.Terminal, _
-            | HandleCompletionKind.SendFailure, _ ->
-                Error "durable completion missing body"
+            | HandleCompletionKind.SendFailure, _ -> Error "durable completion missing body"
 
         /// Interpreter path: proven terminal only. No fromAborted.
         let tryFromProvenTerminal (evidence: TerminalEvidence) : Result<JoinableCompletion, string> =
@@ -227,10 +207,7 @@ module ChildRecovery =
         | ObserveHostSignals of SessionId * (HostObservation list -> ChildRecoveryProgram<'result>)
         | ProveTerminal of TerminalEvidence * (JoinableCompletion -> ChildRecoveryProgram<'result>)
         | CommitCompletion of JoinableCompletion * (unit -> ChildRecoveryProgram<'result>)
-        | CommitAbandonment of
-            HandleId *
-            HandleAbandonReason *
-            (unit -> ChildRecoveryProgram<'result>)
+        | CommitAbandonment of HandleId * HandleAbandonReason * (unit -> ChildRecoveryProgram<'result>)
         | KeepWaiting of reason: string * (unit -> ChildRecoveryProgram<'result>)
         | Block of reason: string
 
@@ -247,8 +224,7 @@ module ChildRecovery =
             let rec bind current =
                 match current with
                 | Return value -> cont value
-                | ReadDurableHandle(handle, next) ->
-                    ReadDurableHandle(handle, (fun evidence -> bind (next evidence)))
+                | ReadDurableHandle(handle, next) -> ReadDurableHandle(handle, (fun evidence -> bind (next evidence)))
                 | ReadChildSnapshot(sessionId, next) ->
                     ReadChildSnapshot(sessionId, (fun evidence -> bind (next evidence)))
                 | ObserveHostSignals(sessionId, next) ->
@@ -278,8 +254,7 @@ module ChildRecovery =
     let proveTerminal (evidence: TerminalEvidence) : ChildRecoveryProgram<JoinableCompletion> =
         ProveTerminal(evidence, Return)
 
-    let commitCompletion (proof: JoinableCompletion) : ChildRecoveryProgram<unit> =
-        CommitCompletion(proof, Return)
+    let commitCompletion (proof: JoinableCompletion) : ChildRecoveryProgram<unit> = CommitCompletion(proof, Return)
 
     let commitAbandonment (handle: HandleId) (reason: HandleAbandonReason) : ChildRecoveryProgram<unit> =
         CommitAbandonment(handle, reason, Return)
@@ -289,10 +264,7 @@ module ChildRecovery =
     let block (reason: string) : ChildRecoveryProgram<'result> = Block reason
 
     /// Recover one child: read durable → snapshot → observations → resolve → commit.
-    let recoverChild
-        (handle: HandleId)
-        (childSession: SessionId)
-        : ChildRecoveryProgram<ChildResolution> =
+    let recoverChild (handle: HandleId) (childSession: SessionId) : ChildRecoveryProgram<ChildResolution> =
         childRecovery {
             let! durable = readDurableHandle handle
             let! snapshot = readChildSnapshot childSession
@@ -336,8 +308,7 @@ module ChildRecovery =
         | ReadChildSnapshot(sessionId, next) ->
             ChildRecoveryTrace.ReadChildSnapshot sessionId
             :: trace (next ChildSnapshotEvidence.Missing)
-        | ObserveHostSignals(sessionId, next) ->
-            ChildRecoveryTrace.ObserveHostSignals sessionId :: trace (next [])
+        | ObserveHostSignals(sessionId, next) -> ChildRecoveryTrace.ObserveHostSignals sessionId :: trace (next [])
         | ProveTerminal(evidence, next) ->
             match JoinableCompletion.tryFromProvenTerminal evidence with
             | Ok proof -> ChildRecoveryTrace.ProveTerminal :: trace (next proof)
@@ -349,3 +320,63 @@ module ChildRecovery =
             ChildRecoveryTrace.CommitAbandonment(handle, reason) :: trace (next ())
         | KeepWaiting(reason, next) -> ChildRecoveryTrace.KeepWaiting reason :: trace (next ())
         | Block reason -> [ ChildRecoveryTrace.Blocked reason ]
+
+    /// §九 join-recovery timeline events (pure observation log, not a program counter).
+    /// agentId is the AgentHandle key string (same as JoinableCompletion.agentId).
+    [<RequireQualifiedAccess>]
+    type JoinRecoveryTrace =
+        | RawAbortObserved of SessionId
+        | ChildRecoveryStarted of SessionId
+        | TerminalProofIssued of agentId: string
+        | HandleCompletionCommitted of agentId: string
+        | JoinReturned of agentId: string * ChildFinality
+
+    /// Pure invariant over a join-recovery timeline:
+    /// ∀ JoinReturned(agent) ∃ TerminalProofIssued(agent) before HandleCompletionCommitted(agent)
+    /// before that JoinReturned; RawAbortObserved never adjacent to HandleCompletionCommitted
+    /// or JoinReturned (abort is observation, not a completion step).
+    let joinReturnedImpliesProofBeforeCommit (events: JoinRecoveryTrace list) : bool =
+        let adjacentForbidden a b =
+            match a, b with
+            | JoinRecoveryTrace.RawAbortObserved _, JoinRecoveryTrace.HandleCompletionCommitted _
+            | JoinRecoveryTrace.RawAbortObserved _, JoinRecoveryTrace.JoinReturned _
+            | JoinRecoveryTrace.HandleCompletionCommitted _, JoinRecoveryTrace.RawAbortObserved _
+            | JoinRecoveryTrace.JoinReturned _, JoinRecoveryTrace.RawAbortObserved _ -> true
+            | _ -> false
+
+        let rec adjacencyOk =
+            function
+            | []
+            | [ _ ] -> true
+            | a :: b :: rest ->
+                if adjacentForbidden a b then
+                    false
+                else
+                    adjacencyOk (b :: rest)
+
+        let orderForJoinReturns =
+            events
+            |> List.indexed
+            |> List.forall (fun (i, event) ->
+                match event with
+                | JoinRecoveryTrace.JoinReturned(agentId, _) ->
+                    let before = List.take i events
+
+                    let proofIdx =
+                        before
+                        |> List.tryFindIndex (function
+                            | JoinRecoveryTrace.TerminalProofIssued id when id = agentId -> true
+                            | _ -> false)
+
+                    let commitIdx =
+                        before
+                        |> List.tryFindIndex (function
+                            | JoinRecoveryTrace.HandleCompletionCommitted id when id = agentId -> true
+                            | _ -> false)
+
+                    match proofIdx, commitIdx with
+                    | Some p, Some c -> p < c
+                    | _ -> false
+                | _ -> true)
+
+        adjacencyOk events && orderForJoinReturns

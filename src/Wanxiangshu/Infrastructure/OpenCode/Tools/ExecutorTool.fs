@@ -138,9 +138,7 @@ module ExecutorTool =
                             let runtime = scope.ExecutorRuntimeFor context
 
                             let! summary =
-                                ExecutorSummarize.summarizeSpool
-                                    (ExecutorSummarize.asExecutorRuntime runtime)
-                                    spoolPath
+                                ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
 
                             let instructions =
                                 if System.String.IsNullOrWhiteSpace summary then

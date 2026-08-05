@@ -70,27 +70,29 @@ type ForkRuntime
 
                 let! result = ChildRunProgram.run childRun work childRun.Cancellation.Token
 
-                let completion =
+                // P0-RECOVERY-JOIN-001: ParentCancelled → durable HandleAbandoned
+                // (cancelChildren). Do not mint aborted cell / SetResult.
+                // Join surfaces Abandoned via projection, not HandleCompleted(ABORTED).
+                let completionOpt =
                     match result with
-                    | Ok value -> value
-                    | Error error ->
-                        match error with
-                        | AgentError.ParentCancelled -> ChildRun.makeAborted childRun "parent cancelled"
-                        | AgentError.InvalidFork message
-                        | AgentError.HostFailure message
-                        | AgentError.SessionDead message -> ChildRun.makeFailed childRun message
+                    | Error AgentError.ParentCancelled -> None
+                    | Ok value -> Some value
+                    | Error(AgentError.InvalidFork message)
+                    | Error(AgentError.HostFailure message)
+                    | Error(AgentError.SessionDead message) -> Some(ChildRun.makeFailed childRun message)
 
-                // Set the single-assignment completion cell exactly once.
-                childRun.Completion.TrySet(completion) |> ignore
+                match completionOpt with
+                | None -> ()
+                | Some completion ->
+                    childRun.Completion.TrySet(completion) |> ignore
 
-                if publishCompletion then
-                    mailbox.Publish completion
+                    if publishCompletion then
+                        mailbox.Publish completion
 
-                // Notify the external listener (used for tests and PTY sender).
-                try
-                    terminalListener completion
-                with _ ->
-                    ()
+                    try
+                        terminalListener completion
+                    with _ ->
+                        ()
             }
 
         childRun, runTask

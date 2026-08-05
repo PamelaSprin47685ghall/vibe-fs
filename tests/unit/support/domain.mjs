@@ -2319,6 +2319,11 @@ const tryFromDurableCompleted = member(
   'tryFromDurableCompleted',
 )
 const resolveChild = member(ChildRecoveryModule, 'ChildRecovery', 'resolveChild')
+const joinReturnedImpliesProofBeforeCommit = member(
+  ChildRecoveryModule,
+  'ChildRecovery',
+  'joinReturnedImpliesProofBeforeCommit',
+)
 
 export const childRecovery = (() => {
   const DurableClass =
@@ -2329,14 +2334,22 @@ export const childRecovery = (() => {
     ChildRecoveryModule.ChildRecovery_ChildSnapshotEvidence
   const ObservationClass =
     ChildRecoveryModule.HostObservation ?? ChildRecoveryModule.ChildRecovery_HostObservation
+  const JoinTraceClass =
+    ChildRecoveryModule.JoinRecoveryTrace ?? ChildRecoveryModule.ChildRecovery_JoinRecoveryTrace
+  const FinalityClass =
+    ChildRecoveryModule.ChildFinality ?? ChildRecoveryModule.ChildRecovery_ChildFinality
 
   if (typeof DurableClass !== 'function') throw new Error('ChildRecovery.DurableHandleEvidence missing')
   if (typeof SnapshotClass !== 'function') throw new Error('ChildRecovery.ChildSnapshotEvidence missing')
   if (typeof ObservationClass !== 'function') throw new Error('ChildRecovery.HostObservation missing')
+  if (typeof JoinTraceClass !== 'function') throw new Error('ChildRecovery.JoinRecoveryTrace missing')
+  if (typeof FinalityClass !== 'function') throw new Error('ChildRecovery.ChildFinality missing')
 
   const durableOf = unionCase(DurableClass, 'DurableHandleEvidence')
   const snapshotOf = unionCase(SnapshotClass, 'ChildSnapshotEvidence')
   const observationOf = unionCase(ObservationClass, 'HostObservation')
+  const joinTraceOf = unionCase(JoinTraceClass, 'JoinRecoveryTrace')
+  const finalityOf = unionCase(FinalityClass, 'ChildFinality')
 
   return {
     durableUnknown: () => durableOf('Unknown', []),
@@ -2381,6 +2394,23 @@ export const childRecovery = (() => {
       Object.keys(ChildRecoveryModule).filter(
         (k) => k.includes('JoinableCompletion') || k.includes('fromAborted'),
       ),
+
+    // ── JoinRecoveryTrace (§九) ────────────────────────────────────────────
+    finalitySucceeded: (body) => finalityOf('Succeeded', [body]),
+    finalityFailed: (body) => finalityOf('Failed', [body]),
+    finalityAbandoned: (reason) =>
+      finalityOf('Abandoned', [
+        typeof reason === 'string' ? buildHandleAbandonReason(reason) : reason,
+      ]),
+
+    rawAbortObserved: (childSession) => joinTraceOf('RawAbortObserved', [childSession]),
+    childRecoveryStarted: (childSession) => joinTraceOf('ChildRecoveryStarted', [childSession]),
+    terminalProofIssued: (agentId) => joinTraceOf('TerminalProofIssued', [agentId]),
+    handleCompletionCommitted: (agentId) => joinTraceOf('HandleCompletionCommitted', [agentId]),
+    joinReturned: (agentId, finality) => joinTraceOf('JoinReturned', [agentId, finality]),
+
+    joinReturnedImpliesProofBeforeCommit: (events) =>
+      joinReturnedImpliesProofBeforeCommit(toList(events)),
   }
 })()
 
@@ -4213,5 +4243,16 @@ export const orchestratorProgram = (() => {
   return {
     empty,
     interpret: (program) => interpret(program),
+  }
+})()
+
+// ── Join Program DSL (P0-RECOVERY-JOIN-001) ──────────────────────────────────
+const JoinProgramModule = await prod('Domain/JoinProgram')
+
+export const joinProgram = (() => {
+  const joinAnyFn = member(JoinProgramModule, 'JoinProgram', 'joinAny')
+  return {
+    /** Pure AST constructor: FamilyRecoveryPermit → JoinProgram. */
+    joinAny: (permit) => joinAnyFn(permit),
   }
 })()

@@ -69,6 +69,64 @@ export const RULES = [
     label: 'JoinTool must RequireFamilyRecovery / match FamilyReady',
     positive: true,
   },
+  {
+    id: 'join-tool-family-blocked',
+    fileHint: 'JoinTool.fs',
+    pattern: /FamilyBlocked/,
+    label: 'JoinTool must match FamilyBlocked',
+    positive: true,
+  },
+  {
+    id: 'join-tool-join-program',
+    fileHint: 'JoinTool.fs',
+    pattern: /joinAny|JoinProgram|JoinInterpreter/,
+    label: 'JoinTool must enter JoinProgram / joinAny / JoinInterpreter',
+    positive: true,
+  },
+  {
+    id: 'join-tool-no-bare-runtime-join',
+    fileHint: 'JoinTool.fs',
+    // P0 §五 / §十: JoinTool must not call runtime.Join directly.
+    pattern: /runtime\.Join\s*\(/,
+    label: 'JoinTool must not call runtime.Join; use joinAny + JoinInterpreter',
+  },
+  {
+    id: 'host-fork-restart-false-finality',
+    fileHint: 'HostForkRestart.fs',
+    // Synthetic aborted / restored finality must not be published on restart.
+    pattern: /AgentCompletion\.aborted|makeAborted|ofSimpleText[\s\S]{0,100}?restored/,
+    label: 'HostForkRestart must not mint aborted or synthetic restored finality',
+  },
+  {
+    id: 'host-fork-restart-proof-structure',
+    fileHint: 'HostForkRestart.fs',
+    // Restart recovery must walk interpreter / JoinableCompletion path.
+    pattern:
+      /ChildRecoveryInterpreter|tryFromProvenTerminal|JoinableCompletion|recordCompletion|HandleCompletionCodec\.tryRead/,
+    label: 'HostForkRestart must use proven terminal or durable completion structure',
+    positive: true,
+  },
+  {
+    id: 'host-fork-restart-bare-publish',
+    fileHint: 'HostForkRestart.fs',
+    pattern: /AgentCompletion\.completed[\s\S]{0,400}PublishCompletion/,
+    label: 'HostForkRestart must not PublishCompletion from bare AgentCompletion.completed',
+  },
+  {
+    id: 'fork-runtime-parent-cancelled-aborted',
+    fileHint: 'ForkRuntime.fs',
+    pattern: /ParentCancelled[\s\S]{0,120}makeAborted|makeAborted[\s\S]{0,80}parent cancelled/,
+    label: 'ParentCancelled must not mint makeAborted completion cell',
+  },
+  {
+    // P0 §十: production recordCompletion call sites must be definition or ChildRecoveryInterpreter.
+    // Scanned across all src/Wanxiangshu/**/*.fs (no fileHint). Comments stripped before match.
+    id: 'record-completion-single-owner',
+    fileHint: null,
+    pattern: /\brecordCompletion\b/,
+    label:
+      'HandleController.recordCompletion production caller must be only ChildRecoveryInterpreter (or definition)',
+  },
 ]
 
 export const RULE_IDS = RULES.map((r) => r.id)
@@ -76,6 +134,12 @@ export const RULE_IDS = RULES.map((r) => r.id)
 const norm = (p) => p.replace(/\\/g, '/')
 
 const stripComments = (line) => line.replace(/\/\/.*/g, '')
+
+/** Basename allowlist for record-completion-single-owner (definition + sole commit owner). */
+const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
+  'HandleController.fs',
+  'ChildRecoveryInterpreter.fs',
+])
 
 /**
  * Scan one file body. Multi-line rules see joined non-comment text; single-line
@@ -113,6 +177,14 @@ export const scanText = (text, file = '<synthetic>') => {
     let found = false
     for (let i = 0; i < codeLines.length; i++) {
       if (rule.pattern.test(codeLines[i])) {
+        // Sole-owner rule: definition + ChildRecoveryInterpreter may call; others red.
+        if (
+          rule.id === 'record-completion-single-owner' &&
+          RECORD_COMPLETION_OWNER_BASENAMES.has(base)
+        ) {
+          found = true
+          break
+        }
         hits.push({
           id: rule.id,
           file,
@@ -125,6 +197,12 @@ export const scanText = (text, file = '<synthetic>') => {
       }
     }
     if (!found && rule.pattern.test(joined)) {
+      if (
+        rule.id === 'record-completion-single-owner' &&
+        RECORD_COMPLETION_OWNER_BASENAMES.has(base)
+      ) {
+        continue
+      }
       // Multi-line hit: approximate first line of match.
       const m = joined.match(rule.pattern)
       let line = 1

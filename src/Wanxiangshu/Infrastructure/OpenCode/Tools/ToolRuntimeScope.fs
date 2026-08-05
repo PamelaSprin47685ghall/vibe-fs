@@ -228,10 +228,7 @@ type ToolRuntimeScope
         task {
             match familyRecovery with
             | None ->
-                return
-                    FamilyRecovery.FamilyBlocked(
-                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
-                    )
+                return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
             | Some fn -> return! fn root
         }
 

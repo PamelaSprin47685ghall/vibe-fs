@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
 open Wanxiangshu.Domain.ChildRecovery
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 open Wanxiangshu.Kernel
@@ -147,9 +148,7 @@ type HostForkRuntime
     /// Recovery restore failures must surface. Silent success would let Join
     /// proceed against a half-restored family (P0-RECOVERY-JOIN-001).
     member this.AwaitRecovery() =
-        task {
-            do! this.EnsureChildRestoreStarted()
-        }
+        task { do! this.EnsureChildRestoreStarted() }
 
     /// Explicit restore instruction for SessionRecovery RestoreLinkedHandles.
     member this.RestoreLinkedHandles() : Task = this.EnsureChildRestoreStarted()
@@ -211,10 +210,65 @@ type HostForkRuntime
                 (fun run outcome -> this.Complete(run, outcome))
         )
 
-    /// EXEC-009: projection-first join. Durable `HandleProjection.joinable` is the
-    /// fact source; the mailbox only wakes waiters. Agent payloads from the mailbox
-    /// are discarded and the loop re-reads the projection. PTY stays mailbox-driven
-    /// (EXEC-015).
+    /// P0-RECOVERY-JOIN-001: permit-gated join. Signature proves FamilyRecoveryPermit.
+    /// Consumes root + journalSequence; agent join requires journal (no fake empty permit for pure PTY).
+    /// closureDigest not re-checked: authorizeFamilyResume already bound digest into the private
+    /// permit token; re-discover would need a full RecoveryClosure recompute this path does not hold.
+    /// Production JoinTool / JoinInterpreter must use this path — not bare Join.
+    member this.JoinWithPermit(permit: FamilyRecoveryPermit, ?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
+        let root = FamilyRecoveryPermit.root permit
+        let permitSeq = FamilyRecoveryPermit.journalSequence permit
+
+        if root <> parentId then
+            task {
+                return
+                    Error(
+                        ForkError.NotFound(
+                            sprintf
+                                "family recovery permit root mismatch: permit=%s runtime=%s"
+                                (SessionId.value root)
+                                (SessionId.value parentId)
+                        )
+                    )
+            }
+        else
+            match journal with
+            | None ->
+                // Agent join with FamilyRecoveryPermit is journal-backed. Pure PTY must not
+                // present a family permit (no synthetic empty FamilyReady).
+                task {
+                    return
+                        Error(
+                            ForkError.NotFound
+                                "family recovery permit requires journal; pure PTY join must not use JoinWithPermit"
+                        )
+                }
+            | Some durable ->
+                let currentSeq = JournalRevision.value (AgentJournal.revision durable)
+
+                // Permit was sealed at recovery authorize time. Journal must not have
+                // been replaced by an older stream (current < permit). Growth (current > permit)
+                // is expected while join waits; only regression fails closed.
+                if currentSeq < permitSeq then
+                    task {
+                        return
+                            Error(
+                                ForkError.NotFound(
+                                    sprintf
+                                        "family recovery permit journalSequence stale: permit=%d current=%d"
+                                        permitSeq
+                                        currentSeq
+                                )
+                            )
+                    }
+                else
+                    this.Join(?timeoutMs = timeoutMs)
+
+    /// EXEC-009 / P0-RECOVERY-JOIN-001: projection-first join after family recovery.
+    /// Prefer JoinWithPermit from production JoinTool (permit token required).
+    /// Durable `HandleProjection.joinable` is the fact source; mailbox wakes waiters.
+    /// Agent payloads from the mailbox are discarded and the loop re-reads projection.
+    /// PTY stays mailbox-driven (EXEC-015). Abandoned surfaces via tryConsumeDurable.
     ///
     /// Consume = read blob → CAS `HandleRetired`. CommitUnknown / append failure
     /// must not deliver. Concurrent joins: single winner via journal gate.
@@ -278,10 +332,7 @@ type HostForkRuntime
                             | Ok(Some completion) ->
                                 match record.Lifecycle with
                                 | HandleLifecycle.CompletedAwaitingJoin durableCell ->
-                                    let body =
-                                        HandleCompletionCodec.encodeOutcome
-                                            completion.RunId
-                                            completion.Outcome
+                                    let body = HandleCompletionCodec.encodeOutcome completion.RunId completion.Outcome
 
                                     match
                                         JoinableCompletion.tryFromDurableCompleted

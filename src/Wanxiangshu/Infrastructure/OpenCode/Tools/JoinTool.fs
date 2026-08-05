@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Domain.JoinProgram
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -8,7 +9,7 @@ open Wanxiangshu.Session
 
 /// join() waits for the owning runtime's next physical completion. Orchestrator
 /// join is routed to its ManagerJob publication mailbox by authority role.
-/// P0-RECOVERY-JOIN-001: FamilyReady permit before any join consume.
+/// P0-RECOVERY-JOIN-001: FamilyReady permit → joinAny → JoinInterpreter (no bare Join).
 module JoinTool =
 
     let private tString = ToolHostCodec.TString
@@ -47,11 +48,7 @@ module JoinTool =
             | RecoveryBlock.ChildRecoveryFailed(sid, reason) ->
                 sprintf "family recovery blocked: child %s (%s)" (SessionId.value sid) reason
 
-        ToolHostCodec.tomlObject
-            [ "error",
-              tTable
-                  [ "code", tString "RECOVERY_BLOCKED"
-                    "message", tString message ] ]
+        ToolHostCodec.tomlObject [ "error", tTable [ "code", tString "RECOVERY_BLOCKED"; "message", tString message ] ]
 
     let private encodeCompletion (runtime: HostForkRuntime) (completion: RunCompletion) =
         let isPty = runtime.IsPtyCompletion completion.RunId
@@ -125,7 +122,7 @@ module JoinTool =
 
                 match recovery with
                 | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked blocks
-                | FamilyRecovery.FamilyReady _ ->
+                | FamilyRecovery.FamilyReady permit ->
                     if scope.IsRole(context, Role.Orchestrator) then
                         let! verdict = scope.OrchestratorHostFor(context.SessionId).JoinPublished()
                         return ToolHostCodec.tomlObject [ "outcome", tString verdict ]
@@ -139,7 +136,10 @@ module JoinTool =
                                 { new IDisposable with
                                     member _.Dispose() = detachAbort () }
 
-                            match! runtime.Join() with
+                            let program = joinAny permit
+                            let! joined = JoinInterpreter.interpret runtime program
+
+                            match joined with
                             | Ok completion -> return encodeCompletion runtime completion
                             | Error joinError ->
                                 return

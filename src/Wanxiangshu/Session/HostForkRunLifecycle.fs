@@ -97,6 +97,7 @@ module HostForkRunLifecycle =
                 |> Option.iter (fun subscription -> subscription.Dispose())
 
                 // EXEC-009: durable blob + HandleCompleted precede mailbox delivery.
+                // P0 §十: sole production owner of recordCompletion is ChildRecoveryInterpreter.
                 let runId = "run-" + run.AgentId
                 let childId = run.ChildId
 
@@ -104,7 +105,7 @@ module HostForkRunLifecycle =
                     match journal with
                     | None -> agentOutcome
                     | Some _ ->
-                        match HandleController.recordCompletion journal parentId proof with
+                        match ChildRecoveryInterpreter.commitJoinable journal parentId proof with
                         | Ok() -> agentOutcome
                         | Error error ->
                             AgentCompletion.failed
@@ -194,13 +195,7 @@ module HostForkRunLifecycle =
                     "ERROR"
 
             let agentOutcome =
-                AgentCompletion.failed
-                    run.AgentId
-                    runId
-                    (Some run.Role)
-                    (Some childId)
-                    code
-                    error
+                AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
 
             let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
 

@@ -38,6 +38,7 @@
     <Compile Include="Domain/RecoverySlot.fs"/>
     <Compile Include="Domain/SessionRecovery.fs"/>
     <Compile Include="Domain/ChildRecovery.fs"/>
+    <Compile Include="Domain/JoinProgram.fs"/>
     <Compile Include="Domain/OrchestratorProgram.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
@@ -163,6 +164,7 @@
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
     <Compile Include="Session/HandleCompletionCodec.fs"/>
+    <Compile Include="Application/Reconciliation/ChildRecoveryInterpreter.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
     <Compile Include="Session/HostForkChildDispatch.fs"/>
     <Compile Include="Session/HostForkAgentOwner.fs"/>
@@ -182,6 +184,7 @@
     <Compile Include="Session/BloggerCoordinator.fs"/>
     <Compile Include="Application/Reconciliation/BloggerCrashRecovery.fs"/>
     <Compile Include="Application/Reconciliation/SessionRecoveryInterpreter.fs"/>
+    <Compile Include="Application/Reconciliation/JoinInterpreter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>

@@ -110,17 +110,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         task {
             match lock recoveryGateLock (fun () -> familyRecoveryPorts) with
             | None ->
-                return
-                    FamilyRecovery.FamilyBlocked(
-                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
-                    )
+                return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
             | Some ports -> return! SessionRecoveryInterpreter.Coordinator.recoverFamily ports root
         }
 
     /// Await family recovery before business effects. Returns FamilyRecovery so
     /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
-    member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> =
-        this.RequireFamilyRecovery root
+    member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = this.RequireFamilyRecovery root
 
     member this.ArmRecovery(sessionId: SessionId) =
         this.RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance

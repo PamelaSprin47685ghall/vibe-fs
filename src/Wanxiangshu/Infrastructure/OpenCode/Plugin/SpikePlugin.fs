@@ -147,8 +147,7 @@ module SpikePlugin =
                                     | FamilyRecovery.FamilyReady _ ->
                                         let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-                                        let! outcome =
-                                            EnforcerHost.handleContinuation scope journal sid bloggerMessages
+                                        let! outcome = EnforcerHost.handleContinuation scope journal sid bloggerMessages
 
                                         match outcome with
                                         | EnforcerHost.ContinuationOutcome.ProjectMessages messages ->
@@ -165,11 +164,7 @@ module SpikePlugin =
 
                                             HostMessageProjection.replaceMessagesInPlace outObj projected
                                         | EnforcerHost.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
-                                            let projected =
-                                                if List.isEmpty messages then
-                                                    bloggerMessages
-                                                else
-                                                    messages
+                                            let projected = if List.isEmpty messages then bloggerMessages else messages
 
                                             HostMessageProjection.replaceMessagesInPlace outObj projected
 
