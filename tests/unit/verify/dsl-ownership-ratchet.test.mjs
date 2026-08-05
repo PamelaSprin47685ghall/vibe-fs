@@ -8,6 +8,10 @@
  * POSIX-normalized and relative to --root. A file/gate whose actual count exceeds its
  * baseline (0 when absent) prints "<file> <gate> <old> -> <new>" and exits non-zero.
  * A drop below baseline exits zero. Synthetic fixtures only — never production trees.
+ *
+ * M2 exemption: Application/** paths ending in Interpreter.fs raw-task is not counted
+ * (side-effect owners); every other gate in those files, and every gate elsewhere,
+ * still counts.
  */
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
@@ -138,4 +142,86 @@ test('DSL_OWNERSHIP_RATCHET_ignores_non_program_dirs', async (t) => {
   const out = output(result)
   assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${out}`)
   assert.ok(!out.includes('Infrastructure'), `expected no Infrastructure output, got: ${out}`)
+})
+
+test('DSL_OWNERSHIP_RATCHET_application_interpreter_raw_task_is_exempt', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Application/DummyInterpreter.fs'
+  const source = ['module DummyInterpreter', 'let run () = task { return 1 }'].join('\n')
+  fx.write(file, source)
+
+  // Fixture self-check: the raw-task violation exists in the text; only the
+  // Application/**/*Interpreter.fs exemption may drop it from the count.
+  const hits = scanText(source, file).filter((v) => v.gate === 'raw-task')
+  assert.equal(hits.length, 1)
+
+  // Interpreter files own their side effects: raw-task is exempt, exit 0.
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${out}`)
+  assert.ok(!out.includes('DummyInterpreter'), `expected no DummyInterpreter output, got: ${out}`)
+})
+
+test('DSL_OWNERSHIP_RATCHET_application_interpreter_other_gates_still_count', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Application/DummyInterpreter.fs'
+  const source = ['module DummyInterpreter', 'let mutable x = 1'].join('\n')
+  fx.write(file, source)
+
+  // Fixture self-check: exactly 1 mutable hit.
+  const hits = scanText(source, file).filter((v) => v.gate === 'mutable')
+  assert.equal(hits.length, 1)
+
+  // The exemption covers raw-task only: mutable still counts and must fail.
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
+  assert.ok(
+    out.includes('DummyInterpreter') && out.includes('mutable'),
+    `expected DummyInterpreter mutable hint, got: ${out}`,
+  )
+})
+
+test('DSL_OWNERSHIP_RATCHET_non_application_interpreter_raw_task_regression', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Domain/NotAnInterpreter.fs'
+  const source = ['module NotAnInterpreter', 'let run () = task { return 1 }'].join('\n')
+  fx.write(file, source)
+
+  // Fixture self-check: exactly 1 raw-task hit.
+  const hits = scanText(source, file).filter((v) => v.gate === 'raw-task')
+  assert.equal(hits.length, 1)
+
+  // Exemption is Application/**/*Interpreter.fs only: Domain files still fail.
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
+})
+
+test('DSL_OWNERSHIP_RATCHET_application_non_interpreter_raw_task_regression', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Application/Helpers.fs'
+  const source = ['module Helpers', 'let run () = task { return 1 }'].join('\n')
+  fx.write(file, source)
+
+  // Fixture self-check: exactly 1 raw-task hit.
+  const hits = scanText(source, file).filter((v) => v.gate === 'raw-task')
+  assert.equal(hits.length, 1)
+
+  // File must end with Interpreter.fs to be exempt: Helpers.fs still fails.
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
 })

@@ -29,6 +29,11 @@ const PROGRAM_SUBDIRS = PROGRAM_DIRS.map((dir) =>
 export const isProgramRelPath = (relPath) =>
   PROGRAM_SUBDIRS.some((dir) => relPath === dir || relPath.startsWith(dir + '/'))
 
+/** True when relPath is an Application/**\/*Interpreter.fs (M2 side-effect owner).
+ *  Such files own their side effects: raw-task is exempt from the ratchet. */
+export const isApplicationInterpreter = (relPath) =>
+  relPath.startsWith('Application/') && relPath.endsWith('Interpreter.fs')
+
 export const DEFAULT_OUT = join(
   dirname(fileURLToPath(import.meta.url)),
   'dsl-ownership-ratchet-baseline.json',
@@ -66,7 +71,12 @@ const scanRoot = (root) => {
       text: readFileSync(file, 'utf8'),
     }))
     .filter((entry) => isProgramRelPath(entry.file))
-  return countByFileGate(scanFiles(entries))
+  const counts = countByFileGate(scanFiles(entries))
+  for (const [file, gates] of counts) {
+    if (isApplicationInterpreter(file)) gates.delete('raw-task')
+    if (gates.size === 0) counts.delete(file)
+  }
+  return counts
 }
 
 const runCli = () => {
