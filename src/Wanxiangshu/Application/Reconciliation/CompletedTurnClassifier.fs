@@ -109,7 +109,10 @@ module CompletedTurnClassifier =
             // abort/error may still be racing the idle wake-up.
             | None -> TurnUnknown
 
-    let needsZeroWidthContinuation (role: AgentRole option) (outcome: TurnOutcome) (_parts: MessagePart array) =
+    /// ARCH-011: named for the typed occasion (unfinished interaction), not for any
+    /// character feature of the repair payload. `_parts` is deliberately ignored: a
+    /// `TurnInProgress`/`TurnNeedsContinuation` outcome already carries the decision.
+    let needsInteractionRepair (role: AgentRole option) (outcome: TurnOutcome) (_parts: MessagePart array) =
         supportsInteractionRepair role
         && (match outcome with
             | TurnInProgress
