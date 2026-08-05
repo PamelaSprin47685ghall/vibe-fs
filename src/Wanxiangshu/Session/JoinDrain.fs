@@ -302,9 +302,7 @@ module JoinDrain =
                         | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
                             match HandleCompletionCodec.decodeBody body with
                             | LegacyFalseAbort _ ->
-                                ignore (
-                                    tryMigrateRetiredFalseAbort durable parentId record blobRef blobDigest
-                                )
+                                ignore (tryMigrateRetiredFalseAbort durable parentId record blobRef blobDigest)
                             | _ -> ()
                         | _ -> ()
                     | _ -> ()

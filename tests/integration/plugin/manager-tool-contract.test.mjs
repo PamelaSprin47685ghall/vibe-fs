@@ -80,6 +80,8 @@ const EXPECTED_ARGUMENTS = {
   inspector: { agent: 'required', prompt: 'optional', prompts: 'optional' },
   join: {},
   list: {},
+  mv: { source: 'required', destination: 'required' },
+  rm: { path: 'required' },
   verdict: { verdict: 'required' },
 }
 
@@ -153,6 +155,8 @@ const KNOWN_TOOL_KEYS = [
   'edit',
   'glob',
   'grep',
+  'mv',
+  'rm',
   'inspector',
   'coder',
   'executor',
@@ -165,7 +169,7 @@ const KNOWN_TOOL_KEYS = [
 const ALLOWED_TOOLS = {
   orchestrator: ['fork-manager', 'join'],
   manager: ['fork', 'join', 'list'],
-  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector'],
+  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm'],
   inspector: ['read', 'glob', 'grep', 'executor'],
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
   browser: ['read', 'glob', 'grep', 'network'],

@@ -10,7 +10,7 @@ namespace Wanxiangshu.Domain
 /// format holes. A `sprintf` here would be how a session id or a token count gets into a prompt that
 /// must not carry one.
 ///
-/// ── two texts deliberately NOT here ─────────────────────────────────────────
+/// ── one text deliberately NOT here ─────────────────────────────────────────
 ///
 /// `ReviewChallenge.Text` now carries a `# ` prefix before it is sent. The prefix does not break
 /// REVIEW-003: `PerfectChallengeIssued` records the digest of the final sent bytes
@@ -19,12 +19,14 @@ namespace Wanxiangshu.Domain
 /// every confirmation while looking like correct fail-closed behaviour — the failure mode
 /// `ReviewChallenge`'s own comment warns about.
 ///
-/// The zero-width continuation (`"\u200B"`, `TurnCompletionProgram.fs:215`) stays raw because its
-/// emptiness IS its meaning. It is transport rather than semantic delta; a `# ` prefix would make it
-/// non-empty and promote a transport nudge into the Companion's semantic history.
-///
-/// Both exclusions are ARCH-010's own: a payload whose bytes carry a domain contract is not a
-/// rendering choice, and the clause governs LLM-facing notation rather than transport markers.
+/// ARCH-011 (状态先于表示): the repair's identity lives in the typed `repairKind`
+/// (FALLBACK-008 claim scope), never in the payload bytes. The old zero-width continuation
+/// (`"\u200B"`) encoded "this is a transport poke" in the string itself and let the Companion
+/// recover it by stripping U+200B and re-testing emptiness — reverse inference through
+/// character features, which ARCH-011 forbids. Its consumer (`CompanionDelta`) is gone, and the
+/// bytes were rejected as whitespace-only by Anthropic. `InteractionRepairContinue` renders the
+/// same poke as a TOML comment: non-whitespace to every validator, instruction-only per
+/// ARCH-010, and identity-free by construction.
 [<RequireQualifiedAccess>]
 module RuntimeNudge =
 
@@ -67,6 +69,16 @@ module RuntimeNudge =
     /// `SyntheticToml.comment ""` renders as `#`.
     // ponytail: one-byte nudge; expand only if bare `#` stops eliciting the report.
     let MissingFinalReportInstructions = [ "" ]
+
+    /// Interaction repair that continues an in-progress turn (finish=tool-calls with no
+    /// tool part, or a reasoning-only stop). ARCH-011: the typed `repairKind` is the
+    /// identity; this text only asks the model to continue. Rendered as a comment per
+    /// ARCH-010, and non-whitespace to every validator (the `"\u200B"` predecessor was
+    /// rejected as whitespace-only by Anthropic).
+    let InteractionRepairContinueInstructions = [ "Continue." ]
+
+    let interactionRepairContinue =
+        SyntheticToml.document InteractionRepairContinueInstructions []
 
     let providerRetry = SyntheticToml.document ProviderRetryInstructions []
     let backgroundJoinGuard = SyntheticToml.document BackgroundJoinGuardInstructions []

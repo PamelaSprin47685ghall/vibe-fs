@@ -149,8 +149,7 @@ module HandleCompletionCodec =
                         )
                     | _ -> Invalid(CompletionDecodeError.UnknownFinality status)
                 | None -> Invalid CompletionDecodeError.MissingSchemaVersion
-                | Some version when version <> "2" ->
-                    Invalid(CompletionDecodeError.UnknownSchemaVersion version)
+                | Some version when version <> "2" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
                 | Some _ ->
                     match finalityField with
                     | None -> Invalid CompletionDecodeError.MissingFinality

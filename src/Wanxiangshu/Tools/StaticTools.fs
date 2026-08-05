@@ -24,6 +24,15 @@ module NodeFs =
     [<Import("statSync", "fs")>]
     let statSync (path: string) : obj = jsNative
 
+    [<Import("readdirSync", "fs")>]
+    let readdirSync (path: string) : obj = jsNative
+
+    [<Import("renameSync", "fs")>]
+    let renameSync (source: string, destination: string) : unit = jsNative
+
+    [<Import("rmSync", "fs")>]
+    let rmSync (path: string, options: obj) : unit = jsNative
+
 module NodeProcess =
     [<Import("platform", "process")>]
     let platform: string = jsNative
@@ -42,6 +51,8 @@ module StaticTools =
         | ToolPermission.Edit -> "edit"
         | ToolPermission.Glob -> "glob"
         | ToolPermission.Grep -> "grep"
+        | ToolPermission.Move -> "mv"
+        | ToolPermission.Remove -> "rm"
         | ToolPermission.Inspector -> "inspector"
         | ToolPermission.Coder -> "coder"
         | ToolPermission.Exec -> "executor"
@@ -67,6 +78,8 @@ module StaticTools =
               "edit"
               "glob"
               "grep"
+              "mv"
+              "rm"
               "inspector"
               "coder"
               "executor"

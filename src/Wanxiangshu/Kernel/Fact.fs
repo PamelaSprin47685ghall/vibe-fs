@@ -65,8 +65,7 @@ module Fact =
     /// Clean-break: why a durable completion cell was rejected as false finality.
     /// Legacy abort blobs are Host observations written as if they were terminals.
     [<RequireQualifiedAccess>]
-    type FalseCompletionReason =
-        | LegacyAbortWasObservation
+    type FalseCompletionReason = | LegacyAbortWasObservation
 
     [<RequireQualifiedAccess>]
     type AgentFact =

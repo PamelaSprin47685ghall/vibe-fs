@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- AGENT-016：managed agent Host-final permission 固定 `external_directory = allow`，覆盖 Host 默认 ask，取消项目外路径的交互确认。
+- AGENT-019：managed agent Host-final permission 固定 `external_directory = allow`，覆盖 Host 默认 ask，取消项目外路径的交互确认。
 
 ## 0.5.3
 

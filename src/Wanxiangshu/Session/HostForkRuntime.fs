@@ -305,13 +305,15 @@ type HostForkRuntime
                     else
                         Ok()
 
-    /// P0-RECOVERY-JOIN-001: permit-gated join. Production JoinTool uses this path.
+    /// P0-RECOVERY-JOIN-001: permit-gated single-result join for legacy interpreters
+    /// and internal waiters. Production JoinTool uses JoinAvailable.
     member this.JoinWithPermit(permit: FamilyRecoveryPermit, ?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         match this.validatePermit permit with
         | Error e -> Task.FromResult(Error e)
         | Ok() -> this.Join(?timeoutMs = timeoutMs)
 
-    /// EXEC-018 batch join under FamilyRecoveryPermit (next JoinTool path).
+    /// EXEC-018 batch join under FamilyRecoveryPermit.
+    /// Production JoinTool uses this path.
     member this.JoinAvailableWithPermit
         (permit: FamilyRecoveryPermit, maxCount: int, interrupt: Task<unit>)
         : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
@@ -412,13 +414,21 @@ type HostForkRuntime
             return! loop ()
         }
 
-    /// Compatibility single-result join (timeout budget). New callers: JoinAvailable.
+    /// Compatibility single-result join. None is unbounded; Some is an explicit
+    /// internal waiter budget. New model callers use JoinAvailable.
     member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
-        let budgetMs = defaultArg timeoutMs 600_000
+        let budgetMs = timeoutMs
 
         task {
             do! this.AwaitRecovery()
-            let interrupt = PtyTiming.timerTask budgetMs
+
+            let interrupt =
+                match budgetMs with
+                | Some milliseconds -> PtyTiming.timerTask milliseconds
+                | None ->
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+                        .Task
+
             let! outcome = this.JoinAvailable(1, interrupt)
 
             match outcome with

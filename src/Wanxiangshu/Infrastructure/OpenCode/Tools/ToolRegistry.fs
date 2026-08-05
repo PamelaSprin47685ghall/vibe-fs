@@ -27,6 +27,8 @@ module ToolRegistry =
         | "verdict" -> fun r -> Roles.isAllowed r ToolPermission.Verdict
         | "executor" -> fun r -> Roles.isAllowed r ToolPermission.Exec
         | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
+        | "mv" -> fun r -> Roles.isAllowed r ToolPermission.Move
+        | "rm" -> fun r -> Roles.isAllowed r ToolPermission.Remove
         | "coder" -> fun r -> r = Role.DevOps
         | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
         | _ -> fun _ -> false
@@ -79,6 +81,9 @@ module ToolRegistry =
               ExecutorTool.spec factory runtime
               InspectorTool.spec factory runtime
               CoderTool.spec factory runtime
+              // AGENT-016/017/018: Coder-only POSIX mv/rm.
+              FileMutationTools.mvSpec factory
+              FileMutationTools.rmSpec factory
               // ENFORCER-010: Blogger's tool set is exactly { blog }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               BlogTool.spec factory runtime parkedHost ]

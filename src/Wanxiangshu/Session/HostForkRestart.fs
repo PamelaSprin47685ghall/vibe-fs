@@ -65,11 +65,7 @@ module HostForkRestart =
         }
 
     /// Clean-break: retired handle whose last cell was a legacy abort → replacement once.
-    let private migrateRetiredIfFalseAbort
-        (journal: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        : unit =
+    let private migrateRetiredIfFalseAbort (journal: AgentJournal) (parentId: SessionId) (record: HandleRecord) : unit =
         match record.LastCompletion with
         | None -> ()
         | Some cell ->
@@ -79,9 +75,7 @@ module HostForkRestart =
                 | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
                     match HandleCompletionCodec.decodeBody body with
                     | LegacyFalseAbort _ ->
-                        ignore (
-                            JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest
-                        )
+                        ignore (JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest)
                     | _ -> ()
                 | _ -> ()
             | _ -> ()
@@ -133,12 +127,7 @@ module HostForkRestart =
                                 HandleCompletionCodec.tryMaterialiseRunCompletion record agentId decoded
 
                             ignore (
-                                JoinableCompletion.fromDecoded
-                                    agentId
-                                    record.Handle
-                                    record.ChildSessionId
-                                    decoded
-                                    body
+                                JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
                             )
 
                             runtime.PublishCompletion completion
@@ -155,8 +144,7 @@ module HostForkRestart =
                                            Reason = FalseCompletionReason.LegacyAbortWasObservation |})
                                     journal
                             with
-                            | Ok _ ->
-                                runtime.MarkInterrupted(agentId, "host restart: legacy false abort rejected")
+                            | Ok _ -> runtime.MarkInterrupted(agentId, "host restart: legacy false abort rejected")
                             | Error failure ->
                                 runtime.MarkInterrupted(
                                     agentId,
@@ -164,8 +152,7 @@ module HostForkRestart =
                                         "host restart: false abort reject failed: %s"
                                         (JournalAppendFailure.describe failure)
                                 )
-                        | Invalid _ ->
-                            runtime.MarkInterrupted(agentId, "host restart: invalid completion blob")
+                        | Invalid _ -> runtime.MarkInterrupted(agentId, "host restart: invalid completion blob")
                     | Ok(None, _, _) ->
                         do!
                             recoverChild

@@ -291,8 +291,14 @@ module TurnCompletionProgram =
             if managerJobHandedOff then
                 completeReviewerOrAssistant false |> ignore
                 AsyncSupport.completedTask ()
-            elif CompletedTurnClassifier.needsZeroWidthContinuation turn.AgentRole turn.Outcome turn.Parts then
-                sendRepair sessionPort eventPort journal turn "\u200B" "zero-width"
+            elif CompletedTurnClassifier.needsInteractionRepair turn.AgentRole turn.Outcome turn.Parts then
+                sendRepair
+                    sessionPort
+                    eventPort
+                    journal
+                    turn
+                    RuntimeNudge.interactionRepairContinue
+                    "interaction-repair"
             else
                 AsyncSupport.completedTask ()
         | TurnNeedsContinuation _ when reviewerAlreadyConfirmed ->
