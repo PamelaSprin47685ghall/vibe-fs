@@ -2,14 +2,16 @@
 
 ## 0. Host 源代码位置（最重要的一条）
 
-`../opencode` 是 OpenCode 的完整源代码仓库。
+`../opencode` 是 OpenCode 的完整源代码仓库（若存在）。本机当前无该兄弟仓库；
+Host 行为以发布二进制为准（见下），源码路径表保留为「源码可用时的地图」。
 
 ```text
-/home/kunweiz/Desktop/vibe/opencode        ← Host 源码（当前 1.18.10）
-/home/kunweiz/Desktop/vibe/wanxiangshu     ← 本仓库（插件）
+../opencode                            ← Host 源码（若存在；本机当前缺失）
+/Users/yuanxi/Workwork/vibe-fs-wt      ← 本仓库（插件）
 ```
 
 任何关于 Host 行为的问题，先读源码，不要猜、不要只读 `.d.ts`、不要只做黑盒实验。
+源码缺失时，用发布二进制的 bundled JS 交叉验证（见下）。
 
 常用位置：
 
@@ -28,13 +30,14 @@
 看类型会得出"transform 时无任何身份可用"的错误结论；读 `prompt.ts` 才能发现
 assistant message 在 transform 之前已经创建并持久化。
 
-已发布版本二进制在 `~/.cache/.bun/install/global/node_modules/opencode-ai/bin/opencode.exe`，
+已发布版本二进制在 `~/.bun/install/global/node_modules/opencode-ai/bin/opencode.exe`
+（`~/.bun/bin/opencode` 符号链接指向它；当前 1.18.13），
 可用 `strings` 提取 bundled JS 交叉验证源码与实际运行版本是否一致。
 
 判断 SSOT 条款"Host 能力不足"之前，必须先读源码。 `ARCH-003` 禁止修改 Host 本体，
 但不禁止阅读它——恰恰相反，只有读过才能证明某个 Hook 组合确实不存在。
 
-生产源码唯一根 `src/Wanxiangshu/`（190 个 `.fs`，`Wanxiangshu.fsproj` 编译全部）。
+生产源码唯一根 `src/Wanxiangshu/`（209 个 `.fs`，`Wanxiangshu.fsproj` 编译全部）。
 布局纪律由 `scripts/repository-layout-gate.mjs`（`gate:layout`）机器验证：根目录白名单、
 生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约：Fable 输出
 `dist/`，npm 包 main 指向 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`。
@@ -72,6 +75,7 @@ assistant message 在 transform 之前已经创建并持久化。
 | 测试、门禁、canary 剧本 | spec/10 | conformance Verify 段 |
 | Journal、事实、持久化 | spec/11 | — |
 | 运行时合成 TOML 记法 | spec/13（`ARCH-010`） | conformance ARCH-010 行 + `tests/unit/Context/synthetic-toml.test.mjs` |
+| LLM 退化循环检测与强杀恢复 | spec/17（`LOOP-`） | conformance LOOP 段 + `tests/unit/Domain/loop-*.test.mjs` |
 | Strength / Enforcer nudge / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `docs/rfcs/` 各文件 Status 字段 |
 | 任何生产代码改动 | spec/01（架构 DNA） | `spec/conformance.md`（由 `spec/conformance.toml` 生成） |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
@@ -118,7 +122,7 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 | `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
 | `docs/rfcs/` | 未来设计 RFC（strength / student-teacher / enforcer-nudge）；非产品合同 |
 | `resources/` | 运行时静态资源：prompts/ + enforcer/catalog.json（随 npm pack 发布） |
-| `spec/` | 0.5.3 过渡：coverage.toml 骨架；条款正文仍在 spec/ |
+| `spec/coverage.toml` | 由 `spec/conformance.toml` 生成的过渡覆盖映射（勿手改） |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
@@ -148,7 +152,12 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 
 ### 当前开发阶段
 
-0.5.2 全 SSOT 收敛已发布：Active 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
+0.5.3 已发布（tag `v0.5.3`）：仓库规范化（单一 manifest、`resources/` 布局、
+spec/ 条款文档、`dist/` 构建输出、统一 `tests/` 树、Wanxiangshu 项目改名去掉
+`.Next`、数据驱动 enforcer catalog），无运行时行为变化。STATUS ledger 退役进
+`spec/conformance.toml` / `spec/conformance.md`。
+
+Active SSOT 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
 0 PURE_CORE_ONLY / 0 NOT_IMPLEMENTED。Active 子集 = spec/01–13 + spec/15 Blogger
 工具化 + spec/17 LOOP。spec/14 Strength 与 spec/16 Student&Teacher 已迁
 `docs/rfcs/strength.md` / `docs/rfcs/student-teacher.md`，ENFORCER nudge/throttle 在
@@ -160,8 +169,9 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
   与 `HostSignalBootstrap.fs` 进入生产路径，`AttemptPlanner.plan` 两个调用点）；
   X-A–X-D layer-4 canary 已交付（`tests/e2e/tests/x-recovery-canary.mjs` + 四个 TOML 剧本）
 - `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
-- V2 runner `compactAfterOverflow` 不遵守 `compaction.auto=false`：Host 上游观察项
-  （ARCH-003，不可在本仓修；归档见 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §7）
+- Host compaction 的 `compactIfNeeded` 估算路径（`packages/core/src/session/compaction.ts`）
+  无插件 hook 可达：预防层启动门禁因此必须含运行时探测（HOST-006 收容层 + PERSIST-010
+  `ContextReanchored`；归档见 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §7）
 
 ---
 
@@ -265,19 +275,21 @@ P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMA
 npm run gate:static            # 第 0 层：layout + ssot + conformance + architecture + docs + toml + budget + surface + role-matrix
 npm run gate:shock             # 第 0 层：静态残留审计 + 单一写入口（shock-audit.mjs）
 
-npm run build                                # 生产 Fable → dist（dotnet fable precompile src/Wanxiangshu/Wanxiangshu.fsproj）
+npm run build                                # 生产 Fable → dist（clean-fable-output.mjs 清空 + dotnet fable precompile src/Wanxiangshu/Wanxiangshu.fsproj -o dist）
 
 npm run test                   # 第 1–3 层（mjs，无编译步骤）
 npm run test:harness           # gate-testkit：mock 森林与隔离自检
 npm run test:e2e              # 单轮 canary（run-canary-staggered.mjs，事件驱动错峰全并行）
 npm run test:e2e:three        # canary 三轮（CANARY_REPEAT=3）
-npm run check:release          # gate:static → build → unit → harness → e2e×3 → npm pack --dry-run
+npm run check                  # gate:static → build → unit → harness
+npm run check:release          # check + e2e×3 + npm pack --dry-run
 ```
 
 `test:unit` 只是 `test` 的别名（`tests-next/` 已删除，残余 F# 套件归零）。
 `gate:toml`（`scripts/toml-format.mjs`）：剧本 TOML 必须与 formatter 输出逐字节一致。
 `gate:budget`（`scripts/budget-gate.mjs`）：`tests/e2e/**`、
-`scripts/**`、`tests/unit/runner.mjs` 里不得出现 ≥1000 的计时字面量，值必须来自
+`tests/support/**`、
+`scripts/**` 与 `tests/unit/runner.mjs` 里不得出现 ≥1000 的计时字面量，值必须来自
 `tests/e2e/time-budget.js`。判据是量级即语义线——轮询切片必须比它所受的界更快，
 故合法切片按构造 < 1000ms；≥1000ms 者本身即预算。门禁无豁免通道，字符串也不得把预算
 重述成带单位的时长。
@@ -313,7 +325,7 @@ fenced code block 不触碰。
 叫 `SUITE_TIMEOUT_MS` 会让下一个人把它当主判据。
 
 启动阶段（`spawn` → ready）同样不许只有兜底覆盖。`tests/e2e/readiness.js` 把它
-拆成 6 级因果阶梯，每级独立预算，到达即重新计时；总启动时长因此无界，被界住的是静默。
+拆成 9 级因果阶梯，每级独立预算，到达即重新计时；总启动时长因此无界，被界住的是静默。
 阶梯只前进不回退——重试的健康检查若能重置，重试循环会永久续期启动预算。匹配子进程
 已有的计时行本身，不新增为门禁而生的证据：必须为门禁额外发射的证据，门禁无法信任。
 
@@ -369,7 +381,8 @@ tests/unit/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试（Conte
   `bloggerToml`、`bloggerDelta`、`companionPrompt`、`companionIdentity`、
   `companionProjection`、`hostCompaction`、`probeSelection`、`attemptPlanner`、`xPrefix`、
   `recoverySlot`、`providerInputSeal`、`reviewProjection`、`providerProjection`、
-  `handleProjection`、`orchestratorProjection` 等命名空间
+  `handleProjection`、`orchestratorProjection`、`loopDetector`、`loopSensor`、
+  `xTrace`、`xTraceCapture`、`strength`、`studentTeacher`、`enforcer` 等命名空间
 
 三个已实证的静默陷阱，全部由 facade 封死，`domain.meta.test.mjs` 锁住：
 
@@ -408,7 +421,7 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 
 森林设计已定稿并合入 `spec/10`（VERIFY-003）与 conformance Verify 段，历史记档在
 `docs/archive/shock-anneal-2026/FINAL-REPORT.md`。剧本位于 `tests/e2e/scripts/*.toml`
-（18 个），canary 清单由 `canary-manifest.js` 从文件系统派生。
+（23 个），canary 清单由 `canary-manifest.js` 从文件系统派生。
 
 已落地的构件（`tests/e2e/`）：
 
@@ -418,7 +431,7 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 | `scenario-runtime.js` | 单剧本运行时（前缀索引、seal 屏障、`clearSeals`），取代已删的 `script-loader.js` |
 | `delivery-plan.js` | 故障与内容正交，物理投递计数 |
 | `cold-boundary.js` | 只认显式声明的冷边界 |
-| `scenario-schema.js` | TOML 编译器，8 个根键 + 24 个 flow 动词白名单 + 载入期校验 |
+| `scenario-schema.js` | TOML 编译器，8 个根键 + 26 个 flow 动词白名单 + 载入期校验 |
 | `scenario-runner.js` / `scenario-turn.js` / `scenario-http.js` / `scenario-parallel.js` / `scenario-paths.js` | 单剧本运行、turn 会话、HTTP 通道、并行变体、路径隔离 |
 | `strict-mock-provider.js` | provider 严格 mock：无 scenario 匹配一律记未匹配（K9 已删旧匹配路径） |
 | `provider-wire.js` | testkit 侧仅解码 OpenAI wire，再调生产 projection（VERIFY-007 边界） |
@@ -426,9 +439,9 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 | `stability-checker.js` | VERIFY-004 三轮 + leak check（`run-canary-staggered.mjs` 调用） |
 | `canary-driver.mjs` / `lane.mjs` | canary 驱动与 lane 记账 |
 | `scripts/run-canary-staggered.mjs` | 事件驱动错峰全并行 runner：admitted canary 的首个 host-ready「bark」触发下一个启动，无固定 sleep |
-| `legacy-fields.js` | 20 个退役字段，出现即拒绝载入 |
+| `legacy-fields.js` | 19 个退役字段，出现即拒绝载入 |
 | `canary-manifest.js` | canary 清单由文件系统派生，计数漂移在结构上不可能发生 |
-| `readiness.js` | 启动 6 级就绪阶梯，单调前进 |
+| `readiness.js` | 启动 9 级就绪阶梯，单调前进 |
 | `watchdog.js` | `advance({blocking})` 判据续期，`unref`，触发时 dump 最后进展 |
 | `time-budget.js` | 全部 wall-clock 兜底的单一来源，逐条带理由（VERIFY-004） |
 | `scripts/toml-format.mjs` | 行式 formatter，`gate:toml` 强制逐字节一致 |
@@ -535,7 +548,8 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 - Pre-0.5.0 journal 不猜测迁移，启动发现旧 schema 直接失败（PERSIST-005）
 - 外部副作用走类型化 Requested → 幂等执行 → Accepted（PERSIST-009；worktree=`WorktreeCreateRequested`/`WorktreeCreated`，publish=`PublishClaimed`/`Published`）
 - 序列化时间戳必须归一化到 UTC offset（PERSIST-001）。否则同一事实在不同时区产出不同
-  字节，快照指纹与跨机重放全部失效。`test` 跑三个时区正是为了逼出这一类
+  字节，快照指纹与跨机重放全部失效。`domain.meta.test.mjs` 在 UTC / Asia/Shanghai /
+  America/Los_Angeles 三个时区下断言 `isExpired` 与 `remainingMs` 不随环境漂移
 - Projection 的 create 类操作必须幂等（`createJob` 曾无条件覆盖，恢复重放会抹掉进度）
 
 ---
