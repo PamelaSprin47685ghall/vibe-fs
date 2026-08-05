@@ -37,8 +37,8 @@ assistant message 在 transform 之前已经创建并持久化。
 判断 SSOT 条款"Host 能力不足"之前，必须先读源码。 `ARCH-003` 禁止修改 Host 本体，
 但不禁止阅读它——恰恰相反，只有读过才能证明某个 Hook 组合确实不存在。
 
-生产源码唯一根 `src/Wanxiangshu/`（219 个 `.fs`，`Wanxiangshu.fsproj` 编译全部；
-`scripts/checks/architecture.mjs` 实证输出「219 文件」）。
+生产源码唯一根 `src/Wanxiangshu/`（220 个 `.fs`，`Wanxiangshu.fsproj` 编译全部；
+`scripts/checks/architecture.mjs` 实证输出「220 文件」）。
 布局纪律由 `scripts/checks/architecture.mjs`（`npm run lint` 第 2 步）机器验证：
 `src/` 下唯一 F# 根、fsproj 每文件恰编译一次、无盘上未编译/已声明缺失文件、
 Kernel/Domain 不引用上层命名空间与 `Fable.Core.JsInterop`、package resource 读取
@@ -185,9 +185,12 @@ Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具�
   `XWire.fs` / `CompanionTransform.fs`）；X-A–X-D layer-4 canary 已交付
   （`tests/e2e/cases/context-recovery.test.mjs` + `tests/e2e/scenarios/x-*.toml` 四个剧本）
 - `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
-- Host compaction 预防/收容：预防层关闭 `automatic`/`overflow`/`autocontinue`/`prune`
-  并在首轮启动做运行时探测，收容层由 `HostCompactionGate.fs` 把任何观察到的
-  compaction pseudo-run 转成一条 `ContextReanchored`（HOST-006 / PERSIST-010）
+- Host compaction 预防/收容（HOST-006 / PERSIST-010）：Host 的 `compactIfNeeded`
+  估算路径（`../opencode/packages/core/src/session/compaction.ts`）无插件
+  hook 可达，因此预防层不能只写配置——必须关闭 `automatic`/`overflow`/
+  `autocontinue`/`prune` 并在首轮启动做运行时探测；收容层由
+  `HostCompactionGate.fs` 把任何观察到的 compaction pseudo-run 转成一条
+  `ContextReanchored`
 
 ---
 
@@ -227,11 +230,13 @@ Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具�
 没有已提交的探针时，X 看到的就是原始历史——这是 spec/12 的正确行为，不是降级。
 
 手工 `/compact` 无法阻断（Host 无配置开关也无可否决 Hook，属官方支持用法）。
-解法是两层（HOST-006）：预防层关掉 `automatic`/`overflow`/`autocontinue`/`prune`
-并在首轮启动做运行时探测（首个 managed session 完成第一轮请求后 compaction
-pseudo-run 必须为零，否则 `HostContractUnsupported` 启动失败），
-收容层把任何观察到的 compaction 转成 `ContextReanchored` 重锚
-（`HostCompactionGate.fs`，PERSIST-010）。
+Host 的 `compactIfNeeded` 估算路径同样无插件 hook 可达，因此配置关闭本身
+不能单独构成证明。解法是两层（HOST-006）：预防层关掉
+`automatic`/`overflow`/`autocontinue`/`prune` 并在首轮启动做运行时探测
+（首个 managed session 完成第一轮请求后 compaction pseudo-run 必须为零，
+否则 `HostContractUnsupported` 启动失败），收容层把任何观察到的
+compaction 转成 `ContextReanchored` 重锚（`HostCompactionGate.fs`，
+PERSIST-010）。
 
 ---
 
@@ -443,6 +448,7 @@ canary 清单由 `tests/e2e/support/manifest.mjs` 从文件系统派生（`CANAR
 | `support/delivery-plan.js` | 故障与内容正交，物理投递计数（`attempts` 一基） |
 | `support/cold-boundary.js` | 只认显式声明的冷边界 |
 | `support/scenario-schema.js` | TOML 编译器，8 个根键 + 26 个 flow 动词白名单 + 载入期校验（含死边可达性不动点） |
+| `support/legacy-fields.js` | 20 个退役字段，出现即拒绝载入 |
 | `support/scenario-runner.js` / `scenario-turn.js` / `scenario-http.js` / `scenario-parallel.js` / `scenario-paths.js` | 单剧本运行、turn 会话、HTTP 通道、并行变体、路径隔离 |
 | `support/strict-mock-*.js`（provider/server/sse/responses/matches/decorate/state/signals） | provider 严格 mock 拆分：无 scenario 匹配一律记未匹配 |
 | `support/provider-wire.js` | testkit 侧仅解码 OpenAI wire，再调生产 projection（VERIFY-007 边界） |
