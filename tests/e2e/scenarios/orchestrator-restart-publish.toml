@@ -71,7 +71,8 @@ flow = [
   # started — which is what makes "the restored job resumes" a claim about production
   # rather than about what the harness swapped in.
   # Completion = Published journal fact; `orch.2` covers the restart race path (the
-  # pre-restart join already answered before the crash).
+  # recovered run answering the old turn again: interrupted join re-delivery, or the
+  # pre-crash join's step-2 continuation).
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
   { wait = "orch-continue.0" },
   { wait = "manager.0" },
