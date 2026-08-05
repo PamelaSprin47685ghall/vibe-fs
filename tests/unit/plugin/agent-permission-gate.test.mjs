@@ -94,7 +94,7 @@ const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agen
 
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog']
+  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog']
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
@@ -102,7 +102,7 @@ const allowList = (config, name) => {
 const ROLE_ALLOW = {
   Manager: ['fork', 'join', 'list'],
   Orchestrator: ['fork-manager', 'join'],
-  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector'],
+  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm'],
   Inspector: ['read', 'glob', 'grep', 'executor'],
   Browser: ['read', 'glob', 'grep', 'network'],
   Meditator: ['read', 'glob', 'grep', 'inspector'],
@@ -221,6 +221,8 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       edit: 'Edit',
       glob: 'Glob',
       grep: 'Grep',
+      mv: 'Move',
+      rm: 'Remove',
       inspector: 'Inspector',
       executor: 'Exec',
       coder: 'Coder',

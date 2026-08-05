@@ -224,6 +224,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/CoderTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BlogTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/VerdictTool.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>
