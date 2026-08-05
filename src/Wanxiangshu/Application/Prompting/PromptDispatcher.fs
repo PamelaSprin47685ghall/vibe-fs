@@ -154,7 +154,7 @@ module PromptDispatcher =
             match Map.tryFind key projection.PendingClaims with
             | Some claim when
                 claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                   PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
                 ->
                 match claim.EffectiveAgent with
                 | None -> Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
