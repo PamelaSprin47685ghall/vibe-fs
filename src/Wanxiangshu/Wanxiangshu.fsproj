@@ -140,6 +140,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/CanonicalJson.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/Projection.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Events.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedTerminalBus.fs"/>

@@ -223,6 +223,17 @@ module SpikePlugin =
                             | None -> ()
                         | None -> ()
 
+                        // HOST-013: the pair-programming thought marker. Runs
+                        // after XTrace capture (the marker never enters the
+                        // trace) and before ReviewSeal (the seal covers the
+                        // final bytes the provider receives). Idempotent per
+                        // anchor; no anchor → untouched.
+                        let messages = unbox<obj array> outObj?messages |> Array.toList
+
+                        match PairProgrammingThoughtTransform.tryInject projectionSessionIdOpt messages with
+                        | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
+                        | None -> ()
+
                         // REVIEW-010: seal LAST, and only after the Companion rewrite has
                         // mutated `outObj`. The seal must digest the message view the
                         // provider actually receives; sealing before the rewrite would
