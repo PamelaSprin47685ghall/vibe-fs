@@ -5,7 +5,7 @@ Product contract: no
 Runtime status: inactive
 Target version: undecided
 
-条款前缀：`STRENGTH-`。正文中「spec/13 — Projection Algebra」的引用保持历史语义，代数语义由本文档 STRENGTH-066…074 自洽承载。
+条款前缀：`STRENGTH-`。正文中「spec/13 — Projection Algebra」的引用已被 superseded 到 `spec/16 — Projection Algebra`，代数语义由本文档 STRENGTH-066…074 与 spec/16 共同承载。
 
 ---
 
@@ -34,7 +34,7 @@ Predict & Reduce Strength 用于识别主模型即将进行的机械性只读调
 13. 已提交的旁路工具批次在主模型投影中与普通历史工具调用字节一致。
 14. 训练流按受控概率纳入旁路请求符号；该概率由预测倾向的负反馈控制。
 15. 系统追求稳定、成本合理的闭环工作点，不声称识别反事实最优策略。
-16. 投影功能必须通过 typed DSL/组合子编写（spec/13 Projection Algebra）；领域事实和生命周期仍由 Journal Fold 与普通程序控制。
+16. 投影功能必须通过 typed DSL/组合子编写（spec/16 Projection Algebra）；领域事实和生命周期仍由 Journal Fold 与普通程序控制。
 17. 候选帧（Candidate Frame）采用「候选-消费-提升」两阶段语义：候选只对首次目标 attempt 可见，主 provider 确认消费后才 promote 为活动历史。
 18. Replica 使用 fast-replica/deep-replica 内部 Agent，只提供模型绑定，不决定 CanonicalRole。
 19. 训练状态只按 X 的 CanonicalRole 分桶，不按模型组合或版本细分。
@@ -956,7 +956,7 @@ ExecutionSurface 决定 Replica 的只读权限。
 
 所有策略参数都是集中式代码常量（PolicyConstants）。
 
-所有 provider-visible 历史都由同一个 Projection DSL（spec/13）家族产生。
+所有 provider-visible 历史都由同一个 Projection DSL（spec/16）家族产生。
 
 不为统计纯洁性增加模型对、版本、仓库或 Session 分桶。
 
@@ -1987,8 +1987,8 @@ Strength 不测量上下文窗口，不预测是否接近上限。
 
 # 十九、投影 DSL（全局架构，不属于 Strength 子模块）
 
-> 根据最终审阅裁决，Projection DSL 提升为全局基础设施 spec/13 — Projection Algebra（条款前缀 `PROJ-`）。
-> 以下条款是 STRENGTH 对 DSL 的使用规范。完整 DSL 定义见 spec/13。
+> 根据最终审阅裁决，Projection DSL 提升为全局基础设施 spec/16 — Projection Algebra（条款前缀 `PROJ-`）。
+> 以下条款是 STRENGTH 对 DSL 的使用规范。完整 DSL 定义见 spec/16。
 
 ## STRENGTH-066：采用 DSL/组合子
 
@@ -2664,9 +2664,9 @@ SatelliteTypes / SatelliteRuntime / SatelliteFold
 
 判据：退役符号残留数为零；Companion 行为无回归。
 
-## STRENGTH-086：阶段 A——spec/13 Projection DSL 迁移
+## STRENGTH-086：阶段 A——spec/16 Projection DSL 迁移
 
-先完成 spec/13（Projection Algebra）的 DSL 实现与迁移：
+先完成 spec/16（Projection Algebra）的 DSL 实现与迁移：
 
 ```text
 SemanticEvent
@@ -2679,7 +2679,7 @@ property tests
 追溯迁移所有旧投影（按 PROJ-008 顺序）
 ```
 
-在 spec/13 迁移完成前，不实现生产 Strength transform。
+在 spec/16 迁移完成前，不实现生产 Strength transform。
 
 ### PROJ-008 迁移顺序
 
@@ -3064,7 +3064,7 @@ provider 请求数才代表判断深度
 9. 跨 Session 的 identity 由确定性合成 ID 映射生成。
 10. 训练状态只按 X 的 CanonicalRole 分桶（Z_X 自身的角色不是分桶键），旁路标签按负反馈概率纳入。
 11. 所有策略参数是集中式代码常量。
-12. 投影 DSL（spec/13）是所有 provider-visible projection 的唯一生产路径。
+12. 投影 DSL（spec/16）是所有 provider-visible projection 的唯一生产路径。
 13. 目标是稳定合理，不是反事实最优。
 14. Z_X 无自身 epoch，按 ε(X) 渲染（STRENGTH-010）。
 15. Z_X 无恢复路径，失败即丢弃决策（STRENGTH-014）。
@@ -3113,7 +3113,7 @@ K ∈ {0,1,2}，按 provider 请求计数
 候选-消费-提升两阶段语义（候选只对首次 attempt 可见）
 统一 SemanticEventCursor（替代 TurnIndex+PartIndex）
 控制论负反馈（只按 X 的 CanonicalRole 分桶，两个独立控制环）
-typed projection DSL（spec/13，全局架构，所有投影的唯一生产路径）
+typed projection DSL（spec/16，全局架构，所有投影的唯一生产路径）
 所有策略参数集中在 PolicyConstants 中
 卫星结构层泛化（SatelliteContract + SatelliteRuntime，策略层不泛化）
 全局记号统一（规范位置 spec/99）
@@ -3185,7 +3185,7 @@ IMPLEMENT ONLY AFTER PROJECTION DSL MIGRATION AND HOST CANARIES
 | spec/11 | 语义 | PERSIST-010 新增 SatelliteLinked/Retired fold 规则；单调性条件改用切点 |
 | spec/12 | 机械 | CTX-011 probe 规则改为序关系；CTX-003 记号更新 |
 | spec/99 | 语义 | 新增规范符号表一节 |
-| spec/13 | 语义 | 阶段顺序按 Writeback 类分组；冲突规则泛化 |
+| spec/16 | 语义 | 阶段顺序按 Writeback 类分组；冲突规则泛化 |
 
 ## 纪律
 
@@ -3244,7 +3244,7 @@ IMPLEMENTATION          APPROVED AFTER C-04 & C-05
 ```text
 生产启用前置条件
     阶段 0（记号改革 + 卫星结构层）完成，退役符号残留数为零
-    阶段 A（spec/13 投影 DSL 迁移）完成，PROJ-008 六步全过
+    阶段 A（spec/16 投影 DSL 迁移）完成，PROJ-008 六步全过
     C-01 至 C-21 全部通过
     K1 灰度稳定
     K2 独立门禁通过
