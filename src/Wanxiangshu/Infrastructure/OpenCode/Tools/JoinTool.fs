@@ -1,12 +1,14 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
 /// join() waits for the owning runtime's next physical completion. Orchestrator
 /// join is routed to its ManagerJob publication mailbox by authority role.
+/// P0-RECOVERY-JOIN-001: FamilyReady permit before any join consume.
 module JoinTool =
 
     let private tString = ToolHostCodec.TString
@@ -22,6 +24,34 @@ module JoinTool =
         | ForkError.NotFound id -> "NOT_FOUND:" + id
         | ForkError.TimedOut -> "TIMED_OUT"
         | ForkError.TerminalMaterializationFailed id -> "TERMINAL_MATERIALIZATION_FAILED:" + id
+
+    let private recoveryBlocked (blocks: NonEmpty<RecoveryBlock>) =
+        let head = blocks.Head
+
+        let message =
+            match head with
+            | RecoveryBlock.RecoveryCoordinatorUnavailable sid ->
+                sprintf "family recovery blocked: coordinator unavailable for %s" (SessionId.value sid)
+            | RecoveryBlock.SnapshotUnreadable(sid, reason) ->
+                sprintf "family recovery blocked: snapshot unreadable %s (%s)" (SessionId.value sid) reason
+            | RecoveryBlock.MissingSession sid ->
+                sprintf "family recovery blocked: missing session %s" (SessionId.value sid)
+            | RecoveryBlock.LinkageConflict(parent, child) ->
+                sprintf
+                    "family recovery blocked: linkage conflict %s → %s"
+                    (SessionId.value parent)
+                    (SessionId.value child)
+            | RecoveryBlock.RecoveryCycle _ -> "family recovery blocked: recovery cycle"
+            | RecoveryBlock.PendingClaimUnknown(sid, _) ->
+                sprintf "family recovery blocked: pending claim unknown %s" (SessionId.value sid)
+            | RecoveryBlock.ChildRecoveryFailed(sid, reason) ->
+                sprintf "family recovery blocked: child %s (%s)" (SessionId.value sid) reason
+
+        ToolHostCodec.tomlObject
+            [ "error",
+              tTable
+                  [ "code", tString "RECOVERY_BLOCKED"
+                    "message", tString message ] ]
 
     let private encodeCompletion (runtime: HostForkRuntime) (completion: RunCompletion) =
         let isPty = runtime.IsPtyCompletion completion.RunId
@@ -85,30 +115,39 @@ module JoinTool =
                   "agent", tString agentName
                   "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ] ]
 
-    let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
+    let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) (context: HostToolContext) =
         task {
-            if scope.IsRole(context, Role.Orchestrator) then
-                let! verdict = scope.OrchestratorHostFor(context.SessionId).JoinPublished()
-                return ToolHostCodec.tomlObject [ "outcome", tString verdict ]
+            if String.IsNullOrWhiteSpace context.SessionId then
+                return ToolHostCodec.tomlObject [ "error", tString "Missing sessionID" ]
             else
-                match scope.RuntimeFor context with
-                | Error runtimeError -> return ToolHostCodec.tomlObject [ "error", tString runtimeError ]
-                | Ok runtime ->
-                    let detachAbort = context.AttachAbort(fun () -> runtime.Cancel())
+                let root = SessionId.create context.SessionId
+                let! recovery = scope.RequireFamilyRecovery root
 
-                    use _cleanup =
-                        { new IDisposable with
-                            member _.Dispose() = detachAbort () }
+                match recovery with
+                | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked blocks
+                | FamilyRecovery.FamilyReady _ ->
+                    if scope.IsRole(context, Role.Orchestrator) then
+                        let! verdict = scope.OrchestratorHostFor(context.SessionId).JoinPublished()
+                        return ToolHostCodec.tomlObject [ "outcome", tString verdict ]
+                    else
+                        match scope.RuntimeFor context with
+                        | Error runtimeError -> return ToolHostCodec.tomlObject [ "error", tString runtimeError ]
+                        | Ok runtime ->
+                            let detachAbort = context.AttachAbort(fun () -> runtime.Cancel())
 
-                    match! runtime.Join() with
-                    | Ok completion -> return encodeCompletion runtime completion
-                    | Error joinError ->
-                        return
-                            ToolHostCodec.tomlObject
-                                [ "error",
-                                  tTable
-                                      [ "code", tString (errorCode joinError)
-                                        "message", tString (joinError.ToString()) ] ]
+                            use _cleanup =
+                                { new IDisposable with
+                                    member _.Dispose() = detachAbort () }
+
+                            match! runtime.Join() with
+                            | Ok completion -> return encodeCompletion runtime completion
+                            | Error joinError ->
+                                return
+                                    ToolHostCodec.tomlObject
+                                        [ "error",
+                                          tTable
+                                              [ "code", tString (errorCode joinError)
+                                                "message", tString (joinError.ToString()) ] ]
         }
 
     let spec scope =

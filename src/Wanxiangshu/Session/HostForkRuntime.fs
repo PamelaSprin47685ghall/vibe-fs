@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
+open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 open Wanxiangshu.Kernel
@@ -75,12 +76,14 @@ type HostForkRuntime
                 runtime.PublishCompletion completion
                 runtime.UnregisterPty completion.RunId)
 
-    let completedTask () : Task = task { return () } :> Task
-    let mutable recoveryTask: Task = completedTask ()
+    // RECOVERY-FAMILY: constructor must not start recovery side effects.
+    // Linked-child restore is RestoreLinkedHandles under FamilyRecoveryPermit.
+    let recoveryStartLock = obj ()
+    let mutable recoveryTask: Task option = None
 
     let restoreChildren () =
         match journal with
-        | None -> completedTask ()
+        | None -> task { return () } :> Task
         | Some j ->
             HostForkRestart.restoreLinkedChildren
                 runtime
@@ -91,7 +94,15 @@ type HostForkRuntime
                 childCreatedDir
                 directoryOf
 
-    do recoveryTask <- restoreChildren ()
+    /// Start restore at most once when a permit-holding caller first needs it.
+    member private _.EnsureChildRestoreStarted() =
+        lock recoveryStartLock (fun () ->
+            match recoveryTask with
+            | Some t -> t
+            | None ->
+                let t = restoreChildren ()
+                recoveryTask <- Some t
+                t)
 
     member internal _.Runtime = runtime
     member internal _.Children = children
@@ -133,13 +144,15 @@ type HostForkRuntime
             HandleProjection.isRetired handle projection
             || HandleProjection.isAbandoned handle projection)
 
+    /// Recovery restore failures must surface. Silent success would let Join
+    /// proceed against a half-restored family (P0-RECOVERY-JOIN-001).
     member this.AwaitRecovery() =
         task {
-            try
-                do! recoveryTask
-            with _ ->
-                ()
+            do! this.EnsureChildRestoreStarted()
         }
+
+    /// Explicit restore instruction for SessionRecovery RestoreLinkedHandles.
+    member this.RestoreLinkedHandles() : Task = this.EnsureChildRestoreStarted()
 
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
         let workRecord =
@@ -252,35 +265,40 @@ type HostForkRuntime
                             match HandleCompletionCodec.tryRead durable record agentId with
                             | Error err -> Some(Error(ForkError.NotFound err))
                             | Ok None ->
-                                // Cancelled / 0.5.1 line without blob: still CAS-retire so
-                                // the handle cannot be joined twice after a hollow complete.
-                                match HandleController.consume durable parentId record.Handle with
-                                | Ok _ ->
-                                    Some(
-                                        Ok
-                                            { RunId = "run-" + agentId
-                                              AgentId = agentId
-                                              AgentName = record.TargetAgent
-                                              Role = AgentRoleIdentity.ofRole record.CanonicalRole
-                                              Outcome =
-                                                AgentCompletion.aborted
-                                                    agentId
-                                                    ("run-" + agentId)
-                                                    (Some(AgentRoleIdentity.ofRole record.CanonicalRole))
-                                                    (Some record.ChildSessionId)
-                                                    "CANCELLED"
-                                                    "handle completed without durable payload"
-                                              CompletedAt = System.DateTimeOffset.UtcNow }
-                                    )
-                                | Error AlreadyRetired -> attempt rest
-                                | Error(NotJoinable _) -> attempt rest
-                                | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+                                // P0-RECOVERY-JOIN-001: hollow CompletedAwaitingJoin without
+                                // blob is not joinable. Never synthesize aborted/CANCELLED.
+                                match record.Lifecycle with
+                                | HandleLifecycle.CompletedAwaitingJoin cell ->
+                                    match cell.Kind with
+                                    | HandleCompletionKind.Terminal
+                                    | HandleCompletionKind.SendFailure ->
+                                        Some(Error(ForkError.TerminalMaterializationFailed agentId))
+                                    | HandleCompletionKind.Cancelled -> attempt rest
+                                | _ -> attempt rest
                             | Ok(Some completion) ->
-                                match HandleController.consume durable parentId record.Handle with
-                                | Ok _ -> Some(Ok completion)
-                                | Error AlreadyRetired -> attempt rest
-                                | Error(NotJoinable _) -> attempt rest
-                                | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+                                match record.Lifecycle with
+                                | HandleLifecycle.CompletedAwaitingJoin durableCell ->
+                                    let body =
+                                        HandleCompletionCodec.encodeOutcome
+                                            completion.RunId
+                                            completion.Outcome
+
+                                    match
+                                        JoinableCompletion.tryFromDurableCompleted
+                                            agentId
+                                            record.Handle
+                                            record.ChildSessionId
+                                            durableCell.Kind
+                                            (Some body)
+                                    with
+                                    | Error _ -> attempt rest
+                                    | Ok _ ->
+                                        match HandleController.consume durable parentId record.Handle with
+                                        | Ok _ -> Some(Ok completion)
+                                        | Error AlreadyRetired -> attempt rest
+                                        | Error(NotJoinable _) -> attempt rest
+                                        | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
+                                | _ -> attempt rest
 
                 attempt joinable
 

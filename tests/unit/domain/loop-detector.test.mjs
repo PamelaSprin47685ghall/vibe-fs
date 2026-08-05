@@ -1,6 +1,6 @@
 // tests/unit/Domain/loop-detector.test.mjs — LOOP-003/004/005/011 pure detector.
 //
-// Final design: ignore whitespace, sliding 4-grams, slow exp mixture,
+// Final design: ignore whitespace + '-', sliding 4-grams, slow exp mixture,
 // normal-code prior (N_eff=256), LOOP when N_eff ≤ 140. Layer 1 only.
 
 import assert from 'node:assert/strict'
@@ -45,9 +45,9 @@ test('LOOP_003_fewer_than_four_characters_keeps_prior', () => {
   assert.ok(Math.abs(result.effective - 256) < 1e-6)
 })
 
-test('LOOP_003_whitespace_is_ignored_and_does_not_advance', () => {
+test('LOOP_003_whitespace_and_minus_are_ignored_and_do_not_advance', () => {
   const detector = loopDetector.create()
-  const result = loopDetector.pushText(detector, ' \n\t\r'.repeat(500))
+  const result = loopDetector.pushText(detector, ' \n\t\r-'.repeat(500))
 
   assert.equal(result.step, 0)
   assert.equal(result.isLoop, false)
@@ -103,19 +103,19 @@ test('LOOP_005_streaming_matches_batch_push', () => {
   assert.ok(Math.abs(streamResult.hhi - batchResult.hhi) < 1e-12)
 })
 
-test('LOOP_005_whitespace_does_not_form_grams_or_dilute_prior', () => {
-  const withSpaces = loopDetector.create()
-  const withoutSpaces = loopDetector.create()
+test('LOOP_005_ignored_chars_do_not_form_grams_or_dilute_prior', () => {
+  const withIgnored = loopDetector.create()
+  const withoutIgnored = loopDetector.create()
 
-  const spaced = 'a b c d e f g h'
+  const ignored = 'a-b c\td\ne\rf-g h'
   const compact = 'abcdefgh'
 
-  const spacedResult = loopDetector.pushText(withSpaces, spaced)
-  const compactResult = loopDetector.pushText(withoutSpaces, compact)
+  const ignoredResult = loopDetector.pushText(withIgnored, ignored)
+  const compactResult = loopDetector.pushText(withoutIgnored, compact)
 
-  assert.equal(spacedResult.step, compactResult.step)
-  assert.ok(Math.abs(spacedResult.effective - compactResult.effective) < 1e-9)
-  assert.ok(Math.abs(spacedResult.hhi - compactResult.hhi) < 1e-12)
+  assert.equal(ignoredResult.step, compactResult.step)
+  assert.ok(Math.abs(ignoredResult.effective - compactResult.effective) < 1e-9)
+  assert.ok(Math.abs(ignoredResult.hhi - compactResult.hhi) < 1e-12)
 })
 
 test('LOOP_009_text_delta_decodes_fail_closed', () => {

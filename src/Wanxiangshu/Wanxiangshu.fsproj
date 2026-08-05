@@ -36,6 +36,9 @@
     <Compile Include="Domain/EnforcerCycle.fs"/>
     <Compile Include="Domain/StudentTeacher.fs"/>
     <Compile Include="Domain/RecoverySlot.fs"/>
+    <Compile Include="Domain/SessionRecovery.fs"/>
+    <Compile Include="Domain/ChildRecovery.fs"/>
+    <Compile Include="Domain/OrchestratorProgram.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/XTrace.fs"/>
@@ -74,6 +77,7 @@
     <Compile Include="Journal/EnforcementProjection.fs"/>
     <Compile Include="Journal/BloggerCycleProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
+    <Compile Include="Journal/RecoveryClosureProjection.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
     <Compile Include="Journal/Boot.fs"/>
     <Compile Include="Journal/ProjectionState.fs"/>
@@ -177,6 +181,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
     <Compile Include="Session/BloggerCoordinator.fs"/>
     <Compile Include="Application/Reconciliation/BloggerCrashRecovery.fs"/>
+    <Compile Include="Application/Reconciliation/SessionRecoveryInterpreter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>

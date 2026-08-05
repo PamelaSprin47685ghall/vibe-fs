@@ -3,6 +3,8 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading
 open ToolHostCodec
+open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 
 /// Non-interactive command execution with the request's sole 3x deadline and
@@ -116,24 +118,43 @@ module ExecutorTool =
                               "stderr", TString stderr ]
                 | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
                     try
-                        let runtime = scope.ExecutorRuntimeFor context
+                        // P0-RECOVERY-JOIN-001: map/reduce Join requires FamilyReady on parent.
+                        let! recoveryOk =
+                            task {
+                                if String.IsNullOrWhiteSpace context.SessionId then
+                                    return true
+                                else
+                                    let root = SessionId.create context.SessionId
+                                    let! recovery = scope.RequireFamilyRecovery root
 
-                        let! summary =
-                            ExecutorSummarize.summarizeSpool (ExecutorSummarize.asExecutorRuntime runtime) spoolPath
+                                    match recovery with
+                                    | FamilyRecovery.FamilyBlocked _ -> return false
+                                    | FamilyRecovery.FamilyReady _ -> return true
+                            }
 
-                        let instructions =
-                            if System.String.IsNullOrWhiteSpace summary then
-                                []
-                            else
-                                [ summary ]
+                        if not recoveryOk then
+                            return error "RECOVERY_BLOCKED: family recovery incomplete before executor summarize"
+                        else
+                            let runtime = scope.ExecutorRuntimeFor context
 
-                        return
-                            tomlObjectWithInstructions
-                                instructions
-                                [ "exit_code", TInt exitCode
-                                  "spool_path", TString spoolPath
-                                  "total_bytes", TInt64 totalBytes
-                                  "chunk_count", TInt chunkCount ]
+                            let! summary =
+                                ExecutorSummarize.summarizeSpool
+                                    (ExecutorSummarize.asExecutorRuntime runtime)
+                                    spoolPath
+
+                            let instructions =
+                                if System.String.IsNullOrWhiteSpace summary then
+                                    []
+                                else
+                                    [ summary ]
+
+                            return
+                                tomlObjectWithInstructions
+                                    instructions
+                                    [ "exit_code", TInt exitCode
+                                      "spool_path", TString spoolPath
+                                      "total_bytes", TInt64 totalBytes
+                                      "chunk_count", TInt chunkCount ]
                     finally
                         Spool.delete spoolPath
         }

@@ -9,6 +9,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
@@ -64,19 +65,15 @@ module SpikePlugin =
 
                 let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
-                // PROMPT-011: the pending-claim pass must NOT run here, inside the
-                // plugin constructor. The Host awaits the constructor before its
-                // project instance is ready (`plugin/index.ts:112-123,222-224`), and
-                // `reconcile` reads `session.messages` through the SDK — an
-                // in-process fetch that competes with Host startup. Under parallel
-                // canary load that read can exceed the silence window and park the
-                // constructor, so a restarted session never sends its next prompt.
-                // Attach the gate instead; the first real Host event starts the
-                // pass (single-flight), and every business entry point awaits it.
-                scope.AttachRecoveryGate(PromptRecovery.RecoveryGate(journal, snapshotOpt))
-
-                scope.AttachBloggerRecoveryGate(
-                    BloggerCrashRecovery.RecoveryGate(journal, scope :> IParkedTransformHost, snapshotOpt)
+                // RECOVERY-FAMILY: attach ports only. Interpreter runs on first
+                // RequireFamilyRecovery / EnsureRecoveryDone, never in constructor
+                // (Host awaits constructor before project ready).
+                scope.AttachFamilyRecoveryPorts(
+                    { Journal = journal
+                      Snapshot = snapshotOpt
+                      ParkedHost = Some(scope :> IParkedTransformHost)
+                      RestoreHandles = None
+                      RecoverJob = None }
                 )
 
                 let transform inObj outObj : Task<unit> =
@@ -142,43 +139,50 @@ module SpikePlugin =
 
                                 match SessionAssociationProjection.tryMainSessionOf sid associations with
                                 | Some _ ->
-                                    // ENFORCER-154: crash-window recovery before commit
-                                    // so durable open materialization can re-arm InFlight.
-                                    do! scope.EnsureRecoveryDone()
+                                    // RECOVERY-FAMILY: family recovery before blogger continuation effects.
+                                    let! recovery = scope.EnsureRecoveryDone sid
 
-                                    let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
+                                    match recovery with
+                                    | FamilyRecovery.FamilyBlocked _ -> ()
+                                    | FamilyRecovery.FamilyReady _ ->
+                                        let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-                                    let! outcome = EnforcerHost.handleContinuation scope journal sid bloggerMessages
+                                        let! outcome =
+                                            EnforcerHost.handleContinuation scope journal sid bloggerMessages
 
-                                    match outcome with
-                                    | EnforcerHost.ContinuationOutcome.ProjectMessages messages ->
-                                        let projected =
-                                            if List.isEmpty messages then
-                                                Diagnostic.emit
-                                                    "enforcer-empty-project"
-                                                    [ "session_id", sessionId
-                                                      "result", "ProjectMessages empty; keep raw transcript" ]
+                                        match outcome with
+                                        | EnforcerHost.ContinuationOutcome.ProjectMessages messages ->
+                                            let projected =
+                                                if List.isEmpty messages then
+                                                    Diagnostic.emit
+                                                        "enforcer-empty-project"
+                                                        [ "session_id", sessionId
+                                                          "result", "ProjectMessages empty; keep raw transcript" ]
 
-                                                bloggerMessages
-                                            else
-                                                messages
+                                                    bloggerMessages
+                                                else
+                                                    messages
 
-                                        HostMessageProjection.replaceMessagesInPlace outObj projected
-                                    | EnforcerHost.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
-                                        let projected = if List.isEmpty messages then bloggerMessages else messages
+                                            HostMessageProjection.replaceMessagesInPlace outObj projected
+                                        | EnforcerHost.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
+                                            let projected =
+                                                if List.isEmpty messages then
+                                                    bloggerMessages
+                                                else
+                                                    messages
 
-                                        HostMessageProjection.replaceMessagesInPlace outObj projected
+                                            HostMessageProjection.replaceMessagesInPlace outObj projected
 
-                                        Diagnostic.emit
-                                            "enforcer-stop-physical-run"
-                                            [ "session_id", sessionId; "result", reason ]
+                                            Diagnostic.emit
+                                                "enforcer-stop-physical-run"
+                                                [ "session_id", sessionId; "result", reason ]
 
-                                        // Await abort so Host fiber interrupt is pending before
-                                        // transform returns → handle.process / provider skipped.
-                                        // Transform-initiated abort is not LoopSensor-armed → no
-                                        // ProviderRetryAttempt (TurnAborted only).
-                                        let! _ = sessionPort.AbortSession sid
-                                        ()
+                                            // Await abort so Host fiber interrupt is pending before
+                                            // transform returns → handle.process / provider skipped.
+                                            // Transform-initiated abort is not LoopSensor-armed → no
+                                            // ProviderRetryAttempt (TurnAborted only).
+                                            let! _ = sessionPort.AbortSession sid
+                                            ()
                                 | None -> ()
                             | None -> ()
                         | None -> ()

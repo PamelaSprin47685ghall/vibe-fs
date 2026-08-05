@@ -52,8 +52,9 @@ const assertCallable = (mod, modulePath, names) => {
 test('VERIFY_005_AgentProgram_publishes_its_flow_entrypoints', async () => {
   const mod = await load('Agent/AgentProgram')
 
-  assert.deepEqual(surfaceOf(mod).sort(), ['forkAgent', 'runAgentFlow', 'validateSession'])
-  assertCallable(mod, 'Agent/AgentProgram', ['forkAgent', 'validateSession', 'runAgentFlow'])
+  // FLOW pilot: forkAgent + Flow.lift wrapper removed; plain task entrypoints remain.
+  assert.deepEqual(surfaceOf(mod).sort(), ['runAgentFlow', 'validateSession'])
+  assertCallable(mod, 'Agent/AgentProgram', ['validateSession', 'runAgentFlow'])
 })
 
 test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {

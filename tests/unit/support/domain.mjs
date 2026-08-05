@@ -2304,6 +2304,86 @@ export const handleProjection = (() => {
  *  completion from the durable blob via `HandleCompletionCodec.tryRead`. The
  *  mailbox is notification-only; these are the production exports C6 added.
  *  There is no `tryJoin` on the projection — reality uses `joinable` + consume. */
+// P0-RECOVERY-JOIN-001: recordCompletion requires JoinableCompletion proof.
+const ChildRecoveryModule = await prod('Domain/ChildRecovery')
+const terminalEvidenceCompleted = member(ChildRecoveryModule, 'TerminalEvidence', 'completed')
+const terminalEvidenceFailed = member(ChildRecoveryModule, 'TerminalEvidence', 'failed')
+const tryFromProvenTerminal = member(
+  ChildRecoveryModule,
+  'JoinableCompletion',
+  'tryFromProvenTerminal',
+)
+const tryFromDurableCompleted = member(
+  ChildRecoveryModule,
+  'JoinableCompletion',
+  'tryFromDurableCompleted',
+)
+const resolveChild = member(ChildRecoveryModule, 'ChildRecovery', 'resolveChild')
+
+export const childRecovery = (() => {
+  const DurableClass =
+    ChildRecoveryModule.DurableHandleEvidence ??
+    ChildRecoveryModule.ChildRecovery_DurableHandleEvidence
+  const SnapshotClass =
+    ChildRecoveryModule.ChildSnapshotEvidence ??
+    ChildRecoveryModule.ChildRecovery_ChildSnapshotEvidence
+  const ObservationClass =
+    ChildRecoveryModule.HostObservation ?? ChildRecoveryModule.ChildRecovery_HostObservation
+
+  if (typeof DurableClass !== 'function') throw new Error('ChildRecovery.DurableHandleEvidence missing')
+  if (typeof SnapshotClass !== 'function') throw new Error('ChildRecovery.ChildSnapshotEvidence missing')
+  if (typeof ObservationClass !== 'function') throw new Error('ChildRecovery.HostObservation missing')
+
+  const durableOf = unionCase(DurableClass, 'DurableHandleEvidence')
+  const snapshotOf = unionCase(SnapshotClass, 'ChildSnapshotEvidence')
+  const observationOf = unionCase(ObservationClass, 'HostObservation')
+
+  return {
+    durableUnknown: () => durableOf('Unknown', []),
+    durableActive: () => durableOf('Active', []),
+    durableRetired: () => durableOf('Retired', []),
+    durableCompletedAwaitingJoin: (proof) => durableOf('CompletedAwaitingJoin', [proof]),
+    durableAbandoned: (reason) => durableOf('Abandoned', [reason]),
+
+    snapshotMissing: () => snapshotOf('Missing', []),
+    snapshotActive: () => snapshotOf('Active', []),
+    snapshotUnreadable: (reason) => snapshotOf('Unreadable', [reason]),
+    snapshotTerminal: (evidence) => snapshotOf('Terminal', [evidence]),
+
+    abortedObserved: (reason) => observationOf('AbortedObserved', [reason]),
+    parentCancelled: () => observationOf('ParentCancelled', []),
+    recoveryPending: () => observationOf('RecoveryInFlight', []),
+    recoveryInFlight: () => observationOf('RecoveryInFlight', []),
+    sessionActive: () => observationOf('SessionActive', []),
+
+    evidenceCompleted: (agentId, handle, child, body) =>
+      terminalEvidenceCompleted(agentId, handle, child, body),
+    evidenceFailed: (agentId, handle, child, body) =>
+      terminalEvidenceFailed(agentId, handle, child, body),
+
+    tryFromProvenTerminal: (evidence) => resultOf(tryFromProvenTerminal(evidence)),
+    tryFromDurableCompleted: (agentId, handle, child, kind, body) =>
+      resultOf(
+        tryFromDurableCompleted(
+          agentId,
+          handle,
+          child,
+          typeof kind === 'string' ? completionKind.of(kind) : kind,
+          body === undefined || body === null ? undefined : body,
+        ),
+      ),
+
+    resolveChild: (durable, snapshot, observations) =>
+      resolveChild(durable, snapshot, toList(observations)),
+
+    /** JoinableCompletion cases — no fromAborted export exists on production module. */
+    joinableCompletionExports: () =>
+      Object.keys(ChildRecoveryModule).filter(
+        (k) => k.includes('JoinableCompletion') || k.includes('fromAborted'),
+      ),
+  }
+})()
+
 export const handleController = (() => {
   const m = bind(HandleControllerModule, 'HandleController', [
     'link',
@@ -2311,23 +2391,40 @@ export const handleController = (() => {
     'recordAbandon',
     'retire',
     'consume',
+    'agentHandle',
   ])
 
   // Fable erases `option`: Some x = x, None = undefined. Controllers take
   // `AgentJournal option`; pass the instance directly.
+  //
+  // recordCompletion facade still accepts (agentId, kind, body) for tests; it
+  // mints JoinableCompletion via Domain TerminalEvidence (no raw Aborted path).
   return {
     link: (journal, parentId, agentId, childSessionId, targetAgent, role) =>
       resultOf(m.link(journal, parentId, agentId, childSessionId, targetAgent, role)),
-    recordCompletion: (journal, parentId, agentId, kind, body) =>
-      resultOf(
-        m.recordCompletion(
-          journal,
-          parentId,
-          agentId,
-          typeof kind === 'string' ? buildCompletionKind(kind) : kind,
-          body === undefined ? undefined : body,
-        ),
-      ),
+    recordCompletion: (journal, parentId, agentId, kind, body, childSessionId) => {
+      const kindName = typeof kind === 'string' ? kind : caseOf(kind)
+      const content = body === undefined || body === null ? '' : String(body)
+      if (content === '') return { ok: false, error: 'proven terminal body must be non-empty' }
+      const handle = m.agentHandle(agentId)
+      const child =
+        childSessionId === undefined || childSessionId === null
+          ? sessionId(`fixture-child-${agentId}`)
+          : typeof childSessionId === 'string'
+            ? sessionId(childSessionId)
+            : childSessionId
+      let evidence
+      if (kindName === 'Terminal') {
+        evidence = terminalEvidenceCompleted(agentId, handle, child, content)
+      } else if (kindName === 'SendFailure') {
+        evidence = terminalEvidenceFailed(agentId, handle, child, content)
+      } else {
+        return { ok: false, error: 'Cancelled is not joinable under P0-RECOVERY-JOIN-001' }
+      }
+      const proof = resultOf(tryFromProvenTerminal(evidence))
+      if (!proof.ok) return proof
+      return resultOf(m.recordCompletion(journal, parentId, proof.value))
+    },
     recordAbandon: (journal, parentId, agentId, reason, abandonedAt) =>
       resultOf(
         m.recordAbandon(
@@ -4009,5 +4106,112 @@ export const studentTeacher = (() => {
       const outcome = unionCase(StudentTeacherModule.ReturnDeleteOutcome, 'ReturnDeleteOutcome')(outcomeName, [])
       return m.returnMayProceed(outcome)
     },
+  }
+})()
+
+// ── Session family recovery (RECOVERY-FAMILY / FLOW) ─────────────────────────
+const SessionRecoveryModule = await prod('Domain/SessionRecovery')
+
+export const sessionRecovery = (() => {
+  const authorize = member(SessionRecoveryModule, 'SessionRecovery', 'authorizeFamilyResume')
+  const familyReadyBeforeBusiness = member(SessionRecoveryModule, 'SessionRecovery', 'familyReadyBeforeBusiness')
+  const permitRoot = member(SessionRecoveryModule, 'FamilyRecoveryPermit', 'root')
+
+  const RecoveryBlockClass =
+    SessionRecoveryModule.RecoveryBlock ?? SessionRecoveryModule.SessionRecovery_RecoveryBlock
+  const SessionRecoveryClass =
+    SessionRecoveryModule.SessionRecovery ?? SessionRecoveryModule.SessionRecovery_SessionRecovery
+  const RecoveryTraceClass =
+    SessionRecoveryModule.RecoveryTrace ?? SessionRecoveryModule.SessionRecovery_RecoveryTrace
+  const NonEmptyClass =
+    SessionRecoveryModule.NonEmpty$1 ??
+    SessionRecoveryModule.SessionRecovery_NonEmpty$1 ??
+    SessionRecoveryModule.NonEmpty
+
+  if (typeof RecoveryBlockClass !== 'function') {
+    throw new Error('SessionRecovery.RecoveryBlock missing')
+  }
+  if (typeof SessionRecoveryClass !== 'function') {
+    throw new Error('SessionRecovery.SessionRecovery missing')
+  }
+  if (typeof RecoveryTraceClass !== 'function') {
+    throw new Error('SessionRecovery.RecoveryTrace missing')
+  }
+
+  const blockOf = unionCase(RecoveryBlockClass, 'RecoveryBlock')
+  const recoveryOf = unionCase(SessionRecoveryClass, 'SessionRecovery')
+  const traceOf = unionCase(RecoveryTraceClass, 'RecoveryTrace')
+
+  const nonEmptyOne = (value) => {
+    // F# record { Head; Tail } for NonEmpty<'a>
+    if (NonEmptyClass && typeof NonEmptyClass === 'function') {
+      try {
+        return new NonEmptyClass(value, FsList.empty())
+      } catch {
+        // fall through to plain object shape Fable often uses for records
+      }
+    }
+    return { Head: value, Tail: FsList.empty() }
+  }
+
+  const emptyMap = FsMap.empty(ordinalComparer)
+
+  return {
+    authorizeFamilyResume: (root, sequence, recovered) => authorize(root, sequence, recovered),
+    familyReadyBeforeBusiness: (traces) => familyReadyBeforeBusiness(toList(traces)),
+    permitRoot: (permit) => permitRoot(permit),
+
+    snapshotUnreadable: (session, reason) => blockOf('SnapshotUnreadable', [session, reason]),
+    blocked: (block) => recoveryOf('Blocked', [nonEmptyOne(block)]),
+
+    recoveredClosure: (root, resultsBySession = {}) => {
+      const pairs = Object.entries(resultsBySession).map(([id, outcome]) => [sessionId(id), outcome])
+      const results =
+        pairs.length === 0
+          ? emptyMap
+          : FsMap.ofArray(pairs, {
+              Compare: (left, right) => {
+                const a = Ids.session.value(left)
+                const b = Ids.session.value(right)
+                return a < b ? -1 : a > b ? 1 : 0
+              },
+            })
+      return {
+        Closure: {
+          Root: root,
+          Nodes: FsList.empty(),
+          Digest: '',
+          JournalSequence: 0n,
+        },
+        Results: results,
+      }
+    },
+
+    traceDiscover: (id) => traceOf('DiscoverClosure', [sessionId(id)]),
+    traceFamilyReady: (id, digest) => traceOf('FamilyReadyIssued', [sessionId(id), digest]),
+    traceBusiness: (name) => traceOf('BusinessOperation', [name]),
+  }
+})()
+
+// ── Orchestrator Program DSL (FLOW pilot) ────────────────────────────────────
+const OrchestratorProgramModule = await prod('Domain/OrchestratorProgram')
+
+export const orchestratorProgram = (() => {
+  const empty =
+    OrchestratorProgramModule.OrchestratorProgramTypes_OrchestratorProgramModule_empty ??
+    OrchestratorProgramModule.OrchestratorProgram_empty ??
+    OrchestratorProgramModule.empty
+  const interpret =
+    OrchestratorProgramModule.TraceInterpreter_interpret ??
+    OrchestratorProgramModule.interpret
+  if (typeof empty === 'undefined') {
+    throw new Error('OrchestratorProgram.empty missing')
+  }
+  if (typeof interpret !== 'function') {
+    throw new Error('TraceInterpreter.interpret missing')
+  }
+  return {
+    empty,
+    interpret: (program) => interpret(program),
   }
 })()

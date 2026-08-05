@@ -4,7 +4,6 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Flow
 open Wanxiangshu.Kernel.AsyncSupport
 
 module ProcessRunner =
@@ -16,45 +15,26 @@ module ProcessRunner =
     open Wanxiangshu.Process.Deadline
     open Wanxiangshu.Process.Spool
 
-    type ProcessFlow<'a> = Flow<ProcessContext, ProcessError, 'a>
-    let private ``process`` = FlowBuilder<ProcessContext, ProcessError>(None)
-
-    let private fromTask (f: ProcessContext -> CancellationToken -> Task<'a>) : ProcessFlow<'a> =
-        Flow.create (fun ctx ct ->
-            task {
-                try
-                    let! r = f ctx ct
-                    return Ok r
-                with
-                | _ when ct.IsCancellationRequested -> return Error(ProcessError.ProcessCancelled "Cancelled by token")
-                | :? OperationCanceledException when ct.IsCancellationRequested ->
-                    return Error(ProcessError.ProcessCancelled "Cancelled by token")
-                | ex -> return Error(ProcessError.ExecutionFailed ex.Message)
-            })
-
     /// EXEC-011: the effective deadline is `min(3 × estimate, administrator ceiling)`.
     /// Read from the context so the ceiling is the one the caller configured, not a
     /// second copy of the rule here.
     let private budgetSpan (estimate: ProcessEstimate) (ctx: ProcessContext) =
         ProcessEstimate.effectiveDeadline estimate.EstimatedRuntime ctx.HardLimit
 
-    let private validateEstimate (estimate: ProcessEstimate) : ProcessFlow<unit> =
-        ``process`` {
-            let (RuntimeSeconds runtime) = estimate.EstimatedRuntime
-            let (OutputBytes output) = estimate.EstimatedOutput
+    let private validateEstimate (estimate: ProcessEstimate) : Result<unit, ProcessError> =
+        let (RuntimeSeconds runtime) = estimate.EstimatedRuntime
+        let (OutputBytes output) = estimate.EstimatedOutput
 
-            if Double.IsNaN runtime || Double.IsInfinity runtime || runtime <= 0.0 then
-                return!
-                    Flow.fail (ProcessError.ExecutionFailed "estimated_running_secs must be a finite positive number")
-            elif output < 0L then
-                return! Flow.fail (ProcessError.ExecutionFailed "estimated_output_bytes must be non-negative")
-            elif output > Int64.MaxValue / 3L then
-                return! Flow.fail (ProcessError.ExecutionFailed "estimated_output_bytes too large")
-            else
-                return ()
-        }
+        if Double.IsNaN runtime || Double.IsInfinity runtime || runtime <= 0.0 then
+            Error(ProcessError.ExecutionFailed "estimated_running_secs must be a finite positive number")
+        elif output < 0L then
+            Error(ProcessError.ExecutionFailed "estimated_output_bytes must be non-negative")
+        elif output > Int64.MaxValue / 3L then
+            Error(ProcessError.ExecutionFailed "estimated_output_bytes too large")
+        else
+            Ok()
 
-    let private spawnFlow
+    let private spawnHost
         (hostSpawn:
             Command
                 -> ProcessContext
@@ -64,15 +44,22 @@ module ProcessRunner =
                 -> Task<Result<ChildProcess, string>>)
         (cmd: Command)
         (estimate: ProcessEstimate)
-        : ProcessFlow<ChildProcess * OutputCollector> =
-        ``process`` {
-            let collector = create estimate
+        (ctx: ProcessContext)
+        (ct: CancellationToken)
+        : Task<Result<ChildProcess * OutputCollector, ProcessError>> =
+        task {
+            try
+                let collector = create estimate
+                let! spawnResult = hostSpawn cmd ctx (addStdout collector) (addStderr collector) ct
 
-            let! spawnResult = fromTask (fun ctx ct -> hostSpawn cmd ctx (addStdout collector) (addStderr collector) ct)
-
-            match spawnResult with
-            | Ok child -> return (child, collector)
-            | Error reason -> return! Flow.fail (ProcessError.SpawnFailed reason)
+                match spawnResult with
+                | Ok child -> return Ok(child, collector)
+                | Error reason -> return Error(ProcessError.SpawnFailed reason)
+            with
+            | _ when ct.IsCancellationRequested -> return Error(ProcessError.ProcessCancelled "Cancelled by token")
+            | :? OperationCanceledException when ct.IsCancellationRequested ->
+                return Error(ProcessError.ProcessCancelled "Cancelled by token")
+            | ex -> return Error(ProcessError.ExecutionFailed ex.Message)
         }
 
     let private runProgram
@@ -85,53 +72,45 @@ module ProcessRunner =
                 -> Task<Result<ChildProcess, string>>)
         (cmd: Command)
         (estimate: ProcessEstimate)
-        : ProcessFlow<ProcessOutcome> =
-        ``process`` {
-            do! validateEstimate estimate
-
-            let mutable gateHeld = false
-
-            try
-                if estimate.EstimatedMemory = EstimatedMemory.Large then
-                    do!
-                        fromTask (fun _ ct ->
-                            task {
-                                do! LargeGate.acquire ct
-                                return ()
-                            })
-
-                    gateHeld <- true
-
-                let! (child, collector) = spawnFlow hostSpawn cmd estimate
+        (ctx: ProcessContext)
+        (ct: CancellationToken)
+        : Task<Result<ProcessOutcome, ProcessError>> =
+        task {
+            match validateEstimate estimate with
+            | Error e -> return Error e
+            | Ok() ->
+                let mutable gateHeld = false
 
                 try
-                    let clock = fun () -> DateTimeOffset.UtcNow
+                    if estimate.EstimatedMemory = EstimatedMemory.Large then
+                        do! LargeGate.acquire ct
+                        gateHeld <- true
 
-                    // The applied budget is returned alongside the outcome so the
-                    // reported timeout is the one that actually fired. Recomputing it
-                    // for the error would be a second read of the ceiling, and a
-                    // TimeoutExceeded carrying a different duration than the deadline
-                    // that expired is a lie the operator cannot detect.
-                    let! (waited, budget) =
-                        fromTask (fun ctx ct ->
-                            task {
-                                let budget = budgetSpan estimate ctx
-                                let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
-                                return waited, budget
-                            })
+                    match! spawnHost hostSpawn cmd estimate ctx ct with
+                    | Error e -> return Error e
+                    | Ok(child, collector) ->
+                        let clock = fun () -> DateTimeOffset.UtcNow
 
-                    if waited.TimedOut then
-                        return! Flow.fail (ProcessError.TimeoutExceeded budget)
-                    else
-                        return buildResult collector waited.ExitCode
+                        // The applied budget is returned alongside the outcome so the
+                        // reported timeout is the one that actually fired. Recomputing it
+                        // for the error would be a second read of the ceiling, and a
+                        // TimeoutExceeded carrying a different duration than the deadline
+                        // that expired is a lie the operator cannot detect.
+                        let budget = budgetSpan estimate ctx
+                        let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
+
+                        try
+                            child.Kill()
+                        with _ ->
+                            ()
+
+                        if waited.TimedOut then
+                            return Error(ProcessError.TimeoutExceeded budget)
+                        else
+                            return Ok(buildResult collector waited.ExitCode)
                 finally
-                    try
-                        child.Kill()
-                    with _ ->
-                        ()
-            finally
-                if gateHeld then
-                    LargeGate.release ()
+                    if gateHeld then
+                        LargeGate.release ()
         }
 
     let runWithHost
@@ -147,7 +126,7 @@ module ProcessRunner =
         (ctx: ProcessContext)
         (ct: CancellationToken)
         : Task<Result<ProcessOutcome, ProcessError>> =
-        Flow.run ctx ct (runProgram hostSpawn cmd estimate)
+        runProgram hostSpawn cmd estimate ctx ct
 
     let run
         (cmd: Command)

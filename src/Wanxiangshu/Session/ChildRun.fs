@@ -133,43 +133,31 @@ module ChildRun =
 /// path; the orphan showcase `AgentProgram` module has been removed.
 module ChildRunProgram =
 
-    let private fromTask (f: CancellationToken -> Task<AgentCompletionOutcome>) : AgentFlow<AgentCompletionOutcome> =
-        Flow.create (fun _ ct ->
-            task {
-                if ct.IsCancellationRequested then
-                    return Error AgentError.ParentCancelled
-                else
-                    try
-                        let! outcome = f ct
-                        return Ok outcome
-                    with
-                    | :? OperationCanceledException -> return Error AgentError.ParentCancelled
-                    | ex -> return Error(AgentError.HostFailure ex.Message)
-            })
-
-    /// Build the AgentFlow that runs `work` and returns the resulting
-    /// RunCompletion.  Cancellation and exceptions are mapped into a
-    /// single-assignment RunCompletion value by the caller (ForkRuntime).
-    let run (run: ChildRun) (work: CancellationToken -> Task<AgentCompletionOutcome>) : AgentFlow<RunCompletion> =
-        agent {
-            // Validate the managed identity through the canonical AgentProgram
-            // before executing the physical child work.
-            let! identityOk =
-                Flow.lift (fun _ _ ->
-                    task {
-                        let! result =
-                            AgentProgram.runAgentFlow
-                                { SessionId = run.AgentId
-                                  AgentName = run.AgentName }
-                                CancellationToken.None
-                                (AgentProgram.validateSession run.AgentName)
-
-                        return result |> Result.defaultValue false
-                    })
-
-            if not identityOk then
-                return! Flow.fail (AgentError.InvalidFork "Child run identity does not match managed agent")
+    /// Run `work` and return the resulting RunCompletion.
+    /// Cancellation and exceptions are mapped into the Result channel.
+    let run
+        (run: ChildRun)
+        (work: CancellationToken -> Task<AgentCompletionOutcome>)
+        (ct: CancellationToken)
+        : Task<Result<RunCompletion, AgentError>> =
+        task {
+            if ct.IsCancellationRequested then
+                return Error AgentError.ParentCancelled
             else
-                let! outcome = fromTask work
-                return ChildRun.makeCompleted run outcome
+                try
+                    let! identityResult =
+                        AgentProgram.runAgentFlow
+                            { SessionId = run.AgentId
+                              AgentName = run.AgentName }
+                            ct
+                            (AgentProgram.validateSession run.AgentName)
+
+                    match identityResult with
+                    | Ok true ->
+                        let! outcome = work ct
+                        return Ok(ChildRun.makeCompleted run outcome)
+                    | _ -> return Error(AgentError.InvalidFork "Child run identity does not match managed agent")
+                with
+                | :? OperationCanceledException -> return Error AgentError.ParentCancelled
+                | ex -> return Error(AgentError.HostFailure ex.Message)
         }

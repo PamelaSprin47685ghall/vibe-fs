@@ -4,18 +4,14 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Flow
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 
-/// Production CompanionFlow program — the canonical `companion {}` builder usage.
-/// Companion flows manage projection delta computation and blogger step
-/// scheduling. Prefix-epoch lifecycle is NOT here: CTX-002 puts it after a failed
-/// attempt, where `Domain.AttemptPlanner` decides it from the attempt outcome.
+/// Production Companion program — now expressed as functions, not a Flow AST.
+///
+/// ARCH-001: control flow is plain `let!/do!/match/task`, not a state machine.
+/// The run helper keeps the same boundary so callers can be migrated one at a time.
 module CompanionProgram =
-
-    /// Lift a plain Task into the CompanionFlow.
-    let private fromTask (f: CompanionContext -> CancellationToken -> Task<'a>) : CompanionFlow<'a> = Flow.lift f
 
     /// Build the next delta between the last successful projection and the
     /// current canonical projection.  Returns None when there is no delta.
@@ -25,22 +21,23 @@ module CompanionProgram =
         (cursor: SemanticCursor)
         (previousCutoff: int)
         (current: ProviderSemanticProjection)
-        : CompanionFlow<BloggerDeltaChunk option> =
-        companion {
-            let! delta =
-                fromTask (fun _ _ct ->
-                    task {
-                        return
-                            BloggerDelta.nextChunk BloggerDelta.DeltaLimitBytes cursor previousCutoff current.Messages
-                    })
+        (_ctx: CompanionContext)
+        (_ct: CancellationToken)
+        : Task<BloggerDeltaChunk option> =
+        task { return BloggerDelta.nextChunk BloggerDelta.DeltaLimitBytes cursor previousCutoff current.Messages }
 
-            return delta
-        }
-
-    /// Run a companion flow to completion and return its result.
+    /// Run a companion action to completion and return its result.
     let runCompanionFlow
         (ctx: CompanionContext)
         (ct: CancellationToken)
-        (flow: CompanionFlow<'a>)
+        (action: CompanionContext -> CancellationToken -> Task<'a>)
         : Task<Result<'a, CompanionError>> =
-        Flow.run ctx ct flow
+        task {
+            try
+                let! value = action ctx ct
+                return Ok value
+            with
+            | :? OperationCanceledException when ct.IsCancellationRequested ->
+                return Error(CompanionError.BloggerFailed "cancelled")
+            | ex -> return Error(CompanionError.ProjectionFailed ex.Message)
+        }

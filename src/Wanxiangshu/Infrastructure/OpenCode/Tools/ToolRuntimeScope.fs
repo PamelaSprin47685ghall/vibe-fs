@@ -2,6 +2,8 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -45,6 +47,8 @@ type ToolRuntimeScope
     let childRecord = defaultArg childWorkRecordFor (fun _ -> None)
     let terminalPort = eventPort
     let mutable disposed = false
+    /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
+    let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
 
     let registerChild parentSid (_role: AgentRole) childId =
         sessionParents.[SessionId.value childId] <- parentSid
@@ -215,6 +219,21 @@ type ToolRuntimeScope
     member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx
 
     member this.IsRole(ctx: HostToolContext, expected: Role) = this.RoleFor ctx = Some expected
+
+    /// Wire PluginRuntimeScope.RequireFamilyRecovery (or test double).
+    member _.AttachFamilyRecovery(fn: SessionId -> Task<FamilyRecovery>) = familyRecovery <- Some fn
+
+    /// P0-RECOVERY-JOIN-001: join / JoinPublished require FamilyReady. Missing attach → FamilyBlocked.
+    member _.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
+        task {
+            match familyRecovery with
+            | None ->
+                return
+                    FamilyRecovery.FamilyBlocked(
+                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
+                    )
+            | Some fn -> return! fn root
+        }
 
     member _.RuntimeFor(ctx: HostToolContext) =
         if String.IsNullOrWhiteSpace ctx.SessionId then

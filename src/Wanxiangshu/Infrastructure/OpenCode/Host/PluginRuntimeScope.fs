@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -58,13 +59,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let startupProbeGate = obj ()
     let mutable startupProbeDone = false
 
-    /// PROMPT-011 post-init recovery gate.
+    /// Family recovery coordinator ports (PROMPT-011 + C5 + RECOVERY-FAMILY).
     ///
-    /// Created empty; `AttachRecoveryGate` seeds it with the journal and snapshot
-    /// port once both exist (after `createHost`). Attaching is pure bookkeeping —
-    /// no SDK call happens until the first real Host event calls `EnsureRecoveryDone`.
-    let mutable recoveryGate: PromptRecovery.RecoveryGate option = None
-    let mutable bloggerRecoveryGate: BloggerCrashRecovery.RecoveryGate option = None
+    /// Attached after `createHost`. First business entry point runs
+    /// SessionRecoveryProgram; later callers await the same single-flight task.
+    let mutable familyRecoveryPorts: SessionRecoveryInterpreter.Ports option = None
     let recoveryGateLock = obj ()
 
     /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
@@ -102,33 +101,26 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             loopSensor <- Some empty
             empty
 
-    member this.AttachRecoveryGate(gate: PromptRecovery.RecoveryGate) =
-        lock recoveryGateLock (fun () -> recoveryGate <- Some gate)
+    member this.AttachFamilyRecoveryPorts(ports: SessionRecoveryInterpreter.Ports) =
+        lock recoveryGateLock (fun () -> familyRecoveryPorts <- Some ports)
 
-    member this.AttachBloggerRecoveryGate(gate: BloggerCrashRecovery.RecoveryGate) =
-        lock recoveryGateLock (fun () -> bloggerRecoveryGate <- Some gate)
-
-    /// PROMPT-011 + C5: await prompt claim recovery AND blogger crash-window pass.
-    ///
-    /// Safe to call from any event entry point: first caller starts each pass,
-    /// later callers await the same tasks. A journal-less or snapshot-less scope
-    /// has nothing to reconcile and completes immediately.
-    member this.EnsureRecoveryDone() : System.Threading.Tasks.Task =
+    /// RECOVERY-FAMILY: obtain FamilyRecovery for a parent before business work.
+    /// Missing ports → FamilyBlocked (fail closed). Never synthetic FamilyReady.
+    member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
         task {
-            let prompt =
-                lock recoveryGateLock (fun () -> recoveryGate)
-                |> Option.map (fun gate -> gate.EnsureDone())
-                |> Option.defaultValue (AsyncSupport.completedTask ())
-
-            let blogger =
-                lock recoveryGateLock (fun () -> bloggerRecoveryGate)
-                |> Option.map (fun gate -> gate.EnsureDone())
-                |> Option.defaultValue (AsyncSupport.completedTask ())
-
-            do! prompt
-            do! blogger
+            match lock recoveryGateLock (fun () -> familyRecoveryPorts) with
+            | None ->
+                return
+                    FamilyRecovery.FamilyBlocked(
+                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
+                    )
+            | Some ports -> return! SessionRecoveryInterpreter.Coordinator.recoverFamily ports root
         }
-        :> System.Threading.Tasks.Task
+
+    /// Await family recovery before business effects. Returns FamilyRecovery so
+    /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
+    member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> =
+        this.RequireFamilyRecovery root
 
     member this.ArmRecovery(sessionId: SessionId) =
         this.RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance

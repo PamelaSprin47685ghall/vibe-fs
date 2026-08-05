@@ -1,6 +1,6 @@
 /**
  * C5 item 20: pure decision table for Blogger crash windows A/B/C/D.
- * Host wiring is exercised via production gate attach + unit classify.
+ * Family recovery interpreter owns startup timing; classify stays pure.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -20,6 +20,10 @@ const scopeSrc = readFileSync(
   join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs'),
   'utf8',
 )
+const interpreterSrc = readFileSync(
+  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs'),
+  'utf8',
+)
 
 test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(recoverySrc, /module BloggerCrashRecovery/)
@@ -30,19 +34,16 @@ test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(recoverySrc, /crash-window-A/)
 })
 
-test('C5_crash_recovery_gate_attached_from_plugin', () => {
-  assert.match(spikeSrc, /AttachBloggerRecoveryGate/)
-  assert.match(spikeSrc, /BloggerCrashRecovery\.RecoveryGate/)
-  assert.match(scopeSrc, /AttachBloggerRecoveryGate/)
-  assert.match(scopeSrc, /bloggerRecoveryGate/)
-  // EnsureRecoveryDone awaits both prompt + blogger passes.
-  assert.match(scopeSrc, /do! blogger/)
+test('C5_crash_recovery_wired_through_family_ports', () => {
+  assert.match(spikeSrc, /AttachFamilyRecoveryPorts/)
+  assert.match(scopeSrc, /RequireFamilyRecovery/)
+  assert.match(interpreterSrc, /BloggerCrashRecovery\.reconcile/)
+  assert.doesNotMatch(spikeSrc, /AttachBloggerRecoveryGate/)
+  assert.doesNotMatch(scopeSrc, /bloggerRecoveryGate/)
 })
 
 test('C5_classify_open_request_window_A_unsent', async () => {
-  const { caseOf, payloadOf } = await import('../support/domain.mjs')
-  // Import production classify via built module if exported; else structural.
-  // classifyOpenRequest is pure and exported from BloggerCrashRecovery.
+  const { caseOf } = await import('../support/domain.mjs')
   const mod = await import(
     new URL('../../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
   )
@@ -54,9 +55,7 @@ test('C5_classify_open_request_window_A_unsent', async () => {
   assert.ok(classify, 'classifyOpenRequest export present')
   const a = classify(false, false, false)
   assert.ok(a, 'window A decision')
-  // F# option Some becomes value; DU case name.
-  const outcome = a.fields ? a : a
-  assert.equal(caseOf(outcome), 'AbandonedUnsent')
+  assert.equal(caseOf(a), 'AbandonedUnsent')
 })
 
 test('C5_classify_open_request_window_C_tool_present', async () => {

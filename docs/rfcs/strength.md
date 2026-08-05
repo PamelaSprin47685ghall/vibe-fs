@@ -5,7 +5,7 @@ Product contract: no
 Runtime status: inactive
 Target version: undecided
 
-条款前缀：`STRENGTH-`。正文中「spec/13 — Projection Algebra」的引用已被 superseded 到 `spec/16 — Projection Algebra`，代数语义由本文档 STRENGTH-066…074 与 spec/16 共同承载。
+条款前缀：`STRENGTH-`。Projection Algebra 规范位于 `spec/16`（条款前缀 `PROJ-`），代数语义由本文档 STRENGTH-066…074 与 spec/16 共同承载。
 
 ---
 

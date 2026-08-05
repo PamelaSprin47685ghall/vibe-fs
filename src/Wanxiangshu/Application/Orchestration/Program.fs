@@ -7,7 +7,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
-open Wanxiangshu.Kernel.Flow
+
 open Wanxiangshu.Kernel.Identity
 
 /// ORCH-004/005/006/007: worktree → review → rebase → fresh review → short-CAS
@@ -27,18 +27,6 @@ module OrchestratorProgram =
     type private PublishAttempt =
         | TargetMoved
         | Landed of CommitHash
-
-    let private fromTask action =
-        Flow.create (fun context cancellation ->
-            task {
-                try
-                    let! value = action context cancellation
-                    return Ok value
-                with
-                | :? OperationCanceledException when cancellation.IsCancellationRequested ->
-                    return Error(OrchestratorError.PublishFailed "cancelled")
-                | error -> return Error(OrchestratorError.PublishFailed error.Message)
-            })
 
     let private failed (job: ManagerJob) details =
         OrchestratorVerdict.IntegrationFailed(job.JobId, details)
@@ -372,27 +360,22 @@ module OrchestratorProgram =
         }
 
     let private program (deps: OrchestratorProgramDeps) (job: ManagerJob) =
-        orchestrator {
-            use! _worktree = fromTask (fun _ _ -> Task.FromResult job.Worktree)
-            let! action = fromTask (fun _ _ -> recoveryFor deps job)
+        task {
+            let! action = recoveryFor deps job
 
             match action with
-            | Some recoveryAction -> return! fromTask (fun _ _ -> resume deps job recoveryAction)
+            | Some recoveryAction -> return! resume deps job recoveryAction
             | None ->
-                let! managerResult = fromTask (fun _ _ -> deps.Manager.AwaitManager job.JobId)
-
-                match managerResult with
+                match! deps.Manager.AwaitManager job.JobId with
                 | Error error -> return failed job (sprintf "Manager run failed: %s" error)
-                | Ok() -> return! fromTask (fun _ _ -> afterManager deps job)
+                | Ok() -> return! afterManager deps job
         }
 
     let run (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {
-            let context =
-                { TargetRef = job.TargetRef
-                  WorktreePath = job.Worktree.Path }
-
-            match! Flow.run context CancellationToken.None (program deps job) with
-            | Ok verdict -> return verdict
-            | Error error -> return failed job (sprintf "%A" error)
+            try
+                return! program deps job
+            with
+            | :? OperationCanceledException -> return failed job "cancelled"
+            | error -> return failed job (sprintf "%A" error)
         }

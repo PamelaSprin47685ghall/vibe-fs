@@ -1,45 +1,31 @@
 namespace Wanxiangshu.Agent
 
+open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Flow
 
-/// Production AgentFlow program — the canonical `agent {}` builder usage.
-/// This module composes manager/coder/inspector/etc. operations inside the
-/// domain-specific computation expression defined in KISS-N01 §3.
+/// Production Agent program — now expressed as functions, not a Flow AST.
+///
+/// ARCH-001: control flow is plain `let!/do!/match/task`, not a state machine.
+/// The run helper keeps the same boundary so callers can be migrated one at a time.
 module AgentProgram =
 
-    /// Lift a plain Task into the AgentFlow.
-    let private fromTask (f: AgentContext -> CancellationToken -> Task<'a>) : AgentFlow<'a> = Flow.lift f
-
-    /// Fork a sub-agent and return once it completes.
-    /// Production usage of the `agent {}` builder with fork/join semantics.
-    let forkAgent
-        (targetAgent: string)
-        (prompt: string)
-        (forkFn: string -> string -> Task<Result<string, string>>)
-        : AgentFlow<string> =
-        agent {
-            let! handle =
-                fromTask (fun _ ct ->
-                    task {
-                        match! forkFn targetAgent prompt with
-                        | Ok h -> return h
-                        | Error e -> return failwith e
-                    })
-
-            return handle
+    /// Run a simple agent action with the canonical cancellation/exception mapping.
+    let runAgentFlow
+        (ctx: AgentContext)
+        (ct: CancellationToken)
+        (action: AgentContext -> CancellationToken -> Task<'a>)
+        : Task<Result<'a, AgentError>> =
+        task {
+            try
+                let! value = action ctx ct
+                return Ok value
+            with
+            | :? OperationCanceledException when ct.IsCancellationRequested -> return Error AgentError.ParentCancelled
+            | ex -> return Error(AgentError.HostFailure ex.Message)
         }
 
     /// Run a simple agent program that validates session identity.
-    let validateSession (expectedName: string) : AgentFlow<bool> =
-        agent {
-            let! name = fromTask (fun ctx _ct -> task { return ctx.AgentName })
-
-            return name = expectedName
-        }
-
-    /// Execute an agent flow to completion and return the result.
-    let runAgentFlow (ctx: AgentContext) (ct: CancellationToken) (flow: AgentFlow<'a>) : Task<Result<'a, AgentError>> =
-        Flow.run ctx ct flow
+    let validateSession (expectedName: string) (ctx: AgentContext) (_ct: CancellationToken) : Task<bool> =
+        task { return ctx.AgentName = expectedName }

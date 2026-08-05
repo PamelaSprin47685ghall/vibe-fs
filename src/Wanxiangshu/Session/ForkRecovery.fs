@@ -1,53 +1,25 @@
 namespace Wanxiangshu.Session
 
-open System
 open Wanxiangshu.Kernel.Identity
 
 /// Rebuilds physical ChildRun aggregates from durable linkage after restart.
 /// No runtime id or synthetic running state participates in ownership.
+/// P0-RECOVERY-JOIN-001: restore/interrupt never mint durable or cell finality.
 module ForkRecovery =
 
+    /// Re-register Active run after restart. Completion cell stays open.
     let restore agentId agentName role agents =
         let runId = "restored-" + agentId
         let run = ChildRun.create agentId runId agentName role "(restored from journal)"
-
-        let completion =
-            { RunId = runId
-              AgentId = agentId
-              AgentName = agentName
-              Role = role
-              Outcome = AgentCompletion.ofSimpleText agentId runId role "(restored)"
-              CompletedAt = DateTimeOffset.UtcNow }
-
-        run.Completion.TrySet(completion) |> ignore
         Map.add agentId run agents
 
-    let markInterrupted agentId reason agents =
+    /// Cancel in-flight busy work only. Keep handle Active; do not fill completion.
+    let markInterrupted agentId (_reason: string) agents =
         match Map.tryFind agentId agents with
         | None -> agents
         | Some run ->
             ChildRun.cancel run
-            let runId = "interrupted-" + agentId
-            let interrupted = ChildRun.create agentId runId run.AgentName run.Role run.Prompt
-            run.ChildSessionId |> Option.iter (ChildRun.bindSession interrupted)
-
-            let completion =
-                { RunId = runId
-                  AgentId = agentId
-                  AgentName = run.AgentName
-                  Role = run.Role
-                  Outcome =
-                    AgentCompletion.failed
-                        agentId
-                        runId
-                        (Some run.Role)
-                        run.ChildSessionId
-                        "INTERRUPTED"
-                        ("interrupted:" + reason)
-                  CompletedAt = DateTimeOffset.UtcNow }
-
-            interrupted.Completion.TrySet(completion) |> ignore
-            Map.add agentId interrupted agents
+            agents
 
     let bindChildSession agentId (childSessionId: SessionId) agents =
         match Map.tryFind agentId agents with

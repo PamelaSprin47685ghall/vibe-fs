@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel.Fact
@@ -63,59 +64,62 @@ module HostSignalBootstrap =
 
             let onTurn (turn: ReconciledTurn) : Task =
                 task {
-                    // PROMPT-011: the recovery pass must complete before any business
-                    // effect of a real turn. First turn starts the single pass; later
-                    // turns await the same completed task (no-op).
-                    do! scope.EnsureRecoveryDone()
+                    // RECOVERY-FAMILY: family recovery before business effects of a turn.
+                    let! recovery = scope.EnsureRecoveryDone turn.SessionId
 
-                    // Manager sessions run inside their own worktree, not the plugin's
-                    // root workspace. The review-guard tree check must resolve that
-                    // worktree's GitTreePort; otherwise it compares against a
-                    // different Git object graph and can never see the confirmed tree.
-                    let sessionKey = SessionId.value turn.SessionId
+                    match recovery with
+                    | FamilyRecovery.FamilyBlocked _ ->
+                        // Fail closed: do not arm recovery, reconcile, or complete turn.
+                        ()
+                    | FamilyRecovery.FamilyReady _ ->
+                        // Manager sessions run inside their own worktree, not the plugin's
+                        // root workspace. The review-guard tree check must resolve that
+                        // worktree's GitTreePort; otherwise it compares against a
+                        // different Git object graph and can never see the confirmed tree.
+                        let sessionKey = SessionId.value turn.SessionId
 
-                    let managerGitTreePort =
-                        match scope.SessionDirectories.TryGetValue sessionKey with
-                        | true, directory when not (String.IsNullOrWhiteSpace directory) ->
-                            Some(GitTree.create directory)
-                        | _ -> gitTreePort
+                        let managerGitTreePort =
+                            match scope.SessionDirectories.TryGetValue sessionKey with
+                            | true, directory when not (String.IsNullOrWhiteSpace directory) ->
+                                Some(GitTree.create directory)
+                            | _ -> gitTreePort
 
-                    match turn.Outcome with
-                    | TurnFailed _
-                    | TurnAborted _ ->
-                        scope.ArmRecovery turn.SessionId
+                        match turn.Outcome with
+                        | TurnFailed _
+                        | TurnAborted _ ->
+                            scope.ArmRecovery turn.SessionId
 
-                        // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
-                        // slot of the Companion that owns it, through the same failure event.
-                        // The Companion's single-flight gate serialises the slot sequence,
-                        // so this flag cannot race a squash decision.
-                        for KeyValue(_, companion) in scope.Companions do
-                            match companion.BloggerSession with
-                            | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
-                            | _ -> ()
-                    | TurnCompleted
-                    | TurnNeedsContinuation _
-                    | TurnInProgress
-                    | TurnUnknown -> ()
+                            // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
+                            // slot of the Companion that owns it, through the same failure event.
+                            // The Companion's single-flight gate serialises the slot sequence,
+                            // so this flag cannot race a squash decision.
+                            for KeyValue(_, companion) in scope.Companions do
+                                match companion.BloggerSession with
+                                | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
+                                | _ -> ()
+                        | TurnCompleted
+                        | TurnNeedsContinuation _
+                        | TurnInProgress
+                        | TurnUnknown -> ()
 
-                    XWire.reconcileAttempt journal scope turn
+                        XWire.reconcileAttempt journal scope turn
 
-                    do!
-                        TurnCompletionProgram.applyWithContinuation
-                            sessionPort
-                            eventPort
-                            journal
-                            managerGitTreePort
-                            scope.VerdictSessions
-                            scope.NudgeSent
-                            scope.ManagerGuardNudges
-                            scope.JoinGuardNudges
-                            scope.SessionParents
-                            scope.DisposeExecutorRuntime
-                            scope.HasLivePty
-                            scope.AbortedSessions
-                            (Some scope.LoopSensor)
-                            turn
+                        do!
+                            TurnCompletionProgram.applyWithContinuation
+                                sessionPort
+                                eventPort
+                                journal
+                                managerGitTreePort
+                                scope.VerdictSessions
+                                scope.NudgeSent
+                                scope.ManagerGuardNudges
+                                scope.JoinGuardNudges
+                                scope.SessionParents
+                                scope.DisposeExecutorRuntime
+                                scope.HasLivePty
+                                scope.AbortedSessions
+                                (Some scope.LoopSensor)
+                                turn
                 }
 
             /// HOST-006 containment: observe every reconciled snapshot for compaction
@@ -130,10 +134,12 @@ module HostSignalBootstrap =
             /// no state that could drift.
             let onSnapshot (sessionId: SessionId) (messages: SessionMessage list) : Task =
                 task {
-                    // PROMPT-011: the recovery pass must complete before the startup
-                    // compaction probe judges the first turn — the probe is a business
-                    // effect too (it can refuse to run).
-                    do! scope.EnsureRecoveryDone()
+                    // RECOVERY-FAMILY: family recovery before compaction probe effects.
+                    let! recovery = scope.EnsureRecoveryDone sessionId
+
+                    match recovery with
+                    | FamilyRecovery.FamilyBlocked _ -> return ()
+                    | FamilyRecovery.FamilyReady _ -> ()
 
                     // HOST-006 prevention layer's second half: the runtime probe.
                     //

@@ -2,7 +2,7 @@ namespace Wanxiangshu.Domain
 
 /// LOOP-003…005: low 4-gram-diversity loop detector.
 ///
-/// Drop space/tab/CR/LF, then sliding 4-grams + three slow exponential kernels
+/// Drop space/tab/CR/LF/minus, then sliding 4-grams + three slow exponential kernels
 /// + normal-code prior (innocent until proven looping). Fixed hash buckets keep
 /// memory O(1). Physical threshold lives in N_eff space.
 ///
@@ -33,7 +33,7 @@ module LoopDetector =
     let Epsilon = 1e-300
 
     let isIgnored (ch: char) =
-        ch = ' ' || ch = '\t' || ch = '\r' || ch = '\n'
+        ch = ' ' || ch = '\t' || ch = '\r' || ch = '\n' || ch = '-'
 
     [<RequireQualifiedAccess>]
     type State =
@@ -176,7 +176,7 @@ module LoopDetector =
                 updateGram detector bucket
                 evaluate detector
 
-    /// Push UTF-16 code units. Space/tab/CR/LF are ignored (LOOP-003/004).
+    /// Push UTF-16 code units. Space/tab/CR/LF/minus are ignored (LOOP-003/004).
     let pushText (detector: Detector) (text: string) : Evaluation =
         if isNull text || text.Length = 0 then
             evaluate detector

@@ -39,7 +39,18 @@ const { SessionIdModule_create, PhysicalUserMessageIdModule_create } = await imp
 )
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
-const { HandleController_recordCompletion: recordCompletion } = await import('../../../dist/Session/HandleController.js')
+const {
+  HandleController_recordCompletion: recordCompletion,
+  HandleController_agentHandle: agentHandle,
+} = await import('../../../dist/Session/HandleController.js')
+const ChildRecovery = await import('../../../dist/Domain/ChildRecovery.js')
+const terminalEvidenceCompleted =
+  ChildRecovery.TerminalEvidenceModule_completed ?? ChildRecovery.TerminalEvidence_completed
+const terminalEvidenceFailed =
+  ChildRecovery.TerminalEvidenceModule_failed ?? ChildRecovery.TerminalEvidence_failed
+const tryFromProvenTerminal =
+  ChildRecovery.JoinableCompletionModule_tryFromProvenTerminal ??
+  ChildRecovery.JoinableCompletion_tryFromProvenTerminal
 
 /**
  * The smallest SDK client double: mint child ids, accept prompts. The id list is
@@ -142,17 +153,19 @@ export const withExecutablePlugin = async (body) => {
         for (const [parentSessionId, byChild] of recorderByParent) {
           const agentId = byChild.get(sessionId)
           if (agentId !== undefined) {
-            // HandleCompletionKind.Terminal is Fable union case tag 0
-            // (Session/HandleController.fs, Kind = Terminal for Completed).
+            // P0-RECOVERY-JOIN-001: mint JoinableCompletion via Domain proof only.
             // EXEC-009: body is the durable join payload; fixture writes a minimal
-            // completed blob so projection-first join can consume after restart.
-            const kind = outcome.tag === 0 ? { tag: 0, fields: [] } : { tag: 1, fields: [] }
+            // completed/failed blob so projection-first join can consume after restart.
+            // outcome.tag 0 = Completed; other tags are proven Failed (not raw Aborted).
+            if (typeof terminalEvidenceCompleted !== 'function' || typeof tryFromProvenTerminal !== 'function') {
+              throw new Error('ChildRecovery TerminalEvidence / JoinableCompletion not exported')
+            }
             const body =
               outcome.tag === 0
                 ? JSON.stringify({
                     status: 'completed',
                     run_id: `run-${agentId}`,
-                    work_record: '',
+                    work_record: 'fixture-work-record',
                     child_session_id: sessionId,
                     authority_root: '',
                     provider_run: '',
@@ -165,14 +178,17 @@ export const withExecutablePlugin = async (body) => {
                     message: 'fixture terminal failure',
                     child_session_id: sessionId,
                   })
-            // Fable erases `string option`: Some x = x, None = null/undefined.
-            const recorded = recordCompletion(
-              runtime.journal,
-              SessionIdModule_create(parentSessionId),
-              agentId,
-              kind,
-              body,
-            )
+            const handle = agentHandle(agentId)
+            const child = SessionIdModule_create(sessionId)
+            const evidence =
+              outcome.tag === 0
+                ? terminalEvidenceCompleted(agentId, handle, child, body)
+                : terminalEvidenceFailed(agentId, handle, child, body)
+            const proof = tryFromProvenTerminal(evidence)
+            if (proof.tag !== 0) {
+              throw new Error(`JoinableCompletion(${agentId}) rejected: ${proof.fields?.[0]}`)
+            }
+            const recorded = recordCompletion(runtime.journal, SessionIdModule_create(parentSessionId), proof.fields[0])
             if (recorded.tag !== 0) {
               throw new Error(`HandleCompleted(${agentId}) rejected: ${recorded.fields?.[0]}`)
             }

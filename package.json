@@ -30,7 +30,8 @@
     "test:package": "node tests/integration/package/run.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
     "check": "npm run lint && npm run build && npm test && npm run test:integration",
-    "check:release": "npm run check && npm run test:e2e -- --repeat 3 && npm run test:package && npm pack --dry-run"
+    "check:release": "npm run check && npm run test:e2e -- --repeat 3 && npm run test:package && npm pack --dry-run",
+    "gate:dsl-ownership": "node scripts/checks/dsl-ownership.mjs"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.17.4"

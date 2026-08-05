@@ -3,6 +3,7 @@ namespace Wanxiangshu.Session
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -65,81 +66,56 @@ module HostForkRunLifecycle =
         fun agentId childId (_role: AgentRole) agent prompt ->
             sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt
 
-    let private deliverCompletion
+    /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
+    /// Aborted is observation — never recordCompletion / SetResult / mailbox.
+    /// Claim runs only after JoinableCompletion proof succeeds (fail closed).
+    let private deliverProvenCompletion
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
         (journal: AgentJournal option)
         (parentId: SessionId)
         (run: PendingHostRun)
-        (outcome: TerminalOutcome)
-        (workRecord: string option)
-        (subscriptionToDispose: IDisposable option)
+        (evidence: TerminalEvidence)
+        (agentOutcome: AgentCompletionOutcome)
         =
-        subscriptionToDispose
-        |> Option.iter (fun subscription -> subscription.Dispose())
+        match JoinableCompletion.tryFromProvenTerminal evidence with
+        | Error _ ->
+            // Fail closed: leave run Active / pending for a later proven terminal.
+            ()
+        | Ok proof ->
+            let claimed, subscriptionToDispose =
+                lock gate (fun () ->
+                    match pendingRuns.TryGetValue run.AgentId with
+                    | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
+                        run.Finished <- true
+                        pendingRuns.Remove run.AgentId |> ignore
+                        true, run.Subscription
+                    | _ -> false, None)
 
-        // EXEC-009: durable blob + HandleCompleted precede mailbox delivery.
-        // Join consumes from projection/blob; mailbox is wait-notification only.
-        let runId = "run-" + run.AgentId
-        let childId = run.ChildId
+            if claimed then
+                subscriptionToDispose
+                |> Option.iter (fun subscription -> subscription.Dispose())
 
-        let completionKind, agentOutcome =
-            match outcome with
-            | Completed result when not result.IsValid ->
-                // EXEC-006: `IsValid` decides whether a completed run carries
-                // terminal output. The join wire then carries the materialised LWR.
-                HandleCompletionKind.SendFailure,
-                AgentCompletion.failed
-                    run.AgentId
-                    runId
-                    (Some run.Role)
-                    (Some childId)
-                    "MISSING_FINAL_REPORT"
-                    "completed with empty terminal output"
-            | Completed result ->
-                HandleCompletionKind.Terminal,
-                AgentCompletion.completed
-                    run.AgentId
-                    childId
-                    runId
-                    run.Role
-                    result.AuthorityRootUserMessageId
-                    // HOST-010/HOST-011: terminal provider run IS the assistant message.
-                    result.ProviderRun
-                    (workRecord |> Option.defaultValue "")
-                    result.Directory
-            | Aborted reason ->
-                HandleCompletionKind.SendFailure,
-                AgentCompletion.aborted run.AgentId runId (Some run.Role) (Some childId) "ABORTED" reason
-            | Failed error ->
-                let code =
-                    if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
-                        "MISSING_FINAL_REPORT"
-                    elif error = "cancelled" then
-                        "CANCELLED"
-                    else
-                        "ERROR"
+                // EXEC-009: durable blob + HandleCompleted precede mailbox delivery.
+                let runId = "run-" + run.AgentId
+                let childId = run.ChildId
 
-                HandleCompletionKind.SendFailure,
-                AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
+                let finalOutcome =
+                    match journal with
+                    | None -> agentOutcome
+                    | Some _ ->
+                        match HandleController.recordCompletion journal parentId proof with
+                        | Ok() -> agentOutcome
+                        | Error error ->
+                            AgentCompletion.failed
+                                run.AgentId
+                                runId
+                                (Some run.Role)
+                                (Some childId)
+                                "PERSIST"
+                                (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
 
-        let body = Some(HandleCompletionCodec.encodeOutcome runId agentOutcome)
-
-        let finalOutcome =
-            match journal with
-            | None -> agentOutcome
-            | Some _ ->
-                match HandleController.recordCompletion journal parentId run.AgentId completionKind body with
-                | Ok() -> agentOutcome
-                | Error error ->
-                    // Never leave Source unset: Join must unblock even when append fails.
-                    AgentCompletion.failed
-                        run.AgentId
-                        runId
-                        (Some run.Role)
-                        (Some childId)
-                        "PERSIST"
-                        (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
-
-        run.Source.SetResult finalOutcome
+                run.Source.SetResult finalOutcome
 
     let complete
         (gate: obj)
@@ -157,21 +133,85 @@ module HostForkRunLifecycle =
         // or session-A fallback: a missing LWR is an empty work_record, not a
         // second channel.
         let completedWorkRecord = workRecord
+        let runId = "run-" + run.AgentId
+        let childId = run.ChildId
+        let handle = HandleController.agentHandle run.AgentId
 
-        // First matching terminal claims the run immediately. No Ready gate:
-        // install/recovery/restart windows must not buffer-and-lose completion.
-        // Token + Finished prevent stale or double SetResult.
-        let claimed, subscriptionToDispose =
-            lock gate (fun () ->
-                match pendingRuns.TryGetValue run.AgentId with
-                | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
-                    run.Finished <- true
-                    pendingRuns.Remove run.AgentId |> ignore
-                    true, run.Subscription
-                | _ -> false, None)
+        match outcome with
+        | Aborted _ ->
+            // Observation only. Keep pending run Active for a later proven terminal.
+            ()
+        | Completed result when not result.IsValid ->
+            let agentOutcome =
+                AgentCompletion.failed
+                    run.AgentId
+                    runId
+                    (Some run.Role)
+                    (Some childId)
+                    "MISSING_FINAL_REPORT"
+                    "completed with empty terminal output"
 
-        if claimed then
-            deliverCompletion journal parentId run outcome completedWorkRecord subscriptionToDispose
+            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+            deliverProvenCompletion
+                gate
+                pendingRuns
+                journal
+                parentId
+                run
+                (TerminalEvidence.failed run.AgentId handle childId body)
+                agentOutcome
+        | Completed result ->
+            let agentOutcome =
+                AgentCompletion.completed
+                    run.AgentId
+                    childId
+                    runId
+                    run.Role
+                    result.AuthorityRootUserMessageId
+                    // HOST-010/HOST-011: terminal provider run IS the assistant message.
+                    result.ProviderRun
+                    (completedWorkRecord |> Option.defaultValue "")
+                    result.Directory
+
+            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+            deliverProvenCompletion
+                gate
+                pendingRuns
+                journal
+                parentId
+                run
+                (TerminalEvidence.completed run.AgentId handle childId body)
+                agentOutcome
+        | Failed error ->
+            let code =
+                if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
+                    "MISSING_FINAL_REPORT"
+                elif error = "cancelled" then
+                    "CANCELLED"
+                else
+                    "ERROR"
+
+            let agentOutcome =
+                AgentCompletion.failed
+                    run.AgentId
+                    runId
+                    (Some run.Role)
+                    (Some childId)
+                    code
+                    error
+
+            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+            deliverProvenCompletion
+                gate
+                pendingRuns
+                journal
+                parentId
+                run
+                (TerminalEvidence.failed run.AgentId handle childId body)
+                agentOutcome
 
     let installRun
         (gate: obj)

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Session
 
+open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
@@ -22,6 +23,9 @@ type HandleConsumeRejection =
 /// the appends across the fork path, the completion path and the cancel path
 /// meant three modules each knew part of that order, and none of them could see
 /// whether the other two agreed.
+///
+/// P0-RECOVERY-JOIN-001: `recordCompletion` accepts only `JoinableCompletion`.
+/// Raw Aborted / bare kind+body cannot claim the completion cell.
 module HandleController =
 
     /// An agent child's handle IS its runtime agent id.
@@ -63,21 +67,24 @@ module HandleController =
                        TargetAgent = targetAgent
                        CanonicalRole = AgentRoleIdentity.toRole role |})
 
-    /// EXEC-004: claim the single-assignment completion cell.
+    /// EXEC-004 / P0-RECOVERY-JOIN-001: claim the single-assignment completion cell
+    /// only with a proven `JoinableCompletion` (Succeeded | Failed finality).
     ///
-    /// Terminal and send-failure write the join payload blob BEFORE the fact
-    /// (PERSIST-007). Cancelled carries no body. The fold refuses a second claim,
-    /// so a duplicate is a no-op rather than an overwrite.
+    /// Blob write precedes the fact (PERSIST-007). Kind + body come from the proof;
+    /// callers cannot pass raw Aborted or bare `HandleCompletionKind` + `"ABORTED"`.
+    /// The fold refuses a second claim, so a duplicate is a no-op rather than overwrite.
     let recordCompletion
         (journal: AgentJournal option)
         (parentId: SessionId)
-        (agentId: string)
-        (kind: HandleCompletionKind)
-        (body: string option)
+        (completion: JoinableCompletion)
         : Result<unit, string> =
         match journal with
         | None -> Ok()
         | Some durable ->
+            let agentId = JoinableCompletion.agentId completion
+            let kind = JoinableCompletion.kind completion
+            let body = JoinableCompletion.body completion
+
             let writeRefs () : Result<BlobRef option * BlobDigest option, string> =
                 match body with
                 | None -> Ok(None, None)

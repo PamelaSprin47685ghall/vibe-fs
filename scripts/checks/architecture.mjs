@@ -140,6 +140,44 @@ for (const file of productionFs) {
   }
 }
 
+// ⑨ RECOVERY-FAMILY: no local recovery-gate bypass; constructor must not start restore.
+{
+  const forbiddenCallers = [
+    'PromptRecovery.RecoveryGate',
+    'BloggerCrashRecovery.RecoveryGate',
+    'AttachRecoveryGate',
+    'AttachBloggerRecoveryGate',
+  ]
+  for (const file of productionFs) {
+    const text = read(file)
+    // Domain DSL may name RecoveryGate only as history; production wiring must not.
+    if (file.includes('/Domain/SessionRecovery.fs')) continue
+    for (const token of forbiddenCallers) {
+      if (text.includes(token)) {
+        fail('recovery-family', `${file}: forbidden local recovery gate '${token}'`)
+      }
+    }
+  }
+
+  const forkRuntime = `${PRODUCTION_ROOT}/Session/HostForkRuntime.fs`
+  if (existsSync(forkRuntime)) {
+    const text = read(forkRuntime)
+    if (/do\s+recoveryTask\s*<-\s*restoreChildren/.test(text)) {
+      fail('recovery-family', `${forkRuntime}: constructor must not start restoreChildren`)
+    }
+  }
+
+  const dsl = `${PRODUCTION_ROOT}/Domain/SessionRecovery.fs`
+  if (!existsSync(dsl)) {
+    fail('recovery-family', `${dsl}: SessionRecovery DSL missing`)
+  } else {
+    const text = read(dsl)
+    if (!/type FamilyRecoveryPermit\s*=\s*\n\s*private/.test(text) && !/FamilyRecoveryPermit\s*=\s*private/.test(text)) {
+      fail('recovery-family', `${dsl}: FamilyRecoveryPermit must be private`)
+    }
+  }
+}
+
 if (violations.length === 0) {
   console.log(`architecture: OK — ${productionFs.length} 文件`)
   process.exit(0)

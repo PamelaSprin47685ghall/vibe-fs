@@ -68,14 +68,7 @@ type ForkRuntime
                             return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
 
-                let flow = ChildRunProgram.run childRun work
-
-                let! result =
-                    AgentProgram.runAgentFlow
-                        { SessionId = agentId
-                          AgentName = agentName }
-                        childRun.Cancellation.Token
-                        flow
+                let! result = ChildRunProgram.run childRun work childRun.Cancellation.Token
 
                 let completion =
                     match result with

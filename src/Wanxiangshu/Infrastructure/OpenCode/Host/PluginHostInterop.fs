@@ -58,20 +58,25 @@ module PluginHostInterop =
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
         : ToolRegistration =
-        ToolRegistry.create
-            toolModule
-            sessionPort
-            journal
-            gitTreePort
-            workspaceDirectory
-            scope.SessionParents
-            currentPhysicalUserMessage
-            scope.VerdictSessions
-            scope.SessionDirectories
-            onRunStarted
-            parentWorkRecordFor
-            childWorkRecordFor
-            snapshot
-            cancelSignals
-            eventPort
-            (Some(scope :> IParkedTransformHost))
+        let registration =
+            ToolRegistry.create
+                toolModule
+                sessionPort
+                journal
+                gitTreePort
+                workspaceDirectory
+                scope.SessionParents
+                currentPhysicalUserMessage
+                scope.VerdictSessions
+                scope.SessionDirectories
+                onRunStarted
+                parentWorkRecordFor
+                childWorkRecordFor
+                snapshot
+                cancelSignals
+                eventPort
+                (Some(scope :> IParkedTransformHost))
+
+        // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
+        registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)
+        registration
