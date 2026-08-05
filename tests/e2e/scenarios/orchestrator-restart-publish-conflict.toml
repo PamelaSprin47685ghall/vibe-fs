@@ -9,7 +9,8 @@
 # new turn (`orch-continue`). Completion criteria = `Published eq 1` journal fact.
 # Original-turn `orch.2` is a restart race path: the recovered run may answer the old
 # turn again (interrupted join re-delivered at step 1, or the pre-crash join's
-# step-2 continuation). Declared below with a terminal text reply; `optional = true`
+# step-2 continuation). Declared below with a join reply (so the rebase-conflict
+# resume keeps running) plus an optional orch.3 join-retry tail; `optional = true`
 # admits the Continue prompt winning the race and anchoring `orch-continue` directly.
 #
 # ── the recovery file this one loaded was empty ──────────────────────────────
