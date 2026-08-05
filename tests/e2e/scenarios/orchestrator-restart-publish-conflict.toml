@@ -7,7 +7,10 @@
 # Host does not re-drive pending tools after restart; recovery is triggered only by new
 # input (`runLoop`). Pending join maps to interrupted-error; a new user message anchors a
 # new turn (`orch-continue`). Completion criteria = `Published eq 1` journal fact.
-# Original-turn `orch.2` is a non-deterministic race path and is not declared.
+# Original-turn `orch.2` is a restart race path: the recovered run may answer the old
+# turn again (interrupted join re-delivered at step 1, or the pre-crash join's
+# step-2 continuation). Declared below with a terminal text reply; `optional = true`
+# admits the Continue prompt winning the race and anchoring `orch-continue` directly.
 #
 # ── the recovery file this one loaded was empty ──────────────────────────────
 #
@@ -57,7 +60,7 @@ flow = [
 
   # Continue drives recovery (Host has no auto-recovery). Causal order on the common path:
   # Continue → 2nd conflict-resume → review/confirm → Published → orch-continue join/text.
-  # orch.2 is not declared (non-deterministic race with Continue).
+  # `orch.2` covers the restart race path (the recovered run answering the old turn again).
   # The SAME conflict-resume key, delivered a second time. The JSON form declared this as
   # `manager-conflict-resume-2` at `lane.turn = 5` with `"Resolved rebase resolution."`
   # against the first edge's `"Resuming rebase resolution."` — two different responses for
@@ -92,6 +95,19 @@ tools = ["fork-manager", "join"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
+
+# orch.2: restart race path. After restart the recovered run may answer the
+# old turn again — either the pre-crash join (step-1) was answered and the
+# model's next request is this step, or the interrupted join is re-delivered
+# at step 1 and this step follows it. The text reply terminates the recovered
+# turn deterministically; the Continue prompt then drives `orch-continue` as
+# the declared recovery path. `optional = true` because the Continue prompt's
+# new user message may win the race and anchor `orch-continue` directly,
+# leaving this step unreached on that run.
+
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "Publish completed after restart." }
 
 # The post-restart continuation is a new user message from the scenario, so it is its own turn.
 

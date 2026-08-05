@@ -83,8 +83,8 @@ tools = ["write"]
 id = "coder-nudged"
 lane = "fast-coder"
 user = [
-  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
-  "# nudge continue second run while first is busy",
+  "TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "nudge continue second run while first is busy",
 ]
 tools = ["write"]
 
