@@ -77,6 +77,8 @@ module SessionRecovery =
     type SessionRecovery =
         | NoRecoveryRequired of RecoveryReceipt
         | Recovered of RecoveryReceipt
+        /// Recovery still in flight / transient unreadable. No permit; not a hard block.
+        | Waiting of NonEmpty<RecoveryBlock>
         | Blocked of NonEmpty<RecoveryBlock>
 
     /// Private: only authorizeFamilyResume may construct.
@@ -91,6 +93,8 @@ module SessionRecovery =
     [<RequireQualifiedAccess>]
     type FamilyRecovery =
         | FamilyReady of FamilyRecoveryPermit
+        /// Incomplete family recovery: no permit, consumers must wait (not RECOVERY_BLOCKED).
+        | FamilyWaiting of NonEmpty<RecoveryBlock>
         | FamilyBlocked of NonEmpty<RecoveryBlock>
 
     type RecoveryClosure =
@@ -126,6 +130,108 @@ module SessionRecovery =
     type JobRecovery =
         { JobId: ManagerJobId
           Outcome: SessionRecovery }
+
+    /// Per-handle recovery wait (incomplete; must not issue FamilyRecoveryPermit).
+    type HandleRecoveryWait =
+        { Handle: AgentHandleId
+          ChildSession: SessionId
+          Reason: string }
+
+    /// Per-handle recovery block.
+    type HandleRecoveryBlock =
+        { Handle: AgentHandleId
+          ChildSession: SessionId
+          Reason: string }
+
+    /// One recovered agent handle under a parent session.
+    type RecoveredHandle =
+        {
+            Handle: AgentHandleId
+            ChildSession: SessionId
+            /// terminal | active | abandoned — determined family outcomes only.
+            Kind: string
+        }
+
+    /// Query result for RestoreHandles (GREEN-4). Missing work = NoLinkedHandles, not missing port.
+    [<RequireQualifiedAccess>]
+    type HandleFamilyRecovery =
+        | NoLinkedHandles
+        | HandlesRecovered of NonEmpty<RecoveredHandle>
+        | HandlesWaiting of NonEmpty<HandleRecoveryWait>
+        | HandlesBlocked of NonEmpty<HandleRecoveryBlock>
+
+    /// Query result for RecoverJobs (GREEN-4).
+    [<RequireQualifiedAccess>]
+    type JobFamilyRecovery =
+        | NoRelatedJobs
+        | JobsRecovered of NonEmpty<ManagerJobId>
+        | JobRecoveryUnknown of ManagerJobId * reason: string
+        | JobsBlocked of NonEmpty<RecoveryBlock>
+
+    /// Map handle-family query into SessionRecovery for merge / authorize.
+    /// Determined: NoLinkedHandles / HandlesRecovered → permit-eligible.
+    /// HandlesWaiting → Waiting (no permit, join waits). HandlesBlocked → Blocked.
+    let sessionRecoveryOfHandleFamily
+        (sessionId: SessionId)
+        (sequence: int64)
+        (family: HandleFamilyRecovery)
+        : SessionRecovery =
+        match family with
+        | HandleFamilyRecovery.NoLinkedHandles ->
+            SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create sessionId sequence None [] [])
+        | HandleFamilyRecovery.HandlesRecovered handles ->
+            let restored = NonEmpty.toList handles |> List.map (fun h -> h.Handle)
+
+            SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None [] restored)
+        | HandleFamilyRecovery.HandlesWaiting waits ->
+            let reasons =
+                NonEmpty.toList waits
+                |> List.map (fun w ->
+                    RecoveryBlock.ChildRecoveryFailed(
+                        w.ChildSession,
+                        sprintf "handle %s waiting: %s" (AgentHandleId.value w.Handle) w.Reason
+                    ))
+
+            match NonEmpty.ofList reasons with
+            | Some blocks -> SessionRecovery.Waiting blocks
+            | None ->
+                SessionRecovery.Waiting(NonEmpty.one (RecoveryBlock.ChildRecoveryFailed(sessionId, "handles waiting")))
+        | HandleFamilyRecovery.HandlesBlocked blocks ->
+            let reasons =
+                NonEmpty.toList blocks
+                |> List.map (fun b ->
+                    RecoveryBlock.ChildRecoveryFailed(
+                        b.ChildSession,
+                        sprintf "handle %s blocked: %s" (AgentHandleId.value b.Handle) b.Reason
+                    ))
+
+            match NonEmpty.ofList reasons with
+            | Some bs -> SessionRecovery.Blocked bs
+            | None ->
+                SessionRecovery.Blocked(NonEmpty.one (RecoveryBlock.ChildRecoveryFailed(sessionId, "handles blocked")))
+
+    /// Map job-family query into SessionRecovery.
+    let sessionRecoveryOfJobFamily
+        (sessionId: SessionId)
+        (sequence: int64)
+        (family: JobFamilyRecovery)
+        : SessionRecovery =
+        match family with
+        | JobFamilyRecovery.NoRelatedJobs ->
+            SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create sessionId sequence None [] [])
+        | JobFamilyRecovery.JobsRecovered _ ->
+            SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None [] [])
+        | JobFamilyRecovery.JobRecoveryUnknown(jobId, reason) ->
+            // Transient / unknown job evidence → wait, not hard FamilyBlocked.
+            SessionRecovery.Waiting(
+                NonEmpty.one (
+                    RecoveryBlock.ChildRecoveryFailed(
+                        sessionId,
+                        sprintf "job %s unknown: %s" (ManagerJobId.value jobId) reason
+                    )
+                )
+            )
+        | JobFamilyRecovery.JobsBlocked blocks -> SessionRecovery.Blocked blocks
 
     /// Closed AST (FLOW-002). No arbitrary Task injection.
     type SessionRecoveryProgram<'result> =
@@ -216,7 +322,10 @@ module SessionRecovery =
 
         check Set.empty closure.Nodes
 
-    /// Pure authorize: any Blocked child → FamilyBlocked; else private permit.
+    /// Pure authorize:
+    /// any Blocked → FamilyBlocked (hard, no permit);
+    /// else any Waiting → FamilyWaiting (no permit, consumers wait);
+    /// else FamilyReady (private permit).
     let authorizeFamilyResume
         (root: SessionId)
         (journalSequence: int64)
@@ -228,12 +337,26 @@ module SessionRecovery =
             |> List.collect (fun (_, outcome) ->
                 match outcome with
                 | SessionRecovery.Blocked bs -> NonEmpty.toList bs
+                | SessionRecovery.Waiting _
                 | SessionRecovery.NoRecoveryRequired _
                 | SessionRecovery.Recovered _ -> [])
 
         match NonEmpty.ofList blocks with
         | Some nonEmpty -> FamilyRecovery.FamilyBlocked nonEmpty
-        | None -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit(root, journalSequence, recovered.Closure.Digest))
+        | None ->
+            let waits =
+                recovered.Results
+                |> Map.toList
+                |> List.collect (fun (_, outcome) ->
+                    match outcome with
+                    | SessionRecovery.Waiting ws -> NonEmpty.toList ws
+                    | SessionRecovery.Blocked _
+                    | SessionRecovery.NoRecoveryRequired _
+                    | SessionRecovery.Recovered _ -> [])
+
+            match NonEmpty.ofList waits with
+            | Some nonEmpty -> FamilyRecovery.FamilyWaiting nonEmpty
+            | None -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit(root, journalSequence, recovered.Closure.Digest))
 
     let private mergeOutcomes (outcomes: SessionRecovery list) : SessionRecovery =
         match
@@ -247,14 +370,23 @@ module SessionRecovery =
             match
                 outcomes
                 |> List.tryPick (function
-                    | SessionRecovery.Recovered r -> Some(SessionRecovery.Recovered r)
+                    | SessionRecovery.Waiting ws -> Some(SessionRecovery.Waiting ws)
                     | _ -> None)
             with
-            | Some recovered -> recovered
+            | Some waiting -> waiting
             | None ->
-                match outcomes with
-                | head :: _ -> head
-                | [] -> SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
+                match
+                    outcomes
+                    |> List.tryPick (function
+                        | SessionRecovery.Recovered r -> Some(SessionRecovery.Recovered r)
+                        | _ -> None)
+                with
+                | Some recovered -> recovered
+                | None ->
+                    match outcomes with
+                    | head :: _ -> head
+                    | [] ->
+                        SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
 
     /// Child-first program for one parent family (RECOVERY-FAMILY-001/002).
     let recoverFamily (parentSession: SessionId) : SessionRecoveryProgram<FamilyRecovery> =
@@ -321,6 +453,7 @@ module SessionRecovery =
         | RecoverManagerJob of ManagerJobId
         | ValidateClosure of digest: string
         | FamilyReadyIssued of root: SessionId * digest: string
+        | FamilyWaiting of count: int
         | FamilyBlocked of count: int
         | BusinessOperation of name: string
 
@@ -385,6 +518,7 @@ module SessionRecovery =
                     FamilyRecoveryPermit.closureDigest permit
                 )
                 :: trace (next permit)
+            | FamilyRecovery.FamilyWaiting waits -> [ RecoveryTrace.FamilyWaiting(List.length (NonEmpty.toList waits)) ]
             | FamilyRecovery.FamilyBlocked blocks ->
                 [ RecoveryTrace.FamilyBlocked(List.length (NonEmpty.toList blocks)) ]
         | Block blocks -> [ RecoveryTrace.FamilyBlocked(List.length (NonEmpty.toList blocks)) ]

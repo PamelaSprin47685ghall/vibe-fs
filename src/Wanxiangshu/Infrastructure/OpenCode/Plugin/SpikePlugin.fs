@@ -65,16 +65,45 @@ module SpikePlugin =
 
                 let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
 
-                // RECOVERY-FAMILY: attach ports only. Interpreter runs on first
-                // RequireFamilyRecovery / EnsureRecoveryDone, never in constructor
-                // (Host awaits constructor before project ready).
-                scope.AttachFamilyRecoveryPorts(
-                    { Journal = journal
-                      Snapshot = snapshotOpt
-                      ParkedHost = Some(scope :> IParkedTransformHost)
-                      RestoreHandles = None
-                      RecoverJob = None }
-                )
+                // GREEN-4: mandatory SessionRecoveryPorts. Real RestoreHandles/RecoverJobs.
+                // Missing journal or snapshot → leave ports unattached (RequireFamilyRecovery
+                // → FamilyBlocked RecoveryCoordinatorUnavailable). Never attach None ports
+                // that collapse to NoRecoveryRequired.
+                match journal, snapshotOpt with
+                | Some durable, Some snapshot ->
+                    let restoreHandles (sessionId: SessionId) : Task<HandleFamilyRecovery> =
+                        HostForkRestart.restoreLinkedChildrenWithoutRuntime snapshot durable sessionId
+
+                    let recoverJobs (sessionId: SessionId) : Task<JobFamilyRecovery> =
+                        task {
+                            let orch = (AgentJournal.snapshot durable).AgentProjections.Orchestrator
+                            // Session-scoped: jobs whose ManagerSessionId matches, or any
+                            // active job when session is orchestrator root with active set.
+                            let related =
+                                OrchestratorProjection.activeJobs orch
+                                |> List.filter (fun job ->
+                                    job.ManagerSessionId = sessionId
+                                    || SessionId.value job.ManagerSessionId = SessionId.value sessionId)
+
+                            match NonEmpty.ofList (related |> List.map (fun j -> j.ManagerJobId)) with
+                            | None -> return JobFamilyRecovery.NoRelatedJobs
+                            | Some ids -> return JobFamilyRecovery.JobsRecovered ids
+                        }
+
+                    scope.AttachFamilyRecoveryPorts(
+                        { Journal = durable
+                          Snapshot = snapshot
+                          ParkedHost = scope :> IParkedTransformHost
+                          RecoverPromptClaims = SessionRecoveryInterpreter.defaultRecoverPromptClaims durable snapshot
+                          RecoverBlogger =
+                            SessionRecoveryInterpreter.defaultRecoverBlogger
+                                durable
+                                (scope :> IParkedTransformHost)
+                                snapshot
+                          RestoreHandles = restoreHandles
+                          RecoverJobs = recoverJobs }
+                    )
+                | _ -> ()
 
                 let transform inObj outObj : Task<unit> =
                     task {
@@ -144,6 +173,7 @@ module SpikePlugin =
 
                                     match recovery with
                                     | FamilyRecovery.FamilyBlocked _ -> ()
+                                    | FamilyRecovery.FamilyWaiting _
                                     | FamilyRecovery.FamilyReady _ ->
                                         let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 

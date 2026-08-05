@@ -165,6 +165,17 @@ for (const file of productionFs) {
     if (/do\s+recoveryTask\s*<-\s*restoreChildren/.test(text)) {
       fail('recovery-family', `${forkRuntime}: constructor must not start restoreChildren`)
     }
+    // GREEN-4: second recovery ownership must not reappear (code only; comments ok).
+    const codeOnly = text
+      .split('\n')
+      .filter((l) => !/^\s*\/\//.test(l) && !/^\s*\*/.test(l))
+      .join('\n')
+    if (/\brecoveryTask\b/.test(codeOnly)) {
+      fail('recovery-family', `${forkRuntime}: recoveryTask must not exist (SessionRecoveryProgram owns restore)`)
+    }
+    if (/member[^\n]*AwaitRecovery/.test(codeOnly) || /EnsureChildRestoreStarted/.test(codeOnly)) {
+      fail('recovery-family', `${forkRuntime}: AwaitRecovery / EnsureChildRestoreStarted deleted (GREEN-4)`)
+    }
   }
 
   const dsl = `${PRODUCTION_ROOT}/Domain/SessionRecovery.fs`

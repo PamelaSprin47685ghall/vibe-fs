@@ -48,27 +48,65 @@ type AgentCompletionPayload =
         Directory: string option
     }
 
+/// Agent join finality only (EXEC-020): Completed | Failed | Abandoned.
+/// Host abort is observation, not agent terminal.
 type AgentCompletionOutcome =
     | AgentCompleted of AgentCompletionPayload
     | AgentFailed of AgentFailurePayload
-    | AgentAborted of AgentFailurePayload
     /// EXEC-009: durable HandleAbandoned reported once in a join [[result]] batch.
     /// Flat wire: status="abandoned", agent, reason — not nested [error].
     | AgentAbandoned of agentId: string * reason: string
+
+/// PTY exit payload (kind=pty, status=completed).
+type PtyExit =
+    { PtyId: string
+      Outcome: string
+      Closed: bool }
+
+/// PTY failure payload (kind=pty, status=failed).
+type PtyFailure =
+    { PtyId: string
+      Outcome: string
+      Closed: bool
+      Code: string
+      Message: string }
+
+/// PTY abort payload (kind=pty, status=aborted) — PTY-only; agent path forbids aborted.
+type PtyAbort =
+    { PtyId: string
+      Outcome: string
+      Closed: bool
+      Code: string
+      Message: string }
+
+/// Agent item inside a join [[result]] batch. No aborted branch.
+type AgentJoinItem =
+    | AgentCompletedItem of AgentCompletionPayload
+    | AgentFailedItem of AgentFailurePayload
+    | AgentAbandonedItem of agentId: string * reason: string
+
+/// PTY item inside a join [[result]] batch. Aborted is legal for PTY only.
+type PtyJoinItem =
+    | PtyExited of PtyExit
+    | PtyFailed of PtyFailure
+    | PtyAborted of PtyAbort
+
+/// One join batch item: agent or PTY.
+type JoinItem =
+    | AgentItem of AgentJoinItem
+    | PtyItem of PtyJoinItem
 
 module AgentCompletion =
     let text (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted payload -> payload.WorkRecord
-        | AgentFailed payload
-        | AgentAborted payload -> payload.Message
+        | AgentFailed payload -> payload.Message
         | AgentAbandoned(_, reason) -> reason
 
     let status (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted _ -> "completed"
         | AgentFailed _ -> "failed"
-        | AgentAborted _ -> "aborted"
         | AgentAbandoned _ -> "abandoned"
 
     let isCompleted (outcome: AgentCompletionOutcome) =
@@ -105,22 +143,6 @@ module AgentCompletion =
         message
         =
         AgentFailed
-            { AgentId = agentId
-              ChildSessionId = childSessionId
-              RunId = runId
-              Role = role
-              Code = code
-              Message = message }
-
-    let aborted
-        (agentId: string)
-        (runId: string)
-        (role: AgentRole option)
-        (childSessionId: SessionId option)
-        code
-        message
-        =
-        AgentAborted
             { AgentId = agentId
               ChildSessionId = childSessionId
               RunId = runId
@@ -167,19 +189,11 @@ module AgentCompletion =
                     RunId = runId
                     AgentId = agentId
                     Role = Some role }
-        | AgentAborted payload ->
-            AgentAborted
-                { payload with
-                    RunId = runId
-                    AgentId = agentId
-                    Role = Some role }
         | AgentAbandoned(_, reason) -> AgentAbandoned(agentId, reason)
 
-/// A completed (or failed/aborted) agent run.
-///
-/// Future: AgentId will be removed in P6 since the agent identity is the
-/// key in ForkRuntime's Map<string, ChildRun>. AgentName is the preferred
-/// field for consumer code that needs the managed agent name.
+/// One agent or PTY run completion cell for join wire / JoinDrain materialisation.
+/// GREEN-5: agent facts live in Journal; mailbox agent channel is wake-only.
+/// PTY facts live in mailbox as PtyJoinItem and project here for Join API.
 type RunCompletion =
     {
         /// Unique identity for this run attempt.
@@ -195,9 +209,114 @@ type RunCompletion =
         /// Canonical role of the agent.
         Role: AgentRole
 
-        /// The completion outcome (completed/failed/aborted payload).
+        /// Agent finality only: completed | failed | abandoned (no aborted).
         Outcome: AgentCompletionOutcome
 
         /// When the run reached terminal state.
         CompletedAt: DateTimeOffset
     }
+
+/// PTY mailbox helpers (GREEN-5): physical item ↔ join wire projection.
+module PtyJoinItem =
+    let ptyId (item: PtyJoinItem) =
+        match item with
+        | PtyExited e -> e.PtyId
+        | PtyFailed f -> f.PtyId
+        | PtyAborted a -> a.PtyId
+
+    /// Compat projection into RunCompletion for JoinWithPermit / ExecutorSummarize /
+    /// CompletionMailbox.Join only. Production JoinTool batch path keeps PtyJoinItem
+    /// (HostForkRuntime → JoinItem → renderer) so aborted is not lost on wire.
+    /// PtyAborted projects with Code = "PTY_ABORTED" so ofRunCompletion can recover it;
+    /// never map abort to a generic business AgentFailed without that discriminant.
+    let abortedCode = "PTY_ABORTED"
+
+    let toRunCompletion (item: PtyJoinItem) : RunCompletion =
+        let id = ptyId item
+        let role = AgentRole.DevOps
+
+        match item with
+        | PtyExited e ->
+            { RunId = id
+              AgentId = id
+              AgentName = id
+              Role = role
+              Outcome = AgentCompletion.ofSimpleText id id role e.Outcome
+              CompletedAt = DateTimeOffset.UtcNow }
+        | PtyFailed f ->
+            { RunId = id
+              AgentId = id
+              AgentName = id
+              Role = role
+              Outcome = AgentCompletion.failed id id (Some role) None f.Code f.Message
+              CompletedAt = DateTimeOffset.UtcNow }
+        | PtyAborted a ->
+            { RunId = id
+              AgentId = id
+              AgentName = id
+              Role = role
+              Outcome =
+                AgentCompletion.failed
+                    id
+                    id
+                    (Some role)
+                    None
+                    abortedCode
+                    (if String.IsNullOrWhiteSpace a.Message then
+                         a.Outcome
+                     else
+                         a.Message)
+              CompletedAt = DateTimeOffset.UtcNow }
+
+/// Project RunCompletion into typed JoinItem (agent vs PTY).
+module JoinItem =
+    /// Agent durable → AgentItem. PTY via isPtyRun; Code=PTY_ABORTED recovers PtyAborted.
+    let ofRunCompletion (isPtyRun: bool) (completion: RunCompletion) : JoinItem =
+        if isPtyRun then
+            match completion.Outcome with
+            | AgentCompleted payload ->
+                PtyItem(
+                    PtyExited
+                        { PtyId = completion.RunId
+                          Outcome = payload.WorkRecord
+                          Closed = true }
+                )
+            | AgentFailed payload when payload.Code = PtyJoinItem.abortedCode ->
+                PtyItem(
+                    PtyAborted
+                        { PtyId = completion.RunId
+                          Outcome = payload.Message
+                          Closed = true
+                          Code = payload.Code
+                          Message = payload.Message }
+                )
+            | AgentFailed payload ->
+                PtyItem(
+                    PtyFailed
+                        { PtyId = completion.RunId
+                          Outcome = payload.Message
+                          Closed = true
+                          Code = payload.Code
+                          Message = payload.Message }
+                )
+            | AgentAbandoned(_, reason) ->
+                // PTY type has no abandoned case; surface as failed with ABANDONED code.
+                PtyItem(
+                    PtyFailed
+                        { PtyId = completion.RunId
+                          Outcome = reason
+                          Closed = true
+                          Code = "ABANDONED"
+                          Message = reason }
+                )
+        else
+            match completion.Outcome with
+            | AgentCompleted payload -> AgentItem(AgentCompletedItem payload)
+            | AgentFailed payload -> AgentItem(AgentFailedItem payload)
+            | AgentAbandoned(agentId, reason) -> AgentItem(AgentAbandonedItem(agentId, reason))
+
+    /// Direct wrap: agent RunCompletion without PTY classification.
+    let ofAgentRunCompletion (completion: RunCompletion) : JoinItem = ofRunCompletion false completion
+
+    /// PTY mailbox fact stays PtyJoinItem through join wire (EXEC-020).
+    let ofPtyJoinItem (item: PtyJoinItem) : JoinItem = PtyItem item

@@ -116,14 +116,6 @@ module ChildRun =
           Outcome = AgentCompletion.failed run.AgentId run.RunId (Some run.Role) run.ChildSessionId "ERROR" message
           CompletedAt = DateTimeOffset.UtcNow }
 
-    let makeAborted (run: ChildRun) (reason: string) : RunCompletion =
-        { RunId = run.RunId
-          AgentId = run.AgentId
-          AgentName = run.AgentName
-          Role = run.Role
-          Outcome = AgentCompletion.aborted run.AgentId run.RunId (Some run.Role) run.ChildSessionId "CANCELLED" reason
-          CompletedAt = DateTimeOffset.UtcNow }
-
     /// Try to complete this run with the given RunCompletion.  Returns true
     /// if this is the first (and only) write.  Idempotent no-op after first set.
     let tryComplete (run: ChildRun) (completion: RunCompletion) : bool = run.Completion.TrySet(completion)

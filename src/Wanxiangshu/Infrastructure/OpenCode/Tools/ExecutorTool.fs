@@ -133,12 +133,21 @@ module ExecutorTool =
 
                                     match recovery with
                                     | FamilyRecovery.FamilyBlocked _ ->
-                                        return Error "RECOVERY_BLOCKED: family recovery incomplete before executor join"
+                                        return Error "RECOVERY_BLOCKED: family recovery blocked before executor join"
+                                    | FamilyRecovery.FamilyWaiting _ ->
+                                        // Incomplete (HandlesWaiting / transient unreadable):
+                                        // not hard RECOVERY_BLOCKED. Retry until Ready or timeout
+                                        // inside awaitAgent; no permit issued while waiting.
+                                        return Error "RECOVERY_WAITING: family recovery incomplete before executor join"
                                     | FamilyRecovery.FamilyReady permit -> return Ok permit
                                 }
 
+                            // Hard-fail only on definitive FamilyBlocked. Waiting/incomplete
+                            // must not abort map/reduce; JoinWithPermit retries requirePermit.
                             match! requirePermit () with
-                            | Error msg -> return error msg
+                            | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
+                                return error msg
+                            | Error _
                             | Ok _ ->
                                 let runtime = scope.ExecutorRuntimeFor context
 

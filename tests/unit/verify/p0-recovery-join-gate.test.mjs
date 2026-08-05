@@ -16,6 +16,58 @@ const ROOT = new URL('../../../', import.meta.url).pathname
 
 const NEGATIVES = [
   {
+    id: 'agent-aborted-type',
+    file: 'AgentCompletion.fs',
+    source: [
+      'type AgentCompletionOutcome =',
+      '    | AgentCompleted of payload',
+      '    | AgentAborted of reason: string',
+    ].join('\n'),
+  },
+  {
+    id: 'agent-completion-aborted-factory',
+    file: 'AgentCompletion.fs',
+    source: [
+      'module AgentCompletion',
+      'let bad a r = AgentCompletion.aborted a r None None "X" "y"',
+    ].join('\n'),
+  },
+  {
+    id: 'child-run-make-aborted',
+    file: 'ChildRun.fs',
+    source: ['module ChildRun', 'let c = ChildRun.makeAborted run reason'].join('\n'),
+  },
+  {
+    id: 'aborted-run-factory',
+    file: 'domain.mjs',
+    source: ['export const abortedRun = (id) => ({ status: "aborted", id })'].join('\n'),
+  },
+  {
+    id: 'try-from-durable-completed',
+    file: 'ChildRecovery.fs',
+    source: [
+      'match JoinableCompletion.tryFromDurableCompleted agentId handle child kind body with',
+      '| Ok c -> Ok c',
+    ].join('\n'),
+  },
+  {
+    id: 'publish-completion-agent',
+    file: 'ForkRuntime.fs',
+    source: [
+      'member _.PublishCompletion(c: RunCompletion) =',
+      '    mailbox.Publish c',
+    ].join('\n'),
+  },
+  {
+    id: 'awaiting-evidence-case',
+    file: 'ChildRecovery.fs',
+    source: [
+      'type ChildRecoveryResult =',
+      '    | RecoveredActive of x',
+      '    | AwaitingEvidence of reason: string',
+    ].join('\n'),
+  },
+  {
     id: 'lifecycle-aborted-completion',
     file: 'HostForkRunLifecycle.fs',
     source: [
@@ -90,6 +142,52 @@ const NEGATIVES = [
       '    match familyRecoveryPorts with',
       '    | None -> FamilyRecovery.FamilyReady fakePermit',
       '    | Some ports -> recover ports root',
+    ].join('\n'),
+  },
+  {
+    id: 'restore-handles-none-no-recovery',
+    file: 'SessionRecoveryInterpreter.fs',
+    source: [
+      'match ports.RestoreHandles with',
+      '| Some restore -> restore sessionId',
+      '| None -> Task.FromResult(SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence))',
+    ].join('\n'),
+  },
+  {
+    id: 'recover-job-none-no-recovery',
+    file: 'SessionRecoveryInterpreter.fs',
+    source: [
+      'match ports.RecoverJob with',
+      '| Some recover -> recover jobId',
+      '| None -> Task.FromResult(SessionRecovery.NoRecoveryRequired(emptyReceipt sessionId sequence))',
+    ].join('\n'),
+  },
+  {
+    id: 'spike-restore-handles-none',
+    file: 'SpikePlugin.fs',
+    source: [
+      'scope.AttachFamilyRecoveryPorts(',
+      '    { Journal = journal',
+      '      RestoreHandles = None',
+      '      RecoverJob = None })',
+    ].join('\n'),
+  },
+  {
+    id: 'host-fork-runtime-recovery-task',
+    file: 'HostForkRuntime.fs',
+    source: [
+      'let mutable recoveryTask: Task option = None',
+      'member private _.EnsureChildRestoreStarted() =',
+      '    recoveryTask <- Some t',
+    ].join('\n'),
+  },
+  {
+    id: 'host-fork-runtime-await-recovery-call',
+    file: 'HostForkAgent.fs',
+    source: [
+      'task {',
+      '    do! this.AwaitRecovery()',
+      '    let retired = this.IsRetiredHandle agentId',
     ].join('\n'),
   },
   {
@@ -206,6 +304,35 @@ test('P0_RECOVERY_JOIN_GATE_exports_rule_ids', () => {
   assert.ok(RULE_IDS.includes('join-with-permit-closure-digest'))
   assert.ok(RULE_IDS.includes('lifecycle-aborted-completion'))
   assert.ok(RULE_IDS.includes('record-completion-single-owner'))
+  assert.ok(RULE_IDS.includes('restore-handles-none-no-recovery'))
+  assert.ok(RULE_IDS.includes('recover-job-none-no-recovery'))
+  assert.ok(RULE_IDS.includes('spike-restore-handles-none'))
+  assert.ok(RULE_IDS.includes('host-fork-runtime-recovery-task'))
+  assert.ok(RULE_IDS.includes('host-fork-runtime-await-recovery-call'))
+  // EXEC-020..024 clean-break rules
+  assert.ok(RULE_IDS.includes('agent-aborted-type'))
+  assert.ok(RULE_IDS.includes('agent-completion-aborted-factory'))
+  assert.ok(RULE_IDS.includes('child-run-make-aborted'))
+  assert.ok(RULE_IDS.includes('aborted-run-factory'))
+  assert.ok(RULE_IDS.includes('try-from-durable-completed'))
+  assert.ok(RULE_IDS.includes('publish-completion-agent'))
+  assert.ok(RULE_IDS.includes('awaiting-evidence-case'))
+  assert.ok(RULE_IDS.includes('agent-outcome-completed-case'))
+  assert.ok(RULE_IDS.includes('agent-outcome-failed-case'))
+  assert.ok(RULE_IDS.includes('agent-outcome-abandoned-case'))
+  assert.ok(RULE_IDS.includes('agent-join-item-three-cases'))
+  assert.ok(RULE_IDS.includes('pty-aborted-retained'))
+  assert.ok(RULE_IDS.includes('completion-blob-schema-v2'))
+  assert.ok(RULE_IDS.includes('legacy-false-abort-decode'))
+  assert.ok(RULE_IDS.includes('joinable-from-decoded'))
+  assert.ok(RULE_IDS.includes('session-ports-restore-handles-mandatory'))
+  assert.ok(RULE_IDS.includes('session-ports-recover-jobs-mandatory'))
+  assert.ok(RULE_IDS.includes('child-recovery-result-five-cases'))
+  assert.ok(RULE_IDS.includes('join-program-requires-permit'))
+  assert.ok(RULE_IDS.includes('mailbox-pulse-agent-handle'))
+  assert.ok(RULE_IDS.includes('mailbox-publish-pty-completion'))
+  assert.ok(RULE_IDS.includes('false-completion-rejected-fact'))
+  assert.ok(RULE_IDS.includes('parent-join-correction-fact'))
   assert.equal(RULES.length, RULE_IDS.length)
 })
 
@@ -274,17 +401,24 @@ test('P0_RECOVERY_JOIN_GATE_host_fork_restart_missing_proof_goes_red', () => {
 })
 
 test('P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_structure_stays_green', () => {
+  // EXEC-021/024: only fromDecoded + PulseAgentHandle; no tryFromDurableCompleted / PublishCompletion.
   const source = [
     'module HostForkRestart',
     'match! ChildRecoveryInterpreter.resolveAndCommit ports with',
     '| Ok (Joinable proof) -> ()',
-    'match JoinableCompletion.tryFromDurableCompleted agentId handle child kind body with',
-    '| Ok _ -> runtime.PublishCompletion completion',
+    'match HandleCompletionCodec.decodeBody body with',
+    '| Current decoded ->',
+    '    let proof = JoinableCompletion.fromDecoded agentId handle child decoded body',
+    '    do HandleController.recordCompletion journal parentId proof',
+    '    runtime.PulseAgentHandle agentHandle',
+    '| LegacyFalseAbort _ -> ()',
   ].join('\n')
   const hits = scanText(source, 'HostForkRestart.fs')
   assert.ok(!hits.some((h) => h.id === 'host-fork-restart-proof-structure'))
   assert.ok(!hits.some((h) => h.id === 'host-fork-restart-false-finality'))
   assert.ok(!hits.some((h) => h.id === 'host-fork-restart-bare-publish'))
+  assert.ok(!hits.some((h) => h.id === 'try-from-durable-completed'))
+  assert.ok(!hits.some((h) => h.id === 'publish-completion-agent'))
 })
 
 test('P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
@@ -366,13 +500,25 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
     'src/Wanxiangshu/Session/HostForkRestart.fs',
     'src/Wanxiangshu/Session/ForkRuntime.fs',
     'src/Wanxiangshu/Session/HostForkRuntime.fs',
+    'src/Wanxiangshu/Session/HostForkAgent.fs',
     'src/Wanxiangshu/Session/HandleController.fs',
+    'src/Wanxiangshu/Session/AgentCompletion.fs',
+    'src/Wanxiangshu/Session/HandleCompletionCodec.fs',
+    'src/Wanxiangshu/Session/CompletionMailbox.fs',
+    'src/Wanxiangshu/Session/JoinDrain.fs',
+    'src/Wanxiangshu/Domain/ChildRecovery.fs',
+    'src/Wanxiangshu/Domain/JoinProgram.fs',
+    'src/Wanxiangshu/Domain/SessionRecovery.fs',
+    'src/Wanxiangshu/Kernel/Fact.fs',
     'src/Wanxiangshu/Application/Reconciliation/ChildRecoveryInterpreter.fs',
+    'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarize.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs',
   ]
   const entries = files.map((rel) => ({
     file: rel,
@@ -384,4 +530,45 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
     [],
     hits.map((h) => `${h.id}@${h.file}:${h.line}`).join('; '),
   )
+})
+
+test('P0_RECOVERY_JOIN_GATE_positive_clean_break_shapes_present', () => {
+  const agent = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/AgentCompletion.fs'), 'utf8')
+  const codec = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HandleCompletionCodec.fs'), 'utf8')
+  const child = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/ChildRecovery.fs'), 'utf8')
+  const mailbox = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/CompletionMailbox.fs'), 'utf8')
+  const ports = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs'),
+    'utf8',
+  )
+  const joinProgram = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/JoinProgram.fs'), 'utf8')
+  const fact = readFileSync(join(ROOT, 'src/Wanxiangshu/Kernel/Fact.fs'), 'utf8')
+
+  for (const [file, text, ids] of [
+    ['AgentCompletion.fs', agent, [
+      'agent-outcome-completed-case',
+      'agent-outcome-failed-case',
+      'agent-outcome-abandoned-case',
+      'agent-join-item-three-cases',
+      'pty-aborted-retained',
+    ]],
+    ['HandleCompletionCodec.fs', codec, ['completion-blob-schema-v2', 'legacy-false-abort-decode']],
+    ['ChildRecovery.fs', child, ['joinable-from-decoded', 'child-recovery-result-five-cases']],
+    ['CompletionMailbox.fs', mailbox, ['mailbox-pulse-agent-handle', 'mailbox-publish-pty-completion']],
+    [
+      'SessionRecoveryInterpreter.fs',
+      ports,
+      ['session-ports-restore-handles-mandatory', 'session-ports-recover-jobs-mandatory'],
+    ],
+    ['JoinProgram.fs', joinProgram, ['join-program-requires-permit']],
+    ['Fact.fs', fact, ['false-completion-rejected-fact', 'parent-join-correction-fact']],
+  ]) {
+    const hits = scanText(text, file)
+    for (const id of ids) {
+      assert.ok(
+        !hits.some((h) => h.id === id),
+        `positive rule ${id} must be satisfied in ${file}; hits=${hits.filter((h) => h.id === id).map((h) => h.text).join('|')}`,
+      )
+    }
+  }
 })

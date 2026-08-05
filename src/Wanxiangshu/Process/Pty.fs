@@ -10,15 +10,17 @@ open Wanxiangshu.Session
 
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
 /// are supplied by Complete and share every registered mailbox sender.
-type PtyPort
-    (?mailboxSender: RunCompletion -> unit, ?handler: PtyBackendHandler, ?agentProvider: unit -> AgentRecord list) as this
+/// GREEN-5: sender carries PtyJoinItem (physical PTY fact), not agent RunCompletion.
+type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?agentProvider: unit -> AgentRecord list) as this
     =
     let handler = defaultArg handler (fun _ _ -> Task.FromResult(Ok()))
     let agentProvider = defaultArg agentProvider (fun () -> [])
-    let mailboxSenders = ResizeArray<RunCompletion -> unit>()
+    let mailboxSenders = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()
     let active = Dictionary<PtyId, PtyHandle * ref<bool>>()
     let closedIds = HashSet<PtyId>()
+    /// Owner TERM/KILL requested: next Complete for this id → PtyAborted (EXEC-020).
+    let abortPending = HashSet<PtyId>()
 
     let readWaiters =
         Dictionary<PtyId, TaskCompletionSource<Result<string * bool, string>>>()
@@ -26,15 +28,17 @@ type PtyPort
     let exitTasks = Dictionary<PtyId, Task>()
     do mailboxSender |> Option.iter mailboxSenders.Add
 
-    /// Owner-initiated terminate: sends TERM to the backend ONLY. Does NOT
+    /// Owner-initiated terminate: marks abort-pending + sends TERM. Does NOT
     /// remove from active, does NOT mark closed, does NOT FailRead, does NOT
     /// publish completion. Completion belongs exclusively to the backend's
-    /// onExit → Complete path. (SSOT §7 cleanup policy.)
+    /// onExit → Complete path, which emits PtyAborted when abort-pending.
     let requestTerminate (id: PtyId) =
         let live =
             lock gate (fun () ->
                 match active.TryGetValue id with
-                | true, (_, closed) when not closed.Value -> true
+                | true, (_, closed) when not closed.Value ->
+                    abortPending.Add id |> ignore
+                    true
                 | _ -> false)
 
         if live then
@@ -46,7 +50,9 @@ type PtyPort
     /// Complete from a backend exit (onExit). This is the ONLY path that
     /// publishes completion to mailbox senders. Removes from active, marks
     /// closed, fails any parked reader, then delivers the completion.
-    let completeFromExit (id: PtyId) (outcome: Result<string, string>) =
+    /// EXEC-020: physical abort (owner kill / parent cancel TERM|KILL) → PtyAborted;
+    /// natural exit → PtyExited; backend spawn/IO error → PtyFailed.
+    let completeFromExit (id: PtyId) (item: PtyJoinItem) =
         let target =
             lock gate (fun () ->
                 match active.TryGetValue id with
@@ -55,7 +61,7 @@ type PtyPort
 
         match target with
         | None -> ()
-        | Some(handle, closed) ->
+        | Some(_handle, closed) ->
             let alreadyClosed =
                 lock closed (fun () ->
                     if closed.Value then
@@ -73,34 +79,16 @@ type PtyPort
                 // below is the authoritative exit outcome delivered to Join.
                 this.FailRead(id, "PTY closed before read completed")
 
-                // AGENT-013 makes PTY DevOps-exclusive, and the handle now carries the
-                // managed agent its fork selected, so neither the name nor the role is
-                // rebuilt here. The PTY id is the agent id: a PTY is its own resource,
-                // not a child agent session.
-                let role = AgentRoleIdentity.ofManaged handle.Agent
-
-                let typedOutcome =
-                    match outcome with
-                    | Ok text -> AgentCompletion.ofSimpleText id.Value id.Value role text
-                    | Error err -> AgentCompletion.ofSimpleError id.Value id.Value role err
-
-                let completion =
-                    { RunId = id.Value
-                      AgentId = id.Value
-                      AgentName = handle.Agent.Name
-                      Role = role
-                      Outcome = typedOutcome
-                      CompletedAt = DateTimeOffset.UtcNow }
-
+                // AGENT-013: PTY DevOps-exclusive. GREEN-5: physical PtyJoinItem only.
                 let senders = lock gate (fun () -> mailboxSenders |> Seq.toList)
 
                 for sender in senders do
                     try
-                        sender completion
+                        sender item
                     with _ ->
                         ()
 
-    member _.AddMailboxSender(sender: RunCompletion -> unit) =
+    member _.AddMailboxSender(sender: PtyJoinItem -> unit) =
         lock gate (fun () -> mailboxSenders.Add sender)
 
     member _.MailboxSender = mailboxSender
@@ -139,6 +127,7 @@ type PtyPort
     /// Sends a command to the backend. Returns the backend's outcome so callers
     /// (e.g. SendPty) can surface write errors as tool errors instead of always
     /// succeeding. Completion/exit still belongs to the backend's onExit.
+    /// TERM/KILL/INT marks abort-pending so onExit → PtyAborted (EXEC-020).
     member this.Send(id: PtyId, command: PtyCommand) : Task<Result<unit, string>> =
         let live, closed =
             lock gate (fun () ->
@@ -152,6 +141,11 @@ type PtyPort
             else
                 Task.FromResult(Error(sprintf "Unknown PTY id: %s" id.Value))
         else
+            match command with
+            | PtyCommand.Signal(PtySignal.Terminate | PtySignal.Kill | PtySignal.Interrupt) ->
+                lock gate (fun () -> abortPending.Add id |> ignore)
+            | _ -> ()
+
             task {
                 try
                     return! handler id command
@@ -227,14 +221,72 @@ type PtyPort
 
     /// Complete from a backend exit (onExit). This is the ONLY path that
     /// publishes completion to mailbox senders.
+    /// If owner requested terminate (Close/CloseAll/TERM), emits PtyAborted;
+    /// else Ok → PtyExited, Error → PtyFailed. Tests may call CompleteAborted
+    /// to force abort without the terminate mark.
     member this.Complete(id: PtyId, ?outcome: Result<string, string>) =
-        completeFromExit id (defaultArg outcome (Ok PtyOutcome.Closed))
-        lock gate (fun () -> exitTasks.Remove id |> ignore)
+        let wasAbort =
+            lock gate (fun () ->
+                let marked = abortPending.Remove id
+                exitTasks.Remove id |> ignore
+                marked)
+
+        let item =
+            if wasAbort then
+                let text =
+                    match defaultArg outcome (Ok PtyOutcome.Closed) with
+                    | Ok t -> t
+                    | Error e -> e
+
+                let msg =
+                    if String.IsNullOrWhiteSpace text || text = PtyOutcome.Closed then
+                        "PTY aborted"
+                    else
+                        text
+
+                PtyAborted
+                    { PtyId = id.Value
+                      Outcome = msg
+                      Closed = true
+                      Code = "PTY_ABORTED"
+                      Message = msg }
+            else
+                match defaultArg outcome (Ok PtyOutcome.Closed) with
+                | Ok text ->
+                    PtyExited
+                        { PtyId = id.Value
+                          Outcome = text
+                          Closed = true }
+                | Error err ->
+                    PtyFailed
+                        { PtyId = id.Value
+                          Outcome = err
+                          Closed = true
+                          Code = "ERROR"
+                          Message = err }
+
+        completeFromExit id item
+
+    /// Force PtyAborted (tests / callers that already know physical interrupt).
+    member this.CompleteAborted(id: PtyId, ?message: string) =
+        lock gate (fun () ->
+            abortPending.Remove id |> ignore
+            exitTasks.Remove id |> ignore)
+
+        let msg = defaultArg message "PTY aborted"
+
+        completeFromExit
+            id
+            (PtyAborted
+                { PtyId = id.Value
+                  Outcome = msg
+                  Closed = true
+                  Code = "PTY_ABORTED"
+                  Message = msg })
 
     /// Owner-initiated close: sends TERM only. Does NOT publish completion —
-    /// completion is delivered by the backend's onExit → Complete. The caller
-    /// must await the exit (via CloseAll or the registered exit task) for the
-    /// process to actually exit and Complete to fire.
+    /// completion is delivered by the backend's onExit → Complete / CompleteAborted.
+    /// The caller must await the exit (via CloseAll or the registered exit task).
     member this.Close(id: PtyId, ?outcome: Result<string, string>) : unit = requestTerminate id
 
     /// Async owner cleanup: for each active id, send TERM (requestTerminate),

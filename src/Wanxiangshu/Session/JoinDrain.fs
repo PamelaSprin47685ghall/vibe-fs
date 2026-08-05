@@ -13,7 +13,7 @@ open Wanxiangshu.Journal
 ///   Current → fromDecoded → CAS HandleRetired → AgentJoinItem
 ///   LegacyFalseAbort + not retired → HandleFalseCompletionRejected → no result
 ///   LegacyFalseAbort + retired → deterministic replacement migration → no aborted
-///   Invalid → RecoveryBlocked → no consume
+///   Invalid → keep waiting → no consume
 /// Renderer never sees legacy blob.
 module JoinDrain =
 
@@ -195,8 +195,8 @@ module JoinDrain =
                     // Not retired path: joinable projection only holds CompletedAwaitingJoin.
                     rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
                 | Invalid _ ->
-                    // Fail closed: do not consume, do not surface to parent.
-                    Some(Error(ForkError.TerminalMaterializationFailed agentId))
+                    // Invalid: do not consume, do not hard-error, keep waiting.
+                    None
             | Ok(Some _, _, _) -> Some(Error(ForkError.NotFound "completion blob ref/digest pair is incomplete"))
 
     /// Dispatch one record through the correct consume path.

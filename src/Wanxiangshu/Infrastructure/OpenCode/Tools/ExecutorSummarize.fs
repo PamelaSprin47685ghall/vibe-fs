@@ -39,7 +39,6 @@ module ExecutorSummarize =
         | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) -> payload.WorkRecord
         | AgentCompleted _ -> raise (InvalidOperationException "completed with empty work record")
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
-        | AgentAborted payload -> raise (InvalidOperationException payload.Message)
         | AgentAbandoned(_, reason) -> raise (InvalidOperationException reason)
 
     /// Per-chunk join budget. Prevents a single hung summarizer from blocking the

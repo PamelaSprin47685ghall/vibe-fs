@@ -69,9 +69,13 @@ module HostSignalBootstrap =
 
                     match recovery with
                     | FamilyRecovery.FamilyBlocked _ ->
-                        // Fail closed: do not arm recovery, reconcile, or complete turn.
+                        // Fail closed: definitive block → no business effects.
                         ()
+                    | FamilyRecovery.FamilyWaiting _
                     | FamilyRecovery.FamilyReady _ ->
+                        // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
+                        // block. TurnCompletionProgram / EXEC-016 guard must still run so mid-
+                        // turn residual RecoveryIncomplete cannot suppress manager-guard.
                         // Manager sessions run inside their own worktree, not the plugin's
                         // root workspace. The review-guard tree check must resolve that
                         // worktree's GitTreePort; otherwise it compares against a
@@ -139,6 +143,7 @@ module HostSignalBootstrap =
 
                     match recovery with
                     | FamilyRecovery.FamilyBlocked _ -> return ()
+                    | FamilyRecovery.FamilyWaiting _
                     | FamilyRecovery.FamilyReady _ -> ()
 
                     // HOST-006 prevention layer's second half: the runtime probe.

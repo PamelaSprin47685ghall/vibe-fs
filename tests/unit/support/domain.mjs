@@ -136,6 +136,7 @@ const [
   SessionSnapshotPortModule,
   ToolHostCodecModule,
   CompletionMailboxModule,
+  AgentCompletionModuleEarly,
   HostForkRunLifecycleModule,
   HostPendingRunModule,
   EventsModule,
@@ -230,6 +231,7 @@ const [
   prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
   prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
   prod('Session/CompletionMailbox'),
+  prod('Session/AgentCompletion'),
   prod('Session/HostForkRunLifecycle'),
   prod('Session/HostPendingRun'),
   prod('Infrastructure/OpenCode/Host/Events'),
@@ -2650,11 +2652,9 @@ export const joinDrain = (() => {
           ? 'completed'
           : outcome === 'AgentFailed'
             ? 'failed'
-            : outcome === 'AgentAborted'
-              ? 'aborted'
-              : outcome === 'AgentAbandoned'
-                ? 'abandoned'
-                : outcome,
+            : outcome === 'AgentAbandoned'
+              ? 'abandoned'
+              : outcome,
       // AgentAbandoned of agentId * reason → fields [agentId, reason]
       reason: outcome === 'AgentAbandoned' ? payload[1] : undefined,
       workRecord: outcome === 'AgentCompleted' ? payload.WorkRecord : undefined,
@@ -3201,7 +3201,7 @@ const fableInstanceMethod = (mod, typeName, methodName) => {
   return mod[found]
 }
 
-/** CompletionMailbox: queue + wake + bounded drain (EXEC-018). */
+/** CompletionMailbox: dual-channel wake + PTY drain (EXEC-018 / GREEN-5). */
 export const completionMailbox = (() => {
   // Class lives on the module as `CompletionMailbox` (type name = file root).
   // Methods compile as non-curried module statics: `CompletionMailbox__Join_*(_, timeoutMs)`.
@@ -3211,14 +3211,109 @@ export const completionMailbox = (() => {
   }
 
   const joinFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Join')
-  const publishFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Publish')
+  const publishPtyFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'PublishPtyCompletion',
+  )
+  const pulseAgentFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'PulseAgentHandle',
+  )
   const cancelFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Cancel')
-  const pendingCountFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'get_PendingCount')
-  const isCancelledFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'get_IsCancelled')
-  const drainFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'DrainAvailable')
-  const waitForSignalFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'WaitForSignal')
-  const waitForWakeFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'WaitForWake')
+  const pendingCountFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'get_PendingCount',
+  )
+  const pendingPtyCountFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'get_PendingPtyCount',
+  )
+  const isCancelledFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'get_IsCancelled',
+  )
+  const drainPtyFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'DrainPtyCompletions',
+  )
+  const drainAgentWakesFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'DrainAgentWakes',
+  )
+  const waitForSignalFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'WaitForSignal',
+  )
+  const waitForWakeFn = fableInstanceMethod(
+    CompletionMailboxModule,
+    'CompletionMailbox',
+    'WaitForWake',
+  )
   const pulseWakeFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'PulseWake')
+  // PtyJoinItem lives in AgentCompletion; toRunCompletion projects for Join wire.
+  const toRunCompletionFn = member(
+    AgentCompletionModuleEarly,
+    'PtyJoinItem',
+    'toRunCompletion',
+  )
+  // Type name collides with module name, so Fable does NOT export named case
+  // constructors: dist emits `PtyJoinItem` Union + `PtyExit` record class +
+  // `PtyJoinItemModule_*` module functions. Construct by tag at the facade
+  // boundary; case index resolved from cases() so a reorder fails loudly.
+  const PtyJoinItemUnion = AgentCompletionModuleEarly.PtyJoinItem
+  const PtyExitRecord = AgentCompletionModuleEarly.PtyExit
+  const PtyFailureRecord = AgentCompletionModuleEarly.PtyFailure
+  const PtyAbortRecord = AgentCompletionModuleEarly.PtyAbort
+  if (typeof PtyJoinItemUnion !== 'function' || typeof PtyExitRecord !== 'function') {
+    throw new Error(
+      `PtyJoinItem/PtyExit missing; keys=${Object.keys(AgentCompletionModuleEarly).filter((k) => k.includes('Pty')).join(',')}`,
+    )
+  }
+  const buildPtyJoinItem = unionCase(PtyJoinItemUnion, 'PtyJoinItem')
+  const ptyExitedOfPayload = (payload) =>
+    buildPtyJoinItem('PtyExited', [
+      new PtyExitRecord(
+        payload.PtyId,
+        payload.Outcome,
+        payload.Closed === undefined ? true : !!payload.Closed,
+      ),
+    ])
+  const ptyFailedOfPayload = (payload) => {
+    if (typeof PtyFailureRecord !== 'function') {
+      throw new Error('PtyFailure record missing from AgentCompletion module')
+    }
+    return buildPtyJoinItem('PtyFailed', [
+      new PtyFailureRecord(
+        payload.PtyId,
+        payload.Outcome ?? payload.Message ?? 'failed',
+        payload.Closed === undefined ? true : !!payload.Closed,
+        payload.Code ?? 'ERROR',
+        payload.Message ?? payload.Outcome ?? 'failed',
+      ),
+    ])
+  }
+  const ptyAbortedOfPayload = (payload) => {
+    if (typeof PtyAbortRecord !== 'function') {
+      throw new Error('PtyAbort record missing from AgentCompletion module')
+    }
+    return buildPtyJoinItem('PtyAborted', [
+      new PtyAbortRecord(
+        payload.PtyId,
+        payload.Outcome ?? payload.Message ?? 'PTY aborted',
+        payload.Closed === undefined ? true : !!payload.Closed,
+        payload.Code ?? 'PTY_ABORTED',
+        payload.Message ?? payload.Outcome ?? 'PTY aborted',
+      ),
+    ])
+  }
 
   const maxJoinBatch =
     CompletionMailboxModule.JoinBatch_MaxJoinBatch ??
@@ -3229,23 +3324,65 @@ export const completionMailbox = (() => {
       throw new Error('CompletionMailbox JoinBatch.Max / MaxJoinBatch missing')
     })()
 
+  /** Build PtyExited item from agent-shaped test fixture fields or id string. */
+  const ptyExitedOf = (completionOrId) => {
+    if (typeof completionOrId === 'string') {
+      return ptyExitedOfPayload({
+        PtyId: completionOrId,
+        Outcome: `wr-${completionOrId}`,
+        Closed: true,
+      })
+    }
+    const id = completionOrId.AgentId ?? completionOrId.RunId ?? 'pty'
+    const outcomePayload = completionOrId.Outcome
+    let outcome = `wr-${id}`
+    if (outcomePayload && typeof outcomePayload === 'object') {
+      const fields = outcomePayload.fields
+      if (Array.isArray(fields) && fields[0]?.WorkRecord !== undefined) {
+        outcome = fields[0].WorkRecord
+      } else if (outcomePayload.WorkRecord !== undefined) {
+        outcome = outcomePayload.WorkRecord
+      }
+    }
+    return ptyExitedOfPayload({ PtyId: id, Outcome: String(outcome), Closed: true })
+  }
+
   return {
     create: (hasActive = () => true) => new Mailbox({}, hasActive),
-    publish: (box, completion) => publishFn(box, completion),
+    /** GREEN-5: PTY fact publish (replaces publish(RunCompletion)). */
+    publishPty: (box, item) => publishPtyFn(box, item),
+    /**
+     * Test helper: publish a PTY exit derived from completedRun fixture or id string.
+     * Keeps join-v2-mailbox tests readable under dual-channel semantics.
+     */
+    publish: (box, completionOrId) => publishPtyFn(box, ptyExitedOf(completionOrId)),
+    ptyExited: ptyExitedOf,
+    ptyFailed: ptyFailedOfPayload,
+    ptyAborted: ptyAbortedOfPayload,
+    /** EXEC-020: Code used when PtyAborted is projected through toRunCompletion. */
+    ptyAbortedCode: 'PTY_ABORTED',
+    toRunCompletion: (item) => toRunCompletionFn(item),
+    pulseAgentHandle: (box, handle) => pulseAgentFn(box, handle),
     // timeoutMs === undefined → no deadline (Fable optional is nullish).
     join: (box, timeoutMs) => joinFn(box, timeoutMs),
     cancel: (box) => cancelFn(box),
     pendingCount: (box) => pendingCountFn(box),
+    pendingPtyCount: (box) => pendingPtyCountFn(box),
     isCancelled: (box) => isCancelledFn(box),
-    drainAvailable: (box, maxCount) => listItems(drainFn(box, maxCount)),
+    drainPtyCompletions: (box, maxCount) => listItems(drainPtyFn(box, maxCount)),
+    drainAgentWakes: (box, maxCount) => listItems(drainAgentWakesFn(box, maxCount)),
+    /**
+     * Drain PTY channel and project to RunCompletion (Join wire shape).
+     * Tests assert AgentId / publish order on this projection.
+     */
+    drainAvailable: (box, maxCount) =>
+      listItems(drainPtyFn(box, maxCount)).map((item) => toRunCompletionFn(item)),
     waitForSignal: (box, interrupt) => waitForSignalFn(box, interrupt),
     waitForWake: (box) => waitForWakeFn(box),
     pulseWake: (box) => pulseWakeFn(box),
     maxJoinBatch,
   }
-})()
-
-/** EXEC-018 batch ceiling — single export for wire/runtime tests. */
+})()/** EXEC-018 batch ceiling — single export for wire/runtime tests. */
 export const maxJoinBatch = completionMailbox.maxJoinBatch
 
 /** EXEC-017 local join interrupt (tool abort → Signal only). */
@@ -3499,7 +3636,8 @@ export const forkRuntime = (() => {
      * `runner` is uncurried `(agentId, role, prompt) => Promise<AgentCompletionOutcome>`.
      * Omit for default instant-ok runner.
      */
-    create: (runner) => new Runtime(runner, undefined, undefined, true),
+    // GREEN-5: ForkRuntime(runner, listener, cleanup) — no publishToMailbox flag.
+    create: (runner) => new Runtime(runner, undefined, undefined),
     fork: (rt, agentId, role, agentName, prompt) => forkFn(rt, agentId, role, agentName, prompt, undefined),
     awaitAgent: (rt, agentId, timeoutMs) => awaitFn(rt, agentId, timeoutMs),
     cancelAgent: (rt, agentId) => cancelFn(rt, agentId),
@@ -4552,7 +4690,9 @@ export const sessionRecovery = (() => {
     permitRoot: (permit) => permitRoot(permit),
 
     snapshotUnreadable: (session, reason) => blockOf('SnapshotUnreadable', [session, reason]),
+    childRecoveryFailed: (session, reason) => blockOf('ChildRecoveryFailed', [session, reason]),
     blocked: (block) => recoveryOf('Blocked', [nonEmptyOne(block)]),
+    waiting: (block) => recoveryOf('Waiting', [nonEmptyOne(block)]),
 
     recoveredClosure: (root, resultsBySession = {}) => {
       const pairs = Object.entries(resultsBySession).map(([id, outcome]) => [sessionId(id), outcome])
@@ -4608,7 +4748,8 @@ export const orchestratorProgram = (() => {
 
 // ── Join Program DSL (P0-RECOVERY-JOIN-001 + EXEC-018) ───────────────────────
 const JoinProgramModule = await prod('Domain/JoinProgram')
-const AgentCompletionModule = await prod('Session/AgentCompletion')
+// AgentCompletion loaded early (AgentCompletionModuleEarly) for mailbox dual-channel.
+const AgentCompletionModule = AgentCompletionModuleEarly
 const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
 const ManagerJobModule = await prod('Application/Orchestration/ManagerJob')
 
@@ -4632,10 +4773,11 @@ export const agentCompletion = (() => {
   const ofSimpleTextFn = member(AgentCompletionModule, 'AgentCompletion', 'ofSimpleText')
   const ofSimpleErrorFn = member(AgentCompletionModule, 'AgentCompletion', 'ofSimpleError')
   const failedFn = member(AgentCompletionModule, 'AgentCompletion', 'failed')
-  const abortedFn = member(AgentCompletionModule, 'AgentCompletion', 'aborted')
   const abandonedFn = member(AgentCompletionModule, 'AgentCompletion', 'abandoned')
   const statusFn = member(AgentCompletionModule, 'AgentCompletion', 'status')
   const textFn = member(AgentCompletionModule, 'AgentCompletion', 'text')
+  // GREEN-3: JoinItem.ofRunCompletion — agent vs PTY projection surface.
+  const joinItemOfRunCompletionFn = member(AgentCompletionModule, 'JoinItem', 'ofRunCompletion')
 
   const roleOf = (name) => {
     const value = ForkTypesModule.AgentRole?.[name]
@@ -4675,15 +4817,6 @@ export const agentCompletion = (() => {
         code,
         message,
       ),
-    aborted: (agentId, runId, role, code, message) =>
-      abortedFn(
-        agentId,
-        runId,
-        role === undefined || role === null ? undefined : typeof role === 'string' ? roleOf(role) : role,
-        undefined,
-        code,
-        message,
-      ),
     status: (outcome) => statusFn(outcome),
     text: (outcome) => textFn(outcome),
     run,
@@ -4704,14 +4837,10 @@ export const agentCompletion = (() => {
         role,
         outcome: failedFn(agentId, runId, roleOf(role), undefined, code, message),
       }),
-    abortedRun: ({ runId, agentId, agentName, role = 'Coder', code = 'CANCELLED', message = 'aborted' }) =>
-      run({
-        runId,
-        agentId,
-        agentName: agentName ?? agentId,
-        role,
-        outcome: abortedFn(agentId, runId, roleOf(role), undefined, code, message),
-      }),
+    /**
+     * GREEN-3: AgentAborted deleted. No abortedRun factory.
+     * Legacy abort blobs use handleCompletionCodec.legacyAbortedBody only.
+     */
     abandoned: (agentId, reason) => abandonedFn(agentId, reason),
     abandonedRun: ({ runId, agentId, agentName, role = 'Coder', reason = 'ParentCancelled' }) =>
       run({
@@ -4721,6 +4850,8 @@ export const agentCompletion = (() => {
         role,
         outcome: abandonedFn(agentId, reason),
       }),
+    /** Project RunCompletion → JoinItem (AgentItem | PtyItem). */
+    joinItemOfRunCompletion: (isPtyRun, completion) => joinItemOfRunCompletionFn(isPtyRun, completion),
   }
 })()
 
@@ -4731,6 +4862,7 @@ export const agentCompletion = (() => {
 export const joinResultRenderer = (() => {
   const renderInterruptedFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderInterrupted')
   const renderCompletedBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderCompletedBatch')
+  const renderJoinItemBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderJoinItemBatch')
   const renderOrchestratorBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderOrchestratorBatch')
   const renderForkErrorFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderForkError')
 
@@ -4770,6 +4902,19 @@ export const joinResultRenderer = (() => {
         return rec.Agent ?? rec.agent ?? ''
       }
       return renderCompletedBatchFn(isPty, resolve, batch)
+    },
+    /** Production JoinTool path: NonEmptyBatch<JoinItem> with PtyAborted intact. */
+    renderJoinItemBatch: (resolveAgentName, batch) => {
+      const resolve =
+        typeof resolveAgentName === 'function'
+          ? resolveAgentName
+          : (agentId) => {
+              if (typeof resolveAgentName?.TryFindAgent !== 'function') return ''
+              const rec = resolveAgentName.TryFindAgent(agentId)
+              if (!rec) return ''
+              return rec.Agent ?? rec.agent ?? ''
+            }
+      return renderJoinItemBatchFn(resolve, batch)
     },
     renderOrchestratorBatch: (batch) => renderOrchestratorBatchFn(batch),
     renderForkError: (error) => renderForkErrorFn(error),

@@ -9,7 +9,8 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
 /// Production interpreter for ChildRecoveryProgram (P0-RECOVERY-JOIN-001 / FLOW-003).
-/// CommitCompletion → HandleController.recordCompletion only; no bare PublishCompletion bypass.
+/// CommitCompletion → HandleController.recordCompletion only; no bare completion publish.
+/// GREEN-5: after durable commit, Pulse agent handle only (wake); Journal is fact source.
 module ChildRecoveryInterpreter =
 
     type Ports =
@@ -23,8 +24,8 @@ module ChildRecoveryInterpreter =
             Role: AgentRole
             Agent: string
             Observations: HostObservation list
-            /// Process-local mailbox after durable commit. None = durable only.
-            Publish: (RunCompletion -> unit) option
+            /// Process-local agent wake after durable commit. None = durable only.
+            Pulse: (unit -> unit) option
         }
 
     let private textOfParts (parts: MessagePart array) =
@@ -84,23 +85,10 @@ module ChildRecoveryInterpreter =
                         | HandleCompletionKind.SendFailure -> DurableHandleEvidence.Active
                     | Error _ -> DurableHandleEvidence.Unknown
 
-    let private handleRecord (ports: Ports) : HandleRecord =
-        { Handle = ports.Handle
-          ChildSessionId = ports.ChildSession
-          TargetAgent = ports.Agent
-          CanonicalRole = AgentRoleIdentity.toRole ports.Role
-          Lifecycle = HandleLifecycle.Active
-          // Decode-only stub for HandleCompletionCodec; CreationOrder unused.
-          CreationOrder = 0
-          LastCompletion = None }
-
-    let private publishProof (ports: Ports) (proof: JoinableCompletion) : unit =
-        match ports.Publish, JoinableCompletion.body proof with
-        | Some publish, Some body ->
-            match HandleCompletionCodec.tryDecode (handleRecord ports) ports.AgentId body with
-            | Ok completion -> publish completion
-            | Error _ -> ()
-        | _ -> ()
+    let private pulseAfterCommit (ports: Ports) : unit =
+        match ports.Pulse with
+        | Some pulse -> pulse ()
+        | None -> ()
 
     /// P0-RECOVERY-JOIN-001 §十: sole production caller of HandleController.recordCompletion.
     /// Host hot paths (proven terminal) must commit through this function — not call the controller.
@@ -167,17 +155,12 @@ module ChildRecoveryInterpreter =
                                                 )
                                             )
                                         )
-                            | Some assistant ->
-                                return!
-                                    go (
-                                        next (
-                                            ChildSnapshotEvidence.Unreadable(
-                                                sprintf
-                                                    "host restart: child not terminal (finish=%s)"
-                                                    (defaultArg assistant.Finish "none")
-                                            )
-                                        )
-                                    )
+                            | Some _assistant ->
+                                // Mid-turn / non-terminal assistant (finish=tool_calls|none|…):
+                                // stream is readable → child still running. Only GetMessages Error
+                                // is Unreadable. Active → resolveChild(…, SessionActive) →
+                                // RecoveredActive (permit-eligible; join waits on completion).
+                                return! go (next ChildSnapshotEvidence.Active)
                 | ObserveHostSignals(_, next) -> return! go (next ports.Observations)
                 | ProveTerminal(evidence, next) ->
                     match JoinableCompletion.tryFromProvenTerminal evidence with
@@ -187,7 +170,7 @@ module ChildRecoveryInterpreter =
                     match commitJoinable ports.Journal ports.ParentId proof with
                     | Error reason -> return Error reason
                     | Ok() ->
-                        publishProof ports proof
+                        pulseAfterCommit ports
                         return! go (next ())
                 | CommitAbandonment(handle, reason, next) ->
                     let agentId =
@@ -206,5 +189,6 @@ module ChildRecoveryInterpreter =
         go program
 
     /// Run Domain recoverChild and commit via the single write entry.
-    let resolveAndCommit (ports: Ports) : Task<Result<ChildResolution, string>> =
+    /// GREEN-4: ChildRecoveryResult (RecoveredActive ≠ RecoveryIncomplete).
+    let resolveAndCommit (ports: Ports) : Task<Result<ChildRecoveryResult, string>> =
         interpret ports (recoverChild ports.Handle ports.ChildSession)

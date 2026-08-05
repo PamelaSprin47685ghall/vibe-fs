@@ -20,7 +20,7 @@ test('P0_RECOVERY_JOIN_001_aborted_alone_is_not_terminal', () => {
     childRecovery.snapshotMissing(),
     [childRecovery.abortedObserved('host abort')],
   )
-  assert.equal(caseOf(resolution), 'AwaitingEvidence')
+  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
 })
 
 test('P0_RECOVERY_JOIN_001_aborted_observed_never_joinable', () => {
@@ -29,17 +29,37 @@ test('P0_RECOVERY_JOIN_001_aborted_observed_never_joinable', () => {
     childRecovery.snapshotActive(),
     [childRecovery.abortedObserved('signal only')],
   )
-  assert.notEqual(caseOf(resolution), 'Joinable')
-  assert.equal(caseOf(resolution), 'AwaitingEvidence')
+  assert.notEqual(caseOf(resolution), 'RecoveredTerminal')
+  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
 })
 
-test('P0_RECOVERY_JOIN_001_aborted_with_session_active_is_running_again', () => {
+test('P0_RECOVERY_JOIN_001_aborted_with_session_active_is_recovered_active', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableActive(),
     childRecovery.snapshotActive(),
     [childRecovery.abortedObserved('stale abort'), childRecovery.sessionActive()],
   )
-  assert.equal(caseOf(resolution), 'RunningAgain')
+  assert.equal(caseOf(resolution), 'RecoveredActive')
+})
+
+// Mid-turn: readable non-terminal snapshot + SessionActive → RecoveredActive (permit-eligible).
+test('P0_RECOVERY_JOIN_001_mid_turn_snapshot_active_with_session_active_is_recovered_active', () => {
+  const resolution = childRecovery.resolveChild(
+    childRecovery.durableActive(),
+    childRecovery.snapshotActive(),
+    [childRecovery.sessionActive()],
+  )
+  assert.equal(caseOf(resolution), 'RecoveredActive')
+})
+
+// True unreadable → RecoveryIncomplete (wait); never RecoveryBlocked solely from unreadable.
+test('P0_RECOVERY_JOIN_001_true_unreadable_is_recovery_incomplete', () => {
+  const resolution = childRecovery.resolveChild(
+    childRecovery.durableActive(),
+    childRecovery.snapshotUnreadable('GetMessages network error'),
+    [childRecovery.sessionActive()],
+  )
+  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
 })
 
 test('P0_RECOVERY_JOIN_001_tryFromProvenTerminal_rejects_empty_body', () => {
@@ -78,7 +98,7 @@ test('P0_RECOVERY_JOIN_001_proven_terminal_then_joinable', () => {
     childRecovery.snapshotTerminal(evidence),
     [childRecovery.abortedObserved('prior abort ignored once terminal proven')],
   )
-  assert.equal(caseOf(resolution), 'Joinable')
+  assert.equal(caseOf(resolution), 'RecoveredTerminal')
 })
 
 test('P0_RECOVERY_JOIN_001_durable_completed_awaiting_join_is_joinable', () => {
@@ -90,5 +110,5 @@ test('P0_RECOVERY_JOIN_001_durable_completed_awaiting_join_is_joinable', () => {
     childRecovery.snapshotMissing(),
     [childRecovery.abortedObserved('noise')],
   )
-  assert.equal(caseOf(resolution), 'Joinable')
+  assert.equal(caseOf(resolution), 'RecoveredTerminal')
 })

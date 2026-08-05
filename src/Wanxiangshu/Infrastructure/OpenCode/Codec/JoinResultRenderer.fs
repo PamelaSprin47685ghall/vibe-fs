@@ -68,17 +68,18 @@ module JoinResultRenderer =
                 | Some agent -> agent.Name
                 | None -> raw
 
-    let private renderAgentItem
+    let private renderAgentJoinItem
         (resolveAgentName: string -> string)
         (ordinal: int)
         (completion: RunCompletion)
+        (item: AgentJoinItem)
         : string =
         let name = agentName resolveAgentName completion
 
-        match completion.Outcome with
-        | AgentCompleted payload ->
+        match item with
+        | AgentCompletedItem payload ->
             resultEntry ordinal "agent" "completed" [ field "agent" (str name) ] (Some payload.WorkRecord)
-        | AgentFailed payload ->
+        | AgentFailedItem payload ->
             resultEntry
                 ordinal
                 "agent"
@@ -87,16 +88,7 @@ module JoinResultRenderer =
                   field "code" (str payload.Code)
                   field "message" (str payload.Message) ]
                 None
-        | AgentAborted payload ->
-            resultEntry
-                ordinal
-                "agent"
-                "aborted"
-                [ field "agent" (str name)
-                  field "code" (str payload.Code)
-                  field "message" (str payload.Message) ]
-                None
-        | AgentAbandoned(agentId, reason) ->
+        | AgentAbandonedItem(agentId, reason) ->
             let display =
                 if not (String.IsNullOrWhiteSpace name) then
                     name
@@ -105,44 +97,70 @@ module JoinResultRenderer =
 
             resultEntry ordinal "agent" "abandoned" [ field "agent" (str display); field "reason" (str reason) ] None
 
-    let private renderPtyItem (ordinal: int) (completion: RunCompletion) : string =
-        match completion.Outcome with
-        | AgentCompleted payload ->
+    let private renderPtyJoinItem (ordinal: int) (item: PtyJoinItem) : string =
+        match item with
+        | PtyExited payload ->
             resultEntry
                 ordinal
                 "pty"
                 "completed"
-                [ field "outcome" (str payload.WorkRecord)
-                  field "closed" "true"
-                  field "pty_id" (str completion.RunId) ]
+                [ field "outcome" (str payload.Outcome)
+                  field "closed" (if payload.Closed then "true" else "false")
+                  field "pty_id" (str payload.PtyId) ]
                 None
-        | AgentFailed payload
-        | AgentAborted payload ->
-            let status =
-                match completion.Outcome with
-                | AgentAborted _ -> "aborted"
-                | _ -> "failed"
-
+        | PtyFailed payload ->
             resultEntry
                 ordinal
                 "pty"
-                status
-                [ field "outcome" (str payload.Message)
-                  field "closed" "true"
-                  field "pty_id" (str completion.RunId)
+                "failed"
+                [ field "outcome" (str payload.Outcome)
+                  field "closed" (if payload.Closed then "true" else "false")
+                  field "pty_id" (str payload.PtyId)
                   field "code" (str payload.Code)
                   field "message" (str payload.Message) ]
                 None
-        | AgentAbandoned(_, reason) ->
+        | PtyAborted payload ->
             resultEntry
                 ordinal
                 "pty"
-                "abandoned"
-                [ field "outcome" (str reason)
-                  field "closed" "true"
-                  field "pty_id" (str completion.RunId)
-                  field "reason" (str reason) ]
+                "aborted"
+                [ field "outcome" (str payload.Outcome)
+                  field "closed" (if payload.Closed then "true" else "false")
+                  field "pty_id" (str payload.PtyId)
+                  field "code" (str payload.Code)
+                  field "message" (str payload.Message) ]
                 None
+
+    let private renderJoinItem (resolveAgentName: string -> string) (ordinal: int) (item: JoinItem) : string =
+        match item with
+        | AgentItem agentItem ->
+            // JoinItem payload carries no AgentName; empty stub forces resolveAgentName(AgentId).
+            let nameStub =
+                match agentItem with
+                | AgentCompletedItem p ->
+                    { RunId = p.RunId
+                      AgentId = p.AgentId
+                      AgentName = ""
+                      Role = p.Role
+                      Outcome = AgentCompleted p
+                      CompletedAt = DateTimeOffset.UtcNow }
+                | AgentFailedItem p ->
+                    { RunId = p.RunId
+                      AgentId = p.AgentId
+                      AgentName = ""
+                      Role = defaultArg p.Role AgentRole.Executor
+                      Outcome = AgentFailed p
+                      CompletedAt = DateTimeOffset.UtcNow }
+                | AgentAbandonedItem(agentId, reason) ->
+                    { RunId = "abandoned-" + agentId
+                      AgentId = agentId
+                      AgentName = ""
+                      Role = AgentRole.Executor
+                      Outcome = AgentAbandoned(agentId, reason)
+                      CompletedAt = DateTimeOffset.UtcNow }
+
+            renderAgentJoinItem resolveAgentName ordinal nameStub agentItem
+        | PtyItem ptyItem -> renderPtyJoinItem ordinal ptyItem
 
     let private renderCompletionItem
         (isPtyRun: string -> bool)
@@ -150,12 +168,27 @@ module JoinResultRenderer =
         (ordinal: int)
         (completion: RunCompletion)
         : string =
-        if isPtyRun completion.RunId then
-            renderPtyItem ordinal completion
-        else
-            renderAgentItem resolveAgentName ordinal completion
+        let item = JoinItem.ofRunCompletion (isPtyRun completion.RunId) completion
+
+        match item with
+        | AgentItem agentItem -> renderAgentJoinItem resolveAgentName ordinal completion agentItem
+        | PtyItem ptyItem -> renderPtyJoinItem ordinal ptyItem
+
+    /// EXEC-004 / EXEC-018 / EXEC-020: JoinItem batch (production JoinTool path).
+    /// PtyAborted → kind=pty,status=aborted without RunCompletion round-trip.
+    let renderJoinItemBatch (resolveAgentName: string -> string) (batch: NonEmptyBatch<JoinItem>) : string =
+        let items = NonEmptyBatch.toList batch
+        let count = List.length items
+
+        let header = [ field "status" (str "completed"); field "count" (string count) ]
+
+        let entries =
+            items |> List.mapi (fun i item -> renderJoinItem resolveAgentName (i + 1) item)
+
+        completedDocument header entries
 
     /// EXEC-004 / EXEC-018: status=completed + count + [[result]] (single item also uses [[result]]).
+    /// Compat surface for tests / ofRunCompletion path. Production JoinTool uses renderJoinItemBatch.
     /// Pure: no HostForkRuntime — caller supplies isPtyRun / resolveAgentName (empty = unknown).
     let renderCompletedBatch
         (isPtyRun: string -> bool)

@@ -1,21 +1,14 @@
 /**
- * P0 Clean Break RED-1: destroy Agent ABORTED as join finality.
+ * P0 Clean Break GREEN-3: Agent ABORTED destroyed as join finality.
  *
  * Final contract (user adjudication):
  *   Agent finality = Completed | Failed | Abandoned — no AgentAborted.
  *   JoinDrain: HandleRecord → blob → DurableCompletionDecode → branch.
+ *   Invalid → keep waiting (no consume, no hard error).
  *   SendFailure + body is NOT a proof (body may be status=aborted).
  *   Legacy false abort → HandleFalseCompletionRejected (not retired) or
  *   deterministic replacement + ParentJoinCorrectionRequested (retired).
- *
- * RED-1 only: tests must stably fail on current production with
- *   "parent got aborted" / false-completion consume / missing compensation.
- * Production src/ and spec/ untouched. Do not run here (DevOps confirms red).
- *
- * Existing aborted wire fixture path (document only, do not delete):
- *   agentCompletion.abortedRun + JoinResultRenderer | AgentAborted
- *   → status = "aborted" in [[result]]; join-v2-wire only forbids aborted on
- *   interrupted wire, not agent result items.
+ *   Agent join wire never renders status = "aborted".
  */
 
 import assert from 'node:assert/strict'
@@ -57,9 +50,6 @@ const AGENT_ID = 'h-false-abort'
 const HANDLE = handleId.agent(AGENT_ID)
 const TARGET = 'fast-coder'
 const RUN_ID = 'run-legacy-abort'
-
-const EXISTING_ABORTED_WIRE =
-  'domain.mjs agentCompletion.abortedRun + JoinResultRenderer AgentAborted branch'
 
 /** Plant historical false terminal: blob status=aborted + HandleCompleted(SendFailure). */
 const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = {}) => {
@@ -110,24 +100,27 @@ const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = 
 const lifecycleOf = (projection, handle = HANDLE) =>
   handleProjection.read(handleProjection.tryFind(handle, projection)).lifecycle
 
-// ── Pointer: current codebase still exposes aborted join wire ────────────────
+// ── GREEN-3: agent join wire never renders aborted ───────────────────────────
 
-test('P0_CLEAN_BREAK_existing_aborted_join_wire_fixture_still_present', () => {
+test('P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
+  // Agent path: failed is the only negative terminal besides abandoned.
+  // abortedRun factory is gone; failedRun must not emit status=aborted.
   const batch = nonEmptyBatch.ofHeadTail(
-    agentCompletion.abortedRun({
+    agentCompletion.failedRun({
       runId: RUN_ID,
       agentId: AGENT_ID,
       agentName: TARGET,
       code: 'CANCELLED',
-      message: 'aborted',
+      message: 'host abort was observation, not finality',
     }),
   )
   const wire = joinResultRenderer.renderCompletedBatch(joinResultRenderer.stubRuntime(), batch)
   assert.ok(
-    wire.includes('status = "aborted"'),
-    `current production still renders agent aborted; fixture: ${EXISTING_ABORTED_WIRE}`,
+    !wire.includes('status = "aborted"'),
+    'agent join wire must never render status = "aborted"',
   )
-  assert.equal(parseToml(wire).result[0].status, 'aborted')
+  assert.equal(parseToml(wire).result[0].status, 'failed')
+  assert.equal(parseToml(wire).result[0].kind, 'agent')
 })
 
 // ── 1a. Weak proof abolished (codec layer) ───────────────────────────────────
@@ -343,10 +336,11 @@ test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_ter
       childRecovery.snapshotMissing(),
       [childRecovery.abortedObserved('interrupted tool'), childRecovery.recoveryInFlight()],
     )
-    assert.notEqual(caseOf(resolution), 'Joinable')
-    assert.ok(
-      caseOf(resolution) === 'AwaitingEvidence' || caseOf(resolution) === 'RunningAgain',
-      `expected incomplete recovery, got ${caseOf(resolution)}`,
+    assert.notEqual(caseOf(resolution), 'RecoveredTerminal')
+    assert.equal(
+      caseOf(resolution),
+      'RecoveryIncomplete',
+      `expected RecoveryIncomplete, got ${caseOf(resolution)}`,
     )
 
     // Before true terminal: drain empty, HandleRetired=0, no aborted item.
@@ -394,8 +388,8 @@ test('P0_CLEAN_BREAK_property_join_agent_item_implies_v2_terminal_proof', () => 
   /**
    * ∀ join result AgentItem x → history has v2 terminal blob + HandleCompleted
    * + finality ∈ {completed, failed}.
-   * Legacy abort body → not Current RunCompletion (never AgentAborted).
-   */
+    * Legacy abort body → not Current RunCompletion (agent finality has no aborted).
+    */
   const record = {
     Handle: handleId.agent('a'),
     ChildSessionId: CHILD,
@@ -423,7 +417,12 @@ test('P0_CLEAN_BREAK_property_join_agent_item_implies_v2_terminal_proof', () => 
   )
   const decoded = handleCompletionCodec.tryDecode(record, 'a', completedBody)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.notEqual(caseOf(decoded.value.Outcome), 'AgentAborted')
+  const outcomeCase = caseOf(decoded.value.Outcome)
+  assert.ok(
+    outcomeCase === 'AgentCompleted' || outcomeCase === 'AgentFailed' || outcomeCase === 'AgentAbandoned',
+    `agent outcome must be completed|failed|abandoned; got ${outcomeCase}`,
+  )
+  assert.notEqual(outcomeCase, 'AgentAborted')
   const parsed = JSON.parse(completedBody)
   assert.equal(parsed.schemaVersion, 2)
   assert.ok(parsed.finality === 'completed' || parsed.finality === 'failed')

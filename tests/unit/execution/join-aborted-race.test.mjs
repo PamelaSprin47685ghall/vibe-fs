@@ -53,7 +53,7 @@ test('P0_RECOVERY_JOIN_001_case_A_aborted_path_leaves_handle_active', () => {
       childRecovery.snapshotMissing(),
       [childRecovery.abortedObserved(`abort-${i}`)],
     )
-    assert.equal(caseOf(resolution), 'AwaitingEvidence')
+    assert.equal(caseOf(resolution), 'RecoveryIncomplete')
   }
   assert.equal(stateOf(projection).lifecycle, 'Active')
   assert.deepEqual(views(projection), {
@@ -113,10 +113,10 @@ test('P0_RECOVERY_JOIN_001_case_A_tryFromProvenTerminal_then_joinable_once', () 
     childRecovery.snapshotTerminal(evidence),
     [childRecovery.abortedObserved('prior')],
   )
-  assert.equal(caseOf(resolution), 'Joinable')
+  assert.equal(caseOf(resolution), 'RecoveredTerminal')
 })
 
-// ── Case B: Aborted + terminal snapshot → Joinable (not aborted finality) ────
+// ── Case B: Aborted + terminal snapshot → RecoveredTerminal (not abort finality)
 
 test('P0_RECOVERY_JOIN_001_case_B_aborted_then_terminal_snapshot_is_joinable', () => {
   const evidence = childRecovery.evidenceCompleted(AGENT, HANDLE, CHILD, 'terminal-body')
@@ -125,11 +125,11 @@ test('P0_RECOVERY_JOIN_001_case_B_aborted_then_terminal_snapshot_is_joinable', (
     childRecovery.snapshotTerminal(evidence),
     [childRecovery.abortedObserved('host abort before snapshot')],
   )
-  assert.equal(caseOf(resolution), 'Joinable')
-  assert.notEqual(caseOf(resolution), 'Abandon')
+  assert.equal(caseOf(resolution), 'RecoveredTerminal')
+  assert.notEqual(caseOf(resolution), 'RecoveredAbandoned')
 })
 
-// ── Case C: ParentCancelled → Abandon ────────────────────────────────────────
+// ── Case C: ParentCancelled → RecoveredAbandoned ─────────────────────────────
 
 test('P0_RECOVERY_JOIN_001_case_C_parent_cancelled_is_abandon', () => {
   const resolution = childRecovery.resolveChild(
@@ -137,7 +137,7 @@ test('P0_RECOVERY_JOIN_001_case_C_parent_cancelled_is_abandon', () => {
     childRecovery.snapshotMissing(),
     [childRecovery.parentCancelled()],
   )
-  assert.equal(caseOf(resolution), 'Abandon')
+  assert.equal(caseOf(resolution), 'RecoveredAbandoned')
 })
 
 test('P0_RECOVERY_JOIN_001_case_C_parent_cancelled_after_aborts_still_abandon', () => {
@@ -150,18 +150,20 @@ test('P0_RECOVERY_JOIN_001_case_C_parent_cancelled_after_aborts_still_abandon', 
       childRecovery.parentCancelled(),
     ],
   )
-  assert.equal(caseOf(resolution), 'Abandon')
+  assert.equal(caseOf(resolution), 'RecoveredAbandoned')
 })
 
-// ── Case D: Unreadable snapshot → Blocked ────────────────────────────────────
+// ── Case D: Unreadable snapshot → RecoveryIncomplete (wait, not hard block) ──
 
-test('P0_RECOVERY_JOIN_001_case_D_unreadable_snapshot_is_blocked', () => {
+test('P0_RECOVERY_JOIN_001_case_D_unreadable_snapshot_is_incomplete_not_blocked', () => {
   const resolution = childRecovery.resolveChild(
     childRecovery.durableActive(),
     childRecovery.snapshotUnreadable('snapshot decode failed'),
     [childRecovery.abortedObserved('noise')],
   )
-  assert.equal(caseOf(resolution), 'Blocked')
+  // True GetMessages/decode failure: wait (no permit), not RecoveryBlocked hard error.
+  assert.equal(caseOf(resolution), 'RecoveryIncomplete')
+  assert.notEqual(caseOf(resolution), 'RecoveryBlocked')
 })
 
 // ── Case E: Aborted × N → projection / resolve unchanged ─────────────────────
@@ -175,7 +177,7 @@ test('P0_RECOVERY_JOIN_001_case_E_aborted_times_n_projection_unchanged', () => {
       childRecovery.snapshotMissing(),
       Array.from({ length: n + 1 }, (_, i) => childRecovery.abortedObserved(`e-${i}`)),
     )
-    assert.equal(caseOf(resolution), 'AwaitingEvidence')
+    assert.equal(caseOf(resolution), 'RecoveryIncomplete')
   }
   assert.deepEqual(stateOf(projection), before)
   assert.equal(stateOf(projection).lifecycle, 'Active')

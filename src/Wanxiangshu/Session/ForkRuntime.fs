@@ -11,16 +11,15 @@ open Wanxiangshu.Process
 /// Runtime for managing child agent runs and PTY sessions.
 ///
 /// Uses a Map<AgentId, ChildRun> for agent tracking (replacing the previous
-/// Dictionary<AgentId, AgentRecord> + Queue pattern) and keeps a simple
-/// completion mailbox for Join().
+/// Dictionary<AgentId, AgentRecord> + Queue pattern) and dual-channel mailbox:
+/// agent wake-only + PTY PtyJoinItem queue (GREEN-5).
 ///
 /// All public members are thread-safe (lockObj synchronizes map/mailbox access).
 type ForkRuntime
     (
         ?runner: string -> AgentRole -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
-        ?cleanup: string -> unit,
-        ?publishToMailbox: bool
+        ?cleanup: string -> unit
     ) =
 
     let childRunner =
@@ -29,7 +28,6 @@ type ForkRuntime
 
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
-    let publishCompletion = defaultArg publishToMailbox true
 
     let mutable agents: Map<string, ChildRun> = Map.empty
     let mutable ptys: Map<string, PtyRecord> = Map.empty
@@ -44,7 +42,8 @@ type ForkRuntime
         )
 
     /// Start a new child run: create the ChildRun and return a thunk that
-    /// executes the work and posts the completion to the mailbox.
+    /// executes the work. Agent completion settles the cell + pulses wake only;
+    /// durable projection (Host path) is the join fact source.
     let startRun
         (agentId: string)
         (agentName: string)
@@ -85,9 +84,8 @@ type ForkRuntime
                 | None -> ()
                 | Some completion ->
                     childRun.Completion.TrySet(completion) |> ignore
-
-                    if publishCompletion then
-                        mailbox.Publish completion
+                    // GREEN-5: agent mailbox is wake-only; no payload publish.
+                    mailbox.PulseAgentHandle(AgentHandleId.create agentId)
 
                     try
                         terminalListener completion
@@ -142,10 +140,10 @@ type ForkRuntime
                         ForkResult.Nudged agentId)
 
     // -----------------------------------------------------------------------
-    // Public API — Join / signal / drain (EXEC-017 / EXEC-018)
+    // Public API — Join / signal / drain (EXEC-017 / EXEC-018 / GREEN-5)
     // -----------------------------------------------------------------------
 
-    /// Compatibility single-result join. Prefer WaitForSignal + DrainAvailable.
+    /// Compatibility single-result join (PTY mailbox only). Prefer WaitForSignal + drains.
     member _.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         match timeoutMs with
         | Some ms -> mailbox.Join(timeoutMs = ms)
@@ -154,37 +152,29 @@ type ForkRuntime
     /// EXEC-018: wait for completion/cancel signal or local user interrupt.
     member _.WaitForSignal(interrupt: Task<unit>) : Task<MailboxWakeReason> = mailbox.WaitForSignal interrupt
 
-    /// Wake on Publish/Cancel only. Outer layer races journal + user interrupt.
+    /// Wake on Publish/Pulse/Cancel only. Outer layer races journal + user interrupt.
     member _.WaitForWake() : Task<MailboxWakeReason> = mailbox.WaitForWake()
 
     /// Drop pending wake waiters (spurious CompletionMayBeAvailable). Safe: re-drain.
     member _.PulseWake() : unit = mailbox.PulseWake()
 
-    /// EXEC-018: bounded drain of mailbox queue (PTY facts / agent wake payloads).
-    member _.DrainAvailable(maxCount: int) : RunCompletion list = mailbox.DrainAvailable maxCount
+    /// Agent wake only — never carries completion payload (GREEN-5).
+    member _.PulseAgentHandle(handle: AgentHandleId) : unit = mailbox.PulseAgentHandle handle
 
-    // -----------------------------------------------------------------------
-    // Public API — PublishCompletion (external completions, e.g. PTY)
-    // -----------------------------------------------------------------------
+    /// PTY physical result (EXEC-015).
+    member _.PublishPtyCompletion(item: PtyJoinItem) : unit =
+        let id = PtyJoinItem.ptyId item
 
-    /// Publish a completion that originated outside this runtime (e.g. PTY).
-    /// Only accepted if the owning agent/PTY is known to this runtime.
-    member _.PublishCompletion(completion: RunCompletion) : unit =
-        let owned =
-            lock lockObj (fun () ->
-                let known =
-                    ptys |> Map.containsKey completion.RunId
-                    || agents |> Map.containsKey completion.AgentId
-
-                if known then
-                    match agents |> Map.tryFind completion.AgentId with
-                    | Some run when not run.Completion.IsCompleted -> run.Completion.TrySet(completion) |> ignore
-                    | _ -> ()
-
-                known)
+        let owned = lock lockObj (fun () -> ptys |> Map.containsKey id)
 
         if owned then
-            mailbox.Publish completion
+            mailbox.PublishPtyCompletion item
+
+    /// Drain agent wake tokens (no payload). Callers re-read Journal.
+    member _.DrainAgentWakes(maxCount: int) : AgentHandleId list = mailbox.DrainAgentWakes maxCount
+
+    /// EXEC-018: bounded drain of PTY fact queue.
+    member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list = mailbox.DrainPtyCompletions maxCount
 
     // -----------------------------------------------------------------------
     // Public API — PTY management
@@ -272,6 +262,7 @@ type ForkRuntime
         lock lockObj (fun () -> agents |> Map.filter (fun _ run -> ChildRun.isActive run) |> Map.count)
 
     member _.PendingCompletionCount = mailbox.PendingCount
+    member _.PendingPtyCount = mailbox.PendingPtyCount
 
     // -----------------------------------------------------------------------
     // Public API — Cancel / Close

@@ -43,8 +43,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             ?sessionSnapshot = deps.SessionSnapshot,
             onRunStarted = deps.OnRunStarted,
             parentWorkRecordFor = deps.ParentWorkRecordFor,
-            childWorkRecordFor = deps.ChildWorkRecordFor,
-            publishToMailbox = false
+            childWorkRecordFor = deps.ChildWorkRecordFor
         )
 
     let managerAgentId (jobId: ManagerJobId) = ManagerJobId.value jobId
@@ -60,8 +59,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let outcomeOf (run: RunCompletion) =
         match run.Outcome with
         | AgentCompleted _ -> Ok()
-        | AgentFailed payload
-        | AgentAborted payload -> Error payload.Message
+        | AgentFailed payload -> Error payload.Message
         | AgentAbandoned(_, reason) -> Error reason
 
     /// Fork a child and hand back the Host session it created.

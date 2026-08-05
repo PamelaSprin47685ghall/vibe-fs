@@ -32,6 +32,10 @@ module ExecutorSummarizeRuntime =
             member _.JoinWithPermit(timeoutMs) =
                 task {
                     match! requirePermit () with
+                    | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
+                        // Incomplete recovery: wait-not-hard-error. Surface TimedOut so
+                        // awaitAgent loop retries requirePermit until Ready or wall budget.
+                        return Error ForkError.TimedOut
                     | Error msg -> return Error(ForkError.NotFound msg)
                     | Ok permit ->
                         match timeoutMs with

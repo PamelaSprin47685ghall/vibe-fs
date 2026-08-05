@@ -16,6 +16,64 @@ export const PRODUCTION_ROOT = 'src/Wanxiangshu'
 
 /** Pure rules: each id is one CI-checked invariant. */
 export const RULES = [
+  // —— EXEC-020 negative: agent ABORTED finality reintroduction ——
+  {
+    id: 'agent-aborted-type',
+    fileHint: null,
+    pattern: /\bAgentAborted\b/,
+    label: 'production must not reintroduce AgentAborted type/case (EXEC-020)',
+  },
+  {
+    id: 'agent-completion-aborted-factory',
+    fileHint: null,
+    pattern: /AgentCompletion\.aborted\b/,
+    label: 'production must not call AgentCompletion.aborted (EXEC-020)',
+  },
+  {
+    id: 'child-run-make-aborted',
+    fileHint: null,
+    pattern: /ChildRun\.makeAborted\b|\bmakeAborted\b/,
+    label: 'production must not call ChildRun.makeAborted / makeAborted (EXEC-020)',
+  },
+  {
+    id: 'aborted-run-factory',
+    fileHint: null,
+    pattern: /\babortedRun\b/,
+    label: 'production must not define/use abortedRun factory (EXEC-020)',
+  },
+  {
+    id: 'join-renderer-agent-status-aborted',
+    fileHint: 'JoinResultRenderer.fs',
+    // Agent join wire must never render status="aborted" (PTY PtyAborted may).
+    // Match only agent-kind resultEntry with aborted status; do not flag PtyAborted path.
+    pattern: /resultEntry[\s\S]{0,60}"agent"[\s\S]{0,40}"aborted"|"agent"[\s\S]{0,20}"aborted"/,
+    label: 'JoinResultRenderer agent path must not render status="aborted" (EXEC-020)',
+  },
+  {
+    id: 'codec-encode-finality-aborted',
+    fileHint: 'HandleCompletionCodec.fs',
+    // Encode path must never write finality/status aborted as a Current blob.
+    pattern: /finality["']\s*,\s*str\s+"aborted"|str\s+"aborted"[\s\S]{0,80}schemaVersion|"finality",\s*str\s+"aborted"/,
+    label: 'HandleCompletionCodec must not encode finality=aborted as joinable blob (EXEC-021)',
+  },
+  {
+    id: 'try-from-durable-completed',
+    fileHint: null,
+    pattern: /\btryFromDurableCompleted\b/,
+    label: 'tryFromDurableCompleted deleted; use fromDecoded after DurableCompletionDecode (EXEC-021)',
+  },
+  {
+    id: 'publish-completion-agent',
+    fileHint: null,
+    pattern: /\.PublishCompletion\b|\bPublishCompletion\b/,
+    label: 'PublishCompletion(RunCompletion) banned; agent uses PulseAgentHandle + Journal (EXEC-024)',
+  },
+  {
+    id: 'awaiting-evidence-case',
+    fileHint: null,
+    pattern: /\|\s*AwaitingEvidence\b|\bAwaitingEvidence\b\s*of\b/,
+    label: 'AwaitingEvidence deleted; use RecoveryIncomplete | RecoveryBlocked (EXEC-023)',
+  },
   {
     id: 'lifecycle-aborted-completion',
     fileHint: 'HostForkRunLifecycle.fs',
@@ -61,6 +119,39 @@ export const RULES = [
     pattern:
       /familyRecoveryPorts[\s\S]{0,200}None[\s\S]{0,120}FamilyReady|None\s*->\s*[\s\S]{0,80}FamilyReady/,
     label: 'missing ports must not synthesize FamilyReady',
+  },
+  {
+    // GREEN-4: option RestoreHandles / RecoverJob must not collapse to NoRecoveryRequired.
+    id: 'restore-handles-none-no-recovery',
+    fileHint: 'SessionRecoveryInterpreter.fs',
+    pattern:
+      /RestoreHandles[\s\S]{0,120}None[\s\S]{0,80}NoRecoveryRequired|None\s*->\s*[\s\S]{0,60}NoRecoveryRequired[\s\S]{0,80}RestoreHandles|match ports\.RestoreHandles/,
+    label: 'RestoreHandles must be mandatory; missing port must not map to NoRecoveryRequired',
+  },
+  {
+    id: 'recover-job-none-no-recovery',
+    fileHint: 'SessionRecoveryInterpreter.fs',
+    pattern:
+      /RecoverJob[\s\S]{0,120}None[\s\S]{0,80}NoRecoveryRequired|match ports\.RecoverJob|RecoverJob:\s*\([^)]*\)\s*option/,
+    label: 'RecoverJobs must be mandatory; RecoverJob option → NoRecoveryRequired is forbidden',
+  },
+  {
+    id: 'spike-restore-handles-none',
+    fileHint: 'SpikePlugin.fs',
+    pattern: /RestoreHandles\s*=\s*None|RecoverJob\s*=\s*None/,
+    label: 'SpikePlugin must inject real RestoreHandles/RecoverJobs (not None)',
+  },
+  {
+    id: 'host-fork-runtime-recovery-task',
+    fileHint: 'HostForkRuntime.fs',
+    pattern: /\brecoveryTask\b|EnsureChildRestoreStarted|member [^\n]*AwaitRecovery|member [^\n]*RestoreLinkedHandles\s*\(\s*\)/,
+    label: 'HostForkRuntime must not own recoveryTask / AwaitRecovery / EnsureChildRestoreStarted',
+  },
+  {
+    id: 'host-fork-runtime-await-recovery-call',
+    fileHint: null,
+    pattern: /do!\s*this\.AwaitRecovery\s*\(\s*\)/,
+    label: 'production must not call AwaitRecovery (recovery ownership is SessionRecoveryProgram)',
   },
   {
     id: 'join-tool-family-recovery',
@@ -176,6 +267,122 @@ export const RULES = [
     pattern: /\brecordCompletion\b/,
     label:
       'HandleController.recordCompletion production caller must be only ChildRecoveryInterpreter (or definition)',
+  },
+  // —— EXEC-020..024 positive: required shapes must remain ——
+  {
+    id: 'agent-outcome-completed-case',
+    fileHint: 'AgentCompletion.fs',
+    pattern: /\|\s*AgentCompleted\b/,
+    label: 'AgentCompletionOutcome must include AgentCompleted (EXEC-020)',
+    positive: true,
+  },
+  {
+    id: 'agent-outcome-failed-case',
+    fileHint: 'AgentCompletion.fs',
+    pattern: /\|\s*AgentFailed\b/,
+    label: 'AgentCompletionOutcome must include AgentFailed (EXEC-020)',
+    positive: true,
+  },
+  {
+    id: 'agent-outcome-abandoned-case',
+    fileHint: 'AgentCompletion.fs',
+    pattern: /\|\s*AgentAbandoned\b/,
+    label: 'AgentCompletionOutcome must include AgentAbandoned (EXEC-020)',
+    positive: true,
+  },
+  {
+    id: 'agent-join-item-three-cases',
+    fileHint: 'AgentCompletion.fs',
+    pattern:
+      /type AgentJoinItem\s*=\s*\n\s*\|\s*AgentCompletedItem[\s\S]{0,200}\|\s*AgentFailedItem[\s\S]{0,200}\|\s*AgentAbandonedItem/,
+    label: 'AgentJoinItem must be Completed|Failed|Abandoned only (EXEC-020)',
+    positive: true,
+  },
+  {
+    id: 'pty-aborted-retained',
+    fileHint: 'AgentCompletion.fs',
+    pattern: /\|\s*PtyAborted\b/,
+    label: 'PtyJoinItem must retain PtyAborted for physical PTY interrupt (EXEC-020)',
+    positive: true,
+  },
+  {
+    id: 'completion-blob-schema-v2',
+    fileHint: 'HandleCompletionCodec.fs',
+    pattern: /"schemaVersion",\s*box\s*2/,
+    label: 'HandleCompletionCodec encode must write schemaVersion=2 (EXEC-021)',
+    positive: true,
+  },
+  {
+    id: 'legacy-false-abort-decode',
+    fileHint: 'HandleCompletionCodec.fs',
+    pattern: /LegacyFalseAbort/,
+    label: 'HandleCompletionCodec must decode legacy abort as LegacyFalseAbort (EXEC-021)',
+    positive: true,
+  },
+  {
+    id: 'joinable-from-decoded',
+    fileHint: 'ChildRecovery.fs',
+    pattern: /let fromDecoded\b|fromDecoded/,
+    label: 'JoinableCompletion.fromDecoded must exist as sole Current constructor (EXEC-021)',
+    positive: true,
+  },
+  {
+    id: 'session-ports-restore-handles-mandatory',
+    fileHint: 'SessionRecoveryInterpreter.fs',
+    pattern: /RestoreHandles:\s*SessionId\s*->\s*Task</,
+    label: 'SessionRecoveryPorts.RestoreHandles must be mandatory (not option) (EXEC-023)',
+    positive: true,
+  },
+  {
+    id: 'session-ports-recover-jobs-mandatory',
+    fileHint: 'SessionRecoveryInterpreter.fs',
+    pattern: /RecoverJobs:\s*SessionId\s*->\s*Task</,
+    label: 'SessionRecoveryPorts.RecoverJobs must be mandatory (not option) (EXEC-023)',
+    positive: true,
+  },
+  {
+    id: 'child-recovery-result-five-cases',
+    fileHint: 'ChildRecovery.fs',
+    pattern:
+      /type ChildRecoveryResult\s*=[\s\S]{0,400}RecoveredActive[\s\S]{0,200}RecoveredTerminal[\s\S]{0,200}RecoveredAbandoned[\s\S]{0,200}RecoveryIncomplete[\s\S]{0,200}RecoveryBlocked/,
+    label: 'ChildRecoveryResult must be five-case algebra without AwaitingEvidence (EXEC-023)',
+    positive: true,
+  },
+  {
+    id: 'join-program-requires-permit',
+    fileHint: 'JoinProgram.fs',
+    pattern: /JoinAny of FamilyRecoveryPermit|joinAny \(permit: FamilyRecoveryPermit\)/,
+    label: 'JoinProgram must take FamilyRecoveryPermit (EXEC-023)',
+    positive: true,
+  },
+  {
+    id: 'mailbox-pulse-agent-handle',
+    fileHint: 'CompletionMailbox.fs',
+    pattern: /PulseAgentHandle/,
+    label: 'CompletionMailbox must expose PulseAgentHandle wake channel (EXEC-024)',
+    positive: true,
+  },
+  {
+    id: 'mailbox-publish-pty-completion',
+    fileHint: 'CompletionMailbox.fs',
+    pattern: /PublishPtyCompletion/,
+    label: 'CompletionMailbox must expose PublishPtyCompletion PTY channel (EXEC-024)',
+    positive: true,
+  },
+  {
+    // EXEC-022: compensation fact must remain in Kernel fact algebra (codec permanently replayable).
+    id: 'false-completion-rejected-fact',
+    fileHint: 'Fact.fs',
+    pattern: /HandleFalseCompletionRejected/,
+    label: 'AgentFact must retain HandleFalseCompletionRejected for legacy abort compensation (EXEC-022)',
+    positive: true,
+  },
+  {
+    id: 'parent-join-correction-fact',
+    fileHint: 'Fact.fs',
+    pattern: /ParentJoinCorrectionRequested/,
+    label: 'AgentFact must retain ParentJoinCorrectionRequested for retired false-abort migration (EXEC-022)',
+    positive: true,
   },
 ]
 

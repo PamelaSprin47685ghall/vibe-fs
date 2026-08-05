@@ -7,6 +7,19 @@ open Wanxiangshu.Kernel.Identity
 /// Join consumes only JoinableCompletion from decoded v2 terminal; no raw JSON / kind+body.
 module ChildRecovery =
 
+    /// Non-empty list (local; no shared collection dependency).
+    type NonEmpty<'a> = { Head: 'a; Tail: 'a list }
+
+    module NonEmpty =
+        let one (value: 'a) : NonEmpty<'a> = { Head = value; Tail = [] }
+
+        let ofList (values: 'a list) : NonEmpty<'a> option =
+            match values with
+            | [] -> None
+            | head :: tail -> Some { Head = head; Tail = tail }
+
+        let toList (values: NonEmpty<'a>) : 'a list = values.Head :: values.Tail
+
     /// Proven business terminal of a child handle. No Aborted case.
     [<RequireQualifiedAccess>]
     type ChildFinality =
@@ -178,39 +191,73 @@ module ChildRecovery =
         | RecoveryInFlight
         | SessionActive
 
+    /// Proven abandonment of a child handle (durable reason).
+    type ProvenAbandonment =
+        { Handle: HandleId
+          Reason: HandleAbandonReason }
+
+    /// Child still live after recovery work finished (not incomplete).
+    type ActiveChildReceipt =
+        { Handle: HandleId
+          ChildSession: SessionId }
+
+    /// Why recovery cannot finish yet (not a terminal, not blocked).
+    type RecoveryDependency =
+        | AwaitingTerminalEvidence of HandleId * SessionId
+        | HostRestoreInFlight of HandleId * SessionId
+
+    [<RequireQualifiedAccess>]
+    type ChildRecoveryBlock =
+        | Reason of string
+        | SnapshotUnreadable of SessionId * reason: string
+
+    /// Post-recovery child outcome (GREEN-4). RecoveredActive ≠ RecoveryIncomplete.
+    /// Permit may issue only for RecoveredActive | RecoveredTerminal | RecoveredAbandoned.
+    [<RequireQualifiedAccess>]
+    type ChildRecoveryResult =
+        | RecoveredActive of ActiveChildReceipt
+        | RecoveredTerminal of JoinableCompletion
+        | RecoveredAbandoned of ProvenAbandonment
+        | RecoveryIncomplete of RecoveryDependency
+        | RecoveryBlocked of NonEmpty<ChildRecoveryBlock>
+
+    /// Pure resolution before commit. Maps 1:1 to ChildRecoveryResult after effects.
     [<RequireQualifiedAccess>]
     type ChildResolution =
-        | Joinable of JoinableCompletion
-        | Abandon of HandleAbandonReason
-        | AwaitingEvidence
-        | RunningAgain
-        | Blocked of reason: string
+        | RecoveredTerminal of JoinableCompletion
+        | RecoveredAbandoned of HandleAbandonReason
+        | RecoveryIncomplete
+        | RecoveredActive
+        | RecoveryBlocked of reason: string
 
-    /// Pure resolution order (P0-RECOVERY-JOIN-001 §四):
-    /// durable Abandoned → Abandon
-    /// durable CompletedAwaitingJoin → Joinable (rebuild)
-    /// snapshot legal terminal → Joinable
-    /// session active / restore in flight → AwaitingEvidence | RunningAgain
-    /// only AbortedObserved → AwaitingEvidence (never Joinable)
-    /// ParentCancelled / DeadlineExceeded / HostSessionGone → Abandon
-    /// conflict → Blocked
+    /// Pure resolution order (P0-RECOVERY-JOIN-001 §四 + GREEN-4 split):
+    /// durable Abandoned → RecoveredAbandoned
+    /// durable CompletedAwaitingJoin → RecoveredTerminal
+    /// snapshot legal terminal → RecoveredTerminal
+    /// snapshot Unreadable (true read error) → RecoveryIncomplete (wait; no permit; not hard block)
+    /// session active → RecoveredActive (recovery work done; child continues)
+    /// restore in flight / abort-only / unknown → RecoveryIncomplete (must not issue permit)
+    /// ParentCancelled / DeadlineExceeded / HostSessionGone → RecoveredAbandoned
+    /// conflict / retired → RecoveryBlocked
     let resolveChild
         (durable: DurableHandleEvidence)
         (snapshot: ChildSnapshotEvidence)
         (observations: HostObservation list)
         : ChildResolution =
         match durable with
-        | DurableHandleEvidence.Abandoned reason -> ChildResolution.Abandon reason
-        | DurableHandleEvidence.CompletedAwaitingJoin proof -> ChildResolution.Joinable proof
-        | DurableHandleEvidence.Retired -> ChildResolution.Blocked "handle already retired"
+        | DurableHandleEvidence.Abandoned reason -> ChildResolution.RecoveredAbandoned reason
+        | DurableHandleEvidence.CompletedAwaitingJoin proof -> ChildResolution.RecoveredTerminal proof
+        | DurableHandleEvidence.Retired -> ChildResolution.RecoveryBlocked "handle already retired"
         | DurableHandleEvidence.Unknown
         | DurableHandleEvidence.Active ->
             match snapshot with
             | ChildSnapshotEvidence.Terminal evidence ->
                 match JoinableCompletion.tryFromProvenTerminal evidence with
-                | Ok proof -> ChildResolution.Joinable proof
-                | Error reason -> ChildResolution.Blocked reason
-            | ChildSnapshotEvidence.Unreadable reason -> ChildResolution.Blocked reason
+                | Ok proof -> ChildResolution.RecoveredTerminal proof
+                | Error reason -> ChildResolution.RecoveryBlocked reason
+            // True GetMessages / decode failure: incomplete (wait), not definitive block.
+            // Family permit must not issue; join / onTurn consumers treat as wait-not-hard-error.
+            | ChildSnapshotEvidence.Unreadable _ -> ChildResolution.RecoveryIncomplete
             | ChildSnapshotEvidence.Missing
             | ChildSnapshotEvidence.Active ->
                 let hasAbortOnly =
@@ -240,11 +287,13 @@ module ChildRecovery =
                         | _ -> false)
 
                 match abandonReason with
-                | Some reason -> ChildResolution.Abandon reason
-                | None when restoreInFlight -> ChildResolution.AwaitingEvidence
-                | None when sessionActive -> ChildResolution.RunningAgain
-                | None when hasAbortOnly -> ChildResolution.AwaitingEvidence
-                | None -> ChildResolution.AwaitingEvidence
+                | Some reason -> ChildResolution.RecoveredAbandoned reason
+                // Session active = child continues; recovery step for this handle is done.
+                | None when sessionActive -> ChildResolution.RecoveredActive
+                // Restore still running or only abort noise → incomplete (no permit).
+                | None when restoreInFlight -> ChildResolution.RecoveryIncomplete
+                | None when hasAbortOnly -> ChildResolution.RecoveryIncomplete
+                | None -> ChildResolution.RecoveryIncomplete
 
     /// Closed AST (FLOW-002). Not persisted; not a coroutine.
     type ChildRecoveryProgram<'result> =
@@ -310,8 +359,28 @@ module ChildRecovery =
 
     let block (reason: string) : ChildRecoveryProgram<'result> = Block reason
 
+    /// Map pure resolution + handle identity into ChildRecoveryResult (no effects).
+    let toChildRecoveryResult
+        (handle: HandleId)
+        (childSession: SessionId)
+        (resolution: ChildResolution)
+        : ChildRecoveryResult =
+        match resolution with
+        | ChildResolution.RecoveredTerminal proof -> ChildRecoveryResult.RecoveredTerminal proof
+        | ChildResolution.RecoveredAbandoned reason ->
+            ChildRecoveryResult.RecoveredAbandoned { Handle = handle; Reason = reason }
+        | ChildResolution.RecoveredActive ->
+            ChildRecoveryResult.RecoveredActive
+                { Handle = handle
+                  ChildSession = childSession }
+        | ChildResolution.RecoveryIncomplete ->
+            ChildRecoveryResult.RecoveryIncomplete(RecoveryDependency.AwaitingTerminalEvidence(handle, childSession))
+        | ChildResolution.RecoveryBlocked reason ->
+            ChildRecoveryResult.RecoveryBlocked(NonEmpty.one (ChildRecoveryBlock.Reason reason))
+
     /// Recover one child: read durable → snapshot → observations → resolve → commit.
-    let recoverChild (handle: HandleId) (childSession: SessionId) : ChildRecoveryProgram<ChildResolution> =
+    /// Returns ChildRecoveryResult: RecoveredActive ≠ RecoveryIncomplete (GREEN-4).
+    let recoverChild (handle: HandleId) (childSession: SessionId) : ChildRecoveryProgram<ChildRecoveryResult> =
         childRecovery {
             let! durable = readDurableHandle handle
             let! snapshot = readChildSnapshot childSession
@@ -319,19 +388,27 @@ module ChildRecovery =
             let resolution = resolveChild durable snapshot signals
 
             match resolution with
-            | ChildResolution.Joinable proof ->
+            | ChildResolution.RecoveredTerminal proof ->
                 do! commitCompletion proof
-                return ChildResolution.Joinable proof
-            | ChildResolution.Abandon reason ->
+                return ChildRecoveryResult.RecoveredTerminal proof
+            | ChildResolution.RecoveredAbandoned reason ->
                 do! commitAbandonment handle reason
-                return ChildResolution.Abandon reason
-            | ChildResolution.AwaitingEvidence ->
+
+                return ChildRecoveryResult.RecoveredAbandoned { Handle = handle; Reason = reason }
+            | ChildResolution.RecoveredActive ->
+                // Recovery finished; child keeps running. No keepWaiting.
+                return
+                    ChildRecoveryResult.RecoveredActive
+                        { Handle = handle
+                          ChildSession = childSession }
+            | ChildResolution.RecoveryIncomplete ->
                 do! keepWaiting "awaiting terminal evidence"
-                return ChildResolution.AwaitingEvidence
-            | ChildResolution.RunningAgain ->
-                do! keepWaiting "child running again"
-                return ChildResolution.RunningAgain
-            | ChildResolution.Blocked reason -> return! block reason
+
+                return
+                    ChildRecoveryResult.RecoveryIncomplete(
+                        RecoveryDependency.AwaitingTerminalEvidence(handle, childSession)
+                    )
+            | ChildResolution.RecoveryBlocked reason -> return! block reason
         }
 
     [<RequireQualifiedAccess>]

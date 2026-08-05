@@ -31,7 +31,6 @@ type HostForkRuntime
         ?childWorkRecordFor: SessionId -> string option,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
-        ?publishToMailbox: bool,
         /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
         /// Reviewer. The Orchestrator's runtime keeps this off — it opens barriers
         /// itself (ORCH-006) — so exactly one writer owns each barrier.
@@ -42,7 +41,7 @@ type HostForkRuntime
         /// correct outcome for a review without a tree.
         ?treeHashFor: string -> GitTreeHash option
     ) as this =
-    let runtime = ForkRuntime(publishToMailbox = defaultArg publishToMailbox true)
+    let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
@@ -68,42 +67,17 @@ type HostForkRuntime
     let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
     do
-        ptyPortInstance.AddMailboxSender(fun completion ->
-            let owned = lock gate (fun () -> ptyRuns.Contains completion.RunId)
+        ptyPortInstance.AddMailboxSender(fun item ->
+            let id = PtyJoinItem.ptyId item
+            let owned = lock gate (fun () -> ptyRuns.Contains id)
 
             if owned then
                 // A PtyPort can be shared by multiple runtimes. Its sender fan-out
                 // must not turn another runtime's exit into this runtime's join.
-                runtime.PublishCompletion completion
-                runtime.UnregisterPty completion.RunId)
-
-    // RECOVERY-FAMILY: constructor must not start recovery side effects.
-    // Linked-child restore is RestoreLinkedHandles under FamilyRecoveryPermit.
-    let recoveryStartLock = obj ()
-    let mutable recoveryTask: Task option = None
-
-    let restoreChildren () =
-        match journal with
-        | None -> AsyncSupport.completedTask ()
-        | Some j ->
-            HostForkRestart.restoreLinkedChildren
-                runtime
-                sessionSnapshot
-                j
-                parentId
-                children
-                childCreatedDir
-                directoryOf
-
-    /// Start restore at most once when a permit-holding caller first needs it.
-    member private _.EnsureChildRestoreStarted() =
-        lock recoveryStartLock (fun () ->
-            match recoveryTask with
-            | Some t -> t
-            | None ->
-                let t = restoreChildren ()
-                recoveryTask <- Some t
-                t)
+                runtime.PublishPtyCompletion item
+                runtime.UnregisterPty id)
+    // GREEN-4: HostForkRuntime does not own recovery. SessionRecoveryProgram
+    // RestoreHandles → HostForkRestart.restoreLinkedChildren is the sole path.
 
     member internal _.Runtime = runtime
     member internal _.Children = children
@@ -144,14 +118,6 @@ type HostForkRuntime
 
             HandleProjection.isRetired handle projection
             || HandleProjection.isAbandoned handle projection)
-
-    /// Recovery restore failures must surface. Silent success would let Join
-    /// proceed against a half-restored family (P0-RECOVERY-JOIN-001).
-    member this.AwaitRecovery() =
-        task { do! this.EnsureChildRestoreStarted() }
-
-    /// Explicit restore instruction for SessionRecovery RestoreLinkedHandles.
-    member this.RestoreLinkedHandles() : Task = this.EnsureChildRestoreStarted()
 
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
         let workRecord =
@@ -194,7 +160,8 @@ type HostForkRuntime
         Async.StartImmediate(
             HostForkChildDispatch.cancelParent
                 cancelSignals
-                (fun () -> this.AwaitRecovery())
+                // GREEN-4: no second recovery ownership; cancel does not start restore.
+                (fun () -> Task.FromResult(()))
                 runtime
                 ptyPortInstance
                 parentKey
@@ -210,45 +177,57 @@ type HostForkRuntime
                 (fun run outcome -> this.Complete(run, outcome))
         )
 
-    /// EXEC-009 + EXEC-018: durable drain via JoinDrain pure path + PTY mailbox.
+    /// EXEC-009 + EXEC-018 + GREEN-5: agent facts from Journal; PTY from mailbox as PtyJoinItem.
+    /// journal=None: agent join fail-closed; pure PTY drain still allowed.
     /// Abandoned items join the same ResultsAvailable batch — never withhold
     /// completed results behind a top-level ForkError.Abandoned.
-    member private this.tryDrainAvailable(maxCount: int) : Result<JoinWaitOutcome<RunCompletion>, ForkError> option =
+    /// EXEC-020: PTY stays JoinItem/PtyJoinItem until renderer (no toRunCompletion on batch path).
+    member private this.tryDrainAvailable(maxCount: int) : Result<JoinWaitOutcome<JoinItem>, ForkError> option =
         let cap = min maxCount JoinBatch.Max
 
         if cap <= 0 then
             None
         else
+            // Clear agent wakes — they never carry payload (GREEN-5).
+            ignore (runtime.DrainAgentWakes JoinBatch.Max)
+
             match journal with
             | None ->
-                match NonEmptyBatch.tryOfList (runtime.DrainAvailable cap) with
-                | Some batch -> Some(Ok(ResultsAvailable batch))
-                | None -> None
+                // Agent join requires Journal. Pure PTY join may proceed without it.
+                let hasActiveAgents =
+                    runtime.ActiveRunCount > 0
+                    || lock gate (fun () -> pendingRuns.Count > 0)
+                    || runtime.PendingCompletionCount > runtime.PendingPtyCount
+
+                if hasActiveAgents then
+                    Some(
+                        Error(
+                            ForkError.NotFound
+                                "agent join requires journal; journal=None is fail-closed for agent handles"
+                        )
+                    )
+                else
+                    let ptyBatch = runtime.DrainPtyCompletions cap |> List.map JoinItem.ofPtyJoinItem
+
+                    match NonEmptyBatch.tryOfList ptyBatch with
+                    | Some batch -> Some(Ok(ResultsAvailable batch))
+                    | None -> None
             | Some durable ->
                 match JoinDrain.drainFromJournal durable parentId cap with
                 | Error e -> Some(Error e)
                 | Ok durableBatch ->
-                    // Mailbox: PTY facts (EXEC-015) + agent wake payloads (discard).
-                    // Only drain when batch has room; leftover PTY stays queued for next join.
+                    // PTY channel only (EXEC-015). Leftover stays queued for next join.
                     let remaining = cap - List.length durableBatch
 
-                    let ptyBatch =
+                    let agentItems = durableBatch |> List.map JoinItem.ofAgentRunCompletion
+
+                    let ptyItems =
                         if remaining <= 0 then
                             []
                         else
-                            let rec pull acc need =
-                                if need <= 0 then
-                                    List.rev acc
-                                else
-                                    match runtime.DrainAvailable 1 with
-                                    | [] -> List.rev acc
-                                    | c :: _ when lock gate (fun () -> ptyRuns.Contains c.RunId) ->
-                                        pull (c :: acc) (need - 1)
-                                    | _ -> pull acc need
+                            runtime.DrainPtyCompletions remaining |> List.map JoinItem.ofPtyJoinItem
 
-                            pull [] remaining
-
-                    match NonEmptyBatch.tryOfList (durableBatch @ ptyBatch) with
+                    match NonEmptyBatch.tryOfList (agentItems @ ptyItems) with
                     | Some batch -> Some(Ok(ResultsAvailable batch))
                     | None -> None
 
@@ -305,28 +284,30 @@ type HostForkRuntime
                     else
                         Ok()
 
-    /// P0-RECOVERY-JOIN-001: permit-gated single-result join for legacy interpreters
-    /// and internal waiters. Production JoinTool uses JoinAvailable.
+    /// P0-RECOVERY-JOIN-001 + GREEN-4: permit-gated single-result join.
+    /// Validates root / journalSequence lower bound / closureDigest only; never starts recovery.
     member this.JoinWithPermit(permit: FamilyRecoveryPermit, ?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         match this.validatePermit permit with
         | Error e -> Task.FromResult(Error e)
         | Ok() -> this.Join(?timeoutMs = timeoutMs)
 
     /// EXEC-018 batch join under FamilyRecoveryPermit.
-    /// Production JoinTool uses this path.
+    /// GREEN-4: validate permit then drain; does not start RestoreHandles.
+    /// Batch carries JoinItem so PtyAborted survives to renderer (EXEC-020).
     member this.JoinAvailableWithPermit
         (permit: FamilyRecoveryPermit, maxCount: int, interrupt: Task<unit>)
-        : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
+        : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
         match this.validatePermit permit with
         | Error e -> Task.FromResult(Error e)
         | Ok() -> this.JoinAvailable(maxCount, interrupt)
 
     /// EXEC-017 / EXEC-018: bounded batch join with local interrupt (≠ runtime.Cancel).
-    /// Durable agent: projection is fact source; mailbox/journal are wake only.
-    /// PTY: mailbox remains fact source (EXEC-015).
+    /// GREEN-5: agent facts from Journal; agent mailbox channel is wake-only.
+    /// PTY facts from PTY mailbox channel as PtyJoinItem (EXEC-015 / EXEC-020).
+    /// journal=None agent join fails closed.
     member this.JoinAvailable
         (maxCount: int, interrupt: Task<unit>)
-        : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
+        : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
         let cap = min (max 0 maxCount) JoinBatch.Max
 
         let hasWork () =
@@ -344,7 +325,7 @@ type HostForkRuntime
 
         /// Outer race arms: mailbox wake | journal change | user interrupt.
         /// PulseWake after race so a losing WaitForWake waiter never piles up.
-        let rec loop () : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
+        let rec loop () : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
             task {
                 match this.tryDrainAvailable cap with
                 | Some result -> return result
@@ -409,19 +390,41 @@ type HostForkRuntime
                                 | CompletionMayBeAvailable -> return! loop ()
             }
 
-        task {
-            do! this.AwaitRecovery()
-            return! loop ()
-        }
+        // GREEN-4: JoinAvailable does not start recovery; permit path already recovered.
+        loop ()
 
-    /// Compatibility single-result join. None is unbounded; Some is an explicit
-    /// internal waiter budget. New model callers use JoinAvailable.
+    /// Compatibility single-result join (Executor map/reduce agent path).
+    /// None is unbounded; Some is an explicit internal waiter budget.
+    /// Projects JoinItem → RunCompletion for callers that still need agent Outcome.
     member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         let budgetMs = timeoutMs
 
-        task {
-            do! this.AwaitRecovery()
+        let headAsRunCompletion (batch: NonEmptyBatch<JoinItem>) : RunCompletion =
+            match NonEmptyBatch.toList batch |> List.head with
+            | AgentItem(AgentCompletedItem payload) ->
+                { RunId = payload.RunId
+                  AgentId = payload.AgentId
+                  AgentName = payload.AgentId
+                  Role = payload.Role
+                  Outcome = AgentCompleted payload
+                  CompletedAt = DateTimeOffset.UtcNow }
+            | AgentItem(AgentFailedItem payload) ->
+                { RunId = payload.RunId
+                  AgentId = payload.AgentId
+                  AgentName = payload.AgentId
+                  Role = defaultArg payload.Role AgentRole.Executor
+                  Outcome = AgentFailed payload
+                  CompletedAt = DateTimeOffset.UtcNow }
+            | AgentItem(AgentAbandonedItem(agentId, reason)) ->
+                { RunId = "abandoned-" + agentId
+                  AgentId = agentId
+                  AgentName = agentId
+                  Role = AgentRole.Executor
+                  Outcome = AgentAbandoned(agentId, reason)
+                  CompletedAt = DateTimeOffset.UtcNow }
+            | PtyItem item -> PtyJoinItem.toRunCompletion item
 
+        task {
             let interrupt =
                 match budgetMs with
                 | Some milliseconds -> PtyTiming.timerTask milliseconds
@@ -436,18 +439,15 @@ type HostForkRuntime
             | Ok InterruptedByUserMessage ->
                 // Timer interrupt under legacy Join API → TimedOut after final drain.
                 match this.tryDrainAvailable 1 with
-                | Some(Ok(ResultsAvailable batch)) -> return Ok(NonEmptyBatch.toList batch |> List.head)
+                | Some(Ok(ResultsAvailable batch)) -> return Ok(headAsRunCompletion batch)
                 | Some(Error e) -> return Error e
                 | Some(Ok InterruptedByUserMessage)
                 | None -> return Error ForkError.TimedOut
-            | Ok(ResultsAvailable batch) -> return Ok(NonEmptyBatch.toList batch |> List.head)
+            | Ok(ResultsAvailable batch) -> return Ok(headAsRunCompletion batch)
         }
 
     member this.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
-        task {
-            do! this.AwaitRecovery()
-            return! runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
-        }
+        runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
 
     /// Targeted cancel for one forked agent (Executor map/reduce sibling abort).
     /// Completes the pending run cell and aborts the Host child so Join unblocks;

@@ -53,16 +53,6 @@ module HandleCompletionCodec =
                   "message", str payload.Message
                   "child_session_id",
                   str (payload.ChildSessionId |> Option.map SessionId.value |> Option.defaultValue "") ]
-            | AgentAborted payload ->
-                // GREEN-1/2 still compile AgentAborted (GREEN-3 deletes the case).
-                // Encoding path must not plant new aborted finality; emit failed v2.
-                [ "schemaVersion", box 2
-                  "finality", str "failed"
-                  "run_id", str runId
-                  "code", str payload.Code
-                  "message", str payload.Message
-                  "child_session_id",
-                  str (payload.ChildSessionId |> Option.map SessionId.value |> Option.defaultValue "") ]
             | AgentAbandoned(agentId, reason) ->
                 // Abandoned is not a durable completion blob; keep a minimal failed v2
                 // shape only if a caller mistakenly encodes one (should not reach journal).
@@ -240,7 +230,7 @@ module HandleCompletionCodec =
               CompletedAt = DateTimeOffset.UtcNow }
 
     /// Rebuild a `RunCompletion` from durable handle identity + blob body.
-    /// Legacy abort → Error (never AgentAborted RunCompletion).
+    /// Legacy abort → Error (never agent aborted finality).
     let tryDecode (record: HandleRecord) (agentId: string) (json: string) : Result<RunCompletion, string> =
         match decodeBody json with
         | Current decoded -> Ok(tryMaterialiseRunCompletion record agentId decoded)

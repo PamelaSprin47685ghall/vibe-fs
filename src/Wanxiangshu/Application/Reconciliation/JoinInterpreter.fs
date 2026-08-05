@@ -29,11 +29,12 @@ module JoinInterpreter =
         go program
 
     /// EXEC-018 batch path (JoinAvailable). JoinAny in this tree is a programmer error.
+    /// Batch outcome is JoinItem so PtyAborted reaches JoinResultRenderer (EXEC-020).
     let interpretBatch
         (runtime: HostForkRuntime)
-        (program: JoinProgram<Result<JoinWaitOutcome<RunCompletion>, ForkError>, 'result>)
+        (program: JoinProgram<Result<JoinWaitOutcome<JoinItem>, ForkError>, 'result>)
         : Task<'result> =
-        let rec go (current: JoinProgram<Result<JoinWaitOutcome<RunCompletion>, ForkError>, 'result>) : Task<'result> =
+        let rec go (current: JoinProgram<Result<JoinWaitOutcome<JoinItem>, ForkError>, 'result>) : Task<'result> =
             task {
                 match current with
                 | JoinProgram.Return value -> return value
@@ -49,11 +50,11 @@ module JoinInterpreter =
     let runJoinAny (runtime: HostForkRuntime) (permit: FamilyRecoveryPermit) : Task<Result<RunCompletion, ForkError>> =
         interpret runtime (joinAny permit)
 
-    /// Convenience: Domain joinAvailable program then interpretBatch.
+    /// Convenience: Domain joinAvailable program then interpretBatch (JoinItem batch).
     let runJoinAvailable
         (runtime: HostForkRuntime)
         (permit: FamilyRecoveryPermit)
         (maxCount: int)
         (interrupt: Task<unit>)
-        : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
+        : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
         interpretBatch runtime (joinAvailable permit maxCount interrupt)

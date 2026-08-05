@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 
 /// EXEC-018: single-join batch ceiling. One source of truth for runtime + wire.
@@ -57,11 +58,12 @@ module JoinInterrupt =
         { Wait = tcs.Task
           Signal = fun () -> AsyncSupport.trySetResult tcs () |> ignore }
 
-/// Shared completion mailbox: queue + wake signal.
-/// Agent completion: wake only; durable projection is fact source (ARCH-002).
-/// PTY completion: queue holds EXEC-015 facts (backend onExit sole writer).
+/// Dual-channel completion mailbox (GREEN-5 / ARCH-002).
+/// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
+/// PTY channel: physical PtyJoinItem queue — backend onExit sole writer (EXEC-015).
 type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
-    let completions = Queue<RunCompletion>()
+    let agentWakes = Queue<AgentHandleId>()
+    let ptyCompletions = Queue<PtyJoinItem>()
     let waiters = Queue<TaskCompletionSource<MailboxWakeReason>>()
     let mutable cancelled = false
 
@@ -77,11 +79,21 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
         waiters.Enqueue waiter
         waiter
 
-    /// Enqueue completion and wake every signal waiter (Publish is notify, not deliver).
-    member _.Publish(completion: RunCompletion) =
+    let hasQueued () =
+        agentWakes.Count > 0 || ptyCompletions.Count > 0
+
+    /// Agent wake only — never carries completion payload.
+    member _.PulseAgentHandle(handle: AgentHandleId) =
         lock gate (fun () ->
             if not cancelled then
-                completions.Enqueue completion
+                agentWakes.Enqueue handle
+                wakeAll CompletionMayBeAvailable)
+
+    /// PTY physical result (EXEC-015). Sole mailbox path for PTY facts.
+    member _.PublishPtyCompletion(item: PtyJoinItem) =
+        lock gate (fun () ->
+            if not cancelled then
+                ptyCompletions.Enqueue item
                 wakeAll CompletionMayBeAvailable)
 
     /// Spurious wake: drop waiters so outer journal/user race does not pile them up.
@@ -93,17 +105,14 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
             else
                 wakeAll CompletionMayBeAvailable)
 
-    /// Wait for Publish/Cancel only (no user interrupt). HostForkRuntime races this
+    /// Wait for Publish/Pulse/Cancel only (no user interrupt). HostForkRuntime races this
     /// against journal change and local interrupt at the outer level.
     member _.WaitForWake() : Task<MailboxWakeReason> =
         let pending =
             lock gate (fun () ->
-                if cancelled then
-                    Choice1Of2 MailboxCancelled
-                elif completions.Count > 0 then
-                    Choice1Of2 CompletionMayBeAvailable
-                else
-                    Choice2Of2(enqueueWaiter ()))
+                if cancelled then Choice1Of2 MailboxCancelled
+                elif hasQueued () then Choice1Of2 CompletionMayBeAvailable
+                else Choice2Of2(enqueueWaiter ()))
 
         match pending with
         | Choice1Of2 reason -> Task.FromResult reason
@@ -132,28 +141,43 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
                 return UserInterrupted
         }
 
-    /// Bounded drain of queued completions (PTY facts / agent wake payloads).
-    member _.DrainAvailable(maxCount: int) : RunCompletion list =
+    /// Drain agent wake tokens (no payload). Callers re-read Journal after wake.
+    member _.DrainAgentWakes(maxCount: int) : AgentHandleId list =
         if maxCount <= 0 then
             []
         else
             lock gate (fun () ->
                 [ let mutable n = 0
 
-                  while n < maxCount && completions.Count > 0 do
+                  while n < maxCount && agentWakes.Count > 0 do
                       n <- n + 1
-                      yield completions.Dequeue() ])
+                      yield agentWakes.Dequeue() ])
 
-    /// Compatibility: wait once, drain at most one completion (or ForkError).
+    /// Bounded drain of queued PTY facts (EXEC-015).
+    member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list =
+        if maxCount <= 0 then
+            []
+        else
+            lock gate (fun () ->
+                [ let mutable n = 0
+
+                  while n < maxCount && ptyCompletions.Count > 0 do
+                      n <- n + 1
+                      yield ptyCompletions.Dequeue() ])
+
+    /// Compatibility: wait once, drain at most one PTY completion (or ForkError).
+    /// Agent results never leave this mailbox — Journal is the agent fact source.
     member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         let budgetMs = defaultArg timeoutMs 600_000
 
         let rec loop (remainingMs: int) =
             task {
-                let drained = this.DrainAvailable 1
+                // Clear stale agent wakes so WaitForWake does not spin.
+                ignore (this.DrainAgentWakes JoinBatch.Max)
+                let drained = this.DrainPtyCompletions 1
 
                 match drained with
-                | completion :: _ -> return Ok completion
+                | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item)
                 | [] ->
                     if lock gate (fun () -> cancelled) then
                         return Error ForkError.Cancelled
@@ -171,8 +195,10 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
                         match reason with
                         | MailboxCancelled -> return Error ForkError.Cancelled
                         | UserInterrupted ->
-                            match this.DrainAvailable 1 with
-                            | completion :: _ -> return Ok completion
+                            ignore (this.DrainAgentWakes JoinBatch.Max)
+
+                            match this.DrainPtyCompletions 1 with
+                            | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item)
                             | [] -> return Error ForkError.TimedOut
                         | CompletionMayBeAvailable -> return! loop next
             }
@@ -189,5 +215,8 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
                 wakeAll MailboxCancelled
                 true)
 
-    member _.PendingCount = lock gate (fun () -> completions.Count)
+    member _.PendingCount = lock gate (fun () -> agentWakes.Count + ptyCompletions.Count)
+
+    member _.PendingPtyCount = lock gate (fun () -> ptyCompletions.Count)
+    member _.PendingAgentWakeCount = lock gate (fun () -> agentWakes.Count)
     member _.IsCancelled = lock gate (fun () -> cancelled)

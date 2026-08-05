@@ -50,6 +50,21 @@ module JoinTool =
 
                 match recovery with
                 | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked blocks
+                | FamilyRecovery.FamilyWaiting _ ->
+                    // EXEC-023: no permit while waiting — must not drain durable agent
+                    // finals via bare JoinAvailable. Surface retryable RECOVERY_WAITING
+                    // so Manager re-invokes join after RestoreHandles advances to Ready
+                    // or Blocked. Align ExecutorTool FamilyWaiting → RECOVERY_WAITING.
+                    let tString = ToolHostCodec.TString
+                    let tTable = ToolHostCodec.TTable
+
+                    return
+                        ToolHostCodec.tomlObject
+                            [ "error",
+                              tTable
+                                  [ "code", tString "RECOVERY_WAITING"
+                                    "message",
+                                    tString "family recovery incomplete: wait for FamilyReady before join drain" ] ]
                 | FamilyRecovery.FamilyReady permit ->
                     let interrupt = JoinInterrupt.create ()
                     let detachAbort = context.AttachAbort interrupt.Signal
@@ -83,8 +98,7 @@ module JoinTool =
                             | Ok InterruptedByUserMessage -> return JoinResultRenderer.renderInterrupted ()
                             | Ok(ResultsAvailable batch) ->
                                 return
-                                    JoinResultRenderer.renderCompletedBatch
-                                        runtime.IsPtyCompletion
+                                    JoinResultRenderer.renderJoinItemBatch
                                         (fun agentId ->
                                             match runtime.TryFindAgent agentId with
                                             | Some record -> record.Agent
