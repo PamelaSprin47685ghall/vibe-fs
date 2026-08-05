@@ -1,6 +1,11 @@
-# EXEC-002: a `fork` aimed at an agent that is ALREADY busy is a fire-and-forget nudge to
-# that same child, not a second child and not a queued prompt. The claim is what does NOT
-# happen: no prompt queue forms, and the first run is still streaming when the nudge lands.
+# EXEC-002: a `fork` aimed at an agent that is ALREADY busy is a fire-and-forget nudge
+# to that same child (verified by the integration suite through an agent_id reuse);
+# this canary exercises the wire shape under busy overlap. The second fork below uses
+# the managed NAME, so ForkTool creates a second coder child rather than nudging the
+# first — the busy-overlap claim is carried by `assertActiveRequests`, and the second
+# child's first prompt is what this scenario declares. The claim is what does NOT
+# happen: no prompt queue forms, and the first run is still streaming when the second
+# fork lands.
 #
 # So this scenario deliberately never reaches a terminal — it aborts. `assertActiveRequests`
 # is the real assertion: a request must still be open at the moment the nudge is delivered.
@@ -73,11 +78,14 @@ tools = ["write"]
   [[turn.step]]
   respond = { type = "text", text = "Coder first run still working." }
 
-# The nudge arrives at the SAME child as a new user message, so it opens a new turn in the
-# same lane. The JSON form declared no edge for it and relied on `abort` landing first —
-# a race, and under a strict mock an unmatched request is a fatal mismatch. Declared here
-# because production does send it (that is the whole point of the scenario); whether the
-# abort beats it is then no longer load-bearing.
+# The second `fork(agent="fast-coder")` carries a managed NAME, not the handle id
+# from the first fork, so ForkTool does not hit Reuse: it creates a SECOND coder
+# child whose first prompt is the ARCH-010 rendered assignment (comment-prefixed
+# TDD phase + Report-back instructions). The JSON form declared no edge for it and
+# relied on `abort` landing first — a race, and under a strict mock an unmatched
+# request is a fatal mismatch. Declared here because production does send it (the
+# busy-overlap claim is asserted by `assertActiveRequests`, not by this turn);
+# whether the abort beats it is then no longer load-bearing.
 
 [[turn]]
 id = "coder-nudged"
