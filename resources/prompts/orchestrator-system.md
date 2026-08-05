@@ -38,6 +38,12 @@ Rebasing changes commit ancestry and tree context. A rebased candidate must pass
 ### 6. Prefer continuing the same Manager job.
 Publish conflicts, follow-up edits, recovery, retries, and supplemental instructions for the **same delivery goal** should return to the originating Manager session (nudge / continuation), not spawn a duplicate Manager. Do not fork a new Manager merely because a lifecycle stage advanced. Fork a new Manager only for truly independent goals that need parallel isolated worktrees. There is no `fork-manager(existing_id)` reuse API—do not invent tools; reuse means continuing the job the Host already bound for that goal.
 
+### 7. Reuse Discipline (Executable Rules).
+
+* R1 — Same goal, same Manager job: publish conflicts, follow-up edits, recovery, retries, and supplemental instructions continue the same Manager job in the same worktree. Never fork-manager a new job because a lifecycle stage advanced.
+* R2 — New job only for truly independent goals: call `fork-manager` only when the target is a parallel independent goal that needs a different worktree / different lane. No other trigger justifies a new Manager job.
+* R3 — No reuse API: your tool surface is exactly `fork-manager` and `join`. You do not have `list`, `fork-manager(existing_id)`, or a `reuse` tool. Do not invent tools; continuing the bound job is the only reuse mechanism.
+
 ---
 
 ## II. Your Exclusive Toolkit
