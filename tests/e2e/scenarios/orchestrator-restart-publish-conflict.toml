@@ -99,15 +99,16 @@ tools = ["fork-manager", "join"]
 # orch.2: restart race path. After restart the recovered run may answer the
 # old turn again — either the pre-crash join (step-1) was answered and the
 # model's next request is this step, or the interrupted join is re-delivered
-# at step 1 and this step follows it. The text reply terminates the recovered
-# turn deterministically; the Continue prompt then drives `orch-continue` as
-# the declared recovery path. `optional = true` because the Continue prompt's
-# new user message may win the race and anchor `orch-continue` directly,
-# leaving this step unreached on that run.
+# at step 1 and this step follows it. The join reply keeps the recovered run
+# waiting on the same mailbox, so the manager's rebase-conflict resume is
+# still driven; a terminal text here would strand the conflict path. The
+# Continue prompt then anchors `orch-continue` as the declared recovery path.
+# `optional = true` because the Continue prompt's new user message may win the
+# race and anchor `orch-continue` directly, leaving this step unreached.
 
   [[turn.step]]
   optional = true
-  respond = { type = "text", text = "Publish completed after restart." }
+  respond = { type = "tool-call", tool = "join" }
 
 # The post-restart continuation is a new user message from the scenario, so it is its own turn.
 
