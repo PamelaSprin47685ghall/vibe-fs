@@ -15,9 +15,19 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
-import { PRODUCTION_ROOT, scanFiles } from './dsl-ownership.mjs'
+import { PRODUCTION_ROOT, PROGRAM_DIRS, scanFiles } from './dsl-ownership.mjs'
 
 const norm = (p) => p.replace(/\\/g, '/')
+
+// PROGRAM_DIRS are repo-root paths ("src/Wanxiangshu/<Dir>/"); derive the
+// subdirectory names relative to --root (default src/Wanxiangshu).
+const PROGRAM_SUBDIRS = PROGRAM_DIRS.map((dir) =>
+  norm(dir.slice(PRODUCTION_ROOT.length + 1)).replace(/\/$/, ''),
+)
+
+/** True when relPath (POSIX, relative to --root) lives under a program directory. */
+export const isProgramRelPath = (relPath) =>
+  PROGRAM_SUBDIRS.some((dir) => relPath === dir || relPath.startsWith(dir + '/'))
 
 export const DEFAULT_OUT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -50,10 +60,12 @@ export const countByFileGate = (violations) => {
 
 const scanRoot = (root) => {
   const files = walk(root, ['.fs'])
-  const entries = files.map((file) => ({
-    file: norm(relative(root, file)),
-    text: readFileSync(file, 'utf8'),
-  }))
+  const entries = files
+    .map((file) => ({
+      file: norm(relative(root, file)),
+      text: readFileSync(file, 'utf8'),
+    }))
+    .filter((entry) => isProgramRelPath(entry.file))
   return countByFileGate(scanFiles(entries))
 }
 

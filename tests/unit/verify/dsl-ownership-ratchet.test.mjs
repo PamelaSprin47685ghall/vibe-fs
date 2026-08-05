@@ -67,7 +67,7 @@ test('DSL_OWNERSHIP_RATCHET_above_baseline_exits_nonzero_with_hint', async (t) =
   const fx = makeFixture()
   t.after(fx.dispose)
 
-  const file = 'src/Foo.fs'
+  const file = 'Agent/Foo.fs'
   const source = ['module Foo', 'let run () = task { return 1 }', 'let other () = task { return 2 }'].join('\n')
   fx.write(file, source)
 
@@ -86,7 +86,7 @@ test('DSL_OWNERSHIP_RATCHET_unlisted_file_with_violation_exits_nonzero', async (
   const fx = makeFixture()
   t.after(fx.dispose)
 
-  const file = 'src/New.fs'
+  const file = 'Application/New.fs'
   const source = ['module New', 'let mutable counter = 0'].join('\n')
   fx.write(file, source)
 
@@ -94,7 +94,7 @@ test('DSL_OWNERSHIP_RATCHET_unlisted_file_with_violation_exits_nonzero', async (
   const hits = scanText(source, file).filter((v) => v.gate === 'mutable')
   assert.equal(hits.length, 1)
 
-  // Baseline does not mention src/New.fs: any violation there is a new violation.
+  // Baseline does not mention Application/New.fs: any violation there is a new violation.
   const baseline = fx.baseline({})
   const result = await runRatchet(baseline, fx.dir, fx.dir)
   const out = output(result)
@@ -106,7 +106,7 @@ test('DSL_OWNERSHIP_RATCHET_drop_below_baseline_exits_zero', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
-  const file = 'src/Bar.fs'
+  const file = 'Domain/Bar.fs'
   const source = ['module Bar', 'type Flags = { Dirty: bool }'].join('\n')
   fx.write(file, source)
 
@@ -118,4 +118,24 @@ test('DSL_OWNERSHIP_RATCHET_drop_below_baseline_exits_zero', async (t) => {
   const baseline = fx.baseline({ [file]: { 'program-counter': 3 } })
   const result = await runRatchet(baseline, fx.dir, fx.dir)
   assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${output(result)}`)
+})
+
+test('DSL_OWNERSHIP_RATCHET_ignores_non_program_dirs', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Infrastructure/Foo.fs'
+  const source = ['module Foo', 'let run () = task { return 1 }'].join('\n')
+  fx.write(file, source)
+
+  // Fixture self-check: the violation exists; only the scan scope excludes it.
+  const hits = scanText(source, file).filter((v) => v.gate === 'raw-task')
+  assert.equal(hits.length, 1)
+
+  // Infrastructure/ is outside PROGRAM_DIRS: never scanned, never reported.
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${out}`)
+  assert.ok(!out.includes('Infrastructure'), `expected no Infrastructure output, got: ${out}`)
 })
