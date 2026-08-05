@@ -110,6 +110,16 @@ tools = ["fork-manager", "join"]
   optional = true
   respond = { type = "tool-call", tool = "join" }
 
+# orch.3: optional tail for the recovery-race path. When orch.2's join
+# returns a retryable error (RECOVERY_WAITING / RECOVERY_BLOCKED), the model
+# re-invokes join on the SAME old turn before the Continue prompt lands;
+# declare it so that request is answerable. Absent when the join hangs
+# (FamilyReady) or the Continue prompt anchors a fresh turn first.
+
+  [[turn.step]]
+  optional = true
+  respond = { type = "tool-call", tool = "join" }
+
 # The post-restart continuation is a new user message from the scenario, so it is its own turn.
 
 [[turn]]
