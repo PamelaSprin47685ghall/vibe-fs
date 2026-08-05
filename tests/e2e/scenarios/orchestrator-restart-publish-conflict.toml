@@ -9,8 +9,8 @@
 # new turn (`orch-continue`). Completion criteria = `Published eq 1` journal fact.
 # Original-turn `orch.2` is a restart race path: the recovered run may answer the old
 # turn again (interrupted join re-delivered at step 1, or the pre-crash join's
-# step-2 continuation). Declared below with a join reply (so the rebase-conflict
-# resume keeps running) plus an optional orch.3 join-retry tail; `optional = true`
+# step-2 continuation). Declared below with a terminal text reply; job recovery is
+# engine-driven, so the rebase-conflict resume does not depend on it. `optional = true`
 # admits the Continue prompt winning the race and anchoring `orch-continue` directly.
 #
 # ── the recovery file this one loaded was empty ──────────────────────────────
@@ -35,7 +35,12 @@ prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the ta
 must = ["conflict-resume.0", "orch-continue.1"]
 
 flow = [
-  { afterExpectation = { id = "manager.0", gitConflictProof = true } },
+  # gitConflictProof must land AFTER the worktree fork (fork-manager, orch.0):
+  # committing to the target branch before the worktree branched makes the
+  # recovered rebase a no-op (no divergence) and no conflict-resume fires.
+  # orch.0 is the fork-manager call that creates the worktree; its match is the
+  # earliest deterministic point after the branch exists.
+  { afterExpectation = { id = "orch.0", gitConflictProof = true } },
   { afterExpectation = { id = "conflict-resume.0", restart = true } },
 
   { wait = "orch.0" },
@@ -60,15 +65,16 @@ flow = [
   { awaitRestart = true },
 
   # Continue drives recovery (Host has no auto-recovery). Causal order on the common path:
-  # Continue → 2nd conflict-resume → review/confirm → Published → orch-continue join/text.
+  # Continue → (2nd conflict-resume, only when the rebase still conflicts) →
+  # review/confirm → Published → orch-continue join/text.
   # `orch.2` covers the restart race path (the recovered run answering the old turn again).
-  # The SAME conflict-resume key, delivered a second time. The JSON form declared this as
-  # `manager-conflict-resume-2` at `lane.turn = 5` with `"Resolved rebase resolution."`
-  # against the first edge's `"Resuming rebase resolution."` — two different responses for
-  # one key, which content-as-a-pure-function forbids. The two texts existed only so the old
-  # flow could `wait` on distinct ids; nothing asserted which one arrived.
+  # The SAME conflict-resume key may be delivered a second time when the recovered
+  # rebase still conflicts (the manager had not resolved before the crash); when the
+  # crash happened after resolution, the recovered rebase succeeds directly and no
+  # second conflict-resume arrives. Both timelines converge on `Published`, which is
+  # the restart-phase criterion — the conflict-resume wait below is deliberately
+  # absent so a resolved-before-crash run is not held to a resume that never fires.
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
-  { wait = "conflict-resume.0" },
   { wait = "reviewer.0" },
   { wait = "reviewer.1" },
   { wait = "barrier-reviewer.0" },
@@ -100,26 +106,17 @@ tools = ["fork-manager", "join"]
 # orch.2: restart race path. After restart the recovered run may answer the
 # old turn again — either the pre-crash join (step-1) was answered and the
 # model's next request is this step, or the interrupted join is re-delivered
-# at step 1 and this step follows it. The join reply keeps the recovered run
-# waiting on the same mailbox, so the manager's rebase-conflict resume is
-# still driven; a terminal text here would strand the conflict path. The
-# Continue prompt then anchors `orch-continue` as the declared recovery path.
+# at step 1 and this step follows it. The text reply terminates the recovered
+# turn deterministically; job recovery is engine-driven (RecoverManagerJob
+# starts at engine boot, independent of this session's replies), so the
+# manager's rebase-conflict resume is NOT coupled to this step. The Continue
+# prompt then anchors `orch-continue` as the declared recovery path.
 # `optional = true` because the Continue prompt's new user message may win the
 # race and anchor `orch-continue` directly, leaving this step unreached.
 
   [[turn.step]]
   optional = true
-  respond = { type = "tool-call", tool = "join" }
-
-# orch.3: optional tail for the recovery-race path. When orch.2's join
-# returns a retryable error (RECOVERY_WAITING / RECOVERY_BLOCKED), the model
-# re-invokes join on the SAME old turn before the Continue prompt lands;
-# declare it so that request is answerable. Absent when the join hangs
-# (FamilyReady) or the Continue prompt anchors a fresh turn first.
-
-  [[turn.step]]
-  optional = true
-  respond = { type = "tool-call", tool = "join" }
+  respond = { type = "text", text = "Publish completed after restart." }
 
 # The post-restart continuation is a new user message from the scenario, so it is its own turn.
 

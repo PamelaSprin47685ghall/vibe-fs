@@ -483,8 +483,15 @@ const danglingReferences = (entries, scenario) => {
   for (const boundary of scenario.epoch ?? []) check(`cold boundary (${boundary.reason ?? boundary.kind})`, boundary);
 
   for (const id of scenario.must ?? []) {
-    if (!entries.some((entry) => entry.id === id || entry.turnId === id)) {
+    const targets = entries.filter((entry) => entry.id === id || entry.turnId === id);
+    if (targets.length === 0) {
       problems.push(`must references '${id}', which is not a declared step or turn`);
+    } else if (targets.some((entry) => entry.optional === true)) {
+      // `must` means "this MUST be reached"; `optional` means "absence is fine".
+      // Naming an optional step (or a turn containing one) in must is
+      // contradictory: either the step is required (drop optional) or it may
+      // be skipped (drop must).
+      problems.push(`must references '${id}', which is or contains an optional step — a must requirement contradicts optional`);
     }
   }
 
@@ -566,6 +573,17 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     (turn.step ?? []).forEach((step, stepIndex) => {
       if (step.optional !== undefined && step.optional !== true) {
         problems.push(`turn[${index}].step[${stepIndex}] optional must be true when present; omit it otherwise`);
+      }
+      // A race tail is terminal for the turn's requirement surface: every step
+      // AFTER an optional one is only reachable when the race fired, so a
+      // required step there would silently depend on the race. Declare the
+      // tail as optional too, or move the required step before the race.
+      const previous = (turn.step ?? [])[stepIndex - 1];
+      if (previous?.optional === true && step.optional !== true) {
+        problems.push(
+          `turn[${index}].step[${stepIndex}] follows an optional step but is not optional; ` +
+            'a required step after a race tail would depend on the race firing',
+        );
       }
     });
     // An internal turn's prompt is composed by production, which decides WHICH session

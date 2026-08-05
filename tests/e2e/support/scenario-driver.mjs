@@ -567,6 +567,17 @@ export async function runCanary(scriptName, { customs } = {}) {
     if (scenario?.provider?.unexpectedRequests?.length) {
       console.error(JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 3)));
     }
+    if (scenario?.host?.workDir) {
+      try {
+        const { execFileSync } = await import('node:child_process');
+        const gitLog = execFileSync('git', ['-C', scenario.host.workDir, 'log', '--oneline', '--all', '--graph', '-10'], { encoding: 'utf8' }).trim();
+        const branches = execFileSync('git', ['-C', scenario.host.workDir, 'branch', '-a'], { encoding: 'utf8' }).trim();
+        const worktrees = execFileSync('git', ['-C', scenario.host.workDir, 'worktree', 'list'], { encoding: 'utf8' }).trim();
+        console.error(`[GIT-DIAG] workdir=${scenario.host.workDir}\nlog:\n${gitLog}\nbranches:\n${branches}\nworktrees:\n${worktrees}`);
+      } catch (e) {
+        console.error(`[GIT-DIAG-ERR] ${e?.message}`);
+      }
+    }
     if (process.env.SCENARIO_DEBUG_FACTS === '1' && scenario?.host?.workDir) {
       const common = execFileSync('git', ['-C', scenario.host.workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
       const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(scenario.host.workDir, common), 'wanxiangshu-next', 'runtimes');

@@ -528,6 +528,58 @@ user = "go"
   },
 
   {
+    name: 'VERIFY-003 a required step may not follow an optional race tail',
+    fn: () => {
+      // The race tail is terminal for the turn's requirement surface: a required
+      // step after it would only be reachable when the race fired, silently
+      // coupling the requirement to the race.
+      rejects(
+        `scenario = "p"
+prompt = { text = "go" }
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "race tail" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "required after race" }
+`,
+        'follows an optional step but is not optional',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 a must requirement may not name an optional step',
+    fn: () => {
+      // `must` means "this MUST be reached"; `optional` means absence is fine.
+      // Naming one in the other is contradictory.
+      rejects(
+        `scenario = "p"
+prompt = { text = "go" }
+must = ["a.1"]
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "race tail" }
+`,
+        'contradicts optional',
+      );
+    },
+  },
+
+  {
     name: 'VERIFY-003 parentSession is retired, not a reachability input',
     fn: () => {
       // Measured dead twice over. Its only source was a retired legacy parent-session
