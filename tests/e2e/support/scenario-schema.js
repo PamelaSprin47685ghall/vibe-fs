@@ -232,6 +232,10 @@ const compileTurns = (turns) =>
       turnIndex,
       lane: turn.lane,
       internal: turn.internal === true,
+      // A race path may or may not be reached on a given run (e.g. a restart
+      // window where the pre-crash tool already completed). Declared so a
+      // request CAN be answered, but its absence is not an error.
+      optional: step.optional === true,
       kind: turn.kind ?? 'chat',
       turn: turn.user,
       step: stepIndex,
@@ -559,6 +563,11 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     if (turn.internal !== undefined && turn.internal !== true) {
       problems.push(`turn[${index}] internal must be true when present; omit it otherwise`);
     }
+    (turn.step ?? []).forEach((step, stepIndex) => {
+      if (step.optional !== undefined && step.optional !== true) {
+        problems.push(`turn[${index}].step[${stepIndex}] optional must be true when present; omit it otherwise`);
+      }
+    });
     // An internal turn's prompt is composed by production, which decides WHICH session
     // receives it. Pinning it to one alias claims knowledge the scenario does not have.
     //

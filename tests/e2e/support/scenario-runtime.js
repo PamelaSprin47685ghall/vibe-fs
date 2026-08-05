@@ -168,9 +168,15 @@ export class ScenarioRuntime {
    * at all (a re-anchor frame only exists after a restart, a guard nudge only after an
    * unreviewed completion), so their absence is not evidence of a broken scenario. A
    * scenario that needs one to arrive says so with `must`.
+   *
+   * `optional` steps are excluded too: a race path (e.g. a restart window where the
+   * pre-crash tool had already completed) may or may not fire on a given run. It is
+   * declared so a request CAN be answered, but its absence is expected, not a defect.
    */
   unanswered() {
-    return this.scenario.entries.filter((entry) => entry.internal !== true && !this.answered.has(entry.id));
+    return this.scenario.entries.filter(
+      (entry) => entry.internal !== true && entry.optional !== true && !this.answered.has(entry.id),
+    );
   }
 
   /** Whether every id named in `must` was answered. */

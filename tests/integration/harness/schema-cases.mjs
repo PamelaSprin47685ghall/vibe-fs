@@ -483,6 +483,51 @@ user = "go"
   },
 
   {
+    name: 'VERIFY-003 a race step opts out of unanswered with optional',
+    fn: () => {
+      // A race path (restart window, crash timing) may or may not be reached on a
+      // given run. Declaring the step lets a request be answered when it fires;
+      // `optional = true` says its absence at scenario end is expected, not a defect.
+      accepts(`scenario = "p"
+prompt = { text = "go" }
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "race tail" }
+`);
+    },
+  },
+
+  {
+    name: 'VERIFY-003 optional must be true when present',
+    fn: () => {
+      // `optional = false` would read as "checked and required", which is the opposite
+      // of what the field means. Omitting it is the way to say that.
+      rejects(
+        `scenario = "p"
+prompt = { text = "go" }
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  optional = false
+  respond = { type = "text", text = "ok" }
+`,
+        'optional must be true when present',
+      );
+    },
+  },
+
+  {
     name: 'VERIFY-003 parentSession is retired, not a reachability input',
     fn: () => {
       // Measured dead twice over. Its only source was a retired legacy parent-session

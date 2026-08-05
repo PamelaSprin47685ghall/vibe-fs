@@ -8,7 +8,10 @@
 # Host does not re-drive pending tools after restart; recovery is triggered only by new
 # input (`runLoop`). Pending join maps to interrupted-error; a new user message anchors a
 # new turn (`orch-continue`). Completion criteria = `Published eq 1` journal fact.
-# Original-turn `orch.2` is a non-deterministic race path and is not declared.
+# Original-turn `orch.2` is a restart race path: when the pre-restart join was already
+# answered, the recovered run's first request is the old turn's step 2 (pending join
+# interrupted); it is declared below with a terminal text reply so either timeline
+# (step-1 interrupted before join, or step-2 after it) is deterministic.
 #
 # ── the recovery file was the same five keys ────────────────────────────────
 #
@@ -66,7 +69,8 @@ flow = [
   # the recovered run needs is declared below and was declared before the Host ever
   # started — which is what makes "the restored job resumes" a claim about production
   # rather than about what the harness swapped in.
-  # Completion = Published journal fact; orch.2 is not declared (non-deterministic path).
+  # Completion = Published journal fact; `orch.2` covers the restart race path (the
+  # pre-restart join already answered before the crash).
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
   { wait = "orch-continue.0" },
   { wait = "manager.0" },
@@ -104,6 +108,18 @@ tools = ["fork-manager", "join"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
+
+# orch.2: race path when the pre-restart join (step-1) had already been
+# answered before the crash. On restart the Host resumes the old turn, the
+# pending join resolves interrupted, and the model's next request lands here
+# (same user message, second assistant reply). The text reply terminates the
+# recovered turn deterministically; the Continue prompt then drives
+# `orch-continue` as the declared recovery path. `optional = true` because the
+# window only exists when the pre-crash join completed first.
+
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "Publish completed after restart." }
 
 # The post-restart continuation is a new user message from the scenario, so it is its own turn.
 
