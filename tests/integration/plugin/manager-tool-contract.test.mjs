@@ -591,12 +591,12 @@ test('HOST_013_system_and_assistant_history_only_inserts_nothing', async () => {
   })
 })
 
-test('HOST_013_marker_inserts_after_completed_tool_result', async () => {
+test('HOST_013_marker_appends_after_every_anchor', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: a completed tool-result message is an anchor; the marker goes
-    // after it, not after the user that preceded the tool round. The tool shapes
-    // follow the decode path's accepted forms (Projection.decodePart
-    // `tool_result` / `tool-call`, HOST-012).
+    // HOST-013: every anchor — the user message AND the completed tool-result
+    // message — gets its own marker, in order. The tool shapes follow the
+    // decode path's accepted forms (Projection.decodePart `tool_result` /
+    // `tool-call`, HOST-012).
     const toolResultMessage = {
       info: { role: 'tool' },
       parts: [{ type: 'tool_result', callID: 'call_1', result: 'ok' }],
@@ -613,10 +613,12 @@ test('HOST_013_marker_inserts_after_completed_tool_result', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 4)
+    assert.equal(transformed.messages.length, 5)
     assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
-    assert.deepEqual(transformed.messages[2], toolResultMessage)
-    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages[1].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.deepEqual(transformed.messages[3], toolResultMessage)
+    assert.equal(transformed.messages[4].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(markerCount(transformed.messages), 2)
   })
 })
 

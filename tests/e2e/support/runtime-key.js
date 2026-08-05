@@ -142,8 +142,30 @@ export function kindOf(body) {
 
 // ── turn ────────────────────────────────────────────────────────────────────
 
+const PAIR_PROGRAMMING_THOUGHT_SOURCE = 'pair-programming-thought';
+const PAIR_PROGRAMMING_THOUGHT_TEXT = '让我遵循结对编程的理念，用中文进行对话式思考。';
+
 const isUser = (message) => message?.role === 'user';
-const isAssistant = (message) => message?.role === 'assistant';
+
+const isAssistant = (message) => {
+  if (message?.role !== 'assistant') return false;
+  // HOST-013: the synthetic pair-programming thought marker is not a real
+  // assistant step; it never enters the scenario step cursor.
+  //
+  // Measured shapes: Host raw message keeps `info.source`; the OpenAI wire
+  // carries the reasoning text directly as `content` (the transform folding
+  // to `reasoning_content` does not run for test-model), or as a lone
+  // reasoning chunk / message-level `reasoning_content`.
+  if (message?.info?.source === PAIR_PROGRAMMING_THOUGHT_SOURCE) return false;
+  if (message?.content === PAIR_PROGRAMMING_THOUGHT_TEXT) return false;
+  if (message?.reasoning_content === PAIR_PROGRAMMING_THOUGHT_TEXT) return false;
+  const content = message?.content;
+  if (Array.isArray(content) && content.length === 1 && content[0]?.type === 'reasoning'
+      && content[0]?.text === PAIR_PROGRAMMING_THOUGHT_TEXT) {
+    return false;
+  }
+  return true;
+};
 
 const lastUserIndex = (messages) => {
   for (let index = messages.length - 1; index >= 0; index -= 1) {

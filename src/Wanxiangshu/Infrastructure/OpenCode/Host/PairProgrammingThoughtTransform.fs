@@ -8,7 +8,7 @@ open Wanxiangshu.Host
 /// HOST-013: the pair-programming thought marker.
 ///
 /// Injected into the final provider-facing transcript at
-/// `experimental.chat.messages.transform`: after the latest anchor (a user
+/// `experimental.chat.messages.transform`: one marker after every anchor (a user
 /// message or a completed tool-result message) and before ReviewSeal, so the
 /// seal digests the exact bytes the provider receives. XTrace capture runs
 /// earlier in the chain, so the marker never enters a work record.
@@ -45,15 +45,6 @@ module PairProgrammingThoughtTransform =
                    | WireToolResult _ -> true
                    | _ -> false)
 
-    /// Index of the latest anchor, scanning from the back (HOST-013). `None`
-    /// when the history has no anchor — empty array, or system/assistant only.
-    let private latestAnchorIndex (rawMessages: obj list) : int option =
-        rawMessages
-        |> List.mapi (fun index raw -> index, raw)
-        |> List.rev
-        |> List.tryFind (fun (_, raw) -> isAnchor raw)
-        |> Option.map fst
-
     /// HOST-013: stable marker id = digest(sessionId + anchorMessageId +
     /// source). A missing session id participates as the empty string, so the
     /// id stays stable per anchor; re-transforming the same anchor yields the
@@ -77,25 +68,38 @@ module PairProgrammingThoughtTransform =
               )
               "parts", box [| createObj [ "type", box "reasoning"; "text", box text ] |] ]
 
-    /// HOST-013: insert the marker right after the latest anchor.
+    /// HOST-013: replay one marker per anchor, oldest first, appending to the
+    /// transcript. Every transform injects a marker after EVERY anchor (a user
+    /// message or a completed tool-result message), not only the latest one:
     ///
-    /// `None` when there is no anchor, or when the anchor is already followed
-    /// by this round's marker (idempotency key = anchor identity + marker
-    /// source). Previous rounds' markers are not anchors and never suppress a
-    /// new injection.
+    /// * a marker already present after an anchor is kept byte-identical
+    ///   (idempotency key = anchor identity + marker source);
+    /// * a new anchor gets its own marker.
+    ///
+    /// Because Host does not persist synthetic messages, each transform starts
+    /// from the raw history; replaying every anchor with a stable id makes the
+    /// provider-visible wire strictly append-only across rounds, so the prefix
+    /// cache stays hit and the ReviewSeal never sees a rewritten prefix.
     let tryInject (sessionId: string option) (rawMessages: obj list) : obj list option =
-        match latestAnchorIndex rawMessages with
-        | None -> None
-        | Some anchorIndex ->
-            match List.tryItem (anchorIndex + 1) rawMessages with
-            | Some next when isPairProgrammingThought next -> None
-            | _ ->
-                let anchorMessageId =
-                    List.tryItem anchorIndex rawMessages |> Option.bind Projection.hostMessageId
+        let anchorIndexes =
+            rawMessages
+            |> List.mapi (fun index raw -> index, raw)
+            |> List.filter (fun (_, raw) -> isAnchor raw)
+            |> List.map fst
 
-                let marker = buildMarker (stableId sessionId anchorMessageId)
+        if List.isEmpty anchorIndexes then
+            None
+        else
+            // Insert from the back so earlier indices stay valid.
+            (rawMessages, List.rev anchorIndexes)
+            ||> List.fold (fun acc anchorIndex ->
+                match List.tryItem (anchorIndex + 1) acc with
+                | Some next when isPairProgrammingThought next -> acc
+                | _ ->
+                    let anchorMessageId =
+                        List.tryItem anchorIndex acc |> Option.bind Projection.hostMessageId
 
-                Some(
-                    List.take (anchorIndex + 1) rawMessages
-                    @ (marker :: List.skip (anchorIndex + 1) rawMessages)
-                )
+                    let marker = buildMarker (stableId sessionId anchorMessageId)
+
+                    List.take (anchorIndex + 1) acc @ (marker :: List.skip (anchorIndex + 1) acc))
+            |> Some
