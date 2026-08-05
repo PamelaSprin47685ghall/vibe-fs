@@ -36,12 +36,12 @@ user = "Fork a busy coder and nudge it while streaming."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "first busy run: stay streaming until nudged" } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "first busy run: stay streaming until nudged" } }
 
   # The second `fork` at the same agent. EXEC-002 makes this a nudge into the child that
   # step 0 created, which is why no third lane appears anywhere below.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "nudge continue second run while first is busy" } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "nudge continue second run while first is busy" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Nudge sent while the coder remained busy." }
@@ -64,7 +64,10 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder-busy"
 lane = "fast-coder"
-user = "# first busy run: stay streaming until nudged"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# first busy run: stay streaming until nudged",
+]
 tools = ["write"]
 
   [[turn.step]]
@@ -79,7 +82,10 @@ tools = ["write"]
 [[turn]]
 id = "coder-nudged"
 lane = "fast-coder"
-user = "# nudge continue second run while first is busy"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# nudge continue second run while first is busy",
+]
 tools = ["write"]
 
   [[turn.step]]

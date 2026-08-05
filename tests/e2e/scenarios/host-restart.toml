@@ -67,7 +67,7 @@ user = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERF
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write host_restart_proof.txt with OK." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write host_restart_proof.txt with OK." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -146,7 +146,10 @@ tools = ["verdict"]
 [[turn]]
 id = "child-a1"
 lane = "fast-coder"
-user = "# Write host_restart_proof.txt with OK."
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Write host_restart_proof.txt with OK.",
+]
 
   [[turn.step]]
   respond = { type = "text", text = "child-a1 done." }
@@ -161,7 +164,7 @@ user = "Nudge the coder child for child-a2."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Report child-a2." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Report child-a2." } }
 
   [[turn.step]]
   respond = { type = "text", text = "Finished after restart." }
@@ -169,7 +172,10 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "child-a2"
 lane = "fast-coder"
-user = "# Report child-a2."
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Report child-a2.",
+]
 
   [[turn.step]]
   respond = { type = "text", text = "child-a2 done." }

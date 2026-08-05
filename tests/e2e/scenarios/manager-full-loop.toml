@@ -97,7 +97,7 @@ tools = ["fork", "join", "list"]
   respond = { type = "tool-call", tool = "join" }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file summary." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file summary." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -109,7 +109,7 @@ tools = ["fork", "join", "list"]
   respond = { type = "tool-call", tool = "join" }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Apply reviewer REVISE: write CHANGELOG.md with fixed." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Apply reviewer REVISE: write CHANGELOG.md with fixed." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -170,7 +170,10 @@ tools = ["read"]
 [[turn]]
 id = "coder-edit"
 lane = "fast-coder"
-user = "# Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file summary."
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Edit src/main.txt to 'patched'. Stop after the edit and report only the changed file summary.",
+]
 tools = ["write"]
 
   [[turn.step]]
@@ -182,7 +185,10 @@ tools = ["write"]
 [[turn]]
 id = "coder-fix"
 lane = "fast-coder"
-user = "# Apply reviewer REVISE: write CHANGELOG.md with fixed."
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Apply reviewer REVISE: write CHANGELOG.md with fixed.",
+]
 tools = ["write"]
 
   [[turn.step]]

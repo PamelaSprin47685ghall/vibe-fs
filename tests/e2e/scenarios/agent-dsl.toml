@@ -30,7 +30,7 @@ user = "Delegate this canary to a Coder with fork, join the Coder, and report th
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write canary_output.txt with exactly Coder canary slice OK\n, then report completion." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write canary_output.txt with exactly Coder canary slice OK\n, then report completion." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -41,7 +41,10 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = "# Write canary_output.txt with exactly Coder canary slice OK"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Write canary_output.txt with exactly Coder canary slice OK",
+]
 tools = ["write"]
 
   [[turn.step]]

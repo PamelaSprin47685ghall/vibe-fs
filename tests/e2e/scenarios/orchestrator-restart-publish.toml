@@ -148,7 +148,7 @@ user = "# Ship publish_proof.txt to the target branch."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write publish_proof.txt." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -174,7 +174,10 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = "# Write publish_proof.txt."
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Write publish_proof.txt.",
+]
 tools = ["write"]
 
   [[turn.step]]
