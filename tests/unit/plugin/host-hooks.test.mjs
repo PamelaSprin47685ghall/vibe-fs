@@ -228,6 +228,8 @@ test('HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () =
       'inspector',
       'join',
       'list',
+      'mv',
+      'rm',
       'verdict',
     ])
 

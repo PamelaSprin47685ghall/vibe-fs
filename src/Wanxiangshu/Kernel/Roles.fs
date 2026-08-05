@@ -28,6 +28,8 @@ type ToolPermission =
     | Edit
     | Glob
     | Grep
+    | Move
+    | Remove
     | Inspector
     | Coder
     | Exec
@@ -49,6 +51,8 @@ module Roles =
                   ToolPermission.Edit
                   ToolPermission.Glob
                   ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove
                   ToolPermission.Inspector ]
         | Role.Inspector ->
             set
@@ -118,7 +122,7 @@ module RoleDefinitions =
     /// into OpenCode AgentConfig.prompt (host system prompt).
     let coderPrompt =
         "Coder system prompt SSOT: prompts/coder-system.md\n"
-        + "Tools: read / write / edit / glob / grep / inspector.\n"
+        + "Tools: read / write / edit / glob / grep / inspector / mv / rm.\n"
         + "Coder edits then stops. Inspector is only for narrow static facts; never compile, test, diagnose failures, or delegate verification."
 
     /// Full Inspector system prompt lives in prompts/inspector-system.md and is

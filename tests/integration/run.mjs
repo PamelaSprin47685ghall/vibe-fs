@@ -37,6 +37,10 @@ const nodeTestSteps = [
     label: 'plugin/manager-tool-contract.test.mjs',
     files: [path.join(here, 'plugin/manager-tool-contract.test.mjs')],
   },
+  {
+    label: 'plugin/file-mutation-tools.test.mjs',
+    files: [path.join(here, 'plugin/file-mutation-tools.test.mjs')],
+  },
 ]
 
 /** Child entrypoints that already own their silence criterion. */
