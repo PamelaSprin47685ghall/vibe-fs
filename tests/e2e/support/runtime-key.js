@@ -34,6 +34,13 @@
 
 import { messageText, semanticOf } from './provider-wire.js';
 import { toArray as listToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
+// HOST-013: the production constants, read from the build artifact rather than
+// copied, so a rewording of the marker text fails here instead of silently
+// making every marker-shaped assistant count as a real step.
+import {
+  source as pairProgrammingThoughtSource,
+  text as pairProgrammingThoughtText,
+} from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js';
 
 // ── lane ────────────────────────────────────────────────────────────────────
 
@@ -142,9 +149,6 @@ export function kindOf(body) {
 
 // ── turn ────────────────────────────────────────────────────────────────────
 
-const PAIR_PROGRAMMING_THOUGHT_SOURCE = 'pair-programming-thought';
-const PAIR_PROGRAMMING_THOUGHT_TEXT = '让我遵循结对编程的理念，用中文进行对话式思考。';
-
 const isUser = (message) => message?.role === 'user';
 
 const isAssistant = (message) => {
@@ -156,12 +160,12 @@ const isAssistant = (message) => {
   // carries the reasoning text directly as `content` (the transform folding
   // to `reasoning_content` does not run for test-model), or as a lone
   // reasoning chunk / message-level `reasoning_content`.
-  if (message?.info?.source === PAIR_PROGRAMMING_THOUGHT_SOURCE) return false;
-  if (message?.content === PAIR_PROGRAMMING_THOUGHT_TEXT) return false;
-  if (message?.reasoning_content === PAIR_PROGRAMMING_THOUGHT_TEXT) return false;
+  if (message?.info?.source === pairProgrammingThoughtSource) return false;
+  if (message?.content === pairProgrammingThoughtText) return false;
+  if (message?.reasoning_content === pairProgrammingThoughtText) return false;
   const content = message?.content;
   if (Array.isArray(content) && content.length === 1 && content[0]?.type === 'reasoning'
-      && content[0]?.text === PAIR_PROGRAMMING_THOUGHT_TEXT) {
+      && content[0]?.text === pairProgrammingThoughtText) {
     return false;
   }
   return true;
