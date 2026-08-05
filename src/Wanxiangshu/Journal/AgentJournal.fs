@@ -203,6 +203,12 @@ module AgentJournal =
     /// PERSIST-004: a journal that cannot be folded stops startup. Recovering
     /// "as much as folded cleanly" would build the runtime on a prefix no writer
     /// ever produced.
+    ///
+    /// Boot.Diagnostics non-empty means at least one runtime stream was truncated
+    /// mid-file (parse/legacy refusal). Folding the partial prefix invents open
+    /// BloggerRequest slots whose commits never arrived — then a later materialize
+    /// rejects with "already has open request" and the plugin refuses to load.
+    /// Fail closed on diagnostics first; the operator must archive the journal.
     let createFromBoot
         (directory: string)
         (runtimeId: RuntimeId)
@@ -210,13 +216,20 @@ module AgentJournal =
         (startedAt: DateTimeOffset)
         (boot: BootSnapshot)
         : Result<AgentJournal, FoldRejection> =
-        Fold.apply Fold.empty boot.Envelopes
-        |> Result.bind (fun replayed ->
-            let writer, initEnvelope =
-                JournalWriter.create directory runtimeId processId startedAt
+        match boot.Diagnostics with
+        | [] ->
+            Fold.apply Fold.empty boot.Envelopes
+            |> Result.bind (fun replayed ->
+                let writer, initEnvelope =
+                    JournalWriter.create directory runtimeId processId startedAt
 
-            Fold.foldEnvelope replayed initEnvelope
-            |> Result.map (fun withRuntime -> new AgentJournal(writer, withRuntime)))
+                Fold.foldEnvelope replayed initEnvelope
+                |> Result.map (fun withRuntime -> new AgentJournal(writer, withRuntime)))
+        | _ ->
+            // Prefer the first diagnostic (often tip-v2 / pre-0.5.0 clean break).
+            // Concatenate a short tail so multi-file poison is still visible.
+            let reason = boot.Diagnostics |> List.truncate 5 |> String.concat "\n"
+            Error { Fact = "Boot"; Reason = reason }
 
     let create
         (directory: string)

@@ -1,116 +1,118 @@
-// tests/unit/Enforcer/codec.test.mjs — spec/15 ENFORCER-020…025.
+// tests/unit/Enforcer/codec.test.mjs — spec/15 ENFORCER-020…026 tip v2.
 //
-// The blog-argument codec. ENFORCER-190 pure tests 2-4:
-//   2. any omitted field is zero;
-//   3. any field order does not change the canonical result;
-//   4. Damerau–Levenshtein mapping is deterministic.
+// Blog-argument codec: required tip (catalog field exact match), text, optional evidence.
+// No score map, no fuzzy field mapping, no default tip.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { enforcer } from '../support/domain.mjs'
 
-// ── value tolerance (ENFORCER-023) ──────────────────────────────────────────
+const firstField = () => enforcer.fieldNames()[0]
+const firstRule = () => enforcer.tryFindByField(firstField())
 
-test('ENFORCER_023_numeric_spellings_parse', () => {
-  assert.equal(enforcer.parseScore(7), 7)
-  assert.equal(enforcer.parseScore(7.0), 7)
-  assert.equal(enforcer.parseScore('7'), 7)
-  assert.equal(enforcer.parseScore(' 7 '), 7)
+// ── missing / unknown tip (ENFORCER-023) ────────────────────────────────────
+
+test('ENFORCER_023_missing_tip_fails', () => {
+  const result = enforcer.decodeCall({ text: 'work log entry' })
+  assert.equal(result.ok, false)
+  assert.equal(result.error, enforcer.MissingTipError)
+  assert.equal(result.error, 'missing required argument: tip')
 })
 
-test('ENFORCER_023_invalid_values_are_zero_not_failed', () => {
-  for (const bad of [true, false, 'high', 'likely', Number.NaN, Infinity, -1, 10, 7.5, {}, []]) {
-    assert.equal(enforcer.parseScore(bad), undefined, `value ${JSON.stringify(bad)} should parse to zero`)
+test('ENFORCER_023_empty_tip_fails', () => {
+  for (const tip of ['', '   ', null]) {
+    const result = enforcer.decodeCall({ text: 'entry', tip })
+    assert.equal(result.ok, false, `tip=${JSON.stringify(tip)}`)
+    assert.equal(result.error, enforcer.MissingTipError)
   }
 })
 
-// ── field normalization (ENFORCER-024) ──────────────────────────────────────
-
-test('ENFORCER_024_normalization_collapses_spelling_variants', () => {
-  assert.equal(enforcer.normalizeFieldName('ignored_tdd'), 'ignored-tdd')
-  assert.equal(enforcer.normalizeFieldName('ignored.tdd'), 'ignored-tdd')
-  assert.equal(enforcer.normalizeFieldName('ignored--tdd'), 'ignored-tdd')
-  assert.equal(enforcer.normalizeFieldName('IGNORED TDD'), 'ignored-tdd')
-  assert.equal(enforcer.normalizeFieldName('_ignored_tdd_'), 'ignored-tdd')
+test('ENFORCER_023_unknown_tip_fails', () => {
+  const result = enforcer.decodeCall({ text: 'entry', tip: 'not-a-catalog-field' })
+  assert.equal(result.ok, false)
+  assert.equal(result.error, enforcer.unknownTipError('not-a-catalog-field'))
+  assert.match(result.error, /^UnknownTip /)
 })
 
-test('ENFORCER_024_normalization_is_idempotent', () => {
-  for (const input of ['ignored_tdd', 'serial-when-parallel', 'PRIMITIVE Obsession']) {
-    const once = enforcer.normalizeFieldName(input)
-    const twice = enforcer.normalizeFieldName(once)
-    assert.equal(once, twice)
-  }
+test('ENFORCER_024_fuzzy_or_misspelled_tip_is_not_mapped', () => {
+  // Old ENFORCER-024 fuzzy mapping is deleted; exact field only.
+  const result = enforcer.decodeCall({ text: 'entry', tip: 'enf-primitive-obsessin' })
+  assert.equal(result.ok, false)
+  assert.match(result.error, /UnknownTip/)
 })
 
-test('ENFORCER_024_damerau_levenshtein_is_symmetric', () => {
-  assert.equal(enforcer.damerauLevenshtein('abc', 'acb'), 1) // transposition
-  assert.equal(enforcer.damerauLevenshtein('acb', 'abc'), 1)
-  assert.equal(enforcer.damerauLevenshtein('abc', 'abc'), 0)
-  assert.equal(enforcer.damerauLevenshtein('abc', 'abd'), 1)
-})
+// ── valid tip maps RuleId (ENFORCER-021/025) ────────────────────────────────
 
-// ── decode (ENFORCER-020/022/025) ───────────────────────────────────────────
+test('ENFORCER_021_valid_field_maps_exact_rule_id', () => {
+  const field = firstField()
+  const rule = firstRule()
+  assert.ok(rule, `catalog must resolve ${field}`)
 
-test('ENFORCER_022_missing_fields_decode_to_zero', () => {
-  const call = enforcer.decodeCall({ text: 'work log entry' })
-  assert.equal(call.Text, 'work log entry')
-  assert.equal(call.Evidence, undefined)
-  assert.deepEqual([...call.Scores], [])
-})
-
-test('ENFORCER_020_text_is_required_and_trimmed', () => {
-  const empty = enforcer.decodeCall({ text: '   ' })
-  assert.equal(empty.Text, undefined)
-  const ok = enforcer.decodeCall({ text: '  hello  ' })
-  assert.equal(ok.Text, 'hello')
-})
-
-test('ENFORCER_025_same_rule_multiple_fields_take_max', () => {
-  const call = enforcer.decodeCall({
-    text: 'entry',
-    ignored_tdd: 5,
-    'ignored-tdd': 8,
+  const result = enforcer.decodeCall({ text: 'work log entry', tip: field })
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  assert.deepEqual(result.value, {
+    text: 'work log entry',
+    evidence: undefined,
+    tip: {
+      ruleId: rule.ruleId,
+      fieldName: rule.fieldName,
+      catalogOrdinal: rule.catalogOrdinal,
+    },
   })
-  assert.equal(call.Scores.get('enforcement-g01'), 8)
 })
 
-test('ENFORCER_024_misspelled_field_maps_to_nearest_rule', () => {
-  // 'ignored-tdd' is a real field; one typo away is 'enf_ingored_tdd'
-  // (transposition). ENFORCER-024: nearest-neighbour mapping only applies to
-  // unknown keys under the enf_ namespace.
-  const call = enforcer.decodeCall({
-    text: 'entry',
-    enf_ingored_tdd: 6,
-  })
-  assert.equal(call.Scores.get('enforcement-g01'), 6)
+test('ENFORCER_021_tip_trims_whitespace_before_lookup', () => {
+  const field = firstField()
+  const rule = firstRule()
+  const result = enforcer.decodeCall({ text: 'entry', tip: `  ${field}  ` })
+  assert.equal(result.ok, true)
+  assert.equal(result.value.tip.ruleId, rule.ruleId)
+  assert.equal(result.value.tip.fieldName, rule.fieldName)
 })
 
-test('ENFORCER_024_unknown_non_enf_field_is_ignored', () => {
-  // A numeric metadata field without the enf_ prefix must NOT be mapped to a
-  // rule (ENFORCER-024 namespace rule).
-  const call = enforcer.decodeCall({
-    text: 'entry',
-    some_other_number: 7,
-  })
-  assert.deepEqual([...call.Scores], [])
+// ── text / evidence reserved (ENFORCER-022) ─────────────────────────────────
+
+test('ENFORCER_020_text_is_trimmed_empty_becomes_none', () => {
+  const field = firstField()
+  const empty = enforcer.decodeCall({ text: '   ', tip: field })
+  assert.equal(empty.ok, true)
+  assert.equal(empty.value.text, undefined)
+
+  const ok = enforcer.decodeCall({ text: '  hello  ', tip: field })
+  assert.equal(ok.ok, true)
+  assert.equal(ok.value.text, 'hello')
 })
 
-test('ENFORCER_024_text_and_evidence_are_reserved_and_never_scored', () => {
-  const call = enforcer.decodeCall({
+test('ENFORCER_022_text_and_evidence_are_reserved_not_tips', () => {
+  const field = firstField()
+  const result = enforcer.decodeCall({
     text: 'entry',
+    tip: field,
     evidence: 'evidence here',
-    // These collide with nothing; ensure they are not treated as rule scores.
   })
-  assert.equal(call.Text, 'entry')
-  assert.equal(call.Evidence, 'evidence here')
-  assert.deepEqual([...call.Scores], [])
+  assert.equal(result.ok, true)
+  assert.equal(result.value.text, 'entry')
+  assert.equal(result.value.evidence, 'evidence here')
+  assert.equal(result.value.tip.fieldName, field)
 })
 
-test('ENFORCER_023_out_of_range_scores_are_zeroed_not_clamped', () => {
-  const call = enforcer.decodeCall({
+test('ENFORCER_024_extra_numeric_properties_are_ignored', () => {
+  const field = firstField()
+  const result = enforcer.decodeCall({
     text: 'entry',
-    ignored_tdd: 10,
+    tip: field,
+    'primitive-obsession': 7,
+    some_other_number: 3,
   })
-  // 10 is invalid → zero → the rule gets no score.
-  assert.deepEqual([...call.Scores], [])
+  assert.equal(result.ok, true)
+  assert.equal(result.value.tip.fieldName, field)
+  assert.equal(result.value.evidence, undefined)
+})
+
+test('ENFORCER_022_has_valid_text_requires_nonempty_text', () => {
+  const field = firstField()
+  const empty = enforcer.decodeCall({ text: '   ', tip: field })
+  assert.equal(enforcer.hasValidText(empty.value), false)
+  const ok = enforcer.decodeCall({ text: 'body', tip: field })
+  assert.equal(enforcer.hasValidText(ok.value), true)
 })

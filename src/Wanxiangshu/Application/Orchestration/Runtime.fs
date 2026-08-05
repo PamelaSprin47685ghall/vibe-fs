@@ -202,9 +202,14 @@ type Orchestrator
               TargetRef = record.TargetRef
               Worktree = worktree }
 
+    /// Compatibility single-result join (Empty when idle).
     member _.JoinPublished() =
         task {
             match! mailbox.TryJoin() with
             | Some verdict -> return verdict
             | None -> return OrchestratorVerdict.Empty
         }
+
+    /// EXEC-019: bounded FIFO batch with local interrupt (≠ lifecycle Cancel).
+    member _.JoinPublishedBatch(maxCount: int, interrupt: Task<unit>) =
+        mailbox.JoinAvailable(maxCount, interrupt)

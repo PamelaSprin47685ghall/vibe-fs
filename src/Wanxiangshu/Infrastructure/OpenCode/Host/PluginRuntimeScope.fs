@@ -227,7 +227,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     bloggerRuntime.[sessionId] <-
                         { cell with
                             State = BloggerRuntimeState.InFlight context
-                            RepairSpent = cell.RepairSpent })
+                            Recovery = cell.Recovery })
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
@@ -243,7 +243,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                         bloggerRuntime.[sessionId] <-
                             { cell with
                                 State = BloggerRuntimeState.Idle
-                                RepairSpent = false }
+                                Recovery = BloggerToolRecovery.NoRecovery }
                     | _ -> ()
                 | false, _ -> ())
 

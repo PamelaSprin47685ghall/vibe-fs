@@ -7,24 +7,11 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
-/// join() waits for the owning runtime's next physical completion. Orchestrator
-/// join is routed to its ManagerJob publication mailbox by authority role.
-/// P0-RECOVERY-JOIN-001: FamilyReady permit → joinAny → JoinInterpreter (no bare Join).
+/// join() waits for the owning runtime's next physical completion batch.
+/// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
+/// P0-RECOVERY-JOIN-001: FamilyReady permit → joinAvailable → JoinInterpreter (no bare Join).
+/// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
 module JoinTool =
-
-    let private tString = ToolHostCodec.TString
-    let private tBool = ToolHostCodec.TBool
-    let private tTable = ToolHostCodec.TTable
-
-    let private errorCode =
-        function
-        | ForkError.NothingToJoin -> "NOTHING_TO_JOIN"
-        | ForkError.Cancelled -> "CANCELLED"
-        | ForkError.Empty -> "EMPTY"
-        | ForkError.Abandoned(id, reason) -> "ABANDONED:" + id + ":" + reason
-        | ForkError.NotFound id -> "NOT_FOUND:" + id
-        | ForkError.TimedOut -> "TIMED_OUT"
-        | ForkError.TerminalMaterializationFailed id -> "TERMINAL_MATERIALIZATION_FAILED:" + id
 
     let private recoveryBlocked (blocks: NonEmpty<RecoveryBlock>) =
         let head = blocks.Head
@@ -48,74 +35,15 @@ module JoinTool =
             | RecoveryBlock.ChildRecoveryFailed(sid, reason) ->
                 sprintf "family recovery blocked: child %s (%s)" (SessionId.value sid) reason
 
+        let tString = ToolHostCodec.TString
+        let tTable = ToolHostCodec.TTable
+
         ToolHostCodec.tomlObject [ "error", tTable [ "code", tString "RECOVERY_BLOCKED"; "message", tString message ] ]
-
-    let private encodeCompletion (runtime: HostForkRuntime) (completion: RunCompletion) =
-        let isPty = runtime.IsPtyCompletion completion.RunId
-
-        match completion.Outcome with
-        | AgentCompleted payload when isPty ->
-            // EXEC-004: a PTY completion is not an LWR; it keeps its own minimal
-            // schema (kind/status/outcome/closed/pty_id).
-            ToolHostCodec.tomlObject
-                [ "kind", tString "pty"
-                  "status", tString "completed"
-                  "outcome", tString payload.WorkRecord
-                  "closed", tBool true
-                  "pty_id", tString completion.RunId ]
-        | AgentCompleted payload ->
-            // EXEC-004: the success wire is status + agent + work_record. The
-            // work record is the opaque final LWR — one value, no digest /
-            // freshness / coverage metadata, no runtime-only identities.
-            let managed =
-                runtime.TryFindAgent payload.AgentId
-                |> Option.bind (fun record -> ManagedAgent.tryParse record.Agent)
-
-            let agentName =
-                match managed with
-                | Some agent -> agent.Name
-                | None -> payload.AgentId
-
-            ToolHostCodec.tomlObject
-                [ "status", tString "completed"
-                  "agent", tString agentName
-                  "work_record", tString payload.WorkRecord ]
-        | AgentFailed payload
-        | AgentAborted payload when isPty ->
-            ToolHostCodec.tomlObject
-                [ "kind", tString "pty"
-                  "status", tString "failed"
-                  "outcome", tString payload.Message
-                  "closed", tBool true
-                  "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ]
-                  "pty_id", tString completion.RunId ]
-        | AgentFailed payload
-        | AgentAborted payload ->
-            let status =
-                match completion.Outcome with
-                | AgentAborted _ -> "aborted"
-                | _ -> "failed"
-
-            // EXEC-004: the failure wire is status + agent + error. No runtime
-            // identity fields reach the LLM.
-            let managed =
-                runtime.TryFindAgent payload.AgentId
-                |> Option.bind (fun record -> ManagedAgent.tryParse record.Agent)
-
-            let agentName =
-                match managed with
-                | Some agent -> agent.Name
-                | None -> payload.AgentId
-
-            ToolHostCodec.tomlObject
-                [ "status", tString status
-                  "agent", tString agentName
-                  "error", tTable [ "code", tString payload.Code; "message", tString payload.Message ] ]
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) (context: HostToolContext) =
         task {
             if String.IsNullOrWhiteSpace context.SessionId then
-                return ToolHostCodec.tomlObject [ "error", tString "Missing sessionID" ]
+                return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString "Missing sessionID" ]
             else
                 let root = SessionId.create context.SessionId
                 let! recovery = scope.RequireFamilyRecovery root
@@ -123,31 +51,46 @@ module JoinTool =
                 match recovery with
                 | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked blocks
                 | FamilyRecovery.FamilyReady permit ->
+                    let interrupt = JoinInterrupt.create ()
+                    let detachAbort = context.AttachAbort interrupt.Signal
+
+                    use _cleanup =
+                        { new IDisposable with
+                            member _.Dispose() = detachAbort () }
+
                     if scope.IsRole(context, Role.Orchestrator) then
-                        let! verdict = scope.OrchestratorHostFor(context.SessionId).JoinPublished()
-                        return ToolHostCodec.tomlObject [ "outcome", tString verdict ]
+                        let! outcome =
+                            scope
+                                .OrchestratorHostFor(context.SessionId)
+                                .JoinPublishedAvailable(JoinBatch.Max, interrupt.Wait)
+
+                        match outcome with
+                        | Error reason ->
+                            return
+                                ToolHostCodec.tomlObject
+                                    [ "error", ToolHostCodec.TString(sprintf "Orchestrator init failed: %s" reason) ]
+                        | Ok InterruptedByUserMessage -> return JoinResultRenderer.renderInterrupted ()
+                        | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch batch
                     else
                         match scope.RuntimeFor context with
-                        | Error runtimeError -> return ToolHostCodec.tomlObject [ "error", tString runtimeError ]
+                        | Error runtimeError ->
+                            return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString runtimeError ]
                         | Ok runtime ->
-                            let detachAbort = context.AttachAbort(fun () -> runtime.Cancel())
-
-                            use _cleanup =
-                                { new IDisposable with
-                                    member _.Dispose() = detachAbort () }
-
-                            let program = joinAny permit
-                            let! joined = JoinInterpreter.interpret runtime program
+                            let program = joinAvailable permit JoinBatch.Max interrupt.Wait
+                            let! joined = JoinInterpreter.interpretBatch runtime program
 
                             match joined with
-                            | Ok completion -> return encodeCompletion runtime completion
-                            | Error joinError ->
+                            | Ok InterruptedByUserMessage -> return JoinResultRenderer.renderInterrupted ()
+                            | Ok(ResultsAvailable batch) ->
                                 return
-                                    ToolHostCodec.tomlObject
-                                        [ "error",
-                                          tTable
-                                              [ "code", tString (errorCode joinError)
-                                                "message", tString (joinError.ToString()) ] ]
+                                    JoinResultRenderer.renderCompletedBatch
+                                        runtime.IsPtyCompletion
+                                        (fun agentId ->
+                                            match runtime.TryFindAgent agentId with
+                                            | Some record -> record.Agent
+                                            | None -> "")
+                                        batch
+                            | Error joinError -> return JoinResultRenderer.renderForkError joinError
         }
 
     let spec scope =

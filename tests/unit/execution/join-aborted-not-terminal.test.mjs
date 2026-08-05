@@ -49,6 +49,7 @@ test('P0_RECOVERY_JOIN_001_tryFromProvenTerminal_rejects_empty_body', () => {
 })
 
 test('P0_RECOVERY_JOIN_001_tryFromDurableCompleted_rejects_cancelled', () => {
+  // Clean-break: tryFromDurableCompleted deleted; any kind+body is permanent Error.
   const result = childRecovery.tryFromDurableCompleted(
     AGENT,
     HANDLE,
@@ -57,7 +58,7 @@ test('P0_RECOVERY_JOIN_001_tryFromDurableCompleted_rejects_cancelled', () => {
     'ignored',
   )
   assert.equal(result.ok, false)
-  assert.match(String(result.error), /not joinable|Cancelled/i)
+  assert.match(String(result.error), /deleted|not joinable|Cancelled|fromDecoded/i)
 })
 
 test('P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export', () => {

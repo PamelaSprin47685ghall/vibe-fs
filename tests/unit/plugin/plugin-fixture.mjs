@@ -33,8 +33,10 @@ const { forWorkspace } = await import('../../../dist/Journal/RuntimePath.js')
 const { acquire: acquireJournal, release: releaseJournal } = await import('../../../dist/Journal/SharedAgentJournal.js')
 const { acquire: acquireTerminalBus } = await import('../../../dist/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
 const { AgentJournalModule_runtimeId } = await import('../../../dist/Journal/AgentJournal.js')
-const { forJournal, Runtime__AcceptHumanRoot } = await import('../../../dist/Application/Prompting/PromptDispatcher.js')
-const { SessionIdModule_create, PhysicalUserMessageIdModule_create } = await import(
+const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
+  '../../../dist/Application/Prompting/PromptDispatcher.js'
+)
+const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create } = await import(
   '../../../dist/Kernel/Identity.js'
 )
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
@@ -60,6 +62,11 @@ const promptedWaiters = new Map()
 
 const stubClient = (createdIds, prompts, messages) => {
   let counter = 0
+  // PROMPT-011 physical-message store: family recovery（`PromptRecovery.reconcile`
+  // → `findPhysical`）读子会话消息来证明 PromptClaim。旧 fixture 对所有 session 返回
+  // 同一个空数组，子会话的认领永远 StillPending → join RECOVERY_BLOCKED
+  // （`pending claim unknown ...`）。
+  const messagesBySession = new Map() // sessionId -> message[]
   return {
     session: {
       create: async () => {
@@ -68,12 +75,46 @@ const stubClient = (createdIds, prompts, messages) => {
         createdIds.push(id)
         return { data: { id } }
       },
-      messages: async () => ({ data: messages }),
+      messages: async (args) => {
+        // SessionSnapshotPort.GetMessages payload: { path: { id }, query, headers }。
+        const id = args?.path?.id ?? args?.sessionID ?? args?.sessionId
+        const perSession = (id && messagesBySession.get(id)) || []
+        // Legacy 数组：测试直接向 `runtime.messages` push（REVIEW_007 compaction
+        // fixture）。只合并无 session 归属的消息——parent 仍能读到它们，子会话的
+        // prompt 不会跨 session 泄漏。
+        const orphaned = messages.filter(
+          (m) => ![...messagesBySession.values()].some((list) => list.includes(m)),
+        )
+        return { data: [...perSession, ...orphaned] }
+      },
       promptAsync: async (args) => {
         prompts.push(args)
         // 生产在 terminal 订阅安装之后才发 prompt（OneShotAgentTool.fs:115 → send），
         // 故此调用即「可以安全 NotifyTerminal」的就绪信号。
-        const sessionId = args?.sessionID ?? args?.sessionId ?? createdIds[createdIds.length - 1]
+        // OpenCodePort payload: { path: { id }, body: { parts, agent?, model?, metadata? }, headers }。
+        const sessionId = args?.path?.id ?? args?.sessionID ?? args?.sessionId ?? createdIds[createdIds.length - 1]
+        // 合成 Host 物理消息（SessionSnapshotPort.projectMessage 可投影的形状），让
+        // findPhysical 能证明认领。key 在 body.metadata 与 text part metadata 两侧
+        // 都写（OpenCodePort 两处都落，PromptMetadataCodec.PromptKeyField）。
+        const textPart = args?.body?.parts?.find((part) => part?.type === 'text')
+        const key =
+          args?.body?.metadata?.wanxiangshu_prompt_key ?? textPart?.metadata?.wanxiangshu_prompt_key
+        const message = {
+          id: `msg-${sessionId}-${messagesBySession.get(sessionId)?.length ?? 0}`,
+          role: 'user',
+          parts: [
+            {
+              type: 'text',
+              text: textPart?.text ?? '',
+              metadata: key ? { wanxiangshu_prompt_key: key } : undefined,
+            },
+          ],
+          metadata: key ? { wanxiangshu_prompt_key: key } : undefined,
+        }
+        const perSession = messagesBySession.get(sessionId) ?? []
+        perSession.push(message)
+        messagesBySession.set(sessionId, perSession)
+        messages.push(message)
         const waiter = promptedWaiters.get(sessionId)
         if (waiter) {
           promptedWaiters.delete(sessionId)
@@ -226,13 +267,35 @@ export const acceptAuthorityRoot = (runtime, sessionId, agent) => {
 }
 
 /**
+ * Accept a pending AgentOwnerRoot claim on a child session so BusyAgentNudge
+ * (reuse while run active) can resolve ActiveLogicalRun (PROMPT-005).
+ * Call after fork create once promptAsync has recorded the PromptKey in metadata.
+ * The agent comes from the pending claim (PromptDispatcher.fs:147-151), not from
+ * a separate argument.
+ */
+export const acceptChildAgentOwnerRoot = (runtime, childSessionId, promptKey) => {
+  const result = Runtime__AcceptAgentOwnerRoot(
+    forJournal(runtime.journal),
+    PromptKeyModule_create(promptKey),
+    SessionIdModule_create(childSessionId),
+    PhysicalUserMessageIdModule_create(`physical-${childSessionId}`),
+  )
+  if (result.tag !== 0) {
+    throw new Error(
+      `AcceptAgentOwnerRoot(${childSessionId}, ${promptKey}) rejected: ${result.fields?.[0]}`,
+    )
+  }
+}
+
+/**
  * Deliver a real terminal completion for one child session, through the same
  * HostEventPort the plugin subscribed to.
  *
  * `sessionWideText` maps to AgentRunResult.TerminalText (EXEC-006 IsValid).
- * Join's work_record is the materialised LifecycleWorkRecord from the durable
- * XTrace (opening + frames + gap + terminal), not this string alone — fixture
- * completions without an Opening capture therefore yield an empty work_record.
+ * Join LLM wire (EXEC-004 rev.2) renders LWR as entry-local `#` comments before
+ * each [[result]], not as a `work_record =` field. The durable blob still carries
+ * work_record JSON for HandleCompletionCodec. Fixture completions without an
+ * Opening capture yield an empty LWR → no comment block before [[result]].
  * `turnFormalText` is what a one-shot tool reports as output (COMPANION-005).
  *
  * AgentRunResult field order (Kernel/Outcome.fs): SessionId,

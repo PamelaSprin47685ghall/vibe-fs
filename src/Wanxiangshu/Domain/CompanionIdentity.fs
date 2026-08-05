@@ -96,3 +96,8 @@ module CompanionIdentity =
     /// strings with raw TOML, no GUID, no clock.
     let newWorkMessageId (sha256: string -> string) (bloggerSessionId: SessionId) (deltaDigest: BlobDigest) : string =
         sha256 (String.concat "|" [ SessionId.value bloggerSessionId; BlobDigest.value deltaDigest; "new-work" ])
+
+    /// ENFORCER-071 / COMPANION-013: id of one previous_enforcer_tip assistant message.
+    /// Pure function of blogger session + cycle id (provider run of the tip commit).
+    let previousTipMessageId (sha256: string -> string) (bloggerSessionId: SessionId) (cycleId: string) : string =
+        sha256 (String.concat "|" [ SessionId.value bloggerSessionId; cycleId; "previous-enforcer-tip" ])

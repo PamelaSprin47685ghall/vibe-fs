@@ -147,7 +147,18 @@ module SpikePlugin =
                                     | FamilyRecovery.FamilyReady _ ->
                                         let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-                                        let! outcome = EnforcerHost.handleContinuation scope journal sid bloggerMessages
+                                        // InteractionRepair port: HostSessionNudge is compile-later;
+                                        // EnforcerHost only sees InteractionRepairNudge (Session layer).
+                                        let repairNudge: InteractionRepairNudge =
+                                            HostSessionNudge.trySendInteractionRepair sessionPort
+
+                                        let! outcome =
+                                            EnforcerHost.handleContinuation
+                                                scope
+                                                journal
+                                                (Some repairNudge)
+                                                sid
+                                                bloggerMessages
 
                                         match outcome with
                                         | EnforcerHost.ContinuationOutcome.ProjectMessages messages ->

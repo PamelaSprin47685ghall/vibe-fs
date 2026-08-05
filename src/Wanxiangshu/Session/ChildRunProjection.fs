@@ -9,6 +9,7 @@ module ChildRunProjection =
             | Some completion ->
                 match completion.Outcome with
                 | AgentFailed payload when payload.Code = "INTERRUPTED" -> AgentStatus.Interrupted
+                | AgentAbandoned _ -> AgentStatus.Closed
                 | _ -> AgentStatus.Idle
             | None -> AgentStatus.Idle
         elif runtimeCancelled || run.Cancellation.IsCancellationRequested then
@@ -23,6 +24,7 @@ module ChildRunProjection =
                 | Some completion ->
                     match completion.Outcome with
                     | AgentFailed payload when payload.Code = "INTERRUPTED" -> Some payload.Message
+                    | AgentAbandoned(_, reason) -> Some reason
                     | _ -> Some(AgentCompletion.status completion.Outcome)
                 | None -> None
             else

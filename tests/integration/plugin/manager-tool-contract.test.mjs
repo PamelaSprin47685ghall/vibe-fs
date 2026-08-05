@@ -23,7 +23,14 @@ import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { roles, enforcer } from '../../unit/support/domain.mjs'
-import { withPlugin, withExecutablePlugin, acceptAuthorityRoot, notifyCompleted, awaitPrompted } from '../../unit/plugin/plugin-fixture.mjs'
+import {
+  withPlugin,
+  withExecutablePlugin,
+  acceptAuthorityRoot,
+  acceptChildAgentOwnerRoot,
+  notifyCompleted,
+  awaitPrompted,
+} from '../../unit/plugin/plugin-fixture.mjs'
 
 /** AGENT-002: the twenty managed agents, exactly as the Host-final config names them. */
 const ROLE_NAMES = [
@@ -53,20 +60,21 @@ const hostFinalConfig = () => {
 
 /** Every argument of every tool, so a new or renamed argument fails here first. */
 const EXPECTED_ARGUMENTS = {
+  // ENFORCER-020 tip v2: required text + tip enum; optional evidence.
+  // No 120 numeric score properties.
   blog: {
     text: 'required',
+    tip: 'required',
     evidence: 'optional',
-    // ENFORCER-170: the 120 rule fields come from the one catalog.
-    ...Object.fromEntries(enforcer.fieldNames().map((name) => [name, 'optional'])),
   },
-  coder: { agent: 'required', prompt: 'optional', prompts: 'optional' },
+  coder: { agent: 'required', tdd: 'required', prompt: 'optional', prompts: 'optional' },
   executor: {
     command: 'required',
     estimated_mem_usage: 'required',
     estimated_output_bytes: 'required',
     estimated_running_secs: 'required',
   },
-  fork: { agent: 'required', prompt: 'optional' },
+  fork: { agent: 'required', prompt: 'optional', tdd: 'optional' },
   'fork-manager': { agent: 'required', prompt: 'required' },
   'fork-pty': { agent: 'required', prompt: 'optional', signal: 'optional' },
   inspector: { agent: 'required', prompt: 'optional', prompts: 'optional' },
@@ -134,6 +142,7 @@ const agentEnumEntries = (schema) => {
  */
 const KNOWN_TOOL_KEYS = [
   '*',
+  'external_directory',
   'fork',
   'fork-manager',
   'fork-pty',
@@ -179,9 +188,17 @@ const ALLOWED_TOOLS = {
  *
  * So the matrix is pinned literally against spec/02 AGENT-006, and the facade is used
  * below only for what it can say independently: how many tools a role may hold.
+ *
+ * `external_directory` is Host meta-permission, not a role tool: Host defaults it to
+ * ask; every managed agent overrides to allow so project-external paths do not prompt.
  */
 const expectedPermission = (role) =>
-  Object.fromEntries(KNOWN_TOOL_KEYS.map((key) => [key, ALLOWED_TOOLS[role].includes(key) ? 'allow' : 'deny']))
+  Object.fromEntries(
+    KNOWN_TOOL_KEYS.map((key) => [
+      key,
+      key === 'external_directory' || ALLOWED_TOOLS[role].includes(key) ? 'allow' : 'deny',
+    ]),
+  )
 
 /** AGENT-001 case names, in the order of `ROLE_NAMES`. */
 const FACADE_ROLE_CASES = {
@@ -210,7 +227,7 @@ const PROMPT_CLAUSES = {
   'fast-manager': {
     required: [
       /Manager thinks and delegates/,
-      /fork\(agent, prompt\)/,
+      /fork\(agent, prompt, tdd\?\)|fork\(agent, prompt\)/,
       /Treat every `join\(\)` as a deliberate blocking point/,
       /work already known and work newly exposed by the latest facts/,
       /fast-coder/,
@@ -219,6 +236,17 @@ const PROMPT_CLAUSES = {
       /Do not ask a Coder to obtain any of those results through Inspector/,
       /Once its edits are complete, the Coder is done/,
       /DO NOT delegate local workspace reading or search to [`']fast-browser[`'] \/ [`']deep-browser[`']/i,
+      // PR B: sub-session reuse algorithm (list → agent_id → fork), not slogan-only.
+      /sub-session 复用/,
+      /agent_id/,
+      /\blist\b/,
+      /优先复用|Prefer reuse|prefer reuse/i,
+      /不得再次传 managed agent 名称|不得再次传 managed agent/,
+      /向同一 handle 发送 nudge|same handle.*nudge/i,
+      // PR E+: fork optional tdd; prompt-required for coder roles.
+      /tdd/,
+      /fast-coder.*deep-coder|coder role/i,
+      /Required when the target is a coder role|fork a coder role without `tdd`|must pass `tdd/i,
     ],
     forbidden: [],
   },
@@ -235,12 +263,26 @@ const PROMPT_CLAUSES = {
       /DO NOT use `inspector` to bypass that boundary/,
       /Never ask Inspector to run, reproduce, check, or diagnose compilation, builds, typechecks, linters, tests, programs, or runtime behavior/,
       /After the final required file edit, stop working/,
+      // Coder TDD phase discipline (red → green → refactor).
+      /red → green → refactor|red → green/,
+      /tdd/,
+      /Do not delete, skip, loosen, or rewrite/,
+      /schema-required|schema-optional.*prompt-required|Manager `fork` of a Coder role/,
     ],
     forbidden: [/executor/i],
   },
 
   'fast-devops': {
-    required: [/DevOps executes/, /fork-pty/, /No Direct File Modification/],
+    required: [
+      /DevOps executes/,
+      /fork-pty/,
+      /No Direct File Modification/,
+      /tdd="red"/,
+      /tdd="green"/,
+      /Confirm true red\/green|confirm.*red.*green|true red\/green/i,
+      /named `coder` tool|synchronous `coder` tool/,
+      /schema optional `tdd`|prompt-required for `fast-coder`|Manager `fork` of a Coder role/,
+    ],
     forbidden: [],
   },
 
@@ -296,6 +338,9 @@ const PROMPT_CLAUSES = {
       /fork-manager/,
       /Host-owned Dual PERFECT/,
       /fast-manager|deep-manager/,
+      // PR B: continue same Manager job; no invented reuse API.
+      /originating Manager|existing Manager job|Continue the existing Manager/i,
+      /truly independent|真正并行|parallel independent/i,
     ],
     forbidden: [],
   },
@@ -399,9 +444,12 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
     // Independent second source. The facade cannot supply the tool keys without
     // re-deriving the rename table, but it can say how many tools a role holds, and
     // that number comes from `Kernel/Roles.fs` rather than from this file.
+    // external_directory is Host meta-permission (always allow), not a role tool key.
     const allowedCount = ROLE_NAMES.map((role) => [
       role,
-      KNOWN_TOOL_KEYS.filter((key) => key !== '*' && permissions[`fast-${role}`][key] === 'allow').length,
+      KNOWN_TOOL_KEYS.filter(
+        (key) => key !== '*' && key !== 'external_directory' && permissions[`fast-${role}`][key] === 'allow',
+      ).length,
     ])
     const facadeCount = ROLE_NAMES.map((role) => [
       role,
@@ -543,7 +591,7 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     assert.ok(!inspectorText.includes('inspector session-wide A'))
 
     const coderResultP = hooks.tool.coder.execute(
-      { agent: 'fast-coder', prompts: ['apply the requested edit'] },
+      { agent: 'fast-coder', tdd: 'green', prompts: ['apply the requested edit'] },
       { sessionID: 'devops-contract', agent: 'fast-devops' },
     )
     await awaitPrompted(createdIds[1])
@@ -551,17 +599,66 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     const coderText = await coderResultP
     const coderResult = parseToml(coderText)
 
-    // CoderTool.fs:9-21: data-only fields, with the natural-language output as a
-    // leading comment (spec/13).
+    // CoderTool: data-only fields, natural-language output as leading comment (spec/13).
+    // tdd is the normalized wire name of the required phase.
     assert.deepEqual(coderResult, {
       coder_id: createdIds[1],
       agent: 'fast-coder',
       tier: 'fast',
       fallback_peer: 'deep-coder',
+      tdd: 'green',
       parent_b_digest: '',
     })
     assert.ok(coderText.includes('coder turn formal report'))
     assert.ok(!coderText.includes('coder session-wide A'))
+
+    // Child assignment must carry the GREEN phase constraint (not metadata-only).
+    // OpenCodePort promptAsync shape: { path: { id }, body: { parts, … } }.
+    const promptTextFor = (sessionId) => {
+      const entry = runtime.prompts.find((p) => (p?.path?.id ?? p?.sessionID) === sessionId)
+      assert.ok(entry, `coder child ${sessionId} must receive a prompt`)
+      return entry.body.parts[0].text
+    }
+    const greenBody = promptTextFor(createdIds[1])
+    assert.match(greenBody, /TDD phase: GREEN/)
+    assert.match(greenBody, /Do not delete, skip, loosen, or rewrite the test/)
+    assert.match(greenBody, /apply the requested edit/)
+
+    // RED path: success + child prompt forbids production fix.
+    const redResultP = hooks.tool.coder.execute(
+      { agent: 'fast-coder', tdd: 'red', prompt: 'failing test for missing behavior' },
+      { sessionID: 'devops-contract', agent: 'fast-devops' },
+    )
+    await awaitPrompted(createdIds[2])
+    notifyCompleted(runtime, createdIds[2], 'red session-wide A', 'red turn formal report')
+    const redText = await redResultP
+    const redResult = parseToml(redText)
+    assert.equal(redResult.tdd, 'red')
+    assert.equal(redResult.error, undefined)
+    const redBody = promptTextFor(createdIds[2])
+    assert.match(redBody, /TDD phase: RED/)
+    assert.match(redBody, /Do not implement the production fix/)
+    assert.match(redBody, /failing test for missing behavior/)
+
+    // Missing / illegal tdd fail closed (no default green).
+    const missing = parseToml(
+      await hooks.tool.coder.execute(
+        { agent: 'fast-coder', prompts: ['no tdd'] },
+        { sessionID: 'devops-contract', agent: 'fast-devops' },
+      ),
+    )
+    assert.match(missing.error, /missing required argument: tdd/)
+
+    for (const bad of ['RED', 'test', 'refactor', 'blue', '']) {
+      const illegal = parseToml(
+        await hooks.tool.coder.execute(
+          { agent: 'fast-coder', tdd: bad, prompt: 'x' },
+          { sessionID: 'devops-contract', agent: 'fast-devops' },
+        ),
+      )
+      assert.ok(illegal.error, `tdd=${JSON.stringify(bad)} must fail`)
+      assert.match(illegal.error, /missing required argument: tdd|UnknownTddPhase/)
+    }
   })
 })
 
@@ -637,15 +734,23 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     const joinText = await joinResultP
     const join = parseToml(joinText)
 
-    // EXEC-004 / EXEC-006: success wire is status + agent + work_record.
-    // child → parent: includeOpening=false — Opening is not echoed back to the
-    // assigner. Fixture has only an Opening capture (no frames/terminal), so
-    // the materialised LWR is empty after the Opening section is omitted.
-    assert.deepEqual(join, {
+    // EXEC-004 rev.2 / spec/13 §9.6: batch wire — status + count + [[result]].
+    // Single completion still uses [[result]] (count=1, ordinal=1, kind=agent).
+    // work_record is entry-local comment, never a TOML field.
+    // Fixture has no Opening capture → LWR empty → no # comment block before [[result]].
+    assert.equal(join.status, 'completed')
+    assert.equal(join.count, 1)
+    assert.ok(Array.isArray(join.result), '[[result]] must parse as array')
+    assert.equal(join.result.length, 1)
+    assert.deepEqual(join.result[0], {
+      ordinal: 1,
+      kind: 'agent',
       status: 'completed',
       agent: 'fast-coder',
-      work_record: '',
     })
+    assert.equal(join.work_record, undefined, 'work_record must not be a TOML field')
+    assert.ok(!joinText.includes('work_record ='), 'wire must not contain work_record = field line')
+    assert.ok(joinText.includes('[[result]]'), 'single result still uses [[result]]')
     assert.ok(!joinText.includes('# Opening task'), 'join LWR must not echo the child opening')
     assert.ok(!joinText.includes('forked coder turn formal report'))
     assert.ok(!joinText.includes('run-'), 'no run id on the LLM-visible wire')
@@ -656,6 +761,166 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     // 此断言曾按「runtime record 保留完成记录」的假设期望一条 idle 条目——实测生产
     // 返回 []，该假设是测试想象而非契约。
     assert.deepEqual(list, {})
+  })
+})
+
+test('EXEC_002_fork_existing_agent_id_reuses_child_without_new_session', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-reuse', 'fast-manager')
+    const context = { sessionID: 'manager-reuse', agent: 'fast-manager' }
+
+    const created = parseToml(
+      await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'first assignment' }, context),
+    )
+    assert.equal(created.error, undefined, `create fork failed: ${created.error}`)
+    assert.equal(created.agent, 'fast-coder')
+    assert.equal(createdIds.length, 1, 'managed name creates exactly one child session')
+    const agentId = created.agent_id
+    assert.match(agentId, /^[a-z0-9]{6}$/)
+    const promptsAfterCreate = runtime.prompts.length
+    assert.ok(promptsAfterCreate >= 1, 'create path must send a child prompt')
+
+    // PROMPT-005: the create fork is AwaitMode.Detached with a receipt-only stub —
+    // Claimed → Submitted, no PhysicalAccepted, so the child has NO ActiveLogicalRun.
+    // BusyAgentNudge requires one (HostForkBusyNudge.fs:37). Accept the pending
+    // AgentOwnerRoot claim on the child before the busy reuse below.
+    const childSessionId = createdIds[0]
+    // PromptKey is on the last SendPrompt metadata for that child (PROMPT-011).
+    const childPrompt = [...runtime.prompts].reverse().find((p) => {
+      const id = p?.path?.id ?? p?.sessionID ?? p?.sessionId
+      return id === childSessionId
+    })
+    assert.ok(childPrompt, 'create must record a child prompt')
+    const promptKey =
+      childPrompt?.body?.metadata?.wanxiangshu_prompt_key ??
+      childPrompt?.body?.parts?.find((part) => part?.type === 'text')?.metadata?.wanxiangshu_prompt_key
+    assert.equal(typeof promptKey, 'string', 'child prompt must carry PromptKey metadata')
+    acceptChildAgentOwnerRoot(runtime, childSessionId, promptKey)
+
+    // Busy reuse: child still active (no terminal yet). ForkTool TryFindAgent → Reuse →
+    // sendToExistingChild active-run branch → BusyAgentNudge. No session.create.
+    const nudged = parseToml(
+      await hooks.tool.fork.execute({ agent: agentId, prompt: 'nudge: add one constraint' }, context),
+    )
+    assert.equal(nudged.error, undefined, `reuse/nudge failed: ${nudged.error}`)
+    assert.equal(nudged.agent_id, agentId, 'reuse returns the same agent_id')
+    assert.equal(nudged.agent, 'fast-coder')
+    assert.equal(createdIds.length, 1, 'reuse must not create a second child session')
+    assert.ok(
+      runtime.prompts.length > promptsAfterCreate,
+      'busy reuse must deliver a nudge prompt to the existing child',
+    )
+
+    // Managed name again is always create — not silent reuse of the first child.
+    const twin = parseToml(
+      await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'parallel twin work' }, context),
+    )
+    assert.equal(twin.error, undefined, `second create failed: ${twin.error}`)
+    assert.notEqual(twin.agent_id, agentId, 'managed name creates a distinct handle')
+    assert.equal(createdIds.length, 2, 'managed name create adds a second child record')
+  })
+})
+
+test('EXEC_002_fork_optional_tdd_injects_phase_or_fail_closed', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-fork-tdd', 'fast-manager')
+    const context = { sessionID: 'manager-fork-tdd', agent: 'fast-manager' }
+
+    const promptTextFor = (sessionId) => {
+      const entry = [...runtime.prompts].reverse().find((p) => (p?.path?.id ?? p?.sessionID) === sessionId)
+      assert.ok(entry, `fork child ${sessionId} must receive a prompt`)
+      return entry.body.parts[0].text
+    }
+
+    // tdd=red → RED constraint composed into child assignment.
+    const red = parseToml(
+      await hooks.tool.fork.execute(
+        { agent: 'fast-coder', tdd: 'red', prompt: 'failing test for missing index' },
+        context,
+      ),
+    )
+    assert.equal(red.error, undefined, `fork tdd=red failed: ${red.error}`)
+    const redBody = promptTextFor(createdIds[0])
+    assert.match(redBody, /TDD phase: RED/)
+    assert.match(redBody, /Do not implement the production fix/)
+    assert.match(redBody, /failing test for missing index/)
+
+    // tdd=green → GREEN constraint.
+    const green = parseToml(
+      await hooks.tool.fork.execute(
+        { agent: 'deep-coder', tdd: 'green', prompt: 'minimal production fix only' },
+        context,
+      ),
+    )
+    assert.equal(green.error, undefined, `fork tdd=green failed: ${green.error}`)
+    const greenBody = promptTextFor(createdIds[1])
+    assert.match(greenBody, /TDD phase: GREEN/)
+    assert.match(greenBody, /Do not delete, skip, loosen, or rewrite the test/)
+    assert.match(greenBody, /minimal production fix only/)
+
+    // No tdd → behavior unchanged (no phase injection).
+    const plain = parseToml(
+      await hooks.tool.fork.execute({ agent: 'fast-inspector', prompt: 'static fact only' }, context),
+    )
+    assert.equal(plain.error, undefined, `fork without tdd failed: ${plain.error}`)
+    const plainBody = promptTextFor(createdIds[2])
+    assert.doesNotMatch(plainBody, /TDD phase:/)
+    assert.match(plainBody, /static fact only/)
+
+    // Illegal tdd → fail-closed (same wire parse as coder tool).
+    // Empty / omitted is optional-absent (OptionalText), not illegal.
+    for (const bad of ['RED', 'test', 'refactor', 'blue']) {
+      const illegal = parseToml(
+        await hooks.tool.fork.execute({ agent: 'fast-coder', tdd: bad, prompt: 'x' }, context),
+      )
+      assert.ok(illegal.error, `fork tdd=${JSON.stringify(bad)} must fail`)
+      assert.match(illegal.error, /UnknownTddPhase/)
+    }
+
+    // Busy reuse + tdd: compose into nudge prompt text.
+    const reuseCreate = parseToml(
+      await hooks.tool.fork.execute(
+        { agent: 'fast-coder', tdd: 'red', prompt: 'open red assignment' },
+        context,
+      ),
+    )
+    assert.equal(reuseCreate.error, undefined)
+    const reuseChildSessionId = createdIds[createdIds.length - 1]
+    const reusePrompt = [...runtime.prompts].reverse().find((p) => {
+      const id = p?.path?.id ?? p?.sessionID ?? p?.sessionId
+      return id === reuseChildSessionId
+    })
+    const reuseKey =
+      reusePrompt?.body?.metadata?.wanxiangshu_prompt_key ??
+      reusePrompt?.body?.parts?.find((part) => part?.type === 'text')?.metadata?.wanxiangshu_prompt_key
+    acceptChildAgentOwnerRoot(runtime, reuseChildSessionId, reuseKey)
+    const promptsBeforeNudge = runtime.prompts.length
+    const reuseNudge = parseToml(
+      await hooks.tool.fork.execute(
+        { agent: reuseCreate.agent_id, tdd: 'green', prompt: 'switch to green constraint' },
+        context,
+      ),
+    )
+    assert.equal(reuseNudge.error, undefined, `reuse/nudge with tdd failed: ${reuseNudge.error}`)
+    assert.equal(reuseNudge.agent_id, reuseCreate.agent_id)
+    assert.ok(runtime.prompts.length > promptsBeforeNudge, 'nudge must deliver a prompt')
+    const nudgeBody = promptTextFor(reuseChildSessionId)
+    assert.match(nudgeBody, /TDD phase: GREEN/)
+    assert.match(nudgeBody, /switch to green constraint/)
+  })
+})
+
+test('EXEC_002_fork_tool_description_states_create_or_reuse_by_agent_id', async () => {
+  await withPlugin(async (hooks) => {
+    const description = hooks.tool.fork?.description
+    assert.equal(typeof description, 'string', 'fork tool must expose description')
+    assert.match(description, /reuse|agent_id/i)
+    assert.match(description, /Create a managed agent|reuse\/nudge/i)
+    // orchestratorSpec stays create-only wording.
+    const managerJob = hooks.tool['fork-manager']?.description
+    assert.equal(typeof managerJob, 'string')
+    assert.match(managerJob, /Fork a manager job/)
+    assert.doesNotMatch(managerJob, /reuse/i)
   })
 })
 

@@ -49,6 +49,7 @@
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Domain/LoopDetector.fs"/>
     <Compile Include="Domain/ForkChildPayload.fs"/>
+    <Compile Include="Domain/TddPhase.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/CompanionPrompt.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>
@@ -164,6 +165,7 @@
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
     <Compile Include="Session/HandleCompletionCodec.fs"/>
+    <Compile Include="Session/JoinDrain.fs"/>
     <Compile Include="Application/Reconciliation/ChildRecoveryInterpreter.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
     <Compile Include="Session/HostForkChildDispatch.fs"/>
@@ -173,6 +175,7 @@
     <Compile Include="Session/HostForkAgent.fs"/>
     <Compile Include="Session/HostForkPty.fs"/>
     <Compile Include="Session/BloggerRuntimeState.fs"/>
+    <Compile Include="Session/InteractionRepairPort.fs"/>
     <Compile Include="Session/ParkedTransform.fs"/>
     <Compile Include="Session/BloggerAbandon.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/LoopSensor.fs"/>
@@ -213,6 +216,7 @@
     <Compile Include="Infrastructure/OpenCode/Orchestration/ReviewRunner.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/Host.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ToolHostCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Codec/JoinResultRenderer.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/OneShotAgentTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ForkTool.fs"/>

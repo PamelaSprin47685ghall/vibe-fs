@@ -50,9 +50,12 @@ test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   }
 })
 
-test('CTX_012_squash_instruction_omits_scores_and_ordinary_prose', () => {
-  assert.match(prompt.squashInstruction, /omit all scores and evidence/)
-  assert.match(prompt.squashInstruction, /do not output ordinary assistant prose/)
+test('ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
+  assert.match(prompt.squashInstruction, /required tip|catalog field/)
+  assert.match(prompt.squashInstruction, /do not output ordinary assistant prose/i)
+  assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
+  assert.match(prompt.normalInstruction, /required tip|catalog field/)
+  assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })
 
 test('COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {

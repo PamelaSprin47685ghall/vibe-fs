@@ -505,6 +505,28 @@ module Fold =
             |> handleOutcome "HandleAbandoned" projection
             |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
+        // Clean-break: false abort cell → Active only when ref/digest match.
+        | AgentFact.HandleFalseCompletionRejected payload ->
+            AgentProjection.tryUpdate
+                payload.ParentSessionId
+                (fun session ->
+                    HandleProjection.rejectFalseCompletion
+                        payload.Handle
+                        payload.ExpectedCompletionRef
+                        payload.ExpectedCompletionDigest
+                        (Option.defaultValue HandleProjection.empty session.Handles)
+                    |> Result.map (fun updated -> { session with Handles = Some updated }))
+                projection
+            |> handleOutcome "HandleFalseCompletionRejected" projection
+            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+
+        // Clean-break: retired false terminal report. Projection keeps original
+        // Retired tombstone; replacement is linked by a separate HandleLinked.
+        | AgentFact.HandleFalseTerminalReported _ -> Ok projection
+
+        // Clean-break: parent correction notice. No handle lifecycle change.
+        | AgentFact.ParentJoinCorrectionRequested _ -> Ok projection
+
         // HostTurnObserved is a durable observation inbox fact. CompletionReactor
         // (later batch) consumes it; LinkageProjection has no fold effect yet.
         | AgentFact.HostTurnObserved _ -> Ok projection
@@ -756,7 +778,8 @@ module Fold =
                       ToolCallIds = payload.ToolCallIds
                       CycleTextRef = payload.TextRef
                       CycleTextDigest = payload.TextDigest
-                      CycleScoreRef = payload.ScoreVectorRef
+                      TipRuleId = payload.TipRuleId
+                      FieldNameAtCommit = payload.FieldNameAtCommit
                       CycleEvidenceRef = payload.EvidenceRef
                       ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
                 |> Result.bind (fun enfUpdated ->

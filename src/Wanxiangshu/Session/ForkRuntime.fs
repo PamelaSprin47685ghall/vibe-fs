@@ -142,18 +142,26 @@ type ForkRuntime
                         ForkResult.Nudged agentId)
 
     // -----------------------------------------------------------------------
-    // Public API — Join
+    // Public API — Join / signal / drain (EXEC-017 / EXEC-018)
     // -----------------------------------------------------------------------
 
-    /// Await the next available completion. Returns:
-    ///   - Ok(RunCompletion) when a completion is available
-    ///   - Error(NothingToJoin) when no agent or PTY is active
-    ///   - Error(Cancelled) when the runtime has been cancelled
-    ///   - Error(TimedOut) when optional timeout elapses with no completion
+    /// Compatibility single-result join. Prefer WaitForSignal + DrainAvailable.
     member _.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         match timeoutMs with
         | Some ms -> mailbox.Join(timeoutMs = ms)
         | None -> mailbox.Join()
+
+    /// EXEC-018: wait for completion/cancel signal or local user interrupt.
+    member _.WaitForSignal(interrupt: Task<unit>) : Task<MailboxWakeReason> = mailbox.WaitForSignal interrupt
+
+    /// Wake on Publish/Cancel only. Outer layer races journal + user interrupt.
+    member _.WaitForWake() : Task<MailboxWakeReason> = mailbox.WaitForWake()
+
+    /// Drop pending wake waiters (spurious CompletionMayBeAvailable). Safe: re-drain.
+    member _.PulseWake() : unit = mailbox.PulseWake()
+
+    /// EXEC-018: bounded drain of mailbox queue (PTY facts / agent wake payloads).
+    member _.DrainAvailable(maxCount: int) : RunCompletion list = mailbox.DrainAvailable maxCount
 
     // -----------------------------------------------------------------------
     // Public API — PublishCompletion (external completions, e.g. PTY)

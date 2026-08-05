@@ -264,6 +264,60 @@ test('PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
   }
 })
 
+test('ENFORCER_072_BlogEntryCommitted_without_TipRuleId_is_refused_at_envelope_decode', () => {
+  // Boot reads envelopes, not FactCodec alone. Without this check Thoth fails
+  // opaquely, Boot truncates mid-stream, and fold invents "already has open request".
+  const legacy = JSON.stringify({
+    RuntimeId: ['RuntimeId', 'rt1'],
+    LocalSeq: ['LocalSeq', '1'],
+    ObservedAt: '2026-01-01T00:00:00.000+00:00',
+    EventId: ['EventId', 'e1'],
+    Stream: ['Session', ['SessionId', 'ses_a']],
+    Fact: [
+      'Agent',
+      [
+        'BlogEntryCommitted',
+        {
+          SessionId: ['SessionId', 'ses_a'],
+          BloggerSessionId: ['SessionId', 'ses_b'],
+          // no TipRuleId, optional ScoreVectorRef-era shape
+          TextDigest: ['BlobDigest', 'sha'],
+          TextRef: ['BlobRef', 'blobs/sha'],
+        },
+      ],
+    ],
+  })
+  assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true)
+  const decoded = journal.deserialize(legacy)
+  assert.equal(decoded.ok, false)
+  assert.equal(decoded.error, journal.tipV2CleanBreakMessage)
+})
+
+test('ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () => {
+  const legacy = JSON.stringify({
+    RuntimeId: ['RuntimeId', 'rt1'],
+    LocalSeq: ['LocalSeq', '1'],
+    ObservedAt: '2026-01-01T00:00:00.000+00:00',
+    EventId: ['EventId', 'e1'],
+    Stream: ['Session', ['SessionId', 'ses_a']],
+    Fact: [
+      'Agent',
+      [
+        'BlogEntryCommitted',
+        {
+          SessionId: ['SessionId', 'ses_a'],
+          TipRuleId: 'ignored-if-score-vector-present',
+          ScoreVectorRef: ['BlobRef', 'blobs/old'],
+        },
+      ],
+    ],
+  })
+  assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true)
+  const decoded = journal.deserialize(legacy)
+  assert.equal(decoded.ok, false)
+  assert.match(String(decoded.error), /TipRuleId|ScoreVectorRef|tip v2/)
+})
+
 // ── PERSIST-002: two append outcomes, and replay agrees with them ────────────
 
 test('PERSIST_002_a_committed_envelope_replays_into_the_same_projection', () => {

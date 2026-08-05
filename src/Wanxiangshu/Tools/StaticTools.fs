@@ -74,8 +74,12 @@ module StaticTools =
               "verdict"
               "blog" ]
 
+        // Host defaults set external_directory:* = ask (agent.ts). Rulesets merge by
+        // flat concat + findLast, so this trailing allow cancels the Host ask and
+        // stops permission.asked prompts on paths outside the project directory.
         let pairs =
             [ yield "*", box "deny"
+              yield "external_directory", box "allow"
               for name in known do
                   match name, role with
                   // Manager owns "fork"; must not see Orchestrator's narrow tool.

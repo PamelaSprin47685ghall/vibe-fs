@@ -97,6 +97,7 @@ test('EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
     targetAgent: 'fast-coder',
     role: 'Coder',
     lifecycle: 'Abandoned',
+    creationOrder: 0,
     completion: undefined,
     completionRef: undefined,
     completionDigest: undefined,
@@ -105,6 +106,8 @@ test('EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
   assert.equal(handleProjection.isAbandoned(HANDLE, abandoned), true)
   assert.equal(handleProjection.isRetired(HANDLE, abandoned), false)
   assert.deepEqual(views(abandoned), { listable: [], joinable: [], active: [] })
+  // EXEC-009: Abandoned is reportable once via join batch, not via joinable completion cell.
+  assert.equal(handleProjection.reportableAbandoned(abandoned).length, 1)
 })
 
 test('EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
@@ -112,6 +115,7 @@ test('EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
   assert.equal(stateOf(abandoned).lifecycle, 'Abandoned')
   assert.equal(stateOf(abandoned).abandonReason, 'DeadlineExceeded')
   assert.deepEqual(views(abandoned).joinable, [])
+  assert.equal(handleProjection.reportableAbandoned(abandoned).length, 1)
 })
 
 test('EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
@@ -120,10 +124,18 @@ test('EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
     handleProjection.complete(HANDLE, handleProjection.completionOf('Terminal'), abandoned),
     { ok: false, error: 'AlreadyAbandoned' },
   )
-  assert.deepEqual(handleProjection.retire(HANDLE, abandoned), { ok: false, error: 'AlreadyAbandoned' })
+  // Single-report path: Abandoned → Retired (join consume), not AlreadyAbandoned.
+  const retired = handleProjection.retire(HANDLE, abandoned)
+  assert.equal(retired.ok, true)
+  assert.equal(handleProjection.lifecycleOf(handleProjection.tryFind(HANDLE, retired.value)), 'Retired')
+  assert.equal(handleProjection.reportableAbandoned(retired.value).length, 0)
   assert.deepEqual(
     handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), abandoned),
     { ok: false, error: 'AlreadyAbandoned' },
+  )
+  assert.deepEqual(
+    handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), retired.value),
+    { ok: false, error: 'HandleIsRetired' },
   )
 })
 

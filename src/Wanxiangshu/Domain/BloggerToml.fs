@@ -97,6 +97,21 @@ module BloggerToml =
                   DoNotExecTable
                   [ SyntheticToml.field "historic_frame" (SyntheticToml.renderString frameBody) ] ]
 
+    /// ENFORCER-071: one low-trust prior tip block (not a parent instruction).
+    ///
+    ///   [[do_not_exec]]
+    ///   kind = "previous_enforcer_tip"
+    ///   tip = "primitive-obsession"
+    ///   cycle = "…"
+    let renderPreviousEnforcerTip (tipField: string) (cycleId: string) : string =
+        SyntheticToml.document
+            []
+            [ SyntheticToml.tableArrayEntry
+                  DoNotExecTable
+                  [ SyntheticToml.field "kind" (SyntheticToml.renderString "previous_enforcer_tip")
+                    SyntheticToml.field "tip" (SyntheticToml.renderString tipField)
+                    SyntheticToml.field "cycle" (SyntheticToml.renderString cycleId) ] ]
+
     /// CTX-013: the whole document, optionally carrying an instruction header.
     let renderWith (instructions: string list) (items: BloggerDeltaItem list) : string =
         SyntheticToml.document instructions (items |> List.map renderItem)

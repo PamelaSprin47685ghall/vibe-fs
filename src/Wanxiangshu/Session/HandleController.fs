@@ -148,9 +148,10 @@ module HandleController =
                     {| ParentSessionId = parentId
                        Handle = agentHandle agentId |})
 
-    /// EXEC-009: one controlled consume. Projection must already show
-    /// `CompletedAwaitingJoin`; success writes `HandleRetired`. Concurrent callers
-    /// race on the journal gate — the loser sees `AlreadyRetired`.
+    /// EXEC-009: one controlled consume. Projection must show
+    /// `CompletedAwaitingJoin` (completion report) or `Abandoned` (single batch
+    /// report). Success writes `HandleRetired`. Concurrent callers race on the
+    /// journal gate — the loser sees `AlreadyRetired`.
     ///
     /// CommitUnknown must not hand the payload out: the caller would treat the
     /// work as consumed while a later restart might still show it joinable.
@@ -164,9 +165,9 @@ module HandleController =
         match HandleProjection.tryFind handle projection with
         | None -> Error(NotJoinable UnknownHandle)
         | Some { Lifecycle = Retired } -> Error AlreadyRetired
-        | Some { Lifecycle = Abandoned _ } -> Error(NotJoinable AlreadyAbandoned)
         | Some { Lifecycle = Active } -> Error(NotJoinable NotCompleted)
-        | Some record ->
+        | Some({ Lifecycle = CompletedAwaitingJoin _ } as record)
+        | Some({ Lifecycle = Abandoned _ } as record) ->
             match
                 AgentJournal.appendAgent
                     (StreamId.Session parentId)

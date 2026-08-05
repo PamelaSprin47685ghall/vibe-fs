@@ -30,7 +30,7 @@ let seq = 0
 const next = (factValue, run) =>
   envelope({ seq: (seq += 1), stream: stream.session(session), run, fact: factValue })
 
-/** BlogEntryCommitted with full enforcement half. */
+/** BlogEntryCommitted with full enforcement half (tip v2: TipRuleId, no ScoreVectorRef). */
 const entryWithEnforcement = ({
   epoch = 0,
   from,
@@ -41,7 +41,8 @@ const entryWithEnforcement = ({
   n = 1,
   run = `msg_e${n}`,
   toolCalls = [],
-  scoreRef,
+  tipRuleId = `enforcement-tip-${n}`,
+  fieldNameAtCommit = `field-tip-${n}`,
   evidenceRef,
   prefixEpoch = 0,
 }) =>
@@ -60,7 +61,8 @@ const entryWithEnforcement = ({
       TextDigest: blobDigest(`sha-e${n}`),
       ProviderRun: providerRun(run),
       ToolCallIds: toolCalls.map((id) => toolCallId(id)),
-      ScoreVectorRef: scoreRef ? blobRef(scoreRef) : undefined,
+      TipRuleId: tipRuleId,
+      FieldNameAtCommit: fieldNameAtCommit,
       EvidenceRef: evidenceRef ? blobRef(evidenceRef) : undefined,
       ObservedPrefixEpochId: prefixEpochId(prefixEpoch),
     }),
@@ -89,7 +91,8 @@ test('ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage', () => {
       cutoffFrom: 0,
       cutoffTo: 1,
       toolCalls: ['call-1'],
-      scoreRef: 'blob-scores',
+      tipRuleId: 'enforcement-a01',
+      fieldNameAtCommit: 'primitive-obsession',
       evidenceRef: 'blob-evidence',
     }),
   ])
@@ -108,7 +111,8 @@ test('ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
       cutoffTo: 1,
       run: 'msg_run1',
       toolCalls: ['call-a', 'call-b'],
-      scoreRef: 'blob-sc1',
+      tipRuleId: 'enforcement-a01',
+      fieldNameAtCommit: 'primitive-obsession',
       evidenceRef: 'blob-ev1',
     }),
   ])
@@ -117,8 +121,10 @@ test('ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
   assert.equal(s.Enforcement.ByProviderRun.size, 1, 'one enforcement record')
   const [record] = [...s.Enforcement.ByProviderRun.values()]
   assert.ok(record.ToolCallIds, 'tool call ids present')
-  assert.ok(record.CycleScoreRef, 'score ref present')
+  assert.equal(record.TipRuleId, 'enforcement-a01')
+  assert.equal(record.FieldNameAtCommit, 'primitive-obsession')
   assert.ok(record.CycleEvidenceRef, 'evidence ref present')
+  assert.equal(record.CycleScoreRef, undefined, 'ScoreVectorRef path deleted')
 })
 
 test('ENFORCER_045_coverage_strictly_advances_across_commits', () => {
@@ -167,7 +173,8 @@ test('ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
         ToolCallIds: [],
         TextRef: blobRef('blob-old'),
         TextDigest: blobDigest('sha-old'),
-        ScoreVectorRef: undefined,
+        TipRuleId: 'enforcement-old',
+        FieldNameAtCommit: 'primitive-obsession',
         EvidenceRef: undefined,
         ObservedPrefixEpochId: prefixEpochId(0),
       }),

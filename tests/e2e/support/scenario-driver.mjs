@@ -508,7 +508,9 @@ async function runFlow(scenario, doc, ctx) {
       const readResult = results.find((r) => typeof r.output === 'string' && r.output.includes('ECHO_TEST'));
       assert.ok(readResult, `read must return ECHO_TEST: ${JSON.stringify(results)}`);
       assert.ok(readResult.output.includes('CWD='), `read must surface cwd: ${readResult.output}`);
-      const joinResult = results.find((r) => r?.kind === 'pty' && r.closed === true);
+      const joinResult = results.find(
+        (r) => r?.status === 'completed' && Array.isArray(r?.result) && r.result.some((item) => item?.kind === 'pty' && item.closed === true),
+      );
       assert.ok(joinResult, `join must deliver closed: ${JSON.stringify(results)}`);
       const listResult = results.find((r) => Array.isArray(r?.item) || (r && typeof r === 'object' && Object.keys(r).length === 0));
       assert.ok(listResult, `list must return item table: ${JSON.stringify(results)}`);

@@ -524,15 +524,18 @@ try {
   const cycleFacts = runtimeFacts(scenario.host.workDir, 'EnforcementCycleCommitted');
   assert.equal(cycleFacts.length, 0, 'no independent EnforcementCycleCommitted (ENFORCER-045)');
 
-  // ENFORCER-024: the misspelled score field is corrected via codec.
-  // The scenario sends `enf-primitive-obsessin` → codec maps to `primitive-obsession`.
-  // The BlogEntryCommitted's ScoreVectorRef blob should contain the corrected name.
-  const scoreFacts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
-  const hasCorrectedScore = scoreFacts.some((fact) => {
+  // ENFORCER-020/025 tip v2: blog args carry required tip (catalog field exact).
+  // Scenario uses tip = "primitive-obsession"; journal must record TipRuleId / field.
+  const tipFacts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
+  const hasTip = tipFacts.some((fact) => {
     const text = JSON.stringify(fact);
-    return text.includes('primitive-obsession') || text.includes('ScoreVectorRef');
+    return (
+      text.includes('primitive-obsession') ||
+      text.includes('TipRuleId') ||
+      text.includes('enforcement-a01')
+    );
   });
-  assert.ok(hasCorrectedScore, 'codec-corrected score field reaches the journal (ENFORCER-024)');
+  assert.ok(hasTip, 'tip field reaches the journal as TipRuleId (ENFORCER-020/025)');
 
   assert.deepEqual(runtime.unanswered(), [], 'all declared steps must be consumed');
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');

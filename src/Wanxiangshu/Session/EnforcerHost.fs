@@ -36,10 +36,10 @@ module EnforcerHost =
     /// one code constant for how long a transform may stay suspended.
     let ParkedTransformLifetime = StrengthPolicy.Strength.ParkedTransformLifetime
 
-    /// C4: commit-path UTF-8 safety bounds (not nudge/throttle).
+    /// C4: commit-path UTF-8 safety bounds.
     let MaxBlogTextBytes = 512 * 1024
     let MaxEvidenceBytes = 128 * 1024
-    let MaxSerializedScoresBytes = 64 * 1024
+    /// ENFORCER-042: defensive multi-call cap (protocol violation still merged).
     let MaxMergedToolCalls = 32
 
     /// Item 14: three commit outcomes. Park only on KnownCommitted.
@@ -210,34 +210,41 @@ module EnforcerHost =
     /// provider step, in provider-visible order. The ordinal is the part's
     /// index in the assistant message — the only ordering that survives
     /// parallel execution.
+    ///
+    /// ENFORCER-023: only calls that pass tip re-validation enter the list.
+    /// Failed tip decode is a protocol skip (execute should already have
+    /// rejected; defense in depth at transform).
     let extractCalls
         (rawMessages: obj list)
         : (string * (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list * bool) option =
         match lastAssistantStep rawMessages with
         | None -> None
         | Some(messageId, parts, completed) ->
-            let catalog = EnforcerCatalog.triples (RuntimeResources.current().EnforcerRules)
+            let rules = RuntimeResources.current().EnforcerRules
 
             let calls =
                 parts
                 |> List.mapi (fun ordinal part -> ordinal, blogCallFromPart part)
                 |> List.choose (fun (ordinal, parsed) ->
                     parsed
-                    |> Option.map (fun (callId, input) ->
-                        ordinal, callId, EnforcerCodec.decodeCall catalog (decodeObject input)))
+                    |> Option.bind (fun (callId, input) ->
+                        match EnforcerCodec.decodeCall rules (decodeObject input) with
+                        | Ok call -> Some(ordinal, callId, call)
+                        | Error reason ->
+                            // CTX-014: fold identity into result — no whitelist growth for
+                            // protocol-skip diagnostics that are never recovery inputs.
+                            Diagnostic.emit
+                                "enforcer-blog-call-invalid"
+                                [ "result",
+                                  sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
+
+                            None))
 
             Some(messageId, calls, completed)
 
-    /// ENFORCER-045: the score vector as canonical JSON bytes (Map → object).
-    let private scoresToObj (scores: Map<string, byte>) : obj =
-        scores
-        |> Map.toList
-        |> List.map (fun (key, value) -> key, box (int value))
-        |> createObj
-
     /// ENFORCER-043: a cycle is valid when the provider run is provable, at
     /// least one call exists, the merged text is non-empty, and every
-    /// ToolCallId is unique.
+    /// ToolCallId is unique. Tip is required on each call (decode already).
     let private validateCycle
         (messageId: string)
         (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
@@ -257,6 +264,14 @@ module EnforcerHost =
                 let merged =
                     EnforcerCycle.mergeCalls (calls |> List.map (fun (ordinal, _, call) -> ordinal, call))
 
+                if merged.MultiCall then
+                    // ENFORCER-042: multi-call is a protocol violation; still merge defensively.
+                    Diagnostic.emit
+                        "enforcer-protocol-violation"
+                        [ "result",
+                          "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
+                          "call_count", string (List.length calls) ]
+
                 if not (EnforcerCycle.isValidCycle merged) then
                     Error "blog cycle merged text is empty after canonicalisation (ENFORCER-043)"
                 elif SyntheticToml.byteCount merged.MergedText > MaxBlogTextBytes then
@@ -264,16 +279,7 @@ module EnforcerHost =
                 elif SyntheticToml.byteCount merged.MergedEvidence > MaxEvidenceBytes then
                     Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
                 else
-                    let scoresBytes =
-                        if Map.isEmpty merged.MergedScores then
-                            0
-                        else
-                            SyntheticToml.byteCount (CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
-
-                    if scoresBytes > MaxSerializedScoresBytes then
-                        Error(sprintf "blog cycle scores exceed MaxSerializedScoresBytes=%d" MaxSerializedScoresBytes)
-                    else
-                        Ok(merged, callIds)
+                    Ok(merged, callIds)
 
     /// Commit one cycle: blobs first, then the single BlogEntryCommitted
     /// append (PERSIST-009 shape: durable effect → fact). The fold refuses a
@@ -353,22 +359,16 @@ module EnforcerHost =
                     match journal.WriteBlob merged.MergedText with
                     | Error error -> CycleCommitOutcome.KnownNotCommitted error
                     | Ok textBlob ->
-                        let writeScore () =
-                            if Map.isEmpty merged.MergedScores then
-                                Ok None
-                            else
-                                journal.WriteBlob(CanonicalJson.canonicalJson (scoresToObj merged.MergedScores))
-                                |> Result.map Some
-
+                        // ENFORCER-045 tip v2: TipRuleId + FieldNameAtCommit on the fact;
+                        // no score-vector blob (ENFORCER-072).
                         let writeEvidence () =
                             match merged.MergedEvidence with
                             | "" -> Ok None
                             | evidence -> journal.WriteBlob evidence |> Result.map Some
 
-                        match writeScore (), writeEvidence () with
-                        | Error error, _
-                        | _, Error error -> CycleCommitOutcome.KnownNotCommitted error
-                        | Ok scoreRef, Ok evidenceRef ->
+                        match writeEvidence () with
+                        | Error error -> CycleCommitOutcome.KnownNotCommitted error
+                        | Ok evidenceRef ->
                             // Re-read after blobs: only coverage-advancing facts race us;
                             // refuse still-stale staged cursor without writing the fact.
                             let latestBlog =
@@ -392,6 +392,8 @@ module EnforcerHost =
                                         latestBlog.Coverage.IngestedThroughSequence
                                 )
                             else
+                                let tip = merged.CanonicalTip
+
                                 let fact =
                                     AgentFact.BlogEntryCommitted
                                         {| SessionId = mainSessionId
@@ -408,7 +410,8 @@ module EnforcerHost =
                                            TextDigest = textBlob.BlobDigest
                                            ProviderRun = providerRun
                                            ToolCallIds = toolCallIds
-                                           ScoreVectorRef = scoreRef |> Option.map (fun blob -> blob.BlobRef)
+                                           TipRuleId = tip.RuleId
+                                           FieldNameAtCommit = Some tip.FieldName
                                            EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
                                            ObservedPrefixEpochId = epoch |}
 
@@ -573,6 +576,17 @@ module EnforcerHost =
                         Some(messageId, main.Toml)
                     | BloggerRequestContext.Squash _ -> None
 
+                // ENFORCER-070/071: RecentTips from main session (oldest → newest).
+                // Same source for normal / squash / restart / recovery / compaction rebuilds.
+                let previousTips =
+                    match projections.AgentProjections.Sessions |> Map.tryFind owner with
+                    | Some session ->
+                        session.Enforcement
+                        |> Option.map EnforcementProjection.recentTips
+                        |> Option.defaultValue []
+                        |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+                    | None -> []
+
                 let plan =
                     CompanionProjectionBuilder.build
                         HostDigest.sha256Hex
@@ -581,6 +595,7 @@ module EnforcerHost =
                         kind
                         frameBodies
                         delta
+                        previousTips
 
                 // C6: rebuild frames/instruction are synthetic projections, not new
                 // user authority. New Work delta is marked physical for diagnostics;
@@ -614,13 +629,16 @@ module EnforcerHost =
     /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
     /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next
     /// delta starts strictly after this sequence (COMPANION-003 / CTX-011).
-    let private lastCoveredSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) =
-        xTrace.Parts
+    ///
+    /// Scoped to the current reanchor generation's Turn/Part labels (HOST-006).
+    /// `None` = mapping failed (empty trace, or Host cursor not present on XTrace).
+    /// NEVER default to 0: silent 0 with Prev>0 stages Next≤Prev and dies at commit.
+    let private lastCoveredSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) : int64 option =
+        XTraceProjection.currentGenerationParts xTrace.Parts
         |> List.tryFindBack (fun part ->
             part.Turn < nextCursor.TurnIndex
             || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))
         |> Option.map (fun part -> part.Cursor.Sequence)
-        |> Option.defaultValue 0L
 
     /// COMPANION-011: digest of X's provider-visible prefix at the coverable cutoff.
     /// When the cutoff does not move, the previous digest is kept so a mid-turn
@@ -912,11 +930,16 @@ module EnforcerHost =
         reason.IndexOf("merged text is empty", StringComparison.Ordinal) >= 0
 
     /// Rebuild provider-semantic turns from durable XTrace (AABB refresh source).
+    /// Current reanchor generation only: Host turn indices restart after HOST-006,
+    /// so mixing generations under groupBy Turn glues voided labels to live ones.
     let private projectionFromXTrace
         (journal: AgentJournal)
         (xTrace: XTraceProjectionState)
         : ProviderProjection.ProviderSemanticProjection =
-        let byTurn = xTrace.Parts |> List.groupBy (fun part -> part.Turn) |> List.sortBy fst
+        let byTurn =
+            XTraceProjection.currentGenerationParts xTrace.Parts
+            |> List.groupBy (fun part -> part.Turn)
+            |> List.sortBy fst
 
         let messages =
             byTurn
@@ -964,6 +987,11 @@ module EnforcerHost =
 
     /// Public: build the staged offer context from the same delta the coordinator
     /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
+    ///
+    /// ENFORCER-045 / PERSIST-010: refuse at birth when coverage cannot strictly
+    /// advance. A zero-advance window is a known, handleable mapping failure —
+    /// return None so no BloggerMain is started. Unknown invariant breaks that
+    /// still reach commit keep Diagnostic.fatal (君子不立危墙: 已知拒生, 未知仍杀).
     let internal mainContextFromChunk
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
@@ -972,45 +1000,49 @@ module EnforcerHost =
         (xTrace: XTraceProjectionState)
         (projection: ProviderProjection.ProviderSemanticProjection)
         (chunk: BloggerDeltaChunk)
-        : BloggerRequestContext =
-        let nextSeq = lastCoveredSequence xTrace chunk.NextCursor
+        : BloggerRequestContext option =
+        match lastCoveredSequence xTrace chunk.NextCursor with
+        | None -> None
+        | Some nextSeq when nextSeq <= blog.Coverage.IngestedThroughSequence -> None
+        | Some nextSeq ->
+            let nextDigest =
+                coveredPrefixDigest
+                    blog.Coverage.CoverableTurnCutoffExclusive
+                    blog.Coverage.CoveredPrefixDigest
+                    chunk.NextCoverableTurnCutoffExclusive
+                    projection
 
-        let nextDigest =
-            coveredPrefixDigest
-                blog.Coverage.CoverableTurnCutoffExclusive
-                blog.Coverage.CoveredPrefixDigest
-                chunk.NextCoverableTurnCutoffExclusive
-                projection
+            let deltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml)
 
-        let deltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml)
-
-        let requestId =
-            BloggerRequestId.create (
-                HostDigest.sha256Hex (
-                    String.concat
-                        "|"
-                        [ SessionId.value mainSessionId
-                          SessionId.value bloggerSessionId
-                          "main"
-                          BlobDigest.value deltaDigest
-                          string blog.Coverage.IngestedThroughSequence
-                          string nextSeq ]
+            let requestId =
+                BloggerRequestId.create (
+                    HostDigest.sha256Hex (
+                        String.concat
+                            "|"
+                            [ SessionId.value mainSessionId
+                              SessionId.value bloggerSessionId
+                              "main"
+                              BlobDigest.value deltaDigest
+                              string blog.Coverage.IngestedThroughSequence
+                              string nextSeq ]
+                    )
                 )
-            )
 
-        BloggerRequestContext.Main
-            { RequestId = requestId
-              MainSessionId = mainSessionId
-              BloggerSessionId = bloggerSessionId
-              Toml = chunk.Toml
-              PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
-              NextIngestedThroughSequence = nextSeq
-              PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
-              NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
-              NextCoveredPrefixDigest = nextDigest
-              FrameEpochId = blog.FrameEpochId
-              DeltaDigest = deltaDigest
-              ObservedPrefixEpochId = observedEpoch }
+            Some(
+                BloggerRequestContext.Main
+                    { RequestId = requestId
+                      MainSessionId = mainSessionId
+                      BloggerSessionId = bloggerSessionId
+                      Toml = chunk.Toml
+                      PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
+                      NextIngestedThroughSequence = nextSeq
+                      PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
+                      NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
+                      NextCoveredPrefixDigest = nextDigest
+                      FrameEpochId = blog.FrameEpochId
+                      DeltaDigest = deltaDigest
+                      ObservedPrefixEpochId = observedEpoch }
+            )
 
     /// AABB: re-chunk from current IngestedThrough against latest XTrace.
     /// Returns None when sealed or no material.
@@ -1054,7 +1086,7 @@ module EnforcerHost =
                     projection.Messages
             with
             | None -> None
-            | Some chunk -> Some(mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk)
+            | Some chunk -> mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk
 
     /// The Blogger continuation-transform handler.
     ///
@@ -1068,6 +1100,7 @@ module EnforcerHost =
     let handleContinuation
         (scope: IParkedTransformHost)
         (journal: AgentJournal option)
+        (repairNudge: InteractionRepairNudge option)
         (bloggerSessionId: SessionId)
         (rawMessages: obj list)
         : Task<ContinuationOutcome> =
@@ -1133,7 +1166,9 @@ module EnforcerHost =
                     scope.ClearCurrentRequest key
                     project rawMessages
 
-                /// AABB once: prefer latest XTrace chunk; if none, keep old ctx (same prev).
+                /// ENFORCER-068 AABB: refresh transcript + inject repair. Marks AabbRepairConsumed.
+                /// Not used on first pure-prose (that is InteractionNudge). Used for: nudge
+                /// hard-fail, second pure prose, interrupted tool, ENFORCER-061 empty text.
                 let aabbRepair (ctx: BloggerRequestContext) (reason: string) =
                     let cell = scope.GetBloggerRuntime key
 
@@ -1146,7 +1181,7 @@ module EnforcerHost =
                         scope.TryTakePendingOffer key |> ignore
                         project rawMessages
                     else
-                        scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                        scope.SetBloggerRuntime(key, BloggerRuntime.markAabbRepairConsumed cell)
 
                         let fresh =
                             tryRefreshMainContextFromJournal scope durable owner bloggerSessionId
@@ -1162,7 +1197,7 @@ module EnforcerHost =
                                     key,
                                     { c with
                                         State = BloggerRuntimeState.InFlight fresh
-                                        RepairSpent = true }
+                                        Recovery = BloggerToolRecovery.AabbRepairConsumed }
                                 )
                             | _ -> ()
 
@@ -1175,14 +1210,69 @@ module EnforcerHost =
 
                         project (withRepairInstruction rebuilt requestKey)
 
+                /// ENFORCER-066: durable InteractionRepair. No AABB transcript refresh.
+                /// repairNudge is injected from HostSessionNudge (compile-order port).
+                let interactionNudge
+                    (ctx: BloggerRequestContext)
+                    (terminalRun: ProviderRunIdentity)
+                    (reason: string)
+                    : Task<ContinuationOutcome> =
+                    task {
+                        match repairNudge with
+                        | None ->
+                            Diagnostic.emit
+                                "enforcer-cycle-nudge-fail"
+                                [ "session_id", key; "result", "no repair nudge port; " + reason ]
+
+                            return aabbRepair ctx ("nudge-no-port: " + reason)
+                        | Some send ->
+                            let! sent =
+                                send bloggerSessionId RepairInstruction None journal terminalRun "blogger-missing-tool"
+
+                            match sent with
+                            | Ok _ ->
+                                scope.SetBloggerRuntime(
+                                    key,
+                                    BloggerRuntime.markInteractionNudgeIssued (scope.GetBloggerRuntime key) terminalRun
+                                )
+
+                                Diagnostic.emit "enforcer-cycle-nudge" [ "session_id", key; "result", reason ]
+
+                                // Nudge is a durable prompt_async; transform projects current view only.
+                                return project rawMessages
+                            | Error err when err.IndexOf("already claimed", StringComparison.OrdinalIgnoreCase) >= 0 ->
+                                // ENFORCER-067: claim exists / pending — not failure; no AABB.
+                                match (scope.GetBloggerRuntime key).Recovery with
+                                | BloggerToolRecovery.NoRecovery ->
+                                    scope.SetBloggerRuntime(
+                                        key,
+                                        BloggerRuntime.markInteractionNudgeIssued
+                                            (scope.GetBloggerRuntime key)
+                                            terminalRun
+                                    )
+                                | _ -> ()
+
+                                Diagnostic.emit "enforcer-cycle-nudge-pending" [ "session_id", key; "result", err ]
+
+                                return project rawMessages
+                            | Error err ->
+                                // ENFORCER-067 immediate failure → AABB.
+                                Diagnostic.emit "enforcer-cycle-nudge-fail" [ "session_id", key; "result", err ]
+
+                                return aabbRepair ctx ("nudge-failed: " + err)
+                    }
+
                 if hasIncompleteBlogTool rawMessages then
                     return project rawMessages
                 elif hasFailedBlogAttempt rawMessages then
-                    // Host cleanup after kill/abort: hanging blog → error+interrupted.
+                    // Interrupted tool call is NOT pure-prose nudge (ENFORCER-060/065).
+                    // Original recovery: one AABB, then exhaust.
                     match liveCtx with
-                    | Some ctx when not (scope.GetBloggerRuntime key).RepairSpent ->
-                        return aabbRepair ctx "blog tool interrupted without completed call"
-                    | Some _ -> return fatalEnd "blog tool interrupted; aabb exhausted"
+                    | Some ctx ->
+                        match (scope.GetBloggerRuntime key).Recovery with
+                        | BloggerToolRecovery.AabbRepairConsumed ->
+                            return fatalEnd "blog tool interrupted; aabb exhausted"
+                        | _ -> return aabbRepair ctx "blog tool interrupted without completed call"
                     | None ->
                         // No live cycle: interrupted blog without authority is stop/abort residue,
                         // not a repair opportunity. Stop, never inject # Protocol repair.
@@ -1192,14 +1282,34 @@ module EnforcerHost =
                 elif not assistantCompleted then
                     return project (rebuild ())
                 else
-                    // ENFORCER-060: completed assistant, zero blog parts → pure prose.
+                    // ENFORCER-060/064..068: completed assistant, zero blog parts → pure prose.
                     let cell = scope.GetBloggerRuntime key
+
+                    let terminalRun =
+                        match lastAssistantStep rawMessages with
+                        | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
+                            ProviderRunIdentity.create messageId
+                        | _ -> ProviderRunIdentity.create "unknown-prose-run"
 
                     match liveCtx with
                     | None -> return stop "unowned-completed-prose-without-CurrentRequest"
-                    | Some ctx when not cell.RepairSpent ->
-                        return aabbRepair ctx "no completed blog calls (ENFORCER-060)"
-                    | Some _ -> return fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
+                    | Some ctx ->
+                        match cell.Recovery with
+                        | BloggerToolRecovery.NoRecovery ->
+                            return! interactionNudge ctx terminalRun "no completed blog calls (ENFORCER-060)"
+                        | BloggerToolRecovery.InteractionNudgeIssued issuedRun when issuedRun = terminalRun ->
+                            // ENFORCER-067: same terminal re-entry / transform re-fire — not failure.
+                            // Do not AABB until a *new* pure-prose terminal arrives.
+                            Diagnostic.emit
+                                "enforcer-cycle-nudge-pending"
+                                [ "session_id", key; "result", "same terminal re-entry while nudge in flight" ]
+
+                            return project rawMessages
+                        | BloggerToolRecovery.InteractionNudgeIssued _ ->
+                            // Semantic failure: nudge accepted, new terminal still pure prose → AABB.
+                            return aabbRepair ctx "nudge semantic failure; pure prose again (ENFORCER-067)"
+                        | BloggerToolRecovery.AabbRepairConsumed ->
+                            return fatalEnd "protocol-repair-exhausted (ENFORCER-060)"
             | Some durable, Some owner, Some(messageId, calls, assistantCompleted) when not (List.isEmpty calls) ->
                 // ENFORCER-044: merge/commit on completed blog tool parts when this plugin
                 // owns the cycle (live CurrentRequest).
@@ -1359,9 +1469,12 @@ module EnforcerHost =
                     match validateCycle messageId calls with
                     | Error reason when
                         isEmptyTextCycleFailure reason
-                        && not (scope.GetBloggerRuntime key).RepairSpent
+                        && (match (scope.GetBloggerRuntime key).Recovery with
+                            | BloggerToolRecovery.AabbRepairConsumed -> false
+                            | _ -> true)
                         && not (hasIncompleteBlogTool rawMessages)
                         ->
+                        // ENFORCER-061: empty text keeps one AABB repair budget (not pure-prose nudge).
                         injectRepair <- true
 
                         let fresh =
@@ -1373,7 +1486,7 @@ module EnforcerHost =
                         | Some freshCtx ->
                             repairCtx <- Some freshCtx
                             let cell = scope.GetBloggerRuntime key
-                            scope.SetBloggerRuntime(key, BloggerRuntime.markRepairSpent cell)
+                            scope.SetBloggerRuntime(key, BloggerRuntime.markAabbRepairConsumed cell)
                             scope.SetCurrentRequest(key, freshCtx)
 
                             match scope.GetBloggerRuntime key with
@@ -1384,13 +1497,18 @@ module EnforcerHost =
                                         key,
                                         { c with
                                             State = BloggerRuntimeState.InFlight freshCtx
-                                            RepairSpent = true }
+                                            Recovery = BloggerToolRecovery.AabbRepairConsumed }
                                     )
                                 | _ -> ()
 
                             Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                     | Error reason ->
-                        if isEmptyTextCycleFailure reason && (scope.GetBloggerRuntime key).RepairSpent then
+                        if
+                            isEmptyTextCycleFailure reason
+                            && match (scope.GetBloggerRuntime key).Recovery with
+                               | BloggerToolRecovery.AabbRepairConsumed -> true
+                               | _ -> false
+                        then
                             unexpectedEnd "protocol-repair-exhausted"
                         else
                             unexpectedEnd reason

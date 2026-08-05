@@ -235,3 +235,24 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
     const fromSchema = allowList(config, agentName('fast', role)).map(permissionOf).sort()
     assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)  }
 })
+
+test('AGENT_016_external_directory_overrides_host_default_ask', () => {
+  // AGENT-016: Host agent.ts defaults external_directory:* = ask. Managed agents
+  // must emit a trailing allow so findLast cancels the Host ask on any external path.
+  const config = buildConfig()
+  assert.equal(managedAgentConfig.configure(config).ok, true)
+
+  for (const tier of TIERS) {
+    for (const role of ROLES) {
+      const name = agentName(tier, role)
+      const rules = mergedRules(config, name)
+      const action = evaluate(rules, 'external_directory', '/tmp/outside/*').action
+      assert.equal(action, 'allow', `${name} must allow external_directory (got ${action})`)
+      assert.equal(
+        config.agent[name].permission.external_directory,
+        'allow',
+        `${name} permission object must set external_directory allow`,
+      )
+    }
+  }
+})

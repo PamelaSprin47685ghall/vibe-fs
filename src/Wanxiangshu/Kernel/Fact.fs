@@ -62,6 +62,12 @@ module Fact =
         /// Child Host session is gone and cannot be recovered.
         | HostSessionGone
 
+    /// Clean-break: why a durable completion cell was rejected as false finality.
+    /// Legacy abort blobs are Host observations written as if they were terminals.
+    [<RequireQualifiedAccess>]
+    type FalseCompletionReason =
+        | LegacyAbortWasObservation
+
     [<RequireQualifiedAccess>]
     type AgentFact =
 
@@ -280,6 +286,33 @@ module Fact =
                Reason: HandleAbandonReason
                AbandonedAt: DateTimeOffset |}
 
+        /// Clean-break: durable completion cell held a legacy abort observation
+        /// (blob status=aborted), not a proven business terminal. Fold may revert
+        /// CompletedAwaitingJoin → Active only when ref/digest match exactly.
+        | HandleFalseCompletionRejected of
+            {| ParentSessionId: SessionId
+               Handle: HandleId
+               ExpectedCompletionRef: BlobRef
+               ExpectedCompletionDigest: BlobDigest
+               Reason: FalseCompletionReason |}
+
+        /// Clean-break: parent already retired a false terminal. Records the bad
+        /// cell so replacement migration is pure and idempotent.
+        | HandleFalseTerminalReported of
+            {| ParentSessionId: SessionId
+               Handle: HandleId
+               BadCompletionRef: BlobRef
+               BadCompletionDigest: BlobDigest
+               Reason: FalseCompletionReason |}
+
+        /// Clean-break: parent was notified that a prior aborted join result is void;
+        /// child continues under a deterministic replacement handle.
+        | ParentJoinCorrectionRequested of
+            {| ParentSessionId: SessionId
+               OriginalHandle: HandleId
+               ReplacementHandle: HandleId
+               BadCompletionDigest: BlobDigest |}
+
         /// Durable observation that a Host turn reached a terminal snapshot.
         /// Idempotent identity = SessionId + ProviderRun (when present). Wake only;
         /// business completion still derives from full snapshot (ARCH-002).
@@ -426,6 +459,9 @@ module Fact =
         /// may be derived from the other.
         /// ENFORCER-045: one atomic BloggerMain cycle — frame + coverage +
         /// enforcement half. No separate EnforcementCycleCommitted.
+        /// Tip v2 (ENFORCER-020..026 / 045): TipRuleId is the stable catalog
+        /// identity; FieldNameAtCommit is an optional audit snapshot.
+        /// ScoreVectorRef is deleted (ENFORCER-072).
         | BlogEntryCommitted of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
@@ -440,7 +476,8 @@ module Fact =
                TextDigest: BlobDigest
                ProviderRun: ProviderRunIdentity
                ToolCallIds: ToolCallId list
-               ScoreVectorRef: BlobRef option
+               TipRuleId: string
+               FieldNameAtCommit: string option
                EvidenceRef: BlobRef option
                ObservedPrefixEpochId: PrefixEpochId |}
 

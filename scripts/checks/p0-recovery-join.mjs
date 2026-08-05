@@ -79,8 +79,10 @@ export const RULES = [
   {
     id: 'join-tool-join-program',
     fileHint: 'JoinTool.fs',
-    pattern: /joinAny|JoinProgram|JoinInterpreter/,
-    label: 'JoinTool must enter JoinProgram / joinAny / JoinInterpreter',
+    // EXEC-018: JoinTool production path is joinAvailable + interpretBatch (JoinAny remains
+    // a valid positive match for legacy DSL / gate synthetics).
+    pattern: /joinAny|joinAvailable|JoinProgram|JoinInterpreter/,
+    label: 'JoinTool must enter JoinProgram / joinAny|joinAvailable / JoinInterpreter',
     positive: true,
   },
   {
@@ -89,7 +91,7 @@ export const RULES = [
     // P0 §五 / §十: JoinTool must not bare-call runtime.Join (JoinWithPermit / Join(permit ok elsewhere).
     // Bare = runtime.Join( without leading permit argument.
     pattern: /runtime\.Join\s*\(\s*(?!permit\b)/,
-    label: 'JoinTool must not call runtime.Join; use joinAny + JoinInterpreter',
+    label: 'JoinTool must not call runtime.Join; use joinAvailable|joinAny + JoinInterpreter',
   },
   {
     // P0 REVISE: production Tools agent-join must not bare-call runtime.Join(
@@ -150,7 +152,7 @@ export const RULES = [
     fileHint: 'HostForkRestart.fs',
     // Restart recovery must walk interpreter / JoinableCompletion path.
     pattern:
-      /ChildRecoveryInterpreter|tryFromProvenTerminal|JoinableCompletion|recordCompletion|HandleCompletionCodec\.tryRead/,
+      /ChildRecoveryInterpreter|tryFromProvenTerminal|JoinableCompletion|recordCompletion|HandleCompletionCodec\.(tryRead|tryReadBody|decodeBody)|fromDecoded|LegacyFalseAbort/,
     label: 'HostForkRestart must use proven terminal or durable completion structure',
     positive: true,
   },

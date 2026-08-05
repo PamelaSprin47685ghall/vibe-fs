@@ -3,12 +3,15 @@ namespace Wanxiangshu.Session
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain.ChildRecovery
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 
 /// Restart recovery for linked children. Terminal path: ChildRecoveryInterpreter
 /// → JoinableCompletion → recordCompletion → PublishCompletion. Fail closed on proof.
+/// Clean-break: legacy abort blobs never publish; retired false terminals migrate once.
 module HostForkRestart =
 
     let private ports
@@ -61,15 +64,35 @@ module HostForkRestart =
             | Error reason -> runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
         }
 
+    /// Clean-break: retired handle whose last cell was a legacy abort → replacement once.
+    let private migrateRetiredIfFalseAbort
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        : unit =
+        match record.LastCompletion with
+        | None -> ()
+        | Some cell ->
+            match cell.CompletionRef, cell.CompletionDigest with
+            | Some blobRef, Some blobDigest ->
+                match journal.Writer.BlobWriter.Read blobRef with
+                | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
+                    match HandleCompletionCodec.decodeBody body with
+                    | LegacyFalseAbort _ ->
+                        ignore (
+                            JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest
+                        )
+                    | _ -> ()
+                | _ -> ()
+            | _ -> ()
+
     /// EXEC-009 restart recovery: rebuild this parent's join mailbox from the
     /// durable handle records.
     ///
-    /// Retired handles are skipped. EXEC-009 makes the tombstone permanent and
-    /// forbids a retired id degrading back into a fork target, so restoring one
-    /// would put a consumed completion back on the mailbox and let `join` return it
-    /// a second time.
+    /// Retired handles: clean-break may mint a deterministic replacement when
+    /// LastCompletion blob is LegacyFalseAbort. Otherwise tombstone stays permanent.
     ///
-    /// PTY and ManagerJob handles are skipped too: this rebuilds agent children, and
+    /// PTY and ManagerJob handles are skipped: this rebuilds agent children, and
     /// a PTY is re-owned by `PtyPort`, not by a transcript replay.
     let restoreLinkedChildren
         (runtime: ForkRuntime)
@@ -89,9 +112,9 @@ module HostForkRestart =
 
             for record in records do
                 match record.Lifecycle, HandleId.tryAgent record.Handle with
-                | HandleLifecycle.Retired, _
                 | HandleLifecycle.Abandoned _, _
                 | _, None -> ()
+                | HandleLifecycle.Retired, Some _ -> migrateRetiredIfFalseAbort journal parentId record
                 | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
                     let agentId = AgentHandleId.value agentHandle
                     let role = AgentRoleIdentity.ofRole record.CanonicalRole
@@ -101,23 +124,49 @@ module HostForkRestart =
                     runtime.Restore(agentId, role, record.TargetAgent)
                     runtime.BindChildSession(agentId, record.ChildSessionId)
 
-                    // Durable blob already sealed: mailbox only after proof. No re-record.
-                    match record.Lifecycle, HandleCompletionCodec.tryRead journal record agentId with
-                    | HandleLifecycle.CompletedAwaitingJoin cell, Ok(Some completion) ->
-                        let body = HandleCompletionCodec.encodeOutcome completion.RunId completion.Outcome
+                    // Durable blob: decode first. LegacyFalseAbort → reject, no publish.
+                    match HandleCompletionCodec.tryReadBody journal record with
+                    | Ok(Some body, Some blobRef, Some blobDigest) ->
+                        match HandleCompletionCodec.decodeBody body with
+                        | Current decoded ->
+                            let completion =
+                                HandleCompletionCodec.tryMaterialiseRunCompletion record agentId decoded
 
-                        match
-                            JoinableCompletion.tryFromDurableCompleted
-                                agentId
-                                record.Handle
-                                record.ChildSessionId
-                                cell.Kind
-                                (Some body)
-                        with
-                        | Ok _ -> runtime.PublishCompletion completion
-                        | Error reason ->
-                            runtime.MarkInterrupted(agentId, sprintf "host restart: proof failed: %s" reason)
-                    | _, Ok None ->
+                            ignore (
+                                JoinableCompletion.fromDecoded
+                                    agentId
+                                    record.Handle
+                                    record.ChildSessionId
+                                    decoded
+                                    body
+                            )
+
+                            runtime.PublishCompletion completion
+                        | LegacyFalseAbort _ ->
+                            match
+                                AgentJournal.appendAgent
+                                    (StreamId.Session parentId)
+                                    None
+                                    (AgentFact.HandleFalseCompletionRejected
+                                        {| ParentSessionId = parentId
+                                           Handle = record.Handle
+                                           ExpectedCompletionRef = blobRef
+                                           ExpectedCompletionDigest = blobDigest
+                                           Reason = FalseCompletionReason.LegacyAbortWasObservation |})
+                                    journal
+                            with
+                            | Ok _ ->
+                                runtime.MarkInterrupted(agentId, "host restart: legacy false abort rejected")
+                            | Error failure ->
+                                runtime.MarkInterrupted(
+                                    agentId,
+                                    sprintf
+                                        "host restart: false abort reject failed: %s"
+                                        (JournalAppendFailure.describe failure)
+                                )
+                        | Invalid _ ->
+                            runtime.MarkInterrupted(agentId, "host restart: invalid completion blob")
+                    | Ok(None, _, _) ->
                         do!
                             recoverChild
                                 runtime
@@ -128,8 +177,7 @@ module HostForkRestart =
                                 record.ChildSessionId
                                 role
                                 record.TargetAgent
-                    | _, Error reason -> runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
-                    | _, Ok(Some _) -> ()
+                    | Error reason -> runtime.MarkInterrupted(agentId, sprintf "host restart: %s" reason)
                 | HandleLifecycle.Active, Some agentHandle ->
                     let agentId = AgentHandleId.value agentHandle
                     let role = AgentRoleIdentity.ofRole record.CanonicalRole

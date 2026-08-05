@@ -1,15 +1,22 @@
 namespace Wanxiangshu.Domain
 
+open System.Threading.Tasks
 open Wanxiangshu.Domain.SessionRecovery
 
 /// P0-RECOVERY-JOIN-001 §五: closed join program. Data only — Interpreter executes.
-/// `JoinAny` consumes a private-token FamilyRecoveryPermit; no bare join effect.
+/// `JoinAny` / `JoinAvailable` consume FamilyRecoveryPermit; no bare join effect.
 module JoinProgram =
 
-    /// Free `'outcome` is materialised by the production interpreter (Session join Result).
+    /// Free `'outcome` is materialised by the production interpreter.
+    /// JoinAny → single Result; JoinAvailable → batch JoinWaitOutcome Result.
     type JoinProgram<'outcome, 'result> =
         | Return of 'result
         | JoinAny of FamilyRecoveryPermit * ('outcome -> JoinProgram<'outcome, 'result>)
+        | JoinAvailable of
+            FamilyRecoveryPermit *
+            maxCount: int *
+            interrupt: Task<unit> *
+            ('outcome -> JoinProgram<'outcome, 'result>)
 
     type JoinBuilder() =
         member _.Return(value: 'result) : JoinProgram<'outcome, 'result> = Return value
@@ -25,10 +32,20 @@ module JoinProgram =
                 match current with
                 | Return value -> cont value
                 | JoinAny(permit, next) -> JoinAny(permit, (fun outcome -> bind (next outcome)))
+                | JoinAvailable(permit, maxCount, interrupt, next) ->
+                    JoinAvailable(permit, maxCount, interrupt, (fun outcome -> bind (next outcome)))
 
             bind program
 
     let join = JoinBuilder()
 
-    /// Build a join program that must present FamilyRecoveryPermit to the interpreter.
+    /// Single-result join program (FamilyRecoveryPermit required).
     let joinAny (permit: FamilyRecoveryPermit) : JoinProgram<'outcome, 'outcome> = JoinAny(permit, Return)
+
+    /// EXEC-018 batch join program: maxCount + local interrupt (≠ runtime.Cancel).
+    let joinAvailable
+        (permit: FamilyRecoveryPermit)
+        (maxCount: int)
+        (interrupt: Task<unit>)
+        : JoinProgram<'outcome, 'outcome> =
+        JoinAvailable(permit, maxCount, interrupt, Return)

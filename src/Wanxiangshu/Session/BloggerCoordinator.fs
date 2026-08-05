@@ -74,16 +74,9 @@ module BloggerCoordinator =
         with
         | None -> None
         | Some chunk ->
-            Some(
-                EnforcerHost.mainContextFromChunk
-                    mainSessionId
-                    bloggerSessionId
-                    observedEpoch
-                    blog
-                    xTrace
-                    projection
-                    chunk
-            )
+            // Birth gate: mapping failure / Next≤Prev → None (no Start, no fatal).
+            // Commit-path fatal remains only for contexts that somehow escaped this gate.
+            EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection chunk
 
     /// C5: durable materialization. Context blob is the irrecomputable semantic
     /// input. Pre-send PromptKey=None; after physical send, re-append with the

@@ -3,8 +3,8 @@ namespace Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
-/// P0-RECOVERY-JOIN-001: Aborted is observation, not durable finality.
-/// Join consumes only JoinableCompletion; HandleCompleted writers hold that proof.
+/// P0-RECOVERY-JOIN-001 + clean-break: Aborted is observation, not durable finality.
+/// Join consumes only JoinableCompletion from decoded v2 terminal; no raw JSON / kind+body.
 module ChildRecovery =
 
     /// Proven business terminal of a child handle. No Aborted case.
@@ -30,7 +30,51 @@ module ChildRecovery =
         let failed (agentId: string) (handle: HandleId) (childSession: SessionId) (body: string) : TerminalEvidence =
             ProvenFailed(agentId, handle, childSession, body)
 
-    /// Single-assignment completion cell proof. Private: only proveTerminal /
+    /// Completion blob v2 finality (schemaVersion=2). No aborted.
+    type CompletedPayload =
+        { RunId: string
+          WorkRecord: string
+          ChildSessionId: string
+          AuthorityRoot: string
+          ProviderRun: string
+          Directory: string }
+
+    type FailedPayload =
+        { RunId: string
+          Code: string
+          Message: string
+          ChildSessionId: string }
+
+    /// Decoded current-schema agent completion. No Aborted case.
+    type DurableAgentCompletionV2 =
+        | CompletedV2 of CompletedPayload
+        | FailedV2 of FailedPayload
+
+    /// Legacy abort observation planted as if it were a terminal (status=aborted).
+    type LegacyAbortPayload =
+        { Status: string
+          RunId: string
+          Code: string
+          Message: string
+          ChildSessionId: string
+          RawBody: string }
+
+    [<RequireQualifiedAccess>]
+    type CompletionDecodeError =
+        | MissingSchemaVersion
+        | UnknownSchemaVersion of version: string
+        | UnknownFinality of finality: string
+        | MissingFinality
+        | InvalidJson of reason: string
+        | IncompletePayload of reason: string
+
+    /// First decode of a durable completion blob. JoinDrain branches on this.
+    type DurableCompletionDecode =
+        | Current of DurableAgentCompletionV2
+        | LegacyFalseAbort of LegacyAbortPayload
+        | Invalid of CompletionDecodeError
+
+    /// Single-assignment completion cell proof. Private: only fromDecoded /
     /// tryFromProvenTerminal may construct. Carries kind + body so
     /// HandleController writes blob + HandleCompleted without external kind/body.
     type JoinableCompletion =
@@ -50,36 +94,30 @@ module ChildRecovery =
         let kind (c: JoinableCompletion) = c.Kind
         let body (c: JoinableCompletion) = c.Body
 
-        /// Rebuild joinable completion already sealed as durable CompletedAwaitingJoin.
-        /// Body may be absent for Cancelled / pre-blob journal lines.
-        let tryFromDurableCompleted
+        /// Sole constructor from a decoded v2 terminal. Never touches raw JSON,
+        /// HandleCompletionKind, or an arbitrary body string as proof.
+        let fromDecoded
             (agentId: string)
             (handle: HandleId)
             (childSession: SessionId)
-            (kind: HandleCompletionKind)
-            (body: string option)
-            : Result<JoinableCompletion, string> =
-            match kind, body with
-            | HandleCompletionKind.Terminal, Some content when content <> "" ->
-                Ok
-                    { AgentId = agentId
-                      Handle = handle
-                      ChildSession = childSession
-                      Finality = ChildFinality.Succeeded content
-                      Kind = kind
-                      Body = Some content }
-            | HandleCompletionKind.SendFailure, Some content when content <> "" ->
-                // Durable SendFailure is a proven business failure cell, not abort-only.
-                Ok
-                    { AgentId = agentId
-                      Handle = handle
-                      ChildSession = childSession
-                      Finality = ChildFinality.Failed content
-                      Kind = kind
-                      Body = Some content }
-            | HandleCompletionKind.Cancelled, _ -> Error "durable Cancelled is not joinable under P0-RECOVERY-JOIN-001"
-            | HandleCompletionKind.Terminal, _
-            | HandleCompletionKind.SendFailure, _ -> Error "durable completion missing body"
+            (decoded: DurableAgentCompletionV2)
+            (encodedBody: string)
+            : JoinableCompletion =
+            match decoded with
+            | CompletedV2 _ ->
+                { AgentId = agentId
+                  Handle = handle
+                  ChildSession = childSession
+                  Finality = ChildFinality.Succeeded encodedBody
+                  Kind = HandleCompletionKind.Terminal
+                  Body = Some encodedBody }
+            | FailedV2 _ ->
+                { AgentId = agentId
+                  Handle = handle
+                  ChildSession = childSession
+                  Finality = ChildFinality.Failed encodedBody
+                  Kind = HandleCompletionKind.SendFailure
+                  Body = Some encodedBody }
 
         /// Interpreter path: proven terminal only. No fromAborted.
         let tryFromProvenTerminal (evidence: TerminalEvidence) : Result<JoinableCompletion, string> =
@@ -102,6 +140,15 @@ module ChildRecovery =
                       Body = Some body }
             | ProvenCompleted _
             | ProvenFailed _ -> Error "proven terminal body must be non-empty"
+
+    /// Pure replacement handle id for a retired false-abort tombstone.
+    /// recovery:<originalAgentId>:<bad-completion-digest> — repeat recovery never mints twice.
+    module FalseTerminalMigration =
+        let replacementAgentId (originalAgentId: string) (badDigest: BlobDigest) : string =
+            sprintf "recovery:%s:%s" originalAgentId (BlobDigest.value badDigest)
+
+        let replacementHandle (originalAgentId: string) (badDigest: BlobDigest) : HandleId =
+            HandleId.Agent(AgentHandleId.create (replacementAgentId originalAgentId badDigest))
 
     /// Domain view of durable handle lifecycle (no Journal types).
     [<RequireQualifiedAccess>]

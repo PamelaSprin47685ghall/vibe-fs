@@ -12,7 +12,19 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { agentJournal, xTraceCapture, sessionId, listItems } from '../support/domain.mjs'
+import {
+  agentJournal,
+  agentFact,
+  xTraceCapture,
+  sessionId,
+  listItems,
+  caseOf,
+  prefixEpochId,
+  providerRun,
+  stream,
+} from '../support/domain.mjs'
+
+const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
 
 const withJournal = (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
@@ -27,6 +39,7 @@ const withJournal = (fn) => {
 }
 
 const SEM = sessionId('ses_cap')
+const streamSession = (sid) => stream.session(sid)
 
 test('COMPANION_007_capture_projection_is_idempotent_across_transforms', () => {
   withJournal((journal) => {
@@ -73,8 +86,8 @@ test('COMPANION_007_capture_projection_appends_only_new_turns', () => {
     assert.equal(parts.length, 2)
     assert.deepEqual(
       parts.map((part) => part.Provenance),
-      ['turn:0/part:0', 'turn:1/part:0'],
-      'provenance must be the stable turn/part identity',
+      ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
+      'provenance is generation-scoped turn/part (HOST-006 reanchor isolation)',
     )
   })
 })
@@ -104,7 +117,70 @@ test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', () => {
     const parts = listItems(updated.Parts)
     assert.deepEqual(
       parts.map((part) => part.Provenance),
-      ['turn:0/part:0', 'turn:1/part:0'],
+      ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
+    )
+  })
+})
+
+test('HOST_006_capture_projection_after_reanchor_uses_next_generation', () => {
+  // Pre-reanchor turns reuse Host indices after ContextReanchored. Provenance
+  // must open g:1 so turn:0/part:0 appends instead of colliding with g:0.
+  withJournal((journal) => {
+    const first = xTraceCapture.captureProjection(
+      journal,
+      SEM,
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text('pre-compact task')] },
+          { role: 'assistant', parts: [xTraceCapture.text('pre-compact work')] },
+        ],
+      }),
+    )
+    assert.equal(listItems(first.Parts).length, 2)
+    assert.deepEqual(
+      listItems(first.Parts).map((part) => part.Provenance),
+      ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
+    )
+
+    const reanchor = AgentJournalModule_appendAgent(
+      streamSession(SEM),
+      undefined,
+      agentFact('ContextReanchored', {
+        SessionId: SEM,
+        PreviousEpochId: prefixEpochId(0),
+        NextEpochId: prefixEpochId(1),
+        ObservedCompactionRun: providerRun('msg_compaction_1'),
+      }),
+      journal,
+    )
+    assert.equal(caseOf(reanchor), 'Ok', 'ContextReanchored must fold')
+
+    // Host renumbered: same turn indices, new content after compaction.
+    const second = xTraceCapture.captureProjection(
+      journal,
+      SEM,
+      xTraceCapture.semantic({
+        messages: [
+          { role: 'user', parts: [xTraceCapture.text('summary-of-prior')] },
+          { role: 'assistant', parts: [xTraceCapture.text('post-compact work')] },
+        ],
+      }),
+    )
+    const parts = listItems(second.Parts)
+    assert.equal(parts.length, 4, 'reanchor generation must append, not collide')
+    assert.deepEqual(
+      parts.map((part) => part.Provenance),
+      [
+        'g:0/turn:0/part:0',
+        'g:0/turn:1/part:0',
+        'g:1/turn:0/part:0',
+        'g:1/turn:1/part:0',
+      ],
+    )
+    // Sequence remains strictly monotonic across generations.
+    assert.deepEqual(
+      parts.map((part) => Number(part.Cursor.Sequence)),
+      [1, 2, 3, 4],
     )
   })
 })

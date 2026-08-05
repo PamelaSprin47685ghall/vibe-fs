@@ -140,17 +140,51 @@ module XTraceProjection =
                 { state with
                     Terminal = Some(textRef, textDigest) }
 
+    /// Provenance generation: `g:N/...` after HOST-006 reanchor; legacy `turn:N/part:M` → 0.
+    let provenanceGeneration (provenance: string) : int =
+        if provenance.StartsWith("g:") then
+            let rest = provenance.Substring(2)
+            let slash = rest.IndexOf('/')
+            let token = if slash < 0 then rest else rest.Substring(0, slash)
+
+            match System.Int32.TryParse token with
+            | true, n when n >= 0 -> n
+            | _ -> 0
+        else
+            0
+
+    /// Host turn indices restart per reanchor generation; XTrace Sequence does not.
+    /// Turn/Part labels are only comparable within one generation.
+    let currentGenerationParts (parts: XTracePartRef list) : XTracePartRef list =
+        match parts with
+        | [] -> []
+        | _ ->
+            let maxGen =
+                parts |> List.map (fun part -> provenanceGeneration part.Provenance) |> List.max
+
+            parts |> List.filter (fun part -> provenanceGeneration part.Provenance = maxGen)
+
     /// Map an ingest cursor (sequence of the last COVERED part) to the semantic
     /// cursor of the first UNCOVERED part. `>` not `>=`: the coverage sequence
     /// names a part already consumed, so the delta starts strictly after it.
     /// A sequence past the head means "nothing left" (one turn past the last part).
+    ///
+    /// After HOST-006 reanchor, Host renumbering voids old turn indices. Resolve the
+    /// cursor against the current generation only so nextChunk / lastCoveredSequence
+    /// share one numbering. Pre-reanchor sequences still advance coverage via
+    /// absolute Sequence, but their Turn labels are never mixed with post-reanchor ones.
     let semanticCursorFor (sequence: int64) (state: XTraceProjectionState) : SemanticCursor =
-        match state.Parts |> List.tryFind (fun part -> part.Cursor.Sequence > sequence) with
+        let searchable =
+            let current = currentGenerationParts state.Parts
+
+            if List.isEmpty current then state.Parts else current
+
+        match searchable |> List.tryFind (fun part -> part.Cursor.Sequence > sequence) with
         | Some part ->
             { TurnIndex = part.Turn
               PartIndex = part.PartIndex }
         | None ->
-            match List.tryLast state.Parts with
+            match List.tryLast searchable with
             | Some last ->
                 { TurnIndex = last.Turn + 1
                   PartIndex = 0 }

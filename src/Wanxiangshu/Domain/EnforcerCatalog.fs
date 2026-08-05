@@ -10,6 +10,20 @@ type EnforcerRule =
       Nudge: string
       CatalogOrdinal: int }
 
+/// ENFORCER-004 / 021: tip identity after catalog resolve.
+/// FieldName is provider-facing only; RuleId is the durable identity.
+type EnforcerTip =
+    { RuleId: string
+      FieldName: string
+      CatalogOrdinal: int }
+
+module EnforcerTip =
+
+    let ofRule (rule: EnforcerRule) : EnforcerTip =
+        { RuleId = rule.RuleId
+          FieldName = rule.FieldName
+          CatalogOrdinal = rule.CatalogOrdinal }
+
 module EnforcerCatalog =
 
     let private isNonEmpty (s: string) = not (isNull s) && s.Trim().Length > 0
@@ -55,6 +69,20 @@ module EnforcerCatalog =
                     | Some bad -> Error(sprintf "enforcer catalog empty text on rule ordinal %d" bad.CatalogOrdinal)
                     | None -> Ok ordered
 
-    /// Provider codec catalog: FieldName, RuleId, CatalogOrdinal.
-    let triples (rules: EnforcerRule list) : (string * string * int) list =
-        rules |> List.map (fun r -> r.FieldName, r.RuleId, r.CatalogOrdinal)
+    /// ENFORCER-021: exact field → rule. No fuzzy match (ENFORCER-024).
+    let tryFindByField (field: string) (rules: EnforcerRule list) : EnforcerRule option =
+        if isNull field then
+            None
+        else
+            let trimmed = field.Trim()
+
+            if trimmed.Length = 0 then
+                None
+            else
+                rules |> List.tryFind (fun r -> r.FieldName = trimmed)
+
+    /// Provider enum values: FieldName list in catalog ordinal order.
+    let fieldNames (rules: EnforcerRule list) : string list =
+        rules
+        |> List.sortBy (fun r -> r.CatalogOrdinal)
+        |> List.map (fun r -> r.FieldName)

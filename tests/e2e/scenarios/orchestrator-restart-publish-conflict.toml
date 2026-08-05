@@ -2,6 +2,13 @@
 # job must resume the same rebase — not restart the original task — and still publish
 # exactly once.
 #
+# ── recovery is Continue-driven (Host has no auto-recovery) ──────────────────
+#
+# Host does not re-drive pending tools after restart; recovery is triggered only by new
+# input (`runLoop`). Pending join maps to interrupted-error; a new user message anchors a
+# new turn (`orch-continue`). Completion criteria = `Published eq 1` journal fact.
+# Original-turn `orch.2` is a non-deterministic race path and is not declared.
+#
 # ── the recovery file this one loaded was empty ──────────────────────────────
 #
 # `orchestrator-restart-publish-conflict-recovery.json` was `{"scenario":
@@ -48,13 +55,15 @@ flow = [
 
   { awaitRestart = true },
 
-  { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
-
-  # The SAME key, delivered a second time. The JSON form declared this as
+  # Continue drives recovery (Host has no auto-recovery). Causal order on the common path:
+  # Continue → 2nd conflict-resume → review/confirm → Published → orch-continue join/text.
+  # orch.2 is not declared (non-deterministic race with Continue).
+  # The SAME conflict-resume key, delivered a second time. The JSON form declared this as
   # `manager-conflict-resume-2` at `lane.turn = 5` with `"Resolved rebase resolution."`
   # against the first edge's `"Resuming rebase resolution."` — two different responses for
   # one key, which content-as-a-pure-function forbids. The two texts existed only so the old
   # flow could `wait` on distinct ids; nothing asserted which one arrived.
+  { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
   { wait = "conflict-resume.0" },
   { wait = "reviewer.0" },
   { wait = "reviewer.1" },
@@ -83,6 +92,8 @@ tools = ["fork-manager", "join"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
+
+# The post-restart continuation is a new user message from the scenario, so it is its own turn.
 
 [[turn]]
 id = "orch-continue"
@@ -198,172 +209,172 @@ internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", "enf-primitive-obsessin" = 7 } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
 
 [[epoch]]
 turn = "blogger"

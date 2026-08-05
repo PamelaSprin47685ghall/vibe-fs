@@ -62,6 +62,7 @@ const [
   WriterModule,
   BootModule,
   BlogProj,
+  EnforcementProj,
   PrefixProj,
   FallbackProj,
   ReviewProj,
@@ -78,6 +79,7 @@ const [
   SyntheticTomlModule,
   ToolResultBoundModule,
   ForkChildPayloadModule,
+  TddPhaseModule,
   BloggerTomlModule,
   BloggerDeltaModule,
   CompanionPromptModule,
@@ -112,8 +114,6 @@ const [
   PromptResourcesModule,
   EnforcerCatalogDomainModule,
   EnforcerCodecModule,
-  EnforcerThrottleModule,
-  EnforcerNudgeModule,
   EnforcerCycleModule,
   StudentTeacherModule,
   BloggerRequestContextModule,
@@ -131,6 +131,7 @@ const [
   FallbackControllerModule,
   HandleControllerModule,
   HandleCompletionCodecModule,
+  JoinDrainModule,
   ReviewSealModule,
   SessionSnapshotPortModule,
   ToolHostCodecModule,
@@ -155,6 +156,7 @@ const [
   prod('Journal/Writer'),
   prod('Journal/Boot'),
   prod('Journal/BlogProjection'),
+  prod('Journal/EnforcementProjection'),
   prod('Journal/PrefixEpochProjection'),
   prod('Journal/FallbackProjection'),
   prod('Journal/ReviewProjection'),
@@ -171,6 +173,7 @@ const [
   prod('Domain/SyntheticToml'),
   prod('Domain/ToolResultBound'),
   prod('Domain/ForkChildPayload'),
+  prod('Domain/TddPhase'),
   prod('Domain/BloggerToml'),
   prod('Domain/BloggerDelta'),
   prod('Domain/CompanionPrompt'),
@@ -205,8 +208,6 @@ const [
   prod('Infrastructure/Resources/PromptResources'),
   prod('Domain/EnforcerCatalog'),
   prod('Domain/EnforcerCodec'),
-  prod('Domain/EnforcerThrottle'),
-  prod('Domain/EnforcerNudge'),
   prod('Domain/EnforcerCycle'),
   prod('Domain/StudentTeacher'),
   prod('Domain/BloggerRequestContext'),
@@ -224,6 +225,7 @@ const [
   prod('Session/FallbackController'),
   prod('Session/HandleController'),
   prod('Session/HandleCompletionCodec'),
+  prod('Session/JoinDrain'),
   prod('Application/Reconciliation/ReviewSeal'),
   prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
   prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
@@ -682,6 +684,9 @@ export const journal = {
   deserializeFact: (json) => resultOf(FactCodec.deserializeFact(json)),
   containsLegacyFallbackFields: (json) => FactCodec.containsLegacyFallbackFields(json),
   pre050MigrationMessage: FactCodec.pre050MigrationMessage,
+  /** ENFORCER-072: ScoreVectorRef-era BlogEntryCommitted (no max-score migration). */
+  containsLegacyScoreVectorEntry: (json) => FactCodec.containsLegacyScoreVectorEntry(json),
+  tipV2CleanBreakMessage: FactCodec.tipV2CleanBreakMessage,
   compareSortKey: (a, b) => Envelopes.compareSortKey(a, b),
 }
 
@@ -935,6 +940,31 @@ export const forkChildPayload = (() => {
 })()
 
 /**
+ * Coder TDD phase (closed Red | Green). Wire codec + child assignment text.
+ * Used by named `coder` (required tdd) and Manager `fork` (optional tdd).
+ * Obtain DU values via `parse("red"|"green")` — no ordinal construction.
+ */
+export const tddPhase = (() => {
+  const m = bind(TddPhaseModule, 'TddPhase', [
+    'wireName',
+    'parseTddPhase',
+    'RedAssignment',
+    'GreenAssignment',
+    'assignmentText',
+    'composeAssignment',
+  ])
+
+  return {
+    wireName: (phase) => m.wireName(phase),
+    parse: (raw) => resultOf(m.parseTddPhase(raw)),
+    redAssignment: m.RedAssignment,
+    greenAssignment: m.GreenAssignment,
+    assignmentText: (phase) => m.assignmentText(phase),
+    composeAssignment: (phase, prompt) => m.composeAssignment(phase, prompt),
+  }
+})()
+
+/**
  * ARCH-010: the one canonical writer for runtime synthetic TOML.
  *
  * Exposed separately from `bloggerToml` because the ownership split is the point of the
@@ -1029,6 +1059,7 @@ export const bloggerToml = (() => {
     'NewWorkTable',
     'renderItem',
     'renderHistoricFrame',
+    'renderPreviousEnforcerTip',
     'renderWith',
     'render',
   ])
@@ -1042,6 +1073,8 @@ export const bloggerToml = (() => {
     newWorkTable: m.NewWorkTable,
     renderItem: (item) => m.renderItem(item),
     renderHistoricFrame: (body) => m.renderHistoricFrame(body),
+    /** ENFORCER-071: one previous_enforcer_tip do_not_exec block. */
+    renderPreviousEnforcerTip: (tipField, cycleId) => m.renderPreviousEnforcerTip(tipField, cycleId),
     renderWith: (instructions, items) => m.renderWith(toList(instructions), toList(items)),
     render: (items) => m.render(toList(items)),
 
@@ -1282,6 +1315,8 @@ export const companionPrompt = {
   squashInstruction: CompanionPromptModule.SquashInstruction,
   memoryPreamble: CompanionPromptModule.CompanionMemoryPreamble,
   workingRecord: (body) => CompanionPromptModule.workingRecordMessage(body),
+  /** ENFORCER-071: previous tip as low-trust assistant body. */
+  previousTip: (tipField, cycleId) => CompanionPromptModule.previousTipMessage(tipField, cycleId),
   newWork: (toml) => CompanionPromptModule.newWorkMessage(toml),
   memoryBlock: (frozenRecordPrefix) => CompanionPromptModule.companionMemoryBlock(frozenRecordPrefix),
 }
@@ -1311,6 +1346,10 @@ export const companionIdentity = {
 
   instructionMessageId: (sha256, { blogger, epoch, kind }) =>
     CompanionIdentityModule.instructionMessageId(sha256, sessionId(blogger), frameEpochId(epoch), kind),
+
+  /** ENFORCER-071: stable id for one previous_enforcer_tip message. */
+  previousTipMessageId: (sha256, { blogger, cycleId }) =>
+    CompanionIdentityModule.previousTipMessageId(sha256, sessionId(blogger), cycleId),
 }
 
 /** COMPANION-005 / CTX-012: the Companion's provider-visible message list. */
@@ -1324,11 +1363,12 @@ export const companionProjection = (() => {
 
     /**
      * `frames` is `[{ digest, body }]`; `delta` is `{ messageId, toml }` or omitted.
+     * `previousTips` is `[{ field, cycleId }]` (oldest → newest); default empty.
      *
      * The tuple lists are converted here: an F# tuple is a JS array, and a `list` of
      * them still needs `toList` or it folds as empty.
      */
-    build: (sha256, { blogger, epoch, kind, frames, delta }) => {
+    build: (sha256, { blogger, epoch, kind, frames, delta, previousTips = [] }) => {
       const plan = m.build(
         sha256,
         sessionId(blogger),
@@ -1336,6 +1376,7 @@ export const companionProjection = (() => {
         kind,
         toList(frames.map((f) => [blobDigest(f.digest), f.body])),
         delta === undefined ? undefined : [delta.messageId, delta.toml],
+        toList(previousTips.map((t) => [t.field, t.cycleId])),
       )
 
       const messages = listItems(plan.Messages).map((msg) => ({
@@ -1971,6 +2012,67 @@ export const blogProjection = (() => {
   }
 })()
 
+/**
+ * ENFORCER-045/070/154: enforcement half of BlogEntryCommitted + bounded RecentTips.
+ * VERIFY-008: tip RuleId / FieldName / CycleId only via this facade.
+ */
+export const enforcementProjection = (() => {
+  const m = bind(EnforcementProj, 'EnforcementProjection', [
+    'empty',
+    'applyFromEntry',
+    'tryFindByProviderRun',
+    'recentTips',
+  ])
+
+  return {
+    empty: m.empty,
+    RecentTipLimit: EnforcementProj.RecentTipLimit ?? 8,
+
+    /** Build an EnforcementCycleRecord (tip v2). */
+    cycleRecord: ({
+      mainSessionId,
+      bloggerSessionId,
+      run,
+      toolCallIds = [],
+      textRef,
+      textDigest,
+      tipRuleId,
+      fieldNameAtCommit,
+      evidenceRef,
+      prefixEpoch = 0,
+    }) => ({
+      MainSessionId: typeof mainSessionId === 'string' ? sessionId(mainSessionId) : mainSessionId,
+      BloggerSessionId: typeof bloggerSessionId === 'string' ? sessionId(bloggerSessionId) : bloggerSessionId,
+      ProviderRun: typeof run === 'string' ? providerRun(run) : run,
+      ToolCallIds: toList(toolCallIds.map((id) => (typeof id === 'string' ? toolCallId(id) : id))),
+      CycleTextRef: typeof textRef === 'string' ? blobRef(textRef) : textRef,
+      CycleTextDigest: typeof textDigest === 'string' ? blobDigest(textDigest) : textDigest,
+      TipRuleId: tipRuleId,
+      FieldNameAtCommit: fieldNameAtCommit,
+      CycleEvidenceRef: evidenceRef == null ? undefined : typeof evidenceRef === 'string' ? blobRef(evidenceRef) : evidenceRef,
+      ObservedPrefixEpochId: prefixEpochId(prefixEpoch),
+    }),
+
+    applyFromEntry: (state, record) => resultOf(m.applyFromEntry(state, record)),
+
+    tryFindByProviderRun: (run, state) => {
+      const key = typeof run === 'string' ? providerRun(run) : run
+      return unwrapOption(m.tryFindByProviderRun(key, state))
+    },
+
+    /** Oldest → newest RecentTip list (plain objects). */
+    recentTips: (state) =>
+      listItems(m.recentTips(state)).map((t) => ({
+        ruleId: t.RuleId,
+        fieldName: t.FieldName,
+        cycleId: t.CycleId,
+      })),
+
+    tipRuleIdOf: (record) => record?.TipRuleId,
+    fieldNameAtCommitOf: (record) => record?.FieldNameAtCommit,
+  }
+})()
+
 /** COMPANION-009 / CTX-012: which X prefix generation is in force. */
 export const prefixEpochProjection = (() => {
   const m = bind(PrefixProj, 'PrefixEpochProjection', [
@@ -2217,6 +2319,7 @@ export const handleProjection = (() => {
     'isAbandoned',
     'listable',
     'joinable',
+    'reportableAbandoned',
     'activeHandles',
     'tryFindByChildSession',
     'linkedChildren',
@@ -2258,12 +2361,15 @@ export const handleProjection = (() => {
     isAbandoned: (handle, current) => m.isAbandoned(handle, current),
     listable: (current) => listItems(m.listable(current)),
     joinable: (current) => listItems(m.joinable(current)),
+    reportableAbandoned: (current) => listItems(m.reportableAbandoned(current)),
     activeHandles: (current) => listItems(m.activeHandles(current)),
     tryFindByChildSession: (child, current) => unwrapOption(m.tryFindByChildSession(child, current)),
     linkedChildren: (current) => listItems(m.linkedChildren(current)),
     lifecycleOf: (record) => caseOf(record.Lifecycle),
     lifecycleSealsBlogger: (lifecycle) => m.lifecycleSealsBlogger(lifecycle),
     recordSealsBlogger: (record) => m.recordSealsBlogger(record),
+    /** EXEC-018 creation order assigned on HandleLinked. */
+    creationOrder: (record) => record.CreationOrder,
 
     /** One handle record as comparable text. */
     read: (record) => {
@@ -2286,6 +2392,8 @@ export const handleProjection = (() => {
         targetAgent: record.TargetAgent,
         role: caseOf(record.CanonicalRole),
         lifecycle,
+        // EXEC-018: HandleLinked fold order (stable join key #2).
+        creationOrder: record.CreationOrder,
         // EXEC-005: `list` must distinguish which completion landed, so the kind is
         // part of the state rather than a flag beside it.
         completion,
@@ -2313,12 +2421,15 @@ const tryFromProvenTerminal = member(
   'JoinableCompletion',
   'tryFromProvenTerminal',
 )
-const tryFromDurableCompleted = member(
-  ChildRecoveryModule,
-  'JoinableCompletion',
-  'tryFromDurableCompleted',
-)
+// Clean-break: tryFromDurableCompleted deleted. Facade keeps a permanent Error
+// so RED tests still call the name; production has no weak kind+body proof.
 const resolveChild = member(ChildRecoveryModule, 'ChildRecovery', 'resolveChild')
+const fromDecoded = member(ChildRecoveryModule, 'JoinableCompletion', 'fromDecoded')
+const falseTerminalReplacementAgentId = member(
+  ChildRecoveryModule,
+  'FalseTerminalMigration',
+  'replacementAgentId',
+)
 const joinReturnedImpliesProofBeforeCommit = member(
   ChildRecoveryModule,
   'ChildRecovery',
@@ -2375,16 +2486,15 @@ export const childRecovery = (() => {
       terminalEvidenceFailed(agentId, handle, child, body),
 
     tryFromProvenTerminal: (evidence) => resultOf(tryFromProvenTerminal(evidence)),
-    tryFromDurableCompleted: (agentId, handle, child, kind, body) =>
-      resultOf(
-        tryFromDurableCompleted(
-          agentId,
-          handle,
-          child,
-          typeof kind === 'string' ? completionKind.of(kind) : kind,
-          body === undefined || body === null ? undefined : body,
-        ),
-      ),
+    /** Deleted weak proof. Always Error (SendFailure+body is not JoinableCompletion). */
+    tryFromDurableCompleted: (_agentId, _handle, _child, _kind, _body) => ({
+      ok: false,
+      error: 'tryFromDurableCompleted deleted: decode DurableCompletionDecode then fromDecoded',
+    }),
+    fromDecoded: (agentId, handle, child, decoded, encodedBody) =>
+      fromDecoded(agentId, handle, child, decoded, encodedBody),
+    replacementAgentId: (originalAgentId, badDigest) =>
+      falseTerminalReplacementAgentId(originalAgentId, badDigest),
 
     resolveChild: (durable, snapshot, observations) =>
       resolveChild(durable, snapshot, toList(observations)),
@@ -2478,6 +2588,9 @@ export const handleCompletionCodec = (() => {
     'encodeOutcome',
     'tryDecode',
     'tryRead',
+    'tryReadBody',
+    'decodeBody',
+    'tryMaterialiseRunCompletion',
   ])
 
   return {
@@ -2486,6 +2599,101 @@ export const handleCompletionCodec = (() => {
     tryRead: (journal, record, agentId) => {
       const value = resultOf(m.tryRead(journal, record, agentId))
       return value.ok ? { ok: true, value: unwrapOption(value.value) } : { ok: false, error: value.error }
+    },
+    tryReadBody: (journal, record) => resultOf(m.tryReadBody(journal, record)),
+    decodeBody: (json) => m.decodeBody(json),
+    tryMaterialiseRunCompletion: (record, agentId, decoded) =>
+      m.tryMaterialiseRunCompletion(record, agentId, decoded),
+    /**
+     * Legacy false-abort completion blob (pre-v2). Keys match historical
+     * status=aborted plant. Decode → LegacyFalseAbort (never RunCompletion).
+     */
+    legacyAbortedBody: ({
+      runId = 'run-legacy-abort',
+      code = 'CANCELLED',
+      message = 'host abort observation written as finality',
+      childSessionId = '',
+    } = {}) =>
+      JSON.stringify({
+        status: 'aborted',
+        run_id: runId,
+        code,
+        message,
+        child_session_id: childSessionId,
+      }),
+  }
+})()
+
+/**
+ * EXEC-009 + EXEC-018 pure durable join drain (JoinDrain.fs).
+ * HostForkRuntime.tryDrainAvailable → JoinDrain.drainFromJournal.
+ * Tests drive this path — never re-implement sort or hand-build batches around drain.
+ */
+export const joinDrain = (() => {
+  const m = bind(JoinDrainModule, 'JoinDrain', [
+    'stableJoinKey',
+    'orderedCandidates',
+    'drainFromJournal',
+    'reconcileFalseAborts',
+    'tryMigrateRetiredFalseAbort',
+  ])
+
+  const completionView = (c) => {
+    const outcome = caseOf(c.Outcome)
+    const payload = payloadOf(c.Outcome)
+    return {
+      runId: c.RunId,
+      agentId: c.AgentId,
+      agentName: c.AgentName,
+      status:
+        outcome === 'AgentCompleted'
+          ? 'completed'
+          : outcome === 'AgentFailed'
+            ? 'failed'
+            : outcome === 'AgentAborted'
+              ? 'aborted'
+              : outcome === 'AgentAbandoned'
+                ? 'abandoned'
+                : outcome,
+      // AgentAbandoned of agentId * reason → fields [agentId, reason]
+      reason: outcome === 'AgentAbandoned' ? payload[1] : undefined,
+      workRecord: outcome === 'AgentCompleted' ? payload.WorkRecord : undefined,
+    }
+  }
+
+  const tuple2 = (key) => {
+    if (Array.isArray(key)) return { creationOrder: key[0], targetAgent: key[1] }
+    if (key && typeof key === 'object' && Array.isArray(key.fields)) {
+      return { creationOrder: key.fields[0], targetAgent: key.fields[1] }
+    }
+    if (key && typeof key === 'object') {
+      const a = key[0] ?? key.Item1
+      const b = key[1] ?? key.Item2
+      if (a !== undefined) return { creationOrder: a, targetAgent: b }
+    }
+    throw new Error(`stableJoinKey unexpected shape: ${JSON.stringify(key)}`)
+  }
+
+  return {
+    /** EXEC-018 production key: (CreationOrder, TargetAgent). */
+    stableJoinKey: (record) => tuple2(m.stableJoinKey(record)),
+
+    /** Merge reportableAbandoned + joinable, sort by stableJoinKey. */
+    orderedCandidates: (projection) => listItems(m.orderedCandidates(projection)),
+
+    /**
+     * Journal-backed production drain (merge → sort → CAS consume).
+     * Returns { ok:true, items } or { ok:false, error }.
+     */
+    drainFromJournal: (journal, parentId, maxCount) => {
+      const value = resultOf(m.drainFromJournal(journal, parentId, maxCount))
+      if (!value.ok) {
+        return {
+          ok: false,
+          error: typeof value.error === 'string' ? value.error : caseOf(value.error),
+        }
+      }
+      return { ok: true, items: listItems(value.value).map(completionView) }
     },
   }
 })()
@@ -2735,6 +2943,9 @@ export const promptDispatcher = (() => {
 
     /** PROMPT-006: an `AdmittedWithReceipt` outcome for a stub port to return. */
     admittedWithReceipt: (receipt) => buildSendOutcome('AdmittedWithReceipt', [receipt]),
+    /** Explicit transport failure for InteractionRepair hard-fail paths. */
+    retryable: (reason) => buildSendOutcome('Retryable', [reason]),
+    fatal: (reason) => buildSendOutcome('Fatal', [reason]),
 
     /**
      * PROMPT-005/007: authority projection after a send.
@@ -2868,17 +3079,44 @@ export const toolHostCodec = (() => {
  */
 const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
   'create',
+  'createFromBoot',
   'appendAgent',
   'snapshot',
   'revision',
   'snapshotWithRevision',
   'awaitChangeFrom',
   'handleProjection',
+  'writeBlob',
 ])
 
 export const agentJournal = {
   create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
     const result = resultOf(AgentJournalCreate.create(directory, runtimeId(runtime), pid, utcOffset(startedAt)))
+    return result.ok
+      ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
+      : result
+  },
+  /**
+   * PERSIST-004 restart: fold BootSnapshot then open a fresh writer RuntimeId.
+   * BootSnapshot must be the F# value from `bootSnapshot.load(directory)`.
+   */
+  createFromBoot: ({
+    directory,
+    boot,
+    runtime = 'rt_restart',
+    pid = 4243,
+    startedAt = '2026-01-01T01:00:00Z',
+  } = {}) => {
+    if (boot === undefined || boot === null) throw new Error('createFromBoot requires boot snapshot')
+    const result = resultOf(
+      AgentJournalCreate.createFromBoot(
+        directory,
+        runtimeId(runtime),
+        pid,
+        utcOffset(startedAt),
+        boot,
+      ),
+    )
     return result.ok
       ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
       : result
@@ -2892,6 +3130,13 @@ export const agentJournal = {
   /** Module-level awaitChangeFrom (fromRevision, journal) → Task/Promise. */
   awaitChangeFrom: (fromRevision, journal) => AgentJournalCreate.awaitChangeFrom(fromRevision, journal),
   handleProjection: (journal, parentId) => AgentJournalCreate.handleProjection(journal, parentId),
+  /** Blob write receipt: { BlobRef, BlobDigest } after Ok. */
+  writeBlob: (content, journal) => resultOf(AgentJournalCreate.writeBlob(content, journal)),
+}
+
+/** F# Boot.boot(directory) — raw BootSnapshot for createFromBoot (not plain-JS projection). */
+export const bootSnapshot = {
+  load: (directory) => Boots.boot(directory),
 }
 
 export const rootKind = {
@@ -2956,7 +3201,7 @@ const fableInstanceMethod = (mod, typeName, methodName) => {
   return mod[found]
 }
 
-/** CompletionMailbox: queue + waiter + optional Join deadline. */
+/** CompletionMailbox: queue + wake + bounded drain (EXEC-018). */
 export const completionMailbox = (() => {
   // Class lives on the module as `CompletionMailbox` (type name = file root).
   // Methods compile as non-curried module statics: `CompletionMailbox__Join_*(_, timeoutMs)`.
@@ -2970,6 +3215,19 @@ export const completionMailbox = (() => {
   const cancelFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'Cancel')
   const pendingCountFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'get_PendingCount')
   const isCancelledFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'get_IsCancelled')
+  const drainFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'DrainAvailable')
+  const waitForSignalFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'WaitForSignal')
+  const waitForWakeFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'WaitForWake')
+  const pulseWakeFn = fableInstanceMethod(CompletionMailboxModule, 'CompletionMailbox', 'PulseWake')
+
+  const maxJoinBatch =
+    CompletionMailboxModule.JoinBatch_MaxJoinBatch ??
+    CompletionMailboxModule.JoinBatch_Max ??
+    CompletionMailboxModule.MaxJoinBatch ??
+    CompletionMailboxModule.maxJoinBatch ??
+    (() => {
+      throw new Error('CompletionMailbox JoinBatch.Max / MaxJoinBatch missing')
+    })()
 
   return {
     create: (hasActive = () => true) => new Mailbox({}, hasActive),
@@ -2979,8 +3237,57 @@ export const completionMailbox = (() => {
     cancel: (box) => cancelFn(box),
     pendingCount: (box) => pendingCountFn(box),
     isCancelled: (box) => isCancelledFn(box),
+    drainAvailable: (box, maxCount) => listItems(drainFn(box, maxCount)),
+    waitForSignal: (box, interrupt) => waitForSignalFn(box, interrupt),
+    waitForWake: (box) => waitForWakeFn(box),
+    pulseWake: (box) => pulseWakeFn(box),
+    maxJoinBatch,
   }
 })()
+
+/** EXEC-018 batch ceiling — single export for wire/runtime tests. */
+export const maxJoinBatch = completionMailbox.maxJoinBatch
+
+/** EXEC-017 local join interrupt (tool abort → Signal only). */
+export const joinInterrupt = (() => {
+  const createFn = member(CompletionMailboxModule, 'JoinInterrupt', 'create')
+  return {
+    create: () => createFn(),
+    wait: (interrupt) => interrupt.Wait,
+    signal: (interrupt) => interrupt.Signal(),
+  }
+})()
+
+/** EXEC-004 / EXEC-018 NonEmptyBatch constructors. */
+export const nonEmptyBatch = (() => {
+  const ofHeadTailFn = member(CompletionMailboxModule, 'NonEmptyBatch', 'ofHeadTail')
+  const tryOfListFn = member(CompletionMailboxModule, 'NonEmptyBatch', 'tryOfList')
+  const toListFn = member(CompletionMailboxModule, 'NonEmptyBatch', 'toList')
+  const lengthFn = member(CompletionMailboxModule, 'NonEmptyBatch', 'length')
+  return {
+    ofHeadTail: (head, tail = []) => ofHeadTailFn(head, toList(tail)),
+    tryOfList: (items) => unwrapOption(tryOfListFn(toList(items))),
+    toList: (batch) => listItems(toListFn(batch)),
+    length: (batch) => lengthFn(batch),
+  }
+})()
+
+/** JoinWaitOutcome DU helpers (case names, never ordinals). */
+export const joinWaitOutcome = {
+  nameOf: (outcome) => caseOf(outcome),
+  isInterrupted: (outcome) => caseOf(outcome) === 'InterruptedByUserMessage',
+  results: (outcome) => {
+    if (caseOf(outcome) !== 'ResultsAvailable') {
+      throw new Error(`expected ResultsAvailable, got ${caseOf(outcome)}`)
+    }
+    return payloadOf(outcome)
+  },
+}
+
+/** MailboxWakeReason case name. */
+export const mailboxWakeReason = {
+  nameOf: (reason) => caseOf(reason),
+}
 
 /** HostEventPort sticky terminal + late-subscriber replay. */
 export const hostEventPort = (() => {
@@ -3698,7 +4005,13 @@ export const enforcerCatalogResource = (() => {
  * Domain never reads files; tests hand rules via `rule(...)`.
  */
 export const enforcerCatalog = (() => {
-  const api = bind(EnforcerCatalogDomainModule, 'EnforcerCatalog', ['validate', 'triples'])
+  // ENFORCER-170: validate + field lookup only. `triples` was a facade ghost —
+  // production never exported it; binding it fail-closed every unit import.
+  const api = bind(EnforcerCatalogDomainModule, 'EnforcerCatalog', [
+    'validate',
+    'tryFindByField',
+    'fieldNames',
+  ])
   const Rule = EnforcerCatalogDomainModule.EnforcerRule
   if (typeof Rule !== 'function') {
     throw new Error('Domain/EnforcerCatalog exports no EnforcerRule constructor')
@@ -3721,7 +4034,11 @@ export const enforcerCatalog = (() => {
       const result = resultOf(api.validate(schemaVersion, toList(rules)))
       return result.ok ? { ok: true, value: listItems(result.value) } : result
     },
-    triples: (rules) => listItems(api.triples(toList(rules))),
+    tryFindByField: (field, rules) => {
+      const found = api.tryFindByField(field, toList(rules))
+      return isNone(found) ? undefined : found
+    },
+    fieldNames: (rules) => listItems(api.fieldNames(toList(rules))),
   }
 })()
 
@@ -3729,100 +4046,125 @@ export const enforcerCatalog = (() => {
 
 export const enforcer = (() => {
   const catalog = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', ['load'])
+  const catalogDomain = bind(EnforcerCatalogDomainModule, 'EnforcerCatalog', [
+    'tryFindByField',
+    'fieldNames',
+  ])
+  // MissingTipError is a codec string literal export (Fable: EnforcerCodecModule.MissingTipError).
   const codec = bind(EnforcerCodecModule, 'EnforcerCodec', [
-    'CanonicalBlogCall',
-    'normalizeFieldName',
-    'hasEnfPrefix',
-    'parseScore',
-    'damerauLevenshtein',
-    'resolveField',
     'decodeCall',
     'hasValidText',
+    'unknownTipError',
   ])
-  const throttle = bind(EnforcerThrottleModule, 'EnforcerThrottle', [
-    'ThrottleState',
-    'ThrottleTauObservations',
-    'decay',
-    'normalizedObservation',
-    'epochStart',
-    'observe',
-    'shouldTrigger',
-    'consume',
-    'pressureAt',
-    'steadyEvidence',
-    'isolatedPressure',
-  ])
-  const nudge = bind(EnforcerNudgeModule, 'EnforcerNudge', [
-    'renderLine',
-    'renderEvidence',
-    'renderBatch',
-    'mergeEvidence',
-  ])
-  const cycle = bind(EnforcerCycleModule, 'EnforcerCycle', ['MergedCycle', 'mergeCalls', 'isValidCycle'])
+  const cycle = bind(EnforcerCycleModule, 'EnforcerCycle', ['mergeCalls', 'isValidCycle'])
 
   // Explicit load: module import no longer reads package resources (0.5.3).
   const catalogRules = listItems(catalog.load())
+  const tipOf = (call) => {
+    const tip = call?.Tip
+    if (!tip) return undefined
+    return {
+      ruleId: tip.RuleId,
+      fieldName: tip.FieldName,
+      catalogOrdinal: tip.CatalogOrdinal,
+    }
+  }
+
+  const missingTipError =
+    EnforcerCodecModule.MissingTipError ??
+    EnforcerCodecModule.EnforcerCodec_MissingTipError ??
+    'missing required argument: tip'
 
   return {
-    /** 已加载的 Enforcer 规则（resources/enforcer/catalog.json，ENFORCER-170）。 */
+    /** Packaged catalog rules (resources/enforcer/catalog.json, ENFORCER-170). */
     rules: catalogRules,
     ruleCount: catalogRules.length,
-    fieldNames: () => catalogRules.map((r) => r.FieldName),
+    fieldNames: () => listItems(catalogDomain.fieldNames(toList(catalogRules))),
+    MissingTipError: missingTipError,
+    unknownTipError: (tipValue) => codec.unknownTipError(tipValue),
 
-    /** ENFORCER-022/023/024/025：解析一个 blog 调用的参数。 */
+    /** ENFORCER-021: exact field → rule (no fuzzy match). */
+    tryFindByField: (field) => {
+      const rule = unwrapOption(catalogDomain.tryFindByField(field, toList(catalogRules)))
+      if (!rule) return undefined
+      return {
+        ruleId: rule.RuleId,
+        fieldName: rule.FieldName,
+        catalogOrdinal: rule.CatalogOrdinal,
+      }
+    },
+
+    /**
+     * ENFORCER-020..026 tip codec.
+     * Returns `{ ok: true, value }` or `{ ok: false, error }` (VERIFY-008 full structure).
+     */
     decodeCall: (rawArgs) => {
-      // Production expects Map<string, obj>; tests hand plain objects.
-      const mapped = mapOf(rawArgs)
-      return codec.decodeCall(
-        toList(catalogRules.map((r) => [r.FieldName, r.RuleId, r.CatalogOrdinal])),
-        mapped,
-      )
+      const result = resultOf(codec.decodeCall(toList(catalogRules), mapOf(rawArgs ?? {})))
+      if (!result.ok) return result
+      const call = result.value
+      return {
+        ok: true,
+        value: {
+          text: call.Text,
+          evidence: call.Evidence,
+          tip: tipOf(call),
+        },
+      }
     },
 
-    /** ENFORCER-023：值容错。 */
-    parseScore: (v) => codec.parseScore(v),
-
-    /** ENFORCER-024：字段名规范化。 */
-    normalizeFieldName: (s) => codec.normalizeFieldName(s),
-
-    /** ENFORCER-024：DL 距离。 */
-    damerauLevenshtein: (a, b) => codec.damerauLevenshtein(a, b),
-
-    /** ENFORCER-081/083/084：throttle。 */
-    epochStart: (ordinal) => throttle.epochStart(BigInt(ordinal)),
-    observe: (state, score, ordinal) => {
-      const [next, pressure] = throttle.observe(throttle.ThrottleTauObservations, state, score, BigInt(ordinal))
-      return { state: next, pressure }
+    hasValidText: (decoded) => {
+      // Accept facade shape or raw CanonicalBlogCall.
+      if (decoded && typeof decoded === 'object' && 'text' in decoded && !('Text' in decoded)) {
+        return decoded.text != null && String(decoded.text).trim().length > 0
+      }
+      return codec.hasValidText(decoded)
     },
-    shouldTrigger: (pressure) => throttle.shouldTrigger(pressure),
-    consume: (state, ordinal) => throttle.consume(state, BigInt(ordinal)),
-    steadyEvidence: (score) => throttle.steadyEvidence(throttle.ThrottleTauObservations, score),
-    pressureAt: (evidence, sinceConsumed) => throttle.pressureAt(throttle.ThrottleTauObservations, evidence, sinceConsumed),
-    isolatedPressure: (initialEvidence, elapsed) =>
-      throttle.isolatedPressure(throttle.ThrottleTauObservations, initialEvidence, elapsed),
 
-    /** ENFORCER-100/101/102：nudge 渲染。 */
-    renderLine: (key, text) => nudge.renderLine(key, text),
-    renderEvidence: (e) => nudge.renderEvidence(e),
-    renderBatch: (rules, evidence) =>
-      nudge.renderBatch(toList(rules.map((r) => [r[0], r[1], r[2]])), evidence),
-    mergeEvidence: (items) => nudge.mergeEvidence(toList(items)),
-
-    /** ENFORCER-042/043：cycle 合并。 */
+    /**
+     * ENFORCER-042/025: multi-call merge → single CanonicalTip (first by PartOrdinal).
+     * `calls` is `[[ordinal, { text, tipField, evidence? }], ...]`.
+     */
     mergeCalls: (calls) => {
       const list = toList(
-        calls.map(([ordinal, call]) => [
-          ordinal,
-          {
-            Text: call.Text ?? undefined,
-            Evidence: call.Evidence ?? undefined,
-            Scores: mapOf(call.Scores ?? {}),
-          },
-        ]),
+        calls.map(([ordinal, call]) => {
+          const tipField = call.tipField ?? call.tip ?? call.Tip?.FieldName
+          const decoded = resultOf(
+            codec.decodeCall(
+              toList(catalogRules),
+              mapOf({
+                text: call.text ?? call.Text ?? '',
+                tip: tipField,
+                ...(call.evidence != null || call.Evidence != null
+                  ? { evidence: call.evidence ?? call.Evidence }
+                  : {}),
+              }),
+            ),
+          )
+          if (!decoded.ok) {
+            throw new Error(`mergeCalls fixture tip decode failed: ${decoded.error}`)
+          }
+          return [ordinal, decoded.value]
+        }),
       )
-      return cycle.mergeCalls(list)
+      const merged = cycle.mergeCalls(list)
+      const tip = {
+        ruleId: merged.CanonicalTip.RuleId,
+        fieldName: merged.CanonicalTip.FieldName,
+        catalogOrdinal: merged.CanonicalTip.CatalogOrdinal,
+      }
+      return {
+        mergedText: merged.MergedText,
+        tip,
+        mergedEvidence: merged.MergedEvidence,
+        multiCall: merged.MultiCall,
+      }
     },
-    isValidCycle: (merged) => cycle.isValidCycle(merged),
+    isValidCycle: (merged) => {
+      if (merged && typeof merged === 'object' && 'mergedText' in merged) {
+        return String(merged.mergedText ?? '').trim().length > 0
+      }
+      return cycle.isValidCycle(merged)
+    },
   }
 })()
 
@@ -3904,6 +4246,7 @@ export const bloggerRequestContext = (() => {
 
 export const bloggerRuntime = (() => {
   const stateCase = unionCase(BloggerRuntimeModule.BloggerRuntimeState, 'BloggerRuntimeState')
+  const recoveryCase = unionCase(BloggerRuntimeModule.BloggerToolRecovery, 'BloggerToolRecovery')
   const m = bind(BloggerRuntimeModule, 'BloggerRuntime', [
     'empty',
     'ofState',
@@ -3912,7 +4255,8 @@ export const bloggerRuntime = (() => {
     'onCycleCommitted',
     'onSquashCommitted',
     'onFail',
-    'markRepairSpent',
+    'markInteractionNudgeIssued',
+    'markAabbRepairConsumed',
     'onSeal',
     'forceSeal',
     'onReactivate',
@@ -3926,6 +4270,14 @@ export const bloggerRuntime = (() => {
     'adoptPendingAsCurrent',
   ])
 
+  const recoveryOf = (cell) => {
+    const tag = caseOf(cell.Recovery)
+    if (tag === 'InteractionNudgeIssued') {
+      return { tag, run: cell.Recovery.fields?.[0] }
+    }
+    return { tag }
+  }
+
   return {
     idle: m.ofState(stateCase('Idle', [])),
     parked: m.ofState(stateCase('Parked', [])),
@@ -3933,6 +4285,12 @@ export const bloggerRuntime = (() => {
     disposed: m.ofState(stateCase('Disposed', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
+    recovery: {
+      noRecovery: () => recoveryCase('NoRecovery', []),
+      interactionNudgeIssued: (run) => recoveryCase('InteractionNudgeIssued', [providerRun(run)]),
+      aabbRepairConsumed: () => recoveryCase('AabbRepairConsumed', []),
+      of: recoveryOf,
+    },
     onMaterial: (cell, ctx) => {
       const r = resultOf(m.onMaterial(cell, ctx))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
@@ -3942,7 +4300,7 @@ export const bloggerRuntime = (() => {
         state: pair[0],
         decision: caseOf(pair[1]),
         pending: unwrapOption(pair[0].PendingOffer),
-        repairSpent: pair[0].RepairSpent,
+        recovery: recoveryOf(pair[0]),
         reactivated: pair[0].ReactivatedAfterSeal,
       }
     },
@@ -3952,7 +4310,7 @@ export const bloggerRuntime = (() => {
         ? {
             ok: true,
             state: r.value,
-            repairSpent: r.value.RepairSpent,
+            recovery: recoveryOf(r.value),
             reactivated: r.value.ReactivatedAfterSeal,
           }
         : { ok: false, error: caseOf(r.error) }
@@ -3965,7 +4323,7 @@ export const bloggerRuntime = (() => {
         ok: true,
         state: pair[0],
         decision: caseOf(pair[1]),
-        repairSpent: pair[0].RepairSpent,
+        recovery: recoveryOf(pair[0]),
         reactivated: pair[0].ReactivatedAfterSeal,
       }
     },
@@ -3975,12 +4333,13 @@ export const bloggerRuntime = (() => {
         ? {
             ok: true,
             state: r.value,
-            repairSpent: r.value.RepairSpent,
+            recovery: recoveryOf(r.value),
             reactivated: r.value.ReactivatedAfterSeal,
           }
         : { ok: false, error: caseOf(r.error) }
     },
-    markRepairSpent: (cell) => m.markRepairSpent(cell),
+    markInteractionNudgeIssued: (cell, run) => m.markInteractionNudgeIssued(cell, providerRun(run)),
+    markAabbRepairConsumed: (cell) => m.markAabbRepairConsumed(cell),
     onSeal: (cell) => m.onSeal(cell),
     forceSeal: (cell) => m.forceSeal(cell),
     onReactivate: (cell) => m.onReactivate(cell),
@@ -4001,7 +4360,7 @@ export const bloggerRuntime = (() => {
       return { ok: true, pending: unwrapOption(pair[0]), state: pair[1] }
     },
     stateOf: (cell) => caseOf(cell.State),
-    repairSpentOf: (cell) => cell.RepairSpent,
+    recoveryOf,
     reactivatedOf: (cell) => cell.ReactivatedAfterSeal,
   }
 })()
@@ -4247,13 +4606,212 @@ export const orchestratorProgram = (() => {
   }
 })()
 
-// ── Join Program DSL (P0-RECOVERY-JOIN-001) ──────────────────────────────────
+// ── Join Program DSL (P0-RECOVERY-JOIN-001 + EXEC-018) ───────────────────────
 const JoinProgramModule = await prod('Domain/JoinProgram')
+const AgentCompletionModule = await prod('Session/AgentCompletion')
+const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
+const ManagerJobModule = await prod('Application/Orchestration/ManagerJob')
 
 export const joinProgram = (() => {
   const joinAnyFn = member(JoinProgramModule, 'JoinProgram', 'joinAny')
+  const joinAvailableFn = member(JoinProgramModule, 'JoinProgram', 'joinAvailable')
   return {
     /** Pure AST constructor: FamilyRecoveryPermit → JoinProgram. */
     joinAny: (permit) => joinAnyFn(permit),
+    /** EXEC-018 batch program: permit + maxCount + interrupt.Wait. */
+    joinAvailable: (permit, maxCount, interruptWait) => joinAvailableFn(permit, maxCount, interruptWait),
+    caseName: (program) => caseOf(program),
+  }
+})()
+
+/**
+ * AgentCompletion / RunCompletion constructors for mailbox + renderer tests.
+ * Role is Session.AgentRole (ForkTypes), not Kernel.Role.
+ */
+export const agentCompletion = (() => {
+  const ofSimpleTextFn = member(AgentCompletionModule, 'AgentCompletion', 'ofSimpleText')
+  const ofSimpleErrorFn = member(AgentCompletionModule, 'AgentCompletion', 'ofSimpleError')
+  const failedFn = member(AgentCompletionModule, 'AgentCompletion', 'failed')
+  const abortedFn = member(AgentCompletionModule, 'AgentCompletion', 'aborted')
+  const abandonedFn = member(AgentCompletionModule, 'AgentCompletion', 'abandoned')
+  const statusFn = member(AgentCompletionModule, 'AgentCompletion', 'status')
+  const textFn = member(AgentCompletionModule, 'AgentCompletion', 'text')
+
+  const roleOf = (name) => {
+    const value = ForkTypesModule.AgentRole?.[name]
+    if (value === undefined) throw new Error(`unknown AgentRole '${name}'`)
+    return value
+  }
+
+  /** Build a RunCompletion record for mailbox publish / renderer input. */
+  const run = ({
+    runId,
+    agentId,
+    agentName = '',
+    role = 'Coder',
+    outcome,
+    completedAt = new Date(),
+  }) => ({
+    RunId: runId,
+    AgentId: agentId,
+    AgentName: agentName,
+    Role: typeof role === 'string' ? roleOf(role) : role,
+    Outcome: outcome,
+    CompletedAt: completedAt,
+  })
+
+  return {
+    role: roleOf,
+    ofSimpleText: (agentId, runId, role, text) =>
+      ofSimpleTextFn(agentId, runId, typeof role === 'string' ? roleOf(role) : role, text),
+    ofSimpleError: (agentId, runId, role, message) =>
+      ofSimpleErrorFn(agentId, runId, typeof role === 'string' ? roleOf(role) : role, message),
+    failed: (agentId, runId, role, code, message) =>
+      failedFn(
+        agentId,
+        runId,
+        role === undefined || role === null ? undefined : typeof role === 'string' ? roleOf(role) : role,
+        undefined,
+        code,
+        message,
+      ),
+    aborted: (agentId, runId, role, code, message) =>
+      abortedFn(
+        agentId,
+        runId,
+        role === undefined || role === null ? undefined : typeof role === 'string' ? roleOf(role) : role,
+        undefined,
+        code,
+        message,
+      ),
+    status: (outcome) => statusFn(outcome),
+    text: (outcome) => textFn(outcome),
+    run,
+    /** Convenience: completed agent RunCompletion with work record text. */
+    completedRun: ({ runId, agentId, agentName, role = 'Coder', workRecord = '' }) =>
+      run({
+        runId,
+        agentId,
+        agentName: agentName ?? agentId,
+        role,
+        outcome: ofSimpleTextFn(agentId, runId, roleOf(role), workRecord),
+      }),
+    failedRun: ({ runId, agentId, agentName, role = 'Coder', code = 'ERROR', message = 'failed' }) =>
+      run({
+        runId,
+        agentId,
+        agentName: agentName ?? agentId,
+        role,
+        outcome: failedFn(agentId, runId, roleOf(role), undefined, code, message),
+      }),
+    abortedRun: ({ runId, agentId, agentName, role = 'Coder', code = 'CANCELLED', message = 'aborted' }) =>
+      run({
+        runId,
+        agentId,
+        agentName: agentName ?? agentId,
+        role,
+        outcome: abortedFn(agentId, runId, roleOf(role), undefined, code, message),
+      }),
+    abandoned: (agentId, reason) => abandonedFn(agentId, reason),
+    abandonedRun: ({ runId, agentId, agentName, role = 'Coder', reason = 'ParentCancelled' }) =>
+      run({
+        runId: runId ?? `abandoned-${agentId}`,
+        agentId,
+        agentName: agentName ?? agentId,
+        role,
+        outcome: abandonedFn(agentId, reason),
+      }),
+  }
+})()
+
+/**
+ * EXEC-004 rev.2 / spec/13 §9.6 JoinResultRenderer — LLM-facing join wire only.
+ * `runtime` for agent/pty batch is a minimal { IsPtyCompletion, TryFindAgent } surface.
+ */
+export const joinResultRenderer = (() => {
+  const renderInterruptedFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderInterrupted')
+  const renderCompletedBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderCompletedBatch')
+  const renderOrchestratorBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderOrchestratorBatch')
+  const renderForkErrorFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderForkError')
+
+  /**
+   * Minimal HostForkRuntime surface for JoinResultRenderer.
+   * IsPtyCompletion is a type extension (HostForkPty) that Fable may emit as a
+   * module function reading `.Gate` / `.PtyRuns` — supply both property and getter.
+   */
+  const stubRuntime = ({ ptyRunIds = new Set(), agents = new Map() } = {}) => {
+    const ids = ptyRunIds instanceof Set ? ptyRunIds : new Set(ptyRunIds)
+    const gate = {}
+    // Fable HashSet-like: Contains + has + .has for either emission.
+    const ptyRuns = {
+      Contains: (runId) => ids.has(runId),
+      contains: (runId) => ids.has(runId),
+      has: (runId) => ids.has(runId),
+    }
+    return {
+      Gate: gate,
+      get_Gate: () => gate,
+      PtyRuns: ptyRuns,
+      get_PtyRuns: () => ptyRuns,
+      IsPtyCompletion: (runId) => ids.has(runId),
+      TryFindAgent: (agentId) => agents.get(agentId),
+    }
+  }
+
+  return {
+    renderInterrupted: () => renderInterruptedFn(),
+    renderCompletedBatch: (runtime, batch) => {
+      const isPty = (runId) =>
+        typeof runtime?.IsPtyCompletion === 'function' ? !!runtime.IsPtyCompletion(runId) : false
+      const resolve = (agentId) => {
+        if (typeof runtime?.TryFindAgent !== 'function') return ''
+        const rec = runtime.TryFindAgent(agentId)
+        if (!rec) return ''
+        return rec.Agent ?? rec.agent ?? ''
+      }
+      return renderCompletedBatchFn(isPty, resolve, batch)
+    },
+    renderOrchestratorBatch: (batch) => renderOrchestratorBatchFn(batch),
+    renderForkError: (error) => renderForkErrorFn(error),
+    stubRuntime,
+  }
+})()
+
+/** EXEC-019 VerdictMailbox: FIFO batch drain + JoinAvailable interrupt race. */
+export const verdictMailbox = (() => {
+  const Mailbox = ManagerJobModule.VerdictMailbox
+  if (Mailbox === undefined) {
+    throw new Error('Application/Orchestration/ManagerJob did not export VerdictMailbox')
+  }
+
+  const publishFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'Publish')
+  const startJobFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'StartJob')
+  const drainFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'DrainAvailable')
+  const tryJoinBatchFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'TryJoinBatch')
+  const tryJoinFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'TryJoin')
+  const joinAvailableFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'JoinAvailable')
+  const pendingCountFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'get_PendingCount')
+  const hasActiveFn = fableInstanceMethod(ManagerJobModule, 'VerdictMailbox', 'get_HasActive')
+
+  const buildVerdict = unionCase(OrchestratorTypes.OrchestratorVerdict, 'OrchestratorVerdict')
+
+  return {
+    create: () => new Mailbox(),
+    startJob: (box) => startJobFn(box),
+    publish: (box, verdict) => publishFn(box, verdict),
+    drainAvailable: (box, maxCount) => listItems(drainFn(box, maxCount)),
+    tryJoinBatch: (box, maxCount) => tryJoinBatchFn(box, maxCount).then((list) => listItems(list)),
+    tryJoin: (box) => tryJoinFn(box),
+    joinAvailable: (box, maxCount, interrupt) => joinAvailableFn(box, maxCount, interrupt),
+    pendingCount: (box) => pendingCountFn(box),
+    hasActive: (box) => hasActiveFn(box),
+    /** Construct OrchestratorVerdict by case name (fields as raw Fable values when needed). */
+    verdict: (name, fields = []) => buildVerdict(name, fields),
+    empty: () => buildVerdict('Empty', []),
+    rejectedDirty: (reason) => buildVerdict('RejectedDirty', [reason]),
+    published: (jobId, head) => buildVerdict('Published', [managerJobId(jobId), commitHash(head)]),
+    needsReview: (jobId, details) => buildVerdict('NeedsReview', [managerJobId(jobId), details]),
+    integrationFailed: (jobId, details) => buildVerdict('IntegrationFailed', [managerJobId(jobId), details]),
+    nameOf: (verdict) => caseOf(verdict),
   }
 })()

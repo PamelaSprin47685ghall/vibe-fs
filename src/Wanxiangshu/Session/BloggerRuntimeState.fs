@@ -1,6 +1,15 @@
 namespace Wanxiangshu.Session
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel.Identity
+
+/// ENFORCER-064: Blogger missing-tool recovery (NoRecovery | InteractionNudgeIssued | Aabb).
+/// Type name avoids dsl-ownership Stage/Spent suffixes; cases match the clause.
+[<RequireQualifiedAccess>]
+type BloggerToolRecovery =
+    | NoRecovery
+    | InteractionNudgeIssued of ProviderRunIdentity
+    | AabbRepairConsumed
 
 /// ENFORCER-047: single Blogger coordinator state.
 ///
@@ -16,14 +25,14 @@ type BloggerRuntimeState =
     | Sealed
     | Disposed
 
-/// Host-owned cell: state + pending offer + one-repair budget.
-/// CurrentRequest lives in InFlight payload; RepairSpent is per logical request.
+/// Host-owned cell: state + pending offer + ENFORCER-064 recovery.
+/// CurrentRequest lives in InFlight payload; Recovery is per logical request.
 type BloggerRuntimeCell =
     {
         State: BloggerRuntimeState
         PendingOffer: BloggerRequestContext option
-        /// FALLBACK-008 / item 15: at most one repair per logical request.
-        RepairSpent: bool
+        /// ENFORCER-064 / FALLBACK-008: nudge once then optional AABB per logical request.
+        Recovery: BloggerToolRecovery
         /// Handle is CompletedAwaitingJoin/Retired but main received a new Authority Root:
         /// Blogger may drain until catch-up; host forceSeals when durable sealed and no material.
         ReactivatedAfterSeal: bool
@@ -50,20 +59,20 @@ module BloggerRuntime =
     let empty: BloggerRuntimeCell =
         { State = BloggerRuntimeState.Idle
           PendingOffer = None
-          RepairSpent = false
+          Recovery = BloggerToolRecovery.NoRecovery
           ReactivatedAfterSeal = false }
 
     let ofState (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { State = state
           PendingOffer = None
-          RepairSpent = false
+          Recovery = BloggerToolRecovery.NoRecovery
           ReactivatedAfterSeal = false }
 
     let private withState (cell: BloggerRuntimeCell) (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { cell with
             State = state
             PendingOffer = None
-            RepairSpent = false }
+            Recovery = BloggerToolRecovery.NoRecovery }
 
     /// Main-session material arrived. InFlight never queues (XTrace keeps backlog).
     /// Parked: Decision.Offer only — physical PendingOffer is the host dictionary.
@@ -78,7 +87,7 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.InFlight ctx
                     PendingOffer = None
-                    RepairSpent = false },
+                    Recovery = BloggerToolRecovery.NoRecovery },
                 Decision.Start ctx
             )
         | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
@@ -88,7 +97,7 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.Parked
                     PendingOffer = None
-                    RepairSpent = false },
+                    Recovery = BloggerToolRecovery.NoRecovery },
                 Decision.Offer ctx
             )
         | BloggerRuntimeState.Sealed -> Ok(cell, Decision.Ignore)
@@ -109,7 +118,7 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.InFlight ctx
                     PendingOffer = None
-                    RepairSpent = false }
+                    Recovery = BloggerToolRecovery.NoRecovery }
 
     let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
@@ -118,7 +127,7 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.Parked
                     // keep PendingOffer
-                    RepairSpent = false }
+                    Recovery = BloggerToolRecovery.NoRecovery }
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NotInFlight
@@ -137,7 +146,7 @@ module BloggerRuntime =
                     { cell with
                         State = BloggerRuntimeState.InFlight ctx
                         PendingOffer = None
-                        RepairSpent = false },
+                        Recovery = BloggerToolRecovery.NoRecovery },
                     Decision.Start ctx
                 )
             | None ->
@@ -145,12 +154,12 @@ module BloggerRuntime =
                     { cell with
                         State = BloggerRuntimeState.Parked
                         PendingOffer = None
-                        RepairSpent = false },
+                        Recovery = BloggerToolRecovery.NoRecovery },
                     Decision.Ignore
                 )
         | _ -> Error TransitionError.NotInFlight
 
-    /// Final fail of the logical request: Idle + clear PendingOffer + reset RepairSpent.
+    /// Final fail of the logical request: Idle + clear PendingOffer + reset recovery.
     let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
@@ -158,16 +167,22 @@ module BloggerRuntime =
             Ok
                 { cell with
                     PendingOffer = None
-                    RepairSpent = false }
+                    Recovery = BloggerToolRecovery.NoRecovery }
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { cell with
                     State = BloggerRuntimeState.Idle
                     PendingOffer = None
-                    RepairSpent = false }
+                    Recovery = BloggerToolRecovery.NoRecovery }
         | _ -> Error TransitionError.NotInFlight
 
-    let markRepairSpent (cell: BloggerRuntimeCell) : BloggerRuntimeCell = { cell with RepairSpent = true }
+    let markInteractionNudgeIssued (cell: BloggerRuntimeCell) (run: ProviderRunIdentity) : BloggerRuntimeCell =
+        { cell with
+            Recovery = BloggerToolRecovery.InteractionNudgeIssued run }
+
+    let markAabbRepairConsumed (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        { cell with
+            Recovery = BloggerToolRecovery.AabbRepairConsumed }
 
     /// Fork-child handle became joinable/retired: stop new Y requests.
     let onSeal (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
@@ -182,14 +197,14 @@ module BloggerRuntime =
         | _ ->
             { State = BloggerRuntimeState.Sealed
               PendingOffer = None
-              RepairSpent = false
+              Recovery = BloggerToolRecovery.NoRecovery
               ReactivatedAfterSeal = false }
 
     /// Force sealed (no in-flight preserve). Used when dropping offers after join.
     let forceSeal (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Sealed
           PendingOffer = None
-          RepairSpent = false
+          Recovery = BloggerToolRecovery.NoRecovery
           ReactivatedAfterSeal = false }
 
     /// New Authority Root on this main: Blogger may run again after a handle seal.
@@ -205,7 +220,7 @@ module BloggerRuntime =
         | BloggerRuntimeState.Sealed ->
             { State = BloggerRuntimeState.Idle
               PendingOffer = None
-              RepairSpent = false
+              Recovery = BloggerToolRecovery.NoRecovery
               ReactivatedAfterSeal = true }
         | BloggerRuntimeState.InFlight _
         | BloggerRuntimeState.Idle
@@ -216,7 +231,7 @@ module BloggerRuntime =
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
           PendingOffer = None
-          RepairSpent = false
+          Recovery = BloggerToolRecovery.NoRecovery
           ReactivatedAfterSeal = false }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
@@ -254,7 +269,7 @@ module BloggerRuntime =
                 ctx,
                 { cell with
                     State = BloggerRuntimeState.Parked
-                    RepairSpent = false }
+                    Recovery = BloggerToolRecovery.NoRecovery }
             )
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
@@ -283,4 +298,4 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.InFlight ctx
                     PendingOffer = None
-                    RepairSpent = false }
+                    Recovery = BloggerToolRecovery.NoRecovery }

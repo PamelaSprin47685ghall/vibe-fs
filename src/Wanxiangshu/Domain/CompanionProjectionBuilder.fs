@@ -29,9 +29,24 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Normal -> "normal"
         | CompanionRequestKind.Squash _ -> "squash"
 
-    /// Normal: assistant `[[do_not_exec]]` historic frames + one user message
-    /// (instruction comment header first, then [[new_work_to_record]] data).
-    /// Squash: oldest k assistant historic frames + squash instruction LAST (no delta).
+    /// ENFORCER-071: low-trust previous tip messages (oldest → newest).
+    /// Domain shape is (FieldName, CycleId); Journal maps RecentTips into this.
+    let private tipMessages
+        (sha256: string -> string)
+        (bloggerSessionId: SessionId)
+        (previousTips: (string * string) list)
+        : CompanionProjectedMessage list =
+        previousTips
+        |> List.map (fun (tipField, cycleId) ->
+            { MessageId = CompanionIdentity.previousTipMessageId sha256 bloggerSessionId cycleId
+              Role = "assistant"
+              Text = CompanionPrompt.previousTipMessage tipField cycleId
+              IsPhysical = false })
+
+    /// Normal: previous_enforcer_tip blocks + historic frames + one user delta.
+    /// Squash: previous_enforcer_tip blocks + oldest k frames + squash instruction LAST.
+    /// Tips cover normal / squash / restart / recovery / compaction rebuilds because
+    /// every rebuild path calls this builder with the same RecentTips projection.
     ///
     /// HOST-010: last user message binds the outbound assistant. For normal that
     /// is the combined delta message; for squash it is the instruction message.
@@ -42,11 +57,14 @@ module CompanionProjectionBuilder =
         (kind: CompanionRequestKind)
         (frameBodies: (BlobDigest * string) list)
         (physicalDelta: (string * string) option)
+        (previousTips: (string * string) list)
         : CompanionProjectionPlan =
         let selected =
             match kind with
             | CompanionRequestKind.Normal -> frameBodies
             | CompanionRequestKind.Squash count -> frameBodies |> List.truncate count
+
+        let tips = tipMessages sha256 bloggerSessionId previousTips
 
         let frameMessages =
             selected
@@ -68,8 +86,8 @@ module CompanionProjectionBuilder =
                         IsPhysical = true } ]
                 | None -> []
 
-            // Combined delta is last (HOST-010). No separate instruction message.
-            { Messages = frameMessages @ deltaMessages }
+            // Tips then frames then combined delta last (HOST-010).
+            { Messages = tips @ frameMessages @ deltaMessages }
         | CompanionRequestKind.Squash _ ->
             let instruction =
                 { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
@@ -77,7 +95,7 @@ module CompanionProjectionBuilder =
                   Text = CompanionPrompt.SquashInstruction
                   IsPhysical = false }
 
-            { Messages = frameMessages @ [ instruction ] }
+            { Messages = tips @ frameMessages @ [ instruction ] }
 
     /// First-turn shape: one physical combined delta (instruction header + data), no frames.
     let isFirstTurnShape (plan: CompanionProjectionPlan) =

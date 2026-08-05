@@ -18,6 +18,10 @@ open Wanxiangshu.Session
 /// cell is already InFlight with a real context.
 module BloggerCrashRecovery =
 
+    /// Must match EnforcerHost interactionNudge repairKind (ENFORCER-066 claim scope).
+    [<Literal>]
+    let BloggerMissingToolRepairKind = "blogger-missing-tool"
+
     [<RequireQualifiedAccess>]
     type WindowOutcome =
         /// A: Host session gone after materialize → abandon, Idle.
@@ -63,10 +67,152 @@ module BloggerCrashRecovery =
         else
             Some(WindowOutcome.RestoredInFlight(SessionId.create "decision"))
 
+    /// ENFORCER-153 pure rejudge from already-resolved evidence.
+    ///
+    /// `claimedTerminalRun`: durable InteractionRepair claim for blogger-missing-tool
+    /// (payload digests terminal run). `completedAssistants`: chronological completed
+    /// assistant terminals as (runId, hasBlogToolCall).
+    ///
+    /// Conservative (no AABB re-spend without second pure-prose evidence; no second
+    /// nudge when claim exists):
+    /// - no claim → NoRecovery
+    /// - claim + no blog after claim (any number of pure-prose terminals) →
+    ///   InteractionNudgeIssued claimed
+    /// - claim + valid blog after claim → NoRecovery (cycle completed / success)
+    ///
+    /// AabbRepairConsumed is never derived on cold rejudge: AABB is memory-only
+    /// (markAabbRepairConsumed + transform injection, no journal fact). A second
+    /// pure-prose terminal is the trigger for aabbRepair (ENFORCER-067), not its
+    /// receipt — deriving consumed here would let the hot path fatalEnd without
+    /// ever injecting the AABB repair (budget stolen across a crash).
+    let rejudgeFromEvidence
+        (claimedTerminalRun: string option)
+        (completedAssistants: (string * bool) list)
+        : BloggerToolRecovery =
+        match claimedTerminalRun with
+        | None -> BloggerToolRecovery.NoRecovery
+        | Some claimed ->
+            let afterClaimed =
+                completedAssistants
+                |> List.skipWhile (fun (id, _) -> id <> claimed)
+                |> function
+                    | _ :: rest -> rest
+                    | [] ->
+                        // Claimed run absent from transcript: keep nudge stage, never invent AABB.
+                        []
+
+            let hasBlogAfter = afterClaimed |> List.exists (fun (_, hasBlog) -> hasBlog)
+
+            if hasBlogAfter then
+                BloggerToolRecovery.NoRecovery
+            else
+                // No durable AABB evidence exists (AABB = memory mark + transform
+                // injection only): never invent AabbRepairConsumed. Restore as
+                // InteractionNudgeIssued claimed; the hot path re-runs aabbRepair
+                // on the next *new* pure-prose terminal (issuedRun <> terminalRun).
+                BloggerToolRecovery.InteractionNudgeIssued(ProviderRunIdentity.create claimed)
+
+    let private hasBlogToolCall (parts: MessagePart array) : bool =
+        parts
+        |> Array.exists (function
+            | MessagePart.ToolCall(_, name, _) when name = "blog" -> true
+            | _ -> false)
+
+    /// Completed assistant terminals: (message id = ProviderRunIdentity, has blog tool call).
+    let private completedAssistantEvidence (messages: SessionMessage list) : (string * bool) list =
+        messages
+        |> List.choose (fun m ->
+            if
+                m.Role = "assistant"
+                && m.Completed
+                && not (System.String.IsNullOrWhiteSpace m.Id)
+            then
+                Some(m.Id, hasBlogToolCall m.Parts)
+            else
+                None)
+
+    /// Durable claim for repairKind against a terminal run (ClaimSequences read).
+    let private repairClaimedFor
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (terminalRun: ProviderRunIdentity)
+        : bool =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+
+        match
+            PromptAuthorityLedger.activeProfile bloggerSessionId projections,
+            PromptAuthorityLedger.projectionFor bloggerSessionId projections
+        with
+        | Some profile, Some authProj ->
+            PromptAuthority.repairAlreadyClaimed
+                profile.SessionId
+                profile.LogicalRunId
+                terminalRun
+                BloggerMissingToolRepairKind
+                authProj
+        | _ -> false
+
+    /// When the claimed terminal is absent from the Host snapshot, recover its run id
+    /// from ClaimSequences scopes (session \u001f run \u001f InteractionRepair \u001f run \u001f kind).
+    let private claimedRunFromSequences (journal: AgentJournal) (bloggerSessionId: SessionId) : string option =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+
+        match PromptAuthorityLedger.projectionFor bloggerSessionId projections with
+        | None -> None
+        | Some authProj ->
+            let suffix = "\u001f" + BloggerMissingToolRepairKind
+
+            authProj.ClaimSequences
+            |> Map.toList
+            |> List.tryPick (fun (scope, seq) ->
+                if seq < 1 then
+                    None
+                elif not (scope.EndsWith(suffix, System.StringComparison.Ordinal)) then
+                    None
+                else
+                    let withoutKind = scope.Substring(0, scope.Length - suffix.Length)
+                    let sep = withoutKind.LastIndexOf('\u001f')
+
+                    if sep < 0 then
+                        None
+                    else
+                        let runId = withoutKind.Substring(sep + 1)
+
+                        if System.String.IsNullOrWhiteSpace runId then
+                            None
+                        else
+                            Some runId)
+
+    /// ENFORCER-153: rejudge BloggerToolRecovery from claim + Host transcript.
+    let rejudgeToolRecovery
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (messages: SessionMessage list)
+        : BloggerToolRecovery =
+        let terminals = completedAssistantEvidence messages
+
+        let claimedFromTerminals =
+            terminals
+            |> List.tryPick (fun (id, _) ->
+                let run = ProviderRunIdentity.create id
+
+                if repairClaimedFor journal bloggerSessionId run then
+                    Some id
+                else
+                    None)
+
+        let claimedTerminalRun =
+            match claimedFromTerminals with
+            | Some _ as hit -> hit
+            | None -> claimedRunFromSequences journal bloggerSessionId
+
+        rejudgeFromEvidence claimedTerminalRun terminals
+
     let private restoreRuntime
         (host: IParkedTransformHost)
         (bloggerSessionId: SessionId)
         (state: BloggerRuntimeState)
+        (recovery: BloggerToolRecovery)
         : unit =
         let key = SessionId.value bloggerSessionId
 
@@ -74,7 +220,7 @@ module BloggerCrashRecovery =
             key,
             { State = state
               PendingOffer = None
-              RepairSpent = false
+              Recovery = recovery
               ReactivatedAfterSeal = false }
         )
 
@@ -115,7 +261,8 @@ module BloggerCrashRecovery =
                             | BloggerRuntimeState.Sealed
                             | BloggerRuntimeState.Disposed -> ()
                             | BloggerRuntimeState.Idle when hasAnyReceipt && not hasOpen && not (host.HasParked key) ->
-                                restoreRuntime host bloggerId BloggerRuntimeState.Parked
+                                // Cycle already receipted → NoRecovery (ENFORCER-063 success path).
+                                restoreRuntime host bloggerId BloggerRuntimeState.Parked BloggerToolRecovery.NoRecovery
                                 results.Add(WindowOutcome.RestoredParked bloggerId)
                             | BloggerRuntimeState.Idle -> ()
                     | _ -> ()
@@ -139,7 +286,13 @@ module BloggerCrashRecovery =
                             | Error reason ->
                                 // Cold crash: Host session unreadable → abandon window A.
                                 abandon durable openReq (sprintf "crash-window-A: host snapshot error: %s" reason)
-                                restoreRuntime host openReq.BloggerSessionId BloggerRuntimeState.Idle
+
+                                restoreRuntime
+                                    host
+                                    openReq.BloggerSessionId
+                                    BloggerRuntimeState.Idle
+                                    BloggerToolRecovery.NoRecovery
+
                                 host.ClearCurrentRequest bloggerKey
                                 results.Add(WindowOutcome.AbandonedUnsent openReq.RequestId)
                             | Ok messages ->
@@ -160,7 +313,14 @@ module BloggerCrashRecovery =
                                         WindowOutcome.Unreadable(openReq.BloggerSessionId, "context blob unreadable")
                                     )
                                 | Some ctx ->
-                                    restoreRuntime host openReq.BloggerSessionId (BloggerRuntimeState.InFlight ctx)
+                                    // ENFORCER-153: rejudge from claim + transcript, not memory bool.
+                                    let recovery = rejudgeToolRecovery durable openReq.BloggerSessionId messages
+
+                                    restoreRuntime
+                                        host
+                                        openReq.BloggerSessionId
+                                        (BloggerRuntimeState.InFlight ctx)
+                                        recovery
 
                                     if liveCurrent.IsNone then
                                         host.SetCurrentRequest(bloggerKey, ctx)

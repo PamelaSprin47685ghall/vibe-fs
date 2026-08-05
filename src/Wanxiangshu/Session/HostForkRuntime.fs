@@ -84,7 +84,7 @@ type HostForkRuntime
 
     let restoreChildren () =
         match journal with
-        | None -> task { return () } :> Task
+        | None -> AsyncSupport.completedTask ()
         | Some j ->
             HostForkRestart.restoreLinkedChildren
                 runtime
@@ -210,59 +210,83 @@ type HostForkRuntime
                 (fun run outcome -> this.Complete(run, outcome))
         )
 
-    /// P0-RECOVERY-JOIN-001: permit-gated join. Signature proves FamilyRecoveryPermit.
-    /// Consumes root + journalSequence + closureDigest (re-discover family closure from journal).
-    /// Agent join requires journal (no fake empty permit for pure PTY).
-    /// Production JoinTool / JoinInterpreter must use this path — not bare Join.
-    member this.JoinWithPermit(permit: FamilyRecoveryPermit, ?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
+    /// EXEC-009 + EXEC-018: durable drain via JoinDrain pure path + PTY mailbox.
+    /// Abandoned items join the same ResultsAvailable batch — never withhold
+    /// completed results behind a top-level ForkError.Abandoned.
+    member private this.tryDrainAvailable(maxCount: int) : Result<JoinWaitOutcome<RunCompletion>, ForkError> option =
+        let cap = min maxCount JoinBatch.Max
+
+        if cap <= 0 then
+            None
+        else
+            match journal with
+            | None ->
+                match NonEmptyBatch.tryOfList (runtime.DrainAvailable cap) with
+                | Some batch -> Some(Ok(ResultsAvailable batch))
+                | None -> None
+            | Some durable ->
+                match JoinDrain.drainFromJournal durable parentId cap with
+                | Error e -> Some(Error e)
+                | Ok durableBatch ->
+                    // Mailbox: PTY facts (EXEC-015) + agent wake payloads (discard).
+                    // Only drain when batch has room; leftover PTY stays queued for next join.
+                    let remaining = cap - List.length durableBatch
+
+                    let ptyBatch =
+                        if remaining <= 0 then
+                            []
+                        else
+                            let rec pull acc need =
+                                if need <= 0 then
+                                    List.rev acc
+                                else
+                                    match runtime.DrainAvailable 1 with
+                                    | [] -> List.rev acc
+                                    | c :: _ when lock gate (fun () -> ptyRuns.Contains c.RunId) ->
+                                        pull (c :: acc) (need - 1)
+                                    | _ -> pull acc need
+
+                            pull [] remaining
+
+                    match NonEmptyBatch.tryOfList (durableBatch @ ptyBatch) with
+                    | Some batch -> Some(Ok(ResultsAvailable batch))
+                    | None -> None
+
+    /// Permit gate shared by JoinWithPermit / JoinAvailableWithPermit.
+    member private this.validatePermit(permit: FamilyRecoveryPermit) : Result<unit, ForkError> =
         let root = FamilyRecoveryPermit.root permit
         let permitSeq = FamilyRecoveryPermit.journalSequence permit
         let permitDigest = FamilyRecoveryPermit.closureDigest permit
 
         if root <> parentId then
-            task {
-                return
-                    Error(
-                        ForkError.NotFound(
-                            sprintf
-                                "family recovery permit root mismatch: permit=%s runtime=%s"
-                                (SessionId.value root)
-                                (SessionId.value parentId)
-                        )
-                    )
-            }
+            Error(
+                ForkError.NotFound(
+                    sprintf
+                        "family recovery permit root mismatch: permit=%s runtime=%s"
+                        (SessionId.value root)
+                        (SessionId.value parentId)
+                )
+            )
         else
             match journal with
             | None ->
-                // Agent join with FamilyRecoveryPermit is journal-backed. Pure PTY must not
-                // present a family permit (no synthetic empty FamilyReady).
-                task {
-                    return
-                        Error(
-                            ForkError.NotFound
-                                "family recovery permit requires journal; pure PTY join must not use JoinWithPermit"
-                        )
-                }
+                Error(
+                    ForkError.NotFound
+                        "family recovery permit requires journal; pure PTY join must not use JoinWithPermit"
+                )
             | Some durable ->
                 let currentSeq = JournalRevision.value (AgentJournal.revision durable)
 
-                // Permit was sealed at recovery authorize time. Journal must not have
-                // been replaced by an older stream (current < permit). Growth (current > permit)
-                // is expected while join waits; only regression fails closed.
                 if currentSeq < permitSeq then
-                    task {
-                        return
-                            Error(
-                                ForkError.NotFound(
-                                    sprintf
-                                        "family recovery permit journalSequence stale: permit=%d current=%d"
-                                        permitSeq
-                                        currentSeq
-                                )
-                            )
-                    }
+                    Error(
+                        ForkError.NotFound(
+                            sprintf
+                                "family recovery permit journalSequence stale: permit=%d current=%d"
+                                permitSeq
+                                currentSeq
+                        )
+                    )
                 else
-                    // Same pure discover as SessionRecoveryInterpreter AuthorizeResume path.
                     let current =
                         RecoveryClosureProjection.discover
                             root
@@ -270,179 +294,143 @@ type HostForkRuntime
                             currentSeq
 
                     if current.Digest <> permitDigest then
-                        task {
-                            return
-                                Error(
-                                    ForkError.NotFound(
-                                        sprintf
-                                            "family recovery permit closureDigest mismatch: permit=%s current=%s"
-                                            permitDigest
-                                            current.Digest
-                                    )
-                                )
-                        }
+                        Error(
+                            ForkError.NotFound(
+                                sprintf
+                                    "family recovery permit closureDigest mismatch: permit=%s current=%s"
+                                    permitDigest
+                                    current.Digest
+                            )
+                        )
                     else
-                        this.Join(?timeoutMs = timeoutMs)
+                        Ok()
 
-    /// EXEC-009 / P0-RECOVERY-JOIN-001: projection-first join after family recovery.
-    /// Prefer JoinWithPermit from production JoinTool (permit token required).
-    /// Durable `HandleProjection.joinable` is the fact source; mailbox wakes waiters.
-    /// Agent payloads from the mailbox are discarded and the loop re-reads projection.
-    /// PTY stays mailbox-driven (EXEC-015). Abandoned surfaces via tryConsumeDurable.
-    ///
-    /// Consume = read blob → CAS `HandleRetired`. CommitUnknown / append failure
-    /// must not deliver. Concurrent joins: single winner via journal gate.
-    ///
-    /// Join never waits forever: default budget 600s. On timeout, one final durable
-    /// consume is attempted; still empty → TimedOut.
-    member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
-        let budgetMs = defaultArg timeoutMs 600_000
+    /// P0-RECOVERY-JOIN-001: permit-gated join. Production JoinTool uses this path.
+    member this.JoinWithPermit(permit: FamilyRecoveryPermit, ?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
+        match this.validatePermit permit with
+        | Error e -> Task.FromResult(Error e)
+        | Ok() -> this.Join(?timeoutMs = timeoutMs)
 
-        let isPty runId =
-            lock gate (fun () -> ptyRuns.Contains runId)
+    /// EXEC-018 batch join under FamilyRecoveryPermit (next JoinTool path).
+    member this.JoinAvailableWithPermit
+        (permit: FamilyRecoveryPermit, maxCount: int, interrupt: Task<unit>)
+        : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
+        match this.validatePermit permit with
+        | Error e -> Task.FromResult(Error e)
+        | Ok() -> this.JoinAvailable(maxCount, interrupt)
 
-        let tryConsumeDurable (durable: AgentJournal) : Result<RunCompletion, ForkError> option =
-            let projection = AgentJournal.handleProjection durable parentId
+    /// EXEC-017 / EXEC-018: bounded batch join with local interrupt (≠ runtime.Cancel).
+    /// Durable agent: projection is fact source; mailbox/journal are wake only.
+    /// PTY: mailbox remains fact source (EXEC-015).
+    member this.JoinAvailable
+        (maxCount: int, interrupt: Task<unit>)
+        : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
+        let cap = min (max 0 maxCount) JoinBatch.Max
 
-            // EXEC-009: Abandoned is durable and not joinable. Surface it before
-            // waiting so Join does not hang or misreport Completed.
-            let abandoned =
-                HandleProjection.linkedChildren projection
-                |> List.tryPick (fun record ->
-                    match record.Lifecycle, HandleId.tryAgent record.Handle with
-                    | HandleLifecycle.Abandoned reason, Some agentHandleId ->
-                        let agentId = AgentHandleId.value agentHandleId
+        let hasWork () =
+            runtime.ActiveRunCount > 0
+            || runtime.PendingCompletionCount > 0
+            || lock gate (fun () -> pendingRuns.Count > 0 || ptyRuns.Count > 0)
+            || match journal with
+               | None -> false
+               | Some durable ->
+                   let p = AgentJournal.handleProjection durable parentId
 
-                        let reasonText =
-                            match reason with
-                            | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
-                            | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
-                            | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
+                   not (List.isEmpty (HandleProjection.joinable p))
+                   || not (List.isEmpty (HandleProjection.reportableAbandoned p))
+                   || not (List.isEmpty (HandleProjection.activeHandles p))
 
-                        Some(Error(ForkError.Abandoned(agentId, reasonText)))
-                    | _ -> None)
-
-            match abandoned with
-            | Some result -> Some result
-            | None ->
-                let joinable = HandleProjection.joinable projection
-
-                let rec attempt records =
-                    match records with
-                    | [] -> None
-                    | record :: rest ->
-                        match HandleId.tryAgent record.Handle with
-                        | None -> attempt rest
-                        | Some agentHandleId ->
-                            let agentId = AgentHandleId.value agentHandleId
-
-                            match HandleCompletionCodec.tryRead durable record agentId with
-                            | Error err -> Some(Error(ForkError.NotFound err))
-                            | Ok None ->
-                                // P0-RECOVERY-JOIN-001: hollow CompletedAwaitingJoin without
-                                // blob is not joinable. Never synthesize aborted/CANCELLED.
-                                match record.Lifecycle with
-                                | HandleLifecycle.CompletedAwaitingJoin cell ->
-                                    match cell.Kind with
-                                    | HandleCompletionKind.Terminal
-                                    | HandleCompletionKind.SendFailure ->
-                                        Some(Error(ForkError.TerminalMaterializationFailed agentId))
-                                    | HandleCompletionKind.Cancelled -> attempt rest
-                                | _ -> attempt rest
-                            | Ok(Some completion) ->
-                                match record.Lifecycle with
-                                | HandleLifecycle.CompletedAwaitingJoin durableCell ->
-                                    let body = HandleCompletionCodec.encodeOutcome completion.RunId completion.Outcome
-
-                                    match
-                                        JoinableCompletion.tryFromDurableCompleted
-                                            agentId
-                                            record.Handle
-                                            record.ChildSessionId
-                                            durableCell.Kind
-                                            (Some body)
-                                    with
-                                    | Error _ -> attempt rest
-                                    | Ok _ ->
-                                        match HandleController.consume durable parentId record.Handle with
-                                        | Ok _ -> Some(Ok completion)
-                                        | Error AlreadyRetired -> attempt rest
-                                        | Error(NotJoinable _) -> attempt rest
-                                        | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
-                                | _ -> attempt rest
-
-                attempt joinable
-
-        /// Race journal revision wake vs mailbox completion (PTY + agent notify).
-        /// Choice1 = durable change (re-loop); Choice2 = mailbox result.
-        let raceChangeAndMailbox
-            (durable: AgentJournal)
-            (fromRev: JournalRevision)
-            (ms: int)
-            : Task<Choice<JournalChange, Result<RunCompletion, ForkError>>> =
+        /// Outer race arms: mailbox wake | journal change | user interrupt.
+        /// PulseWake after race so a losing WaitForWake waiter never piles up.
+        let rec loop () : Task<Result<JoinWaitOutcome<RunCompletion>, ForkError>> =
             task {
-                let changeTask =
-                    task {
-                        let! change = durable.AwaitChangeFrom fromRev
-                        return Choice1Of2 change
-                    }
-
-                let mailTask =
-                    task {
-                        let! joined = runtime.Join(timeoutMs = ms)
-                        return Choice2Of2 joined
-                    }
-
-                return! emitJsExpr (changeTask, mailTask) "Promise.race([$0, $1])"
-            }
-
-        let rec loop (remainingMs: int) : Task<Result<RunCompletion, ForkError>> =
-            task {
-                match journal with
-                | Some durable ->
-                    match tryConsumeDurable durable with
-                    | Some result -> return result
-                    | None ->
-                        if remainingMs <= 0 then
-                            return Error ForkError.TimedOut
-                        else
-                            // Snapshot revision under gate, then recheck durable before waiting.
+                match this.tryDrainAvailable cap with
+                | Some result -> return result
+                | None ->
+                    if runtime.IsCancelled then
+                        return Error ForkError.Cancelled
+                    elif not (hasWork ()) then
+                        return Error ForkError.NothingToJoin
+                    else
+                        match journal with
+                        | Some durable ->
                             let _, fromRev = durable.SnapshotWithRevision
 
-                            match tryConsumeDurable durable with
+                            match this.tryDrainAvailable cap with
                             | Some result -> return result
                             | None ->
-                                let started = DateTimeOffset.UtcNow
-                                let! raced = raceChangeAndMailbox durable fromRev remainingMs
+                                // Tagged race arms without nested task{} (dsl-ownership).
+                                // kind: 0=wake(+reason), 1=journal change, 2=user interrupt.
+                                let wakeTask: Task<obj> =
+                                    emitJsExpr
+                                        (runtime.WaitForWake())
+                                        "$0.then(function (r) { return { kind: 0, reason: r }; })"
 
-                                let elapsed = int (DateTimeOffset.UtcNow - started).TotalMilliseconds
+                                let changeTask: Task<obj> =
+                                    emitJsExpr
+                                        (durable.AwaitChangeFrom fromRev)
+                                        "$0.then(function () { return { kind: 1 }; })"
 
-                                let next = max 0 (remainingMs - max 0 elapsed)
+                                let userTask: Task<obj> =
+                                    emitJsExpr interrupt "$0.then(function () { return { kind: 2 }; })"
 
-                                match raced with
-                                | Choice1Of2 _ ->
-                                    // Journal advanced — re-read projection (may still be None).
-                                    return! loop next
-                                | Choice2Of2(Ok completion) when isPty completion.RunId -> return Ok completion
-                                | Choice2Of2(Ok _) ->
-                                    // Agent mailbox payload is notification only — re-loop.
-                                    return! loop next
-                                | Choice2Of2(Error ForkError.TimedOut) ->
-                                    match tryConsumeDurable durable with
-                                    | Some result -> return result
-                                    | None -> return Error ForkError.TimedOut
-                                | Choice2Of2(Error e) -> return Error e
-                | None ->
-                    if remainingMs <= 0 then
-                        return Error ForkError.TimedOut
-                    else
-                        let! joined = runtime.Join(timeoutMs = remainingMs)
-                        return joined
+                                let! winner =
+                                    emitJsExpr (wakeTask, changeTask, userTask) "Promise.race([$0, $1, $2])": Task<obj>
+
+                                runtime.PulseWake()
+
+                                match this.tryDrainAvailable cap with
+                                | Some result -> return result
+                                | None ->
+                                    let kind: int = emitJsExpr winner "$0.kind"
+
+                                    if kind = 0 then
+                                        let reason: MailboxWakeReason = emitJsExpr winner "$0.reason"
+
+                                        match reason with
+                                        | MailboxCancelled -> return Error ForkError.Cancelled
+                                        | CompletionMayBeAvailable
+                                        | UserInterrupted -> return! loop ()
+                                    elif kind = 2 then
+                                        return Ok InterruptedByUserMessage
+                                    else
+                                        return! loop ()
+                        | None ->
+                            let! signal = runtime.WaitForSignal interrupt
+
+                            match this.tryDrainAvailable cap with
+                            | Some result -> return result
+                            | None ->
+                                match signal with
+                                | MailboxCancelled -> return Error ForkError.Cancelled
+                                | UserInterrupted -> return Ok InterruptedByUserMessage
+                                | CompletionMayBeAvailable -> return! loop ()
             }
 
         task {
             do! this.AwaitRecovery()
-            return! loop budgetMs
+            return! loop ()
+        }
+
+    /// Compatibility single-result join (timeout budget). New callers: JoinAvailable.
+    member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
+        let budgetMs = defaultArg timeoutMs 600_000
+
+        task {
+            do! this.AwaitRecovery()
+            let interrupt = PtyTiming.timerTask budgetMs
+            let! outcome = this.JoinAvailable(1, interrupt)
+
+            match outcome with
+            | Error e -> return Error e
+            | Ok InterruptedByUserMessage ->
+                // Timer interrupt under legacy Join API → TimedOut after final drain.
+                match this.tryDrainAvailable 1 with
+                | Some(Ok(ResultsAvailable batch)) -> return Ok(NonEmptyBatch.toList batch |> List.head)
+                | Some(Error e) -> return Error e
+                | Some(Ok InterruptedByUserMessage)
+                | None -> return Error ForkError.TimedOut
+            | Ok(ResultsAvailable batch) -> return Ok(NonEmptyBatch.toList batch |> List.head)
         }
 
     member this.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =

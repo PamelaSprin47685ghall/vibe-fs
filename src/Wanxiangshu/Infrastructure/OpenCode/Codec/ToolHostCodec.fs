@@ -84,8 +84,14 @@ module ToolHostCodec =
     [<Emit("$0.schema.enum($1)")>]
     let private rawEnumSchema (tool: obj) (values: string array) : obj = jsNative
 
+    [<Emit("$0.schema.enum($1).describe($2)")>]
+    let private rawEnumSchemaDescribed (tool: obj) (values: string array) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.enum($1).optional()")>]
     let private rawOptionalEnumSchema (tool: obj) (values: string array) : obj = jsNative
+
+    [<Emit("$0.schema.enum($1).describe($2).optional()")>]
+    let private rawOptionalEnumSchemaDescribed (tool: obj) (values: string array) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.union([$0.schema.enum($1), $0.schema.string()])")>]
     let private rawManagedOrHandleSchema (tool: obj) (values: string array) : obj = jsNative
@@ -189,8 +195,14 @@ module ToolHostCodec =
     let enumSchema values (HostToolFactory factory) =
         HostSchema(rawEnumSchema factory (List.toArray values))
 
+    let enumSchemaDescribed values description (HostToolFactory factory) =
+        HostSchema(rawEnumSchemaDescribed factory (List.toArray values) description)
+
     let optionalEnumSchema values (HostToolFactory factory) =
         HostSchema(rawOptionalEnumSchema factory (List.toArray values))
+
+    let optionalEnumSchemaDescribed values description (HostToolFactory factory) =
+        HostSchema(rawOptionalEnumSchemaDescribed factory (List.toArray values) description)
 
     let managedOrHandleSchema values (HostToolFactory factory) =
         HostSchema(rawManagedOrHandleSchema factory (List.toArray values))

@@ -185,6 +185,9 @@ module CompanionTransform =
                     let ingestCursor =
                         XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
 
+                    // Cheap prefilter only: skip EnsureBlogger when the Host view has
+                    // nothing past the ingest cursor. Birth gate (Next>Prev) still
+                    // runs inside onMainMaterial via mainContextFromChunk.
                     let hasMaterial =
                         BloggerDelta.nextChunk
                             BloggerDelta.DeltaLimitBytes

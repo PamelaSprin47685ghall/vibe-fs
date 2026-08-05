@@ -1,0 +1,466 @@
+/**
+ * P0 Clean Break RED-1: destroy Agent ABORTED as join finality.
+ *
+ * Final contract (user adjudication):
+ *   Agent finality = Completed | Failed | Abandoned — no AgentAborted.
+ *   JoinDrain: HandleRecord → blob → DurableCompletionDecode → branch.
+ *   SendFailure + body is NOT a proof (body may be status=aborted).
+ *   Legacy false abort → HandleFalseCompletionRejected (not retired) or
+ *   deterministic replacement + ParentJoinCorrectionRequested (retired).
+ *
+ * RED-1 only: tests must stably fail on current production with
+ *   "parent got aborted" / false-completion consume / missing compensation.
+ * Production src/ and spec/ untouched. Do not run here (DevOps confirms red).
+ *
+ * Existing aborted wire fixture path (document only, do not delete):
+ *   agentCompletion.abortedRun + JoinResultRenderer | AgentAborted
+ *   → status = "aborted" in [[result]]; join-v2-wire only forbids aborted on
+ *   interrupted wire, not agent result items.
+ */
+
+import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
+import {
+  agentCompletion,
+  agentFact,
+  agentFactCaseNames,
+  agentJournal,
+  bootSnapshot,
+  caseOf,
+  childRecovery,
+  completionKind,
+  envelope,
+  fact,
+  fold,
+  forkRuntime,
+  handleCompletionCodec,
+  handleController,
+  handleId,
+  handleProjection,
+  idValue,
+  joinDrain,
+  joinResultRenderer,
+  maxJoinBatch,
+  nonEmptyBatch,
+  roles,
+  sessionId,
+  stream,
+} from '../support/domain.mjs'
+
+const PARENT = sessionId('ses_parent_clean_break')
+const CHILD = sessionId('ses_child_clean_break')
+const AGENT_ID = 'h-false-abort'
+const HANDLE = handleId.agent(AGENT_ID)
+const TARGET = 'fast-coder'
+const RUN_ID = 'run-legacy-abort'
+
+const EXISTING_ABORTED_WIRE =
+  'domain.mjs agentCompletion.abortedRun + JoinResultRenderer AgentAborted branch'
+
+/** Plant historical false terminal: blob status=aborted + HandleCompleted(SendFailure). */
+const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = {}) => {
+  const body = handleCompletionCodec.legacyAbortedBody({
+    runId: RUN_ID,
+    code: 'CANCELLED',
+    message: 'host abort observation written as finality',
+    childSessionId: idValue.session(child),
+  })
+  assert.match(body, /"status"\s*:\s*"aborted"/)
+
+  const written = agentJournal.writeBlob(body, journal)
+  assert.equal(written.ok, true, written.ok ? '' : written.error)
+  const receipt = written.value
+
+  const linked = handleController.link(
+    journal,
+    PARENT,
+    agentId,
+    child,
+    TARGET,
+    forkRuntime.role('Coder'),
+  )
+  assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
+
+  // Bypass JoinableCompletion: historical SendFailure cell → aborted blob.
+  const completed = agentJournal.appendAgent(
+    stream.session(PARENT),
+    undefined,
+    agentFact('HandleCompleted', {
+      ParentSessionId: PARENT,
+      Handle: handleId.agent(agentId),
+      Kind: completionKind.of('SendFailure'),
+      CompletionRef: receipt.BlobRef,
+      CompletionDigest: receipt.BlobDigest,
+    }),
+    journal,
+  )
+  assert.equal(completed.ok, true, completed.ok ? '' : JSON.stringify(completed.error))
+
+  return {
+    body,
+    blobDigest: idValue.blobDigest(receipt.BlobDigest),
+    receipt,
+  }
+}
+
+const lifecycleOf = (projection, handle = HANDLE) =>
+  handleProjection.read(handleProjection.tryFind(handle, projection)).lifecycle
+
+// ── Pointer: current codebase still exposes aborted join wire ────────────────
+
+test('P0_CLEAN_BREAK_existing_aborted_join_wire_fixture_still_present', () => {
+  const batch = nonEmptyBatch.ofHeadTail(
+    agentCompletion.abortedRun({
+      runId: RUN_ID,
+      agentId: AGENT_ID,
+      agentName: TARGET,
+      code: 'CANCELLED',
+      message: 'aborted',
+    }),
+  )
+  const wire = joinResultRenderer.renderCompletedBatch(joinResultRenderer.stubRuntime(), batch)
+  assert.ok(
+    wire.includes('status = "aborted"'),
+    `current production still renders agent aborted; fixture: ${EXISTING_ABORTED_WIRE}`,
+  )
+  assert.equal(parseToml(wire).result[0].status, 'aborted')
+})
+
+// ── 1a. Weak proof abolished (codec layer) ───────────────────────────────────
+
+test('P0_CLEAN_BREAK_tryFromDurableCompleted_refuses_send_failure_aborted_body', () => {
+  const body = handleCompletionCodec.legacyAbortedBody({ runId: RUN_ID })
+  // tryFromDurableCompleted deleted: facade returns permanent Error (weak proof abolished).
+  const weak = childRecovery.tryFromDurableCompleted(
+    AGENT_ID,
+    HANDLE,
+    CHILD,
+    'SendFailure',
+    body,
+  )
+  assert.equal(
+    weak.ok,
+    false,
+    'SendFailure + status=aborted body must not be JoinableCompletion (weak proof abolished)',
+  )
+})
+
+// ── 1b. Real journal blob + restart fold + JoinDrain ─────────────────────────
+
+test('P0_CLEAN_BREAK_legacy_aborted_blob_after_restart_join_drain_must_not_return_aborted', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-restart-'))
+  const created = agentJournal.create({ directory: dir, runtime: 'rt_pre' })
+  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
+
+  plantLegacyFalseAbort(created.journal)
+
+  // Pre-restart: legacy abort blob is not a RunCompletion (decode → LegacyFalseAbort).
+  {
+    const projection = agentJournal.handleProjection(created.journal, PARENT)
+    assert.equal(lifecycleOf(projection), 'CompletedAwaitingJoin')
+    const record = handleProjection.tryFind(HANDLE, projection)
+    const decoded = handleCompletionCodec.tryRead(created.journal, record, AGENT_ID)
+    assert.equal(decoded.ok, false, 'legacy abort must not materialise RunCompletion')
+    const body = handleCompletionCodec.legacyAbortedBody({
+      runId: RUN_ID,
+      code: 'CANCELLED',
+      message: 'host abort observation written as finality',
+      childSessionId: idValue.session(CHILD),
+    })
+    assert.equal(caseOf(handleCompletionCodec.decodeBody(body)), 'LegacyFalseAbort')
+  }
+
+  created.dispose()
+
+  const boot = bootSnapshot.load(dir)
+  const restarted = agentJournal.createFromBoot({
+    directory: dir,
+    boot,
+    runtime: 'rt_post',
+  })
+  assert.equal(restarted.ok, true, restarted.ok ? '' : JSON.stringify(restarted.error))
+
+  try {
+    const j = restarted.journal
+    const before = agentJournal.handleProjection(j, PARENT)
+    assert.equal(lifecycleOf(before), 'CompletedAwaitingJoin')
+    assert.equal(handleProjection.joinable(before).length, 1)
+    assert.equal(handleProjection.isRetired(HANDLE, before), false)
+
+    // Production JoinDrain path (JoinTool / HostForkRuntime durable drain).
+    const drained = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    assert.equal(drained.ok, true, drained.ok ? '' : drained.error)
+
+    // RED: current code returns status=aborted and CAS-retires the handle.
+    const abortedItems = drained.items.filter((i) => i.status === 'aborted')
+    assert.equal(
+      abortedItems.length,
+      0,
+      `JoinDrain must not surface agent aborted; got ${JSON.stringify(drained.items)}`,
+    )
+    assert.equal(
+      drained.items.filter((i) => i.agentId === AGENT_ID).length,
+      0,
+      'parent join must not return agent result for false-abort handle',
+    )
+
+    const after = agentJournal.handleProjection(j, PARENT)
+    assert.equal(
+      handleProjection.isRetired(HANDLE, after),
+      false,
+      'legacy false abort must not be CAS-retired as normal completion',
+    )
+
+    // Compensation fact (not in algebra yet → RED when asserted present).
+    const cases = agentFactCaseNames()
+    assert.ok(
+      cases.includes('HandleFalseCompletionRejected'),
+      `AgentFact must include HandleFalseCompletionRejected; have: ${cases.join(', ')}`,
+    )
+
+    const life = lifecycleOf(after)
+    assert.ok(
+      life === 'Active' || life === 'CompletedAwaitingJoin',
+      `child must stay recoverable after reject, lifecycle=${life}`,
+    )
+  } finally {
+    restarted.dispose()
+  }
+})
+
+// ── 2. Already-Retired migration ─────────────────────────────────────────────
+
+test('P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-retired-'))
+  const created = agentJournal.create({ directory: dir, runtime: 'rt_pre' })
+  assert.equal(created.ok, true)
+
+  plantLegacyFalseAbort(created.journal)
+
+  // Historical path: parent already retired under old code (force tombstone; do not
+  // use new JoinDrain which rejects without retiring).
+  const forcedRetire = agentJournal.appendAgent(
+    stream.session(PARENT),
+    undefined,
+    agentFact('HandleRetired', { ParentSessionId: PARENT, Handle: HANDLE }),
+    created.journal,
+  )
+  assert.equal(forcedRetire.ok, true, forcedRetire.ok ? '' : JSON.stringify(forcedRetire.error))
+  assert.equal(
+    handleProjection.isRetired(HANDLE, agentJournal.handleProjection(created.journal, PARENT)),
+    true,
+  )
+  created.dispose()
+
+  const boot = bootSnapshot.load(dir)
+  const restarted = agentJournal.createFromBoot({ directory: dir, boot, runtime: 'rt_post' })
+  assert.equal(restarted.ok, true, restarted.ok ? '' : JSON.stringify(restarted.error))
+
+  try {
+    const j = restarted.journal
+    // Trigger clean-break reconcile (retired LegacyFalseAbort → replacement).
+    const drained = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    assert.equal(drained.ok, true, drained.ok ? '' : drained.error)
+    assert.equal(
+      drained.items.filter((i) => i.status === 'aborted').length,
+      0,
+      'retired false abort must not surface aborted to parent',
+    )
+
+    const after = agentJournal.handleProjection(j, PARENT)
+
+    assert.equal(handleProjection.isRetired(HANDLE, after), true)
+
+    const cases = agentFactCaseNames()
+    assert.ok(
+      cases.includes('ParentJoinCorrectionRequested'),
+      'AgentFact must include ParentJoinCorrectionRequested for retired false terminal',
+    )
+
+    // Deterministic replacement: recovery:<H>:<bad-digest> — pure, once.
+    const listed = handleProjection
+      .listable(after)
+      .map((r) => handleProjection.read(r).handle)
+      .filter((h) => h !== handleId.describe(HANDLE))
+    const active = handleProjection
+      .activeHandles(after)
+      .map((r) => handleProjection.read(r).handle)
+      .filter((h) => h !== handleId.describe(HANDLE))
+    const replacements = [...new Set([...listed, ...active])]
+    assert.ok(
+      replacements.length >= 1,
+      `expected deterministic replacement handle; listed=${JSON.stringify(listed)} active=${JSON.stringify(active)}`,
+    )
+
+    // Repeat recovery: same replacement set (no second mint).
+    const boot2 = bootSnapshot.load(dir)
+    const again = agentJournal.createFromBoot({
+      directory: dir,
+      boot: boot2,
+      runtime: 'rt_post2',
+    })
+    assert.equal(again.ok, true)
+    try {
+      const drained2 = joinDrain.drainFromJournal(again.journal, PARENT, maxJoinBatch)
+      assert.equal(drained2.ok, true)
+      const after2 = agentJournal.handleProjection(again.journal, PARENT)
+      const againIds = [
+        ...handleProjection.listable(after2).map((r) => handleProjection.read(r).handle),
+        ...handleProjection.activeHandles(after2).map((r) => handleProjection.read(r).handle),
+      ].filter((h) => h !== handleId.describe(HANDLE))
+      assert.deepEqual(
+        [...new Set(againIds)].sort(),
+        replacements.sort(),
+        'repeat recovery must not mint a second replacement handle',
+      )
+    } finally {
+      again.dispose()
+    }
+  } finally {
+    restarted.dispose()
+  }
+})
+
+// ── 3. Delayed recovery race (unit shape; full E2E later) ────────────────────
+
+test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-join-abort-cb-race-'))
+  const created = agentJournal.create({ directory: dir })
+  assert.equal(created.ok, true)
+
+  try {
+    const j = created.journal
+    const linked = handleController.link(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
+    assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
+
+    // Host Aborted observation while recovery still incomplete → never Joinable.
+    const resolution = childRecovery.resolveChild(
+      childRecovery.durableActive(),
+      childRecovery.snapshotMissing(),
+      [childRecovery.abortedObserved('interrupted tool'), childRecovery.recoveryInFlight()],
+    )
+    assert.notEqual(caseOf(resolution), 'Joinable')
+    assert.ok(
+      caseOf(resolution) === 'AwaitingEvidence' || caseOf(resolution) === 'RunningAgain',
+      `expected incomplete recovery, got ${caseOf(resolution)}`,
+    )
+
+    // Before true terminal: drain empty, HandleRetired=0, no aborted item.
+    const early = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    assert.equal(early.ok, true)
+    assert.deepEqual(early.items, [])
+    assert.equal(handleProjection.isRetired(HANDLE, agentJournal.handleProjection(j, PARENT)), false)
+
+    // True terminal → completed once, retire once; never aborted.
+    const sealed = agentCompletion.completedRun({
+      runId: 'run-true-terminal',
+      agentId: AGENT_ID,
+      agentName: TARGET,
+      workRecord: 'real work done',
+    })
+    const body = handleCompletionCodec.encodeOutcome(sealed.RunId, sealed.Outcome)
+    const recorded = handleController.recordCompletion(j, PARENT, AGENT_ID, 'Terminal', body, CHILD)
+    assert.equal(recorded.ok, true, recorded.ok ? '' : recorded.error)
+
+    const finalDrain = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
+    assert.equal(finalDrain.ok, true)
+    assert.equal(finalDrain.items.length, 1)
+    assert.equal(finalDrain.items[0].status, 'completed')
+    assert.notEqual(finalDrain.items[0].status, 'aborted')
+    assert.equal(handleProjection.isRetired(HANDLE, agentJournal.handleProjection(j, PARENT)), true)
+
+    const batch = nonEmptyBatch.ofHeadTail(
+      agentCompletion.completedRun({
+        runId: finalDrain.items[0].runId,
+        agentId: finalDrain.items[0].agentId,
+        agentName: finalDrain.items[0].agentName,
+        workRecord: finalDrain.items[0].workRecord,
+      }),
+    )
+    const wire = joinResultRenderer.renderCompletedBatch(joinResultRenderer.stubRuntime(), batch)
+    assert.ok(!wire.includes('status = "aborted"'))
+  } finally {
+    created.dispose()
+  }
+})
+
+// ── 4. Full-history property skeleton ────────────────────────────────────────
+
+test('P0_CLEAN_BREAK_property_join_agent_item_implies_v2_terminal_proof', () => {
+  /**
+   * ∀ join result AgentItem x → history has v2 terminal blob + HandleCompleted
+   * + finality ∈ {completed, failed}.
+   * Legacy abort body → not Current RunCompletion (never AgentAborted).
+   */
+  const record = {
+    Handle: handleId.agent('a'),
+    ChildSessionId: CHILD,
+    TargetAgent: TARGET,
+    CanonicalRole: roles.of('Coder'),
+    Lifecycle: undefined,
+    CreationOrder: 0,
+    LastCompletion: undefined,
+  }
+
+  const legacy = handleCompletionCodec.legacyAbortedBody({ runId: 'r1' })
+  const legacyDecoded = handleCompletionCodec.tryDecode(record, 'a', legacy)
+  assert.equal(legacyDecoded.ok, false, 'legacy abort must not materialise RunCompletion')
+  const legacyBranch = handleCompletionCodec.decodeBody(legacy)
+  assert.equal(caseOf(legacyBranch), 'LegacyFalseAbort')
+
+  const completedBody = handleCompletionCodec.encodeOutcome(
+    'r2',
+    agentCompletion.completedRun({
+      runId: 'r2',
+      agentId: 'a2',
+      agentName: TARGET,
+      workRecord: 'ok',
+    }).Outcome,
+  )
+  const decoded = handleCompletionCodec.tryDecode(record, 'a', completedBody)
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  assert.notEqual(caseOf(decoded.value.Outcome), 'AgentAborted')
+  const parsed = JSON.parse(completedBody)
+  assert.equal(parsed.schemaVersion, 2)
+  assert.ok(parsed.finality === 'completed' || parsed.finality === 'failed')
+})
+
+// ── Fold: historical SendFailure cell shape ──────────────────────────────────
+
+test('P0_CLEAN_BREAK_fold_replays_send_failure_as_awaiting_join_no_compensation_fact_yet', () => {
+  const facts = [
+    fact('HandleLinked', {
+      ParentSessionId: PARENT,
+      ChildSessionId: CHILD,
+      Handle: HANDLE,
+      TargetAgent: TARGET,
+      CanonicalRole: roles.of('Coder'),
+    }),
+    fact('HandleCompleted', {
+      ParentSessionId: PARENT,
+      Handle: HANDLE,
+      Kind: completionKind.of('SendFailure'),
+      CompletionRef: undefined,
+      CompletionDigest: undefined,
+    }),
+  ]
+  const folded = fold.apply(
+    fold.empty,
+    facts.map((value, index) => envelope({ seq: index + 1, stream: stream.session(PARENT), fact: value })),
+  )
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+  const handles = fold.session(folded.value, 'ses_parent_clean_break').Handles
+  const state = handleProjection.read(handleProjection.tryFind(HANDLE, handles))
+  assert.equal(state.lifecycle, 'CompletedAwaitingJoin')
+  assert.equal(state.completion, 'SendFailure')
+
+  // GREEN-2: compensation fact is in the algebra.
+  assert.ok(
+    agentFactCaseNames().includes('HandleFalseCompletionRejected'),
+    'AgentFact must include HandleFalseCompletionRejected',
+  )
+})

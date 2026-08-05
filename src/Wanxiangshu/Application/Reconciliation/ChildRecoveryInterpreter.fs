@@ -62,21 +62,22 @@ module ChildRecoveryInterpreter =
                 | HandleLifecycle.Retired -> DurableHandleEvidence.Retired
                 | HandleLifecycle.Abandoned reason -> DurableHandleEvidence.Abandoned reason
                 | HandleLifecycle.CompletedAwaitingJoin cell ->
-                    match HandleCompletionCodec.tryRead journal record ports.AgentId with
-                    | Ok(Some completion) ->
-                        let body = HandleCompletionCodec.encodeOutcome completion.RunId completion.Outcome
+                    match HandleCompletionCodec.tryReadBody journal record with
+                    | Ok(Some body, _, _) ->
+                        match HandleCompletionCodec.decodeBody body with
+                        | Current decoded ->
+                            let proof =
+                                JoinableCompletion.fromDecoded
+                                    ports.AgentId
+                                    ports.Handle
+                                    ports.ChildSession
+                                    decoded
+                                    body
 
-                        match
-                            JoinableCompletion.tryFromDurableCompleted
-                                ports.AgentId
-                                ports.Handle
-                                ports.ChildSession
-                                cell.Kind
-                                (Some body)
-                        with
-                        | Ok proof -> DurableHandleEvidence.CompletedAwaitingJoin proof
-                        | Error _ -> DurableHandleEvidence.Active
-                    | Ok None ->
+                            DurableHandleEvidence.CompletedAwaitingJoin proof
+                        | LegacyFalseAbort _ -> DurableHandleEvidence.Active
+                        | Invalid _ -> DurableHandleEvidence.Unknown
+                    | Ok(None, _, _) ->
                         match cell.Kind with
                         | HandleCompletionKind.Cancelled -> DurableHandleEvidence.Active
                         | HandleCompletionKind.Terminal
@@ -88,7 +89,10 @@ module ChildRecoveryInterpreter =
           ChildSessionId = ports.ChildSession
           TargetAgent = ports.Agent
           CanonicalRole = AgentRoleIdentity.toRole ports.Role
-          Lifecycle = HandleLifecycle.Active }
+          Lifecycle = HandleLifecycle.Active
+          // Decode-only stub for HandleCompletionCodec; CreationOrder unused.
+          CreationOrder = 0
+          LastCompletion = None }
 
     let private publishProof (ports: Ports) (proof: JoinableCompletion) : unit =
         match ports.Publish, JoinableCompletion.body proof with

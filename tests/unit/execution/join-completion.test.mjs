@@ -5,6 +5,7 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
+  agentCompletion,
   caseOf,
   completionMailbox,
   hostEventPort,
@@ -112,39 +113,27 @@ test('EXEC_join_mailbox_with_no_completion_times_out', async () => {
 
   assert.ok(elapsed >= 25, `expected ~40ms wait, got ${elapsed}ms`)
   assert.ok(elapsed < 2000, `must not hang; got ${elapsed}ms`)
-  assert.equal(result.tag, 1, 'Error result')
+  assert.equal(caseOf(result), 'Error', 'Error result')
   assert.equal(caseOf(result.fields[0]), 'TimedOut')
 })
 
 test('EXEC_join_mailbox_completion_before_deadline_returns_ok', async () => {
   const box = completionMailbox.create(() => true)
-  const completion = {
-    RunId: 'run-x',
-    AgentId: 'agent-x',
-    AgentName: 'fast-coder',
-    Role: roles.of('Coder'),
-    Outcome: {
-      tag: 1,
-      fields: [
-        {
-          AgentId: 'agent-x',
-          ChildSessionId: undefined,
-          RunId: 'run-x',
-          Role: undefined,
-          Code: 'OK',
-          Message: 'done',
-        },
-      ],
-    },
-    CompletedAt: new Date(),
-  }
+  // AgentCompletionOutcome is Session.AgentRole, not Kernel.Role.
+  const completion = agentCompletion.completedRun({
+    runId: 'run-x',
+    agentId: 'agent-x',
+    agentName: 'fast-coder',
+    role: 'Coder',
+    workRecord: 'done',
+  })
 
   const pending = completionMailbox.join(box, 500)
   await new Promise((r) => setTimeout(r, 10))
   completionMailbox.publish(box, completion)
 
   const result = await pending
-  assert.equal(result.tag, 0, 'Ok completion')
+  assert.equal(caseOf(result), 'Ok', 'Ok completion')
   assert.equal(result.fields[0].AgentId, 'agent-x')
 })
 

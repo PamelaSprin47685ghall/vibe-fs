@@ -231,14 +231,15 @@ test('P0_RECOVERY_JOIN_GATE_join_tool_missing_recovery_goes_red', () => {
 })
 
 test('P0_RECOVERY_JOIN_GATE_join_tool_with_dsl_stays_green_for_positive', () => {
+  // EXEC-018 production shape: joinAvailable + interpretBatch (joinAny still accepted).
   const source = [
     'module JoinTool',
     'let execute scope context =',
     '    let! recovery = scope.RequireFamilyRecovery root',
     '    match recovery with',
     '    | FamilyReady permit ->',
-    '        let program = JoinProgram.joinAny permit',
-    '        let! joined = JoinInterpreter.interpret runtime program',
+    '        let program = joinAvailable permit MaxJoinBatch interrupt.Wait',
+    '        let! joined = JoinInterpreter.interpretBatch runtime program',
     '        match joined with',
     '        | Ok c -> encode c',
     '    | FamilyBlocked b -> recoveryBlocked b',

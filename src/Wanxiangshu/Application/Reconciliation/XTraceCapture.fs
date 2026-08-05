@@ -222,17 +222,29 @@ module XTraceCapture =
                             includeOpening
                     )
 
+    /// HOST-006: Host turn indices restart after reanchor; XTrace does not.
+    /// Provenance must carry the reanchor generation or post-compaction turns
+    /// collide with pre-compaction `turn:0/part:0` and never append — RecordCoverage
+    /// then maps a Host cursor onto a dead numbering and stages Next≤Prev.
+    let private captureGeneration (journal: AgentJournal) (sessionId: SessionId) : int =
+        AgentJournal.snapshot journal
+        |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
+        |> Option.bind (fun session -> session.PrefixEpoch)
+        |> Option.map (fun epoch -> Set.count epoch.ReanchoredRuns)
+        |> Option.defaultValue 0
+
     /// COMPANION-003 / COMPANION-007: synchronise the XTrace with the provider's
     /// semantic projection at the transform boundary.
     ///
     /// The Blogger chunker works in semantic (turn/part) coordinates against the
     /// same projection, so the XTrace must mirror it part-for-part or the
-    /// `SemanticCursor → XTrace cursor` mapping in `CompanionJournalPort` cannot
-    /// advance monotonically (measured: `BlogEntryCommitted` was rejected as
-    /// "consumed nothing" when the XTrace lagged the projection).
+    /// `SemanticCursor → XTrace cursor` mapping cannot advance monotonically
+    /// (measured: `BlogEntryCommitted` was rejected as "consumed nothing" when
+    /// the XTrace lagged the projection).
     ///
-    /// Idempotent by (turn, part) provenance: the same turn is re-observed on
-    /// every later request, and re-observing must not duplicate the trace.
+    /// Idempotent by `(reanchorGen, turn, part)` provenance: the same Host view is
+    /// re-observed every transform without duplicating the trace; a reanchor opens
+    /// a new generation so renumbered Host turns append instead of colliding.
     ///
     /// Returns the updated XTrace state (or `None` without a journal), so the
     /// caller can refresh the in-memory Companion mirror — otherwise the chunker
@@ -247,6 +259,7 @@ module XTraceCapture =
         | None -> None
         | Some durable ->
             let existing = xTraceOf durable sessionId
+            let generation = captureGeneration durable sessionId
 
             let recorded =
                 existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
@@ -257,7 +270,10 @@ module XTraceCapture =
             |> List.iteri (fun turnIndex message ->
                 message.Parts
                 |> List.iteri (fun partIndex part ->
-                    let provenance = sprintf "turn:%d/part:%d" turnIndex partIndex
+                    // g:N isolates Host renumbering after ContextReanchored (HOST-006).
+                    // PrefixRebase does not grow ReanchoredRuns, so ordinary epoch
+                    // promotion keeps the same generation and stays idempotent.
+                    let provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex
 
                     if not (Set.contains provenance recorded) then
                         cursor <- cursor + 1L

@@ -12,6 +12,12 @@ module FactCodec =
     let pre050MigrationMessage =
         "Wanxiangshu 0.5.0 does not support pre-0.5.0 runtime journals.\nArchive or remove the old Wanxiangshu runtime journal before starting."
 
+    /// ENFORCER-072 / PERSIST-005: tip v2 clean break. Old ScoreVectorRef-era
+    /// BlogEntryCommitted lines cannot losslessly become a single tip (ties,
+    /// empties, multi-high scores). Refuse — never invent a tip from max score.
+    let tipV2CleanBreakMessage =
+        "Wanxiangshu tip v2 requires BlogEntryCommitted.TipRuleId; ScoreVectorRef-era entries are not supported (ENFORCER-072 / PERSIST-005).\nArchive or remove the old Wanxiangshu runtime journal before starting."
+
     /// Field and case names that only a pre-0.5.0 journal can contain.
     ///
     /// Two groups, both fatal:
@@ -59,6 +65,18 @@ module FactCodec =
     let containsLegacyFallbackFields (json: string) =
         pre050Markers
         |> Array.exists (fun marker -> json.IndexOf(marker, StringComparison.Ordinal) >= 0)
+
+    /// ENFORCER-072: BlogEntryCommitted carrying ScoreVectorRef, or lacking
+    /// TipRuleId, is a pre-tip-v2 shape. Explicit refuse — no max-score migration.
+    let containsLegacyScoreVectorEntry (json: string) =
+        if json.IndexOf("\"BlogEntryCommitted\"", StringComparison.Ordinal) < 0 then
+            false
+        else
+            let hasScoreVector =
+                json.IndexOf("\"ScoreVectorRef\"", StringComparison.Ordinal) >= 0
+
+            let hasTipRuleId = json.IndexOf("\"TipRuleId\"", StringComparison.Ordinal) >= 0
+            hasScoreVector || not hasTipRuleId
 
     /// PERSIST-001: the fact's own bytes must not depend on the machine that
     /// reads them. Embedded DateTimeOffset fields (RuntimeStarted.StartedAt,
@@ -158,6 +176,8 @@ module FactCodec =
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
             Error pre050MigrationMessage
+        elif containsLegacyScoreVectorEntry json then
+            Error tipV2CleanBreakMessage
         else
             Decode.Auto.fromString<Fact> (migrateHandleCompleted json, extra = extra)
             |> Result.map pinToUtc

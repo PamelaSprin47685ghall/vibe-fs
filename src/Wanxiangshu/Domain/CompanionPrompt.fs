@@ -9,10 +9,11 @@ namespace Wanxiangshu.Domain
 module CompanionPrompt =
 
     /// Plain lines for ARCH-010 TOML instruction header (SyntheticToml.comment adds `# `).
+    /// ENFORCER-030: required tip; no omit-scores wording.
     let NormalInstructionLines =
         [ "Write the dense work-log continuation now by calling the blog tool exactly once."
-          "Put the continuation in `text`, omit zero-valued scores, and do not output"
-          "ordinary assistant prose." ]
+          "Put the continuation in `text`, set required tip to one catalog field, and do not"
+          "output ordinary assistant prose." ]
 
     /// Standalone normal instruction (prompt_async claim / diagnostics). Same text as header.
     let NormalInstruction =
@@ -21,10 +22,11 @@ module CompanionPrompt =
         |> String.concat "\n"
 
     /// CTX-012 / ENFORCER-030: final user message on a squash request (instruction-only).
+    /// Squash must still choose exactly one tip.
     let SquashInstructionLines =
         [ "Rewrite the preceding assistant work-log frames now by calling the blog tool"
-          "exactly once. Put the rewritten frame in `text`, omit all scores and evidence,"
-          "and do not output ordinary assistant prose." ]
+          "exactly once. Put the rewritten frame in `text`, set required tip to one catalog"
+          "field, and do not output ordinary assistant prose." ]
 
     let SquashInstruction =
         SquashInstructionLines
@@ -41,6 +43,10 @@ module CompanionPrompt =
     /// Still wrapped as `[[do_not_exec]] historic_frame`; only the message role is assistant.
     let workingRecordMessage (frameBody: string) =
         BloggerToml.renderHistoricFrame frameBody
+
+    /// ENFORCER-071: one previous tip as low-trust assistant body (not an instruction).
+    let previousTipMessage (tipField: string) (cycleId: string) =
+        BloggerToml.renderPreviousEnforcerTip tipField cycleId
 
     /// COMPANION-005: normal delta user message = instruction header first, then data body.
     ///

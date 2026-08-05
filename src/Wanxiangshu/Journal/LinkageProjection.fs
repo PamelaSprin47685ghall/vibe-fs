@@ -43,6 +43,12 @@ type HandleRecord =
         TargetAgent: string
         CanonicalRole: Role
         Lifecycle: HandleLifecycle
+        /// EXEC-018: handle create order (HandleLinked fold sequence). Additive;
+        /// derived from link order, not a fact-schema field. Stable sort key #2.
+        CreationOrder: int
+        /// Last completion cell ever written. Survives Retired so clean-break
+        /// migration can re-read the blob for LegacyFalseAbort without history scan.
+        LastCompletion: HandleCompletion option
     }
 
 /// Durable handle linkage for one parent session.
@@ -50,9 +56,14 @@ type HandleRecord =
 /// PERSIST-008: one map, keyed lookup, no history scan. Retired entries stay in
 /// the map — that IS the tombstone. Removing them would make a retired id
 /// indistinguishable from one that never existed, which is the exact confusion
-/// EXEC-009 forbids. Abandoned entries stay for the same reason.
+/// EXEC-009 forbids. Abandoned entries stay until join reports them once, then
+/// retire (single-report tombstone, same spirit as completion consume).
 type AgentLinkageProjection =
-    { Handles: Map<HandleId, HandleRecord> }
+    {
+        Handles: Map<HandleId, HandleRecord>
+        /// Monotonic counter: next CreationOrder assigned on HandleLinked.
+        NextCreationOrder: int
+    }
 
 /// Why a lifecycle transition was refused.
 type HandleTransitionRejection =
@@ -70,7 +81,9 @@ type HandleTransitionRejection =
 
 module HandleProjection =
 
-    let empty = { Handles = Map.empty }
+    let empty =
+        { Handles = Map.empty
+          NextCreationOrder = 0 }
 
     let link
         (handle: HandleId)
@@ -82,18 +95,34 @@ module HandleProjection =
         match Map.tryFind handle current.Handles with
         | Some { Lifecycle = Retired } -> Error HandleIsRetired
         | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | _ ->
+        | Some existing ->
             Ok
-                { current with
-                    Handles =
-                        Map.add
-                            handle
-                            { Handle = handle
-                              ChildSessionId = childSessionId
-                              TargetAgent = targetAgent
-                              CanonicalRole = role
-                              Lifecycle = Active }
-                            current.Handles }
+                { Handles =
+                    Map.add
+                        handle
+                        { existing with
+                            ChildSessionId = childSessionId
+                            TargetAgent = targetAgent
+                            CanonicalRole = role
+                            Lifecycle = Active }
+                        current.Handles
+                  NextCreationOrder = current.NextCreationOrder }
+        | None ->
+            let order = current.NextCreationOrder
+
+            Ok
+                { Handles =
+                    Map.add
+                        handle
+                        { Handle = handle
+                          ChildSessionId = childSessionId
+                          TargetAgent = targetAgent
+                          CanonicalRole = role
+                          Lifecycle = Active
+                          CreationOrder = order
+                          LastCompletion = None }
+                        current.Handles
+                  NextCreationOrder = order + 1 }
 
     /// EXEC-004: terminal, send-failure and cancel race for one cell. Whoever
     /// arrives first wins; later arrivals are refused, not overwritten.
@@ -114,7 +143,8 @@ module HandleProjection =
                         Map.add
                             handle
                             { record with
-                                Lifecycle = CompletedAwaitingJoin completion }
+                                Lifecycle = CompletedAwaitingJoin completion
+                                LastCompletion = Some completion }
                             current.Handles }
 
     /// EXEC-009: durable abandon. Active or CompletedAwaitingJoin → Abandoned.
@@ -138,8 +168,9 @@ module HandleProjection =
                                 Lifecycle = Abandoned reason }
                             current.Handles }
 
-    /// `join` consumed the completion and wrote the tombstone (EXEC-004).
-    /// Abandoned is not joinable and must not retire via this path.
+    /// EXEC-004/EXEC-009: join consumed a reportable terminal (CompletedAwaitingJoin
+    /// or Abandoned) and wrote the tombstone. Active has no payload to consume.
+    /// Abandoned → Retired is the single-report path (EXEC-009 batch item once).
     let retire
         (handle: HandleId)
         (current: AgentLinkageProjection)
@@ -148,11 +179,33 @@ module HandleProjection =
         | None -> Error UnknownHandle
         | Some { Lifecycle = Retired } -> Error HandleIsRetired
         | Some { Lifecycle = Active } -> Error NotCompleted
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
         | Some record ->
             Ok
                 { current with
                     Handles = Map.add handle { record with Lifecycle = Retired } current.Handles }
+
+    /// Clean-break: reject a false completion cell only when lifecycle is
+    /// CompletedAwaitingJoin and ref/digest match exactly → Active. Mismatch
+    /// refuses so a true terminal cannot be revoked by a bad compensation fact.
+    /// Already Active = prior reject succeeded (idempotent Ok).
+    let rejectFalseCompletion
+        (handle: HandleId)
+        (expectedRef: BlobRef)
+        (expectedDigest: BlobDigest)
+        (current: AgentLinkageProjection)
+        : Result<AgentLinkageProjection, HandleTransitionRejection> =
+        match Map.tryFind handle current.Handles with
+        | None -> Error UnknownHandle
+        | Some { Lifecycle = Retired } -> Error HandleIsRetired
+        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
+        | Some { Lifecycle = Active } -> Ok current
+        | Some({ Lifecycle = CompletedAwaitingJoin cell } as record) ->
+            match cell.CompletionRef, cell.CompletionDigest with
+            | Some blobRef, Some digest when blobRef = expectedRef && digest = expectedDigest ->
+                Ok
+                    { current with
+                        Handles = Map.add handle { record with Lifecycle = Active } current.Handles }
+            | _ -> Error AlreadyCompleted
 
     let tryFind (handle: HandleId) (current: AgentLinkageProjection) = Map.tryFind handle current.Handles
 
@@ -182,7 +235,8 @@ module HandleProjection =
             | Active
             | CompletedAwaitingJoin _ -> true)
 
-    /// EXEC-004: what `join` may consume. Abandoned is never joinable.
+    /// EXEC-004: what `join` may consume as completion cells. Abandoned is not
+    /// a completion cell — see `reportableAbandoned` for EXEC-009 batch items.
     let joinable (current: AgentLinkageProjection) =
         current
         |> recordsWhere (fun record ->
@@ -190,6 +244,18 @@ module HandleProjection =
             | CompletedAwaitingJoin _ -> true
             | Active
             | Abandoned _
+            | Retired -> false)
+
+    /// EXEC-009: Abandoned handles that join must include in the next `[[result]]`
+    /// batch (explicit status, not Completed). After report, consume retires them
+    /// so they appear at most once.
+    let reportableAbandoned (current: AgentLinkageProjection) =
+        current
+        |> recordsWhere (fun record ->
+            match record.Lifecycle with
+            | Abandoned _ -> true
+            | Active
+            | CompletedAwaitingJoin _
             | Retired -> false)
 
     /// EXEC-009: parent abort cancels every owned resource individually, so the

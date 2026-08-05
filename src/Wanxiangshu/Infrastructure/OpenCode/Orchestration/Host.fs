@@ -62,6 +62,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | AgentCompleted _ -> Ok()
         | AgentFailed payload
         | AgentAborted payload -> Error payload.Message
+        | AgentAbandoned(_, reason) -> Error reason
 
     /// Fork a child and hand back the Host session it created.
     ///
@@ -289,6 +290,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
         }
 
+    /// Compatibility single-result join (stringified Empty/verdict). Prefer JoinPublishedAvailable.
     member _.JoinPublished() : Task<string> =
         task {
             match! engine () with
@@ -296,6 +298,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | Ok engine ->
                 let! verdict = engine.JoinPublished()
                 return sprintf "%A" verdict
+        }
+
+    /// EXEC-019: FIFO batch + local interrupt (JoinTool renders wire).
+    member _.JoinPublishedAvailable
+        (maxCount: int, interrupt: Task<unit>)
+        : Task<Result<JoinWaitOutcome<OrchestratorVerdict>, string>> =
+        task {
+            match! engine () with
+            | Error reason -> return Error reason
+            | Ok engine ->
+                let! outcome = engine.JoinPublishedBatch(maxCount, interrupt)
+                return Ok outcome
         }
 
     member _.Cancel() = runtime.Cancel()

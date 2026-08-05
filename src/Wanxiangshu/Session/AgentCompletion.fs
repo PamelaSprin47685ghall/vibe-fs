@@ -52,6 +52,9 @@ type AgentCompletionOutcome =
     | AgentCompleted of AgentCompletionPayload
     | AgentFailed of AgentFailurePayload
     | AgentAborted of AgentFailurePayload
+    /// EXEC-009: durable HandleAbandoned reported once in a join [[result]] batch.
+    /// Flat wire: status="abandoned", agent, reason — not nested [error].
+    | AgentAbandoned of agentId: string * reason: string
 
 module AgentCompletion =
     let text (outcome: AgentCompletionOutcome) =
@@ -59,12 +62,14 @@ module AgentCompletion =
         | AgentCompleted payload -> payload.WorkRecord
         | AgentFailed payload
         | AgentAborted payload -> payload.Message
+        | AgentAbandoned(_, reason) -> reason
 
     let status (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted _ -> "completed"
         | AgentFailed _ -> "failed"
         | AgentAborted _ -> "aborted"
+        | AgentAbandoned _ -> "abandoned"
 
     let isCompleted (outcome: AgentCompletionOutcome) =
         match outcome with
@@ -146,6 +151,8 @@ module AgentCompletion =
     let ofSimpleError (agentId: string) (runId: string) (role: AgentRole) (message: string) =
         failed agentId runId (Some role) None "ERROR" message
 
+    let abandoned (agentId: string) (reason: string) = AgentAbandoned(agentId, reason)
+
     let withRunIdentity (agentId: string) (runId: string) (role: AgentRole) (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted payload ->
@@ -166,6 +173,7 @@ module AgentCompletion =
                     RunId = runId
                     AgentId = agentId
                     Role = Some role }
+        | AgentAbandoned(_, reason) -> AgentAbandoned(agentId, reason)
 
 /// A completed (or failed/aborted) agent run.
 ///

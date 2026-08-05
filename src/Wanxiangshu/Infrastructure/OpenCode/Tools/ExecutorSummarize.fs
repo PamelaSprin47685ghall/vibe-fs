@@ -40,6 +40,7 @@ module ExecutorSummarize =
         | AgentCompleted _ -> raise (InvalidOperationException "completed with empty work record")
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAborted payload -> raise (InvalidOperationException payload.Message)
+        | AgentAbandoned(_, reason) -> raise (InvalidOperationException reason)
 
     /// Per-chunk join budget. Prevents a single hung summarizer from blocking the
     /// whole map/reduce forever (Part 1: unblock; Part 2 owns richer partial text).
