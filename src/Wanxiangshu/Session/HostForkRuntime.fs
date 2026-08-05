@@ -293,10 +293,18 @@ type HostForkRuntime
     /// Consume = read blob → CAS `HandleRetired`. CommitUnknown / append failure
     /// must not deliver. Concurrent joins: single winner via journal gate.
     ///
-    /// Join never waits forever: default budget 600s. On timeout, one final durable
-    /// consume is attempted; still empty → TimedOut.
+    /// Model-visible join is unbounded: a child's terminal is the child's own
+    /// guarantee, so the only legitimate reasons to stop waiting are durable
+    /// facts — a completion, an Abandoned handle, or no active runs. The model
+    /// join tool (JoinTool → JoinWithPermit) never passes a budget, so a
+    /// long-lived child can never be misreported as TIMED_OUT; a user interrupt
+    /// is the caller-controlled exit (AttachAbort → Cancel → Cancelled).
+    /// `timeoutMs` is an explicit per-segment budget used only by internal
+    /// waiters that may legitimately abandon (ExecutorSummarize map/reduce,
+    /// whose spooled output is already on disk). On budget expiry one final
+    /// durable consume is attempted; still empty → TimedOut.
     member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
-        let budgetMs = defaultArg timeoutMs 600_000
+        let budgetMs = timeoutMs
 
         let isPty runId =
             lock gate (fun () -> ptyRuns.Contains runId)
@@ -375,10 +383,11 @@ type HostForkRuntime
 
         /// Race journal revision wake vs mailbox completion (PTY + agent notify).
         /// Choice1 = durable change (re-loop); Choice2 = mailbox result.
+        /// `ms: None` = unbounded mailbox wait (model join); `Some` = internal segment budget.
         let raceChangeAndMailbox
             (durable: AgentJournal)
             (fromRev: JournalRevision)
-            (ms: int)
+            (ms: int option)
             : Task<Choice<JournalChange, Result<RunCompletion, ForkError>>> =
             task {
                 let changeTask =
@@ -389,23 +398,28 @@ type HostForkRuntime
 
                 let mailTask =
                     task {
-                        let! joined = runtime.Join(timeoutMs = ms)
-                        return Choice2Of2 joined
+                        match ms with
+                        | Some budget ->
+                            let! joined = runtime.Join(timeoutMs = budget)
+                            return Choice2Of2 joined
+                        | None ->
+                            let! joined = runtime.Join()
+                            return Choice2Of2 joined
                     }
 
                 return! emitJsExpr (changeTask, mailTask) "Promise.race([$0, $1])"
             }
 
-        let rec loop (remainingMs: int) : Task<Result<RunCompletion, ForkError>> =
+        let rec loop (remaining: int option) : Task<Result<RunCompletion, ForkError>> =
             task {
                 match journal with
                 | Some durable ->
                     match tryConsumeDurable durable with
                     | Some result -> return result
                     | None ->
-                        if remainingMs <= 0 then
-                            return Error ForkError.TimedOut
-                        else
+                        match remaining with
+                        | Some ms when ms <= 0 -> return Error ForkError.TimedOut
+                        | _ ->
                             // Snapshot revision under gate, then recheck durable before waiting.
                             let _, fromRev = durable.SnapshotWithRevision
 
@@ -413,11 +427,13 @@ type HostForkRuntime
                             | Some result -> return result
                             | None ->
                                 let started = DateTimeOffset.UtcNow
-                                let! raced = raceChangeAndMailbox durable fromRev remainingMs
+                                let! raced = raceChangeAndMailbox durable fromRev remaining
 
                                 let elapsed = int (DateTimeOffset.UtcNow - started).TotalMilliseconds
 
-                                let next = max 0 (remainingMs - max 0 elapsed)
+                                let next =
+                                    remaining
+                                    |> Option.map (fun ms -> max 0 (ms - max 0 elapsed))
 
                                 match raced with
                                 | Choice1Of2 _ ->
@@ -433,11 +449,12 @@ type HostForkRuntime
                                     | None -> return Error ForkError.TimedOut
                                 | Choice2Of2(Error e) -> return Error e
                 | None ->
-                    if remainingMs <= 0 then
-                        return Error ForkError.TimedOut
-                    else
-                        let! joined = runtime.Join(timeoutMs = remainingMs)
-                        return joined
+                    match remaining with
+                    | Some ms when ms <= 0 -> return Error ForkError.TimedOut
+                    | _ ->
+                        match remaining with
+                        | Some ms -> return! runtime.Join(timeoutMs = ms)
+                        | None -> return! runtime.Join()
             }
 
         task {
