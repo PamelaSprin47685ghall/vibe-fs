@@ -1,0 +1,409 @@
+{
+  "Agent/AgentProgram.fs": {
+    "raw-task": 2
+  },
+  "Application/Orchestration/ManagerJob.fs": {
+    "mutable": 2,
+    "raw-task": 3
+  },
+  "Application/Orchestration/Program.fs": {
+    "raw-task": 14
+  },
+  "Application/Orchestration/Runtime.fs": {
+    "raw-task": 3
+  },
+  "Application/Prompting/PromptDispatcherSend.fs": {
+    "raw-task": 2
+  },
+  "Application/Reconciliation/BloggerCrashRecovery.fs": {
+    "program-counter": 1,
+    "raw-task": 2,
+    "mutable": 1
+  },
+  "Application/Reconciliation/ChildRecoveryInterpreter.fs": {
+    "raw-task": 1
+  },
+  "Application/Reconciliation/CompanionTransform.fs": {
+    "raw-task": 1
+  },
+  "Application/Reconciliation/JoinInterpreter.fs": {
+    "raw-task": 2
+  },
+  "Application/Reconciliation/PromptRecovery.fs": {
+    "behaviour-bool": 3,
+    "raw-task": 3,
+    "mutable": 1
+  },
+  "Application/Reconciliation/ReconcileSupervisor.fs": {
+    "program-counter": 10,
+    "raw-task": 1,
+    "mutable": 8
+  },
+  "Application/Reconciliation/ReviewSeal.fs": {
+    "raw-task": 1
+  },
+  "Application/Reconciliation/ReviewerGuardState.fs": {
+    "behaviour-bool": 1
+  },
+  "Application/Reconciliation/SessionRecoveryInterpreter.fs": {
+    "raw-task": 7,
+    "behaviour-bool": 1
+  },
+  "Application/Reconciliation/TurnCompletionProgram.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 6,
+    "program-counter": 2,
+    "behaviour-bool": 1
+  },
+  "Application/Reconciliation/TurnReconcile.fs": {
+    "program-counter": 4
+  },
+  "Application/Reconciliation/XTraceCapture.fs": {
+    "mutable": 1
+  },
+  "Application/Reconciliation/XWire.fs": {
+    "raw-task": 1
+  },
+  "Domain/BloggerDelta.fs": {
+    "mutable": 5
+  },
+  "Domain/LoopDetector.fs": {
+    "mutable": 4
+  },
+  "Domain/PromptAuthority.fs": {
+    "behaviour-bool": 1
+  },
+  "Domain/RecoverySlot.fs": {
+    "behaviour-bool": 2
+  },
+  "Domain/ReviewWitness.fs": {
+    "behaviour-bool": 7
+  },
+  "Domain/SyntheticToml.fs": {
+    "mutable": 2
+  },
+  "Domain/TddPhase.fs": {
+    "behaviour-bool": 5
+  },
+  "Domain/ToolResultBound.fs": {
+    "mutable": 4
+  },
+  "Infrastructure/Git/GitOperations.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 8
+  },
+  "Infrastructure/Git/IntegrationGate.fs": {
+    "mutable": 1,
+    "raw-task": 2
+  },
+  "Infrastructure/Git/WorktreeResource.fs": {
+    "infrastructure-leak": 1,
+    "mutable": 2,
+    "raw-task": 9
+  },
+  "Infrastructure/OpenCode/Codec/ToolHostCodec.fs": {
+    "raw-task": 1,
+    "mutable": 1
+  },
+  "Infrastructure/OpenCode/Host/HostJoinGuard.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Host/HostReviewGuard.fs": {
+    "behaviour-bool": 1,
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Host/HostSessionNudge.fs": {
+    "raw-task": 2
+  },
+  "Infrastructure/OpenCode/Host/HostSignalBootstrap.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 3,
+    "behaviour-bool": 1
+  },
+  "Infrastructure/OpenCode/Host/LoopSensor.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Host/ManagedAgentConfig.fs": {
+    "mutable": 4
+  },
+  "Infrastructure/OpenCode/Host/OpenCodePort.fs": {
+    "raw-task": 9
+  },
+  "Infrastructure/OpenCode/Host/PluginRuntimeScope.fs": {
+    "mutable": 9,
+    "raw-task": 2,
+    "program-counter": 1,
+    "behaviour-bool": 1
+  },
+  "Infrastructure/OpenCode/Host/SessionSnapshotPort.fs": {
+    "raw-task": 2
+  },
+  "Infrastructure/OpenCode/Host/Sessions.fs": {
+    "raw-task": 4
+  },
+  "Infrastructure/OpenCode/Host/SharedState.fs": {
+    "mutable": 1
+  },
+  "Infrastructure/OpenCode/Orchestration/GitAdapter.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 3
+  },
+  "Infrastructure/OpenCode/Orchestration/Host.fs": {
+    "raw-task": 11,
+    "mutable": 2
+  },
+  "Infrastructure/OpenCode/Orchestration/JobRecovery.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Orchestration/ReviewRunner.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Orchestration/ReviewState.fs": {
+    "behaviour-bool": 1
+  },
+  "Infrastructure/OpenCode/Orchestration/WorktreeCleanup.fs": {
+    "raw-task": 5
+  },
+  "Infrastructure/OpenCode/Plugin/SpikePlugin.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 3
+  },
+  "Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/BlogTool.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/CoderTool.fs": {
+    "behaviour-bool": 4,
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/ExecutorSummarize.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 8,
+    "mutable": 6
+  },
+  "Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 3
+  },
+  "Infrastructure/OpenCode/Tools/ExecutorTool.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 3
+  },
+  "Infrastructure/OpenCode/Tools/FileMutationTools.fs": {
+    "raw-task": 4,
+    "mutable": 3
+  },
+  "Infrastructure/OpenCode/Tools/ForkTool.fs": {
+    "behaviour-bool": 2,
+    "raw-task": 2
+  },
+  "Infrastructure/OpenCode/Tools/InspectorTool.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/JoinTool.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/ListTool.fs": {
+    "behaviour-bool": 2,
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/OneShotAgentTool.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 2,
+    "mutable": 3
+  },
+  "Infrastructure/OpenCode/Tools/PtyTool.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 1
+  },
+  "Infrastructure/OpenCode/Tools/ToolRegistry.fs": {
+    "raw-task": 2
+  },
+  "Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs": {
+    "infrastructure-leak": 1,
+    "mutable": 2,
+    "program-counter": 1,
+    "raw-task": 3
+  },
+  "Infrastructure/OpenCode/Tools/VerdictTool.fs": {
+    "raw-task": 1
+  },
+  "Infrastructure/Resources/RuntimeResources.fs": {
+    "mutable": 1
+  },
+  "Journal/AgentJournal.fs": {
+    "mutable": 5
+  },
+  "Journal/Boot.fs": {
+    "mutable": 4
+  },
+  "Journal/Fold.fs": {
+    "behaviour-bool": 1
+  },
+  "Journal/OrchestratorProjection.fs": {
+    "behaviour-bool": 3
+  },
+  "Journal/ReviewProjection.fs": {
+    "behaviour-bool": 1
+  },
+  "Journal/Writer.fs": {
+    "mutable": 3
+  },
+  "Kernel/Flow.fs": {
+    "raw-task": 11,
+    "mutable": 11,
+    "behaviour-bool": 1
+  },
+  "Process/LargeGate.fs": {
+    "mutable": 2
+  },
+  "Process/NodeProcessHost.fs": {
+    "raw-task": 1,
+    "mutable": 2
+  },
+  "Process/NodeProcessWait.fs": {
+    "raw-task": 2,
+    "mutable": 6
+  },
+  "Process/ProcessRunner.fs": {
+    "infrastructure-leak": 6,
+    "raw-task": 4,
+    "mutable": 1
+  },
+  "Process/Pty.fs": {
+    "infrastructure-leak": 1,
+    "behaviour-bool": 5,
+    "raw-task": 3
+  },
+  "Process/PtyApi.fs": {
+    "mutable": 1
+  },
+  "Process/PtyBackend.fs": {
+    "raw-task": 1,
+    "behaviour-bool": 1,
+    "mutable": 1
+  },
+  "Process/PtySupervisor.fs": {
+    "mutable": 2,
+    "behaviour-bool": 3,
+    "raw-task": 2
+  },
+  "Process/PtyTiming.fs": {
+    "raw-task": 2
+  },
+  "Process/PtyTypes.fs": {
+    "infrastructure-leak": 1
+  },
+  "Session/AgentRoleIdentity.fs": {
+    "infrastructure-leak": 1
+  },
+  "Session/BloggerCoordinator.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 3,
+    "program-counter": 1
+  },
+  "Session/BloggerRuntimeState.fs": {
+    "program-counter": 10,
+    "behaviour-bool": 1
+  },
+  "Session/ChildRun.fs": {
+    "mutable": 2,
+    "raw-task": 1
+  },
+  "Session/ChildRunProjection.fs": {
+    "behaviour-bool": 2
+  },
+  "Session/Companion.fs": {
+    "mutable": 6
+  },
+  "Session/CompanionHost.fs": {
+    "infrastructure-leak": 1,
+    "mutable": 4,
+    "behaviour-bool": 16,
+    "raw-task": 2
+  },
+  "Session/CompanionHostBlogger.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 2
+  },
+  "Session/CompanionProgram.fs": {
+    "raw-task": 2
+  },
+  "Session/CompletionMailbox.fs": {
+    "infrastructure-leak": 1,
+    "mutable": 3,
+    "raw-task": 2
+  },
+  "Session/EnforcerHost.fs": {
+    "infrastructure-leak": 1,
+    "mutable": 7,
+    "raw-task": 2,
+    "program-counter": 12
+  },
+  "Session/ForkRuntime.fs": {
+    "infrastructure-leak": 1,
+    "mutable": 2,
+    "raw-task": 4
+  },
+  "Session/ForkTypes.fs": {
+    "behaviour-bool": 2
+  },
+  "Session/HandleCompletionCodec.fs": {
+    "infrastructure-leak": 1
+  },
+  "Session/HostForkAgent.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 5
+  },
+  "Session/HostForkAgentOwner.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 1
+  },
+  "Session/HostForkBusyNudge.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 1
+  },
+  "Session/HostForkChildDispatch.fs": {
+    "infrastructure-leak": 2,
+    "raw-task": 2,
+    "mutable": 1
+  },
+  "Session/HostForkPty.fs": {
+    "infrastructure-leak": 2,
+    "raw-task": 2
+  },
+  "Session/HostForkRestart.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 2,
+    "mutable": 1
+  },
+  "Session/HostForkRunLifecycle.fs": {
+    "infrastructure-leak": 1,
+    "raw-task": 1
+  },
+  "Session/HostForkRuntime.fs": {
+    "infrastructure-leak": 2,
+    "program-counter": 2,
+    "mutable": 1,
+    "raw-task": 2
+  },
+  "Session/HostPendingRun.fs": {
+    "infrastructure-leak": 1
+  },
+  "Session/ParkedTransform.fs": {
+    "mutable": 2
+  },
+  "Tools/FileTools.fs": {
+    "raw-task": 3
+  },
+  "Tools/StaticTools.fs": {
+    "infrastructure-leak": 2,
+    "raw-task": 1
+  },
+  "Tools/ToolContext.fs": {
+    "infrastructure-leak": 1
+  }
+}
