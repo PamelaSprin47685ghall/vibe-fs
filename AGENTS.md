@@ -37,11 +37,16 @@ assistant message 在 transform 之前已经创建并持久化。
 判断 SSOT 条款"Host 能力不足"之前，必须先读源码。 `ARCH-003` 禁止修改 Host 本体，
 但不禁止阅读它——恰恰相反，只有读过才能证明某个 Hook 组合确实不存在。
 
-生产源码唯一根 `src/Wanxiangshu/`（209 个 `.fs`，`Wanxiangshu.fsproj` 编译全部）。
-布局纪律由 `scripts/repository-layout-gate.mjs`（`gate:layout`）机器验证：根目录白名单、
-生产源码唯一根、顶层 module 与文件名一致、重复源码探测。分发产物契约：Fable 输出
-`dist/`，npm 包 main 指向 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`。
-根 `package.json` 为唯一 manifest；`files` = `dist` + `resources`；无 postbuild staging。
+生产源码唯一根 `src/Wanxiangshu/`（219 个 `.fs`，`Wanxiangshu.fsproj` 编译全部；
+`scripts/checks/architecture.mjs` 实证输出「219 文件」）。
+布局纪律由 `scripts/checks/architecture.mjs`（`npm run lint` 第 2 步）机器验证：
+`src/` 下唯一 F# 根、fsproj 每文件恰编译一次、无盘上未编译/已声明缺失文件、
+Kernel/Domain 不引用上层命名空间与 `Fable.Core.JsInterop`、package resource 读取
+仅在 `Infrastructure/Resources/`、无 `.gen.fs`、无旧路径词汇（`docs/evidence`、
+`docs/archive`、`SSOT/`、`STATUS/`、`vibe-fs`、`testkit`、`Wanxiangshu.Next`）。
+分发产物契约：Fable 输出 `dist/`，npm 包 main 指向
+`dist/Infrastructure/OpenCode/Plugin/Plugin.js`。根 `package.json` 为唯一 manifest；
+`files` = `dist` + `resources`；无 postbuild staging（0.5.3 起）。
 
 ---
 
@@ -55,7 +60,7 @@ assistant message 在 transform 之前已经创建并持久化。
 
 反过来做的两种典型失败：
 
-其一，写完才想起看文档。此时代码已经按旧语义定型，要么返工，要么把旧语义又固化一遍——后者更糟，因为它让 `conformance.md` 与代码的偏离多一处，而且看起来像「完成了工作」。
+其一，写完才想起看文档。此时代码已经按旧语义定型，要么返工，要么把旧语义又固化一遍——后者更糟，因为它让规范与代码的偏离多一处，而且看起来像「完成了工作」。
 
 其二，一头扎进代码细节，丢掉大局。症状被修好，条款仍被违反。典型形态：给旧类型补字段、加 adapter、让旧测试继续通过——每一步局部合理，合起来是在维护过渡态。
 
@@ -63,21 +68,23 @@ assistant message 在 transform 之前已经创建并持久化。
 
 | 任务涉及 | 必读条款 | 必读状态 |
 |---------|---------|---------|
-| Prompt 发送、Authority、Dispatcher | spec/03 | conformance Prompt 段 |
-| Fallback、cursor、circuit breaker | spec/04 | conformance Fallback 段 |
-| Review、verdict、witness、seal | spec/05 + HOST-010/011 | conformance Review 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
-| Orchestrator、publish、rebase、恢复 | spec/06 | conformance Orchestrator 段 |
-| Host hook、事件、reconcile | spec/07 | conformance Host 段 + `docs/archive/shock-anneal-2026/evidence/host-transform-run-binding.md` |
-| Companion、Blogger、projection、epoch | spec/08 + spec/12 | conformance Companion 段 |
-| 上下文恢复、Blogger delta、X prefix probe、Y squash | spec/12（`CTX-`） | conformance CTX 段 |
-| compaction、`/compact`、reanchor | spec/07 + spec/12 | `docs/archive/blockers-closed.md` + `docs/archive/shock-anneal-2026/evidence/host-context-recovery.md` |
-| fork/join/list、PTY、进程 | spec/09 | conformance Execution 段 |
-| 测试、门禁、canary 剧本 | spec/10 | conformance Verify 段 |
-| Journal、事实、持久化 | spec/11 | — |
-| 运行时合成 TOML 记法 | spec/13（`ARCH-010`） | conformance ARCH-010 行 + `tests/unit/Context/synthetic-toml.test.mjs` |
-| LLM 退化循环检测与强杀恢复 | spec/17（`LOOP-`） | conformance LOOP 段 + `tests/unit/Domain/loop-*.test.mjs` |
-| Strength / Enforcer nudge / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `enforcer-nudge.md` / `student-teacher.md`） | `docs/rfcs/` 各文件 Status 字段 |
-| 任何生产代码改动 | spec/01（架构 DNA） | `spec/conformance.md`（由 `spec/conformance.toml` 生成） |
+| Prompt 发送、Authority、Dispatcher | spec/03 | `tests/unit/prompt/*.test.mjs` + `tests/unit/context/attempt-plan.test.mjs` |
+| Fallback、cursor、circuit breaker | spec/04 | `tests/unit/fallback/*.test.mjs` |
+| Review、verdict、witness、seal | spec/05 + HOST-010/011 | `tests/unit/review/*.test.mjs` |
+| Orchestrator、publish、rebase、恢复 | spec/06 | `tests/unit/orchestrator/*.test.mjs` + `tests/unit/execution/join-*.test.mjs` |
+| Host hook、事件、reconcile | spec/07 | `tests/unit/plugin/host-hooks.test.mjs` + `tests/unit/execution/host-turn-observed.test.mjs` |
+| Companion、Blogger、projection、epoch | spec/08 + spec/12 | `tests/unit/context/*.test.mjs` + `tests/unit/enforcer/*.test.mjs` |
+| 上下文恢复、Blogger delta、X prefix probe、Y squash | spec/12（`CTX-`） | `tests/unit/context/`（`probe-selection` / `recovery-slot` / `x-trace*` / `blogger-*`）+ `tests/e2e/cases/context-recovery.test.mjs`（X-A–X-D） |
+| compaction、`/compact`、reanchor | spec/07 + spec/12 | `tests/unit/context/host-compaction-policy.test.mjs` + `src/Wanxiangshu/Infrastructure/OpenCode/Host/HostCompactionGate.fs` |
+| fork/join/list、PTY、进程 | spec/09 | `tests/unit/execution/`（`handle*` / `join*` / `fork-*` / `executor-*`） |
+| 测试、门禁、canary 剧本 | spec/10 | `tests/e2e/` + `tests/unit/verify/` + `tests/integration/harness/` |
+| Journal、事实、持久化 | spec/11 | `tests/unit/journal/*.test.mjs` + `tests/integration/journal/boot.test.mjs` |
+| 运行时合成 TOML 记法 | spec/13（`ARCH-010`） | `tests/unit/context/synthetic-toml.test.mjs` + `tests/integration/harness/arch010-cases.mjs` |
+| 结构化程序 DSL（FLOW-） | spec/14（`FLOW-`） | `tests/unit/verify/dsl-ownership.test.mjs` + `scripts/checks/dsl-ownership.mjs` + `TASK.md` |
+| Projection Algebra（PROJ-） | spec/16（`PROJ-`） | `tests/unit/context/companion-projection.test.mjs` + `tests/unit/orchestrator/program.test.mjs` |
+| LLM 退化循环检测与强杀恢复 | spec/17（`LOOP-`） | `tests/unit/domain/loop-*.test.mjs` |
+| Strength / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `student-teacher.md`） | `docs/rfcs/` 各文件 Status 字段 |
+| 任何生产代码改动 | spec/01（架构 DNA） | `scripts/checks/architecture.mjs` + `scripts/checks/spec.mjs` |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
 
 `spec/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
@@ -85,15 +92,14 @@ assistant message 在 transform 之前已经创建并持久化。
 ### 提交前运行 lint
 
 任何面向仓库的改动，在 `git commit` 前必须先跑 `npm run lint`。
-该命令执行 `scripts/pre-commit-formatter.mjs --all`，检查并修正全部
-`.fs`、`.fsi`、`.xml`、`.fsproj` 文件格式。
-运行后再做 `git add`，可确保提交内容通过 `gate:static` 与本地可选的
-pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
-安装依赖不修改 `.git/hooks`（无 `prepare` 钩子）。
+该命令执行 `npm run format:check`（`dotnet tool run fantomas --check src/Wanxiangshu`）
+再跑 `node scripts/check.mjs`（focused checks 串行：spec → architecture →
+dsl-ownership → p0-recovery-join）。运行后再做 `git add`，可确保提交内容通过检查。
+0.5.3 起仓库不再安装 pre-commit 钩子（无 `prepare` 钩子），由 CI/本地 lint 兜底。
 
 `npm run lint` 也用于满足 Reasonix 编程器的 delivery work-mode 检查：
 在交付阶段，该检查要求工作区无未格式化的 F# 与 XML 源文件；
-`--all` 模式会重写所有相关文件，因此必须先跑 lint 再提交。
+若存在未格式化文件，`fantomas --check` 会失败，需先 `npm run format` 再提交。
 
 ### 迷路时向上走
 
@@ -115,22 +121,21 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 | 位置 | 性质 |
 |------|------|
 | `spec/` | 唯一产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以此为准。`spec/00.md` 导航，`spec/99.md` 词汇表 |
-| `spec/conformance.md` | 条款 vs 代码合规表，由 `scripts/conformance-gate.mjs` 从 `spec/conformance.toml` 生成（勿手改）。Active 账本 |
-| `docs/archive/blockers-closed.md` | 已闭合 Host/SSOT 例外记录（非活跃 blocker 账本） |
-| `docs/archive/shock-anneal-2026/` | 休克—退火迁移最终报告（`FINAL-REPORT.md`）+ 原始机器证据（`evidence/`） |
-| `docs/evidence/` | 发布验证证据（按版本目录） |
+| `scripts/checks/spec.mjs` | 规范内部一致性检查：条款唯一、无悬空引用、前缀归属（`PREFIX_OWNER` 硬编码表）、`spec/00.md` 导航完整。0.5.3 实证：209 条款 / 620 引用 / 19 文件 |
+| `scripts/checks/architecture.mjs` | 源码根、fsproj 完整性、分层边界、资源读取位置、无 `.gen.fs`、无旧路径（VERIFY-005） |
 | `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
-| `docs/rfcs/` | 未来设计 RFC（strength / student-teacher / enforcer-nudge）；非产品合同 |
+| `docs/decisions/enforcer-catalog.md` | Enforcer 规则目录裁决（0.5.3：规则实例 = 打包资源 `resources/enforcer/catalog.json`，非生成源码） |
+| `docs/rfcs/` | 未来设计 RFC（strength / student-teacher）；非产品合同 |
+| `docs/architecture.md` / `development.md` / `releasing.md` | 架构速览 / 开发 / 发布流程。0.5.3 起取代旧 `docs/archive/` 与 `docs/evidence/`（两者已删除） |
 | `resources/` | 运行时静态资源：prompts/ + enforcer/catalog.json（随 npm pack 发布） |
-| `spec/coverage.toml` | 由 `spec/conformance.toml` 生成的过渡覆盖映射（勿手改） |
 
 代码里的注释不是规范。测试断言不是规范。README 不是规范。
 
-`spec/` 只描述应该如何，不描述当前如何。实现状态词
-（`CONFORMANT` / `PARTIAL` / `CONTRADICTS` / `UNVERIFIED` / `NOT_IMPLEMENTED` / `PURE_CORE_ONLY`）
-只出现在 `spec/conformance.toml` / 生成的 `spec/conformance.md`。
-`node scripts/ssot-lint.mjs` 强制这一分离，并检查条款 ID 唯一性与悬空引用。
-新增条款前缀必须同时注册进 `scripts/ssot-lint.mjs` 的前缀表，否则该前缀的全部引用被判悬空。
+0.5.3 起不再有 `spec/conformance.toml` / `spec/conformance.md` / `coverage.toml`：
+conformance 账本与 STATUS ledger 已退役删除，条款状态由 `scripts/checks/spec.mjs`
+（文本一致性）与 `scripts/checks/architecture.mjs`（源码面）直接断言，不再有
+「实现状态词」中间层。`spec/` 只描述应该如何；实现是否满足由 focused checks
+与测试树给出证据，不落账本。
 
 ### 发现条款本身有问题
 
@@ -144,34 +149,45 @@ pre-commit 钩子（`node scripts/pre-commit-formatter.mjs`）一致检查。
 
 ## 2. 迁移已收口，当前开发阶段
 
-休克—退火迁移已收口（最终报告 `docs/archive/shock-anneal-2026/FINAL-REPORT.md`）。
-0.5.2 已发布（tag `v0.5.2`）：gate:static → build → unit（737）→ harness（285）→
-P0×3（19 canary × 3 轮 = 57/57）完整通过；Active SSOT 192/192 CONFORMANT。
-`spec/conformance.toml` 是逐条款机器账本，`spec/conformance.md` 由
-`scripts/conformance-gate.mjs` 生成。
+休克—退火迁移已收口。0.5.3 已发布：仓库规范化（单一 manifest、`resources/` 布局、
+`spec/` 条款文档、`dist/` 构建输出、统一 `tests/` 树、Wanxiangshu 项目改名去掉
+`.Next`、数据驱动 enforcer catalog），无运行时行为变化。0.5.3 同时退役了
+conformance 账本、STATUS ledger 与旧 gate 森林（见下）。
 
 ### 当前开发阶段
 
-0.5.3 已发布（tag `v0.5.3`）：仓库规范化（单一 manifest、`resources/` 布局、
-spec/ 条款文档、`dist/` 构建输出、统一 `tests/` 树、Wanxiangshu 项目改名去掉
-`.Next`、数据驱动 enforcer catalog），无运行时行为变化。STATUS ledger 退役进
-`spec/conformance.toml` / `spec/conformance.md`。
+0.5.3 主线是「结构化程序 DSL 根治」（见 `TASK.md` 与 `spec/14`，FLOW-001…FLOW-010）：
+删除「通用 Flow 包一层 Task 就算 DSL」的设计，为每个业务上下文建立封闭、强类型、
+可解释的 Program DSL；业务程序只能构造 Program，副作用只由 Interpreter 执行；
+用编译边界与 CI 门禁（`scripts/checks/dsl-ownership.mjs`，阈值 322 冻结 backlog）
+封死绕过路径。`spec/16`（PROJ-，Projection Algebra）承接 `spec/08` 的
+`COMPANION-007` 与 `spec/10` 的 `VERIFY-007`，作为投影的正式规范。
 
-Active SSOT 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
-0 PURE_CORE_ONLY / 0 NOT_IMPLEMENTED。Active 子集 = spec/01–13 + spec/15 Blogger
-工具化 + spec/17 LOOP。spec/14 Strength 与 spec/16 Student&Teacher 已迁
-`docs/rfcs/strength.md` / `docs/rfcs/student-teacher.md`，ENFORCER nudge/throttle 在
-`docs/rfcs/enforcer-nudge.md`——均为已批准但未交付的未来设计，不属于当前产品合同。
+### 已退役的 0.5.2 机制（勿重新引入）
+
+| 旧机制 | 0.5.3 替代 |
+|--------|-----------|
+| `spec/conformance.toml` / `conformance.md` / `coverage.toml` 账本 | `scripts/checks/spec.mjs`（条款唯一/悬空引用/前缀归属/导航）+ `scripts/checks/architecture.mjs`（源码面） |
+| `gate:static` 森林（layout / ssot / conformance / architecture / docs / toml / budget / surface / role-matrix / shock） | `npm run lint` → `node scripts/check.mjs`：`checks/spec.mjs` + `checks/architecture.mjs` + `checks/dsl-ownership.mjs` + `checks/p0-recovery-join.mjs`；其余静态性质移入 `tests/integration/harness/`（`arch010-cases` / `budget-cases` / `schema-cases` / `single-source-cases` 等） |
+| `tests/unit/runner.mjs`（父层）+ `run-inner.mjs` | `tests/unit/run.mjs`（陈旧产物 fail closed + 判据静默监督）+ `tests/e2e/support/supervise-node-test.mjs`（共享 VERIFY-004 判据） |
+| `tests/e2e/scripts/*.toml`（23 个）+ `run-canary-staggered.mjs` | `tests/e2e/scenarios/*.toml`（24 个）+ `tests/e2e/cases/*.test.mjs`（20 个）+ `tests/e2e/run.mjs`（事件驱动错峰全并行，`--repeat 3`） |
+| `docs/archive/`、`docs/evidence/`、blockers-closed | 已删除。Host 例外见 `spec/07` HOST-006（compaction 预防/收容）；发布流程见 `docs/releasing.md` |
+| `docs/rfcs/enforcer-nudge.md` | nudge/throttle 语义并入 `spec/15`（ENFORCER-）；规则实例数据化于 `resources/enforcer/catalog.json`（`docs/decisions/enforcer-catalog.md`） |
+
+Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具化子集）。
+`docs/rfcs/strength.md` / `docs/rfcs/student-teacher.md` 是已批准但未交付的未来
+设计，不属于当前产品合同。
 
 ### 已知说明（非发布阻塞）
 
 - X 恢复链生产接线已闭合（`XWire.applyTransform` / `reconcileAttempt` 经 `SpikePlugin.fs`
-  与 `HostSignalBootstrap.fs` 进入生产路径，`AttemptPlanner.plan` 两个调用点）；
-  X-A–X-D layer-4 canary 已交付（`tests/e2e/tests/x-recovery-canary.mjs` + 四个 TOML 剧本）
+  与 `HostSignalBootstrap.fs` 进入生产路径，`AttemptPlanner.plan` 两个调用点：
+  `XWire.fs` / `CompanionTransform.fs`）；X-A–X-D layer-4 canary 已交付
+  （`tests/e2e/cases/context-recovery.test.mjs` + `tests/e2e/scenarios/x-*.toml` 四个剧本）
 - `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
-- Host compaction 的 `compactIfNeeded` 估算路径（`packages/core/src/session/compaction.ts`）
-  无插件 hook 可达：预防层启动门禁因此必须含运行时探测（HOST-006 收容层 + PERSIST-010
-  `ContextReanchored`；归档见 `docs/archive/shock-anneal-2026/FINAL-REPORT.md` §7）
+- Host compaction 预防/收容：预防层关闭 `automatic`/`overflow`/`autocontinue`/`prune`
+  并在首轮启动做运行时探测，收容层由 `HostCompactionGate.fs` 把任何观察到的
+  compaction pseudo-run 转成一条 `ContextReanchored`（HOST-006 / PERSIST-010）
 
 ---
 
@@ -210,9 +226,12 @@ Active SSOT 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
 推论：`transform` hook 里做不了恢复决策，因为它看不到 attempt 结局。
 没有已提交的探针时，X 看到的就是原始历史——这是 spec/12 的正确行为，不是降级。
 
-手工 `/compact` 无法阻断（SSOT 例外 1，见 `docs/archive/blockers-closed.md`）。
-解法是两层：预防层关掉 `auto`/`prune`/`autocontinue` 并在首轮启动探测，
-收容层把任何观察到的 compaction 转成 `ContextReanchored` 重锚。
+手工 `/compact` 无法阻断（Host 无配置开关也无可否决 Hook，属官方支持用法）。
+解法是两层（HOST-006）：预防层关掉 `automatic`/`overflow`/`autocontinue`/`prune`
+并在首轮启动做运行时探测（首个 managed session 完成第一轮请求后 compaction
+pseudo-run 必须为零，否则 `HostContractUnsupported` 启动失败），
+收容层把任何观察到的 compaction 转成 `ContextReanchored` 重锚
+（`HostCompactionGate.fs`，PERSIST-010）。
 
 ---
 
@@ -229,10 +248,12 @@ Active SSOT 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
 
 出现第二个 writer 是熔断条件，立即停止新增迁移。
 
-`scripts/architecture-gate.mjs` 的 `single-constructor` 检查双向：既查「没有旁路者」，
-也查「存在调用者」。只有前者时，一个零调用点的唯一入口能长期假装合规——
-`buildAttemptExecutionProfile` 就这样在 `PROMPT-008` 标着 `CONTRADICTS` 的情况下
-存活到包 X8 才拿到第一个真实调用点（`AttemptPlanner.plan`）。
+`scripts/architecture-gate.mjs` 已随 0.5.3 删除，其 `single-constructor` 双向检查
+（既查「没有旁路者」，也查「存在调用者」）的历史教训仍在：只有前者时，一个零调用点
+的唯一入口能长期假装合规——`buildAttemptExecutionProfile` 就这样在 `PROMPT-008`
+标着 `CONTRADICTS` 的情况下存活到包 X8 才拿到第一个真实调用点（`AttemptPlanner.plan`）。
+当前由 `tests/unit/context/attempt-plan.test.mjs` 把 profile 钉为请求的唯一源头，
+单一写入口规则列于 `spec/10`（VERIFY-005）。
 
 ### 判死代码要量，不要读
 
@@ -241,7 +262,7 @@ Active SSOT 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
 
 | 死法 | 症状 | 量法 |
 |------|------|------|
-| 零调用点 | 唯一入口无人调用 | `architecture-gate` 双向检查 |
+| 零调用点 | 唯一入口无人调用 | 旧 `architecture-gate` 双向检查；现由 `tests/unit/context/attempt-plan.test.mjs` 把 `buildAttemptExecutionProfile` 钉为唯一源头 |
 | 有写入无读取 | 字段被赋值，读侧分支从不进入 | 在读点插桩计数，跑全部剧本 |
 | 有读取无数据 | 读到的永远是 `undefined`，比较短路 | 在比较点打印两侧实际值 |
 
@@ -258,55 +279,39 @@ Active SSOT 192/192 CONFORMANT，0 IMPLEMENTING / 0 PARTIAL /
 
 ## 5. 验证阶梯
 
-`VERIFY-001` 六层，`VERIFY-002` 不允许跨级：
+`VERIFY-001` 六层，`VERIFY-002` 五级晋级阶梯不允许跨级：
 
 ```text
-0. 静态检查（不需要产物，任何阶段可跑）
-1. 纯函数测试
-2. 资源契约测试
-3. Fake Host 轨迹
-4. 单 canary（CANARY_REPEAT=1）
+0. 静态检查（规范一致性、旧符号灭绝、架构门禁）— 不需要产物，任何阶段可跑
+1. 纯函数测试（Fallback fold、authority fold、review witness）
+2. 资源契约测试（Flow Using、Completion Channel、Process pumps）
+3. Fake Host 轨迹（blogger busy skip、nudge、fallback、guard）
+4. 单 canary（real OpenCode Host + mock provider）
 5. 发布门禁（恰好 3 轮 × 完整 check:release）
 ```
 
-命令：
+命令（0.5.3）：
 
 ```bash
-npm run gate:static            # 第 0 层：layout + ssot + conformance + architecture + docs + toml + budget + surface + role-matrix
-npm run gate:shock             # 第 0 层：静态残留审计 + 单一写入口（shock-audit.mjs）
+npm run lint                  # 第 0 层：format:check + node scripts/check.mjs（spec → architecture → dsl-ownership → p0-recovery-join）
+npm run format               # 修正 F#/XML 格式（dotnet tool run fantomas）
 
-npm run build                                # 生产 Fable → dist（clean-fable-output.mjs 清空 + dotnet fable precompile src/Wanxiangshu/Wanxiangshu.fsproj -o dist）
-
-npm run test                   # 第 1–3 层（mjs，无编译步骤）
-npm run test:harness           # gate-testkit：mock 森林与隔离自检
-npm run test:e2e              # 单轮 canary（run-canary-staggered.mjs，事件驱动错峰全并行）
-npm run test:e2e:three        # canary 三轮（CANARY_REPEAT=3）
-npm run check                  # gate:static → build → unit → harness
-npm run check:release          # check + e2e×3 + npm pack --dry-run
+npm run build                # 生产 Fable → dist（scripts/build.mjs：rm dist → fable precompile → 清 .gitignore/.fs → 校验入口与 catalog）
+npm test                     # 第 1–3 层：node tests/unit/run.mjs（陈旧产物 fail closed + 判据静默监督）
+npm run test:unit            # test 别名
+npm run test:integration     # node tests/integration/run.mjs：resources → journal/boot → plugin → package → harness（顺序串行）
+npm run test:e2e             # 单轮 canary（tests/e2e/run.mjs，事件驱动错峰全并行；--repeat 3 为三轮）
+npm run test:package         # 独立跑 package 套件（pack/install/import 检查）
+npm run check                # lint → build → unit → integration
+npm run check:release        # check + test:e2e --repeat 3 + test:package + npm pack --dry-run
+npm run gate:dsl-ownership   # 单独跑 DSL 门禁（--threshold=322）
 ```
 
-`test:unit` 只是 `test` 的别名（`tests-next/` 已删除，残余 F# 套件归零）。
-`gate:toml`（`scripts/toml-format.mjs`）：剧本 TOML 必须与 formatter 输出逐字节一致。
-`gate:budget`（`scripts/budget-gate.mjs`）：`tests/e2e/**`、
-`tests/support/**`、
-`scripts/**` 与 `tests/unit/runner.mjs` 里不得出现 ≥1000 的计时字面量，值必须来自
-`tests/e2e/time-budget.js`。判据是量级即语义线——轮询切片必须比它所受的界更快，
-故合法切片按构造 < 1000ms；≥1000ms 者本身即预算。门禁无豁免通道，字符串也不得把预算
-重述成带单位的时长。
-`gate:surface`（`scripts/surface-inventory.mjs`）：ARCH-010
-纳入范围的运行时合成文本必须逐一登记并分类。清单由 sink 侧派生而非手写生产者清单——
-PROMPT-005 使 `PromptDispatcher` 的三个 send 成员加 `sendFirstPrompt` 成为插件文本到达
-provider 的唯一通路，故 sink 是可枚举的闭集。双向检查：新增 send 站点无条目判红，条目
-指向已消失的站点也判红；sink 名改动导致扫描为空同样 fail closed。system prompt 与
-human raw 的排除是结构性的而非声明式的——send 站点文件不得在代码里引用 prompt asset，
-send 行不得携带 `HumanRoot`。两项均已红过。
+`test` 拒绝在 `dist` 陈旧时运行（fail closed）。先 `npm run build`。
 
-`gate:layout`（`scripts/repository-layout-gate.mjs`）：根目录白名单、生产源码唯一根
-（`src/Wanxiangshu/`）、顶层 module 与文件名一致、重复源码探测。
-`gate:docs`（`scripts/strip-doc-bold.mjs`）：prose 去加粗 + 全角标点空格规范化，
-fenced code block 不触碰。
-
-`test`（`test:unit`）拒绝在 `dist` 陈旧时运行（fail closed）。先 `npm run build`。
+时间界（VERIFY-004）：所有 wall-clock 兜底集中定义在
+`tests/e2e/support/time-budget.js`，逐条带理由；`tests/integration/harness/budget-cases.mjs`
+断言整张预算表与实现逐字一致（预算表变更即红灯）。
 
 ### 时间界的四条实测语义（VERIFY-004）
 
@@ -324,10 +329,12 @@ fenced code block 不触碰。
 命名随语义走：总超时改名 `SUITE_BACKSTOP_MS`，因为它在正确接线后只剩兜底职责；
 叫 `SUITE_TIMEOUT_MS` 会让下一个人把它当主判据。
 
-启动阶段（`spawn` → ready）同样不许只有兜底覆盖。`tests/e2e/readiness.js` 把它
-拆成 9 级因果阶梯，每级独立预算，到达即重新计时；总启动时长因此无界，被界住的是静默。
-阶梯只前进不回退——重试的健康检查若能重置，重试循环会永久续期启动预算。匹配子进程
-已有的计时行本身，不新增为门禁而生的证据：必须为门禁额外发射的证据，门禁无法信任。
+启动阶段（`spawn` → ready）同样不许只有兜底覆盖。`tests/e2e/support/readiness.js`
+把它拆成 9 级因果阶梯（`READINESS_STAGES`），每级独立预算，到达即重新计时；总启动
+时长因此无界，被界住的是静默。阶梯只前进不回退——重试的健康检查若能重置，重试循环会
+永久续期启动预算。就绪门禁：未在有限窗口内输出就绪标记 → canary 失败；早退门禁：
+输出就绪标记前退出 → canary 失败。匹配子进程已有的计时行本身，不新增为门禁而生的
+证据：必须为门禁额外发射的证据，门禁无法信任。
 
 先跑当前改动的最小目标测试；该阶段契约证明后才扩大范围。
 
@@ -354,25 +361,26 @@ repeat-until-pass 宣称成功、在测试中手工写 projection 终态。
 理由不是省编译时间，而是语言边界物理性地阻止测试触碰实现内部。能从 mjs 干净进入的
 恰好是 SSOT 认定为事实的契约面；碰不到的恰好是实现自由部分。
 
-布局：
+布局（0.5.3，目录已小写化）：
 
 ```text
-tests/unit/runner.mjs              父层。陈旧产物 fail closed + 判据静默窗口监督
-tests/unit/run-inner.mjs           子层。node:test 实际执行（files/timeout/concurrency）
-tests/unit/verdict-feed.mjs        判据分类：哪些事件允许续期 watchdog
-tests/unit/fixtures/*.fixture.mjs  门禁驱动的故意病态套件，对真实套件不可见
-tests/unit/domain.mjs              唯一允许知道 Fable 输出形状的文件
-tests/unit/domain.meta.test.mjs    facade 自身的契约（锁住三个静默陷阱）
-tests/unit/guide-contract.test.mjs ARCH-009 契约：断言不存在无界的 `Parallel.map*` 兄弟
-tests/unit/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试（Context/Prompt/Review/Fallback/
-                                 Execution/Journal/Orchestrator/Kernel/Plugin/Verify/Strength/Enforcer/StudentTeacher）
+tests/unit/run.mjs                        入口。陈旧产物 fail closed + 判据静默窗口监督
+tests/unit/support/run-inner.mjs          node:test 实际执行（files/timeout/concurrency）
+tests/unit/support/verdict-feed.mjs       判据分类：哪些事件允许续期 watchdog
+tests/unit/support/fixtures/*.fixture.mjs 门禁驱动的故意病态套件，对真实套件不可见
+tests/unit/support/domain.mjs             唯一允许知道 Fable 输出形状的文件（facade）
+tests/unit/domain.meta.test.mjs           facade 自身的契约（锁住三个静默陷阱，含三时区断言）
+tests/unit/guide-contract.test.mjs        VERIFY-005/008：DSL 程序入口导出契约（可调用 + 元数）
+tests/unit/<domain>/*.test.mjs            按条款命名的第 1–3 层测试（context/prompt/review/
+                                         fallback/execution/journal/orchestrator/kernel/plugin/
+                                         verify/enforcer/strength/student-teacher/agent/domain/…）
 ```
 
 铁律：
 
 - 禁止断言 DU tag 序数、Fable 命名约定（`Module_` 前缀、`$reflection`、`FSharpMap` 内部）
-- Fable 约定只能出现在 `tests/unit/domain.mjs` 这一个 facade 里，等价于生产侧的
-  Adapter/Codec 边界门禁
+- Fable 约定只能出现在 `tests/unit/support/domain.mjs` 这一个 facade 里，等价于生产侧的
+  Adapter/Codec 边界门禁（`spec/10` VERIFY-008）
 - 禁止只断言真值。mjs 无编译期重命名保护，字段改名会静默读到 `undefined`；
   断言必须比对完整结构或完整序列化文本
 - 禁止为测试可见性新增生产 export。缺契约面就补契约，不补 export
@@ -382,7 +390,9 @@ tests/unit/<Domain>/*.test.mjs     按条款命名的第 1–3 层测试（Conte
   `companionProjection`、`hostCompaction`、`probeSelection`、`attemptPlanner`、`xPrefix`、
   `recoverySlot`、`providerInputSeal`、`reviewProjection`、`providerProjection`、
   `handleProjection`、`orchestratorProjection`、`loopDetector`、`loopSensor`、
-  `xTrace`、`xTraceCapture`、`strength`、`studentTeacher`、`enforcer` 等命名空间
+  `xTrace`、`xTraceCapture`、`strength`、`studentTeacher`、`enforcer`、
+  `joinProgram`、`orchestratorProgram`、`forkChildPayload`、`sessionRecovery`、
+  `executorSummarize` 等命名空间
 
 三个已实证的静默陷阱，全部由 facade 封死，`domain.meta.test.mjs` 锁住：
 
@@ -414,41 +424,39 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 （`Infrastructure/OpenCode/Host/`）的 `curriedHook` / `pairedHook` 两个 emit 助手分开表达。
 
 推论：改动任何 `[<Emit>]` 或 `Plugin.fs` 导出面之后，必须真的 `import` 一次发布产物。
-`tests/unit/Plugin/host-hooks.test.mjs` 以 fixture 完备性门禁锁住 hook 面，
+`tests/unit/plugin/host-hooks.test.mjs` 以 fixture 完备性门禁锁住 hook 面，
 新增 hook 未登记会失败。
 
 ## 7. Canary 剧本与 fixture
 
-森林设计已定稿并合入 `spec/10`（VERIFY-003）与 conformance Verify 段，历史记档在
-`docs/archive/shock-anneal-2026/FINAL-REPORT.md`。剧本位于 `tests/e2e/scripts/*.toml`
-（23 个），canary 清单由 `canary-manifest.js` 从文件系统派生。
+森林设计已定稿并合入 `spec/10`（VERIFY-003）。0.5.3 布局：剧本位于
+`tests/e2e/scenarios/*.toml`（24 个），case 位于 `tests/e2e/cases/*.test.mjs`（20 个），
+canary 清单由 `tests/e2e/support/manifest.mjs` 从文件系统派生（`CANARY_SUFFIX` =
+`.test.mjs`；空/缺失目录即报错，绝不静默空跑）。runner 为 `tests/e2e/run.mjs`。
 
 已落地的构件（`tests/e2e/`）：
 
 | 文件 | 职责 |
 |------|------|
-| `runtime-key.js` | `(lane, turn, step, kind)` 纯函数 + 最长前缀唯一查找 |
-| `scenario-runtime.js` | 单剧本运行时（前缀索引、seal 屏障、`clearSeals`），取代已删的 `script-loader.js` |
-| `delivery-plan.js` | 故障与内容正交，物理投递计数 |
-| `cold-boundary.js` | 只认显式声明的冷边界 |
-| `scenario-schema.js` | TOML 编译器，8 个根键 + 26 个 flow 动词白名单 + 载入期校验 |
-| `scenario-runner.js` / `scenario-turn.js` / `scenario-http.js` / `scenario-parallel.js` / `scenario-paths.js` | 单剧本运行、turn 会话、HTTP 通道、并行变体、路径隔离 |
-| `strict-mock-provider.js` | provider 严格 mock：无 scenario 匹配一律记未匹配（K9 已删旧匹配路径） |
-| `provider-wire.js` | testkit 侧仅解码 OpenAI wire，再调生产 projection（VERIFY-007 边界） |
-| `event-probe*.js` / `journal-observer.js` | 判据事件等待/查询与 journal 事实观察 |
-| `stability-checker.js` | VERIFY-004 三轮 + leak check（`run-canary-staggered.mjs` 调用） |
-| `canary-driver.mjs` / `lane.mjs` | canary 驱动与 lane 记账 |
-| `scripts/run-canary-staggered.mjs` | 事件驱动错峰全并行 runner：admitted canary 的首个 host-ready「bark」触发下一个启动，无固定 sleep |
-| `legacy-fields.js` | 19 个退役字段，出现即拒绝载入 |
-| `canary-manifest.js` | canary 清单由文件系统派生，计数漂移在结构上不可能发生 |
-| `readiness.js` | 启动 9 级就绪阶梯，单调前进 |
-| `watchdog.js` | `advance({blocking})` 判据续期，`unref`，触发时 dump 最后进展 |
-| `time-budget.js` | 全部 wall-clock 兜底的单一来源，逐条带理由（VERIFY-004） |
-| `scripts/toml-format.mjs` | 行式 formatter，`gate:toml` 强制逐字节一致 |
-| `scripts/budget-gate.mjs` | `gate:budget`，禁止 ≥1000 的计时字面量散落，无豁免通道 |
-| `scripts/surface-inventory.mjs` | `gate:surface`，ARCH-010 合成文本 surface 清单由 sink 侧派生，双向检查 |
+| `support/runtime-key.js` | `(lane, turn, step, kind)` 纯函数 + 最长前缀唯一查找 |
+| `support/scenario-runtime.js` | 单剧本运行时（前缀索引、seal 屏障、`clearSeals`） |
+| `support/delivery-plan.js` | 故障与内容正交，物理投递计数（`attempts` 一基） |
+| `support/cold-boundary.js` | 只认显式声明的冷边界 |
+| `support/scenario-schema.js` | TOML 编译器，8 个根键 + 26 个 flow 动词白名单 + 载入期校验（含死边可达性不动点） |
+| `support/scenario-runner.js` / `scenario-turn.js` / `scenario-http.js` / `scenario-parallel.js` / `scenario-paths.js` | 单剧本运行、turn 会话、HTTP 通道、并行变体、路径隔离 |
+| `support/strict-mock-*.js`（provider/server/sse/responses/matches/decorate/state/signals） | provider 严格 mock 拆分：无 scenario 匹配一律记未匹配 |
+| `support/provider-wire.js` | testkit 侧仅解码 OpenAI wire，再调生产 projection（VERIFY-007 边界） |
+| `support/event-probe.js` / `event-shape.js` / `journal-observer.js` | 判据事件等待/查询与 journal 事实观察 |
+| `support/stability-checker.js` | VERIFY-004 三轮 + leak check（`tests/e2e/run.mjs` 调用） |
+| `support/scenario-driver.mjs` / `lane.mjs` | canary 驱动与 lane 记账 |
+| `support/manifest.mjs` | canary 清单由文件系统派生，计数漂移在结构上不可能发生 |
+| `support/readiness.js` | 启动 9 级就绪阶梯（`READINESS_STAGES`），单调前进 |
+| `support/watchdog.js` | `advance({blocking})` 判据续期，`unref`，触发时 dump 最后进展 |
+| `support/time-budget.js` | 全部 wall-clock 兜底的单一来源，逐条带理由（VERIFY-004） |
+| `support/supervise-node-test.mjs` | 判据静默监督共享实现（unit/integration/package 共用） |
+| `support/spawn-ledger.js` / `process-lifecycle.js` / `process-host*.js` / `reaper.mjs` | 进程树、spawn 记账与清理 |
 
-内容层（VERIFY-003）：
+内容层（VERIFY-003，未变）：
 
 - 剧本是 mock 的压缩表示法。压掉重复的对话前缀，不压掉语义
 - 一个 scenario 恰好一个 TOML 文件，Host 启动前一次性静态加载。禁止运行期换剧本
@@ -462,14 +470,12 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
   作者只知内容」的唯一正确表达，不要改成整段字面量
 - `internal = true` 的 turn 禁止带 lane：其 prompt 由生产内部合成，不属任何声明车道
 
-死边检查与 `internal`：
+死边检查与 `internal`（载入期不动点可达性）：
 
-- 载入期计算可达性，不动点而非单遍——fork 链是真实的（Manager → Coder → 其子会话），
-  可达边是已达 turn 的 `respond.args.prompt`
-- prompt 由生产内部合成的 lane 用 `internal = true` opt out。它们不在可达性的论域内，
-  不是「需要更聪明的可达性」。当前两例：Blogger（`CompanionHostBlogger.fs` 的
-  `sendBloggerPrompt`）、Executor map 子会话（`ExecutorSummarize.fs` 的 `runExecutorPrompt`）
-- `internal = false` 被拒绝。它读起来像「已检查且可达」，是该字段含义的反面
+- 可达边是已达 turn 的 `respond.args.prompt`；`internal = true` opt out（不在可达性
+  论域内）。`internal = false` 被拒绝。当前内部合成 lane：Blogger
+  （`CompanionHostBlogger.fs` 的 `sendBloggerPrompt`）、Executor map 子会话
+  （`ExecutorSummarize.fs` 的 `runExecutorPrompt`）
 - title turn 不需要特例：title 请求携带被标题的对话，普通前缀规则即可覆盖
 
 故障层：
@@ -508,6 +514,8 @@ wire 上真实存在什么——四条实测纠正，每条都曾让整类断言
 
 被删的伪门禁：`containsTool`（其检查的工具词汇已灭绝，恒真）、`selfRebaseBlog`（零调用点）。
 判据存在性本身要被门禁守住，否则一个恒真检查会长期冒充覆盖。
+0.5.3 起旧 `scripts/run-canary-staggered.mjs` / `tests/e2e/tests/x-recovery-canary.mjs`
+已删除：X 恢复 canary 现为 `tests/e2e/cases/context-recovery.test.mjs`（X-A–X-D 四剧本）。
 
 投影分工（VERIFY-007）：
 
@@ -524,7 +532,7 @@ wire 上真实存在什么——四条实测纠正，每条都曾让整类断言
 
 ### Canary 判据静默与事件间隔
 
-`manager-companion-canary.mjs` 在 `run-canary-staggered.mjs` 并发套件中偶发
+`manager-companion.test.mjs` 在 `tests/e2e/run.mjs` 并发套件中偶发
 `manager tool schema must include manager tools` 失败，独立重跑却通过。根因不是
 schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEOUT_MS`：事件探针在这段时间内
 没有收到续期事件，watchdog 先于真实完成触发。这是一个 flaky 窗口，而非被测语义失败。
@@ -541,16 +549,20 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 
 ## 8. Journal
 
-- 位于 Git common directory 下私有 `wanxiangshu-next/runtimes` 路径，
-  不在受测 workspace 创建 `node_modules` 或 `.wanxiangshu-next`
+- 位于 Git common directory 下私有 `wanxiangshu-next/runtimes` 路径
+  （`src/Wanxiangshu/Journal/RuntimePath.fs`），不在受测 workspace 创建
+  `node_modules` 或 `.wanxiangshu-next`
 - Append 只有 Committed 或 CommitUnknown，没有部分写入（PERSIST-002）
 - Projection 查询不扫描完整历史，必须 O(1) 积分状态（PERSIST-008）
 - Pre-0.5.0 journal 不猜测迁移，启动发现旧 schema 直接失败（PERSIST-005）
 - 外部副作用走类型化 Requested → 幂等执行 → Accepted（PERSIST-009；worktree=`WorktreeCreateRequested`/`WorktreeCreated`，publish=`PublishClaimed`/`Published`）
 - 序列化时间戳必须归一化到 UTC offset（PERSIST-001）。否则同一事实在不同时区产出不同
-  字节，快照指纹与跨机重放全部失效。`domain.meta.test.mjs` 在 UTC / Asia/Shanghai /
-  America/Los_Angeles 三个时区下断言 `isExpired` 与 `remainingMs` 不随环境漂移
+  字节，快照指纹与跨机重放全部失效。`tests/unit/domain.meta.test.mjs` 在 UTC /
+  Asia/Shanghai / America/Los_Angeles 三个时区下断言 `isExpired` 与 `remainingMs`
+  不随环境漂移
 - Projection 的 create 类操作必须幂等（`createJob` 曾无条件覆盖，恢复重放会抹掉进度）
+- 上下文恢复事实的 fold 规则见 PERSIST-010：`OpeningPromptCaptured` 幂等不可覆盖、
+  `XTracePartAppended` 严格顺序 append-only、`ContextReanchored`（HOST-006 收容层）等
 
 ---
 
