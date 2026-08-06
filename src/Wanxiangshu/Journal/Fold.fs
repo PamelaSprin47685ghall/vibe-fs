@@ -842,7 +842,7 @@ module Fold =
                     |> Result.bind (fun enfUpdated ->
                         BloggerCycleProjection.recordReceipt
                             { ProviderRun = payload.ProviderRun
-                              Kind = BloggerCycleKind.Entry
+                              Kind = BlogFrameKind.Entry
                               RequestId = payload.RequestId }
                             cycles
                         |> Result.map (fun cycleUpdated ->
@@ -874,7 +874,7 @@ module Fold =
 
                     BloggerCycleProjection.recordReceipt
                         { ProviderRun = payload.ProviderRun
-                          Kind = BloggerCycleKind.Squash
+                          Kind = BlogFrameKind.Squash
                           RequestId = payload.RequestId }
                         cycles
                     |> Result.map (fun updated ->

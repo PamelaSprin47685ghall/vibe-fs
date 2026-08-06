@@ -57,6 +57,18 @@ const NEGATIVES = [
     line: 2,
   },
   {
+    gate: 'dup-cases',
+    file: 'Agent/Negative_dup_cases.fs',
+    source: ['module Sample', 'type Alpha =', '    | First', '    | Second', 'type Beta =', '    | First', '    | Second'].join('\n'),
+    line: 2,
+  },
+  {
+    gate: 'dup-cases',
+    file: 'Session/ChildRecovery.fs',
+    source: ['module Sample', 'type Alpha =', '    | First', '    | Second', 'type ChildResolution =', '    | First', '    | Second'].join('\n'),
+    line: 2,
+  },
+  {
     gate: 'bool-loop',
     file: 'src/Wanxiangshu/Process/Negative_bool_loop.fs',
     source: ['module Sample', 'let mutable a = false', 'let mutable b = false', 'while x do', '    ()'].join('\n'),
@@ -78,7 +90,7 @@ const CLEAN = [
   '}',
 ].join('\n')
 
-test('DSL_OWNERSHIP_exports_eight_named_gates', () => {
+test('DSL_OWNERSHIP_exports_nine_named_gates', () => {
   assert.deepEqual(GATE_NAMES, [
     'mutable',
     'flow-lift',
@@ -88,12 +100,13 @@ test('DSL_OWNERSHIP_exports_eight_named_gates', () => {
     'program-counter',
     'behaviour-bool',
     'bool-loop',
+    'dup-cases',
   ])
-  assert.equal(FORBIDDEN.length, 8)
+  assert.equal(FORBIDDEN.length, 9)
 })
 
 for (const sample of NEGATIVES) {
-  if (sample.gate === 'bool-loop') continue
+  if (sample.gate === 'bool-loop' || sample.gate === 'dup-cases') continue
   test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
     const file = sample.file ?? `Agent/Negative_${sample.gate}.fs`
     const hits = scanText(sample.source, file)
@@ -104,12 +117,16 @@ for (const sample of NEGATIVES) {
   })
 }
 
-for (const sample of NEGATIVES.filter((s) => s.gate === 'bool-loop')) {
+for (const sample of NEGATIVES.filter((s) => s.gate === 'bool-loop' || s.gate === 'dup-cases')) {
   test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
     const hits = scanFiles([{ file: sample.file, text: sample.source }])
     const ofGate = hits.filter((v) => v.gate === sample.gate)
     if (sample.file.startsWith('Process/') || sample.file.includes('/Process/')) {
       assert.equal(ofGate.length, 0, 'Process physical paths are exempt from bool-loop')
+    } else if (sample.file.endsWith('ChildRecovery.fs')) {
+      // DUP_CASES_EXEMPT registers ChildRecovery.fs:ChildResolution; a DU with
+      // that exact basename:name must not fire.
+      assert.equal(ofGate.length, 0, 'registered exemption does not fire')
     } else {
       assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
       assert.equal(ofGate[0].line, sample.line)

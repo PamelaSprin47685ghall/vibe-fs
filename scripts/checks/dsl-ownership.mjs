@@ -152,7 +152,27 @@ export const FORBIDDEN = [
     pattern: /$^/,
     label: 'multi mutable-false booleans with a while loop',
   },
+  {
+    // PR 9 item 6: duplicate case sets across DUs are a FILE-level pattern
+    // (two DUs with the exact same case-name set), enforced in scanFiles.
+    // Registered here so GATE_NAMES / counts stay authoritative.
+    gate: 'dup-cases',
+    pattern: /$^/,
+    label: 'duplicate DU case-name set',
+  },
 ]
+
+// PR 9 item 6 exemptions — each entry names the FILE:DU whose case set may
+// legitimately repeat another DU's, with the reason the pair is not a
+// duplicate knowledge representation:
+//   ChildRecovery.fs:ChildResolution    pure Decision layer (no payloads),
+//                                       1:1 to ChildRecoveryResult after effects
+//   ManagedAgent.fs:ManagedAgentParseError  Infrastructure boundary; one-way
+//                                       from AgentNameRejection (ManagedAgent.fs:66)
+export const DUP_CASES_EXEMPT = new Set([
+  'ChildRecovery.fs:ChildResolution',
+  'ManagedAgent.fs:ManagedAgentParseError',
+])
 
 export const GATE_NAMES = FORBIDDEN.map((item) => item.gate)
 
@@ -202,6 +222,53 @@ export const scanFiles = (entries) => {
           line: first + 1,
           text: `${bools} mutable false booleans with a while loop`,
         })
+      }
+
+      // PR 9 item 6: duplicate DU case-name sets within one file. Two DUs with
+      // the exact same case names are the same knowledge in two shapes unless
+      // the pair is a registered exemption (decision layer / boundary).
+      const duRe = /^\s*(?:type|and)\s+(\w+)\s*=\s*/
+      const caseRe = /^\s*\| ([A-Z]\w+)/
+      const byCases = new Map()
+      let cur = null
+      const linesArr = text.split('\n')
+      for (let i = 0; i < linesArr.length; i++) {
+        const line = linesArr[i]
+        const code2 = line.replace(/\/\/.*/g, '')
+        const dm = duRe.exec(code2)
+        if (dm) {
+          cur = { name: dm[1], cases: [], line: i + 1 }
+          for (const c of code2.matchAll(/\| ([A-Z]\w+)/g)) cur.cases.push(c[1])
+          byCases.set(cur.name, cur)
+          continue
+        }
+        if (cur) {
+          const cm = caseRe.exec(code2)
+          if (cm) {
+            cur.cases.push(cm[1])
+          } else if (code2.trim() && !/^\s*[{}]/.test(code2) && !code2.includes('of ') && code2.trim() !== '|') {
+            cur = null
+          }
+        }
+      }
+      const base = norm(String(file)).split('/').pop() ?? ''
+      for (const a of byCases.values()) {
+        for (const b of byCases.values()) {
+          if (a === b || a.cases.length < 2) continue
+          const keyA = `${base}:${a.name}`
+          const keyB = `${base}:${b.name}`
+          if (DUP_CASES_EXEMPT.has(keyA) || DUP_CASES_EXEMPT.has(keyB)) continue
+          if (a.cases.length === b.cases.length && a.cases.every((c, idx) => c === b.cases[idx])) {
+            if (a.name < b.name) {
+              violations.push({
+                gate: 'dup-cases',
+                file,
+                line: a.line,
+                text: `DU '${a.name}' repeats case set of '${b.name}': ${a.cases.join(' | ')}`,
+              })
+            }
+          }
+        }
       }
     }
   }
