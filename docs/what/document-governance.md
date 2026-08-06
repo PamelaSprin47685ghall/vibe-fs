@@ -85,14 +85,15 @@ what → shape → how → code/resources
 ## GOV-006：Proposal 生命周期
 
 ```text
-创建 → 讨论修改 → 规范面可接纳性检查 → 裁决
-→ 原子更新受影响规范面 → 未完成实现对齐写入 status → 删除 proposal
+proposal(禁止未经用户同意删除任何未实现的 proposal) → 更新 why → what → shape → how → 决定 proof → 移动 proposal 文件到 status → 阅读相关的代码和文档 → 代码实现 → 检查 proof → 删除 status 中的 proposal 文件
 ```
 
-- 接受或拒绝后均立即删除 proposal 文件。
-- 有长期价值的理由写入 `why/`；不保留 proposal 全文副本。
-- 规范面原子更新 = 同一次变更内恢复受影响 `why/what/shape/how/proof` 的内部一致；不要求实现面同一次完成。
-- 实现落后由 `status/` 表达；对齐后删除对应 status 条目。
+- **未实现 Proposal 删除保护**：禁止未经用户同意删除任何未实现的 proposal。
+- **单向规范流动与更新**：Proposal 经裁决或推进时，遵循 `what → shape → how → code/resources` 单向链与 `proof` 验证，同一次变更内依序更新 `why` → `what` → `shape` → `how` 并决定 `proof`。
+- **移动至 status 跟踪差距**：规范更新后若实现尚未完成，须将未完成实现的 proposal 移动到 `status/`（或在 `status/` 中建立差距条目）作为流动面活跃差距进行跟踪；在实现未完成前不得提前删除。
+- **代码实现与验证**：阅读相关的代码和文档，进行代码实现，并通过 `proof` 检查验证整条 `what → shape → how → code` 链。
+- **对齐后清理**：仅在代码实现完全对齐规范且通过 `proof` 检查后，方可删除 `status/` 中的 proposal 文件/差距条目。
+- **长期理由分发**：有长期价值的理由写入 `why/`；不保留已完成或已废止 proposal 全文副本作为第二设计源。
 
 ## GOV-007：规范面可接纳性（Proposal Admission）
 

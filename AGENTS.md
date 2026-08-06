@@ -27,7 +27,7 @@ why（设计理由与 Kolmogorov 宝典；不直接约束实现）
 > Kolmogorov 标准工作流程
 
 ```text
-proposal(可接纳性检查已由用户确认接受) → 更新 why → what → shape → how → 决定 proof → 移动 proposal 文件到 status → 阅读相关的代码和文档 → 代码实现 → 检查 proof → 删除 status 中的 proposal 文件
+proposal(禁止未经用户同意删除任何未实现的 proposal) → 更新 why → what → shape → how → 决定 proof → 移动 proposal 文件到 status → 阅读相关的代码和文档 → 代码实现 → 检查 proof → 删除 status 中的 proposal 文件
 
 **两种典型失败：**
 1. **写完才想起看文档**：代码已经按旧语义定型，要么返工，要么把旧语义固化，导致规范与代码偏离。

@@ -30,19 +30,26 @@
 
 ## 新增或修改产品行为
 
-1. 若变更未裁决：在 `proposal/` 撰写候选，填齐最小模板（见下）。
+遵循 Kolmogorov 标准工作流程（GOV-006）：
+
+```text
+proposal(禁止未经用户同意删除任何未实现的 proposal) → 更新 why → what → shape → how → 决定 proof → 移动 proposal 文件到 status → 阅读相关的代码和文档 → 代码实现 → 检查 proof → 删除 status 中的 proposal 文件
+```
+
+1. 若变更未裁决：在 `proposal/` 撰写候选，填齐最小模板（见下）。禁止未经用户同意删除任何未实现的 proposal。
 2. 检查 `BaselineAdmissible`（GOV-007）：规范面无内部冲突；已知实现差距已在 `status/`；proposal 影响图完整。
-3. 裁决接受后，同一变更内更新所有受影响的：
+3. 裁决接受或推进时，在同一变更内依序更新受影响的规范面：
    - `why/`（理由与被拒方向，仅当有长期解释价值）
    - `what/`（行为）
    - `shape/`（边界与所有权）
    - `how/`（目标实现）
-   - `proof/`（如何证明）
-4. 实现尚未对齐：在 `status/` 建或更新精简条目。
-5. 删除该 proposal 文件。
-6. 实现追上后删除对应 status。
+   - 决定 `proof/`（如何证明）
+4. 移动 proposal 文件到 `status/`（或在 `status/` 中建立/更新活跃差距条目进行跟踪）。
+5. 阅读相关的代码和文档，进行代码实现。
+6. 检查 `proof`，验证整条 `what → shape → how → code` 链。
+7. 代码实现完全对齐规范并检查 `proof` 通过后，删除 `status/` 中的 proposal 文件/差距条目。
 
-裁决拒绝：有价值的拒绝理由写入 `why/`，删除 proposal。
+裁决拒绝：有价值的拒绝理由写入 `why/`；若未实现未经用户同意不得擅自删除 proposal 文件。
 
 ---
 

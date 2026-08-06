@@ -12,7 +12,7 @@
 
 **Proposal 直达代码。** 候选设计未进入正式规范就被实现，会在基线上叠加未裁决变量。出问题后无法区分旧基线缺陷与新设计副作用。
 
-**永久保留 accepted proposal。** Proposal 若裁决后仍留作第二份设计文档，必然与正式层漂移。Git 已保存历史；长期知识必须分发进 `why/what/shape/how/proof`，然后删除 proposal。
+**未实现时提前删除 Proposal / 永久保留 Proposal。** 禁止未经用户同意删除任何未实现的 proposal（未完成实现的 proposal 须移至 `status/` 跟踪）；但在代码实现完全对齐规范且通过 proof 检查后必须清理，不得永久留作第二份设计文档与正式层漂移。Git 已保存历史；长期知识分发进 `why/what/shape/how/proof`。
 
 **独立 Decision 档案。** 再造 `accepted-decision` 状态层，等于用元数据重复表达 `what/` 已承担的“已被裁决”。分发到正式层即可，不需要第三套身份。
 
@@ -35,6 +35,6 @@
 
 Proposal 不得污染不可信规范面。规范面内部矛盾或未登记的实现差距存在时，可以讨论 proposal，但不得把它写成当前 `what/shape/how/proof`。
 
-Proposal 不是档案。裁决后把知识放到正式层并删除原文。
+Proposal 不是档案。裁决后遵循 Kolmogorov 工作流程（GOV-006）把知识分发到正式规范面，未完成实现的 proposal 移至 status/ 跟踪，代码实现完全对齐并通过 proof 检查后清理 status 中的 proposal 文件，不留作第二设计源。
 
 Hotfix 不得成为破坏文档一致性的借口。Hotfix 豁免的是 Proposal 的前期流程，不豁免文档与代码的同 COMMIT 原子更新。
