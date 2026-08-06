@@ -213,16 +213,21 @@ export const unitRunnerCases = [
       // and it was invisible until the red proof was attempted. Which is the argument for
       // 「门禁必须红过一次才算存在」 stated as cheaply as it can be stated.
       //
-      // The distinguishing input is work that is legitimately slower than the window: ten tests at
-      // 40% of the per-test bound each, none near the bound, the total past the window. Only
-      // per-verdict renewal survives it. The window must cover first-verdict latency (~700ms,
-      // measured) plus one verdict gap, so it stays at UNIT_RUNNER_PROBE_SILENCE_MS rather than TIGHT.
-      const run = await runFixture('slower-than-the-window.fixture.mjs', scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS));
+      // Distinguishing input: many short FIXED wall-clock slices (not a fraction of
+      // PER_TEST). GHA stretches proportional slices into the per-test bound. Fixed 80ms
+      // slices stay short; count is chosen so total exceeds silence.
+      const probeSliceMs = 80;
+      const probeSliceCount = Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.25) / probeSliceMs);
+      const run = await runFixture('slower-than-the-window.fixture.mjs', {
+        ...scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS),
+        UNIT_RUNNER_PROBE_SLICE_MS: String(probeSliceMs),
+        UNIT_RUNNER_PROBE_SLICE_COUNT: String(probeSliceCount),
+      });
 
       assertEq(run.code, 0, `legitimate slow work must complete: ${run.stderr.slice(-400)}`);
       assertTrue(
-        run.stderr.includes('runner: 10 passed, 0 failed'),
-        `all ten verdicts must arrive: ${run.stderr.slice(-300)}`,
+        run.stderr.includes(`runner: ${probeSliceCount} passed, 0 failed`),
+        `all ${probeSliceCount} verdicts must arrive: ${run.stderr.slice(-300)}`,
       );
       assertTrue(
         !run.stderr.includes('WATCHDOG'),
