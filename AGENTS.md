@@ -80,7 +80,7 @@ Kernel/Domain 不引用上层命名空间与 `Fable.Core.JsInterop`、package re
 | 测试、门禁、canary 剧本 | `docs/proof/verify.md` | `tests/e2e/` + `tests/unit/verify/` + `tests/integration/harness/` |
 | Journal、事实、持久化 | `docs/what/persist.md` | `tests/unit/journal/*.test.mjs` + `tests/integration/journal/boot.test.mjs` |
 | 运行时合成 TOML 记法 | `docs/how/synthetic-toml.md`（`ARCH-010`） | `tests/unit/context/synthetic-toml.test.mjs` + `tests/integration/harness/arch010-cases.mjs` |
-| 结构化程序 DSL（FLOW-） | `docs/what/flow.md`（`FLOW-`） | `tests/unit/verify/dsl-ownership.test.mjs` + `scripts/checks/dsl-ownership.mjs` + `TASK.md` |
+| 结构化程序 DSL（FLOW-） | `docs/what/flow.md`（`FLOW-`） | `tests/unit/verify/dsl-ownership.test.mjs` + `scripts/checks/dsl-ownership.mjs` |
 | Projection Algebra（PROJ-） | `docs/what/projection.md`（`PROJ-`） | `tests/unit/context/companion-projection.test.mjs` + `tests/unit/orchestrator/program.test.mjs` |
 | LLM 退化循环检测与强杀恢复 | `docs/what/loop.md`（`LOOP-`） | `tests/unit/domain/loop-*.test.mjs` |
 | Strength / Student&Teacher（未裁决） | `docs/proposal/strength.md` / `student-teacher.md` | `docs/status/strength-student-teacher.md` |
@@ -145,15 +145,7 @@ dsl-ownership → p0-recovery-join）。运行后再做 `git add`，可确保提
 
 ---
 
-## 2. 迁移已收口，当前开发阶段
-
-休克—退火迁移已收口。0.5.3 已发布：仓库规范化（单一 manifest、`resources/` 布局、
-`dist/` 构建输出、统一 `tests/` 树、Wanxiangshu 项目改名去掉 `.Next`、
-数据驱动 enforcer catalog）。其后文档体系 clean break 至 `docs/{why,what,shape,how,proof,status,proposal}`。
-
-### 当前开发阶段
-
-**DSL 全面主导化已完成**（门禁债 `157 → 0`；tip 含 `826268eb` / `5e399826`）。
+## 2. 现行开发纪律与控制流
 
 现行控制流纪律：
 
@@ -166,18 +158,7 @@ Domain   = 事实 / 证据 / 决策 / 值对象
 ```
 
 规范：`docs/what/architecture.md` / `shape/architecture.md`（ARCH-）+ `docs/what/flow.md`（FLOW-001…008）。  
-投影：`docs/what/projection.md`（PROJ-）。  
-历史纠偏施工单见 `TASK.md`（档案，非现行施工指令）。
-
-### 主导化结果（摘要）
-
-| 阶段 | 结果 |
-|------|------|
-| 纠偏 PR0–PR5 | 删通用 Kernel Program/TraceInterpreter；Orchestrator/Reconcile/Join 直接 CE |
-| P0 | Child/Session Recovery → Workflow；`business-interpreter=0`；`second-runtime-protocol=0` |
-| P1 | DrainWindow；`CycleDisposition`；`BloggerRuntimeHost` 统一 seal/blocks；ReconcileSupervisor 薄 facade |
-| P2 | Flow→`Parallel`；Host 边界 open 白名单；合法 mutable 门禁化 |
-| P3 | `threshold=0`；`npm run check`；`test:e2e --repeat 3`；package / pack dry-run |
+投影：`docs/what/projection.md`（PROJ-）。
 
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`、
 `Application/Reconciliation/ChildRecoveryWorkflow.fs`、
@@ -210,41 +191,13 @@ Domain   = 事实 / 证据 / 决策 / 值对象
 
 ### 施工纪律（常驻）
 
-Review 三问（`TASK.md` §八）：
+Review 三问：
 
 1. 能否直接 `let!/match/return!`？能 → 禁造 AST。  
 2. DU 是领域状态还是「程序下一步」？后者删。  
 3. Interpreter 解外部协议还是把内部 Command 变回函数调用？后者删。
 
 禁止：`agent{}` 空壳包 `task{}`、长期双跑、只改文档不改门禁、skip/known-red 伪装完成。
-
-### 已退役的 0.5.2 机制（勿重新引入）
-
-| 旧机制 | 0.5.3 替代 |
-|--------|-----------|
-| `spec/conformance.toml` / `conformance.md` / `coverage.toml` 账本 | `scripts/checks/spec.mjs` + `scripts/checks/architecture.mjs` |
-| `gate:static` 森林 | `npm run lint` → `node scripts/check.mjs`；其余静态性质在 `tests/integration/harness/` |
-| `tests/unit/runner.mjs`（父层）+ `run-inner.mjs` | `tests/unit/run.mjs` + `tests/e2e/support/supervise-node-test.mjs` |
-| `tests/e2e/scripts/*.toml` + `run-canary-staggered.mjs` | `tests/e2e/scenarios/*.toml` + `tests/e2e/cases/*.test.mjs` + `tests/e2e/run.mjs` |
-| `docs/archive/`、`docs/evidence/`、旧 `spec/`、`docs/rfcs/`、`docs/decisions/` | 已删除或 clean break。Host 例外见 HOST-006；规范导航见 `docs/README.md` |
-| 生成式 enforcer 规则源码 | `resources/enforcer/catalog.json` + `docs/why/enforcer.md` / `docs/what/enforcer.md` |
-
-Active 规范 = `docs/{what,shape,how,proof,why}` 中带条款定义的文件（含 ENFORCER- Blogger 子集）。
-`docs/proposal/strength.md` / `student-teacher.md` 是未裁决候选，不属于当前产品合同。
-
-### 已知说明（非发布阻塞）
-
-- X 恢复链生产接线已闭合（`XWire.applyTransform` / `reconcileAttempt` 经 `SpikePlugin.fs`
-  与 `HostSignalBootstrap.fs` 进入生产路径，`AttemptPlanner.plan` 两个调用点：
-  `XWire.fs` / `CompanionTransform.fs`）；X-A–X-D layer-4 canary 已交付
-  （`tests/e2e/cases/context-recovery.test.mjs` + `tests/e2e/scenarios/x-*.toml` 四个剧本）
-- `PERSIST-009` worktree 路径无独立 fault-injection canary（依赖 fold 单测 + publish canary）
-- Host compaction 预防/收容（HOST-006 / PERSIST-010）：Host 的 `compactIfNeeded`
-  估算路径（`../opencode/packages/core/src/session/compaction.ts`）无插件
-  hook 可达，因此预防层不能只写配置——必须关闭 `automatic`/`overflow`/
-  `autocontinue`/`prune` 并在首轮启动做运行时探测；收容层由
-  `HostCompactionGate.fs` 把任何观察到的 compaction pseudo-run 转成一条
-  `ContextReanchored`
 
 ---
 

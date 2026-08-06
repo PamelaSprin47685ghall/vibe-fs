@@ -170,6 +170,7 @@ npm run check:release
 |------|------|
 | `npm run format` / `format:check` | Fantomas 写/检 F# |
 | `npm run lint` | `format:check` + `scripts/check.mjs` |
+| `npm run gate:dsl-ownership` | DSL 结构门禁检查（`threshold=0`） |
 | `npm run test:package` | tarball 内容、隔离安装、import、资源 |
 | `npm run test:e2e -- --repeat N` | e2e 多轮（发布链路内为 3 轮） |
 
@@ -191,7 +192,7 @@ npm run check:release
 - **实现差距**：`docs/status/`（对齐后删除）。
 - 测试直接引用条款 ID。规范不跟踪实现进度。
 
-导航：[docs/README.md](docs/README.md)。治理：`docs/what/document-governance.md`。
+导航：[docs/README.md](docs/README.md)。治理：[docs/what/document-governance.md](docs/what/document-governance.md) · [docs/how/document-governance.md](docs/how/document-governance.md)。
 
 ### 运行时资源
 

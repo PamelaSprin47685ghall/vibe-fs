@@ -40,7 +40,7 @@ export const isExternalProtocolPath = (file) => {
 }
 
 /**
- * Legal mutable (TASK.md / FLOW):
+ * Legal mutable (FLOW):
  * - Domain pure algorithm scratch
  * - Kernel/Parallel bounded concurrency cells
  * - Session / Application physical runtime cells (maps, single-flight, create tasks, locks)

@@ -1,5 +1,21 @@
 # 合成 TOML — 可执行记法与迁移（how）
 
+## 需求意图与范围（A2 需求意图）
+
+### 1. 问题陈述
+当系统在运行期向 LLM 会话上下文注入补全（continuation）、修补（repair）、警戒（guard）、Blogger delta 或工具结果时，如果继续使用裸自然语言或杂乱格式，模型将在文本视觉层混淆冯诺依曼意义上的“控制指令（Instruction）”与“观察数据（Data）”，导致提示词注入（Prompt Injection）漏洞与指令误执行。合成 TOML 模块旨在为所有运行时合成文本建立确定性的、物理视觉上隔离的 TOML 记法，同时确保该记法仅作为面向 LLM 的单向表示，绝对禁止反向解析或作为 Authority 证据。
+
+### 2. 输入输出与规则边界
+- **输入**：运行时生成的强类型指令、工具输出文本、历史消息快照。
+- **输出**：面向 LLM 的单向 Synthetic TOML 文本 payload。
+- **核心边界与不变量**：
+  1. System/Developer 原生 Prompt 明确排除（§2）：原生角色 Prompt 继续使用 Markdown/裸英语，严禁 TOML 包装。
+  2. 冯诺依曼指令数据分离：Instruction 必须且只能写为顶层 `#` 注释；Data 必须写为 TOML 字段/表/值；Instruction 永远物理位于最最前。
+  3. 单向表示与零反向解析：合成 TOML 严禁反向解析为领域对象或用作 Prompt Origin / Authority 证据（ARCH-010 / PROMPT-001）。
+  4. M0–M5 有界迁移：M4 非 Blogger 表面拆为独立 proposal 逐裁决，严禁单一变更内吞入全部生产点。
+
+---
+
 主条款：ARCH-010（`docs/what/architecture.md`）。  
 行为摘要：`what/synthetic-toml.md`。所有权：`shape/synthetic-toml.md`。证明：`proof/synthetic-toml.md`。理由：`why/synthetic-toml.md`。
 

@@ -27,6 +27,14 @@ Host events 流
 
 `LoopSensor` 是 transport 边沿上的观测器，不是第二套 Reconciler。
 
+## LoopDetector 可变状态物理封闭（LOOP-011 证明约束）
+
+`LoopDetector` 的内部数组与可变字段（`Step`、`PrefixLength`、`Value`、`Cross`）属于模块私有实现细节：
+
+1. **禁止导出**：不得在 `shape/loop.md` 或 API 接口中暴露公开可变字段。
+2. **生命周期隔离**：严格绑定到单次 `ProviderRunIdentity`，attempt 结束立即释放。
+3. **并发安全护栏**：禁止跨线程引用或跨 attempt 复用；外部只能通过 `feed` 提交字符或读取只读快照。
+
 ---
 
 ## LOOP-009：事件选型与 Host 能力

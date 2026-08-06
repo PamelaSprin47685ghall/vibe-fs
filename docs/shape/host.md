@@ -52,7 +52,7 @@ SessionId ≠ BloggerSessionId
 禁止用 after 的 callID 与别处 messageID 猜测配对。  
 禁止使用 SDK/Host 不存在的字段（如 `userMessageID`）冒充物理用户消息身份。
 
-## HOST-012：多实例共享边界
+## HOST-012：多实例共享与并发边界
 
 Host 按 directory 实例化插件；worktree 触发第二实例。跨实例因果链（fork → verdict）上：
 
@@ -66,3 +66,8 @@ Host 按 directory 实例化插件；worktree 触发第二实例。跨实例因�
 ```
 
 新增跨实例状态必须同时登记共享清单与 `PluginRuntimeScope` 初始化，否则第二实例静默失配。
+
+### 并发与同步契约 (C2 并发安全)
+- **不可变 Swap 机制**：共享字典（`SessionParents`, `VerdictSessions`, `SessionDirectories`）在运行时为不可变 Map/Set，写操作必须通过 Thread-safe Immutable Swap（原子性指针替换/CAS）完成。
+- **快照读隔离**：读操作获取特定时刻的不可变 Snapshot 引用，保证单次 Reconcile/Projection 过程中的视图一致性，杜绝脏读。
+- **防止更新丢失**：严格禁止直接在共享字典上进行 mutable 就地修改。所有跨实例更新经单写者 CAS 校验，防止 Node.js 事件循环微任务交错导致的更新覆盖。

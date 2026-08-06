@@ -1,5 +1,21 @@
 # LOOP — 目标实现
 
+## 需求意图与范围（A2 需求意图）
+
+### 1. 问题陈述
+LLM 在流式文本生成过程中偶发进入低多样性退化循环（单字符、短语或长句子重复）。若任由其运行至自然结束，会浪费大量 Provider Token、污染历史 Transcript 尾部并推迟系统进入自动恢复槽。LOOP 模块旨在提供一个 O(1) 时间与空间复杂度的流式传感器，在不修改 Host 本体（ARCH-003）与不上报碎片事实（ARCH-002）的前提下，尽早识别退化流、物理强杀请求，并精确桥接至 FallbackController 触发自动恢复。
+
+### 2. 输入输出与规则边界
+- **输入**：OpenCode 流式 `message.part.delta` 文本增量（field=text）。
+- **输出**：`Evaluation` 快照决策（`IsLoop`）、`LoopKillArmed` 进程内局部标志与物理 `AbortSession` 动作。
+- **核心边界与不变量**：
+  1. 不估算 Token 或上下文窗口容量（CTX-001）。
+  2. 不将 delta 文本拼装为领域事实或透传给 Reconciler（ARCH-002）。
+  3. 单线程事件泵串行投递假设：每个 provider attempt 对应单事件循环，`LoopDetector` 可变状态物理封入 attempt 内部，严禁跨线程或跨 attempt 复用。
+  4. 强杀与 Fallback 桥接：Host 返回 `TurnAborted` 且 `LoopKillArmed` 命中时，必须重新分类为领域 `TurnFailed`，并唯一通过 `FallbackController.recordConfirmedFailure` 推进恢复槽。
+
+---
+
 ## LOOP-003：判定指标
 
 ### 观测单位
@@ -149,19 +165,39 @@ $$
 
 ---
 
-## LOOP-005：O(1) 递推与固定内存
+## LOOP-005：O(1) 递推与私有封装状态
 
-### 状态
+### 模块与私有封装状态
+
+`LoopDetector` 在 `Domain/LoopDetector.fs` 中实现为纯模块与领域类型。 evaluation 快照与 detector 状态解耦：
 
 ```fsharp
-type LoopDetector =
-    { mutable Step: int              // 已处理的 4-gram 数
-      Prefix: char[]                 // 最近不足 4 或用于滑动的前缀（仅非空白）
+[<RequireQualifiedAccess>]
+type State =
+    | Normal
+    | Loop
+
+type Evaluation =
+    { State: State
+      IsLoop: bool
+      EffectiveCharacterCount: float
+      Hhi: float
+      Step: int }
+
+type Detector =
+    { mutable Step: int
+      Prefix: char[]
       mutable PrefixLength: int
-      Value: float[][]               // [HASH_BUCKETS][K]
-      LastStep: int[]                // [HASH_BUCKETS]
-      Total: float[]                 // [K]，初始 1/(1-λ_j)
-      Cross: float[][] }             // [K][K]，初始 HHI_normal·T_j·T_k
+      Value: float[][]
+      LastStep: int[]
+      Total: float[]
+      Cross: float[][] }
+
+module LoopDetector =
+    val create : unit -> Detector
+    val pushCharacter : Detector -> char -> Evaluation
+    val pushText : Detector -> string -> Evaluation
+    val evaluate : Detector -> Evaluation
 ```
 
 不保存无限增长的 4-gram Map；固定哈希桶。
@@ -197,13 +233,57 @@ return evaluate（N_eff ≤ 140 → LOOP）
 
 哈希碰撞使 HHI 略偏高（更敏感）；禁止为「更准」改回无限 Map。
 
-### 生命周期
+### 生命周期与封装隔离
 
 ```text
 每个 provider attempt 一个全新 LoopDetector（带代码先验）
-强杀、turn 结束、session 删除 → 丢弃
-禁止跨 attempt 复用检测器状态
+必须严格绑定到 ProviderRunIdentity
+强杀、turn 结束、session 删除 → 丢弃，禁止跨 attempt 复用或泄露引用
 ```
+
+---
+
+## 强杀与 Fallback 桥接算法（LOOP-006）
+
+当 `LoopDetector` 判定 `N_eff <= 140` 触发 LOOP 时，必须按以下五步动作序列执行强杀与 Fallback 桥接：
+
+```text
+Step 1: 触发强杀 (Abort Trigger)
+    if is_loop and not LoopKillArmed.contains(sessionId, providerRunIdentity):
+        LoopKillArmed.record(sessionId, providerRunIdentity) // 记录进程内局部标志
+        HostSDK.abortSession(sessionId)                       // 物理强杀请求
+    else:
+        ignore (重复 delta 幂等跳过)
+
+Step 2: Reconcile 阶段截获
+    when Host 返回 ReconciledTurn，其Outcome 为 TurnAborted (如 MessageAbortedError / finish=aborted):
+        if LoopKillArmed.contains(sessionId, providerRunIdentity):
+            LoopKillArmed.clear(sessionId)
+            // 将事件层面的 TurnAborted 重新分类为领域 TurnFailed (原因: "LoopDetectedKill")
+            outcome = TurnFailed("LoopDetectedKill")
+
+Step 3: 推进 FallbackController (Sole Writer)
+    if outcome == TurnFailed("LoopDetectedKill"):
+        FallbackController.recordConfirmedFailure(providerRunIdentity) // 推进 Fallback cursor
+
+Step 4: 检查 Fallback 决策与 Continuation 发送
+    verdict = FallbackController.getVerdict()
+    if verdict.MayContinue:
+        // 允许继续自动恢复 -> 发送 ProviderRetryAttempt continuation prompt
+        syntheticPrompt = "Continue from the interruption without repeating already produced content."
+        PromptDispatcher.dispatchContinuation(
+            sessionId,
+            Continuation(ProviderRetryAttempt),
+            syntheticPrompt
+        )
+    else:
+        // 预算耗尽 -> 终止于 FallbackExhausted 终局
+        transitionTo(FallbackExhausted)
+```
+
+`LoopKillArmed` 是进程内局部事实，不写入 Journal，重启崩溃后自然丢失（安全侧 Fail-Closed，允许重复输出）。
+
+---
 
 ### 并发模型
 
@@ -240,5 +320,3 @@ provider_error              // 仅 abort 失败原因
 ```
 
 禁止把完整循环正文写入日志；禁止用 HHI / N_eff 驱动 Fallback 之外的业务分支。
-
----

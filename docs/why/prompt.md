@@ -8,6 +8,10 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 
 ## 备选与被拒
 
+**身份类型与错误表达：裸 `string` vs 强类型包装与 DU。** 拒裸 string：用裸 `string` 表示 `SessionId`、`LogicalRunId`、`ToolCallId` 会使不同领域的 ID 能被互相误传而编译器毫无察觉；拒绝在 `SendFailed of error: string` 中使用裸字符串，这会导致下游写出脆弱的错误散文匹配。选单 Case DU 包装（如 `SessionId of string`）与结构化 `DispatchError` DU，确保错误分支与身份类型在编译期完全闭合。
+
+**巨型 Profile 传递 vs 领域子记录拆分。** 拒巨型 Profile 直传：直接把包含 15 个字段的 `AttemptExecutionProfile` 塞给各个子模块，会导致调用方隐式读取不属于己方边界的字段，破坏 ARCH-001/ARCH-008 分层。选按领域拆分：拆为 `AuthorityProfile`、`RequestProfile` 与 `ProjectionContext` 三个聚焦记录，跨模块调用仅传递契约所需部分。
+
 **恢复语义：exactly-once / 重发 / at-most-one。** 拒 exactly-once：Host 已可能开始 provider run，无法单边保证物理一次性。拒重发：重发在 Host 留下的 `msg_*` 之外产生第二次逻辑效果。选 at-most-once + fail-closed unknown（PROMPT-011）：未证明落地就保持 Pending，不自动补投。
 
 **PromptKey：内容 digest vs 时间/随机窗口身份。** 拒时间窗口：跨崩溃不可靠，且无法区分「同一 Guard 连发两次」。`ClaimSequence` 由 journal fold 派生的单调序号，使同 payload 重发成为两个 key。

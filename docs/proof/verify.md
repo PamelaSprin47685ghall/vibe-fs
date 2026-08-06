@@ -384,6 +384,14 @@ scripts/checks/architecture.mjs    源码根、fsproj 完整性、分层边界�
 
 把它们放进测试套件会造成两个错误：需要先编译才能检查源码；门禁失败与行为失败混在同一个红灯里，无法分别处理（退火期必须能分层打开反馈）。
 
+## Fail-Closed 校验与破坏性回归测试指南
+
+为了确保系统遇到数据损坏、版本不兼容或边界失配时能够安全 Fail-Closed，而不是崩溃或吞掉上下文，第 1–3 层测试中必须包含以下破坏性回归测试集：
+
+1. **Envelope 字节损坏回归测试**：在 Journal 反序列化入口传入 0x04–0xFF 的非法 `FallbackOffset` 字节，验证系统返回 `Result.Error` 并干净触发 `CommitUnknown` / Reconcile 拒绝，绝对不抛出未捕获的 `invalidOp`。
+2. **裸文本/未绑定 ID 拒绝测试**：传入未带 SessionBinding 或包含未知来源字符串的 `PromptAbandonReason`，验证 PromptDispatcher 正确拒绝并维持前置安全状态。
+3. **Intent 互斥组合测试**：同时声明 `keepPhysicalPrefix` 与 `activatePrefixEpoch`，验证 Planner 准确捕获并产出 `ProjectionConflict`，安全挂起当前 Attempt。
+
 ## VERIFY-006：No-Go（出现任一项不得发布 0.5.0）
 
 ```text
