@@ -1,0 +1,133 @@
+# Agent 与能力 — 可观察行为
+
+条款前缀：`AGENT-`。  
+权限写入点与双层边界见 `shape/agent.md`。
+
+## AGENT-001：Canonical Role 与 Agent Tier
+
+Canonical Role 决定工具权限与 system prompt。
+
+```fsharp
+type Role =
+    | Orchestrator | Manager | Coder | Inspector | DevOps
+    | Browser | Meditator | Reviewer | Blogger | Executor
+
+type AgentTier = Fast | Deep
+```
+
+Tier **只**改变模型绑定。fast-ROLE 与 deep-ROLE 的 system prompt、工具权限、能力矩阵必须相同。
+
+Canonical Role **不**决定 Companion 资格（COMPANION-001/002）。
+
+## AGENT-002：必须存在的 20 个 Agent
+
+```text
+fast-orchestrator     deep-orchestrator
+fast-manager          deep-manager
+fast-coder            deep-coder
+fast-inspector        deep-inspector
+fast-devops           deep-devops
+fast-browser          deep-browser
+fast-meditator        deep-meditator
+fast-reviewer         deep-reviewer
+fast-blogger          deep-blogger
+fast-executor         deep-executor
+```
+
+缺任一 → 启动失败。每个 Agent 必须有非空且 pair 内互异的 model 字符串。
+
+## AGENT-003：Peer
+
+```text
+peer(fast-ROLE) = deep-ROLE
+peer(deep-ROLE) = fast-ROLE
+```
+
+Peer 名称必须在启动配置验证阶段证明存在。
+
+## AGENT-004：非法旧名
+
+下列全部非法，无 alias、无自动补全：
+
+```text
+orchestrator, manager, build, plan, coder, inspector, devops,
+browser, meditator, reviewer, blogger, executor, fast, deep,
+reviewer-fast, fast_reviewer
+```
+
+## AGENT-005：用户必须显式选择
+
+新的公开 Authority Root 必须携带准确 Agent（如 `fast-coder`）。  
+省略、旧名或 build/plan → `HostContractUnsupported`。
+
+## AGENT-006：能力矩阵
+
+| 角色 | 工具 |
+|------|------|
+| Orchestrator | `fork-manager`, `join` |
+| Manager | `fork-agent`, `join`, `list` |
+| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector`, `mv`, `rm` |
+| Inspector | `read`, `glob`, `grep`, `executor` |
+| DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
+| Browser | `read`, `glob`, `grep`, network tools |
+| Meditator | `read`, `glob`, `grep`, `inspector` |
+| Reviewer | `read`, `glob`, `grep`, `inspector`, `verdict` |
+| Blogger | `blog` |
+| Executor | 无工具 |
+
+## AGENT-008：内部 Agent 不可见
+
+Blogger、Executor 不得出现在任何模型可见的 enum、schema 或工具参数提示中。
+
+## AGENT-009：示踪面可见集合
+
+| 暴露面 | 可见 Agent |
+|--------|-----------|
+| Manager fork-agent | fast/deep coder, inspector, devops, browser, meditator, reviewer |
+| Orchestrator fork-manager | fast-manager, deep-manager |
+| Inspector tool | fast-inspector, deep-inspector |
+| Coder tool | fast-coder, deep-coder |
+| list() | 当前运行中的 handle（非可创建清单） |
+
+## AGENT-010：fast/deep 权限一致
+
+```text
+permissions(fast-ROLE) = permissions(deep-ROLE)
+```
+
+不得出现 fast 只读、deep 才可写。
+
+## AGENT-011：Manager 无普通工具
+
+Manager 只有 `fork-agent` / `join` / `list`。  
+不能直接读文件、跑终端、改仓库。
+
+## AGENT-012：Coder 的 Inspector 不透明
+
+Coder 可见 `inspector` 工具，但 prompt 只能把它描述为不透明只读调查服务。  
+不得泄露 Executor 权限，不得把 Inspector 当常规验证代理。
+
+## AGENT-013：DevOps 独占 PTY
+
+只有 DevOps 可创建/操作 PTY。  
+文件修改只能经同步 `coder` 工具委派，不能直接 `write`/`edit`。
+
+## AGENT-014：Reviewer 只读
+
+Reviewer = 只读工具 + `verdict`。不能写文件、不能跑命令。
+
+## AGENT-015：Orchestrator 只 fork Manager
+
+`fork-manager` 只接受 `fast-manager` / `deep-manager`。
+
+## AGENT-016：mv / rm 仅 Coder
+
+`mv`/`rm` 只进 Coder 矩阵。其它角色（含 DevOps）不得获得。双层 fail-closed 适用。
+
+## AGENT-017：mv 语义
+
+POSIX `mv`：参数 `source`、`destination`；目标存在则覆盖；目录/跨文件系统按 POSIX。
+
+## AGENT-018：rm 语义
+
+POSIX `rm`，但**禁止删非空目录**：文件与空目录可删，非空目录拒绝。参数 `path`。

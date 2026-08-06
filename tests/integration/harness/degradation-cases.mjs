@@ -1,7 +1,7 @@
 /**
  * gate-degradation-cases.mjs — W7: every forbidden degradation has a case, and that is checked.
  *
- * VERIFY-004 lists thirteen degradations under `### 禁止退化清单` (spec/10.md). W7's charge is a
+ * VERIFY-004 lists thirteen degradations under `### 禁止退化清单` (docs/proof/verify.md). W7's charge is a
  * failing test per item, and a completeness gate over the set — because a registered case file that
  * contributes nothing looks, in the gate's output, exactly like one whose cases all pass. The
  * placeholder this package started from (`gate-readiness-cases.mjs` was an empty array) is the

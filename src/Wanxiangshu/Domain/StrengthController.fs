@@ -2,7 +2,7 @@ namespace Wanxiangshu.Domain
 
 open Wanxiangshu.Domain.StrengthTypes
 
-/// spec/14 STRENGTH-027/028/030：负反馈控制器。
+/// docs/proposal/strength.md STRENGTH-027/028/030：负反馈控制器。
 ///
 /// 两个独立反馈环（K1 与 K2，STRENGTH-031）。ρ 随预测倾向反向变化（STRENGTH-028）：
 /// 预测过多 → ρ 降 → 旁路序列纳入率降 → read 信号少 → 倾向回落。

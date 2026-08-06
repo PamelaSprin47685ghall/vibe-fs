@@ -1,4 +1,4 @@
-// tests/unit/Strength/predictor.test.mjs — spec/14 STRENGTH-021/022/023/092.
+// tests/unit/Strength/predictor.test.mjs — docs/proposal/strength.md STRENGTH-021/022/023/092.
 //
 // The request-level n-gram predictor. Pure functions only: state in, state out.
 // These tests pin the contract STRENGTH-092 names:

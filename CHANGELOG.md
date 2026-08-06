@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 文档体系 clean break：废止根 `spec/` 与旧 `docs/rfcs`/`docs/decisions` 权威路径；产品规范迁入 `docs/{why,what,shape,how,proof}`，流动面为 `proposal/`、`status/`。
+- 条款 ID（`ARCH-`/`PROMPT-`/…）保留且唯一归属一层；`scripts/checks/spec.mjs` 扫描正式层；导航见 `docs/README.md`。
+- 工程入口（`AGENTS.md`、根 README、VERIFY-004 退化清单）改指向新路径；无运行时协议变更。
+
 ## 0.5.4
 
 - AGENT-019：managed agent Host-final permission 固定 `external_directory = allow`，覆盖 Host 默认 ask，取消项目外路径的交互确认。

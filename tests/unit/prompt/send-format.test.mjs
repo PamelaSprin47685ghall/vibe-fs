@@ -1,6 +1,6 @@
 // tests/unit/Prompt/send-format.test.mjs — PROMPT-006.
 //
-// spec/03 PROMPT-006 fixes the send-time options at every dispatch:
+// docs/what/prompt.md PROMPT-006 fixes the send-time options at every dispatch:
 //
 //   { Agent = Some effectiveAgent
 //     Model = None

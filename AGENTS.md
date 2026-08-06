@@ -68,26 +68,26 @@ Kernel/Domain 不引用上层命名空间与 `Fable.Core.JsInterop`、package re
 
 | 任务涉及 | 必读条款 | 必读状态 |
 |---------|---------|---------|
-| Prompt 发送、Authority、Dispatcher | spec/03 | `tests/unit/prompt/*.test.mjs` + `tests/unit/context/attempt-plan.test.mjs` |
-| Fallback、cursor、circuit breaker | spec/04 | `tests/unit/fallback/*.test.mjs` |
-| Review、verdict、witness、seal | spec/05 + HOST-010/011 | `tests/unit/review/*.test.mjs` |
-| Orchestrator、publish、rebase、恢复 | spec/06 | `tests/unit/orchestrator/*.test.mjs` + `tests/unit/execution/join-*.test.mjs` |
-| Host hook、事件、reconcile | spec/07 | `tests/unit/plugin/host-hooks.test.mjs` + `tests/unit/execution/host-turn-observed.test.mjs` |
-| Companion、Blogger、projection、epoch | spec/08 + spec/12 | `tests/unit/context/*.test.mjs` + `tests/unit/enforcer/*.test.mjs` |
-| 上下文恢复、Blogger delta、X prefix probe、Y squash | spec/12（`CTX-`） | `tests/unit/context/`（`probe-selection` / `recovery-slot` / `x-trace*` / `blogger-*`）+ `tests/e2e/cases/context-recovery.test.mjs`（X-A–X-D） |
-| compaction、`/compact`、reanchor | spec/07 + spec/12 | `tests/unit/context/host-compaction-policy.test.mjs` + `src/Wanxiangshu/Infrastructure/OpenCode/Host/HostCompactionGate.fs` |
-| fork/join/list、PTY、进程 | spec/09 | `tests/unit/execution/`（`handle*` / `join*` / `fork-*` / `executor-*`） |
-| 测试、门禁、canary 剧本 | spec/10 | `tests/e2e/` + `tests/unit/verify/` + `tests/integration/harness/` |
-| Journal、事实、持久化 | spec/11 | `tests/unit/journal/*.test.mjs` + `tests/integration/journal/boot.test.mjs` |
-| 运行时合成 TOML 记法 | spec/13（`ARCH-010`） | `tests/unit/context/synthetic-toml.test.mjs` + `tests/integration/harness/arch010-cases.mjs` |
-| 结构化程序 DSL（FLOW-） | spec/14（`FLOW-`） | `tests/unit/verify/dsl-ownership.test.mjs` + `scripts/checks/dsl-ownership.mjs` + `TASK.md` |
-| Projection Algebra（PROJ-） | spec/16（`PROJ-`） | `tests/unit/context/companion-projection.test.mjs` + `tests/unit/orchestrator/program.test.mjs` |
-| LLM 退化循环检测与强杀恢复 | spec/17（`LOOP-`） | `tests/unit/domain/loop-*.test.mjs` |
-| Strength / Student&Teacher（未来设计） | `docs/rfcs/`（`strength.md` / `student-teacher.md`） | `docs/rfcs/` 各文件 Status 字段 |
-| 任何生产代码改动 | spec/01（架构 DNA） | `scripts/checks/architecture.mjs` + `scripts/checks/spec.mjs` |
+| Prompt 发送、Authority、Dispatcher | `docs/what/prompt.md` | `tests/unit/prompt/*.test.mjs` + `tests/unit/context/attempt-plan.test.mjs` |
+| Fallback、cursor、circuit breaker | `docs/what/fallback.md` | `tests/unit/fallback/*.test.mjs` |
+| Review、verdict、witness、seal | `docs/what/review.md` + HOST-010/011 | `tests/unit/review/*.test.mjs` |
+| Orchestrator、publish、rebase、恢复 | `docs/what/orchestrator.md` | `tests/unit/orchestrator/*.test.mjs` + `tests/unit/execution/join-*.test.mjs` |
+| Host hook、事件、reconcile | `docs/what/host.md` | `tests/unit/plugin/host-hooks.test.mjs` + `tests/unit/execution/host-turn-observed.test.mjs` |
+| Companion、Blogger、projection、epoch | `docs/what/companion.md` + `docs/what/context.md` | `tests/unit/context/*.test.mjs` + `tests/unit/enforcer/*.test.mjs` |
+| 上下文恢复、Blogger delta、X prefix probe、Y squash | `docs/what/context.md`（`CTX-`） | `tests/unit/context/`（`probe-selection` / `recovery-slot` / `x-trace*` / `blogger-*`）+ `tests/e2e/cases/context-recovery.test.mjs`（X-A–X-D） |
+| compaction、`/compact`、reanchor | `docs/what/host.md` + `docs/what/context.md` | `tests/unit/context/host-compaction-policy.test.mjs` + `src/Wanxiangshu/Infrastructure/OpenCode/Host/HostCompactionGate.fs` |
+| fork/join/list、PTY、进程 | `docs/what/execution.md` | `tests/unit/execution/`（`handle*` / `join*` / `fork-*` / `executor-*`） |
+| 测试、门禁、canary 剧本 | `docs/proof/verify.md` | `tests/e2e/` + `tests/unit/verify/` + `tests/integration/harness/` |
+| Journal、事实、持久化 | `docs/what/persist.md` | `tests/unit/journal/*.test.mjs` + `tests/integration/journal/boot.test.mjs` |
+| 运行时合成 TOML 记法 | `docs/how/synthetic-toml.md`（`ARCH-010`） | `tests/unit/context/synthetic-toml.test.mjs` + `tests/integration/harness/arch010-cases.mjs` |
+| 结构化程序 DSL（FLOW-） | `docs/what/flow.md`（`FLOW-`） | `tests/unit/verify/dsl-ownership.test.mjs` + `scripts/checks/dsl-ownership.mjs` + `TASK.md` |
+| Projection Algebra（PROJ-） | `docs/what/projection.md`（`PROJ-`） | `tests/unit/context/companion-projection.test.mjs` + `tests/unit/orchestrator/program.test.mjs` |
+| LLM 退化循环检测与强杀恢复 | `docs/what/loop.md`（`LOOP-`） | `tests/unit/domain/loop-*.test.mjs` |
+| Strength / Student&Teacher（未裁决） | `docs/proposal/strength.md` / `student-teacher.md` | `docs/status/strength-student-teacher.md` |
+| 任何生产代码改动 | `docs/what/architecture.md` + `docs/shape/architecture.md` | `scripts/checks/architecture.mjs` + `scripts/checks/spec.mjs` |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见上一节） |
 
-`spec/00.md` 是导航，条款速查表在那里。不确定读哪个文件时先读它。
+`docs/README.md` 是导航。不确定读哪个文件时先读它。执行链：`what → shape → how → code`。
 
 ### 提交前运行 lint
 
@@ -120,22 +120,20 @@ dsl-ownership → p0-recovery-join）。运行后再做 `git add`，可确保提
 
 | 位置 | 性质 |
 |------|------|
-| `spec/` | 唯一产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以此为准。`spec/00.md` 导航，`spec/99.md` 词汇表 |
-| `scripts/checks/spec.mjs` | 规范内部一致性检查：条款唯一、无悬空引用、前缀归属（`PREFIX_OWNER` 硬编码表）、`spec/00.md` 导航完整。0.5.3 实证：209 条款 / 620 引用 / 19 文件 |
+| `docs/what` · `shape` · `how` · `proof` · `why` | 分域产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以正式层为准。导航 `docs/README.md`，词汇表 `docs/what/glossary.md` |
+| `docs/proposal/` | 未裁决候选；禁止直接实现 |
+| `docs/status/` | 实现相对规范的活跃差距；对齐后删除 |
+| `scripts/checks/spec.mjs` | 规范内部一致性：条款唯一、无悬空引用、前缀归属、导航覆盖 |
 | `scripts/checks/architecture.mjs` | 源码根、fsproj 完整性、分层边界、资源读取位置、无 `.gen.fs`、无旧路径（VERIFY-005） |
-| `docs/decisions/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
-| `docs/decisions/enforcer-catalog.md` | Enforcer 规则目录裁决（0.5.3：规则实例 = 打包资源 `resources/enforcer/catalog.json`，非生成源码） |
-| `docs/rfcs/` | 未来设计 RFC（strength / student-teacher）；非产品合同 |
-| `docs/architecture.md` / `development.md` / `releasing.md` | 架构速览 / 开发 / 发布流程。0.5.3 起取代旧 `docs/archive/` 与 `docs/evidence/`（两者已删除） |
+| `docs/why/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
+| `docs/why/enforcer.md` + `resources/enforcer/catalog.json` | Enforcer 理由与规则实例（实例在实现面） |
 | `resources/` | 运行时静态资源：prompts/ + enforcer/catalog.json（随 npm pack 发布） |
 
-代码里的注释不是规范。测试断言不是规范。README 不是规范。
+代码里的注释不是规范。测试断言不是规范。根 README 不是规范正文。
 
-0.5.3 起不再有 `spec/conformance.toml` / `spec/conformance.md` / `coverage.toml`：
-conformance 账本与 STATUS ledger 已退役删除，条款状态由 `scripts/checks/spec.mjs`
-（文本一致性）与 `scripts/checks/architecture.mjs`（源码面）直接断言，不再有
-「实现状态词」中间层。`spec/` 只描述应该如何；实现是否满足由 focused checks
-与测试树给出证据，不落账本。
+旧 `spec/` 目录与 conformance 账本已 clean break 废止。条款状态由
+`scripts/checks/spec.mjs`（文本一致性）与 `scripts/checks/architecture.mjs`
+（源码面）及测试树直接断言；实现差距只在 `docs/status/`。
 
 ### 发现条款本身有问题
 
@@ -150,9 +148,8 @@ conformance 账本与 STATUS ledger 已退役删除，条款状态由 `scripts/c
 ## 2. 迁移已收口，当前开发阶段
 
 休克—退火迁移已收口。0.5.3 已发布：仓库规范化（单一 manifest、`resources/` 布局、
-`spec/` 条款文档、`dist/` 构建输出、统一 `tests/` 树、Wanxiangshu 项目改名去掉
-`.Next`、数据驱动 enforcer catalog），无运行时行为变化。0.5.3 同时退役了
-conformance 账本、STATUS ledger 与旧 gate 森林（见下）。
+`dist/` 构建输出、统一 `tests/` 树、Wanxiangshu 项目改名去掉 `.Next`、
+数据驱动 enforcer catalog）。其后文档体系 clean break 至 `docs/{why,what,shape,how,proof,status,proposal}`。
 
 ### 当前开发阶段
 
@@ -168,8 +165,8 @@ Domain   = 事实 / 证据 / 决策 / 值对象
            程序计数器 bool、facade 包旧路径、threshold 上调
 ```
 
-规范：`spec/01` ARCH-001 + `spec/14` FLOW-001…008。  
-投影：`spec/16`（PROJ-）。  
+规范：`docs/what/architecture.md` / `shape/architecture.md`（ARCH-）+ `docs/what/flow.md`（FLOW-001…008）。  
+投影：`docs/what/projection.md`（PROJ-）。  
 历史纠偏施工单见 `TASK.md`（档案，非现行施工指令）。
 
 ### 主导化结果（摘要）
@@ -225,16 +222,15 @@ Review 三问（`TASK.md` §八）：
 
 | 旧机制 | 0.5.3 替代 |
 |--------|-----------|
-| `spec/conformance.toml` / `conformance.md` / `coverage.toml` 账本 | `scripts/checks/spec.mjs`（条款唯一/悬空引用/前缀归属/导航）+ `scripts/checks/architecture.mjs`（源码面） |
-| `gate:static` 森林（layout / ssot / conformance / architecture / docs / toml / budget / surface / role-matrix / shock） | `npm run lint` → `node scripts/check.mjs`：`checks/spec.mjs` + `checks/architecture.mjs` + `checks/dsl-ownership.mjs` + `checks/p0-recovery-join.mjs`；其余静态性质移入 `tests/integration/harness/`（`arch010-cases` / `budget-cases` / `schema-cases` / `single-source-cases` 等） |
-| `tests/unit/runner.mjs`（父层）+ `run-inner.mjs` | `tests/unit/run.mjs`（陈旧产物 fail closed + 判据静默监督）+ `tests/e2e/support/supervise-node-test.mjs`（共享 VERIFY-004 判据） |
-| `tests/e2e/scripts/*.toml`（23 个）+ `run-canary-staggered.mjs` | `tests/e2e/scenarios/*.toml`（24 个）+ `tests/e2e/cases/*.test.mjs`（20 个）+ `tests/e2e/run.mjs`（事件驱动错峰全并行，`--repeat 3`） |
-| `docs/archive/`、`docs/evidence/`、blockers-closed | 已删除。Host 例外见 `spec/07` HOST-006（compaction 预防/收容）；发布流程见 `docs/releasing.md` |
-| `docs/rfcs/enforcer-nudge.md` | nudge/throttle 语义并入 `spec/15`（ENFORCER-）；规则实例数据化于 `resources/enforcer/catalog.json`（`docs/decisions/enforcer-catalog.md`） |
+| `spec/conformance.toml` / `conformance.md` / `coverage.toml` 账本 | `scripts/checks/spec.mjs` + `scripts/checks/architecture.mjs` |
+| `gate:static` 森林 | `npm run lint` → `node scripts/check.mjs`；其余静态性质在 `tests/integration/harness/` |
+| `tests/unit/runner.mjs`（父层）+ `run-inner.mjs` | `tests/unit/run.mjs` + `tests/e2e/support/supervise-node-test.mjs` |
+| `tests/e2e/scripts/*.toml` + `run-canary-staggered.mjs` | `tests/e2e/scenarios/*.toml` + `tests/e2e/cases/*.test.mjs` + `tests/e2e/run.mjs` |
+| `docs/archive/`、`docs/evidence/`、旧 `spec/`、`docs/rfcs/`、`docs/decisions/` | 已删除或 clean break。Host 例外见 HOST-006；规范导航见 `docs/README.md` |
+| 生成式 enforcer 规则源码 | `resources/enforcer/catalog.json` + `docs/why/enforcer.md` / `docs/what/enforcer.md` |
 
-Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具化子集）。
-`docs/rfcs/strength.md` / `docs/rfcs/student-teacher.md` 是已批准但未交付的未来
-设计，不属于当前产品合同。
+Active 规范 = `docs/{what,shape,how,proof,why}` 中带条款定义的文件（含 ENFORCER- Blogger 子集）。
+`docs/proposal/strength.md` / `student-teacher.md` 是未裁决候选，不属于当前产品合同。
 
 ### 已知说明（非发布阻塞）
 
@@ -254,7 +250,7 @@ Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具�
 
 ## 3. 三条不可违反的架构 DNA
 
-完整规范 `spec/01.md`。
+完整规范 `docs/what/architecture.md` 与 `docs/shape/architecture.md`。
 
 1. 结构化程序替代状态机（ARCH-001）。控制流只用 `let!/do!/use!/match/尾递归`。
    禁止 `Stage`、`Phase`、`Lease`、`Owner`、`Generation` 作为程序计数器。
@@ -267,7 +263,7 @@ Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具�
 
 ### 第四条：上下文恢复必须由失败驱动（CTX-001 / CTX-002）
 
-与上面三条同级的硬禁止，来自 spec/12。
+与上面三条同级的硬禁止，来自 `docs/what/context.md`（CTX-）。
 
 禁止观察或估算上下文容量（CTX-001）：不读 provider 的 context/input/output limit，
 不做 token 估算，不拿估算值与任何阈值比较。禁止在失败发生前压缩（CTX-002）：
@@ -285,7 +281,7 @@ Active 规范 = spec/01–17（`spec/15` 为 0.5.1 已交付的 Blogger 工具�
 | `CompanionProgram.shouldReplacePrefix` | CTX-001 | `PrefixProbeSelection` |
 
 推论：`transform` hook 里做不了恢复决策，因为它看不到 attempt 结局。
-没有已提交的探针时，X 看到的就是原始历史——这是 spec/12 的正确行为，不是降级。
+没有已提交的探针时，X 看到的就是原始历史——这是 CTX 的正确行为，不是降级。
 
 手工 `/compact` 无法阻断（Host 无配置开关也无可否决 Hook，属官方支持用法）。
 Host 的 `compactIfNeeded` 估算路径同样无插件 hook 可达，因此配置关闭本身
@@ -316,7 +312,7 @@ PERSIST-010）。
 的唯一入口能长期假装合规——`buildAttemptExecutionProfile` 就这样在 `PROMPT-008`
 标着 `CONTRADICTS` 的情况下存活到包 X8 才拿到第一个真实调用点（`AttemptPlanner.plan`）。
 当前由 `tests/unit/context/attempt-plan.test.mjs` 把 profile 钉为请求的唯一源头，
-单一写入口规则列于 `spec/10`（VERIFY-005）。
+单一写入口规则列于 `docs/proof/verify.md`（VERIFY-005）。
 
 ### 判死代码要量，不要读
 
@@ -443,7 +439,7 @@ tests/unit/<domain>/*.test.mjs            按条款命名的第 1–3 层测试�
 
 - 禁止断言 DU tag 序数、Fable 命名约定（`Module_` 前缀、`$reflection`、`FSharpMap` 内部）
 - Fable 约定只能出现在 `tests/unit/support/domain.mjs` 这一个 facade 里，等价于生产侧的
-  Adapter/Codec 边界门禁（`spec/10` VERIFY-008）
+  Adapter/Codec 边界门禁（`docs/proof/verify.md` VERIFY-008）
 - 禁止只断言真值。mjs 无编译期重命名保护，字段改名会静默读到 `undefined`；
   断言必须比对完整结构或完整序列化文本
 - 禁止为测试可见性新增生产 export。缺契约面就补契约，不补 export
@@ -492,7 +488,7 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 
 ## 7. Canary 剧本与 fixture
 
-森林设计已定稿并合入 `spec/10`（VERIFY-003）。0.5.3 布局：剧本位于
+森林设计已定稿并合入 `docs/proof/verify.md`（VERIFY-003）。0.5.3 布局：剧本位于
 `tests/e2e/scenarios/*.toml`（24 个），case 位于 `tests/e2e/cases/*.test.mjs`（20 个），
 canary 清单由 `tests/e2e/support/manifest.mjs` 从文件系统派生（`CANARY_SUFFIX` =
 `.test.mjs`；空/缺失目录即报错，绝不静默空跑）。runner 为 `tests/e2e/run.mjs`。
@@ -640,7 +636,7 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 
 # Kolmogorov 宝典
 
-本宝典唯一权威副本 `docs/decisions/kolmogorov.md`。改动必须两边同步。
+本宝典唯一权威副本 `docs/why/kolmogorov.md`。改动必须两边同步。
 
 - 从最重要的开始。构建软件设计有两种方法：一种是使其足够简单，以至于明显没有缺陷；另一种是使其足够复杂，以至于没有明显的缺陷：请思考你想要哪种。取法于上，仅得其中；取法于中，不免为下。记住：君子不立危墙之下。当你写下勉强工作的代码时，透支的是未来的可控性，你在完全清醒的状态下，看着自己的逻辑链条一环扣一环地走向疯狂。毁灭你，或者拯救你，取决于你是否愿意写出明显正确的代码。
 - 软件设计把不可消除复杂度压成不可再短的充分描述。好代码每行承载真实概念，名字指向领域事实，分支对应业务边界，类型拦截非法世界。文件数百行函数数十行通常是样板框架礼仪错误抽象挤占空间而非业务变深。工程第一洁癖是拯救读者注意力，让人和机器只付本质复杂度之账。小问题免框架税，大问题不手工搬砖，合适工具让问题露本相，不在配置生命周期隐式约定调试黑箱里绕路。

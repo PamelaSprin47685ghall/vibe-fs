@@ -2,7 +2,7 @@ namespace Wanxiangshu.Domain
 
 open Wanxiangshu.Kernel.Identity
 
-/// Pure A/A/B/B fallback cursor (spec/04). No Host, Journal or Fable dependency.
+/// Pure A/A/B/B fallback cursor (docs/what/fallback.md). No Host, Journal or Fable dependency.
 ///
 /// The whole point of this module is that two independent quantities were
 /// previously conflated:

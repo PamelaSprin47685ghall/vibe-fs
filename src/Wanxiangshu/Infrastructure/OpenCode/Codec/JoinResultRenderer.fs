@@ -6,7 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Orchestrator
 open Wanxiangshu.Session
 
-/// EXEC-004 rev.2 / spec/13 §9.6: LLM-facing join wire only.
+/// EXEC-004 rev.2 / docs/how/synthetic-toml.md §9.6: LLM-facing join wire only.
 /// work_record is entry-local comment (SyntheticToml.comment), never a TOML field.
 /// Internal journal / HandleCompletionCodec work_record is unchanged.
 ///
@@ -21,7 +21,7 @@ module JoinResultRenderer =
     let private joinBlocks (blocks: string list) : string =
         (String.concat "\n" (blocks |> List.filter (fun s -> s <> ""))) + "\n"
 
-    /// Top-level fields, then one blank line, then ordinal-stable result blocks (spec/13 §9.6 layout).
+    /// Top-level fields, then one blank line, then ordinal-stable result blocks (docs/how/synthetic-toml.md §9.6 layout).
     let private completedDocument (headerFields: string list) (entries: string list) : string =
         String.concat "\n" headerFields + "\n\n" + String.concat "\n" entries + "\n"
 

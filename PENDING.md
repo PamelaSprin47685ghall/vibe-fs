@@ -1,7 +1,7 @@
 # 前置：DSL 方向（2026-08 裁决，先读）
 
 本清单 8 项是协议/运行时/提示词功能改动，落在 join、Blogger/Enforcer、Transform 等路径上。
-实现它们时必须遵循已纠偏的 DSL 方向（`spec/14` FLOW-001…008 + `TASK.md`）：
+实现它们时必须遵循已纠偏的 DSL 方向（`docs/what/flow.md` FLOW-001…008 + `TASK.md`）：
 
 * DSL 是**直接执行的 F# computation expression**（`taskResult` `let!/match!/return!` + 具名
   capability），不是待解释的业务 AST；禁止为 join/blogger/enforcer 造 `Command/Reply/Step`
@@ -1266,8 +1266,8 @@ CTX_002_transform_injects_exactly_one_pair_programming_thought
 
 修改：
 
-* `spec/07.md`
-* `spec/13.md`
+* `docs/what/host.md`
+* `docs/how/synthetic-toml.md`
 * join runtime/mailbox/tool/renderer
 * join unit + integration tests
 

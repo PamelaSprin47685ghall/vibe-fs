@@ -360,7 +360,7 @@ export const listItems = (list) => FsList.toArray(list)
 // F# `Set<string>` needs a comparer object; Fable does not infer one from the
 // element type. `REVIEW-010`'s `IncludedToolResultDigests` is such a set, and it
 // is the causal evidence a confirmation rests on — so a test that built it wrong
-// would be proving the wrong thing about the most load-bearing check in spec/05.
+// would be proving the wrong thing about the most load-bearing check in docs/what/review.md.
 const ordinalComparer = { Compare: (left, right) => (left < right ? -1 : left > right ? 1 : 0) }
 
 /**
@@ -837,7 +837,7 @@ export const journalStore = () => {
 /** PERSIST-004 merge order across runtime streams, without touching disk. */
 export const kWayMerge = (streams) => listItems(Boots.kWayMerge(toList(streams.map((s) => toList(s)))))
 
-// ── fallback (spec/04) ───────────────────────────────────────────────────────
+// ── fallback (docs/what/fallback.md) ───────────────────────────────────────────────────────
 
 export const cursor = {
   initial: Cursor.initial,
@@ -904,7 +904,7 @@ export const fallbackProjection = (() => {
   }
 })()
 
-// ── failure-driven context recovery (spec/12) ────────────────────────────────
+// ── failure-driven context recovery (docs/what/context.md) ────────────────────────────────
 
 /**
  * ARCH-010 / REVIEW-002: what a newly forked child is told, as one payload.
@@ -1424,7 +1424,7 @@ export const requestKind = (() => {
     bloggerMain: of('BloggerMain'),
     bloggerSquash: of('BloggerSquash'),
     interactionRepair: of('InteractionRepair'),
-    // spec/16 LEARN-050: the Student's two request kinds.
+    // docs/proposal/student-teacher.md LEARN-050: the Student's two request kinds.
     studentLearn: of('StudentLearn'),
     studentCompile: of('StudentCompile'),
     all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair', 'StudentLearn', 'StudentCompile'].map(of),
@@ -2125,7 +2125,7 @@ export const prefixEpochProjection = (() => {
   }
 })()
 
-// ── review (spec/05) ─────────────────────────────────────────────────────────
+// ── review (docs/what/review.md) ─────────────────────────────────────────────────────────
 
 /**
  * REVIEW-006: one witnessed PERFECT verdict.
@@ -2297,7 +2297,7 @@ export const providerProjection = {
   decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
 }
 
-// ── host signals (spec/07) ───────────────────────────────────────────────────
+// ── host signals (docs/what/host.md) ───────────────────────────────────────────────────
 
 export const hostSignals = (() => {
   const m = bind(HostEventCodecModule, 'HostEventCodec', ['isHostSignalEvent', 'tryDecode'])
@@ -2308,7 +2308,7 @@ export const hostSignals = (() => {
   }
 })()
 
-// ── execution handles (spec/09) ──────────────────────────────────────────────
+// ── execution handles (docs/what/execution.md) ──────────────────────────────────────────────
 
 export const handleProjection = (() => {
   const m = bind(LinkageProj, 'HandleProjection', [
@@ -2408,7 +2408,7 @@ export const handleProjection = (() => {
   }
 })()
 
-// ── EXEC-009 consume path (spec/09) ──────────────────────────────────────────
+// ── EXEC-009 consume path (docs/what/execution.md) ──────────────────────────────────────────
 
 /** `HostForkRuntime.Join` reads `HandleProjection.joinable` (above) as the fact
  *  source, then CAS-retires via `HandleController.consume` and materialises the
@@ -2699,7 +2699,7 @@ export const joinDrain = (() => {
   }
 })()
 
-// ── orchestrator (spec/06) ───────────────────────────────────────────────────
+// ── orchestrator (docs/what/orchestrator.md) ───────────────────────────────────────────────────
 
 export const orchestratorProjection = (() => {
   const m = bind(OrchestratorProj, 'OrchestratorProjection', [
@@ -2816,7 +2816,7 @@ export const orchestratorRuntime = {
   join: async (runtime) => orchestratorVerdictOf(await OrchestratorRuntime.Orchestrator__JoinPublished(runtime)),
 }
 
-// ── prompt authority (spec/03) ───────────────────────────────────────────────
+// ── prompt authority (docs/what/prompt.md) ───────────────────────────────────────────────
 
 export const authority = {
   empty: Authority.empty,
@@ -3163,7 +3163,7 @@ export const promptOrigin = (() => {
   }
 })()
 
-// ── process (spec/09) ────────────────────────────────────────────────────────
+// ── process (docs/what/execution.md) ────────────────────────────────────────────────────────
 
 /** A frozen clock. Deadline takes `unit -> DateTimeOffset`, i.e. a thunk. */
 export const clockAt = (iso) => () => utcOffset(iso)
@@ -3819,7 +3819,7 @@ export const diagnostic = (() => {
   }
 })()
 
-// ── spec/17: LOOP detector + text-delta codec ────────────────────────────────
+// ── docs/what/loop.md: LOOP detector + text-delta codec ────────────────────────────────
 
 /**
  * LOOP-003…005: pure O(1) exponential-mixture 4-gram diversity detector.
@@ -4004,7 +4004,7 @@ export const fallbackController = (() => {
 })()
 
 
-// ── spec/14: Strength 纯领域内核 ─────────────────────────────────────────────
+// ── docs/proposal/strength.md: Strength 纯领域内核 ─────────────────────────────────────────────
 
 export const strength = (() => {
   const types = bind(StrengthTypesModule, 'StrengthTypes', [
@@ -4181,7 +4181,7 @@ export const enforcerCatalog = (() => {
   }
 })()
 
-// ── spec/15: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
+// ── docs/what/enforcer.md: Blogger as Enforcer 纯领域内核 ─────────────────────────────────
 
 export const enforcer = (() => {
   const catalog = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', ['load'])
@@ -4307,7 +4307,7 @@ export const enforcer = (() => {
   }
 })()
 
-// ── spec/15 ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
+// ── docs/what/enforcer.md ENFORCER-160/162: 挂起 transform 原语 ────────────────────────────
 
 export const bloggerRequestContext = (() => {
   const build = unionCase(BloggerRequestContextModule.BloggerRequestContext, 'BloggerRequestContext')
@@ -4582,7 +4582,7 @@ export const parkedTransform = (() => {
   }
 })()
 
-// ── spec/16: Student & Teacher 纯领域内核 ────────────────────────────────────
+// ── docs/proposal/student-teacher.md: Student & Teacher 纯领域内核 ────────────────────────────────────
 
 export const studentTeacher = (() => {
   const m = bind(StudentTeacherModule, 'StudentTeacher', [
@@ -4868,7 +4868,7 @@ export const agentCompletion = (() => {
 })()
 
 /**
- * EXEC-004 rev.2 / spec/13 §9.6 JoinResultRenderer — LLM-facing join wire only.
+ * EXEC-004 rev.2 / docs/how/synthetic-toml.md §9.6 JoinResultRenderer — LLM-facing join wire only.
  * `runtime` for agent/pty batch is a minimal { IsPtyCompletion, TryFindAgent } surface.
  */
 export const joinResultRenderer = (() => {

@@ -1,4 +1,4 @@
-// tests/unit/Enforcer/cycle-nudge.test.mjs — spec/15 ENFORCER-041/042/043/025 tip v2.
+// tests/unit/Enforcer/cycle-nudge.test.mjs — docs/what/enforcer.md ENFORCER-041/042/043/025 tip v2.
 //
 // Multi-call cycle merge: single CanonicalTip by PartOrdinal; text/evidence join.
 // Score-batch nudge rendering (ENFORCER-100..102) deleted with tip v2.

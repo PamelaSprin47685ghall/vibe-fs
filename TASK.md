@@ -6,7 +6,7 @@
 > 并声称 `computation expression ≠ DSL`。这正是本轮复杂度膨胀的根源：各业务调用被拆成
 > Command 定义、Reply 定义、构造器、Interpreter 分支、测试 facade 五份；大 Reply DU 让每步
 > 都要处理十几个理论上不可能出现的回复；为测「执行顺序」又造 Trace Interpreter。它实际是
-> 用业务代码重新实现了一遍动态调用协议——而 `spec/01` 的 ARCH-001 早已给出答案：语言运行时
+> 用业务代码重新实现了一遍动态调用协议——而 ARCH-001 早已给出答案：语言运行时
 > 已经提供 continuation、调用栈与取消，业务层直接用 computation expression 写流程。
 >
 > 本文件据此重写。**目标不是做出一个更好的解释器，而是让这类解释器根本不再需要。**
@@ -17,7 +17,7 @@
 
 > **本项目中的 DSL，是直接执行的 F# computation expression，加上领域命名的强类型操作和少量组合子；它不是待解释的业务 AST。**
 
-`spec/14` 声明冲突时以 `spec/01` 的 ARCH-001/ARCH-002/ARCH-003 为准，因此本纠偏直接依据
+`docs/what/flow.md` 声明冲突时以 ARCH-001/ARCH-002/ARCH-003 为准，因此本纠偏直接依据
 SSOT 落地，不依赖对「哪一种解释更高级」的进一步论证。
 
 ---
@@ -151,7 +151,7 @@ ARCH-001 要交给语言运行时的东西。
 
 ### 融合优点：旧设计值得保留的，在直接 CE 中如何承载
 
-旧 spec/14 立过几个真实价值。纠偏不是丢弃它们，而是换掉实现载体：
+旧 FLOW 文档立过几个真实价值。纠偏不是丢弃它们，而是换掉实现载体：
 
 | 旧设计的优点 | 在直接 CE 中的载体 |
 |--------------|-------------------|
@@ -323,7 +323,7 @@ let rec reconcileActive (ops: ReconcileOps) (policy: ReconcilePolicy) (state: Re
 目标：先阻止新增 AST，不动生产行为。
 
 1. 本文件加醒目 `SUPERSEDED` 声明（已完成）。
-2. 修订 `spec/14`，明确它不得改变 `ARCH-001`。
+2. 修订 FLOW 规范，明确它不得改变 `ARCH-001`。
 3. 新增架构决议：**本项目 DSL 为直接执行的 computation expression；禁止把普通业务调用序列编码成 Command/Reply/Step AST。**
 4. 暂停新增以下类型：
 

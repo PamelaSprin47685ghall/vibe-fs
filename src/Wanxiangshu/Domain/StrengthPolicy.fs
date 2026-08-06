@@ -3,10 +3,10 @@ namespace Wanxiangshu.Domain
 open System
 open Wanxiangshu.Kernel
 
-/// spec/14 STRENGTH-079：全部策略常量集中于此，禁止在实现文件中散落数字字面量。
+/// docs/proposal/strength.md STRENGTH-079：全部策略常量集中于此，禁止在实现文件中散落数字字面量。
 ///
 /// 不新增配置文件、TOML 配置节、环境变量或用户设置。所有值都是 best-guess
-/// 第一版常量（取值理由见 spec/14 第二十二节）。
+/// 第一版常量（取值理由见 docs/proposal/strength.md 第二十二节）。
 module StrengthPolicy =
 
     module Strength =

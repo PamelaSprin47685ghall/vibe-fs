@@ -23,7 +23,7 @@ export const PROGRAM_DIRS = [
 ]
 
 /**
- * External-protocol interpreters allowed by spec/14 FLOW-006 (JSON/TOML/Host-wire
+ * External-protocol interpreters allowed by FLOW-006 (JSON/TOML/Host-wire
  * codec/parser/interpreter). Boundary is path+semantic, not a blanket `Interpreter`
  * suffix exemption: a `*Interpreter` module is tolerated only when it interprets an
  * external data format, signalled by a Codec/Parser/Wire path segment or suffix.
@@ -96,7 +96,7 @@ export const FORBIDDEN = [
   },
   {
     // FLOW-006 internal business Interpreter. Allows private/internal/top-level
-    // forms, but never a legitimate external-protocol interpreter (spec/14 FLOW-006:
+    // forms, but never a legitimate external-protocol interpreter (FLOW-006:
     // JSON/TOML/Host-wire codec/parser/interpreter are not second-runtime).
     gate: 'business-interpreter',
     pattern: /\bmodule\s+(?:private\s+|internal\s+)?(?:\w+\.)*\w*Interpreter\s*=/,

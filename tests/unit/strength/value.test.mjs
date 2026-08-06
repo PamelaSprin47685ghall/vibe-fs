@@ -1,4 +1,4 @@
-// tests/unit/Strength/value.test.mjs — spec/14 STRENGTH-024/025.
+// tests/unit/Strength/value.test.mjs — docs/proposal/strength.md STRENGTH-024/025.
 //
 // The value function and the K selection rule. STRENGTH-024 names the exact
 // decision rule: candidates start at {K0}; K1 joins when V1 ≥ threshold; K2

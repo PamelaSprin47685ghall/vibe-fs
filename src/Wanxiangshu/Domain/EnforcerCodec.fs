@@ -2,7 +2,7 @@ namespace Wanxiangshu.Domain
 
 open System
 
-/// spec/15 ENFORCER-020…026：`blog` tip v2 codec.
+/// docs/what/enforcer.md ENFORCER-020…026：`blog` tip v2 codec.
 ///
 /// raw JSON object → Result<CanonicalBlogCall, string>.
 /// tip = catalog field exact match only; no score map, no fuzzy field mapping.
