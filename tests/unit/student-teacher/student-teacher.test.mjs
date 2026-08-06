@@ -1,4 +1,4 @@
-// tests/unit/StudentTeacher/student-teacher.test.mjs — spec/16 LEARN-015/016/017/
+// tests/unit/StudentTeacher/student-teacher.test.mjs — docs/proposal/student-teacher.md LEARN-015/016/017/
 // 024/032/033/035/036/050/051/075. LEARN-089 pure-logic tests: Student tool-face
 // selection, Teacher tier mapping, QA path generation, atomic content append,
 // temp-path ignore, return cleanup result, nudge choice.

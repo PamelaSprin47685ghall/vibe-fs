@@ -6,7 +6,7 @@
 // fixture provides is the sandbox: absolute paths only, so the tools' behaviour is
 // independent of the runner's cwd.
 //
-// Contract under test (spec/02):
+// Contract under test (docs/what/agent.md):
 //   AGENT-016  mv / rm are Coder-only; every other role is denied at the gate.
 //   AGENT-017  mv = POSIX mv: move/rename files and directories.
 //   AGENT-018  rm = POSIX rm minus recursion: files and EMPTY directories are

@@ -38,13 +38,13 @@ try {
   bindLaneSession(scenario.provider, managerId, 'manager-title', 'fast-manager');
 
   const turn = scenario.turn.start(managerId);
-  const fileBody = Buffer.from('spec/13 attached canary body\n', 'utf8').toString('base64');
+  const fileBody = Buffer.from('notes/sample.md attached canary body\n', 'utf8').toString('base64');
   const prompt = await scenario.client.request('POST', `/session/${managerId}/prompt_async`, {
     body: {
       agent: compiled.scenario.prompt.agent,
       parts: [
         { type: 'text', text: compiled.scenario.prompt.text },
-        { type: 'file', mime: 'text/plain', filename: 'spec/13.md', url: `data:text/plain;base64,${fileBody}` },
+        { type: 'file', mime: 'text/plain', filename: 'notes/sample.md', url: `data:text/plain;base64,${fileBody}` },
       ],
       model: { providerID: 'test', modelID: 'test-model' },
     },

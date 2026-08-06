@@ -135,7 +135,7 @@ test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
 test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async () => {
   const mod = await load('Kernel/Parallel')
 
-  // spec/14 (Direct CE) superseded the Flow monad; its monadic surface
+  // docs/what/flow.md (Direct CE) superseded the Flow monad; its monadic surface
   // (Flow_run / Flow_fail / Flow_attempt / Flow_create / Flow_lift and the
   // FlowBuilder) is no longer a demanded contract. Bounded concurrency is still
   // legal, so `Parallel.mapBounded` remains the only required export here.

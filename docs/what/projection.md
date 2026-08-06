@@ -1,0 +1,46 @@
+# Projection Algebra — 行为
+
+条款前缀：`PROJ-`。承接 COMPANION-007 与 VERIFY-007。合成 TOML 记法在 ARCH-010，不承载 PROJ-。
+
+## PROJ-001：投影是代数
+
+Provider-visible 消息投影必须用 typed 组合子/直接执行的 computation expression 表达。禁止各功能直接接收并任意修改 `Message list`。
+
+投影的唯一生产路径是同构的纯函数/直接执行 CE 管线（FLOW-001），不存在 `ProjectionProgram` AST + Interpreter 中间层。
+
+## PROJ-002：输入是事实快照
+
+投影 DSL 核心输入为不可变的 `ProjectionSnapshot`：
+
+```fsharp
+type ProjectionSnapshot =
+    { Attempt: AttemptExecutionProfile
+      PhysicalTimeline: PhysicalTimeline
+      SemanticEvents: SemanticEventTree
+      ActivePrefixEpoch: ActivePrefixEpoch
+      CandidatePrefixProbe: PrefixProbe option
+      BlogFrames: BlogFrame list
+      DelegatedFrames: DelegatedFrame list
+      HostReanchor: ContextReanchorSnapshot option
+      LocalPendingParts: LocalPendingParts
+      TransportMessages: Set<MessageId> }
+```
+
+## PROJ-003：输出管线
+
+核心输出依次为：
+
+```text
+SemanticEventTree
+  → ProviderSemanticProjection
+  → ProviderWireProjection
+  → ProviderInputSeal
+```
+
+`ProviderWireProjection` 与 `ProviderSemanticProjection` 是不同类型（VERIFY-007），不得隐式互转。
+
+## PROJ-007：DSL 不负责生命周期
+
+DSL 只负责不可变快照 → 确定性 provider-visible projection。
+
+DSL 不负责：启动 Replica、等待 provider、执行工具、写 Journal、恢复 Prompt、管理 ProviderRunIdentity、推进生命周期状态、控制器在线更新。

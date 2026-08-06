@@ -3,13 +3,13 @@
  *
  * W7 requires a failing test per forbidden degradation, and the completeness gate
  * that checks "per" needs to know what the items are. They live as prose inside
- * `spec/10.md` under `### 禁止退化清单`, so either a human retypes them here or this
+ * `docs/proof/verify.md` under `### 禁止退化清单`, so either a human retypes them here or this
  * file reads them. W1 and W2 of this same package exist to delete two hand-kept
  * mirrors — a third would be the same defect wearing a new name.
  *
  * ── the anchor is load-bearing ──────────────────────────────────────────────
  *
- * spec/10.md holds 32 fenced ```text blocks. Measured: scanning the file for the
+ * The verify doc holds many fenced ```text blocks. Measured: scanning the file for the
  * first one hands back VERIFY-002's five-level test ladder, and every downstream
  * case would then claim to cover a degradation while naming a test layer. So the
  * search starts at the heading and refuses to cross the next heading — a section
@@ -46,7 +46,7 @@ import { fileURLToPath } from 'node:url';
 /** The heading the list lives under. Exported so a failure message and the test agree. */
 export const ANCHOR = '### 禁止退化清单';
 
-export const SSOT_ORIGIN = 'spec/10.md';
+export const SSOT_ORIGIN = 'docs/proof/verify.md';
 
 /** Resolved from this module, not from `cwd`: two trees import it. */
 const CLAUSE_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', SSOT_ORIGIN);

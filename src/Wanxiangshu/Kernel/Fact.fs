@@ -3,7 +3,7 @@ namespace Wanxiangshu.Kernel
 open System
 open Wanxiangshu.Kernel.Identity
 
-/// Durable domain facts (spec/11).
+/// Durable domain facts (docs/what/persist.md).
 ///
 /// ARCH-005: only what still holds across process boundaries lives here. The
 /// Host transcript owns the conversation, Git owns the code, and this journal
@@ -374,7 +374,7 @@ module Fact =
 
         | JobAbandoned of {| ManagerJobId: ManagerJobId |}
 
-        // ── Companion (spec/08) ─────────────────────────────────────────────
+        // ── Companion (docs/what/companion.md) ─────────────────────────────────────────────
 
         /// COMPANION-003: Y is X's long-lived companion Blogger Session, so which
         /// session that is must survive a restart.
@@ -392,7 +392,7 @@ module Fact =
         /// fresh one rather than reviving this session.
         | CompanionBloggerClosed of {| SessionId: SessionId |}
 
-        // ── lifecycle work record (spec/08, HOST-005) ───────────────────────
+        // ── lifecycle work record (docs/what/companion.md, HOST-005) ───────────────────────
 
         /// COMPANION-003: the Session's opening task prompt, captured verbatim at
         /// the physical acceptance point. Idempotent and never overwritten
@@ -441,7 +441,7 @@ module Fact =
                TextDigest: BlobDigest
                ProviderRun: ProviderRunIdentity |}
 
-        // ── failure-driven context recovery (spec/12) ───────────────────────
+        // ── failure-driven context recovery (docs/what/context.md) ───────────────────────
 
         /// COMPANION-008: one Blogger entry landed, and the coverage it proves
         /// advanced. ONE fact, not two: the clause makes frame append and

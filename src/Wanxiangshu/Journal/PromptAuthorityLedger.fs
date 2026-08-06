@@ -4,7 +4,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
-/// Prompt Authority folds (spec/03).
+/// Prompt Authority folds (docs/what/prompt.md).
 ///
 /// Each fold takes the fact payload directly. The previous version accepted
 /// anonymous records of strings that mirrored the fact shape and re-parsed every

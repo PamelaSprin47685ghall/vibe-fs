@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
-/// spec/15 — the `blog` tool (ENFORCER-010/020/040/041/061 tip v2).
+/// docs/what/enforcer.md — the `blog` tool (ENFORCER-010/020/040/041/061 tip v2).
 ///
 /// Provider schema: required `text` + required `tip` (enum = catalog fields),
 /// optional `evidence`. No 120 numeric score fields (ENFORCER-020).

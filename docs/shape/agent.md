@@ -1,0 +1,46 @@
+# Agent — 所有权与边界
+
+角色矩阵与工具语义见 `what/agent.md`。
+
+## AGENT-007：工具权限双层边界
+
+两层都必须存在，且都只读 `AttemptExecutionProfile.CanonicalRole`：
+
+| 层 | 职责 |
+|----|------|
+| Host-final Agent permission | 无权工具不进入 provider-visible schema |
+| ToolRegistry execution gate | Host 配置异常时仍拒绝越权执行 |
+
+Role 无法确定 → 模型可见插件工具集为空。  
+禁止「role unresolved 时暂时允许 inspector」类放行。
+
+本条只约束**角色工具**。Host 元权限（`external_directory`、`doom_loop`、`question` 等）不进 `ToolPermission` / AGENT-006。
+
+## AGENT-019：`external_directory` 写入边界
+
+`external_directory` 是 Host 路径边界元权限，不是角色工具。
+
+每一个 managed agent（AGENT-002 的 20 名）的 Host-final permission 必须显式：
+
+```text
+external_directory = "allow"
+```
+
+且排在 Host 默认 `external_directory:* = ask` **之后**（flat merge + `findLast`），使任意外部 path 求值为 allow。
+
+**唯一生产写入点**：`StaticTools.permissionObj` → `ManagedAgentConfig.applyOwnedFields`。  
+禁止第二处散落覆盖。
+
+禁止：
+
+1. 省略覆盖、依赖用户 always-allow  
+2. 编入 `Roles.permissions` / `ToolPermission` / AGENT-006  
+3. 用全局 `permission: { external_directory: "allow" }` 顶替 agent 级写入  
+4. 借本条放宽 bash / write / edit 等角色工具  
+
+验证：用 Host ruleset 语义证明每个 managed agent 对任意外部 path 为 allow。
+
+## Companion 资格边界
+
+Companion 是否存在由 Session 种类决定，不由 Role、Tier、工具面或当前 Logical Run 决定（COMPANION-001/002）。  
+Agent 矩阵不得隐含「某角色无 Companion」。

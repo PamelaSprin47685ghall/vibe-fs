@@ -21,7 +21,7 @@ import {
 } from '../../e2e/support/degradation-list.mjs'
 
 /**
- * The thirteen items as they stand in spec/10.md today.
+ * The thirteen items as they stand in docs/proof/verify.md today.
  *
  * Written out here on purpose, and it is NOT a second source of truth: the
  * production path reads the SSOT, and this array's only job is to fail when that
@@ -97,7 +97,7 @@ test('VERIFY_004_the_forbidden_degradations_are_read_from_the_SSOT_in_order', ()
 
   assert.equal(DEGRADATIONS.length, 13)
   assert.equal(EXPECTED_TEXTS.length, 13, 'the expectation itself must hold thirteen items')
-  assert.equal(SSOT_ORIGIN, 'spec/10.md')
+  assert.equal(SSOT_ORIGIN, 'docs/proof/verify.md')
 })
 
 test('VERIFY_004_every_item_carries_a_unique_id_bound_to_the_text_it_names', () => {

@@ -39,7 +39,7 @@ module Identity =
     type LocalEpoch = int64
     type ObservedAt = DateTimeOffset
 
-    // ── prompt authority (spec/03) ──────────────────────────────────────────
+    // ── prompt authority (docs/what/prompt.md) ──────────────────────────────────────────
 
     /// A complete conversation sequence caused by one Authority Root
     /// (PROMPT-002). Continuations extend it; they never create a new one.
@@ -72,7 +72,7 @@ module Identity =
     /// there is no function from a receipt to any message identity.
     type TransportReceipt = private TransportReceipt of string
 
-    // ── provider runs (spec/07) ─────────────────────────────────────────────
+    // ── provider runs (docs/what/host.md) ─────────────────────────────────────────────
 
     /// One provider request and the assistant message it produces.
     ///
@@ -105,7 +105,7 @@ module Identity =
     /// mentions an attempt.
     type SystemPromptId = private SystemPromptId of string
 
-    // ── review (spec/05) ────────────────────────────────────────────────────
+    // ── review (docs/what/review.md) ────────────────────────────────────────────────────
 
     /// One review barrier: the question "is this tree good?" asked once.
     type ReviewBarrierId = private ReviewBarrierId of string
@@ -141,7 +141,7 @@ module Identity =
     /// type would let a fold validate an X rebase against a Y squash's number.
     type PrefixEpochId = private PrefixEpochId of int64
 
-    // ── execution handles (spec/09) ─────────────────────────────────────────
+    // ── execution handles (docs/what/execution.md) ─────────────────────────────────────────
 
     /// A forked agent child, persisted across restart (EXEC-009).
     type AgentHandleId = private AgentHandleId of string
@@ -161,7 +161,7 @@ module Identity =
         | Pty of PtyHandleId
         | ManagerJob of ManagerJobId
 
-    // ── git and worktrees (spec/06) ─────────────────────────────────────────
+    // ── git and worktrees (docs/what/orchestrator.md) ─────────────────────────────────────────
 
     /// Stable identity of a worktree, independent of where it currently lives.
     /// ORCH-006 records both: recovery locates by identity, diagnostics show the

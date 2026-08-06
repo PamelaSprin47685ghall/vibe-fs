@@ -190,7 +190,7 @@ const ALLOWED_TOOLS = {
  * checking stays green when the table is wrong, which is the false green
  * `design-script-forest.md:630` calls more dangerous than no verification at all.
  *
- * So the matrix is pinned literally against spec/02 AGENT-006, and the facade is used
+ * So the matrix is pinned literally against docs/what/agent.md AGENT-006, and the facade is used
  * below only for what it can say independently: how many tools a role may hold.
  *
  * `external_directory` is Host meta-permission, not a role tool: Host defaults it to
@@ -503,11 +503,11 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
   })
 })
 
-// ── HOST-013: the pair-programming thought marker (spec/07) ───────────────────
+// ── HOST-013: the pair-programming thought marker (docs/what/host.md) ───────────────────
 
 // HOST-013: the frozen provider-visible thought text and source identity, read
 // from the build artifact so a rewording fails here instead of asserting stale
-// bytes (single point of definition, spec/07).
+// bytes (single point of definition, docs/what/host.md).
 import {
   source as PAIR_PROGRAMMING_THOUGHT_SOURCE,
   text as PAIR_PROGRAMMING_THOUGHT_TEXT,
@@ -693,7 +693,7 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
   // for the calling session, `RoleFor` is None and the tool set must be empty —
   // every tool, read-only or not, returns the structured rejection. `inspector`
   // is the tool the old code exempted while the role was unresolved, so it is
-  // the one the clause names as the thing to delete (spec/02).
+  // the one the clause names as the thing to delete (docs/what/agent.md).
   await withExecutablePlugin(async (hooks, _directory, _createdIds, _runtime) => {
     // Deliberately NO acceptAuthorityRoot: this session has no root at all.
     const context = { sessionID: 'unresolved-role', agent: 'fast-manager' }
@@ -729,7 +729,7 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     const inspectorResult = parseToml(inspectorText)
 
     // Data-only fields of the TOML result. The natural-language output is carried
-    // as the leading instruction comment (spec/13), so it is asserted on the raw
+    // as the leading instruction comment (docs/how/synthetic-toml.md), so it is asserted on the raw
     // text rather than as a parsed field.
     assert.deepEqual(inspectorResult, {
       inspector_id: createdIds[0],
@@ -750,7 +750,7 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     const coderText = await coderResultP
     const coderResult = parseToml(coderText)
 
-    // CoderTool: data-only fields, natural-language output as leading comment (spec/13).
+    // CoderTool: data-only fields, natural-language output as leading comment (docs/how/synthetic-toml.md).
     // tdd is the normalized wire name of the required phase.
     assert.deepEqual(coderResult, {
       coder_id: createdIds[1],
@@ -885,7 +885,7 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     const joinText = await joinResultP
     const join = parseToml(joinText)
 
-    // EXEC-004 rev.2 / spec/13 §9.6: batch wire — status + count + [[result]].
+    // EXEC-004 rev.2 / docs/how/synthetic-toml.md §9.6: batch wire — status + count + [[result]].
     // Single completion still uses [[result]] (count=1, ordinal=1, kind=agent).
     // work_record is entry-local comment, never a TOML field.
     // Fixture has no Opening capture → LWR empty → no # comment block before [[result]].

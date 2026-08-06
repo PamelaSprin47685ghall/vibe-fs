@@ -2,7 +2,7 @@ namespace Wanxiangshu.Domain
 
 open Wanxiangshu.Kernel
 
-/// spec/16 — Student & Teacher 纯领域内核。
+/// docs/proposal/student-teacher.md — Student & Teacher 纯领域内核。
 ///
 /// LEARN-015/016/017（角色与 tier 映射）、LEARN-018/019（工具面）、
 /// LEARN-032/033/035/036（QA 路径与原子追加）、LEARN-050（请求种类工具面）。

@@ -1,4 +1,4 @@
-// tests/unit/Enforcer/codec.test.mjs — spec/15 ENFORCER-020…026 tip v2.
+// tests/unit/Enforcer/codec.test.mjs — docs/what/enforcer.md ENFORCER-020…026 tip v2.
 //
 // Blog-argument codec: required tip (catalog field exact match), text, optional evidence.
 // No score map, no fuzzy field mapping, no default tip.

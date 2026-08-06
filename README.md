@@ -44,7 +44,7 @@ npm install wanxiangshu --registry <your-private-registry>
 2. 按 Host 的 plugin 配置挂载入口（包名 `wanxiangshu` 或已安装包的 `main`）。
 3. 启动 Host。插件初始化时加载 `resources/` 下 system prompt 与 Enforcer catalog；资源缺失或非法则启动失败（fail fast），无代码内置副本兜底。
 
-配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 `spec/` 为高级参考；安装与挂载不依赖阅读条款正文。
+配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 [docs/README.md](docs/README.md) 为高级参考；安装与挂载不依赖阅读条款正文。
 
 ### 快速开始
 
@@ -68,7 +68,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 
 ### Agent 角色
 
-与 `spec/00.md` 一致（十个 system prompt 角色）：
+与 `docs/what/agent.md` 一致（十个 system prompt 角色）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
@@ -83,7 +83,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | Executor | 无工具 | 内部执行/摘要 |
 | Blogger | `blog` | Companion 叶子，写认知上下文 |
 
-每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `spec/02.md`。
+每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `docs/what/agent.md`。
 
 ### 运行时数据
 
@@ -105,9 +105,9 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | 插件无法加载 / import 失败 | 确认 `dist/.../Plugin.js` 存在；tarball 须含 `dist/` 与 `resources/` |
 | 启动即失败（资源） | 检查十个 prompt 与 `enforcer/catalog.json` 完整合法 |
 | peer 依赖报错 | 安装与 Host 匹配的 `@opencode-ai/plugin` |
-| 行为与预期不符 | 对照 CHANGELOG 与 `spec/`；商业支持见下节 |
+| 行为与预期不符 | 对照 CHANGELOG 与 [docs/README.md](docs/README.md)；商业支持见下节 |
 
-源码排查见贡献者指南与 [docs/development.md](docs/development.md)。
+源码排查见贡献者指南与 `AGENTS.md`。
 
 ### 商业许可与支持
 
@@ -126,8 +126,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 ```text
 src/         生产源码
 resources/   随包运行时资源
-spec/        当前产品规范
-docs/        解释、决策和未来 RFC
+docs/        分域规范 why/what/shape/how/proof + status/proposal
 tests/       unit / integration / e2e
 scripts/     构建与少量仓库检查
 dist/        最终编译输出，不提交
@@ -135,7 +134,7 @@ artifacts/   中间产物与本地发布产物，不提交
 ```
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
-- 规范导航 `spec/00.md`；词汇表 `spec/99.md`；`docs/rfcs/` 非绑定；`docs/decisions/` 已接受决策
+- 规范导航 [docs/README.md](docs/README.md)；词汇表 `docs/what/glossary.md`；未裁决设计在 `docs/proposal/`；实现差距在 `docs/status/`
 - 测试：`tests/unit/`、`tests/integration/`（resources / journal / plugin / package / harness）、`tests/e2e/`（`scenarios/` + `cases/`）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 
@@ -152,7 +151,7 @@ npm run build
 npm test
 ```
 
-请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 [docs/development.md](docs/development.md)）。
+请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 `package.json` / `AGENTS.md`）。
 
 ### 常用命令
 
@@ -184,14 +183,15 @@ npm run check:release
 
 `dist/` 陈旧时 unit 拒绝运行。资源路径由包内 `dist/` 相对定位到 `resources/`，不依赖 `process.cwd()`。
 
-### 规范、决策与 RFC
+### 规范与文档体系
 
-- **绑定合同**：`spec/`；条款 ID 稳定寻址；`spec/00.md` 导航。
-- **决策**：`docs/decisions/`（enforcer catalog、Kolmogorov 纪律等）。
-- **RFC**：`docs/rfcs/`（strength、student-teacher 等）— 非当前产品合同。
+- **行为 / 边界 / 目标实现 / 证明**：`docs/what` · `docs/shape` · `docs/how` · `docs/proof`（条款 ID 稳定寻址）。
+- **理由**：`docs/why/`（含 Kolmogorov 工程纪律）。
+- **未裁决候选**：`docs/proposal/`（如 strength、student-teacher）— 非当前规范。
+- **实现差距**：`docs/status/`（对齐后删除）。
 - 测试直接引用条款 ID。规范不跟踪实现进度。
 
-导读：[docs/architecture.md](docs/architecture.md)、`spec/01.md`。
+导航：[docs/README.md](docs/README.md)。治理：`docs/what/document-governance.md`。
 
 ### 运行时资源
 
@@ -209,9 +209,9 @@ resources/enforcer/catalog.json
 ### 构建与打包
 
 - **构建**：`npm run build` → `scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
-- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`tests/`、`scripts/`、`spec/`、`docs/`、`artifacts/`。
+- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`tests/`、`scripts/`、`docs/`、`artifacts/`。
 
-详见 [docs/releasing.md](docs/releasing.md)。
+发布预检：`npm run check:release`（干净工作树；验证日志进 CI artifact）。
 
 ### 提交要求
 
@@ -231,7 +231,7 @@ npm run check:release
 npm pack --pack-destination artifacts/package
 ```
 
-Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交进仓库。见 [docs/releasing.md](docs/releasing.md)。
+Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交进仓库。
 
 ### 安全与保密
 
@@ -241,4 +241,4 @@ Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[docs/development.md](docs/development.md) · [docs/releasing.md](docs/releasing.md) · [docs/architecture.md](docs/architecture.md) · [spec/00.md](spec/00.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE)
+更多：[docs/README.md](docs/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · `AGENTS.md`
