@@ -9,8 +9,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-const SLICE_MS = Math.max(50, Number(process.env.UNIT_RUNNER_PROBE_SLICE_MS) || 1000)
-const COUNT = Math.max(2, Number(process.env.UNIT_RUNNER_PROBE_SLICE_COUNT) || 9)
+const SLICE_MS = Math.max(50, Number(process.env.UNIT_RUNNER_PROBE_SLICE_MS) || 400)
+const COUNT = Math.max(2, Number(process.env.UNIT_RUNNER_PROBE_SLICE_COUNT) || 25)
 
 for (let index = 1; index <= COUNT; index += 1) {
   test(`slow but progressing ${index}`, async () => {

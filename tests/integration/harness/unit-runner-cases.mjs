@@ -213,20 +213,19 @@ export const unitRunnerCases = [
       // and it was invisible until the red proof was attempted. Which is the argument for
       // 「门禁必须红过一次才算存在」 stated as cheaply as it can be stated.
       //
-      // Distinguishing input: few FIXED slices, serial only for this fixture.
-      // Total wall > silence; each slice ≤ 50% of per-test so GHA timer drift
-      // cannot push one slice past the file timeout (0.75× still cancelled on GHA).
+      // Distinguishing input: fixed short slices, serial only for this fixture.
+      // GHA timer stretch cancelled 0.5–0.75× per-test slices (1 passed,1 failed).
+      // Use a wide local per-test bound + short fixed slices; total > silence.
       // Suite-wide concurrency remains true (NODE_TEST_CONCURRENCY unset elsewhere).
-      const probeSliceMs = Math.min(
-        Math.floor(UNIT_RUNNER_PROBE_PER_TEST_MS * 0.5),
-        1000,
-      );
+      const probePerTestMs = Math.max(UNIT_RUNNER_PROBE_PER_TEST_MS, 10_000);
+      const probeSliceMs = 400;
       const probeSliceCount = Math.max(
-        4,
-        Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.2) / probeSliceMs),
+        5,
+        Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.25) / probeSliceMs),
       );
       const run = await runFixture('slower-than-the-window.fixture.mjs', {
-        ...scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS),
+        PER_TEST_TIMEOUT_MS: String(probePerTestMs),
+        UNIT_VERDICT_SILENCE_MS: String(UNIT_RUNNER_PROBE_SILENCE_MS),
         UNIT_RUNNER_PROBE_SLICE_MS: String(probeSliceMs),
         UNIT_RUNNER_PROBE_SLICE_COUNT: String(probeSliceCount),
         // Local to this fixture only — not a global suite serialisation.
