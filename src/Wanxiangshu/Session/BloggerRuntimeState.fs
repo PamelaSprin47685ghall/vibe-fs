@@ -27,14 +27,20 @@ type BloggerRuntimeState =
     | InFlight of BloggerRequestContext
     | Parked
 
+/// One drain-window opening. Module-private constructor: only the reactivation
+/// path (a new Authority Root arriving on the main) can mint it, so no caller
+/// can forge an open window for an arbitrary root.
+type DrainPermit = private DrainPermit of AuthorityRootUserMessageId
+
 /// After a durable handle seal, whether a new Authority Root reopened a drain
 /// window. The handle lifecycle NEVER unseals (CompletedAwaitingJoin/Abandoned/
 /// Retired stay sealed), so a reactivation can only be observed in-process — the
-/// drain window carries the root that opened it. Closed = seal blocks new Y work.
+/// window carries the root that opened it (as an unforgeable permit). Closed =
+/// seal blocks new Y work.
 [<RequireQualifiedAccess>]
 type DrainWindow =
     | Closed
-    | Open of AuthorityRootUserMessageId
+    | Open of DrainPermit
 
 /// Host-owned cell: state + drain window. CurrentRequest lives in the InFlight
 /// payload; the next-Main-material slot is the host dictionary (ENFORCER-050).
@@ -149,7 +155,7 @@ module BloggerRuntime =
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->
             { cell with
-                Drain = DrainWindow.Open root }
+                Drain = DrainWindow.Open(DrainPermit root) }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
         match cell.State with
