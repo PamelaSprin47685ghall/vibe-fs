@@ -184,23 +184,36 @@ test('C0_park_only_after_KnownCommitted', () => {
   const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
-  // Gate: invalid/failed/unknown paths return before park. The drain branch sits
-  // between `if not committed then` and ParkTransform, so distance is large.
-  const notCommitted = host.indexOf('if not committed then')
-  const park = host.indexOf('ParkTransform', notCommitted)
-  assert.ok(notCommitted >= 0 && park > notCommitted, 'ParkTransform must follow not-committed gate')
-  const between = host.slice(notCommitted, park)
-  // Empty list is forbidden: Host blanks provider messages → 400 → tool loop.
-  assert.doesNotMatch(between, /return \[\]/,
-    'not-committed path must never return [] (blanks Host transcript)')
-  assert.match(between, /return project |return stop |return resumeCatchUp/,
-    'not-committed path must return ContinuationOutcome before ParkTransform')
+  // P1-3: not-committed paths are CycleDisposition arms (Working/InjectRepair/
+  // CommitUnknown/AbandonThenCatchUp); park lives only under Committed.
+  assert.match(host, /type CycleDisposition/,
+    'commit outcomes must collapse into CycleDisposition before park')
+  const committedArm = host.indexOf('| CycleDisposition.Committed')
+  const park = host.indexOf('ParkTransform', committedArm)
+  assert.ok(committedArm >= 0 && park > committedArm,
+    'ParkTransform must sit under CycleDisposition.Committed (KnownCommitted path)')
+  const beforeCommitted = host.slice(0, committedArm)
+  const nonCommittedPark = [
+    '| CycleDisposition.Working',
+    '| CycleDisposition.InjectRepair',
+    '| CycleDisposition.CommitUnknown',
+    '| CycleDisposition.AbandonThenCatchUp',
+  ].some((arm) => {
+    const a = beforeCommitted.lastIndexOf(arm)
+    if (a < 0) return false
+    const p = beforeCommitted.indexOf('ParkTransform', a)
+    return p > a
+  })
+  assert.equal(nonCommittedPark, false,
+    'non-committed dispositions must not reach ParkTransform before Committed arm')
   assert.match(host, /KnownCommitted/, 'KnownCommitted is the only park-enabling commit outcome')
   // Whole file: no bare empty-list quiet-stop (StopPhysicalRun replaces it).
   assert.doesNotMatch(host, /^\s*return \[\]\s*$/m,
     'EnforcerHost must not return [] as quiet stop')
   assert.match(host, /ContinuationOutcome|StopPhysicalRun/,
     'continuation must express stop vs project explicitly')
+  assert.match(host, /return project |return stop |return resumeCatchUp/,
+    'not-committed paths must still return ContinuationOutcome')
 })
 
 test('C0_commit_drains_via_tryRefresh_before_park', () => {
