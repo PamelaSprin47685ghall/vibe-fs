@@ -99,6 +99,35 @@ async function runWatchdogRejectsBackgroundNoise() {
   assertTrue(r.stderr.includes('background progress'), 'diagnostic must preserve background activity');
 }
 
+async function runWatchdogWidenedWindowToleratesDeclaredSlowStep() {
+  // VERIFY-004: a legitimately slow wait step is DECLARED (scenario timeoutMs),
+  // never inferred. setWindow widens the silence window to that bound — slow
+  // work inside the bound must not be mistaken for a hang.
+  const script =
+    `import { Watchdog } from '${watchdogUrl}';\n` +
+    `const w = new Watchdog({ timeoutMs: 150, label: 'gate-widened' });\n` +
+    `w.setWindow(400);\n` +
+    `setTimeout(() => { w.advance({ reason: 'slow-done', lane: 'gate' }); w.stop(); process.exit(0); }, 300);\n` +
+    `setInterval(() => {}, 1000);\n`;
+  const r = await runWatchdogChild(script);
+  assertEq(r.code, 0, `widened window must tolerate declared slow work: ${r.stderr}`);
+  assertTrue(!r.stderr.includes('WATCHDOG'), 'no diagnostic on clean exit');
+}
+
+async function runWatchdogRestoresDefaultWindow() {
+  // setWindow(null) must restore the centralized default: after a declared
+  // slow step ends, silence is judged at the default bound again.
+  const script =
+    `import { Watchdog } from '${watchdogUrl}';\n` +
+    `const w = new Watchdog({ timeoutMs: 150, label: 'gate-restore' });\n` +
+    `w.setWindow(500);\n` +
+    `w.setWindow(null);\n` +
+    `setInterval(() => {}, 1000);\n`;
+  const r = await runWatchdogChild(script);
+  assertEq(r.code, 1, 'restored default window must still fire on silence');
+  assertTrue(r.stderr.includes('WATCHDOG'), 'diagnostic fires at the restored default');
+}
+
 function startDelayedSseServer(events, delayMs) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -377,6 +406,8 @@ export const timeoutCases = [
   { name: 'watchdog fires on silence', fn: runWatchdogFiresOnSilence },
   { name: 'watchdog renews on causal progress', fn: runWatchdogRenewsOnProgress },
   { name: 'watchdog rejects background-only noise', fn: runWatchdogRejectsBackgroundNoise },
+  { name: 'watchdog widened window tolerates declared slow step', fn: runWatchdogWidenedWindowToleratesDeclaredSlowStep },
+  { name: 'watchdog restores default window', fn: runWatchdogRestoresDefaultWindow },
   { name: 'concurrent awaitEvent timeouts stay independent', fn: runConcurrentAwaitTimeouts },
   { name: 'VERIFY-004 no watchdog feed awaits an unspecified host event', fn: runNoWildcardEventAwait },
   { name: 'VERIFY-004 the timeout dump separates causal progress from background', fn: runDiagnosticDumpIsComplete },

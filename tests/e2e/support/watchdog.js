@@ -121,6 +121,19 @@ export class Watchdog {
     this._timer = null;
   }
 
+  /**
+   * Temporarily widen the silence window for one explicitly-bounded wait step
+   * (VERIFY-004: a legitimately slow step must be declared, never inferred —
+   * the scenario's `timeoutMs` is that declaration). `null` restores the
+   * centralized default. Only blocking advances renew the widened window, so
+   * background traffic still cannot extend it.
+   */
+  setWindow(windowMs) {
+    if (this._stopped) return;
+    this._timeoutMs = windowMs ?? WATCHDOG_TIMEOUT_MS;
+    this._arm();
+  }
+
   _arm() {
     clearTimeout(this._timer);
     this._timer = setTimeout(() => {

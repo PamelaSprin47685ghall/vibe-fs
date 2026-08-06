@@ -186,7 +186,16 @@ async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
   for (const step of flow) {
     if (step.wait) {
-      await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
+      // VERIFY-004: an explicitly-bounded wait is a declared slow step — the
+      // watchdog silence window widens to its timeoutMs so a legitimate
+      // recovery chain is not mistaken for a hang. Background traffic never
+      // renews the window; only a blocking advance does.
+      scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+      try {
+        await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
       if (step.watchdog !== false) {
         scenario.watchdog?.advance({
           reason: step.wait,
