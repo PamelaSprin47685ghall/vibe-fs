@@ -16,6 +16,9 @@
 *.pem
 *.key
 
+# Local agent runtime (Reasonix / host tooling)
+/.reasonix/
+
 # Logs
 *.log
 npm-debug.log*
