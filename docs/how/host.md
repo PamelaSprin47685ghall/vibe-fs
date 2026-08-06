@@ -71,6 +71,36 @@ Reviewer: ReviewVerdictRecorded.ProviderRun == ProviderInputSealed.ProviderRun
 X: PrefixRebaseCommitted.SolvingProviderRun 唯一非空
 ```
 
+### 形式化保证（OpenCode 源码锚定）
+
+对照 `../opencode`（commit e024e2ef）逐条验证，因果读在 SDK 行为下唯一成立：
+
+**引理 1：每次 transform 恰对应一条新持久化 assistant。** 主循环每轮创建新 assistant
+（`session/prompt.ts:1187-1194`，`id=MessageID.ascending()`、`parentID=lastUser.id`、
+`time={created}` 无 completed）并**先** `sessions.updateMessage` 持久化（`:1197`），**后**
+才 `plugin.trigger("experimental.chat.messages.transform")`（`:1255`）。每轮恰好一次 transform。
+
+**引理 2：transform 输入不含飞行中 assistant，绑定必须走 SDK 重读，不能看输入。**
+transform 收到的 `{ messages }` 是**循环顶部**快照（`:1094`，在新 assistant 创建之前）。
+in-flight `msg` 已落盘但不在输入里；绑定时经 SDK 读会话（会含 `:1197` 已持久化的它）
+才能命中。
+
+**引理 3：重试复用同一 assistant，不产生第二条未完成者。** provider 重试在
+`handle.process` 内部经 `Effect.retry(SessionRetry.policy)`（`session/processor.ts:660`）
+进行，复用同一 `ctx.assistantMessage`，不新建消息、不重触发 transform。`process` 的 onExit
+统一 `time.completed = Date.now()` 并 `updateMessage`（`processor.ts:594-597`），
+成功/出错/compaction 全路径皆达；中断由 `finalizeInterruptedAssistant`（`prompt.ts:1203-1211`）finalize。
+`continue` 型路径（subtask `:1150`、compaction `:1162`、overflow `:1166`）均不创建 assistant。
+故 transform 触发时，`parentID=lastUser.id` 的**唯一未完成 assistant** 恰为刚创建的 `msg`。
+
+**引理 4：`id` 单调 → 「session 内 assistant 最大」唯一选中它。** `MessageID.ascending()`
+经 `generateID(prefix,"ascending")` 带 lastTimestamp 单调护栏（`core/src/id/id.ts:16-18,54-55`），
+每进程全局严格递增；新创建的即最大，且在 `handle.process` 完成前无人再建更大者。
+
+**并发前提与 fail-closed。** 唯一性要求单 actor 写 assistant（managed Session 单 flight，HOST-004）。
+任一条不满足（经 SDK 读到 0 或 ≥2 未完成 assistant；或突变窗口读到旧快照）→ 不写 seal，
+Review 只见 PendingIdentity/Rejected（REVIEW-010）。开裂侧安全：宁缺 seal 不赌同一身。
+
 ## Marker 程序（归属 HOST-013）
 
 链序（seal 之前）：
