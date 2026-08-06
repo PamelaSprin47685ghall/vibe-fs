@@ -188,7 +188,7 @@ module HostSignalBootstrap =
                 }
 
             let reconciler =
-                ReconcileSupervisor.Supervisor(
+                ReconcileInterpreter.Interpreter(
                     snapshot,
                     binding,
                     onTurn,

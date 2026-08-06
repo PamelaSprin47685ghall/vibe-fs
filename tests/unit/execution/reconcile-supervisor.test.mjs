@@ -195,6 +195,124 @@ test('EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
   assert.equal(completed.length, 0, 'ClearSession mid-backoff must prevent terminal publish')
 })
 
+test('EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once', async () => {
+  const sid = sessionId('ses_reconcile_retry_publish')
+  const physical = physicalUser('user-1')
+  const attempts = []
+  const snapshot = reconcileSupervisor.createSnapshot([
+    { ok: true, messages: reconcileSupervisor.terminalTranscript('user-1', 'asst-terminal') },
+  ])
+  const binding = reconcileSupervisor.createStore()
+  const onTurn = (turn) => {
+    attempts.push(turn)
+    return attempts.length === 1 ? Promise.reject(new Error('throw-once')) : Promise.resolve()
+  }
+  const supervisor = reconcileSupervisor.create({
+    snapshot,
+    binding,
+    onTurn,
+    backoffDelaysMs: TEST_BACKOFF_MS,
+    maxBudgetMs: 400,
+  })
+  reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
+  reconcileSupervisor.kick(supervisor, sid)
+
+  assert.equal(await waitUntil(() => attempts.length === 1, 400), true, 'first onTurn must be attempted')
+  await sleep(20)
+  reconcileSupervisor.kick(supervisor, sid)
+  assert.equal(await waitUntil(() => attempts.length === 2, 400), true, 'later wake must retry unsealed turn')
+  await sleep(30)
+  assert.equal(attempts.length, 2, 'successful retry seals exactly once')
+})
+
+test('EXEC_reconcile_clear_rebind_drops_old_delayed_turn_and_runs_new_binding', async () => {
+  const sid = sessionId('ses_reconcile_generation_fence')
+  const oldPhysical = physicalUser('old-user')
+  const newPhysical = physicalUser('new-user')
+  const turns = []
+  const snapshot = reconcileSupervisor.createSnapshot([
+    { ok: true, messages: reconcileSupervisor.inProgressTranscript('old-user', 'asst-old-ip') },
+    { ok: true, messages: reconcileSupervisor.terminalTranscript('new-user', 'asst-new-terminal') },
+  ])
+  const binding = reconcileSupervisor.createStore()
+  const supervisor = reconcileSupervisor.create({
+    snapshot,
+    binding,
+    onTurn: (turn) => {
+      turns.push(turn)
+      return Promise.resolve()
+    },
+    backoffDelaysMs: CLEAR_BACKOFF_MS,
+    maxBudgetMs: CLEAR_BUDGET_MS,
+  })
+  reconcileSupervisor.bindUserMessage(supervisor, sid, oldPhysical)
+  reconcileSupervisor.kick(supervisor, sid)
+  assert.equal(await waitUntil(() => snapshot.readCount >= 1, 400), true, 'old pass must enter delay')
+
+  reconcileSupervisor.clearSession(supervisor, sid)
+  reconcileSupervisor.bindUserMessage(supervisor, sid, newPhysical)
+  reconcileSupervisor.kick(supervisor, sid)
+
+  assert.equal(await waitUntil(() => turns.length === 1, 700), true, 'new generation must complete')
+  assert.equal(turns.length, 1, 'old delayed generation must never publish')
+  assert.equal(idValue.physicalUser(turns[0].PhysicalUserMessageId), 'new-user')
+})
+
+test('EXEC_reconcile_clear_rebind_fences_post_on_turn_effects_from_old_binding', async () => {
+  const sid = sessionId('ses_reconcile_inflight_generation_fence')
+  const oldPhysical = physicalUser('old-user')
+  const newPhysical = physicalUser('new-user')
+  const turns = []
+  const observed = []
+  let resolveOldTurn
+  const oldTurnFinished = new Promise((resolve) => {
+    resolveOldTurn = resolve
+  })
+  const snapshot = reconcileSupervisor.createSnapshot([
+    { ok: true, messages: reconcileSupervisor.terminalTranscript('old-user', 'asst-old-terminal') },
+    { ok: true, messages: reconcileSupervisor.terminalTranscript('new-user', 'asst-new-terminal') },
+  ])
+  const binding = reconcileSupervisor.createStore()
+  const supervisor = reconcileSupervisor.create({
+    snapshot,
+    binding,
+    onTurn: (turn) => {
+      turns.push(turn)
+      return idValue.physicalUser(turn.PhysicalUserMessageId) === 'old-user'
+        ? oldTurnFinished
+        : Promise.resolve()
+    },
+    onSnapshot: (_session, messages) => {
+      observed.push(messages)
+      return Promise.resolve()
+    },
+    backoffDelaysMs: TEST_BACKOFF_MS,
+    maxBudgetMs: 400,
+  })
+  reconcileSupervisor.bindUserMessage(supervisor, sid, oldPhysical)
+  reconcileSupervisor.kick(supervisor, sid)
+  assert.equal(await waitUntil(() => turns.length === 1, 400), true, 'old onTurn must have started')
+  assert.equal(idValue.physicalUser(turns[0].PhysicalUserMessageId), 'old-user')
+
+  reconcileSupervisor.clearSession(supervisor, sid)
+  reconcileSupervisor.bindUserMessage(supervisor, sid, newPhysical)
+  reconcileSupervisor.kick(supervisor, sid)
+  assert.equal(await waitUntil(() => turns.length === 2, 400), true, 'new generation must complete')
+  assert.equal(idValue.physicalUser(turns[1].PhysicalUserMessageId), 'new-user')
+  assert.equal(observed.length, 1, 'only the new generation may observe after publication')
+
+  resolveOldTurn()
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(observed.length, 1, 'resolving stale onTurn must not observe or seal the old pass')
+  assert.equal(turns.length, 2, 'resolving stale onTurn must not continue or republish the old pass')
+
+  reconcileSupervisor.kick(supervisor, sid)
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(turns.length, 2, 'new generation seal must prevent duplicate publication')
+})
+
 // ── 2. stickyTerminal capacity 256 with FIFO eviction ────────────────────────
 
 test('EXEC_events_sticky_terminal_bounded', () => {

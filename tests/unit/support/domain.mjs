@@ -5201,3 +5201,454 @@ export const programKernel = (() => {
     program: builder,
   }
 })()
+
+// ── Reconcile Program DSL (M3 pure Domain extract; RED-safe if module absent) ─
+// Top-level load must not fail the facade when Domain/ReconcileProgram is still
+// missing — only callers of reconcileProgram.* should see a loud contract error.
+const ReconcileProgramModule = await prod('Domain/ReconcileProgram').catch((error) => ({
+  __missing: error,
+}))
+
+export const reconcileProgram = (() => {
+  const missing = ReconcileProgramModule?.__missing !== undefined
+  const mod = missing ? null : ReconcileProgramModule
+
+  const applyArgs = (fn, args) => {
+    if (typeof fn !== 'function') {
+      throw new TypeError('reconcileProgram: expected function')
+    }
+    if (args.length === 0) return fn()
+    if (fn.length === 0 || fn.length >= args.length) return fn(...args)
+    let cur = fn
+    for (const arg of args) {
+      if (typeof cur !== 'function') {
+        throw new TypeError('reconcileProgram: curried application exhausted early')
+      }
+      cur = cur(arg)
+    }
+    return cur
+  }
+
+  const requireFn = (candidates, label) => {
+    if (missing || mod === null) {
+      throw new Error(
+        `Domain/ReconcileProgram missing (M3): ${label}. ${String(ReconcileProgramModule.__missing?.message ?? ReconcileProgramModule.__missing)}`,
+      )
+    }
+    const found = candidates.find((fn) => typeof fn === 'function')
+    if (typeof found !== 'function') {
+      throw new Error(
+        `${label} missing on Domain/ReconcileProgram. Near: ${Object.keys(mod)
+          .filter((k) => /Reconcile|decide|publish|isTerminal|pickDelay|Trace|Program/i.test(k))
+          .slice(0, 40)
+          .join(', ')}`,
+      )
+    }
+    return found
+  }
+
+  const call = (candidates, label, args = []) => applyArgs(requireFn(candidates, label), args)
+
+  const resolve = (candidates, label) => requireFn(candidates, label)
+
+  // The raw Fable PublishMaps instance does not expose its membership tests as
+  // callable methods in the module shape (Fable emits them as module-level
+  // functions `ReconcileProgram_PublishMaps__provisionalHas` / `__consumedHas`).
+  // publishDecision / clearProvisional therefore wrap the raw instance in a
+  // facade that re-exposes those tests against the raw map. The wrapper is
+  // transparent for round-trips: publishDecision and clearProvisional unwrap it
+  // before handing the map back to the Fable function, so a wrapped `maps` from
+  // one call is accepted as input to the next.
+  const isWrappedMaps = (value) => value !== null && typeof value === 'object' && value.__reconcileRawMaps !== undefined
+  const unwrapMaps = (value) => (isWrappedMaps(value) ? value.__reconcileRawMaps : value)
+
+  const mapsMember = (baseName) => {
+    const suffixed =
+      Object.keys(mod ?? {}).find((key) => key.startsWith(`ReconcileProgram_PublishMaps__${baseName}_`)) ?? undefined
+    return requireFn(
+      [
+        mod?.[`ReconcileProgram_PublishMaps__${baseName}`],
+        mod?.[`PublishMaps__${baseName}`],
+        mod?.[baseName],
+        suffixed !== undefined ? mod?.[suffixed] : undefined,
+      ],
+      `PublishMaps.${baseName}`,
+    )
+  }
+
+  const wrapMaps = (raw) => {
+    if (isWrappedMaps(raw)) return raw
+    if (!raw || typeof raw !== 'object') return raw
+    const provisionalHas = mapsMember('provisionalHas')
+    const consumedHas = mapsMember('consumedHas')
+    // Keep the raw instance reachable and copy its own fields so the wrapper is
+    // usable wherever the raw map previously appeared (raw-maps compatibility).
+    return {
+      __reconcileRawMaps: raw,
+      Consumed: raw.Consumed,
+      Provisional: raw.Provisional,
+      provisionalHas: (turn) => applyArgs(provisionalHas, [raw, turn]),
+      consumedHas: (turn) => applyArgs(consumedHas, [raw, turn]),
+    }
+  }
+
+  /** Outcome name → Domain TurnOutcome-shaped value (or pure string path). */
+  const outcomeOf = (name) =>
+    call(
+      [
+        mod?.outcomeOf,
+        mod?.ReconcileProgram_outcomeOf,
+        mod?.TurnOutcomeModule_ofName,
+        mod?.TurnOutcome_ofName,
+      ],
+      'outcomeOf',
+      [name],
+    )
+
+  return {
+    get isTerminalOutcome() {
+      const fn = resolve(
+        [
+          mod?.isTerminalOutcome,
+          mod?.ReconcileProgram_isTerminalOutcome,
+          mod?.Reconcile_isTerminalOutcome,
+        ],
+        'isTerminalOutcome',
+      )
+      return (outcomeName) => {
+        // Accept either string name (facade constructs DU) or raw union.
+        const outcome = typeof outcomeName === 'string' ? outcomeOf(outcomeName) : outcomeName
+        return applyArgs(fn, [outcome])
+      }
+    },
+
+    get pickDelay() {
+      const fn = resolve(
+        [mod?.pickDelay, mod?.ReconcileProgram_pickDelay, mod?.Reconcile_pickDelay],
+        'pickDelay',
+      )
+      return (sequence, index, budgetRemaining) => applyArgs(fn, [sequence, index, budgetRemaining])
+    },
+
+    get decideStep() {
+      const fn = resolve(
+        [mod?.decideStep, mod?.ReconcileProgram_decideStep, mod?.Reconcile_decideStep],
+        'decideStep',
+      )
+      return (evidence) => applyArgs(fn, [evidence])
+    },
+
+    get decisionName() {
+      const fn = resolve(
+        [mod?.decisionName, mod?.ReconcileProgram_decisionName, mod?.ReconcileDecision_name],
+        'decisionName',
+      )
+      return (decision) => applyArgs(fn, [decision])
+    },
+
+    get clearsContinuationCandidate() {
+      const fn = resolve(
+        [
+          mod?.clearsContinuationCandidate,
+          mod?.ReconcileProgram_clearsContinuationCandidate,
+          mod?.ReconcileDecision_clearsContinuationCandidate,
+        ],
+        'clearsContinuationCandidate',
+      )
+      return (decision) => applyArgs(fn, [decision])
+    },
+
+    get nextBackoffIndex() {
+      const fn = resolve(
+        [mod?.nextBackoffIndex, mod?.ReconcileProgram_nextBackoffIndex],
+        'nextBackoffIndex',
+      )
+      return ({ previous, snapshotOk }) => applyArgs(fn, [previous, snapshotOk])
+    },
+
+    get publishDecision() {
+      const fn = resolve(
+        [mod?.publishDecision, mod?.ReconcileProgram_publishDecision],
+        'publishDecision',
+      )
+      return (maps, turn) => {
+        const raw = applyArgs(fn, [unwrapMaps(maps), turn])
+        // Normalize Fable tuple/record to { shouldPublish, maps }.
+        let normalized
+        if (raw && typeof raw === 'object' && 'shouldPublish' in raw) {
+          normalized = raw
+        } else if (Array.isArray(raw) && raw.length >= 2) {
+          normalized = { shouldPublish: raw[0], maps: raw[1] }
+        } else {
+          return raw
+        }
+        if (normalized && typeof normalized === 'object' && 'maps' in normalized) {
+          return { shouldPublish: normalized.shouldPublish, maps: wrapMaps(normalized.maps) }
+        }
+        return normalized
+      }
+    },
+
+    get clearProvisional() {
+      const fn = resolve(
+        [mod?.clearProvisional, mod?.ReconcileProgram_clearProvisional],
+        'clearProvisional',
+      )
+      return (maps, sessionKey) => wrapMaps(applyArgs(fn, [unwrapMaps(maps), sessionKey]))
+    },
+
+    get consumeKey() {
+      const fn = resolve([mod?.consumeKey, mod?.ReconcileProgram_consumeKey], 'consumeKey')
+      return (turn) => applyArgs(fn, [turn])
+    },
+
+    get stepName() {
+      const fn = resolve(
+        [mod?.stepName, mod?.ReconcileProgram_stepName, mod?.TraceInterpreter_stepName],
+        'stepName',
+      )
+      return (step) => applyArgs(fn, [step])
+    },
+
+    get interpretWith() {
+      const fn = resolve(
+        [
+          mod?.interpretWith,
+          mod?.TraceInterpreter_interpretWith,
+          mod?.ReconcileProgram_interpretWith,
+        ],
+        'TraceInterpreter.interpretWith',
+      )
+      return (reply, program) => applyArgs(fn, [reply, program])
+    },
+
+    get interpret() {
+      const fn = resolve(
+        [mod?.interpret, mod?.TraceInterpreter_interpret, mod?.ReconcileProgram_interpret],
+        'TraceInterpreter.interpret',
+      )
+      return (program) => applyArgs(fn, [program])
+    },
+
+    evidence: {
+      snapshotError: (reason) =>
+        call(
+          [
+            mod?.ReconcileProgram_evidenceSnapshotError,
+            mod?.evidenceSnapshotError,
+            mod?.ReconcileEvidence_SnapshotError,
+            mod?.SnapshotError,
+          ],
+          'ReconcileEvidence.SnapshotError',
+          [reason],
+        ),
+      noTurn: () =>
+        call(
+          [mod?.ReconcileProgram_evidenceNoTurn, mod?.evidenceNoTurn, mod?.ReconcileEvidence_NoTurn, mod?.NoTurn],
+          'ReconcileEvidence.NoTurn',
+          [],
+        ),
+      provisional: (outcomeName) =>
+        call(
+          [
+            mod?.ReconcileProgram_evidenceProvisional,
+            mod?.evidenceProvisional,
+            mod?.ReconcileEvidence_Provisional,
+            mod?.Provisional,
+          ],
+          'ReconcileEvidence.Provisional',
+          [typeof outcomeName === 'string' ? outcomeOf(outcomeName) : outcomeName],
+        ),
+      unknown: () =>
+        call(
+          [mod?.ReconcileProgram_evidenceUnknown, mod?.evidenceUnknown, mod?.ReconcileEvidence_Unknown, mod?.Unknown],
+          'ReconcileEvidence.Unknown',
+          [],
+        ),
+      terminal: (outcomeName) =>
+        call(
+          [
+            mod?.ReconcileProgram_evidenceTerminal,
+            mod?.evidenceTerminal,
+            mod?.ReconcileEvidence_Terminal,
+            mod?.Terminal,
+          ],
+          'ReconcileEvidence.Terminal',
+          [typeof outcomeName === 'string' ? outcomeOf(outcomeName) : outcomeName],
+        ),
+      observedTerminal: (turn) =>
+        call(
+          [
+            mod?.ReconcileProgram_evidenceObservedTerminal,
+            mod?.evidenceObservedTerminal,
+            mod?.ReconcileEvidence_Terminal,
+            mod?.Terminal,
+          ],
+          'ReconcileEvidence.Terminal(observedTurn)',
+          [turn],
+        ),
+      budgetExhausted: ({ hasCandidate }) =>
+        call(
+          [
+            mod?.ReconcileProgram_evidenceBudgetExhausted,
+            mod?.evidenceBudgetExhausted,
+            mod?.ReconcileEvidence_BudgetExhausted,
+            mod?.BudgetExhausted,
+          ],
+          'ReconcileEvidence.BudgetExhausted',
+          [hasCandidate],
+        ),
+      sessionCleared: () =>
+        call(
+          [
+            mod?.ReconcileProgram_evidenceSessionCleared,
+            mod?.evidenceSessionCleared,
+            mod?.ReconcileEvidence_SessionCleared,
+            mod?.SessionCleared,
+          ],
+          'ReconcileEvidence.SessionCleared',
+          [],
+        ),
+    },
+
+    publishMaps: {
+      empty: () =>
+        call(
+          [
+            mod?.ReconcileProgram_publishMapsEmpty,
+            mod?.publishMapsEmpty,
+            mod?.PublishMaps_empty,
+            mod?.emptyPublishMaps,
+          ],
+          'PublishMaps.empty',
+          [],
+        ),
+    },
+
+    turnFixture: ({ session, physical, providerRun, outcome }) =>
+      call(
+        [
+          mod?.ReconcileProgram_turnFixture,
+          mod?.turnFixture,
+          mod?.testTurn,
+        ],
+        'turnFixture',
+        [session, physical, providerRun, typeof outcome === 'string' ? outcomeOf(outcome) : outcome],
+      ),
+
+    programs: {
+      materializePass: ({ session, backoffDelaysMs, maxBudgetMs }) =>
+        call(
+          [
+            mod?.ReconcilePrograms_materializePass,
+            mod?.ReconcileProgram_materializePass,
+            mod?.materializePass,
+          ],
+          'ReconcilePrograms.materializePass',
+          [session, backoffDelaysMs, maxBudgetMs],
+        ),
+    },
+
+    reply: {
+      bindingPresent: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyBindingPresent,
+            mod?.replyBindingPresent,
+            mod?.ReconcileReply_BindingPresent,
+            mod?.BindingPresent,
+          ],
+          'ReconcileReply.BindingPresent',
+          [],
+        ),
+      bindingAbsent: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyBindingAbsent,
+            mod?.replyBindingAbsent,
+            mod?.ReconcileReply_BindingAbsent,
+            mod?.BindingAbsent,
+          ],
+          'ReconcileReply.BindingAbsent',
+          [],
+        ),
+      snapshotOk: (evidence) =>
+        call(
+          [
+            mod?.ReconcileProgram_replySnapshotOk,
+            mod?.replySnapshotOk,
+            mod?.ReconcileReply_SnapshotOk,
+            mod?.SnapshotOk,
+          ],
+          'ReconcileReply.SnapshotOk',
+          [evidence],
+        ),
+      snapshotError: (reason) =>
+        call(
+          [
+            mod?.ReconcileProgram_replySnapshotError,
+            mod?.replySnapshotError,
+            mod?.ReconcileReply_SnapshotError,
+            mod?.SnapshotErrorReply,
+          ],
+          'ReconcileReply.SnapshotError',
+          [reason],
+        ),
+      delayDone: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyDelayDone,
+            mod?.replyDelayDone,
+            mod?.ReconcileReply_DelayDone,
+            mod?.DelayDone,
+          ],
+          'ReconcileReply.DelayDone',
+          [],
+        ),
+      publishDone: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyPublishDone,
+            mod?.replyPublishDone,
+            mod?.ReconcileReply_PublishDone,
+            mod?.PublishDone,
+          ],
+          'ReconcileReply.PublishDone',
+          [],
+        ),
+      publishMapsStored: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyPublishMapsStored,
+            mod?.replyPublishMapsStored,
+            mod?.ReconcileReply_PublishMapsStored,
+            mod?.PublishMapsStored,
+          ],
+          'ReconcileReply.PublishMapsStored',
+          [],
+        ),
+      observeDone: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyObserveDone,
+            mod?.replyObserveDone,
+            mod?.ReconcileReply_ObserveDone,
+            mod?.ObserveDone,
+          ],
+          'ReconcileReply.ObserveDone',
+          [],
+        ),
+      unitOk: () =>
+        call(
+          [
+            mod?.ReconcileProgram_replyUnitOk,
+            mod?.replyUnitOk,
+            mod?.ReconcileReply_UnitOk,
+            mod?.UnitOk,
+          ],
+          'ReconcileReply.UnitOk',
+          [],
+        ),
+    },
+  }
+})()

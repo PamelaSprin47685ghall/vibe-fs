@@ -116,6 +116,38 @@ test('VERIFY_005_Domain_OrchestratorProgram_publishes_empty_and_trace', async ()
   )
 })
 
+test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decide_and_trace', async () => {
+  // M3: pure Reconcile Domain surface before M4 Interpreter cutover.
+  // Must fail while Domain/ReconcileProgram.fs is absent (RED).
+  const mod = await load('Domain/ReconcileProgram')
+  const names = surfaceOf(mod)
+
+  assert.ok(
+    names.some((n) => n.includes('isTerminalOutcome')),
+    `Domain ReconcileProgram must publish isTerminalOutcome; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('pickDelay')),
+    `Domain ReconcileProgram must publish pickDelay; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('decideStep')),
+    `Domain ReconcileProgram must publish decideStep; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('publishDecision')),
+    `Domain ReconcileProgram must publish publishDecision; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('interpretWith') || n.includes('interpret')),
+    `Domain ReconcileProgram must publish TraceInterpreter; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('materializePass') || n.includes('ReconcilePrograms')),
+    `Domain ReconcileProgram must publish materializePass builder; exports: ${names.join(', ')}`,
+  )
+})
+
 test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
   const mod = await load('Process/ProcessRunner')
 

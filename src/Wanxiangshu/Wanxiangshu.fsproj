@@ -42,6 +42,7 @@
     <Compile Include="Domain/ChildRecovery.fs"/>
     <Compile Include="Domain/JoinProgram.fs"/>
     <Compile Include="Domain/OrchestratorProgram.fs"/>
+    <Compile Include="Domain/ReconcileProgram.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/XTrace.fs"/>
@@ -199,6 +200,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostReviewGuard.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostJoinGuard.fs"/>
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
+    <Compile Include="Application/Reconciliation/ReconcileInterpreter.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
     <Compile Include="Application/Reconciliation/ReviewerGuardState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/TerminalPolicy.fs"/>

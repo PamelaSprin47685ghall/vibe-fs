@@ -25,11 +25,6 @@
     "raw-task": 3,
     "mutable": 1
   },
-  "Application/Reconciliation/ReconcileSupervisor.fs": {
-    "program-counter": 10,
-    "raw-task": 1,
-    "mutable": 8
-  },
   "Application/Reconciliation/ReviewSeal.fs": {
     "raw-task": 1
   },
