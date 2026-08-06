@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
 /// Runtime owner for ManagerJob resources. Every job runs the sequential
-/// OrchestratorProgram; the mailbox contains only final post-FF verdicts.
+/// direct-CE OrchestratorProgram workflow; the mailbox contains only final post-FF verdicts.
 ///
 /// ORCH-006's `ManagerJobCreated` is the only writer here, and it is written after
 /// the Manager fork returns a `SessionId` but before the program awaits it. That
@@ -54,7 +54,7 @@ type Orchestrator
         mailbox.StartJob()
 
         task {
-            let! verdict = OrchestratorInterpreter.run programDeps job
+            let! verdict = OrchestratorProgram.run programDeps job
             mailbox.Publish verdict
         }
         |> ignore

@@ -63,6 +63,44 @@ test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
   assertCallable(mod, 'Session/CompanionProgram', ['buildDelta', 'runCompanionFlow'])
 })
 
+test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async () => {
+  // PR3 direct-CE cutover: Application/Orchestration/Program.fs is the sole
+  // production entrypoint. Domain AST + OrchestratorInterpreter are deleted.
+  await assert.rejects(
+    () => load('Domain/OrchestratorProgram'),
+    (error) => {
+      const message = String(error?.message ?? error)
+      return (
+        message.includes('Cannot find module') ||
+        message.includes('ERR_MODULE_NOT_FOUND') ||
+        message.includes('Failed to load') ||
+        error?.code === 'ERR_MODULE_NOT_FOUND'
+      )
+    },
+    'Domain/OrchestratorProgram AST must stay deleted',
+  )
+  await assert.rejects(
+    () => load('Application/Orchestration/OrchestratorInterpreter'),
+    (error) => {
+      const message = String(error?.message ?? error)
+      return (
+        message.includes('Cannot find module') ||
+        message.includes('ERR_MODULE_NOT_FOUND') ||
+        message.includes('Failed to load') ||
+        error?.code === 'ERR_MODULE_NOT_FOUND'
+      )
+    },
+    'OrchestratorInterpreter must stay deleted',
+  )
+
+  const mod = await load('Application/Orchestration/Program')
+
+  // One public `run`. Publish-loop details stay private so ORCH-005's short CAS
+  // window cannot acquire a second caller.
+  assert.deepEqual(surfaceOf(mod).sort(), ['run'])
+  assertCallable(mod, 'Application/Orchestration/Program', ['run'])
+})
+
 test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decisions', async () => {
   const mod = await load('Domain/ReconcileProgram')
   const names = surfaceOf(mod)

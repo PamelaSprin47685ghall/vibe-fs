@@ -2,9 +2,6 @@
   "Application/Orchestration/ManagerJob.fs": {
     "mutable": 2
   },
-  "Application/Orchestration/OrchestratorInterpreter.fs": {
-    "business-interpreter": 1
-  },
   "Application/Reconciliation/BloggerCrashRecovery.fs": {
     "program-counter": 1,
     "mutable": 1
@@ -52,10 +49,6 @@
   },
   "Domain/LoopDetector.fs": {
     "mutable": 4
-  },
-  "Domain/OrchestratorProgram.fs": {
-    "second-runtime-protocol": 3,
-    "business-interpreter": 1
   },
   "Domain/PromptAuthority.fs": {
     "behaviour-bool": 1

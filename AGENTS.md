@@ -171,14 +171,14 @@ Trace Interpreter」并要求业务程序只能构造 Program、副作用只由 
 
 ### DSL 纠偏进度（TASK PR0–PR6）
 
-以 git tip `bcf66e3a` 与生产源码实测为准。完成 = 旧路径已删 + 新路径可跑 + 测试/门禁锁住。
+以 git tip 与生产源码实测为准。完成 = 旧路径已删 + 新路径可跑 + 测试/门禁锁住。
 
 | PR | 内容 | 状态 | 证据 |
 |----|------|------|------|
 | PR 0 | SUPERSEDED 声明 + `spec/14` 改写为直接 CE | **done** | `TASK.md` 头、`spec/14` FLOW-001…008；commit `03223a1b` |
 | PR 1 | 门禁改向：允许 `task{}`、禁止 Command/Reply/Step 与业务 Interpreter | **done** | `scripts/checks/dsl-ownership.mjs` + `direct-ce-contract.test.mjs`；commit `bcf66e3a` |
-| PR 2 | 删除 `Kernel/Program.fs` + `Kernel/TraceInterpreter.fs` 及 facade/测试 | **done** | 已删源文件/fsproj；facade 早在 `bcf66e3a` 移除；ratchet baseline 重生（去掉内核两项，并按现行扫描补回 Join/SessionRecovery/ChildRecovery 既有债务） |
-| PR 3 | Orchestrator 垂直切片：Ops + 直接 CE，删 AST/Interpreter | **todo** | 仍是 `OrchestratorCommand/Reply/Step` + `OrchestratorInterpreter`（`37ddce30` 走了错误 M2 方向） |
+| PR 2 | 删除 `Kernel/Program.fs` + `Kernel/TraceInterpreter.fs` 及 facade/测试 | **done** | commit `ee6e7732`；threshold 曾冻结 174 |
+| PR 3 | Orchestrator 垂直切片：直接 CE，删 AST/Interpreter | **done** | 恢复 `Application/Orchestration/Program.fs` + `Prompts.fs`；删 Domain AST/`OrchestratorInterpreter`；Runtime 调 `OrchestratorProgram.run`；threshold 169 |
 | PR 4 | Reconcile 垂直切片：保留纯决策，删 Command/Reply/Program AST | **todo** | `ReconcileEvidence/Decision` 可保留；AST + `ProtocolMismatch` + `TraceInterpreter` 仍在（`6fe3a9b3`） |
 | PR 5 | Join / SessionRecovery / ChildRecovery 小型 AST 清理 | **todo** | `*Interpreter.fs` 与 `JoinProgram` 仍在 |
 | PR 6 | 文档/命名收尾：去掉 Program-is-data / unique interpreter 表述 | **todo** | AGENTS 后半仍残留旧 Wave/M* 叙述，待与代码同步清理 |

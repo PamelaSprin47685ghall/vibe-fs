@@ -39,7 +39,6 @@
     <Compile Include="Domain/SessionRecovery.fs"/>
     <Compile Include="Domain/ChildRecovery.fs"/>
     <Compile Include="Domain/JoinProgram.fs"/>
-    <Compile Include="Domain/OrchestratorProgram.fs"/>
     <Compile Include="Domain/ReconcileProgram.fs"/>
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
@@ -127,7 +126,8 @@
     <Compile Include="Infrastructure/Git/IntegrationGate.fs"/>
     <Compile Include="Infrastructure/Git/WorktreeResource.fs"/>
     <Compile Include="Application/Orchestration/ManagerJob.fs"/>
-    <Compile Include="Application/Orchestration/OrchestratorInterpreter.fs"/>
+    <Compile Include="Application/Orchestration/Prompts.fs"/>
+    <Compile Include="Application/Orchestration/Program.fs"/>
     <Compile Include="Application/Orchestration/Runtime.fs"/>
     <Compile Include="Infrastructure/Git/GitOperations.fs"/>
     <Compile Include="Session/CompanionTypes.fs"/>
