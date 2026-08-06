@@ -156,12 +156,18 @@ conformance 账本、STATUS ledger 与旧 gate 森林（见下）。
 
 ### 当前开发阶段
 
-0.5.3 主线是「结构化程序 DSL 根治」（见 `TASK.md` 与 `spec/14`，FLOW-001…FLOW-010）：
-删除「通用 Flow 包一层 Task 就算 DSL」的设计，为每个业务上下文建立封闭、强类型、
-可解释的 Program DSL；业务程序只能构造 Program，副作用只由 Interpreter 执行；
-用编译边界与 CI 门禁（`scripts/checks/dsl-ownership.mjs`，阈值 322 冻结 backlog）
-封死绕过路径。`spec/16`（PROJ-，Projection Algebra）承接 `spec/08` 的
-`COMPANION-007` 与 `spec/10` 的 `VERIFY-007`，作为投影的正式规范。
+0.5.3 主线是「结构化程序 DSL 纠偏」（见 `TASK.md` 与 `spec/14`，FLOW-001…FLOW-008）：
+DSL 是**直接执行的 F# computation expression** + 领域命名的强类型操作 + 少量组合子，
+不是待解释的业务 AST。早期 spec/14 曾把 DSL 误写成「封闭指令 AST + 唯一 Interpreter +
+Trace Interpreter」并要求业务程序只能构造 Program、副作用只由 Interpreter 执行；该方向
+与 spec/01 的 ARCH-001（直接用 computation expression 写流程）相悖，已 SUPERSEDED
+（见 `TASK.md` 头部声明与 spec/14 的历史纠偏）。应删除通用 `Kernel/Program.fs`、
+`Kernel/TraceInterpreter.fs` 与 `Command/Reply/Step` 内部协议，禁止再造第二套运行时——
+`AgentProgram`、`CompanionProgram` 那类「functions, not a Flow AST」、直接以 `task`/`let!`/
+异常映射执行的写法正是参考实现。旧设计里值得保留的价值（纯决策、有界递归、命名组合子、
+可检查轨迹、规则 DSL、从 Journal 恢复）由 direct CE / fake ports 承载而非 AST。`spec/16`
+（PROJ-，Projection Algebra）承接 `spec/08` 的 `COMPANION-007` 与 `spec/10` 的 `VERIFY-007`，
+作为投影的正式规范。
 
 ### 已退役的 0.5.2 机制（勿重新引入）
 
@@ -648,6 +654,15 @@ schema 本身，而是两次判据事件之间静默时间超过 `WATCHDOG_TIMEO
 # 关于文件行数
 
 本仓库曾经有文件不超过 300 行限制，现在作废。
+
+> ⚠ **SUPERSEDED（2026-08 裁决）**：以下整段是上一版「Program 为数据 + 唯一 Interpreter」方案
+> 的工作笔记，其方向已被新裁决撤回。新方向见本文件 §2「当前开发阶段」、`spec/14`
+> （FLOW-001…008）与 `TASK.md`：DSL 是**直接执行的 computation expression**，不是待解释的
+> 业务 AST。下文「Program 必须是数据，副作用由 Interpreter 执行」「建立三个 Interpreter」
+> 「该结果由哪个 Program 决定」等表述一律以新方向为准——纯决策仍保留在 Domain，但不存在
+> Program AST / Interpreter / Trace 层。可保留的合理动作只有：纯决策 `Evidence -> Decision`、
+> 有界递归、命名组合子、含预算的退避、fake ports 记录调用轨迹、从 Journal facts 重入普通
+> workflow。本段的逐文件清单与「先止血/后大修」取舍不再作为实施指引。
 
 你说得对，我上一版把**失败后的污染机制**抬得太高了。
 
@@ -1623,3 +1638,858 @@ M20 测试卫生：输家取消、叶子退出、诊断整理
 最终目标不是“全绿且代码看起来用了 CE”，而是：
 
 > 给定同一组 durable facts 和 authoritative snapshot，只能构造出一个合法 Program；该 Program 的 trace 明确、effect 身份稳定，任何事件到达顺序都不能创造第二种业务真相。
+
+# 裁决
+
+这次不是普通的“实现偏重”，而是一次**规范漂移驱动的架构误导**。
+
+`spec/01` 的第一性原理很明确：F#/.NET 运行时已经提供 continuation、局部变量、调用栈和取消机制，业务层应当直接用 computation expression 写流程，不要再造一套 Stage、Phase 或执行机。 
+
+但后来的 `spec/14` 和 `TASK.md` 把它改写成了：
+
+> 封闭指令 AST + Reply + Interpreter + Trace Interpreter
+
+甚至明确提出“computation expression ≠ DSL”。这才是本轮复杂度膨胀的根源。更关键的是，`spec/14` 自己声明冲突时以 `spec/01` 为准，因此现在可以直接依据 SSOT 纠偏，不需要继续证明哪一种解释更“高级”。  
+
+最终裁决应当写成一句话：
+
+> **本项目中的 DSL，是直接执行的 F# computation expression，加上领域命名的强类型操作和少量组合子；它不是待解释的业务 AST。**
+
+---
+
+# 一、先统一正确心智模型
+
+## 1. DSL 应当是什么
+
+推荐定义：
+
+```text
+DSL
+  = F# computation expression
+  + let! / do! / return! / match
+  + 领域命名的强类型函数
+  + 少量有明确语义的组合子
+```
+
+例如：
+
+```fsharp
+orchestrator {
+    let! managerResult = awaitManager ops job ct
+    let! candidate = reviewCandidate ops job managerResult ct
+    let! published = rebaseAndPublish ops job candidate ct
+    return published
+}
+```
+
+这里：
+
+* F# 调用栈就是流程栈；
+* `let!` 就是顺序控制；
+* `match` 就是业务分支；
+* `return!` 就是尾调用；
+* `CancellationToken` 就是取消协议；
+* `Task<Result<_,_>>` 就是异步和错误通道；
+* 普通递归就是循环；
+* 类型系统直接约束每一个操作的输入和返回值。
+
+不需要额外的 `Command`、`Reply`、`Step`、`Suspend` 或 Interpreter。
+
+## 2. DSL 不应当是什么
+
+以下形态全部属于“第二套运行时”：
+
+```fsharp
+type Command =
+    | ReadHead ...
+    | Rebase ...
+    | Publish ...
+
+type Reply =
+    | UnitOk
+    | Head of CommitHash
+    | RebaseOk
+    | RebaseConflict ...
+    | Failed of string
+
+type Program =
+    | Return of Result<...>
+    | Step of Command * (Reply -> Program)
+```
+
+当前 `OrchestratorProgram` 正是这种结构：一个大 `Command`，一个大 `Reply`，一个 continuation-bearing `Step`，再用 builder 拼装数据。它实际上用业务代码重新实现了一遍动态调用协议。 
+
+这会必然产生：
+
+* 每条正常调用被拆成 Command 定义、Reply 定义、构造器、Interpreter 分支、测试 facade 五份；
+* 一个操作只能返回自己那一种结果，但大 Reply DU 允许所有回复；
+* 因此每一步都要处理十几个理论上不可能出现的 Reply；
+* 为了测试“执行顺序”，又造 Trace Interpreter；
+* 为了复用，又造通用 Program Kernel；
+* 最后 CE 不再简化代码，只是 AST 构造器的表面语法。
+
+当前通用 Trace Interpreter 甚至通过给 continuation 传入 `null` 来遍历程序，这已经是抽象失真的强信号。 
+
+---
+
+# 二、目标架构
+
+只保留四层，不再存在 `Program AST → Interpreter` 这一中间层。
+
+```text
+Domain
+    事实、证据、值对象、业务结果 DU、纯决策函数
+
+Application Workflow
+    直接执行的 computation expression
+    let! / match / return! 表达业务流程
+
+Ports / Capabilities
+    业务所需的强类型操作接口
+
+Infrastructure / Runtime
+    Host、Git、Journal、锁、队列、时钟、网络、进程
+```
+
+## Domain 层保留什么
+
+例如 Reconcile 中这些应该保留：
+
+```fsharp
+type ReconcileEvidence =
+    | SnapshotError of string
+    | NoTurn
+    | Provisional of ObservedTurn
+    | Unknown of ObservedTurn option
+    | Terminal of ObservedTurn
+    | BudgetExhausted of hasCandidate: bool
+    | SessionCleared
+
+type ReconcileDecision =
+    | RereadWithBackoff of clearCandidate: bool
+    | Publish
+    | StopPass
+
+val decideStep : ReconcileEvidence -> ReconcileDecision
+```
+
+它们描述的是真实业务概念：观察到了什么、应采取什么决策。
+
+## Domain 层删除什么
+
+这些应删除：
+
+```fsharp
+type ReconcileCommand
+type ReconcileReply
+type ReconcileProgram
+ProtocolMismatch
+materializePass
+TraceInterpreter
+```
+
+因为它们描述的不是领域，而是：
+
+> “程序执行到这里以后，下一个函数调用是什么。”
+
+这正是 `ARCH-001` 要交给语言运行时的东西。
+
+---
+
+# 三、推荐的最小 CE 实现
+
+优先使用内置 `task {}`。只有在 `Result` 短路样板明显过多时，才保留一个极小的 `TaskResultBuilder`。
+
+```fsharp
+type TaskResult<'value, 'error> =
+    Task<Result<'value, 'error>>
+
+type TaskResultBuilder() =
+
+    member _.Return(value: 'value) : TaskResult<'value, 'error> =
+        Task.FromResult(Ok value)
+
+    member _.ReturnFrom
+        (operation: TaskResult<'value, 'error>)
+        : TaskResult<'value, 'error> =
+        operation
+
+    member _.Bind
+        (
+            operation: TaskResult<'value, 'error>,
+            next: 'value -> TaskResult<'next, 'error>
+        )
+        : TaskResult<'next, 'error> =
+        task {
+            match! operation with
+            | Ok value -> return! next value
+            | Error error -> return Error error
+        }
+
+    member _.Zero() : TaskResult<unit, 'error> =
+        Task.FromResult(Ok())
+
+    member _.Delay
+        (factory: unit -> TaskResult<'value, 'error>)
+        : TaskResult<'value, 'error> =
+        task { return! factory () }
+
+let taskResult = TaskResultBuilder()
+```
+
+它必须满足以下限制：
+
+* 直接执行，不构造 AST；
+* 不含 `Command`、`Reply`、`Step`、`Suspend`；
+* 不含 `obj`、`unbox`、反射；
+* 不实现通用 Interpreter；
+* 不持久化 continuation；
+* 最好不提供通用 `While`、`For` 和复杂异常 DSL；
+* 总体保持几十行，不能逐步长成另一个框架。
+
+`agent`、`companion`、`orchestrator` 可以只是这个 builder 的语义别名，甚至可以全部直接使用 `taskResult`。
+
+---
+
+# 四、Orchestrator 应如何改
+
+## 1. 用强类型 capability 替代 Command/Reply
+
+```fsharp
+type OrchestratorOps =
+    {
+        AwaitManager:
+            ManagerJobId ->
+            CancellationToken ->
+            Task<Result<ManagerResult, OrchestratorError>>
+
+        ReadTargetHead:
+            TargetRef ->
+            CancellationToken ->
+            Task<Result<CommitHash, OrchestratorError>>
+
+        RebaseOnto:
+            WorktreePath ->
+            TargetRef ->
+            CancellationToken ->
+            Task<Result<RebaseResult, OrchestratorError>>
+
+        Review:
+            ReviewRequest ->
+            CancellationToken ->
+            Task<Result<ReviewResult, OrchestratorError>>
+
+        Publish:
+            PublishRequest ->
+            CancellationToken ->
+            Task<Result<PublishResult, OrchestratorError>>
+
+        ReleaseWorktree:
+            WorktreePath ->
+            CancellationToken ->
+            Task<Result<unit, OrchestratorError>>
+    }
+```
+
+每个操作返回自己的结果：
+
+```fsharp
+type RebaseResult =
+    | Rebased of CommitHash
+    | Conflicted of files: string list * worktreeHead: CommitHash
+
+type PublishResult =
+    | Landed of CommitHash
+    | TargetMoved
+```
+
+不要再让 `ReadTargetHead` 理论上收到 `ReviewOk` 或 `PublishFailed`。
+
+## 2. 直接写流程
+
+```fsharp
+let rec rebaseReviewPublish
+    (ops: OrchestratorOps)
+    (job: ManagerJob)
+    (round: int)
+    (ct: CancellationToken)
+    : Task<Result<CommitHash, OrchestratorError>> =
+    taskResult {
+        let! targetHead = ops.ReadTargetHead job.TargetRef ct
+        let! rebaseResult = ops.RebaseOnto job.Worktree.Path job.TargetRef ct
+
+        match rebaseResult with
+        | Conflicted(files, worktreeHead) ->
+            let! resumed =
+                resumeConflict ops job files worktreeHead ct
+
+            return! rebaseReviewPublish ops resumed (round + 1) ct
+
+        | Rebased candidate ->
+            let! review =
+                ops.Review
+                    { JobId = job.Id
+                      SessionId = job.ManagerSessionId
+                      Candidate = candidate
+                      Round = round }
+                    ct
+
+            match review with
+            | RevisionRequired feedback ->
+                let! resumed = resumeAfterReview ops job feedback ct
+                return! rebaseReviewPublish ops resumed (round + 1) ct
+
+            | ConfirmedPerfect ->
+                let! publish =
+                    ops.Publish
+                        { JobId = job.Id
+                          Candidate = candidate
+                          ExpectedTargetHead = targetHead }
+                        ct
+
+                match publish with
+                | Landed commit ->
+                    do! ops.ReleaseWorktree job.Worktree.Path ct
+                    return commit
+
+                | TargetMoved ->
+                    return! rebaseReviewPublish ops job (round + 1) ct
+    }
+```
+
+读这段代码时，审阅者看到的就是业务流程，而不是一棵要在脑内执行的 AST。
+
+---
+
+# 五、Reconcile 应如何改
+
+Reconcile 需要把两种东西拆开：
+
+1. **运行时调度机制**：队列、single-flight、generation、清理、并发锁；
+2. **一次 reconcile pass 的业务流程**。
+
+第一类是物理运行时状态，可以保留。第二类直接用 CE。
+
+```fsharp
+type ReconcileOps =
+    {
+        ReadActiveBinding:
+            SessionId ->
+            CancellationToken ->
+            Task<Result<ActiveRunBinding option, ReconcileError>>
+
+        ReadSnapshot:
+            SessionId ->
+            CancellationToken ->
+            Task<Result<SessionMessage list, ReconcileError>>
+
+        Delay:
+            TimeSpan ->
+            CancellationToken ->
+            Task<Result<unit, ReconcileError>>
+
+        PublishTurn:
+            ReconciledTurn ->
+            CancellationToken ->
+            Task<Result<unit, ReconcileError>>
+
+        ObserveSnapshot:
+            SessionId ->
+            SessionMessage list ->
+            CancellationToken ->
+            Task<Result<unit, ReconcileError>>
+    }
+```
+
+```fsharp
+let rec reconcileActive
+    (ops: ReconcileOps)
+    (policy: ReconcilePolicy)
+    (state: ReconcilePassState)
+    (ct: CancellationToken)
+    : Task<Result<unit, ReconcileError>> =
+    taskResult {
+        if state.BudgetRemaining <= TimeSpan.Zero then
+            return! publishCandidateIfNeeded ops state ct
+        else
+            let! messages = ops.ReadSnapshot state.SessionId ct
+            let evidence = classifySnapshot state.Binding messages
+
+            match ReconcileProgram.decideStep evidence with
+            | ReconcileDecision.StopPass ->
+                do! ops.ObserveSnapshot state.SessionId messages ct
+
+            | ReconcileDecision.Publish ->
+                do! publishEvidenceIfNeeded ops state evidence ct
+                do! ops.ObserveSnapshot state.SessionId messages ct
+
+            | ReconcileDecision.RereadWithBackoff clearCandidate ->
+                let delay = policy.NextDelay state.BackoffIndex state.BudgetRemaining
+                do! ops.Delay delay ct
+
+                let next =
+                    state
+                    |> ReconcilePassState.afterObservation evidence clearCandidate
+                    |> ReconcilePassState.consumeBudget delay
+
+                return! reconcileActive ops policy next ct
+    }
+```
+
+现有 `ReconcileProgram` 中大量 `ProtocolMismatch` 分支，正是大 Reply DU 丢失操作级静态类型后产生的补偿代码。 
+
+改造后：
+
+* 不再存在 Reply 协议；
+* 因而没有协议错配；
+* 每个 port 的返回类型在编译期确定；
+* 调度器只负责“何时跑”，不负责“业务下一步做什么”。
+
+---
+
+# 六、逐 PR 纠偏顺序
+
+## PR 0：紧急停止继续跑偏
+
+目标：先阻止新增 AST，不动生产行为。
+
+修改：
+
+1. 给 `TASK.md` 加醒目的 `SUPERSEDED` 声明。
+2. 修订 `spec/14`，明确它不得改变 `ARCH-001`。
+3. 新增一条架构决议：
+
+```text
+本项目 DSL 为直接执行的 computation expression。
+禁止把普通业务调用序列编码成 Command/Reply/Step AST。
+```
+
+4. 暂停新增以下类型：
+
+```text
+*Command
+*Reply
+*Program = Return | Step
+Pure | Suspend
+ProtocolMismatch
+*Interpreter 用于解释内部业务调用
+```
+
+这一 PR 必须最先落地。否则后续删代码时，现有规范测试会持续要求工程师重新补回 Program Kernel 和 Interpreter。
+
+---
+
+## PR 1：纠正测试与门禁
+
+当前门禁扫描整个 Agent、Application、Domain、Kernel、Session，并把原始 `task {}` 视为违规；同时只对名称以 `Interpreter.fs` 结尾的 Application 文件豁免。这会制度性地诱导工程师把正常代码搬进 Interpreter。  
+
+应立即调整。
+
+### 删除或改写
+
+* `tests/unit/verify/program-kernel-contract.test.mjs`
+* `tests/unit/verify/program-kernel.test.mjs`
+* 要求 `programKernel` 导出的 facade 代码；
+* 要求 `Pure/Suspend`、Trace Interpreter 存在的静态测试；
+* 要求 Orchestrator 只能通过 Interpreter 运行的 shape test。
+
+这些测试目前明确锁定了通用 Program Kernel 和 Trace Interpreter，所以它们已从防回归测试变成了错误架构的护城河。  
+
+### 新门禁应检查
+
+禁止：
+
+```text
+业务层 CurrentStage / NextAction / Running 等程序计数器
+Command + Reply + Step/Suspend 内部执行协议
+持久化 continuation 或 Program 节点
+Domain 引用 Host/Infrastructure
+obj/unbox 驱动的通用业务程序内核
+仅用于重放普通调用序列的 Interpreter
+```
+
+允许：
+
+```text
+Application 中直接 task/taskResult
+有界递归
+物理并发状态的 mutable
+锁、队列、取消源、completion cell
+外部协议的 codec/parser/interpreter
+纯领域决策 DU
+```
+
+尤其要删除 `raw-task` 违规项。`task {}` 正是正确方案的一部分，不是逃生口。
+
+---
+
+## PR 2：删除错误的通用基础设施
+
+建议直接删除：
+
+```text
+src/Wanxiangshu/Kernel/Program.fs
+src/Wanxiangshu/Kernel/TraceInterpreter.fs
+```
+
+同步删除：
+
+* `.fsproj` 编译项；
+* `domain.mjs` 的 `programKernel` facade；
+* 对应 contract 和 behavior tests；
+* 所有只为这个内核存在的导出。
+
+然后处理：
+
+```text
+Kernel/Flow.fs
+Kernel/DomainFlow.fs
+```
+
+推荐选择：
+
+### 首选
+
+直接使用：
+
+```fsharp
+task { ... }
+```
+
+### 次选
+
+保留一个极小的：
+
+```fsharp
+TaskResultBuilder
+```
+
+需要保留的并行能力，例如 `parallelMapBounded`，单独放进：
+
+```text
+Kernel/Parallel.fs
+```
+
+不要为了保住一个有用的并行函数而保留整个 Flow 框架。
+
+---
+
+## PR 3：先改 Orchestrator
+
+Orchestrator 是最合适的首个垂直切片：
+
+* AST 和 Interpreter 边界明确；
+* 行为有现成测试；
+* 业务流程相对集中；
+* 能快速展示复杂度下降。
+
+迁移步骤：
+
+1. 为现有行为补 characterization tests；
+2. 定义 `OrchestratorOps`；
+3. 把 `executeCommand` 中每个分支变成一个强类型 capability；
+4. 把 `OrchestratorPrograms` 的嵌套 `Step` 改成直接 CE；
+5. 测试 fresh run；
+6. 测试 conflict resume；
+7. 测试 target moved 重试；
+8. 测试 review revision；
+9. 测试 publish landed；
+10. 同一 PR 删除旧 AST 和 Interpreter。
+
+不要长期双跑。可以在开发分支暂时并存，但合并时必须 clean break。
+
+---
+
+## PR 4：再改 Reconcile
+
+迁移时按下面边界切：
+
+### 保留
+
+```text
+ReconcileEvidence
+ReconcileDecision
+decideStep
+pickDelay
+publishDecision
+PublishMaps
+snapshot classification
+```
+
+### 删除
+
+```text
+ReconcileCommand
+ReconcileReply
+ReconcileProgram
+materializePass
+protocolMismatch
+TraceInterpreter
+stepName / replyName 测试辅助面
+```
+
+### 重构
+
+```text
+ReconcileInterpreter.fs
+    ↓
+Reconciler.fs
+```
+
+其中：
+
+* 队列、generation、single-flight、clear session 保留；
+* `Interpret(program)` 删除；
+* 改成直接调用 `runPass ops ...`；
+* fake port 记录调用事件，用于测试执行顺序。
+
+测试执行轨迹不必来自 AST。Fake port 可以简单记录：
+
+```fsharp
+ResizeArray<ReconcileEvent>
+```
+
+得到：
+
+```text
+ReadBinding
+ReadSnapshot
+Delay
+ReadSnapshot
+Publish
+Observe
+```
+
+这仍然可检查，但不要求生产代码先变成一棵树。
+
+---
+
+## PR 5：清理其余“小型解释器”
+
+逐个审查：
+
+```text
+Domain/JoinProgram.fs
+Domain/SessionRecovery.fs
+Domain/ChildRecovery.fs
+Application/Reconciliation/JoinInterpreter.fs
+Application/Reconciliation/SessionRecoveryInterpreter.fs
+Application/Reconciliation/ChildRecoveryInterpreter.fs
+```
+
+审查标准只有一个：
+
+> 这个 DU 描述的是领域事实/决策，还是只是在描述接下来调用哪个函数？
+
+若是前者，保留。
+
+若是后者，改成直接 CE。
+
+例如当前 `JoinProgram` 一方面宣称是 Program 数据，另一方面又把 `Task<unit>` 作为 `interrupt` 放进节点，本身已经说明“纯数据 AST”边界并不成立。 
+
+---
+
+## PR 6：清理文档和命名
+
+完成后全仓删除或更名：
+
+```text
+Program AST
+Program is data
+unique production interpreter
+Trace Interpreter
+Command/Reply protocol
+materialize program
+executeCommand
+ProtocolMismatch
+```
+
+但是不要机械删除所有 `Interpreter`：
+
+### 可以保留
+
+* 外部 JSON/TOML/Host 协议解释；
+* codec；
+* parser；
+* 真正的语言或数据格式解释器。
+
+### 应删除
+
+* 仅仅把内部 `ReadX` Command 转回 `port.ReadX()` 的解释器；
+* 仅仅把普通函数调用序列编码后再回放的解释器。
+
+---
+
+# 七、建议直接改写 `spec/14`
+
+可按以下条款重写。
+
+## FLOW-001：流程直接由语言表达
+
+业务流程必须直接使用 F# computation expression、`let!`、`do!`、`match`、`return!`、纯函数和有界递归表达。
+
+## FLOW-002：DSL 是可执行语法，不是中间表示
+
+领域 DSL 是 computation expression 与领域命名操作构成的源码表面。
+
+禁止要求业务流程先构造内部 AST 再执行。
+
+## FLOW-003：领域操作必须强类型、具名
+
+业务流程只能通过具名 capability 调用副作用：
+
+```text
+awaitManager
+readTargetHead
+rebaseOnto
+publish
+readSnapshot
+observeSnapshot
+```
+
+不公开泛化的 `execute Command`。
+
+## FLOW-004：纯决策与效果流程分离
+
+领域层负责：
+
+```text
+Evidence -> Decision
+Facts -> Projection
+Input -> Result
+```
+
+Application 层负责根据 Decision 直接执行效果。
+
+## FLOW-005：恢复从事实重新进入普通流程
+
+恢复过程：
+
+```text
+Journal facts
+→ Fold
+→ 纯恢复决策
+→ 调用普通 workflow 的合法入口
+```
+
+不得恢复 Program 节点或 continuation。
+
+## FLOW-006：禁止第二运行时
+
+禁止：
+
+```text
+通用 Program<Pure,Suspend>
+业务 Command/Reply 总线
+Step continuation AST
+内部业务 Interpreter
+ProtocolMismatch 补偿分支
+持久化执行位置
+```
+
+## FLOW-007：循环和并发必须有界
+
+允许普通递归和并发组合子，但必须具有明确：
+
+* 预算；
+* 退出条件；
+* 取消传播；
+* 资源释放；
+* 错误类型。
+
+不要求通过 AST 表达。
+
+## FLOW-008：通过可观察效果测试流程
+
+流程测试使用 fake capabilities 记录调用、参数、facts 和结果。
+
+不以 Program 树形或 Trace Interpreter 作为生产合同。
+
+---
+
+# 八、文件级处理清单
+
+| 文件                                                     | 建议                                     |
+| ------------------------------------------------------ | -------------------------------------- |
+| `Kernel/Program.fs`                                    | 删除                                     |
+| `Kernel/TraceInterpreter.fs`                           | 删除                                     |
+| `Kernel/Flow.fs`                                       | 缩成极小 TaskResult builder，或删除            |
+| `Kernel/DomainFlow.fs`                                 | 删除或仅保留 builder 别名                      |
+| `Domain/OrchestratorProgram.fs`                        | 改成纯领域类型；流程迁到 Application               |
+| `Application/Orchestration/OrchestratorInterpreter.fs` | 改为 `OrchestratorWorkflow.fs`，删除解释循环    |
+| `Domain/ReconcileProgram.fs`                           | 拆成 `ReconcilePolicy.fs`，仅留纯决策          |
+| `Application/Reconciliation/ReconcileInterpreter.fs`   | 改成调度器 + 直接 workflow                    |
+| `Domain/JoinProgram.fs`                                | 改为直接 `joinAny` / `joinAvailable` CE 操作 |
+| `Agent/AgentProgram.fs`                                | 作为正确方向的参考                              |
+| `Session/CompanionProgram.fs`                          | 作为正确方向的参考                              |
+| `dsl-ownership.mjs`                                    | 删除 raw-task 禁令和 Interpreter 路径豁免       |
+| `dsl-ownership-ratchet-baseline.json`                  | 按新规则重新生成                               |
+| Program kernel/trace tests                             | 删除或改成 workflow behavior tests          |
+| `TASK.md`                                              | 标记失效，避免继续指导实施                          |
+
+仓库里的 `AgentProgram` 和 `CompanionProgram` 已经明确使用“functions, not a Flow AST”，并直接以 `task`、`let!`、异常映射来执行，这两处正好可以作为新规范的参考实现。  
+
+---
+
+# 九、每个 PR 的验收标准
+
+一个子系统只有满足以下条件才算纠偏完成：
+
+1. 业务主流程可以从上到下直接阅读。
+2. 不存在该子系统的 `Command + Reply + Step/Suspend`。
+3. 不存在解释该内部 AST 的生产 Interpreter。
+4. 不存在由大 Reply DU 导致的“不可能回复”分支。
+5. Domain 中只剩事实、证据、决策和值对象。
+6. 异步、取消和错误直接使用语言运行时。
+7. 恢复从 Journal facts 和 projection 重新进入正常 workflow。
+8. 测试通过 fake ports 验证调用顺序和外部结果。
+9. 行为级 unit、integration、e2e 全部保持。
+10. 删除旧实现，不留下长期双路径。
+
+建议再加三个量化门槛：
+
+```text
+目标子系统 ProtocolMismatch 数量 = 0
+目标子系统内部 Program Interpreter 数量 = 0
+目标子系统 AST trace-only 测试数量 = 0
+```
+
+---
+
+# 十、Code Review 的三问法
+
+今后任何人提出新的 DSL 抽象，Reviewer 只问三件事：
+
+### 问题一
+
+> 这段流程能不能直接用 `let! / match / return!` 写？
+
+能，就不允许造 AST。
+
+### 问题二
+
+> 这个 DU 表示真实领域状态，还是“程序下一步去哪”？
+
+后者删除。
+
+### 问题三
+
+> 这个 Interpreter 在解释外部协议，还是在把内部 Command 重新变回函数调用？
+
+后者删除。
+
+---
+
+# 最终落地顺序
+
+```text
+先改 spec
+→ 再改门禁
+→ 删除通用 Program Kernel
+→ Orchestrator 垂直切片
+→ Reconcile 垂直切片
+→ Join / Recovery 小型 AST 清理
+→ 文档和 facade 收尾
+```
+
+不要从“优化 Interpreter”开始，也不要先设计一个更强的泛型 Program。正确方向不是做出一个更好的解释器，而是让这类解释器根本不再需要。

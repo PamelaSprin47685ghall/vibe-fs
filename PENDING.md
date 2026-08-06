@@ -1,3 +1,22 @@
+# 前置：DSL 方向（2026-08 裁决，先读）
+
+本清单 8 项是协议/运行时/提示词功能改动，落在 join、Blogger/Enforcer、Transform 等路径上。
+实现它们时必须遵循已纠偏的 DSL 方向（`spec/14` FLOW-001…008 + `TASK.md`）：
+
+* DSL 是**直接执行的 F# computation expression**（`taskResult` `let!/match!/return!` + 具名
+  capability），不是待解释的业务 AST；禁止为 join/blogger/enforcer 造 `Command/Reply/Step`
+  AST 或内部业务 Interpreter。
+* 本 8 项涉及的既有小型 AST（`JoinProgram`）与 mutable 标志（`BloggerRuntimeState`、
+  `EnforcerHost`）按「实际替换语义」处理：迁移时直接改成直接 CE + 纯决策 DU + fake ports
+  记录调用轨迹，绝不「外包一层」或 `Interceptor` 双跑。
+* join 的中断/批量/竞态、Blogger 的 `nudge → AABB`、Enforcer 的 tip 决策，其纯决策部分
+  留 Domain，Application 层按 Decision 直接执行效果。
+* 与 DSL 纠偏纵向推进并行，但本 8 项不得在纠偏完成前把新的 Command/Reply 协议固化进生产。
+
+---
+
+# 一、PENDING（8 项功能）
+
 1. 新功能: 允许 join 的过程等待中被新的 user 消息打断，此时 join 的返回值是一个特殊值，表示优先处理新的 user 消息而不是继续等待。
 2. 修改提示词: [sub-session 复用] 让 orch/manager 优先考虑复用已有的 sub-session 而不是 fork 新的 sub-session，这样可以利用前缀缓存。
 3. 修改格式: sub-session tools/join 返回值里面，work_record 字段不再作为 toml 的一部分列入，而是作为注释放在开头，因为属于 parent 可执行的 instruction-like 内容。
