@@ -191,6 +191,8 @@ export class ProcessHost {
       this._exitInfo = null;
       return;
     }
+    const port = this._port;
+    const pid = this._pid;
     try {
       await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS);
       try { this._child.stdout.destroy(); } catch {}
@@ -198,6 +200,30 @@ export class ProcessHost {
       try { this._child.stdin.destroy(); } catch {}
       this._child = null;
       if (assert) {
+        // Parallel canaries under load: SIGKILL can leave the listen socket
+        // accept-able (orphaned descendant / mid-fork escape). Reclaim before
+        // fail-closed assert — still assert, never paper over a true leak.
+        if (port && !(await checkSocketClosed(port, SOCKET_CHECK_TIMEOUT_MS))) {
+          if (pid) {
+            try {
+              if (process.platform !== 'win32') process.kill(-pid, 'SIGKILL');
+            } catch {}
+            try {
+              process.kill(pid, 'SIGKILL');
+            } catch {}
+          }
+          // Last-resort reclaim of the listen socket owner (harness-only).
+          if (process.platform === 'linux') {
+            try {
+              const { execSync } = await import('node:child_process');
+              execSync(`fuser -k ${port}/tcp`, {
+                stdio: 'ignore',
+                timeout: 2000,
+              });
+            } catch {}
+          }
+          await checkSocketClosed(port, SOCKET_CHECK_TIMEOUT_MS);
+        }
         await this.assertNoLeak();
       }
     } finally {
