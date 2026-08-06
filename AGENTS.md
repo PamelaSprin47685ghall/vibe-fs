@@ -26,7 +26,7 @@ what（可观察行为与条款） → shape（所有权与边界） → how（�
 
 ### 1.2 动手之前先读规范与状态
 
-完整标准工作流程：
+> Kolmogorov 标准工作流程
 
 ```text
 proposal -> write why -> write what -> write shape -> write how -> check how against why -> write proof

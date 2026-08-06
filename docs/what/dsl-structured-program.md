@@ -1,0 +1,57 @@
+# DSL 结构化程序规则 — 行为合同
+
+条款前缀：`DSL-`。与 `FLOW-`、`ARCH-001` 同向；冲突时以 `ARCH-001/002/003` 为准。  
+边界见 `shape/dsl-structured-program.md`；实现姿态见 `how/dsl-structured-program.md`；证明见 `proof/dsl-structured-program.md`。
+
+## DSL-001：业务流程必须用语言结构表达
+
+业务控制流只使用 F# 原生结构：`task { }`、`let!`、`do!`、`use!`、`match` / `match!`、`return!`、具名纯函数、有界递归。
+
+F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可长期存储的字段。
+
+## DSL-002：状态标签必须对应物理世界事物
+
+允许用 DU 表达：
+
+- 封闭领域词汇（如 `Role`、`TurnOutcome`、`BloggerRequestKind`）；
+- 已发生事实的持久证据（如 `AgentFact` 子族、`PromptSubmitted`）；
+- 单次函数返回结果（如 `ExitOrDeadline`、`KillResult`）。
+
+禁止用 DU / 字段表达：
+
+- 当前执行到第几步（`CurrentStage`、`NextAction`、`InFlight`、`Parked`、`Sealed`、`Armed` 等）；
+- 由多个 bool / option / DU 正交组合而成的程序状态乘积；
+- 跨多个 bounded context 的单一大总和类型，却无分治 fold。
+
+判断标准：删除该字段后，能否通过普通函数调用、`match!`、`return!`、资源作用域或有界递归表达同样顺序？若能，则该字段是程序计数器。
+
+## DSL-003：纯决策与效果分层
+
+- `Domain`：纯函数 `Evidence → Decision`；不写盘、不发网、不读时钟。
+- `Application` / `Session`：直接执行 CE，按 `Decision` 调用端口。
+- `Infrastructure`：把能力端口暴露为 `Task<'T>`，不解释业务命令。
+
+禁止在业务层构造 AST 再解释执行。
+
+## DSL-004：恢复重入普通流程
+
+崩溃后由 Journal fold 产出领域事实，再调用普通 workflow 入口。  
+禁止恢复 continuation、program counter、`SlotArmed`、`InFlight` 等执行位置。
+
+## DSL-005：组合状态必须可证明合法
+
+记录或 DU 同时包含 `State` + `Pending/Offer` + `Recovery/Repair` + `Drain` 两类以上字段时，必须计算其可表示组合总数，并证明每种组合都有真实业务意义。否则拆分为独立流程或 capability/permit。
+
+## DSL-006：单一真理源
+
+同一领域事实不得在多处定义同构 DU。发现 case 集完全相同的两个类型，必须合并或明确区分其 bounded context，并给出单向转换理由。
+
+## DSL-007：mutable 仅用于物理资源
+
+`let mutable` 只允许：
+
+- 纯算法 scratch（局部函数内）；
+- `Kernel/Parallel.fs` 等并发原语；
+- 物理 Task / Dictionary / TaskCompletionSource / CancellationTokenRegistration / 锁对象。
+
+禁止用 `mutable` 表达业务阶段、`slotArmed`、行为 bool 等控制流状态。
