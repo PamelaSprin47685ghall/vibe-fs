@@ -20,10 +20,14 @@
    - `repairState` 两段式 claim 检查：同一 terminal 重入 → `InteractionNudgeIssued(terminal)`；任一旧 claim 存在且出现新 pure-prose terminal → `InteractionNudgeIssued(claimedRun)`（AABB 语义失败）；transcript 含注入的 repair 消息（同 requestKey）→ `AabbRepairConsumed`；
    - AABB 消耗的可见证据是注入的 `interaction-repair` synthetic 消息：Host transform 输入是完整 snapshot，后续回合可见该消息（测试 harness 模拟输出累积）。
 
+8. `BloggerRuntimeCell.PendingOffer` 字段与 `BloggerRuntime.tryTakePending` 已删除（ENFORCER-050 / DSL-003）：该字段在所有构造点恒为 `None`（有读取无数据），唯一 staging 权威是 `PluginRuntimeScope` 的独立 `pendingOffer` dictionary；`TransitionError.PendingWhileInFlight` 随之删除。
+
 ## 仍存差距
 
-1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 仍含 `BloggerRuntimeCell` 状态乘积（`State`, `PendingOffer`, `Drain`）。
-   - 后续需拆除 `InFlight/Idle/Parked/Sealed/Disposed` 业务 State，迁移为 single-flight Task ownership。
+1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 仍含 `BloggerRuntimeCell` 状态乘积（`State`, `Drain`）。
+   - 后续需拆除 `InFlight/Idle/Parked/Sealed/Disposed` 业务 State，迁移为 single-flight Task ownership；
+   - `Sealed` 镜像（`onSeal`/`forceSeal` 10+ 调用点）应改为每次从 durable projection（`AgentProjection.mainSealedForBlogger`）判断；
+   - `Drain` 应替换为模块外不可构造的私有 `DrainPermit`（仅「新 Authority Root 重开 drain」路径可得）。
 2. `src/Wanxiangshu/Session/Companion.fs` 仍暴露 `ArmRecoverySlot/DisarmRecoverySlot/IsRecoveryArmed` 查询/设置式 API；底层虽已是 TCS waiter，接口形态仍未迁移为「失败启动一次结构化恢复机会、材料经由 `TryConsumeRecoverySlot` 消费」的直接 CE 流程。
 
 ## 阻塞

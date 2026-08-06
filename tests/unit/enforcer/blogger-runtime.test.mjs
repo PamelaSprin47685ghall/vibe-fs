@@ -14,7 +14,6 @@ test('ENFORCER_047_idle_plus_material_starts_inflight', () => {
   assert.equal(rt.stateOf(r.state), 'InFlight')
   assert.equal(r.decision, 'Start')
   assert.equal(ctx.toml(rt.inFlightContext(r.state)), 'work')
-  assert.equal(r.pending, undefined)
 })
 
 test('ENFORCER_047_inflight_plus_material_skips_without_queue', () => {
@@ -24,7 +23,6 @@ test('ENFORCER_047_inflight_plus_material_skips_without_queue', () => {
   assert.equal(r.decision, 'Skip')
   assert.equal(rt.stateOf(r.state), 'InFlight')
   assert.equal(ctx.toml(rt.inFlightContext(r.state)), 'work', 'original context kept')
-  assert.equal(r.pending, undefined, 'InFlight must not write PendingOffer')
 })
 
 test('ENFORCER_047_cycle_commit_moves_inflight_to_parked', () => {
@@ -40,8 +38,6 @@ test('ENFORCER_047_parked_plus_material_offers_without_leaving_parked', () => {
   assert.equal(r.ok, true)
   assert.equal(r.decision, 'Offer')
   assert.equal(rt.stateOf(r.state), 'Parked', 'Offer must not flip state to InFlight')
-  // Physical PendingOffer is the host dictionary; cell never dual-writes it.
-  assert.equal(r.pending, undefined)
   assert.equal(rt.inFlightContext(r.state), undefined)
 })
 
@@ -99,10 +95,11 @@ test('ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
   assert.notEqual(ctx.toml(rt.inFlightContext(b.state)), 'more')
 })
 
-test('ENFORCER_047_parked_offer_leaves_cell_pending_empty', () => {
+test('ENFORCER_047_parked_offer_keeps_cell_without_pending_slot', () => {
+  // DSL-003: the cell has no PendingOffer mirror — the host dictionary is the
+  // sole staging authority (ENFORCER-050), asserted at the scope level by
+  // offerParked/consumeStaged in parked-transform tests.
   const offered = rt.onMaterial(rt.parked, main2())
   assert.equal(offered.decision, 'Offer')
-  const taken = rt.tryTakePending(offered.state)
-  assert.equal(taken.ok, true)
-  assert.equal(taken.pending, undefined, 'host dictionary is sole PendingOffer authority')
+  assert.equal(rt.stateOf(offered.state), 'Parked')
 })

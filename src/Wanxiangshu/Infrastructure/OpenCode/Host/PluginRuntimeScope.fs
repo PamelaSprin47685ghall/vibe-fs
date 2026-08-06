@@ -200,7 +200,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 | true, cell ->
                     match cell.State with
                     | BloggerRuntimeState.Disposed
-                    | BloggerRuntimeState.Sealed -> bloggerRuntime.[sessionId] <- { cell with PendingOffer = None }
+                    | BloggerRuntimeState.Sealed ->
+                        bloggerRuntime.[sessionId] <-
+                            { cell with
+                                State = BloggerRuntimeState.Sealed }
                     | _ ->
                         bloggerRuntime.[sessionId] <-
                             { BloggerRuntime.empty with

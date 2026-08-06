@@ -4445,7 +4445,6 @@ export const bloggerRuntime = (() => {
     'blocksNewRequest',
     'tryPeekInFlight',
     'tryTakeInFlight',
-    'tryTakePending',
     'adoptPendingAsCurrent',
   ])
 
@@ -4472,7 +4471,6 @@ export const bloggerRuntime = (() => {
         ok: true,
         state: pair[0],
         decision: caseOf(pair[1]),
-        pending: unwrapOption(pair[0].PendingOffer),
         reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
@@ -4518,12 +4516,6 @@ export const bloggerRuntime = (() => {
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
       return { ok: true, context: pair[0], state: pair[1] }
-    },
-    tryTakePending: (cell) => {
-      const r = resultOf(m.tryTakePending(cell))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const pair = r.value
-      return { ok: true, pending: unwrapOption(pair[0]), state: pair[1] }
     },
     stateOf: (cell) => caseOf(cell.State),
     reactivatedOf: (cell) => caseOf(cell.Drain) === 'Open',

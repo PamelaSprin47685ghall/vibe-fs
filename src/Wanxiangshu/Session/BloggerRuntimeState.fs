@@ -17,7 +17,8 @@ type BloggerToolRecovery =
 /// InFlight = provider still working on an uncommitted request (the only busy definition).
 /// Parked = last cycle committed; waiting for future material (not busy).
 /// Sealed = fork-child main handle is joinable/retired AND not reactivated by a new root.
-/// PendingOffer is NOT part of the state tag — it is a separate physical slot on the cell.
+/// The next-Main-material slot lives in the host dictionary (ENFORCER-050), not on
+/// the cell — the cell never carries a PendingOffer mirror.
 [<RequireQualifiedAccess>]
 type BloggerRuntimeState =
     | Idle
@@ -33,12 +34,12 @@ type DrainWindow =
     | Closed
     | Open
 
-/// Host-owned cell: state + pending offer + ENFORCER-064 recovery.
-/// CurrentRequest lives in InFlight payload; Recovery is per logical request.
+/// Host-owned cell: state + drain window. CurrentRequest lives in the InFlight
+/// payload; the next-Main-material slot is the host dictionary (ENFORCER-050).
+/// Recovery is derived, never stored (ENFORCER-153).
 type BloggerRuntimeCell =
     {
         State: BloggerRuntimeState
-        PendingOffer: BloggerRequestContext option
         /// Durable handle sealed + new Authority Root may open one drain window.
         Drain: DrainWindow
     }
@@ -53,7 +54,6 @@ module BloggerRuntime =
         | Disposed
         | Sealed
         | NoContext
-        | PendingWhileInFlight
 
     type Decision =
         | Start of BloggerRequestContext
@@ -63,20 +63,14 @@ module BloggerRuntime =
 
     let empty: BloggerRuntimeCell =
         { State = BloggerRuntimeState.Idle
-          PendingOffer = None
-
           Drain = DrainWindow.Closed }
 
     let ofState (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { State = state
-          PendingOffer = None
-
           Drain = DrainWindow.Closed }
 
     let private withState (cell: BloggerRuntimeCell) (state: BloggerRuntimeState) : BloggerRuntimeCell =
-        { cell with
-            State = state
-            PendingOffer = None }
+        { cell with State = state }
 
     /// Main-session material arrived. InFlight never queues (XTrace keeps backlog).
     /// Parked: Decision.Offer only — physical PendingOffer is the host dictionary.
@@ -89,19 +83,13 @@ module BloggerRuntime =
         | BloggerRuntimeState.Idle ->
             Ok(
                 { cell with
-                    State = BloggerRuntimeState.InFlight ctx
-                    PendingOffer = None },
+                    State = BloggerRuntimeState.InFlight ctx },
                 Decision.Start ctx
             )
         | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
         | BloggerRuntimeState.Parked ->
-            // Host dictionary is sole PendingOffer authority (ENFORCER-050 physical slot).
-            Ok(
-                { cell with
-                    State = BloggerRuntimeState.Parked
-                    PendingOffer = None },
-                Decision.Offer ctx
-            )
+            // The host dictionary stages the offer (ENFORCER-050 physical slot).
+            Ok(cell, Decision.Offer ctx)
         | BloggerRuntimeState.Sealed -> Ok(cell, Decision.Ignore)
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
 
@@ -118,13 +106,11 @@ module BloggerRuntime =
         | BloggerRuntimeState.Parked ->
             Ok
                 { cell with
-                    State = BloggerRuntimeState.InFlight ctx
-                    PendingOffer = None }
+                    State = BloggerRuntimeState.InFlight ctx }
 
     let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight _ ->
-            // keep PendingOffer
             Ok
                 { cell with
                     State = BloggerRuntimeState.Parked }
@@ -144,29 +130,26 @@ module BloggerRuntime =
             | Some ctx ->
                 Ok(
                     { cell with
-                        State = BloggerRuntimeState.InFlight ctx
-                        PendingOffer = None },
+                        State = BloggerRuntimeState.InFlight ctx },
                     Decision.Start ctx
                 )
             | None ->
                 Ok(
                     { cell with
-                        State = BloggerRuntimeState.Parked
-                        PendingOffer = None },
+                        State = BloggerRuntimeState.Parked },
                     Decision.Ignore
                 )
         | _ -> Error TransitionError.NotInFlight
 
-    /// Final fail of the logical request: Idle + clear PendingOffer + reset recovery.
+    /// Final fail of the logical request: Idle.
     let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Ok { cell with PendingOffer = None }
+        | BloggerRuntimeState.Sealed -> Ok cell
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { cell with
-                    State = BloggerRuntimeState.Idle
-                    PendingOffer = None }
+                    State = BloggerRuntimeState.Idle }
         | _ -> Error TransitionError.NotInFlight
 
     /// Fork-child handle became joinable/retired: stop new Y requests.
@@ -176,20 +159,14 @@ module BloggerRuntime =
         | BloggerRuntimeState.InFlight _ ->
             // Let the in-flight cycle finish; seal after commit via coordinator re-check.
             // Mark not reactivated so post-commit paths see the durable seal.
-            { cell with
-                PendingOffer = None
-                Drain = DrainWindow.Closed }
+            { cell with Drain = DrainWindow.Closed }
         | _ ->
             { State = BloggerRuntimeState.Sealed
-              PendingOffer = None
-
               Drain = DrainWindow.Closed }
 
     /// Force sealed (no in-flight preserve). Used when dropping offers after join.
     let forceSeal (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Sealed
-          PendingOffer = None
-
           Drain = DrainWindow.Closed }
 
     /// New Authority Root on this main: Blogger may run again after a handle seal.
@@ -204,8 +181,6 @@ module BloggerRuntime =
         | BloggerRuntimeState.Disposed -> cell
         | BloggerRuntimeState.Sealed ->
             { State = BloggerRuntimeState.Idle
-              PendingOffer = None
-
               Drain = DrainWindow.Open }
         | BloggerRuntimeState.InFlight _
         | BloggerRuntimeState.Idle
@@ -213,8 +188,6 @@ module BloggerRuntime =
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
-          PendingOffer = None
-
           Drain = DrainWindow.Closed }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
@@ -262,15 +235,6 @@ module BloggerRuntime =
         | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NoContext
 
-    let tryTakePending
-        (cell: BloggerRuntimeCell)
-        : Result<BloggerRequestContext option * BloggerRuntimeCell, TransitionError> =
-        match cell.State with
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Ok(None, { cell with PendingOffer = None })
-        | BloggerRuntimeState.InFlight _ when cell.PendingOffer.IsSome -> Error TransitionError.PendingWhileInFlight
-        | _ -> Ok(cell.PendingOffer, { cell with PendingOffer = None })
-
     let adoptPendingAsCurrent
         (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
@@ -283,5 +247,4 @@ module BloggerRuntime =
         | BloggerRuntimeState.Parked ->
             Ok
                 { cell with
-                    State = BloggerRuntimeState.InFlight ctx
-                    PendingOffer = None }
+                    State = BloggerRuntimeState.InFlight ctx }

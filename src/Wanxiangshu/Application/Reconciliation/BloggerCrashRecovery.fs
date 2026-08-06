@@ -83,7 +83,6 @@ module BloggerCrashRecovery =
         host.SetBloggerRuntime(
             key,
             { State = state
-              PendingOffer = None
               Drain = DrainWindow.Closed }
         )
 
