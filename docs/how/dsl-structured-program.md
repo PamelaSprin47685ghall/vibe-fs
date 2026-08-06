@@ -74,3 +74,54 @@ PR 7 BloggerRuntimeCell   → 已落地（二态 + 显式 waiter 参数）
 PR 8 AgentFact            → 已落地（family 拆分）
 PR 9 dsl-ownership        → 已落地（9 门 + 1 报告）
 ```
+
+## 迁移验收表（提交前逐项回答）
+
+### 业务所有权
+
+- 这段 workflow 的唯一入口是什么？
+- 哪个函数拥有完整资源生命周期？
+- 哪个模块拥有纯 Decision？
+- 哪个模块执行副作用？
+
+### 状态检查
+
+- 是否存在表示「下一步执行什么」的字段？
+- 是否存在由多个 bool/option/DU 正交组合出的状态空间？
+- 能否把其中某个字段变成当前函数的局部变量？
+- 能否把某个状态变成正在等待的 Task？
+- 能否把某个 flag 变成不可伪造的 capability/permit？
+
+### CE 检查
+
+- 异步效果是否通过 `let!`/`do!` 明确出现？
+- 分支是否通过 `match`/`match!` 明确出现？
+- 下一轮是否通过 `return!` 明确出现？
+- 资源是否在同一作用域释放？
+- 是否新增了 AST、Interpreter、Command/Reply 或 Step 节点？
+
+### 测试检查
+
+- 测试是否走公共入口？
+- 是否断言真实 Journal 事实或端口调用？
+- 是否覆盖失败、取消、超时和恢复？
+- 是否还在断言内部 state tag？
+- 删除旧状态后，测试是否反而更接近可观察行为？
+
+## 最终判断口诀
+
+看到一段复杂代码时，按这个顺序问：
+
+```text
+一、这是事实，还是「下一步」？
+二、如果是事实，能否由纯函数得到 Decision？
+三、如果是下一步，能否直接调用下一函数？
+四、如果要等待，能否 let! 等一个真实信号？
+五、如果要重试，能否 return! 进入下一轮？
+六、如果要清理，能否让资源留在同一作用域？
+七、如果仍需 mutable，它管理的是物理资源，还是业务进度？
+```
+
+只有最后一个问题的答案是「它只管理锁、Task、TCS、Dictionary、buffer、subscription 或 cancellation lifetime」时，这个 mutable 才应进入豁免（dsl-ownership 的 `mutable` 门 fail-closed 之外的登记路径）。
+
+团队不需要「学会一套神秘的 F# DSL」——普通函数命名业务动作，纯函数做决定，`task` CE 排列顺序，`let!` 等待，`match` 分支，`return!` 继续，`try/finally` 管资源生命周期。除此之外不再创造第二套运行时。
