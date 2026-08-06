@@ -143,6 +143,7 @@ why（设计理由与被拒方案；不直接约束实现）
 
 | Proposal | 候选范围 |
 |------|------|
+| [ChatGPT-F# DSL 规范问题.md](proposal/ChatGPT-F# DSL 规范问题.md) | F# 结构化流程 DSL 迁移分析与痛点候选 |
 | [strength.md](proposal/strength.md) | Predict & Reduce Strength 旁路投机执行 |
 | [student-teacher.md](proposal/student-teacher.md) | Student / Teacher 知识生产流程 |
 
