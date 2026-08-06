@@ -132,14 +132,14 @@ test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
 
 // ── the bounded parallelism kernel the workflows fan out through ────────────
 
-test('VERIFY_005_the_Flow_kernel_publishes_only_bounded_parallelism', async () => {
-  const mod = await load('Kernel/Flow')
+test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async () => {
+  const mod = await load('Kernel/Parallel')
 
   // spec/14 (Direct CE) superseded the Flow monad; its monadic surface
   // (Flow_run / Flow_fail / Flow_attempt / Flow_create / Flow_lift and the
   // FlowBuilder) is no longer a demanded contract. Bounded concurrency is still
   // legal, so `Parallel.mapBounded` remains the only required export here.
-  assertCallable(mod, 'Kernel/Flow', ['Parallel_mapBounded'])
+  assertCallable(mod, 'Kernel/Parallel', ['Parallel_mapBounded'])
 
   // `Parallel.mapBounded` is emitted from the same file. Unbounded fan-out is how
   // a canary starts failing on machine load rather than on logic, so the bounded

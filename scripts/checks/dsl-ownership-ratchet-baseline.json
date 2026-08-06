@@ -45,9 +45,8 @@
   "Domain/ToolResultBound.fs": {
     "mutable": 4
   },
-  "Kernel/Flow.fs": {
-    "mutable": 11,
-    "behaviour-bool": 1
+  "Kernel/Parallel.fs": {
+    "mutable": 3
   },
   "Session/BloggerRuntimeState.fs": {
     "behaviour-bool": 1

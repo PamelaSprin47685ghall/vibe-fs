@@ -196,7 +196,7 @@ const [
   prod('Infrastructure/OpenCode/Codec/HostMessageCodec'),
   prod('Process/Deadline'),
   prod('Process/ProcessRequest'),
-  prod('Kernel/Flow'),
+  prod('Kernel/Parallel'),
   prod('Application/Orchestration/Runtime'),
   prod('Application/Orchestration/Types'),
   prod('Domain/StrengthTypes'),

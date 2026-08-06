@@ -16,7 +16,7 @@
     <Compile Include="Host/HostDigest.fs"/>
     <Compile Include="Kernel/Identity.fs"/>
     <Compile Include="Kernel/Roles.fs"/>
-    <Compile Include="Kernel/Flow.fs"/>
+    <Compile Include="Kernel/Parallel.fs"/>
     <Compile Include="Kernel/DomainFlow.fs"/>
     <Compile Include="Kernel/AsyncSupport.fs"/>
     <Compile Include="Kernel/Outcome.fs"/>
