@@ -232,7 +232,7 @@ P0-2 **done**：`SessionRecoveryProgram` AST + `SessionRecoveryInterpreter` 已�
 |----|------|----------|
 | P0-1 | `ChildRecovery`：Program AST → 纯决策 + 直接 CE workflow | **done** — `ChildRecoveryWorkflow`；sole-owner 门禁已迁；157→155 |
 | P0-2 | `SessionRecovery`：同上 | **done** — `SessionRecoveryWorkflow`；155→153；business-interpreter=0；second-runtime-protocol=0 |
-| P0-3 | 文档/命名清零 | 仓内业务路径不再写 Program-is-data / unique interpreter / Trace Interpreter / materialize program / executeCommand / ProtocolMismatch（外部 codec/parser 的 Interpreter 可留） |
+| P0-3 | 文档/命名清零 | **done** — 生产 `.fs` 无第二运行时标识符；`spec/09` 线性序改为 Workflow/Join CE；门禁仍保留禁止 pattern |
 
 P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是纯决策」而保留 Step/continuation 节点。
 
