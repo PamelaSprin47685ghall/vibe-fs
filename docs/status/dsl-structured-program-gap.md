@@ -60,4 +60,4 @@
 - `npm run lint` 通过。
 - `npm run check` 通过。
 - 完成剩余差距后删除本文件。
-- ENFORCER-153 前置 canary：需在 e2e 层证明注入的 `interaction-repair` synthetic 消息在 Host 下一次 transform 输入的完整 snapshot 中仍然存在（当前由 unit 层 harness 的 transcript 累积模拟，真实 Host 持久化行为尚未有 canary 覆盖）。
+- ENFORCER-153 前置 canary：`tests/e2e/scenarios/enforcer-repair-persist.toml`（真实 Host + mock provider）已覆盖——blog 工具空文本触发 ENFORCER-061 empty-text cycle → AABB repair 注入 synthetic `interaction-repair` 消息 → 下一次 provider 请求的消息历史携带 repair 文本（`# Protocol repair`），证明 Host 持久化了 transform 输出（unit 层的 transcript 累积模拟由此获得真实 Host 证据；`info`/`requestKey` 字段契约由 unit 层 `repairRequestKey` 锁定，provider wire 会剥离 `info`）。
