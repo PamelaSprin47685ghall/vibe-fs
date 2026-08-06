@@ -41,16 +41,19 @@ test('ENFORCER_047_parked_plus_material_offers_without_leaving_parked', () => {
   assert.equal(rt.inFlightContext(r.state), undefined)
 })
 
-test('ENFORCER_047_try_take_inflight_consumes_context_once', () => {
+test('ENFORCER_047_cycle_commit_consumes_inflight_once', () => {
+  // Production path: onCycleCommitted consumes the InFlight context (-> Parked)
+  // and a second commit is rejected — the same one-shot semantics as the former
+  // tryTakeInFlight, driven by the durable commit fact instead of a take API.
   const started = rt.onMaterial(rt.idle, main())
-  const taken = rt.tryTakeInFlight(started.state)
-  assert.equal(taken.ok, true)
-  assert.equal(ctx.toml(taken.context), 'work')
-  assert.equal(rt.stateOf(taken.state), 'Parked')
+  assert.equal(started.ok, true)
+  const committed = rt.onCycleCommitted(started.state)
+  assert.equal(committed.ok, true)
+  assert.equal(rt.stateOf(committed.state), 'Parked')
 
-  const again = rt.tryTakeInFlight(taken.state)
+  const again = rt.onCycleCommitted(committed.state)
   assert.equal(again.ok, false)
-  assert.equal(again.error, 'NoContext')
+  assert.equal(again.error, 'NotInFlight')
 })
 
 test('ENFORCER_047_cycle_commit_from_idle_is_rejected', () => {

@@ -29,7 +29,8 @@
    - `TransitionError.Sealed` 与 Coordinator / EnforcerHost 的错误分支随之删除。
 
 10. `BloggerRuntimeState.Disposed` case 与 `onDispose` 已删除（DSL-003）：唯一写入点 `PluginRuntimeScope.DeleteSession` 在 lock 内**写后立即 Remove**（registry 删除），`GetBloggerRuntime` 对缺失项返回 `BloggerRuntime.empty`（Idle）——生产中没有任何读点能观察到 Disposed cell（有写入无读取）；owner lifetime 的物理事实是 registry 项的存在性，不是状态标签；`DecisionEffect.Disposed` 与 `TransitionError.Disposed` 随之删除。
-11. `DrainWindow.Open` 已携带重开它的 `AuthorityRootUserMessageId`（DSL-003）：
+11. `BloggerRuntime.beginRequest` / `tryTakeInFlight` / `tryPeekInFlight` 已删除（DSL-003）：三个 transition 生产零调用（有定义无调用）；CurrentRequest 无独立 dictionary（注释明言「CurrentRequest IS the InFlight payload. No parallel dict」），`SetCurrentRequest`/`TryPeekCurrentRequest` 直接读写 InFlight payload——单一权威已成立；`tryTakeInFlight` 的一次性消费语义由 `onCycleCommitted`（commit 事实驱动）覆盖。
+12. `DrainWindow.Open` 已携带重开它的 `AuthorityRootUserMessageId`（DSL-003）：
     - 调查确认 handle lifecycle（`CompletedAwaitingJoin | Abandoned | Retired`）**永不因新 root 解除 seal**——`mainSealedForBlogger` 在 reactivation 后仍为 true，故 drain 窗口不是 durable 镜像，而是「新 root 已到达」的进程内信号；
     - `onReactivate` / `reactivateAfterNewRoot` 现在接收 root id，`PromptIngress` 的 `onAuthorityRoot` 信号携带 `promoteToAuthorityRoot physicalMessageId`；
     - 窗口记录「谁重开的」：更旧的 root 迟到不能重开更新的 seal（为后续私有 `DrainPermit` 权限化铺路）。

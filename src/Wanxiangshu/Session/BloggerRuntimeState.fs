@@ -91,19 +91,6 @@ module BloggerRuntime =
             // The host dictionary stages the offer (ENFORCER-050 physical slot).
             Ok(cell, Decision.Offer ctx)
 
-    /// Physical send is about to leave: freeze CurrentRequest (InFlight payload).
-    let beginRequest
-        (cell: BloggerRuntimeCell)
-        (ctx: BloggerRequestContext)
-        : Result<BloggerRuntimeCell, TransitionError> =
-        match cell.State with
-        | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
-        | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked ->
-            Ok
-                { cell with
-                    State = BloggerRuntimeState.InFlight ctx }
-
     let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight _ ->
@@ -182,23 +169,6 @@ module BloggerRuntime =
         | BloggerRuntimeState.InFlight _ -> false
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked -> durableHandleSealed && not (isDrainOpen cell)
-
-    let tryPeekInFlight (cell: BloggerRuntimeCell) : Result<BloggerRequestContext, TransitionError> =
-        match cell.State with
-        | BloggerRuntimeState.InFlight ctx -> Ok ctx
-        | _ -> Error TransitionError.NoContext
-
-    let tryTakeInFlight
-        (cell: BloggerRuntimeCell)
-        : Result<BloggerRequestContext * BloggerRuntimeCell, TransitionError> =
-        match cell.State with
-        | BloggerRuntimeState.InFlight ctx ->
-            Ok(
-                ctx,
-                { cell with
-                    State = BloggerRuntimeState.Parked }
-            )
-        | _ -> Error TransitionError.NoContext
 
     let adoptPendingAsCurrent
         (cell: BloggerRuntimeCell)

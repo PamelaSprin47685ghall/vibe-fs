@@ -4432,7 +4432,6 @@ export const bloggerRuntime = (() => {
     'empty',
     'ofState',
     'onMaterial',
-    'beginRequest',
     'onCycleCommitted',
     'onSquashCommitted',
     'onFail',
@@ -4440,8 +4439,7 @@ export const bloggerRuntime = (() => {
     'onReactivate',
     'inFlightContext',
     'blocksNewRequest',
-    'tryPeekInFlight',
-    'tryTakeInFlight',
+
     'adoptPendingAsCurrent',
   ])
 
@@ -4503,12 +4501,6 @@ export const bloggerRuntime = (() => {
     onReactivate: (cell, root) => m.onReactivate(cell, root),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
     blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),
-    tryTakeInFlight: (cell) => {
-      const r = resultOf(m.tryTakeInFlight(cell))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const pair = r.value
-      return { ok: true, context: pair[0], state: pair[1] }
-    },
     stateOf: (cell) => caseOf(cell.State),
     reactivatedOf: (cell) => caseOf(cell.Drain) === 'Open',
   }
