@@ -93,6 +93,19 @@ test('DSL_OWNERSHIP_TddPhase_domain_type_is_not_behaviour_bool', () => {
   assert.deepEqual(hits, [])
 })
 
+test('DSL_OWNERSHIP_domain_pending_evidence_is_not_behaviour_bool', () => {
+  const source = [
+    'module Sample',
+    'type Witness = | PerfectPending of unit | StillPending of bool | ConflictPending of unit',
+    'let recoveryBudgetSpent claim = true',
+    'let tryTakePending cell = None',
+    'let isPerfectPending w = true',
+  ].join('\n')
+  const hits = scanText(source, 'Domain/Clean.fs')
+  assert.deepEqual(hits, [])
+})
+
+
 test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
   const hits = scanFiles([
     { file: 'a.fs', text: NEGATIVES[0].source },

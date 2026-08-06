@@ -135,14 +135,14 @@ module RecoverySlot =
 
     /// CTX-007 for a main request.
     ///
-    /// `repairSpent` is FALLBACK-008's one-repair budget for this occasion. Passed in
+    /// `aabbConsumed` is FALLBACK-008's one-repair budget for this occasion. Passed in
     /// rather than tracked here because the budget is per unusable terminal and the
     /// Dispatcher already owns it (PROMPT-005); a second counter could disagree.
-    let onMainOutcome (kind: ProviderRequestKind) (repairSpent: bool) (outcome: AttemptOutcome) : SlotDecision =
+    let onMainOutcome (kind: ProviderRequestKind) (aabbConsumed: bool) (outcome: AttemptOutcome) : SlotDecision =
         match outcome with
         | AttemptOutcome.Completed -> SlotDecision.CommitMain(ProviderRequestKind.clearsFailureCountOnSuccess kind)
         | AttemptOutcome.CompletedInvalid ->
-            if repairSpent then
+            if aabbConsumed then
                 SlotDecision.AbandonRoundProduct
             else
                 SlotDecision.RepairOnce

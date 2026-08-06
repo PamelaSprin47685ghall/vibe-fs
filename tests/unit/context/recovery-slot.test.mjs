@@ -136,11 +136,11 @@ test('CTX_007_a_successful_main_commits_and_does_not_move_the_cursor', () => {
 })
 
 test('FALLBACK_008_an_invalid_terminal_earns_exactly_one_repair', () => {
-  const first = slot.onMain({ kind: requestKind.bloggerMain, repairSpent: false, outcome: 'CompletedInvalid' })
+  const first = slot.onMain({ kind: requestKind.bloggerMain, aabbConsumed: false, outcome: 'CompletedInvalid' })
   assert.equal(first.name, 'RepairOnce')
   assert.equal(first.advancesCursor, false, 'an unusable terminal is not a failed slot')
 
-  const second = slot.onMain({ kind: requestKind.bloggerMain, repairSpent: true, outcome: 'CompletedInvalid' })
+  const second = slot.onMain({ kind: requestKind.bloggerMain, aabbConsumed: true, outcome: 'CompletedInvalid' })
   assert.equal(second.name, 'AbandonRoundProduct')
 
   // Still no advance: FALLBACK-008 keeps an invalid terminal out of the A/B count
@@ -180,7 +180,7 @@ test('CTX_008_only_a_failed_slot_advances_the_cursor', () => {
     slot.onSquash('Failed'),
     slot.onMain({ kind: requestKind.workMain, outcome: 'Completed' }),
     slot.onMain({ kind: requestKind.workMain, outcome: 'CompletedInvalid' }),
-    slot.onMain({ kind: requestKind.workMain, repairSpent: true, outcome: 'CompletedInvalid' }),
+    slot.onMain({ kind: requestKind.workMain, aabbConsumed: true, outcome: 'CompletedInvalid' }),
     slot.onMain({ kind: requestKind.workMain, outcome: 'Failed' }),
   ].filter((d) => d.advancesCursor)
 
@@ -303,7 +303,7 @@ test('FALLBACK_012_at_least_one_real_failure_separates_any_two_squashes', () => 
     slot.onSquash('Failed'),
     slot.onMain({ kind: requestKind.bloggerMain, outcome: 'Completed' }),
     slot.onMain({ kind: requestKind.bloggerMain, outcome: 'CompletedInvalid' }),
-    slot.onMain({ kind: requestKind.bloggerMain, repairSpent: true, outcome: 'CompletedInvalid' }),
+    slot.onMain({ kind: requestKind.bloggerMain, aabbConsumed: true, outcome: 'CompletedInvalid' }),
     slot.onMain({ kind: requestKind.bloggerMain, outcome: 'Failed' }),
     slot.onMain({ kind: requestKind.bloggerMain, outcome: 'Aborted' }),
   ]

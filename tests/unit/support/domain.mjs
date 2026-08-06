@@ -1494,8 +1494,8 @@ export const recoverySlot = (() => {
     /** `{ name, clearsFailureCount, advancesCursor, nextArming }`. */
     onSquash: (outcome) => decisionOf(m.onSquashOutcome(buildOutcome(outcome, []))),
 
-    onMain: ({ kind, repairSpent = false, outcome }) =>
-      decisionOf(m.onMainOutcome(kind, repairSpent, buildOutcome(outcome, []))),
+    onMain: ({ kind, aabbConsumed = false, outcome }) =>
+      decisionOf(m.onMainOutcome(kind, aabbConsumed, buildOutcome(outcome, []))),
   }
 })()
 

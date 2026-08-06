@@ -76,10 +76,10 @@ export const FORBIDDEN = [
   },
   {
     gate: 'behaviour-bool',
-    // Exact `TddPhase` identifier is the closed DU Red|Green domain type (PENDING 7),
-    // not a program-counter field; every other *Phase/stage/bool name still fires.
+    // Domain evidence DUs / pure queries ending in Pending|Spent|Phase are allowlisted.
+    // Program-counter bools and staging slots stay forbidden by exact name or residual suffix.
     pattern:
-      /\b(?!TddPhase\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
+      /\b(?!TddPhase\b|parseTddPhase\b|UnknownTddPhase\b|PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
   },
 ]

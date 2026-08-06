@@ -178,12 +178,12 @@ Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflo
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
 （「functions, not a Flow AST」+ 直接 `task`/`let!`）。
 
-**冻结债（`scripts/check.mjs --threshold=99`，P2-1 后实测 99 / 111 files）**：
+**冻结债（`scripts/check.mjs --threshold=60`，P2-3 后实测 60 / 111 files）**：
 
 ```text
 mutable                  47   ← 物理并发/累加器可留；业务决策 mutable 删
-behaviour-bool           39   ← 行为选择 bool → Decision DU（含合法领域名误伤）
 infrastructure-leak      13   ← HostFork*/CompanionHost* 真依赖 open（扩展方法）
+behaviour-bool            0
 program-counter           0
 business-interpreter      0
 second-runtime-protocol   0
@@ -195,8 +195,9 @@ P1-2 **done**：`ReconcileSupervisor` 已是 `Reconciler.Scheduler` 薄 facade�
 P1-3 **done**：`EnforcerHost` → `CycleDisposition`；139→124。  
 program-counter **done**：124→116。  
 P2-2a **done**：死 open 清理；116→108。  
-P2-1 **done**：删 `Kernel/Flow.fs` 外壳；`Kernel/Parallel.fs` 仅保留 `mapBounded`；
-`DomainFlow` 只留 Agent/Companion Error+Context（无 builder）；108→99。
+P2-1 **done**：`Flow`→`Parallel`；108→99。  
+P2-3 **done**：behaviour-bool 领域名 allowlist + 真旗标改名
+（`CompletionCellSettled`/`TerminalStatusLabel`/`bloggerCreateTask`/`aabbConsumed`）；99→60。
 
 仍在盘上的债（非「已合法保留」）：
 
@@ -204,7 +205,7 @@ P2-1 **done**：删 `Kernel/Flow.fs` 外壳；`Kernel/Parallel.fs` 仅保留 `ma
 |------|------|
 | HostFork* / CompanionHost* | 真依赖 `open OpenCode/Process`（P2-2 余下） |
 | `Session/BloggerCoordinator.fs` | 与 Runtime cell 分工待继续收敛（P1-1 余下） |
-| behaviour-bool / mutable | 分拣合法累加器 vs 业务旗标（P2-3） |
+| mutable 47 | 物理 cell/累加器 vs 业务 mutable 继续分拣 |
 
 ### PENDING TASK：DSL 全面主导化
 
@@ -253,13 +254,13 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 |----|------|----------|
 | P2-1 | `Kernel/Flow.fs` / `DomainFlow.fs` | **done** — `Parallel.fs` + 精简 `DomainFlow`；Flow monad/builder 删除；108→99 |
 | P2-2 | `infrastructure-leak` | **partial** — P2-2a 21→13；余下 HostFork*/CompanionHost* 真依赖 open |
-| P2-3 | `mutable` / `behaviour-bool` 分拣 | 物理并发 cell、局部累加器可留并注释理由；行为选择 bool 清零或改为 DU；门禁 pattern 收紧避免误伤合法领域名后，threshold 再降 |
+| P2-3 | `mutable` / `behaviour-bool` 分拣 | **partial** — behaviour-bool=0（99→60）；mutable 47 仍待分拣 |
 
 #### P3 — 主导化验收与文档收束
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P3-1 | threshold 阶梯 | `99（P2-1 后）→ P2 余下` 每次 PR 下调；禁止「修完不降 threshold」 |
+| P3-1 | threshold 阶梯 | `60（P2-3 后）→ P2 余下` 每次 PR 下调；禁止「修完不降 threshold」 |
 | P3-2 | 发布阶梯 | `npm run check` 绿；目标切片 canary 绿；发布前 `check:release` |
 | P3-3 | 文档只描述现行纪律 | AGENTS.md / TASK.md / spec 表述一致：DSL = 直接 CE；无 Wave M* 施工模板；无「Interpreter 为唯一执行者」 |
 

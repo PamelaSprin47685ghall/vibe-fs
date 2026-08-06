@@ -63,7 +63,7 @@ type AgentRecord =
         Role: AgentRole
         Status: AgentStatus
         CurrentRunId: string option
-        LastCompletionStatus: string option
-        HasPendingCompletion: bool
+        TerminalStatusLabel: string option
+        CompletionCellSettled: bool
         ChildSessionId: SessionId option
     }

@@ -6,17 +6,7 @@
     "mutable": 1
   },
   "Application/Reconciliation/PromptRecovery.fs": {
-    "behaviour-bool": 3,
     "mutable": 1
-  },
-  "Application/Reconciliation/ReviewerGuardState.fs": {
-    "behaviour-bool": 1
-  },
-  "Application/Reconciliation/SessionRecoveryWorkflow.fs": {
-    "behaviour-bool": 1
-  },
-  "Application/Reconciliation/TurnCompletionProgram.fs": {
-    "behaviour-bool": 1
   },
   "Application/Reconciliation/XTraceCapture.fs": {
     "mutable": 1
@@ -27,20 +17,8 @@
   "Domain/LoopDetector.fs": {
     "mutable": 4
   },
-  "Domain/PromptAuthority.fs": {
-    "behaviour-bool": 1
-  },
-  "Domain/RecoverySlot.fs": {
-    "behaviour-bool": 2
-  },
-  "Domain/ReviewWitness.fs": {
-    "behaviour-bool": 7
-  },
   "Domain/SyntheticToml.fs": {
     "mutable": 2
-  },
-  "Domain/TddPhase.fs": {
-    "behaviour-bool": 2
   },
   "Domain/ToolResultBound.fs": {
     "mutable": 4
@@ -48,22 +26,15 @@
   "Kernel/Parallel.fs": {
     "mutable": 3
   },
-  "Session/BloggerRuntimeState.fs": {
-    "behaviour-bool": 1
-  },
   "Session/ChildRun.fs": {
     "mutable": 2
-  },
-  "Session/ChildRunProjection.fs": {
-    "behaviour-bool": 2
   },
   "Session/Companion.fs": {
     "mutable": 6
   },
   "Session/CompanionHost.fs": {
     "infrastructure-leak": 1,
-    "mutable": 4,
-    "behaviour-bool": 16
+    "mutable": 4
   },
   "Session/CompanionHostBlogger.fs": {
     "infrastructure-leak": 1
@@ -76,9 +47,6 @@
   },
   "Session/ForkRuntime.fs": {
     "mutable": 2
-  },
-  "Session/ForkTypes.fs": {
-    "behaviour-bool": 2
   },
   "Session/HostForkAgent.fs": {
     "infrastructure-leak": 1

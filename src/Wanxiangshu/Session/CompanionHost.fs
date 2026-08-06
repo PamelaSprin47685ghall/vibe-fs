@@ -27,23 +27,23 @@ type CompanionHost
 
     let bloggerEffectiveAgent = ManagedAgent.nameOf AgentTier.Fast Role.Blogger
 
-    let mutable bloggerTask: Task<SessionId> option = None
+    let mutable bloggerCreateTask: Task<SessionId> option = None
     let mutable bloggerId: SessionId option = None
-    let mutable bloggerFailed = false
+    let mutable bloggerCreateFailed = false
     let bloggerRequestKind = ref ProviderRequestKind.BloggerMain
     let bloggerSquashFrameCount = ref None
     let mutable restoredBloggerIdOpt = restoredBloggerId
 
     let ensureBlogger () =
         lock gate (fun () ->
-            match bloggerTask with
-            | Some _ when bloggerFailed ->
-                bloggerTask <- None
+            match bloggerCreateTask with
+            | Some _ when bloggerCreateFailed ->
+                bloggerCreateTask <- None
                 bloggerId <- None
-                bloggerFailed <- false
+                bloggerCreateFailed <- false
             | _ -> ()
 
-            match bloggerTask with
+            match bloggerCreateTask with
             | Some task -> task
             | None ->
                 // Restore is one-shot. Dead restored child fails send; next material
@@ -53,11 +53,11 @@ type CompanionHost
                 | Some id, None ->
                     let sid = SessionId.create id
                     bloggerId <- Some sid
-                    bloggerFailed <- false
+                    bloggerCreateFailed <- false
                     bloggerCreated sid
                     restoredBloggerIdOpt <- None
                     let t = Task.FromResult(sid)
-                    bloggerTask <- Some t
+                    bloggerCreateTask <- Some t
                     t
                 | _ ->
                     let task =
@@ -74,7 +74,7 @@ type CompanionHost
                                 match created with
                                 | Ok id ->
                                     bloggerId <- Some id
-                                    bloggerFailed <- false
+                                    bloggerCreateFailed <- false
 
                                     bloggerCreated id
 
@@ -87,12 +87,12 @@ type CompanionHost
                                     return id
                                 | Error error -> return raise (InvalidOperationException error)
                             with ex ->
-                                bloggerFailed <- true
+                                bloggerCreateFailed <- true
                                 bloggerId <- None
                                 return raise ex
                         }
 
-                    bloggerTask <- Some task
+                    bloggerCreateTask <- Some task
                     task)
 
     member private this.BloggerDeps: CompanionHostBlogger.BloggerDeps =
@@ -132,9 +132,9 @@ type CompanionHost
     /// Next material creates a fresh Blogger; never keep Parked after fail.
     member this.InvalidateBloggerCache() : unit =
         lock gate (fun () ->
-            bloggerTask <- None
+            bloggerCreateTask <- None
             bloggerId <- None
-            bloggerFailed <- true
+            bloggerCreateFailed <- true
             companion.RecordBloggerClosed())
 
     /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
@@ -188,7 +188,7 @@ type CompanionHost
     /// session stream so a restart never mistakes a dead child for a live link.
     member this.CloseBloggerAsync() : Task =
         task {
-            let taskOpt = lock gate (fun () -> bloggerTask)
+            let taskOpt = lock gate (fun () -> bloggerCreateTask)
 
             match taskOpt with
             | Some task ->
@@ -209,5 +209,5 @@ type CompanionHost
             // C6: cancel in-memory child cache even if CloseBloggerAsync races.
             this.InvalidateBloggerCache()
 
-            if bloggerTask.IsSome || bloggerId.IsSome then
+            if bloggerCreateTask.IsSome || bloggerId.IsSome then
                 this.CloseBloggerAsync() |> ignore

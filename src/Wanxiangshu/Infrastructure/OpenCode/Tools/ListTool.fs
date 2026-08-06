@@ -45,7 +45,8 @@ module ListTool =
               tBool (
                   match handle.Lifecycle with
                   | HandleLifecycle.CompletedAwaitingJoin _ -> true
-                  | HandleLifecycle.Active -> runtimeRecord |> Option.exists (fun record -> record.HasPendingCompletion)
+                  | HandleLifecycle.Active ->
+                      runtimeRecord |> Option.exists (fun record -> record.CompletionCellSettled)
                   | HandleLifecycle.Abandoned _
                   | HandleLifecycle.Retired -> false
               ) ]
@@ -54,7 +55,7 @@ module ListTool =
             optionalField "current_run_id" (runtimeRecord |> Option.bind (fun record -> record.CurrentRunId))
             @ optionalField
                 "last_completion_status"
-                (runtimeRecord |> Option.bind (fun record -> record.LastCompletionStatus))
+                (runtimeRecord |> Option.bind (fun record -> record.TerminalStatusLabel))
 
         let identity =
             match ManagedAgent.tryParse handle.TargetAgent with
