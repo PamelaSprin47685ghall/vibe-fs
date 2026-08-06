@@ -47,6 +47,7 @@
   "devDependencies": {
     "@opencode-ai/plugin": "^1.17.4",
     "eventsource": "^3.0.7",
+    "opencode-ai": "1.18.14",
     "smol-toml": "1.7.0"
   }
 }

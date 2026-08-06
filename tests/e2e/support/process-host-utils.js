@@ -9,12 +9,22 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getDescendantPids } from "./process-host-checks.js";
 import { terminateTree } from "./process-lifecycle.js";
 import { recordSpawn, recordExit } from "./spawn-ledger.js";
 import { SIGTERM_GRACE_MS, SIGKILL_GRACE_MS } from "./time-budget.js";
 
-export const OPENCODE_BIN = process.env.OPENCODE_BIN || "opencode";
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+/** Prefer repo-local bin so CI `npm ci` can run ProcessHost without a global install. */
+function defaultOpencodeBin() {
+  const local = path.join(REPO_ROOT, "node_modules", ".bin", "opencode");
+  if (fs.existsSync(local)) return local;
+  return "opencode";
+}
+
+export const OPENCODE_BIN = process.env.OPENCODE_BIN || defaultOpencodeBin();
 
 const STDOUT_RING_MAX = 100;
 const activeChildPids = new Set();
