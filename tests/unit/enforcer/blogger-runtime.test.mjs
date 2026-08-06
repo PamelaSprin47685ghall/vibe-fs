@@ -76,15 +76,14 @@ test('ENFORCER_047_squash_with_pending_main_restarts_inflight', () => {
   assert.equal(ctx.toml(rt.inFlightContext(r.state)), 'more')
 })
 
-test('ENFORCER_047_dispose_from_any_state_is_terminal', () => {
-  assert.equal(rt.stateOf(rt.onDispose(rt.idle)), 'Disposed')
-  assert.equal(rt.stateOf(rt.onDispose(rt.parked)), 'Disposed')
+test('ENFORCER_047_session_delete_is_registry_removal_not_a_cell_state', () => {
+  // DSL-003: owner lifetime is the physical registry — session delete cancels
+  // the parked waiter and REMOVES the cell (PluginRuntimeScope.DeleteSession);
+  // a missing cell reads back as Idle empty. There is no Disposed state tag:
+  // it was written-then-immediately-removed, so no reader could ever see it.
   const started = rt.onMaterial(rt.idle, main())
-  assert.equal(rt.stateOf(rt.onDispose(started.state)), 'Disposed')
-
-  const after = rt.onMaterial(rt.disposed, main())
-  assert.equal(after.ok, false)
-  assert.equal(after.error, 'Disposed')
+  assert.equal(started.ok, true)
+  assert.equal(rt.stateOf(started.state), 'InFlight')
 })
 
 test('ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {

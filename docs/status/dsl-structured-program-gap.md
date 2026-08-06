@@ -28,7 +28,8 @@
    - `CancelParked` / `SetCurrentRequest` 的 Sealed 保持/拒绝分支删除（durable 检查在每次入口先行）；
    - `TransitionError.Sealed` 与 Coordinator / EnforcerHost 的错误分支随之删除。
 
-10. `DrainWindow.Open` 已携带重开它的 `AuthorityRootUserMessageId`（DSL-003）：
+10. `BloggerRuntimeState.Disposed` case 与 `onDispose` 已删除（DSL-003）：唯一写入点 `PluginRuntimeScope.DeleteSession` 在 lock 内**写后立即 Remove**（registry 删除），`GetBloggerRuntime` 对缺失项返回 `BloggerRuntime.empty`（Idle）——生产中没有任何读点能观察到 Disposed cell（有写入无读取）；owner lifetime 的物理事实是 registry 项的存在性，不是状态标签；`DecisionEffect.Disposed` 与 `TransitionError.Disposed` 随之删除。
+11. `DrainWindow.Open` 已携带重开它的 `AuthorityRootUserMessageId`（DSL-003）：
     - 调查确认 handle lifecycle（`CompletedAwaitingJoin | Abandoned | Retired`）**永不因新 root 解除 seal**——`mainSealedForBlogger` 在 reactivation 后仍为 true，故 drain 窗口不是 durable 镜像，而是「新 root 已到达」的进程内信号；
     - `onReactivate` / `reactivateAfterNewRoot` 现在接收 root id，`PromptIngress` 的 `onAuthorityRoot` 信号携带 `promoteToAuthorityRoot physicalMessageId`；
     - 窗口记录「谁重开的」：更旧的 root 迟到不能重开更新的 seal（为后续私有 `DrainPermit` 权限化铺路）。
@@ -36,7 +37,7 @@
 ## 仍存差距
 
 1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 仍含 `BloggerRuntimeCell` 状态乘积（`State`, `Drain`）。
-   - 后续需拆除 `InFlight/Idle/Parked/Disposed` 业务 State，迁移为 single-flight Task ownership；
+   - 后续需拆除 `InFlight/Idle/Parked` 业务 State，迁移为 single-flight Task ownership；
    - `Drain` 应替换为模块外不可构造的私有 `DrainPermit`（仅「新 Authority Root 重开 drain」路径可得；窗口已记录 root 身份，权限化只需把 `Open of root` 改为不可伪造的 permit 传递）。
 2. `src/Wanxiangshu/Session/Companion.fs` 仍暴露 `ArmRecoverySlot/DisarmRecoverySlot/IsRecoveryArmed` 查询/设置式 API；底层虽已是 TCS waiter，接口形态仍未迁移为「失败启动一次结构化恢复机会、材料经由 `TryConsumeRecoverySlot` 消费」的直接 CE 流程。
 

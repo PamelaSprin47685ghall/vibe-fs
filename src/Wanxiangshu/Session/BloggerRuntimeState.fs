@@ -26,7 +26,6 @@ type BloggerRuntimeState =
     | Idle
     | InFlight of BloggerRequestContext
     | Parked
-    | Disposed
 
 /// After a durable handle seal, whether a new Authority Root reopened a drain
 /// window. The handle lifecycle NEVER unseals (CompletedAwaitingJoin/Abandoned/
@@ -54,7 +53,6 @@ module BloggerRuntime =
         | AlreadyInFlight
         | NotInFlight
         | NotParked
-        | Disposed
         | NoContext
 
     type Decision =
@@ -92,7 +90,6 @@ module BloggerRuntime =
         | BloggerRuntimeState.Parked ->
             // The host dictionary stages the offer (ENFORCER-050 physical slot).
             Ok(cell, Decision.Offer ctx)
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
 
     /// Physical send is about to leave: freeze CurrentRequest (InFlight payload).
     let beginRequest
@@ -100,7 +97,6 @@ module BloggerRuntime =
         (ctx: BloggerRequestContext)
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->
@@ -114,7 +110,6 @@ module BloggerRuntime =
             Ok
                 { cell with
                     State = BloggerRuntimeState.Parked }
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NotInFlight
 
     let onSquashCommitted
@@ -122,7 +117,6 @@ module BloggerRuntime =
         (pendingMain: BloggerRequestContext option)
         : Result<BloggerRuntimeCell * Decision, TransitionError> =
         match cell.State with
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.InFlight _ ->
             match pendingMain with
             | Some ctx ->
@@ -142,7 +136,6 @@ module BloggerRuntime =
     /// Final fail of the logical request: Idle.
     let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { cell with
@@ -165,16 +158,11 @@ module BloggerRuntime =
     /// request, so the new send never reached the provider.
     let onReactivate (cell: BloggerRuntimeCell) (root: AuthorityRootUserMessageId) : BloggerRuntimeCell =
         match cell.State with
-        | BloggerRuntimeState.Disposed -> cell
         | BloggerRuntimeState.InFlight _
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->
             { cell with
                 Drain = DrainWindow.Open root }
-
-    let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
-        { State = BloggerRuntimeState.Disposed
-          Drain = DrainWindow.Closed }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
         match cell.State with
@@ -191,7 +179,6 @@ module BloggerRuntime =
     /// the cell carries no sealed mirror, so it can never drift stale.
     let blocksNewRequest (durableHandleSealed: bool) (cell: BloggerRuntimeCell) : bool =
         match cell.State with
-        | BloggerRuntimeState.Disposed -> true
         | BloggerRuntimeState.InFlight _ -> false
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked -> durableHandleSealed && not (isDrainOpen cell)
@@ -199,7 +186,6 @@ module BloggerRuntime =
     let tryPeekInFlight (cell: BloggerRuntimeCell) : Result<BloggerRequestContext, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight ctx -> Ok ctx
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NoContext
 
     let tryTakeInFlight
@@ -212,7 +198,6 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.Parked }
             )
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | _ -> Error TransitionError.NoContext
 
     let adoptPendingAsCurrent
@@ -220,7 +205,6 @@ module BloggerRuntime =
         (ctx: BloggerRequestContext)
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
-        | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->

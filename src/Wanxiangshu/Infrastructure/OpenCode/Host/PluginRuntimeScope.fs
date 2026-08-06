@@ -195,17 +195,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
                 pendingOffer.Remove sessionId |> ignore
                 // Park cancel/timeout leaves the logical Blogger idle, not disposed.
-                // Disposed sticks; seal is durable so a cancel always clears to Idle.
+                // Seal is durable: park cancel always clears to Idle; the
+                // next entry's durable check re-blocks when still sealed.
                 match bloggerRuntime.TryGetValue sessionId with
                 | true, cell ->
-                    match cell.State with
-                    | BloggerRuntimeState.Disposed -> ()
-                    | _ ->
-                        // Seal is durable: park cancel always clears to Idle; the
-                        // next entry's durable check re-blocks when still sealed.
-                        bloggerRuntime.[sessionId] <-
-                            { BloggerRuntime.empty with
-                                Drain = cell.Drain }
+                    bloggerRuntime.[sessionId] <-
+                        { BloggerRuntime.empty with
+                            Drain = cell.Drain }
                 | false, _ -> ())
 
         member this.HasParked(sessionId: string) : bool =
@@ -217,7 +213,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 let cell = this.GetBloggerRuntimeUnlocked sessionId
 
                 match cell.State with
-                | BloggerRuntimeState.Disposed -> ()
                 | BloggerRuntimeState.InFlight _ ->
                     bloggerRuntime.[sessionId] <-
                         { cell with
@@ -365,9 +360,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         for key in cancelKeys do
             (this :> IParkedTransformHost).CancelParked key
 
-            lock parkedGate (fun () ->
-                bloggerRuntime.[key] <- BloggerRuntime.onDispose BloggerRuntime.empty
-                bloggerRuntime.Remove key |> ignore)
+            lock parkedGate (fun () -> bloggerRuntime.Remove key |> ignore)
 
             this.AttemptPlans.Keys
             |> Seq.filter (fun planKey -> planKey.StartsWith(key + "\u001f", StringComparison.Ordinal))

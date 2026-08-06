@@ -4438,7 +4438,6 @@ export const bloggerRuntime = (() => {
     'onFail',
     'forceSeal',
     'onReactivate',
-    'onDispose',
     'inFlightContext',
     'blocksNewRequest',
     'tryPeekInFlight',
@@ -4457,7 +4456,6 @@ export const bloggerRuntime = (() => {
   return {
     idle: m.ofState(stateCase('Idle', [])),
     parked: m.ofState(stateCase('Parked', [])),
-    disposed: m.ofState(stateCase('Disposed', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
     onMaterial: (cell, ctx) => {
@@ -4503,7 +4501,6 @@ export const bloggerRuntime = (() => {
     },
     forceSeal: (cell) => m.forceSeal(cell),
     onReactivate: (cell, root) => m.onReactivate(cell, root),
-    onDispose: (cell) => m.onDispose(cell),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
     blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),
     tryTakeInFlight: (cell) => {

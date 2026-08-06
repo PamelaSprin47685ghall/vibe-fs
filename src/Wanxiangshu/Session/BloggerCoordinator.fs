@@ -22,7 +22,6 @@ module BloggerCoordinator =
         | OfferedParked of resumed: bool
         | NoMaterial
         | Sealed
-        | Disposed
         | StartFailed of string
         | MaterializeFailed of string
 
@@ -318,7 +317,6 @@ module BloggerCoordinator =
                     | Ok(nextCell, _) ->
                         scope.SetBloggerRuntime(key, nextCell)
                         return Some DecisionEffect.NoMaterial
-                    | Error BloggerRuntime.TransitionError.Disposed -> return Some DecisionEffect.Disposed
                     | Error _ -> return Some DecisionEffect.SkippedInFlight
         }
 
@@ -341,7 +339,6 @@ module BloggerCoordinator =
                 let cell = scope.GetBloggerRuntime key
 
                 match cell.State with
-                | BloggerRuntimeState.Disposed -> return DecisionEffect.Disposed
                 | BloggerRuntimeState.InFlight _ -> return DecisionEffect.SkippedInFlight
                 | BloggerRuntimeState.Idle
                 | BloggerRuntimeState.Parked ->
@@ -371,7 +368,6 @@ module BloggerCoordinator =
                             | Ok(nextCell, _) ->
                                 scope.SetBloggerRuntime(key, nextCell)
                                 return DecisionEffect.NoMaterial
-                            | Error BloggerRuntime.TransitionError.Disposed -> return DecisionEffect.Disposed
                             | Error _ -> return DecisionEffect.SkippedInFlight
         }
 

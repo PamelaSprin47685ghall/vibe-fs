@@ -119,8 +119,7 @@ module BloggerCrashRecovery =
 
                             match live.State with
                             | BloggerRuntimeState.InFlight _
-                            | BloggerRuntimeState.Parked
-                            | BloggerRuntimeState.Disposed -> ()
+                            | BloggerRuntimeState.Parked -> ()
                             | BloggerRuntimeState.Idle when hasAnyReceipt && not hasOpen && not (host.HasParked key) ->
                                 // Cycle already receipted → NoRecovery (ENFORCER-063 success path).
                                 restoreRuntime host bloggerId BloggerRuntimeState.Parked
@@ -137,8 +136,6 @@ module BloggerCrashRecovery =
                     match live.State, liveCurrent with
                     | BloggerRuntimeState.InFlight _, Some _ ->
                         results.Add(WindowOutcome.AlreadyLive openReq.BloggerSessionId)
-                    | BloggerRuntimeState.Disposed, _ ->
-                        results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "disposed"))
                     | _ ->
                         match snapshotOpt with
                         | None -> results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "no snapshot port"))

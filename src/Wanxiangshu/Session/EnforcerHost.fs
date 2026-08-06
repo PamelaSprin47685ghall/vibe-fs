@@ -829,7 +829,6 @@ module EnforcerHost =
                 | None -> None
                 | Some ctx ->
                     match scope.GetBloggerRuntime(key).State with
-                    | BloggerRuntimeState.Disposed -> None
                     | _ -> Some ctx
 
     let private tryOpenByBlogger

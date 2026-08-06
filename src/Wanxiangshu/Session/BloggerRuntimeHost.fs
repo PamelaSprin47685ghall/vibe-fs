@@ -47,6 +47,4 @@ module BloggerRuntimeHost =
         let key = SessionId.value bloggerSessionId
         let cell = scope.GetBloggerRuntime key
 
-        match cell.State with
-        | BloggerRuntimeState.Disposed -> ()
-        | _ -> scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell root)
+        scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell root)
