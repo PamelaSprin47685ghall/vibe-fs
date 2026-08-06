@@ -127,7 +127,7 @@ module XWire =
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
                 match scope.TryRecoveryArming sessionId with
                 | None -> return ()
-                | Some _ ->
+                | Some arming ->
                     let rawMessages = Projection.messagesFromTransformOutput output
                     let physical = Projection.lastUserMessageId rawMessages
 
@@ -162,7 +162,10 @@ module XWire =
 
                                     let cutoff = requestStartCutoff physical rawMessages
                                     let blog = state.Blog |> Option.defaultValue BlogProjection.empty
-                                    let arming = scope.TryRecoveryArming sessionId |> Option.get
+                                    // Reuse the arming bound before the snapshot await: a session
+                                    // deleted inside that window would otherwise make a second
+                                    // TryRecoveryArming return None and Option.get throw (TOCTOU).
+                                    let arming = arming
 
                                     let mayRecover =
                                         RecoverySlot.mayRecover

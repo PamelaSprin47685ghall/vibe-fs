@@ -16,10 +16,10 @@ Infrastructure Host hooks / codec / resource — 不解释业务命令
 
 ## DSL-009：模块与职责
 
-- `NodeProcessWait`：进程等待生命周期拆分为 `awaitExitOrDeadline``killAndAwaitAcknowledgement``waitForProcess`。
-- `BloggerRuntime`：单一入口 `onMainMaterial`，内部无 `BloggerRuntimeState` 状态 DU；`InFlight` 由单一 Task 表示，`Parked` 由 `let!` 等待表示，`Sealed` 由 durable projection 查询表示，`Disposed` 由 owner cancellation 表示。
-- `Companion`：不再暴露 `ArmRecoverySlot/DisarmRecoverySlot/IsRecoveryArmed`；失败路径启动一次性 `runRecoveryOpportunity` CE，由 `TaskCompletionSource` 等待下一份材料。
-- `AgentFact`：按 bounded context 拆分为 `PromptFact` / `ReviewFact` / `ExecutionFact` / `OrchestratorFact` / `CompanionFact`，外层只做 `match fact with | Prompt p -> ...` 一次分派，不构造解释器。
+- `NodeProcessWait`：进程等待生命周期拆分为 `awaitExitOrDeadline`/`killAndAwaitAcknowledgement`/`waitForProcess`。
+- `BloggerRuntime`：单一入口 `onMainMaterial`；`BloggerRuntimeState` 只有 `InFlight`（payload 即 CurrentRequest 唯一权威）与 `Idle` 二态；「有 parked waiter」由 `IParkedTransformHost.HasParked` 物理事实经 `onMaterial` 显式 `hasParkedWaiter` 参数传入；`Sealed` 由 durable projection 查询表示；无 `Parked`/`Disposed` case。
+- `Companion`：恢复槽是一次性物理信号，`ArmRecoverySlot`（真实失败置位）/`IsRecoveryArmed`（squash 决策查询）/`DisarmRecoverySlot`（squash 启动清位）；无 `TaskCompletionSource` waiter、无 `TryConsumeRecoverySlot`。
+- `AgentFact`：拆分为 7 个 bounded-context family（`PromptFactCases` / `ReviewFactCases` / `ExecutionFactCases` / `OrchestratorFactCases` / `CompanionFactCases` 等），`AgentFact` 为 7-case 分派联合，外层 `match` 一次分派后进入 family 纯 fold，不构造解释器。
 
 ## DSL-010：Host 边界白名单
 
