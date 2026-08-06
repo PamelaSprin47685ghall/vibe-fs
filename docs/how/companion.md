@@ -4,7 +4,7 @@
 
 ```fsharp
 type BlogFrameKind = Entry | Squash
-type BlogFrame = { Kind: BlogFrameKind; Digest: string; TextRef: BlobRef }
+type BlogFrame = { Kind: BlogFrameKind; Digest: string; TextRef: BlobRef }  // BlobRef 见 PERSIST-007
 ```
 
 无 Seed。frame 正文是纯工作记录；`[[do_not_exec]] historic_frame` 是消息层渲染，不进 TextRef/digest/delta。

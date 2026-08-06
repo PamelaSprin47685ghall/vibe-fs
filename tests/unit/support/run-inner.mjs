@@ -31,6 +31,12 @@ if (files.length === 0) {
   process.exit(2)
 }
 
+// Default: full in-process parallelism (one dist load). Unit-runner renew probes
+// must force serial slices so wall time exceeds silence (concurrency collapses total).
+const concurrencyEnv = process.env.NODE_TEST_CONCURRENCY
+const concurrency =
+  concurrencyEnv === '1' || concurrencyEnv === 'false' ? 1 : concurrencyEnv ? Number(concurrencyEnv) : true
+
 const stream = run({
   files,
   timeout: PER_TEST_TIMEOUT_MS,
@@ -38,7 +44,7 @@ const stream = run({
   // criterion; the parent's verdict-silence window is the primary one, and this exists so a child
   // that somehow outlives its supervisor cannot run forever.
   signal: AbortSignal.timeout(SUITE_BACKSTOP_MS),
-  concurrency: true,
+  concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : true,
 })
 
 // Every event, not just verdicts. The classifier in `verdict-feed.mjs` decides what renews; sending

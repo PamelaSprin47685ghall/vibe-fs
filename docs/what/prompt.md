@@ -94,3 +94,36 @@ synthetic → 重置 Fallback Offset
 B 侧重试 → 下一真人 root 默认 Agent
 向 Host Prompt 覆盖 Model
 ```
+
+## PROMPT-011：未决发送恢复
+
+Host 已接受 prompt，但插件在写 Submitted / PhysicalAccepted 前崩溃时，判定物理落地的恢复协议。机制与 PromptKey 组成见 `how/prompt.md`。
+
+常量：
+
+```text
+RecoveryTailWindow    = 50   // 读目标 Session 尾部以检索同 PromptKey 的 user 消息
+RecoveryAttemptBudget = 3    // 跨越 3 次插件启动
+```
+
+行为：
+
+1. 对每个 `Claimed` 或 `Submitted` 的 PromptKey：读目标 Session 尾部 `RecoveryTailWindow` 条，查找 metadata 含同一 PromptKey 的 `role=user`。
+   - 找到 → 补写 `PhysicalAccepted`（真实 `msg_*`）
+   - 未找到 → 保持 Pending，**不自动重发**
+2. 第 `RecoveryAttemptBudget` 次启动仍无法证明物理落地 → `Abandoned(UnresolvedAfterRecovery)`。
+
+合同：
+
+```text
+at-most-one logical effect + fail-closed unknown outcome
+```
+
+禁止：
+
+```text
+假装 exactly-once
+用时间窗口代替 PromptKey
+把 accepted-* 当物理落地
+为清理挂起而重发
+```

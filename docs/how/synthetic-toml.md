@@ -1013,11 +1013,17 @@ arbitrary TOML text
 
 # 14. 迁移策略
 
+阶段有界：每阶段有独占文档/实现产物与 exit gate；阶段缺 gate 不得视为完成。
+只有 M3（Blogger）进入当前 release gate；M4 各 surface **拆为独立 proposal** 逐个裁决迁移，
+禁止在单一变更内吞入全部文本生产点（会长期双实现）。各阶段按序合入，不并行堆叠。
+
 ## M0：规范先行
 
 先以 ARCH-010 主条款冻结规则，再迁移生产 prompt。
 
 不得先批量修改生产 prompt，再让实现反向定义规范。
+
+**exit gate**：ARCH-010 冻结、§18 判据可静态核对；无生产 prompt 改动。
 
 ## M1：建立 surface inventory
 
@@ -1039,6 +1045,8 @@ RuntimeSyntheticToml
 
 该分类只用于实现审计，不构成新的运行时 envelope。
 
+**exit gate**：inventory 完整覆盖 src 全部文本生产点；每个 surface 名到其文件/单一写入口的映射可查。
+
 ## M2：复用统一字符串写法
 
 确认仓库既有 canonical string writer 的唯一 owner。
@@ -1052,6 +1060,8 @@ Blogger 和其他 surface 不得保留自己的：
 
 若当前实现存在多处 owner，应先收敛 owner，再迁移文本。
 
+**exit gate**：canonical writer 单一 owner；谖本无第二 delimiter/escape 残留（`"""` 归零）。
+
 ## M3：优先迁移 Blogger
 
 Blogger 已有：
@@ -1062,7 +1072,7 @@ Blogger 已有：
 * 单向 TOML；
 * 现成测试。
 
-因此适合作为首个迁移面。
+因此适合作为首个迁移面。**此处是当前 release gate 进入点。**
 
 迁移内容：
 
@@ -1072,9 +1082,15 @@ Blogger 已有：
 * byte accounting；
 * golden tests。
 
+**exit gate**：Blogger delta 全 golden 对齐；canary 字节断言绿；进入 `check:release`。
+
 ## M4：迁移其他 runtime synthetic surface
 
-根据 inventory 逐一迁移：
+**非 Blogger surface 不得并入本阶段一次性迁移。** 每个 surface 拆为独立 proposal
+（GOV-006/BaselineAdmissible）逐个裁决，各自满足「自身 golden + canary + 单写入口收敛」后才合入；
+同一个 surface 内部也不长期双实现（DslDigest 对齐即删 Legacy）。
+
+根据 inventory 枚举候选：
 
 * continuation；
 * repair；
@@ -1089,6 +1105,8 @@ Blogger 已有：
 
 不得迁移 system prompt assets。
 
+**exit gate**：每个 proposal 独立「迁移前后 digest 等价」canary；不在 release 前塞入未收敛 surface。
+
 ## M5：更新 fixtures 和 canary
 
 更新所有依赖最终文本 bytes 或前缀的：
@@ -1101,6 +1119,8 @@ Blogger 已有：
 * byte-limit test。
 
 若某固定文本拥有自己的 version/digest 合同，必须由该文本的 SSOT owner 按既有规则决定是否 bump；本解释规范不替各领域预先发明统一 versioning 规则。
+
+**exit gate**：fixtures/golden/canary 全绿；无未随文本字节同步的固定断言。
 
 ---
 
