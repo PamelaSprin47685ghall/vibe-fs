@@ -4752,22 +4752,28 @@ export const orchestratorProgram = (() => {
   }
 })()
 
-// ── Join Program DSL (P0-RECOVERY-JOIN-001 + EXEC-018) ───────────────────────
-const JoinProgramModule = await prod('Domain/JoinProgram')
+// ── Join direct CE (P0-RECOVERY-JOIN-001 + EXEC-018 / PR5) ───────────────────
+// Domain JoinProgram AST deleted. Application/Reconciliation/Join.fs is the sole
+// permit-gated entry. Tests assert production surface, not AST case names.
+const JoinModule = await prod('Application/Reconciliation/Join')
 // AgentCompletion loaded early (AgentCompletionModuleEarly) for mailbox dual-channel.
 const AgentCompletionModule = AgentCompletionModuleEarly
 const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
 const ManagerJobModule = await prod('Application/Orchestration/ManagerJob')
 
 export const joinProgram = (() => {
-  const joinAnyFn = member(JoinProgramModule, 'JoinProgram', 'joinAny')
-  const joinAvailableFn = member(JoinProgramModule, 'JoinProgram', 'joinAvailable')
+  const joinAnyFn = JoinModule.joinAny ?? JoinModule.Join_joinAny
+  const joinAvailableFn = JoinModule.joinAvailable ?? JoinModule.Join_joinAvailable
+  if (typeof joinAnyFn !== 'function' || typeof joinAvailableFn !== 'function') {
+    throw new Error(
+      `Join.joinAny/joinAvailable missing; exports: ${Object.keys(JoinModule).join(', ')}`,
+    )
+  }
   return {
-    /** Pure AST constructor: FamilyRecoveryPermit → JoinProgram. */
-    joinAny: (permit) => joinAnyFn(permit),
-    /** EXEC-018 batch program: permit + maxCount + interrupt.Wait. */
-    joinAvailable: (permit, maxCount, interruptWait) => joinAvailableFn(permit, maxCount, interruptWait),
-    caseName: (program) => caseOf(program),
+    /** Direct CE: FamilyRecoveryPermit → runtime.JoinWithPermit. */
+    joinAny: joinAnyFn,
+    /** EXEC-018 batch: permit + maxCount + interrupt.Wait. */
+    joinAvailable: joinAvailableFn,
   }
 })()
 

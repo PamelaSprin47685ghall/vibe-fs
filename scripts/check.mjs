@@ -18,8 +18,8 @@ const checks = [
 for (const script of checks) {
   const args = [script]
   // --threshold freezes current Direct-CE debt baseline (second-runtime-protocol +
-  // infra-leak + others) to be reduced by PR5 deletions; must only ever decrease.
-  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=159')
+  // infra-leak + others) to be reduced by remaining PR5 recovery deletions; must only ever decrease.
+  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=157')
   // Per-file ratchet against the frozen baseline (missing baseline fails with a --generate hint).
   if (script.endsWith('dsl-ownership-ratchet.mjs')) {
     args.push(

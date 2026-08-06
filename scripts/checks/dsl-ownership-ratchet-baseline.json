@@ -9,9 +9,6 @@
   "Application/Reconciliation/ChildRecoveryInterpreter.fs": {
     "business-interpreter": 1
   },
-  "Application/Reconciliation/JoinInterpreter.fs": {
-    "business-interpreter": 1
-  },
   "Application/Reconciliation/PromptRecovery.fs": {
     "behaviour-bool": 3,
     "mutable": 1
@@ -38,9 +35,6 @@
     "mutable": 5
   },
   "Domain/ChildRecovery.fs": {
-    "second-runtime-protocol": 1
-  },
-  "Domain/JoinProgram.fs": {
     "second-runtime-protocol": 1
   },
   "Domain/LoopDetector.fs": {

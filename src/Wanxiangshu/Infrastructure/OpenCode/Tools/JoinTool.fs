@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Domain.JoinProgram
+
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -9,7 +9,7 @@ open Wanxiangshu.Session
 
 /// join() waits for the owning runtime's next physical completion batch.
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
-/// P0-RECOVERY-JOIN-001: FamilyReady permit → joinAvailable → JoinInterpreter (no bare Join).
+/// P0-RECOVERY-JOIN-001: FamilyReady permit → Join.joinAvailable (no bare Join, no AST).
 /// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
 module JoinTool =
 
@@ -91,8 +91,7 @@ module JoinTool =
                         | Error runtimeError ->
                             return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString runtimeError ]
                         | Ok runtime ->
-                            let program = joinAvailable permit JoinBatch.Max interrupt.Wait
-                            let! joined = JoinInterpreter.interpretBatch runtime program
+                            let! joined = Join.joinAvailable runtime permit JoinBatch.Max interrupt.Wait
 
                             match joined with
                             | Ok InterruptedByUserMessage -> return JoinResultRenderer.renderInterrupted ()

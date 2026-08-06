@@ -170,10 +170,9 @@ export const RULES = [
   {
     id: 'join-tool-join-program',
     fileHint: 'JoinTool.fs',
-    // EXEC-018: JoinTool production path is joinAvailable + interpretBatch (JoinAny remains
-    // a valid positive match for legacy DSL / gate synthetics).
-    pattern: /joinAny|joinAvailable|JoinProgram|JoinInterpreter/,
-    label: 'JoinTool must enter JoinProgram / joinAny|joinAvailable / JoinInterpreter',
+    // EXEC-018 / PR5: JoinTool production path is direct Join.joinAvailable (no AST).
+    pattern: /Join\.joinAvailable|Join\.joinAny/,
+    label: 'JoinTool must call Join.joinAvailable / Join.joinAny',
     positive: true,
   },
   {
@@ -182,7 +181,7 @@ export const RULES = [
     // P0 §五 / §十: JoinTool must not bare-call runtime.Join (JoinWithPermit / Join(permit ok elsewhere).
     // Bare = runtime.Join( without leading permit argument.
     pattern: /runtime\.Join\s*\(\s*(?!permit\b)/,
-    label: 'JoinTool must not call runtime.Join; use joinAvailable|joinAny + JoinInterpreter',
+    label: 'JoinTool must not call runtime.Join; use Join.joinAvailable / Join.joinAny',
   },
   {
     // P0 REVISE: production Tools agent-join must not bare-call runtime.Join(
@@ -194,7 +193,7 @@ export const RULES = [
     fileHint: null,
     pattern: /runtime\.Join\s*\(\s*(?!permit\b)/,
     label:
-      'production Tools agent-join must not bare-call runtime.Join(; use Join(permit) / JoinWithPermit / JoinInterpreter',
+      'production Tools agent-join must not bare-call runtime.Join(; use Join(permit) / JoinWithPermit / Join.joinAvailable',
   },
   {
     id: 'executor-tool-require-permit',
@@ -350,9 +349,9 @@ export const RULES = [
   },
   {
     id: 'join-program-requires-permit',
-    fileHint: 'JoinProgram.fs',
-    pattern: /JoinAny of FamilyRecoveryPermit|joinAny \(permit: FamilyRecoveryPermit\)/,
-    label: 'JoinProgram must take FamilyRecoveryPermit (EXEC-023)',
+    fileHint: 'Join.fs',
+    pattern: /joinAny[\s\S]{0,120}FamilyRecoveryPermit|joinAvailable[\s\S]{0,160}FamilyRecoveryPermit/,
+    label: 'Join ops must take FamilyRecoveryPermit (EXEC-023)',
     positive: true,
   },
   {
@@ -407,7 +406,7 @@ const BARE_RUNTIME_JOIN_ALLOWLIST = new Set([
   'HostForkRuntime.fs',
   'ForkRuntime.fs',
   'CompletionMailbox.fs',
-  'JoinInterpreter.fs', // may mention Join only in comments; JoinWithPermit is the call
+  'Join.fs', // direct CE ops call JoinWithPermit / JoinAvailableWithPermit only
 ])
 
 /**

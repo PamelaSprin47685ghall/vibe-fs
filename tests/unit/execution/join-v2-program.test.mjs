@@ -1,31 +1,33 @@
-// Join v2 Domain JoinProgram constructors (EXEC-018) + interrupt ≠ HandleAbandoned.
+// Join v2 direct CE surface (EXEC-018) + interrupt ≠ HandleAbandoned.
+//
+// PR5: Domain JoinProgram AST deleted. Application/Reconciliation/Join.fs is the
+// sole permit-gated join entry. Interrupt semantics stay pure projection checks.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   handleId,
   handleProjection,
-  joinInterrupt,
   joinProgram,
   roles,
   sessionId,
 } from '../support/domain.mjs'
 
-// FamilyRecoveryPermit is opaque; joinAvailable only stores the permit value in the AST.
-// A plain object stands in for the permit at the pure-constructor layer.
-const FAKE_PERMIT = { __testPermit: true }
-
-test('EXEC_018_join_available_program_case_is_join_available', () => {
-  const interrupt = joinInterrupt.create()
-  const program = joinProgram.joinAvailable(FAKE_PERMIT, 32, joinInterrupt.wait(interrupt))
-  assert.equal(joinProgram.caseName(program), 'JoinAvailable')
-  assert.equal(caseOf(program), 'JoinAvailable')
+test('EXEC_018_join_ops_publish_permit_gated_entrypoints', () => {
+  assert.equal(typeof joinProgram.joinAny, 'function')
+  assert.equal(typeof joinProgram.joinAvailable, 'function')
 })
 
-test('EXEC_018_join_any_program_case_is_join_any', () => {
-  const program = joinProgram.joinAny(FAKE_PERMIT)
-  assert.equal(joinProgram.caseName(program), 'JoinAny')
+test('EXEC_018_join_module_has_no_command_reply_ast_exports', async () => {
+  const mod = await import(new URL('../../../dist/Application/Reconciliation/Join.js', import.meta.url).pathname)
+  const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
+  assert.equal(
+    names.some((n) => /Command|Reply|JoinProgram|Interpreter|Step|Return/.test(n)),
+    false,
+    `second-runtime exports leaked: ${names.join(', ')}`,
+  )
+  assert.ok(names.some((n) => n.includes('joinAny') || n === 'joinAny'), names.join(', '))
+  assert.ok(names.some((n) => n.includes('joinAvailable') || n === 'joinAvailable'), names.join(', '))
 })
 
 // Interrupted join must not abandon a still-active child handle (EXEC-017).

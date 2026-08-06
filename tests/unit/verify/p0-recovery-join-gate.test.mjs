@@ -349,8 +349,7 @@ test('P0_RECOVERY_JOIN_GATE_join_tool_missing_recovery_goes_red', () => {
   const source = [
     'module JoinTool',
     'let execute scope context =',
-    '    let program = JoinProgram.joinAny permit',
-    '    let! joined = JoinInterpreter.interpret runtime program',
+    '    let! joined = Join.joinAvailable runtime permit MaxJoinBatch interrupt.Wait',
   ].join('\n')
   const hits = scanText(source, 'JoinTool.fs')
   assert.ok(hits.some((h) => h.id === 'join-tool-family-recovery'))
@@ -358,15 +357,14 @@ test('P0_RECOVERY_JOIN_GATE_join_tool_missing_recovery_goes_red', () => {
 })
 
 test('P0_RECOVERY_JOIN_GATE_join_tool_with_dsl_stays_green_for_positive', () => {
-  // EXEC-018 production shape: joinAvailable + interpretBatch (joinAny still accepted).
+  // EXEC-018 / PR5 production shape: direct Join.joinAvailable (no AST).
   const source = [
     'module JoinTool',
     'let execute scope context =',
     '    let! recovery = scope.RequireFamilyRecovery root',
     '    match recovery with',
     '    | FamilyReady permit ->',
-    '        let program = joinAvailable permit MaxJoinBatch interrupt.Wait',
-    '        let! joined = JoinInterpreter.interpretBatch runtime program',
+    '        let! joined = Join.joinAvailable runtime permit MaxJoinBatch interrupt.Wait',
     '        match joined with',
     '        | Ok c -> encode c',
     '    | FamilyBlocked b -> recoveryBlocked b',
@@ -507,7 +505,7 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
     'src/Wanxiangshu/Session/CompletionMailbox.fs',
     'src/Wanxiangshu/Session/JoinDrain.fs',
     'src/Wanxiangshu/Domain/ChildRecovery.fs',
-    'src/Wanxiangshu/Domain/JoinProgram.fs',
+    'src/Wanxiangshu/Application/Reconciliation/Join.fs',
     'src/Wanxiangshu/Domain/SessionRecovery.fs',
     'src/Wanxiangshu/Kernel/Fact.fs',
     'src/Wanxiangshu/Application/Reconciliation/ChildRecoveryInterpreter.fs',
@@ -541,7 +539,7 @@ test('P0_RECOVERY_JOIN_GATE_positive_clean_break_shapes_present', () => {
     join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs'),
     'utf8',
   )
-  const joinProgram = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/JoinProgram.fs'), 'utf8')
+  const joinOps = readFileSync(join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/Join.fs'), 'utf8')
   const fact = readFileSync(join(ROOT, 'src/Wanxiangshu/Kernel/Fact.fs'), 'utf8')
 
   for (const [file, text, ids] of [
@@ -560,7 +558,7 @@ test('P0_RECOVERY_JOIN_GATE_positive_clean_break_shapes_present', () => {
       ports,
       ['session-ports-restore-handles-mandatory', 'session-ports-recover-jobs-mandatory'],
     ],
-    ['JoinProgram.fs', joinProgram, ['join-program-requires-permit']],
+    ['Join.fs', joinOps, ['join-program-requires-permit']],
     ['Fact.fs', fact, ['false-completion-rejected-fact', 'parent-join-correction-fact']],
   ]) {
     const hits = scanText(text, file)
