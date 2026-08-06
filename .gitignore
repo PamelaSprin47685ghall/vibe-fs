@@ -19,6 +19,13 @@
 # Local agent runtime (Reasonix / host tooling)
 /.reasonix/
 
+# Local NuGet / .NET CLI caches (writable sandbox when home is read-only)
+/.nuget/
+/.dotnet-cli/
+
+# Local delivery verification logs (not product)
+/.delivery-logs/
+
 # Logs
 *.log
 npm-debug.log*

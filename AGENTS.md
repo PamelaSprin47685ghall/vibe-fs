@@ -37,8 +37,8 @@ assistant message 在 transform 之前已经创建并持久化。
 判断 SSOT 条款"Host 能力不足"之前，必须先读源码。 `ARCH-003` 禁止修改 Host 本体，
 但不禁止阅读它——恰恰相反，只有读过才能证明某个 Hook 组合确实不存在。
 
-生产源码唯一根 `src/Wanxiangshu/`（220 个 `.fs`，`Wanxiangshu.fsproj` 编译全部；
-`scripts/checks/architecture.mjs` 实证输出「220 文件」）。
+生产源码唯一根 `src/Wanxiangshu/`（226 个 `.fs`，`Wanxiangshu.fsproj` 编译全部；
+`scripts/checks/architecture.mjs` 实证输出「226 文件」）。
 布局纪律由 `scripts/checks/architecture.mjs`（`npm run lint` 第 2 步）机器验证：
 `src/` 下唯一 F# 根、fsproj 每文件恰编译一次、无盘上未编译/已声明缺失文件、
 Kernel/Domain 不引用上层命名空间与 `Fable.Core.JsInterop`、package resource 读取
@@ -363,7 +363,7 @@ npm run test:e2e             # 单轮 canary（tests/e2e/run.mjs，事件驱动�
 npm run test:package         # 独立跑 package 套件（pack/install/import 检查）
 npm run check                # lint → build → unit → integration
 npm run check:release        # check + test:e2e --repeat 3 + test:package + npm pack --dry-run
-npm run gate:dsl-ownership   # 单独跑 DSL 门禁（--threshold=322）
+npm run gate:dsl-ownership   # 单独跑 DSL 门禁（scripts/check.mjs 固定 --threshold=0）
 ```
 
 `test` 拒绝在 `dist` 陈旧时运行（fail closed）。先 `npm run build`。
