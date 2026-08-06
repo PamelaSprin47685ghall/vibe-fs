@@ -35,12 +35,13 @@ prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the ta
 must = ["conflict-resume.0", "orch-continue.1"]
 
 flow = [
-  # gitConflictProof must land AFTER the worktree fork (fork-manager, orch.0):
-  # committing to the target branch before the worktree branched makes the
-  # recovered rebase a no-op (no divergence) and no conflict-resume fires.
-  # orch.0 is the fork-manager call that creates the worktree; its match is the
-  # earliest deterministic point after the branch exists.
-  { afterExpectation = { id = "orch.0", gitConflictProof = true } },
+  # gitConflictProof must land AFTER the manager worktree exists.
+  # orch.0 only *declares* fork-manager — afterExpectation fires when the provider
+  # request matches, before the tool runs. Committing onto master at orch.0 means
+  # the subsequent worktree is forked from that commit; later rebase is a no-op and
+  # conflict-resume never fires. manager.0 is the first request in the child
+  # worktree session, so the branch point already exists and the target can diverge.
+  { afterExpectation = { id = "manager.0", gitConflictProof = true } },
   { afterExpectation = { id = "conflict-resume.0", restart = true } },
 
   { wait = "orch.0" },

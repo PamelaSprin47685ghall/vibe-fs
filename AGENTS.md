@@ -193,7 +193,8 @@ P0–P2-3c **done**：第二运行时掐断 + Flow→Parallel + bool/program-cou
 合法 mutable 门禁化（157→13）。  
 P2-2 **done**：`HOST_BOUNDARY_OPEN_BASENAMES` 白名单仅 10 个 Host 边界文件可
 `open OpenCode/Process`；其余 Session/Application 仍 fail-closed；13→0。
-P3-1/P3-2 **partial done**：`npm run check` 绿；DSL 门禁债 0；e2e 发布阶梯另计。
+P3-1/P3-2 **partial done**：`npm run check` 绿；DSL 门禁债 0；`test:e2e` 单轮 20/20 绿；`check:release` 三轮另计。
+e2e 修复：`gitConflictProof` 必须挂在 worktree 已存在之后（`manager.0`），不能挂 `orch.0`（tool 执行前匹配）。
 
 仍在盘上的非门禁债：
 
@@ -256,7 +257,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 | ID | 任务 | 完成判据 |
 |----|------|----------|
 | P3-1 | threshold 阶梯 | **done** — `0`；禁止上调；新增违规须同 PR 清掉 |
-| P3-2 | 发布阶梯 | **partial** — `npm run check` 绿（unit 981 + integration 267）；e2e/`check:release` 未在本切片跑 |
+| P3-2 | 发布阶梯 | **partial** — `npm run check` 绿；`npm run test:e2e` 单轮 20/20 绿；`check:release`（`--repeat 3`）未跑 |
 | P3-3 | 文档只描述现行纪律 | **partial** — AGENTS §2 已同步主导化完成态；TASK.md 历史纠偏叙述可保留为档案 |
 
 ### 施工纪律（主导化期间）
