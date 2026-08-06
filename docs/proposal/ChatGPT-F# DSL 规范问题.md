@@ -6,6 +6,8 @@
 **Exported:** 8/6/2026 18:45:39  
 **Link:** [https://chatgpt.com/c/6a744b38-bda4-83eb-aa7d-226a87fa7d7a](https://chatgpt.com/c/6a744b38-bda4-83eb-aa7d-226a87fa7d7a)  
 
+> **裁决状态（2026-08-07）**：本 proposal 的八处代码迁移点与 PR 1–9 已全部实施落地（记录见 `how/dsl-structured-program.md` 迁移完成记录；差距跟踪已随 `status/dsl-structured-program-gap.md` 删除而关闭）。仍保持未裁决候选的两项均有存量证据：PR 9 第 3 项「组合状态结构检测」（存量仅 `BloggerRuntimeCell.State+Drain` 一条合法组合，实施价值低）；PR 9 第 5 项中 ControlState 分类的「必须附 CE 不可表达理由」强化（当前为报告形态）。
+
 ## Prompt:
 8/6/2026, 4:52:08 PM
 
