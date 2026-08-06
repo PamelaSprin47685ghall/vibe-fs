@@ -34,7 +34,7 @@ type HostForkRuntime
         /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
         /// Reviewer. The Orchestrator's runtime keeps this off — it opens barriers
         /// itself (ORCH-006) — so exactly one writer owns each barrier.
-        ?openReviewBarrier: bool,
+        ?managerOpensReviewBarrier: bool,
         /// REVIEW-007: the Git tree hash of a forked Reviewer's directory, used to
         /// open the barrier. `None` for a directory with no readable tree: the
         /// Reviewer's verdict then fails closed under REVIEW-008, which is the
@@ -106,7 +106,10 @@ type HostForkRuntime
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
     member internal _.ParentAbortToken = parentAbortToken
-    member internal _.OpenReviewBarrier = defaultArg openReviewBarrier false
+
+    member internal _.ManagerOpensReviewBarrier =
+        defaultArg managerOpensReviewBarrier false
+
     member internal _.TreeHashFor = defaultArg treeHashFor (fun _ -> None)
 
     /// EXEC-009: retired OR abandoned ids must never re-fork under the same handle.

@@ -178,28 +178,29 @@ Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflo
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
 （「functions, not a Flow AST」+ 直接 `task`/`let!`）。
 
-**冻结债（`scripts/check.mjs --threshold=124`，P1-3 后实测 124 / 111 files）**：
+**冻结债（`scripts/check.mjs --threshold=116`，program-counter 清零后实测 116 / 111 files）**：
 
 ```text
 mutable                  55   ← 物理并发/累加器可留；业务决策 mutable 删
 behaviour-bool           40   ← 行为选择 bool → Decision DU
 infrastructure-leak      21   ← Session/Application 误 open OpenCode/Process
-program-counter           8   ← Turn isContinuation / forceConfirmedReviewer / openReviewBarrier
+program-counter           0
 business-interpreter      0
 second-runtime-protocol   0
 ```
 
 P0 **done**：Child/Session Recovery → Workflow 直接 CE；157→153。  
 P1-1a **done**：`ReactivatedAfterSeal` → `DrainWindow`；153→139。  
-P1-3 **done**：`EnforcerHost` 三旗标 → `CycleDisposition` 穷尽 DU；139→124。
+P1-3 **done**：`EnforcerHost` → `CycleDisposition`；139→124。  
+program-counter **done**：重命名 `isContinuation`/`forceConfirmedReviewer`/`openReviewBarrier`；124→116。
 
-仍在盘上的第二控制流所有者（非「已合法保留」）：
+仍在盘上的债（非「已合法保留」）：
 
 | 位置 | 问题 |
 |------|------|
 | `Session/BloggerCoordinator.fs` | 与 Runtime cell 分工待继续收敛（P1-1 余下） |
 | `Kernel/Flow.fs` / `Kernel/DomainFlow.fs` | 旧 Flow 框架（P2-1） |
-| `Application/Reconciliation/TurnReconcile.fs` 等 | `isContinuation`/`forceConfirmedReviewer` 参数名程序计数器 |
+| Session/Application `open OpenCode/Process` | infrastructure-leak（P2-2） |
 
 ### PENDING TASK：DSL 全面主导化
 
@@ -254,7 +255,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P3-1 | threshold 阶梯 | `124（P1-3 后）→ P1 余下 / P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
+| P3-1 | threshold 阶梯 | `116（program-counter=0）→ P1 余下 / P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
 | P3-2 | 发布阶梯 | `npm run check` 绿；目标切片 canary 绿；发布前 `check:release` |
 | P3-3 | 文档只描述现行纪律 | AGENTS.md / TASK.md / spec 表述一致：DSL = 直接 CE；无 Wave M* 施工模板；无「Interpreter 为唯一执行者」 |
 

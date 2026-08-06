@@ -232,7 +232,7 @@ module HostForkAgent =
                                 // barriers at the reverify site, and a second writer
                                 // would fight the first over `CurrentBarrierId`.
                                 let barrierOutcome =
-                                    if this.OpenReviewBarrier && role = AgentRole.Reviewer then
+                                    if this.ManagerOpensReviewBarrier && role = AgentRole.Reviewer then
                                         match this.TreeHashFor agentId with
                                         | None -> Ok()
                                         | Some tree ->

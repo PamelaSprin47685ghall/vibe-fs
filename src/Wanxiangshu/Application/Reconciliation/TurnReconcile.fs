@@ -39,9 +39,9 @@ module TurnReconcile =
         (declaredRoot: string)
         (root: string)
         (physical: string)
-        (isContinuation: bool)
+        (declaredPhysicalIsContinuationUser: bool)
         =
-        if isContinuation && isAdmissionAddress physical then
+        if declaredPhysicalIsContinuationUser && isAdmissionAddress physical then
             users messages |> List.tryLast |> Option.map (fun message -> message.Id)
         elif physical = declaredRoot then
             Some root
@@ -93,9 +93,12 @@ module TurnReconcile =
                     |> Option.map PhysicalUserMessageId.value
                     |> Option.defaultValue declaredRoot
 
-                let isContinuation = binding.ContinuationMessageIds.Contains declaredPhysical
+                let declaredPhysicalIsContinuationUser =
+                    binding.ContinuationMessageIds.Contains declaredPhysical
 
-                match resolvePhysical messages declaredRoot root declaredPhysical isContinuation with
+                match
+                    resolvePhysical messages declaredRoot root declaredPhysical declaredPhysicalIsContinuationUser
+                with
                 | None -> None
                 | Some physical ->
                     let assistant =

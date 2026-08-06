@@ -85,7 +85,7 @@ type ToolRuntimeScope
             // Reviewer it forks gets its barrier opened here (see
             // `HostForkAgent.Fork`). The Orchestrator's runtime keeps this
             // off; ORCH-006 opens barriers at the reverify site.
-            openReviewBarrier = true,
+            managerOpensReviewBarrier = true,
             treeHashFor =
                 (fun agentId ->
                     // 主会话（无父）的目录从未经 RegisterChildDirectory 注册——

@@ -17,11 +17,7 @@
   },
   "Application/Reconciliation/TurnCompletionProgram.fs": {
     "infrastructure-leak": 1,
-    "program-counter": 2,
     "behaviour-bool": 1
-  },
-  "Application/Reconciliation/TurnReconcile.fs": {
-    "program-counter": 4
   },
   "Application/Reconciliation/XTraceCapture.fs": {
     "mutable": 1
@@ -123,7 +119,6 @@
   },
   "Session/HostForkRuntime.fs": {
     "infrastructure-leak": 2,
-    "program-counter": 2,
     "mutable": 1
   },
   "Session/HostPendingRun.fs": {

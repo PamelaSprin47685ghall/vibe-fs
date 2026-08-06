@@ -179,13 +179,13 @@ module TurnCompletionProgram =
 
             wasAborted, sessionWide
 
-        let completeReviewerOrAssistant (forceConfirmedReviewer: bool) =
+        let completeReviewerOrAssistant (confirmedReviewerEmptyTextFallback: bool) =
             let wasAborted, sessionWide = cleanAbortAndAccumulate ()
 
             let sessionWideText =
                 if not (String.IsNullOrWhiteSpace sessionWide) then
                     sessionWide
-                elif forceConfirmedReviewer then
+                elif confirmedReviewerEmptyTextFallback then
                     // A confirmed double-PERFECT often ends on a tool-only frame.
                     // The witness is already Confirmed, so expose a minimal A rather
                     // than failing a review that actually succeeded.
