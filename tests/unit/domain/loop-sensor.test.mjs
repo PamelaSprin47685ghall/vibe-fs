@@ -370,3 +370,62 @@ test('LOOP_008_loop_kill_advances_cursor_only_via_fallback_controller', () => {
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test('LOOP_008_budget_exhaustion_is_final_and_writes_the_exhausted_fact', () => {
+  // FALLBACK-005: the 12th consecutive failure is immediately final — the
+  // controller returns Exhausted and writes FallbackExhausted; a 13th
+  // confirmed failure on the same run stays AlreadyRecorded (nothing written).
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-loop-exhaust-'))
+  const created = agentJournal.create({ directory, runtime: 'rt_loop_ex' })
+  assert.equal(created.ok, true, created.ok ? '' : created.error)
+  const journal = created.journal
+  const SESSION = 'ses_exhaust'
+
+  try {
+    const runtime = PromptDispatcher.Runtime__AcceptHumanRoot(
+      promptDispatcher.forJournal(journal),
+      sessionId(SESSION),
+      physicalUser('msg_u1'),
+      'fast-coder',
+    )
+    assert.equal(runtime.tag ?? 0, 0)
+
+    for (let i = 1; i <= 11; i += 1) {
+      const advanced = fallbackController.recordConfirmedFailure(
+        journal,
+        cursor.defaultBudget,
+        SESSION,
+        `run-${i}`,
+        'loop-kill',
+      )
+      assert.deepEqual(advanced, { ok: true, outcome: 'Advanced' }, `attempt ${i} must advance`)
+    }
+
+    const twelfth = fallbackController.recordConfirmedFailure(
+      journal,
+      cursor.defaultBudget,
+      SESSION,
+      'run-12',
+      'loop-kill',
+    )
+    assert.deepEqual(twelfth, { ok: true, outcome: 'Exhausted' })
+
+    const exhaustedState = fallbackProjection.read(
+      fold.session(promptDispatcher.journalSnapshot(journal), SESSION).Fallback,
+    )
+    assert.equal(exhaustedState.failures, 12, 'twelve confirmed failures recorded')
+    assert.equal(exhaustedState.exhausted, true, 'FallbackExhausted folded')
+
+    const thirteenth = fallbackController.recordConfirmedFailure(
+      journal,
+      cursor.defaultBudget,
+      SESSION,
+      'run-13',
+      'loop-kill',
+    )
+    assert.deepEqual(thirteenth, { ok: true, outcome: 'AlreadyRecorded' }, 'post-exhaustion is a no-op')
+  } finally {
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
