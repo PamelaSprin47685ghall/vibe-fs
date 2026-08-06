@@ -62,9 +62,10 @@ flow = [
   # pre-restart. The guard round resumes and confirms on the recovered run.
   { wait = "barrier-reviewer.2" },
   # Post-restart resume: restart + cold start + journal fold exceed the default
-  # 5s silence window under forest pressure — same 15000 standard as
-  # host-restart / reviewer-restart / x-a post-restart waits.
-  { wait = "conflict-resume.0", timeoutMs = 15000 },
+  # 5s silence window under forest pressure. 20000 matches reviewer-restart's
+  # post-restart standard — 15000 still flaked once in a 3-round continuous run
+  # (iteration 2 of check:release) where 63 Host launches accumulate.
+  { wait = "conflict-resume.0", timeoutMs = 20000 },
 
   { awaitRestart = true },
 
