@@ -135,7 +135,6 @@ why（设计理由与被拒方案；不直接约束实现）
 | [projection-algebra-gap.md](status/projection-algebra-gap.md) | 收敛 Legacy 拼接到纯 Projection Planner，并覆盖现行投影 intent |
 | [gov-behavior-migration.md](status/gov-behavior-migration.md) | 按照 GOV-011 将 `how/` 中遗留的行为定义升迁至 `what/` |
 | [proposal-code-isolation-gap.md](status/proposal-code-isolation-gap.md) | 清除生产编译图对未裁决 Strength / Student-Teacher proposal 的直接依赖 |
-| [dsl-structured-program-gap.md](status/dsl-structured-program-gap.md) | 消除 `NodeProcessWait`、`Companion` 恢复槽、`BloggerRuntime` 等处的隐性状态机，对齐 `DSL-001..011` |
 
 ---
 
