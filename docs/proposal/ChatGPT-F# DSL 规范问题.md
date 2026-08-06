@@ -1,4 +1,70 @@
-# F# DSL 规范问题
+# Proposal: F# 结构化流程 DSL 治理加固
+
+未裁决候选。不是当前规范，也不是可直接实施的迁移计划。本文末尾保留的 ChatGPT 导出仅是研究输入；其中的路径、计数、结论与代码草图来自未入库的 `repomix-output(20260806-085150).xml`，使用前必须对当前 HEAD 重新取证。
+
+## Problem
+
+ARCH-001 与 FLOW-005 要求业务控制流由结构化程序表达，但现有 DSL 门禁主要依赖路径、名称与局部语法形态。它能阻断已知坏形状，不能单独证明任意 DU、可变 cell 或等待循环没有把执行位置编码成数据。
+
+## Current baseline
+
+- 正式合同位于 `docs/what/architecture.md`、`docs/what/flow.md` 与对应 `shape/how/proof` 文件；它们仍是唯一实现依据。
+- `scripts/checks/dsl-ownership.mjs` 与 ratchet 是当前静态门禁，测试与人工评审补足语义判定。
+- 原始研究列出的 `NodeProcessWait`、Blogger runtime、Companion recovery、重复类型与事实代数是待复核候选问题，不因进入本文而成为已确认 gap。
+
+## Goal
+
+- 建立可复现的语义审计方法，区分领域事实、物理资源状态与程序计数器。
+- 将每个确认的问题拆成单一所有权、单一兼容性处置、可独立证明的 proposal。
+- 只有在现行规范无法充分表达目标时才修改正式层；纯实现偏差进入 `status/`。
+
+## Non-goals
+
+- 不以 DU case 数、`mutable` 数量或名称黑名单直接判定架构违规。
+- 不把本文的 CE 草图、PR 顺序或阈值当作已裁决设计。
+- 不依据缺失附件直接修改生产代码。
+
+## Impact map
+
+- what: `docs/what/architecture.md`、`docs/what/flow.md`
+- shape: `docs/shape/architecture.md`、`docs/shape/flow.md`
+- how: `docs/how/architecture.md`、`docs/how/flow.md`
+- proof: `docs/proof/architecture.md`、`docs/proof/flow.md`、`docs/proof/verify.md`
+- code/resources: `src/Wanxiangshu/` 中经当前 HEAD 复核后确认的各独立所有权边界；`scripts/checks/dsl-ownership.mjs`
+
+## Alternatives
+
+- 只扩充禁用名称：成本低，但改名即可绕过。
+- 以统一 case 数或布尔数量阈值失败：机械可判定，但会误伤合法词汇、证据与局部算法状态。
+- 仅靠人工评审：能判断语义，但缺少可重现证据与回归保护。
+
+## Migration / cutover
+
+先为每个候选问题补当前源码证据与能判红的回归，再按所有权拆分 proposal。每个被接受的子 proposal 按 GOV-006 原子更新正式层；实现落后时另建 `status/`，禁止把本研究转录直接搬入 status 或代码。
+
+## Compatibility disposition
+
+`ExplicitMigration`，仅作为当前合并候选的最严格上界。拆分后的子 proposal 必须分别选择 `Compatible | ExplicitMigration | ExplicitReset | CleanBreak`；未拆分前不得裁决。
+
+## Proof plan
+
+- 对每个候选点给出当前 HEAD 的精确源码位置、可表示非法状态或第二运行时的最小证明。
+- 先破坏目标性质，确认新增门禁或测试确实变红；再提交修复。
+- 保持 `npm run lint`、单元、集成与相关 canary 绿，不用名称统计代替行为证明。
+
+## Decision owner
+
+未指定。裁决前必须由架构负责人认领，并确认拆分后的 Impact map、兼容性处置与 proof plan。
+
+## Admission blockers
+
+- 原始证据附件未入库，无法从本文复核快照来源。
+- 当前文本捆绑进程等待、Companion、Blogger、持久事实、角色类型与门禁等不同所有权。
+- 若干建议是启发式审查条件，不是可直接机械执行的正确性判据。
+
+## Research appendix：原始 ChatGPT 导出
+
+以下内容原样保留用于追溯思路；其中“最终裁决”“推荐 PR 顺序”等措辞只属于原对话，不代表 GOV-006 裁决。
 
 **User:** Anonymous  
 **Created:** 8/6/2026 16:52:11  

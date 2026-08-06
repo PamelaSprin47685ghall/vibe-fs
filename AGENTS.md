@@ -1,7 +1,7 @@
 # AGENTS.md — 万象术工程纪律与 AI 代理指南
 
 > 本文档为万象术（Wanxiangshu）开发人员与 AI 代理（Agents）的**最高行为与工程纪律指南**。  
-> 规范体系整体遵循 `docs/README.md` 定义的单向链条：`what → shape → how → proof → why`。
+> 规范体系遵循 `docs/README.md` 与 GOV-003：`what → shape → how → code/resources`；`proof` 验证整条链，`why` 解释理由。
 
 ---
 
@@ -13,10 +13,8 @@
 
 ```text
 what（可观察行为与条款） → shape（所有权与边界） → how（目标实现与算法） → code/resources
-                                                             ↓
-                                                           proof（验证与剧本）
-                                                             ↑
-                                                           why（设计理由与 Kolmogorov 宝典）
+proof（验证与剧本）验证上述整条链
+why（设计理由与 Kolmogorov 宝典；不直接约束实现）
 ```
 
 - **流动面**：`docs/proposal/`（未裁决候选，禁止直接实现）、`docs/status/`（实现相对规范的活跃差距）。
@@ -26,12 +24,18 @@ what（可观察行为与条款） → shape（所有权与边界） → how（�
 
 ### 1.2 动手之前先读规范与状态
 
-完整标准工作流程：
+完整标准工作流程分为裁决与实现两段：
 
 ```text
-proposal -> write why -> write what -> write shape -> write how -> check how against why -> write proof
-         -> move proposal to status -> write code -> check proof -> remove proposal from status
+proposal → 可接纳性检查 → 裁决
+  接受 → 原子更新 why/what/shape/how/proof → 实现落后时另建 status → 删除 proposal
+  拒绝 → 长期理由按需写入 why → 删除 proposal
+
+实现 → 读 what → 读 shape → 读 how → 对照 status → 读代码
+     → 改 code/resources → 用 proof 验证 → 对齐后删除 status
 ```
+
+`proposal` 是未裁决候选，`status` 是实现相对已裁决规范的活跃差距；二者禁止互相改名或搬运正文。
 
 **两种典型失败：**
 1. **写完才想起看文档**：代码已经按旧语义定型，要么返工，要么把旧语义固化，导致规范与代码偏离。
@@ -56,7 +60,7 @@ proposal -> write why -> write what -> write shape -> write how -> check how aga
 | 结构化程序 DSL（FLOW-） | `docs/what/flow.md`（`FLOW-`） | `tests/unit/verify/dsl-ownership.test.mjs` + `scripts/checks/dsl-ownership.mjs` |
 | Projection Algebra（PROJ-） | `docs/what/projection.md`（`PROJ-`） | `tests/unit/context/companion-projection.test.mjs` + `tests/unit/orchestrator/program.test.mjs` |
 | LLM 退化循环检测与强杀恢复 | `docs/what/loop.md`（`LOOP-`） | `tests/unit/domain/loop-*.test.mjs` |
-| Strength / Student&Teacher（未裁决） | `docs/proposal/strength.md` / `student-teacher.md` | `docs/status/strength-student-teacher.md` |
+| Strength / Student&Teacher（未裁决） | `docs/proposal/strength.md` / `student-teacher.md` | `docs/status/proposal-code-isolation-gap.md` |
 | 任何生产代码改动 | `docs/what/architecture.md` + `docs/shape/architecture.md` | `scripts/checks/architecture.mjs` + `scripts/checks/spec.mjs` |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见 §2.1） |
 
@@ -71,7 +75,7 @@ proposal -> write why -> write what -> write shape -> write how -> check how aga
 | `docs/what` · `shape` · `how` · `proof` · `why` | 分域产品规范。条款 ID 寻址（`PROMPT-005` 等）。冲突时以正式层为准。导航 `docs/README.md`，词汇表 `docs/what/glossary.md` |
 | `docs/proposal/` | 未裁决候选；禁止直接实现 |
 | `docs/status/` | 实现相对规范的活跃差距；对齐后删除 |
-| `scripts/checks/spec.mjs` | 规范内部一致性：条款唯一、无悬空引用、前缀归属、导航覆盖 |
+| `scripts/checks/spec.mjs` | 规范内部一致性：条款唯一、无悬空引用、前缀归属、伪条款 ID、正式文件及全部活跃 status/proposal 导航覆盖 |
 | `scripts/checks/architecture.mjs` | 源码根、fsproj 完整性、分层边界、资源读取位置、无 `.gen.fs`、无旧路径（VERIFY-005） |
 | `docs/why/kolmogorov.md` | Kolmogorov 宝典唯一权威副本（工程铁律与结对输出纪律） |
 | `docs/why/enforcer.md` + `resources/enforcer/catalog.json` | Enforcer 理由与规则实例（实例在实现面） |
@@ -150,7 +154,7 @@ proposal -> write why -> write what -> write shape -> write how -> check how aga
 生产源码统一位于 `src/Wanxiangshu/`（由 `Wanxiangshu.fsproj` 编译全部）：
 - `Kernel/`：与业务无关的基础代数与并发控制（`AsyncSupport.fs`、`Parallel.fs` 等）。
 - `Domain/`：领域事实、证据、决策与值对象（纯逻辑，不引用上层与 `Fable.Core.JsInterop`）。
-- `Session/`：会话级别 Program AST 与结构化程序（`AgentProgram.fs`、`CompanionProgram.fs`）。
+- `Session/`：会话级运行时 cell 与直接执行的结构化程序；禁止业务 Program AST + Interpreter。
 - `Application/`：工作流、恢复逻辑与协调器（`Reconciliation/`、`Orchestrator/`）。
 - `Infrastructure/`：与 OpenCode Host/SDK/Journal/Resources 适配（`OpenCode/`、`Journal/`、`Resources/`）。
 

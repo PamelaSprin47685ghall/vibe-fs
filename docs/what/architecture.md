@@ -41,11 +41,12 @@ client.session.* / prompt_async / session.messages
 ## ARCH-004：前缀缓存保护
 
 平常回合：Y frames 可增长，X active prefix **字节不变**。  
-Epoch 只在下列**已发生事实**提交时切换（冷边界）：
+PrefixEpoch 只在下列**已发生事实**提交时切换（冷边界）：
 
 1. X prefix probe 提升（CTX-012）  
-2. Y BlogSquash 提交（COMPANION-006）  
-3. Host compaction 后重锚（HOST-006）  
+2. Host compaction 后重锚（HOST-006）
+
+Y BlogSquash 只推进 `FrameEpoch`（COMPANION-006），不得改 `PrefixEpoch`。
 
 禁止：按 token / 窗口 / 占比主动切换 epoch；把 Y frames 塞进 X active prefix；用 runtimeId/timestamp 做 canonical equality。
 
@@ -101,3 +102,13 @@ string ↛ origin / authority / phase / next action
 程序状态用 DU、字段、事件、Journal、typed metadata 表达。  
 禁止用空非空、零宽、前缀、regex、error prose 等反推「我是谁、下一步做什么」。  
 测试断言 typed behavior；仅当外部协议规定字节合同时才钉字节。
+
+## ARCH-012：自定义 Tool 文本结果有界
+
+插件返回给 Host 的自定义 tool 文本结果必须在 Host 默认 head truncation 之前完成确定性留尾截断：
+
+- 不超过 2000 行且 UTF-8 不超过 51200 字节时逐字返回。
+- 超限时输出固定 marker + 确定性尾部：优先保留最新完整行；若最后一行自身超限，按 UTF-8 scalar 安全保留其后缀。最终结果同时满足两项上限。
+- 计量与截断只认 UTF-8 字节和换行，不按字符数、token 或 provider 容量估算。
+
+该边界只限制 tool 返回 wire，不改变内部完整结果的事实来源。

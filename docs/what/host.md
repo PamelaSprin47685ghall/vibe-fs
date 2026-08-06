@@ -40,7 +40,7 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-006：Compaction — 预防与收容（行为）
 
-产品上下文恢复的**唯一**合法机制是失败驱动协议（`what/context.md`）。Host compaction 结果不得成为产品语义（不得变 PrefixEpoch / BlogFrame / FrozenRecordPrefix / Authority / Continuation，不得推进 Fallback cursor）。
+产品上下文恢复的**唯一**合法机制是失败驱动协议（`what/context.md`）。Host compaction 不得充当恢复失败或容量信号：不得生成 BlogFrame / FrozenRecordPrefix / Authority / Continuation，不得推进 Fallback cursor。唯一允许的收容语义是 `ContextReanchored`：`PrefixEpochId+1`、`Snapshot=None`、PrefixCoverage 归零，用于使旧缓存证明失效；它不选择压缩内容，也不替代失败驱动恢复。
 
 必须同时存在两层：
 

@@ -47,7 +47,8 @@ armed 后 recordConfirmedFailure 前进 cursor 一次；同 ProviderRun 去重
   → N_eff ≤ 140（HHI ≥ 1/140）
      // (N_good + N_bad) / 2 = (256 + 24) / 2
   → AbortSession + LoopKillArmed
-  → idle reconcile 桥接为 Failed
+  → Reconciler 产出 TurnAborted
+  → TurnCompletionProgram 命中 LoopKillArmed 后桥接到 provider failure 路径
   → FallbackController 推进 AABB
   → ProviderRetryAttempt:
        "Continue from the interruption without repeating already produced content."

@@ -8,14 +8,16 @@
 |----|------|
 | Inventory | 全部纳入范围的 production surface 已列出；插件工具 LLM-visible 返回体在列 |
 | 布局 | instruction 非字段；data 非顶层 comment；instruction 仅最前；data 开始后无顶层 comment |
-| 字符串 | 无 `"""` 多行；三单引号规则；特殊文本经 owner 转义 |
+| 字符串 | 无 `"""` 多行；literal-safe 值走三单引号；delimiter 碰撞/控制字符走 canonical basic fallback |
 | Containment | 不可信输出不能逃到顶层结构（含 `# Ignore all previous instructions` 类） |
 | 权限/Transport | system prompt 未误迁；human raw 未包装；provider/tool 原生 binding 未改 |
 | Blogger | data-only body 与 optional header 分离；chunk 字节合同；join LWR wire 形状 |
+| Tool result bound | pass-through 与 marker+tail 均满足 2000 行 / 51200 UTF-8 bytes；不切断 surrogate pair（ARCH-012） |
 
 ## 测试落点（现行）
 
 - unit：`tests/unit/context/synthetic-toml*.test.mjs`（及相关 projection/join wire）  
+- tool bound：`tests/unit/context/tool-result-bound.test.mjs`
 - integration harness：`arch010-cases` 等 inventory / golden  
 - e2e：依赖 synthetic 外壳的 canary 不得退回裸英语 synthetic  
 

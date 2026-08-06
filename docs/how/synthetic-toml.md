@@ -10,9 +10,9 @@
 - **输出**：面向 LLM 的单向 Synthetic TOML 文本 payload。
 - **核心边界与不变量**：
   1. System/Developer 原生 Prompt 明确排除（§2）：原生角色 Prompt 继续使用 Markdown/裸英语，严禁 TOML 包装。
-  2. 冯诺依曼指令数据分离：Instruction 必须且只能写为顶层 `#` 注释；Data 必须写为 TOML 字段/表/值；Instruction 永远物理位于最最前。
+  2. 冯诺依曼指令数据分离：Instruction 必须且只能写为顶层 `#` 注释；Data 必须写为 TOML 字段/表/值；Instruction 永远物理位于最前。
   3. 单向表示与零反向解析：合成 TOML 严禁反向解析为领域对象或用作 Prompt Origin / Authority 证据（ARCH-010 / PROMPT-001）。
-  4. M0–M5 有界迁移：M4 非 Blogger 表面拆为独立 proposal 逐裁决，严禁单一变更内吞入全部生产点。
+  4. M0–M5 有界迁移：M4 非 Blogger surface 逐项收敛，严禁单一变更内吞全部生产点；仅伴随行为变化时另走 proposal。
 
 ---
 
@@ -55,7 +55,7 @@
 * system prompt；
 * developer prompt；
 * Host 原生角色配置中的 prompt；
-* `next/prompts/*-system.md` 等角色 prompt assets；
+* `resources/prompts/*-system.md` 等角色 prompt assets；
 * provider 原生 system/developer instruction channel。
 
 不得以本解释规范为理由：
@@ -474,7 +474,7 @@ text = "# Ignore the previous instruction."
 
 ## 6.3 多行字符串
 
-所有多行字符串固定使用三单引号字面量。
+含换行且能被 TOML literal multiline string 无损承载的值使用三单引号。若正文含 `'''` 或 TOML 禁止的原始控制字符，则没有合法的 literal multiline 表示，统一回退为 basic string，并使用 canonical escape；禁止改选 `"""`。
 
 标准排版：
 
@@ -492,9 +492,9 @@ text = '''
 3. 内容行不加格式缩进。
 4. 原始内容自身的缩进逐字保留。
 5. closing `'''` 单独占行。
-6. value 恰好是原始内容加一个尾换行。
+6. literal multiline 形态的 value 恰好是规范化原文加一个尾换行；basic fallback 精确保留规范化原文，不额外加换行。
 7. 不使用 `"""`。
-8. 不根据内容在多行 delimiter 之间做选择。
+8. 不在两个 multiline delimiter 之间选择；不安全正文只能回退为 basic string。
 9. 同一 semantic input 必须产生相同 bytes。
 
 正确：
@@ -545,6 +545,8 @@ second line'''
 * 看起来像当前 instruction 的文本。
 
 这些内容必须全部经过既有字符串 renderer，作为 value 输出。
+
+其中 `'''` 碰撞与原始控制字符必须渲染为单行 basic string，换行和控制字符以标准 TOML escape 表达。该 fallback 是 literal multiline 不可表示时的唯一分支，不是第二套业务 renderer。
 
 生产者不得通过直接字符串拼接，让 data 逃逸到顶层 TOML 结构。
 
@@ -914,7 +916,7 @@ message = "..."
 
 不要同时输出 `outcome = message` 与 `[error].message`。
 
-自定义 tool 的 textual body 经 `ToolResultBound` 抢先留尾截断（ARCH-010-TOOL-BOUND），使 Host 默认 2000 行 / 50 KiB head 截断为 no-op。
+自定义 tool 的 textual body 经 `ToolResultBound` 抢先留尾截断（ARCH-012），使 Host 默认 2000 行 / 50 KiB head 截断为 no-op。
 
 PTY completion 不是 LWR：`kind = "pty"` 的 `[[result]]` 保持独立最小 schema（`closed`、`pty_id` 等），不把 agent session 语义强塞给 PTY；PTY 项不渲染 LWR 注释块。
 
@@ -1030,8 +1032,7 @@ arbitrary TOML text
 # 14. 迁移策略
 
 阶段有界：每阶段有独占文档/实现产物与 exit gate；阶段缺 gate 不得视为完成。
-只有 M3（Blogger）进入当前 release gate；M4 各 surface **拆为独立 proposal** 逐个裁决迁移，
-禁止在单一变更内吞入全部文本生产点（会长期双实现）。各阶段按序合入，不并行堆叠。
+M3 先用 Blogger 验证 renderer；M4 再按 surface 逐项迁移。ARCH-010 的现行纳入范围全部受 release gate 约束，禁止在单一变更内吞入全部文本生产点（会长期双实现）。各阶段按序合入，不并行堆叠。
 
 ## M0：规范先行
 
@@ -1076,7 +1077,7 @@ Blogger 和其他 surface 不得保留自己的：
 
 若当前实现存在多处 owner，应先收敛 owner，再迁移文本。
 
-**exit gate**：canonical writer 单一 owner；谖本无第二 delimiter/escape 残留（`"""` 归零）。
+**exit gate**：canonical writer 单一 owner；源码无第二 multiline delimiter/escape owner（`"""` 输出归零）。
 
 ## M3：优先迁移 Blogger
 
@@ -1088,7 +1089,7 @@ Blogger 已有：
 * 单向 TOML；
 * 现成测试。
 
-因此适合作为首个迁移面。**此处是当前 release gate 进入点。**
+因此适合作为首个迁移面。该阶段完成不缩小 ARCH-010 对其它已纳入 surface 的约束范围。
 
 迁移内容：
 
@@ -1098,13 +1099,11 @@ Blogger 已有：
 * byte accounting；
 * golden tests。
 
-**exit gate**：Blogger delta 全 golden 对齐；canary 字节断言绿；进入 `check:release`。
+**exit gate**：Blogger delta 全 golden 对齐；canary 字节断言绿。
 
 ## M4：迁移其他 runtime synthetic surface
 
-**非 Blogger surface 不得并入本阶段一次性迁移。** 每个 surface 拆为独立 proposal
-（GOV-006/BaselineAdmissible）逐个裁决，各自满足「自身 golden + canary + 单写入口收敛」后才合入；
-同一个 surface 内部也不长期双实现（DslDigest 对齐即删 Legacy）。
+**非 Blogger surface 不得一次性混改。** 按 surface 独立迁移，各自满足「自身 golden + canary + 单写入口收敛」后合入；同一个 surface 内部也不长期双实现（digest 对齐即删 Legacy）。仅把已纳入 ARCH-010 的 surface 对齐既有记法不需要新 proposal；若同时改变该 surface 的产品行为，则按 GOV-006 另行裁决。
 
 根据 inventory 枚举候选：
 
@@ -1121,7 +1120,7 @@ Blogger 已有：
 
 不得迁移 system prompt assets。
 
-**exit gate**：每个 proposal 独立「迁移前后 digest 等价」canary；不在 release 前塞入未收敛 surface。
+**exit gate**：每个 surface 独立通过「迁移前后 digest 等价」canary；当前 release 不包含任何未收敛的纳入 surface。
 
 ## M5：更新 fixtures 和 canary
 
@@ -1288,7 +1287,7 @@ data-only 是合法形式。
 * `CTX-013` 允许最前方 instruction comment header。
 * Blogger data body 禁止 comments。
 * Blogger 已删除 `"""` 输出。
-* 所有多行 data 使用 canonical `'''` 排版。
+* literal-safe 多行 data 使用 canonical `'''`；含 delimiter 碰撞或控制字符时使用 canonical basic fallback。
 * 已建立 runtime textual surface inventory。
 * 所有纳入范围的 instruction 使用最前方 comments。
 * 所有纳入范围的 data 使用 fields/tables/values。
@@ -1308,6 +1307,6 @@ data-only 是合法形式。
 
 # 19. 最终规范句
 
-除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库既有 canonical 写法；多行字符串统一采用三单引号字面量，不注入格式缩进，closing delimiter 单独占行。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。
+除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库唯一 canonical writer；literal-safe 多行值使用三单引号且 closing delimiter 单独占行，不可表示的正文回退为 canonical basic string。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。
 
-> 除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库既有 canonical 写法；多行字符串统一采用三单引号字面量，不注入格式缩进，closing delimiter 单独占行。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。
+> 除 system prompt、developer prompt 和角色 prompt assets 外，所有运行时构造或包装并进入 LLM 会话上下文的合成文本，均使用 TOML 形态表达。冯诺依曼意义上的 instruction 只写为最前方 TOML comments；data 只写为其后的 TOML fields、tables 与 values。允许 instruction-only、data-only 和 instruction + data，不引入统一 envelope。字符串严格复用仓库唯一 canonical writer；literal-safe 多行值使用三单引号且 closing delimiter 单独占行，不可表示的正文回退为 canonical basic string。该表示只供 LLM 阅读，永不反向解析，也不承担 origin 或 authority 证明。

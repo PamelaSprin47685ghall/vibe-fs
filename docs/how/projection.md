@@ -36,35 +36,22 @@ Canonical Renderer
 
 ## Intent 排序与冲突（PROJ-005/006）
 
-intent 排序锚点固定为「当前被投影前缀锚」。合并律先于实现固定，禁止依赖注册顺序：
+intent 排序锚点固定为「当前被投影前缀锚」。canonical order、可合并组合与冲突必须先于实现固定，禁止依赖注册顺序：
 
 ```text
 keepPhysicalPrefix        // 无 X 恢复时兜底：物理前缀原样
-activatePrefixEpoch       // X probe 已提交 或 reanchor 后 Snapshot 生效
+activatePrefixEpoch       // X probe 已提交并成为 active snapshot
 insertBlogFrames          // Y 有效帧（Entry/Squash）插入历史槽
 insertRepair              // Interaction Repair 回合
 suppressTransportOnly     // transport-only 消息剔除（COMPANION-012）
 appendReviewChallenge     // skeptical challenge
+insertPairProgrammingThought // HOST-013 固定 marker
 reanchorAfterCompaction   // ContextReanchored → Snapshot=None
 ```
 
-### Intent 合并律矩阵与冲突处置规则
+同锚 intent 必须先按规范定义的稳定总序归一化，再执行显式合并或返回 `ProjectionConflict`。禁止依赖模块注册顺序。
 
-Pure Projection Planner 在处理同一锚点上的 intent 组合时，按以下矩阵裁决：
-
-| Intent 组合 | 关系 | 处置 / 合并函数 |
-|------------|------|----------------|
-| `keepPhysicalPrefix` × `activatePrefixEpoch` | **互斥** | 返回 `ProjectionConflict` Fail-Closed |
-| `keepPhysicalPrefix` × `reanchorAfterCompaction` | **互斥** | 返回 `ProjectionConflict` Fail-Closed |
-| `activatePrefixEpoch` × `reanchorAfterCompaction` | **互斥** | 返回 `ProjectionConflict` Fail-Closed（reanchor 必退役 epoch） |
-| `insertBlogFrames` × `activatePrefixEpoch` | **兼容 (可合并)** | 调用 `mergeBlogFramesIntoEpoch` 将 Y 帧挂载进 Active Epoch |
-| `insertRepair` × (`keepPhysicalPrefix` \| `activatePrefixEpoch`) | **兼容 (可合并)** | 在选定前缀后追加 Interaction Repair 轮次 |
-| `suppressTransportOnly` × *任意 Intent* | **正交 (可合并)** | 施加为树级别的正交过滤函数 |
-| `appendReviewChallenge` × *任意 Intent* | **兼容 (可合并)** | 在渲染树物理尾部追加 Challenge 节点 |
-
-**Fail-Closed 规则**：对于上述矩阵中标为“互斥”的组合或未定义的组合，Planner 必须无条件返回 `ProjectionConflict`，停止渲染并触发 Fail-Closed reconcile，绝对禁止凭注册顺序或主观选边。
-
-**Property-Based 测试要求**：在 `proof/projection.md` 中强制约定，合并函数必须通过基于属性的测试（Property-Based Testing）验证其结合律、交换律与幂等性，确保任意 Intent 组合在不同注册顺序下均产出确定性唯一的 Render 结果或 `ProjectionConflict`。
+合并函数只需证明其真实代数性质：重放型 intent 必须幂等；有序追加型 intent 必须保持 canonical order，不能被虚构为可交换。任何尚未定义的组合 fail closed。PrefixEpoch 始终是冻结 X 前缀选择；`insertBlogFrames` 只在其后构造 Y 可见历史，不得“合入”或改写 active X epoch。
 
 ---
 
@@ -118,6 +105,7 @@ seal 一经发出不可变（COMPANION-009 字节级 sealed 屏障）。
 | LWR / delta | Semantic 源同 XTrace、不同投影（COMPANION-007；delta 见 how/context.md CTX-013） |
 | reanchor | transform 观察到 compaction → `reanchorAfterCompaction`（how/host.md HOST-006） |
 | challenge / seal | how/review.md REVIEW-003/004/006 |
+| pair-programming marker | how/host.md HOST-013 → `insertPairProgrammingThought`；参与 Wire/seal，不进 XTrace |
 
 ---
 
@@ -131,16 +119,9 @@ seal 一经发出不可变（COMPANION-009 字节级 sealed 屏障）。
 4. InteractionRepair projection
 5. ReviewConfirmation + skeptical challenge Seal projection
 6. Host compaction reanchor 后 projection
-7. Strength Primary/Replica projection（含 transport-only suppression）
 
 迁移期间测试环境可同时运行 LegacyProjection 和 DslProjection 并比较 canonical digest；生产环境不得按请求随机混用两套实现。
 
 切换条件：所有历史 canary 轨迹 `LegacyDigest = DslDigest`；允许有意变化的差异须有明确的新 SSOT 条款。
 
 切换后删除 `LegacyProjection`，不长期维护双实现。
-
----
-
-## 历史说明
-
-`docs/proposal/strength.md` 第 19 节把 Projection DSL 称为「spec/13 — Projection Algebra（条款前缀 `PROJ-`）」。本文件生效后，该引用 superseded 为 `docs/what/projection.md`（条款前缀 `PROJ-`）。

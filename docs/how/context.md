@@ -7,7 +7,7 @@
 
 ### 2. 输入输出与规则边界
 - **输入**：Reconciler 确认的真实物理失败（Outcome = Failed）、待探针测量的 X 前缀候选、Blogger 未压缩 Blog 帧。
-- **输出**：`PrefixRebaseCommitted` 事实、`BlogSquashCommitted` 事实、更新后的 `ActivePrefixEpoch`。
+- **输出**：`PrefixRebaseCommitted` / `BlogSquashCommitted` 事实，以及彼此独立的 `ActivePrefixEpoch` / `FrameEpoch` 投影。
 - **核心边界与不变量**：
   1. 失败驱动（CTX-001/002）：恢复动作的前提是一次真实物理失败；绝对禁止在失败前主动压缩或估算 Token 窗口。
   2. 尝试局域化（CTX-010）：X Probe 候选仅写入 Attempt-local 的 `ProjectionChoice`；Probe 成功才提交写盘，Probe 失败丢弃候选且**绝对不写恢复/回滚事实**。

@@ -16,19 +16,9 @@ Claimed → Abandoned
 Claimed → Submitted → Abandoned   （恢复期无法证明物理落地）
 ```
 
-### 失败类型与强类型边界
-
-所有领域标识（`SessionId`、`LogicalRunId`、`MessageId`、`PromptKey` 等）必须使用单 Case 包装类型，禁止使用裸 `string` 偷渡身份。失败原因禁止直接使用裸 `string` 传递，必须收敛为强类型 DU：
-
 ```fsharp
-type DispatchError =
-    | TransportFailed of detail: string
-    | SchemaInvalid of detail: string
-    | QuotaExhausted
-    | HostRefused of reason: string
-
 type PromptAbandonReason =
-    | SendFailed of error: DispatchError
+    | SendFailed of error: string
     | UnresolvedAfterRecovery
 ```
 
@@ -44,27 +34,31 @@ type PromptAbandonReason =
 - `accepted-*` 升级为 PhysicalAccepted  
 - 从 Submitted 推断 Authority 已生效  
 
-## PROMPT-008：原子 AttemptExecutionProfile 与巨型记录拆分
+## PROMPT-008：原子 AttemptExecutionProfile
 
 一次 provider request 的执行身份必须来自**同一个不可变** profile：
 
 ```fsharp
-type AttemptExecutionProfile =
+type AuthorityExecutionProfile =
     { SessionId: SessionId
       LogicalRunId: LogicalRunId
-      AuthorityRootUserMessageId: MessageId
-      PhysicalUserMessageId: MessageId
-      ProviderRunIdentity: ProviderRunIdentity
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      AuthorityKind: RootAuthorityKind
+      SelectedAgent: string
+      PeerAgent: string
+      CanonicalRole: Role
+      SelectedTier: AgentTier }
+
+type AttemptExecutionProfile =
+    { Authority: AuthorityExecutionProfile
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRun: ProviderRunIdentity
       Origin: PromptOrigin
-      SelectedAgent: AgentName
-      PeerAgent: AgentName
-      EffectiveAgent: AgentName
-      CanonicalRole: AgentRole
-      SelectedTier: AgentTier
+      EffectiveAgent: string
       SystemPromptId: SystemPromptId
-      ToolCapabilitySet: ToolCapabilitySet
+      ToolCapabilitySet: Set<ToolPermission>
       RequestKind: ProviderRequestKind
-      ProjectionChoice: XProjectionChoice option }
+      ProjectionChoice: XProjectionChoice }
 
 type ProviderRequestKind =
     | WorkMain
@@ -73,15 +67,9 @@ type ProviderRequestKind =
     | InteractionRepair
 ```
 
-### 巨型上下文治理与子记录分立
+`AuthorityExecutionProfile` 是原子 profile 内的稳定 Authority 子记录，不是第二个构造来源。下游需要更窄视图时只能从完整 profile 纯投影或直接传所需参数；禁止分别构造多个可矛盾的子记录再拼回 attempt。
 
-为了防止模块越界读取非本领域字段，`AttemptExecutionProfile` 在各子系统间传递时必须按边界解耦为聚焦的子记录：
-
-1. **`AuthorityProfile`**：聚合 `SessionId`、`LogicalRunId`、`AuthorityRootUserMessageId`、`Origin`、`CanonicalRole`、`SelectedTier`，由 Authority 模块独立消费。
-2. **`RequestProfile`**：聚合 `ProviderRunIdentity`、`SelectedAgent`、`EffectiveAgent`、`SystemPromptId`、`ToolCapabilitySet`、`RequestKind`，由 Transport / Dispatcher 消费。
-3. **`ProjectionContext`**：聚合 `ProjectionChoice` 与 Snapshot 关联指针，由 Projection 模块消费。
-
-`ProjectionChoice = Some _` 表示本 attempt 使用候选前缀 probe（CTX-010）；仅对该 attempt 有效，不构成领域事实。
+`ProjectionChoice = UsePrefixProbe _` 表示本 attempt 使用候选前缀（CTX-010）；`UseCommittedEpoch` 表示明确选择已提交 epoch。二者仅对该 attempt 有效，不构成领域事实。
 
 禁止从下列碎片临时拼装：
 

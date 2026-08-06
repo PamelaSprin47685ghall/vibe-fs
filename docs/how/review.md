@@ -11,7 +11,7 @@
 - **核心边界与不变量**：
   1. 双 PERFECT + Seal 强制约束（REVIEW-003）：单次 PERFECT 绝对不可信；第二次 PERFECT 判定必须证明质询被成功密封进输入。
   2. Witness 自包含（REVIEW-006）：ReviewWitness 必须自带全量证据，禁止保存在外围可变 Map 中，防止并发 Job 读到空确认。
-  3. Git Tree Hash 作废机制（REVIEW-006）：Git 树变基或代码变更后，旧 Witness 自动失效。
+  3. Git Tree Hash 作废机制（REVIEW-008）：Git 树变基或代码变更后，旧 Witness 自动失效。
   4. 绑定 Fail-Closed（REVIEW-010）：`ProviderRunIdentity` 绑定失败或未封印时，第二次 PERFECT 严禁通过，禁止 same-root 猜测。
 
 ---

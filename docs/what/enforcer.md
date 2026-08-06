@@ -1,7 +1,7 @@
 # Blogger / Enforcer — 可观察行为
 
 条款前缀：`ENFORCER-`。  
-Cycle 写入口与恢复状态机边界见 `shape/enforcer.md`。  
+Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。
 归并、nudge、continuation、compaction 接线见 `how/enforcer.md`。  
 规则实例：`resources/enforcer/catalog.json`。
 
@@ -77,9 +77,9 @@ fast/deep blogger 共用 authoritative system（见资源文件）；工具合�
 
 失败与 Fallback 切换规则不另造预算；走统一 FallbackController。
 
-## ENFORCER-063：成功清零
+## ENFORCER-063：成功关闭恢复窗口
 
-成功提交清零相关 repair 计数。
+成功提交把当前逻辑请求的 `BloggerToolRecovery` 恢复为 `NoRecovery`；不得保留会污染下一请求的 Nudge/AABB 证据，也不得另造 repair 计数器。
 
 ## ENFORCER-072：ScoreVector 删除与版本化 clean break
 

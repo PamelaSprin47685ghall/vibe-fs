@@ -192,7 +192,7 @@ TOML 语法要求根级键值对先于任何表头，否则会被静默归属到
 
 本条款描述的是原理，不是现有实现。
 
-原理必须继承并发扬，任何重构不得丢弃或降级。现有实现（`tests/e2e/watchdog.js`、`scripts/run-canary-staggered.mjs`、`tests/unit/runner.mjs`、`stability-checker.js`）只是一次并不完善的落地，它不因先存在而获得权威。
+原理必须继承并发扬，任何重构不得丢弃或降级。现有落点包括 `tests/e2e/support/watchdog.js`、`tests/e2e/support/readiness.js`、`tests/e2e/support/stability-checker.js`、`tests/unit/support/run-inner.mjs` 与 `tests/unit/support/verdict-feed.mjs`；实现不因先存在而获得权威。
 
 判断标准始终是本条款文字，不是当前代码的行为。
 
@@ -335,7 +335,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 Gate 只阻断语义违规，不阻断尺寸。
 
-### 硬阻断
+### 必须阻断的违规
 
 ```text
 Kernel 引用 Host raw obj
@@ -372,27 +372,29 @@ Review confirmed                           → 只能派生，不能赋值
 
 禁止：删空行、合并语句、一行多事、滥用分号来压缩行数。这类改写既不改善也不劣化门禁结果，只损害可读性。
 
-### Gate 是静态检查器，不是测试
+### 性质决定证明载体
 
-所有 Architecture Gate 都是文件系统加正则的纯文本判断，不得实现为测试用例。它们属于 VERIFY-001 第 0 层，住在 `scripts/`，不依赖任何编译产物：
+能从源码文本或文件图直接判定的性质属于第 0 层静态门禁；依赖调用轨迹、构造可达性或 fold 行为的性质必须由第 1–3 层契约测试证明，不能用正则假装完整。当前自动化所有权如下：
 
-```text
-scripts/check.mjs                  串行执行 focused checks
-scripts/checks/spec.mjs            规范内部一致性（条款唯一、无悬空引用、前缀归属、导航完整）
-scripts/checks/architecture.mjs    源码根、fsproj 完整性、分层边界、资源读取位置、无 .gen.fs、无旧路径
-```
+| 载体 | 当前覆盖 |
+|------|----------|
+| `scripts/checks/spec.mjs` | 条款唯一/引用/前缀/导航、伪条款 ID、流动面定义禁令 |
+| `scripts/checks/architecture.mjs` | 源码根、fsproj 完整性、Kernel/Domain 依赖、资源读取、无 `.gen.fs`、旧路径、recovery ownership |
+| `scripts/checks/dsl-ownership.mjs` | 第二运行时、业务 Interpreter、程序计数器模式、mutable 与 infrastructure-open 边界 |
+| `scripts/checks/p0-recovery-join.mjs` | Agent false finality、recovery/join 特定单一 owner 与正负模式 |
+| `tests/unit/**` | Fallback/Prompt/PTY/Review 的可达构造、唯一入口与完整行为 |
 
-把它们放进测试套件会造成两个错误：需要先编译才能检查源码；门禁失败与行为失败混在同一个红灯里，无法分别处理（退火期必须能分层打开反馈）。
+`npm run lint` 绿色只证明上述静态覆盖，不得宣称已经证明跨文件语义一致、所有 `Result` 穷尽处理或所有算法 owner 唯一。新增静态门禁必须有故意破坏后变红的 fixture；新增行为门禁必须走发布产物测试。
 
 ## Fail-Closed 校验与破坏性回归测试指南
 
 为了确保系统遇到数据损坏、版本不兼容或边界失配时能够安全 Fail-Closed，而不是崩溃或吞掉上下文，第 1–3 层测试中必须包含以下破坏性回归测试集：
 
-1. **Envelope 字节损坏回归测试**：在 Journal 反序列化入口传入 0x04–0xFF 的非法 `FallbackOffset` 字节，验证系统返回 `Result.Error` 并干净触发 `CommitUnknown` / Reconcile 拒绝，绝对不抛出未捕获的 `invalidOp`。
+1. **Envelope 字节损坏回归测试**：在 Journal 反序列化入口传入 0x04–0xFF 的非法 `FallbackOffset` 字节，验证系统返回 typed `Result.Error` 并拒绝加载损坏 envelope，绝对不抛出未捕获的 `invalidOp`，也不构造只属于 Append 的 `CommitUnknown`。
 2. **裸文本/未绑定 ID 拒绝测试**：传入未带 SessionBinding 或包含未知来源字符串的 `PromptAbandonReason`，验证 PromptDispatcher 正确拒绝并维持前置安全状态。
 3. **Intent 互斥组合测试**：同时声明 `keepPhysicalPrefix` 与 `activatePrefixEpoch`，验证 Planner 准确捕获并产出 `ProjectionConflict`，安全挂起当前 Attempt。
 
-## VERIFY-006：No-Go（出现任一项不得发布 0.5.0）
+## VERIFY-006：No-Go（出现任一项不得发布）
 
 ```text
 仍支持 manager/coder/reviewer 等旧 Agent 名称
@@ -536,7 +538,7 @@ scripts/*.mjs          第 0 层静态检查
 Fable 编译产物的命名与容器形状是编译器产物，不是领域概念。它们必须被隔离在唯一一个文件内：
 
 ```text
-tests/unit/domain.mjs   唯一允许知道 Fable 输出形状的文件
+tests/unit/support/domain.mjs   唯一允许知道 Fable 输出形状的文件
 ```
 
 该 facade 承担：`Module_` 前缀名到领域名的映射、DU 到 case 名的读取、`FSharpMap` 到条目的转换、`DateTimeOffset` 等值类型的正确构造。

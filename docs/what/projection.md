@@ -20,7 +20,6 @@ type ProjectionSnapshot =
       ActivePrefixEpoch: ActivePrefixEpoch
       CandidatePrefixProbe: PrefixProbe option
       BlogFrames: BlogFrame list
-      DelegatedFrames: DelegatedFrame list
       HostReanchor: ContextReanchorSnapshot option
       LocalPendingParts: LocalPendingParts
       TransportMessages: Set<MessageId> }
@@ -43,4 +42,4 @@ SemanticEventTree
 
 DSL 只负责不可变快照 → 确定性 provider-visible projection。
 
-DSL 不负责：启动 Replica、等待 provider、执行工具、写 Journal、恢复 Prompt、管理 ProviderRunIdentity、推进生命周期状态、控制器在线更新。
+DSL 不负责：启动或等待任何 Agent/provider、执行工具、写 Journal、恢复 Prompt、管理 ProviderRunIdentity、推进生命周期状态、控制器在线更新。

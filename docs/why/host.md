@@ -12,13 +12,13 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 
 ## 决策理由与被拒方案（A4 设计理由）
 
-### 1. LoopKill 终态映射：一律视作 Abandoned vs 二阶段 Armed 识别 (红线闭环)
-- **被拒方案**：无条件把 Host 暴露的 `TurnAborted` 映射为 `TurnAbandoned`（会导致 LOOP 强杀引发的取消被误判为用户手动取消，从而无法自动推进 Fallback 恢复槽）；或者将 `TurnAborted` 作为 DU 直接透传进领域层（违反 `EXEC-020` 的 Agent 终态代数 `Completed | Failed | Abandoned`）。
-- **选择方案**：Reconciler 消费 `TurnAborted` 时优先拦截进程内 `LoopKillArmed` 标志。若 Armed 命中，清除标志并将事件转换为 `TurnFailed("LoopDetectedKill")` 推进 FallbackController；若未命中，转换为 `TurnAbandoned(UserOrSystemCancelled)`。
+### 1. Provider turn 取消与 Agent 终态分型
+- **被拒方案**：把 provider `TurnAborted` 直接写成 Agent completion；或在 Reconciler 内过早删除 abort 分类。前者违反 EXEC-020，后者让 LOOP-006 无法区分插件强杀与用户取消。
+- **选择方案**：Reconciler 保留 provider-turn `TurnAborted`。消费边界命中 `LoopKillArmed` 时走 provider failure/Fallback；未命中时只终止和清理 turn，绝不构造 Agent `RunCompletion`。
 
-### 2. HOST-012 多实例共享并发：就地修改字典 vs 不可变 Swap 快照 (C2 并发安全)
-- **被拒方案**：在模块级全局单例上直接使用可变 Map/Dictionary 就地修改（In-place mutation），或者使用裸对象加锁。在 Node.js 微任务/事件循环并发交错下，跨 Worktree 的并发读写会导致严重的 Lost Update 与遍历异常。
-- **选择方案**：共享字典（`SessionParents`、`VerdictSessions`、`SessionDirectories`）统一采用 Thread-safe Immutable Swap 机制。写操作生成新 Map 并执行原子 CAS / 指针替换；读操作使用不可变 Snapshot 引用。
+### 2. HOST-012 多实例共享并发：事件循环所有权 vs 未指定 CAS
+- **被拒方案**：在没有 Worker、原子引用类型与内存模型的 Fable/Node 边界上宣称“Thread-safe CAS”；该措辞无法实现也无法验证。
+- **选择方案**：共享注册表由单一 event loop 所有；每次操作不跨 `await`，跨异步边界先取不可变快照。未来若引入真正并行执行，再先定义消息 owner 或原子端口。
 
 ### 3. 多实例状态管理：全局单例 vs PluginRuntimeScope 隔离
 - **被拒方案**：全部使用全局单例（会导致两个 worktree 实例互相覆盖 Journal 句柄与 Companion 缓存）或全部使用每实例隔离（会导致第二 worktree 读不到父会话关系与 Verdict 注册）。

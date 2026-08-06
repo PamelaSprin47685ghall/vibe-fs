@@ -26,6 +26,7 @@ insertBlogFrames
 insertRepair
 suppressTransportOnly
 appendReviewChallenge
+insertPairProgrammingThought
 reanchorAfterCompaction
 ```
 

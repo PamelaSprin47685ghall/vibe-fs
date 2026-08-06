@@ -14,6 +14,6 @@
 
 **envelope：统一 schema vs 局部最小 schema + 全局记法公理。** 拒统一：强制 schema/kind/origin 造假外壳、偷运 authority；比第二套协议更短的是局部最小 + 公理（ARCH-011）。
 
-**解析方向：反解 authority/origin vs 只投影。** 拒反向解析：字符串反推控制流丢类型（ARCH-007）。
+**解析方向：反解 authority/origin vs 只投影。** 拒反向解析：字符串反推控制流丢类型（ARCH-011）。
 
-**字符串：三单引号 vs 转义，顶层 comment=instruction vs 散落。** 拒转义地狱：多行字符串统一三单引号可复现；instruction 只认最前连续 comments（`Scope` containment）。双引号语义、不能跨串承接问题留 how 层细节。
+**字符串：literal-first + basic fallback。** 普通多行正文用三单引号逐字承载；正文自身含 `'''` 或非法控制字符时，literal string 无合法表示，只能由同一 owner 回退到 canonical basic escape。拒绝用 `"""` 建第二套 multiline 方言。instruction 只认最前连续 comments（`Scope` containment）。

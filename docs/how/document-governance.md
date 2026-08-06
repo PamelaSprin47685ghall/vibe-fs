@@ -3,7 +3,7 @@
 ## 需求意图与范围（A2 需求意图）
 
 ### 1. 问题陈述
-软件在演进过程中，如果缺乏严格的规范治理机制，会导致代码与文档脱节、口头规则偷渡、旧架构残余累积以及多轨双实现长期存活。文档治理模块旨在建立 `what → shape → how → proof → why` 的单向流动链条，通过 `scripts/checks/spec.mjs` 自动化硬门禁封杀重复定义、悬空引用与旧规范残余，确保规范文本是系统唯一、自洽的单真理源（SSOT）。
+软件在演进过程中，如果缺乏严格的规范治理机制，会导致代码与文档脱节、口头规则偷渡、旧架构残余累积以及多轨双实现长期存活。文档治理模块执行 `what → shape → how → code/resources` 单向链；`proof` 验证整条链，`why` 保存理由。`scripts/checks/spec.mjs` 只硬阻断它能静态证明的 ID、引用、前缀与导航错误；旧生产路径由 architecture gate 管辖，跨文件语义仍需 proof 与评审。
 
 ### 2. 输入输出与规则边界
 - **输入**：提案文件 `proposal/*.md`、差距记录 `status/*.md`、正式规范 Markdown 文件。
@@ -12,7 +12,7 @@
   1. 单向流动链条：读 what → 读 shape → 读 how → 对照 status → 改代码 → 用 proof 证明。严禁直接根据未裁决 proposal 修改生产代码。
   2. 流动面禁界：`status/` 与 `proposal/` 绝对禁止定义 Clause ID（`## PREFIX-NNN`）。
   3. Clean Break 强约束：旧 `spec/`、`docs/rfcs/`、`TASK.md` 废止，任何对废止路径的依赖均触发编译/门禁红灯。
-  4. M4 TOML 迁移发布门禁收敛：非 Blogger 表面必须拆为独立 proposal 逐裁决，发布前必须实现单写入口收敛、Golden 全绿与 Legacy 代码完全删除。
+  4. Synthetic TOML 发布门禁收敛：ARCH-010 已纳入的 surface 必须逐项完成单写入口、Golden/Canary 与 Legacy 删除；只有伴随产品行为变化时才另走 proposal。
 
 ---
 
@@ -50,7 +50,7 @@
 
 - **Proposal 提交者**：撰写 proposal，明确 Impact map 与 Alternatives，提交 PR。
 - **Decision Owner（裁决人）**：架构负责人或产品 Owner。负责审查 Proposal 的一致性并给出 `Accepted` / `Rejected` 裁决。
-- **文档检查器（`scripts/checks/spec.mjs`）**：自动物理校验 ID 唯一性、无悬空引用、导航覆盖。
+- **文档检查器（`scripts/checks/spec.mjs`）**：自动校验 ID 唯一性、显式引用、前缀归属、伪条款 ID、正式文件及全部活跃 status/proposal 导航覆盖。
 
 ---
 
@@ -67,13 +67,13 @@
 
 ## Hotfix 线上紧急修补路径
 
-当发生线上严重事故需要紧急修复（Hotfix）时，允许走轻量化路径：
+适用边界由 GOV-012 定义。满足该边界时执行：
 
-1. **豁免 Proposal 撰写**：紧急修补无需创建 `proposal/` 文件。
-2. **原子更新**：在同一个 Hotfix 提交/PR 中，必须同时更新：
+1. **原子更新**：在同一个 Hotfix 提交/PR 中，同时更新：
    - 修复代码与自动化测试（`proof/` 对应测试用例）
    - 受影响的正式规范（`what/`/`shape/`/`how/`）
-3. **补齐门禁**：提交前跑通 `npm run lint`，确保绝对单真理源不因紧急修补产生漂移。
+2. **兼容裁决**：若形状或持久化协议变化，记录 GOV-004 的兼容选择。
+3. **补齐门禁**：提交前跑通 `npm run lint` 与受影响测试。
 
 ---
 
@@ -84,7 +84,7 @@
 - [ ] `proposal/` 目录中无未裁决的孤儿文件。
 - [ ] `status/` 目录中描述的所有已知缺口均已被当前发布版本覆盖，或已在发布说明中明确标记。
 - [ ] `scripts/checks/spec.mjs` 检查 100% 零错误（无重复定义、无悬空引用）。
-- [ ] M4 TOML 迁移表面已全部完成 Golden/Canary 对齐，单写入口完全收敛，无混合旧裸文本与新 TOML 的中间过渡态。
+- [ ] ARCH-010 纳入范围的 runtime synthetic surfaces 已完成 Golden/Canary 对齐，单写入口收敛，无混合旧裸文本与新 TOML 的过渡态。
 
 ---
 
@@ -169,7 +169,7 @@ Compatible | ExplicitMigration | ExplicitReset | CleanBreak
 
 ## 导航维护
 
-`docs/README.md` 索引正式规范文件与前缀归属。增删正式文件后同步导航。`proof` 侧检查器验证：定义唯一、引用可解析、前缀归属、导航覆盖。
+`docs/README.md` 索引正式规范文件、前缀归属与全部活跃流动面文件。增删正式文件、status 或 proposal 后同步导航。`proof` 侧检查器验证：定义唯一、引用可解析、前缀归属、导航覆盖。
 
 ---
 

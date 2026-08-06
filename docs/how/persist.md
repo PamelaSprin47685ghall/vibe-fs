@@ -3,16 +3,16 @@
 ## 需求意图与范围（A2 需求意图）
 
 ### 1. 问题陈述
-在系统崩溃、进程硬杀或硬件断电场景下，如果允许先修改内存状态再异步刷盘，或者在读取日志时静默跳过损坏行，会导致恢复后的状态机看见未落盘的“虚幻未来”或建立在破坏基础上的矛盾事实。Journal 子模块旨在提供基于 NDJSON 文件的 Commit-Only 追加日志、内容寻址（Content-Addressed）的 BlobRef 存储，以及两相 `Requested → Accepted` 外部副作用持久化协议。
+在系统崩溃、进程硬杀或硬件断电场景下，如果允许先修改内存状态再异步刷盘，或者在读取日志时静默跳过损坏行，会导致恢复后的投影看见未落盘的“虚幻未来”或建立在破坏基础上的矛盾事实。Journal 子模块提供 NDJSON append-only 日志、内容寻址 BlobRef 存储，以及两相 `Requested → Accepted` 外部副作用持久化协议。
 
 ### 2. 输入输出与规则边界
 - **输入**：领域事件事实、外部副作用请求、大正文 Blob 字节流。
 - **输出**：持久化的 NDJSON 事实行、`BlobRef` 写入收据、`Requested` / `Accepted` 事实时序。
 - **核心边界与不变量**：
-  1. 写盘优先于内存修改（PERSIST-002）：必须先成功追加 NDJSON 介质并确认刷盘，才能替换内存权威状态；写盘失败等同于命令未发生。
-  2. 损坏截断与 Fail-Closed（PERSIST-004）：恢复时遇到坏行必须在损坏点直接截断，绝对禁止跳过坏行继续解析后续行（缺中间导致后续事实建在错基上）。
+  1. 写盘优先于内存修改（PERSIST-002/003）：只有 `Committed` 后才能替换内存权威状态；`CommitUnknown` 必须进入 fail-closed reconcile，不能当作“命令未发生”重试。
+  2. 尾部截断与 Fail-Closed（PERSIST-004）：只允许截断最后一条不完整 envelope；中间损坏必须拒绝启动，绝对禁止截断后把后续事实当作不存在。
   3. 内容寻址 BlobRef（PERSIST-007）：大文本正文按 SHA-256 摘要存为只读 Blob，同字节产生同 BlobRef（写入幂等）；载荷绝对不可变，更新必须产出新 BlobRef。
-  4. 两相副作用契约（PERSIST-009）：外部副作用走 `Requested → 执行 → Accepted` 结构；崩溃恢复时 `Requested` 未 `Accepted` 视作未发生，允许安全重试。
+  4. 两相副作用契约（PERSIST-009）：外部副作用走 `Requested → 幂等执行/核对 → Accepted`；崩溃后仅有 Requested 表示结局未知，必须先按效果身份核对，不能假定未发生或盲目重试。
 
 ---
 
@@ -35,11 +35,11 @@ type BlobWriteReceipt =
 性质（存档侧，`RuntimePath` 下 blob 目录）：
 
 1. 内容寻址：同一规范字节 → 同一 `BlobRef`；写 blob 是幂等的（同 digest 复用既有 payload）。
-2. `BlobDigest` 对**规范序列化字节**（含 ContentType 编码约定）计算；读取时重算失配 → fail closed，不得按路径猜测对齐。
-3. 顺序：先落磁盘与校验 digest，成功后才 append 引用该 blob 的 journal envelope（PERSIST-009 的 Accepted 侧）。写盘失败等同命令未发生。
+2. `BlobDigest` 对写入 blob 的 UTF-8 内容字节计算；读取时按同一字节重算，失配 → fail closed，不得按路径猜测对齐。
+3. 顺序：先落磁盘并取得 receipt，成功后才 append 引用该 blob 的 journal envelope。Blob 写失败时没有可引用的 receipt；Journal append 若为 `CommitUnknown`，按 PERSIST-003 fail closed，不能重试原命令。
 4. 载荷不可变；全文重写以新 `BlobRef` 呈现，旧 blob 由回收策略清理，不原地涂改。
 
-不得把 digest 当随机身份：`BlobId` 可作索引，身份永远是内容本身。
+不得把 digest 当随机身份；`BlobRef` 的路径由完整 digest 确定，身份永远是内容本身。
 
 ---
 
@@ -47,7 +47,7 @@ type BlobWriteReceipt =
 
 ```text
 Requested / Claimed
-→ 幂等执行副作用
+→ 按确定性效果身份执行或核对
 → Accepted / Created / Published
 ```
 
@@ -58,7 +58,7 @@ Requested / Claimed
 | Prompt | （PROMPT-011） | PhysicalAccepted | PROMPT-011 at-most-one |
 | Blogger | `BloggerRequestMaterialized` | Entry/SquashCommitted | ProviderRun receipt |
 
-崩溃后：Requested 未 Accepted → 视为未发生，可重试；Accepted → 物理已完成；重复 Accepted 幂等；不得把 Accepted 折回 Requested。
+崩溃后：Requested 未 Accepted → **结局未知**。先执行表中 Reconcile；仅当物理证据证明效果不存在且该效果的合同允许幂等重试时才重试。Prompt 例外地保持 Pending，按 PROMPT-011 检索 `PromptKey`，不得自动重发。Accepted → 该领域合同已确认物理完成；重复 Accepted 幂等；不得把 Accepted 折回 Requested。
 
 ### Session 创建例外
 
