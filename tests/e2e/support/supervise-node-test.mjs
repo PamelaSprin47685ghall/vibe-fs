@@ -68,6 +68,9 @@ export async function superviseNodeTest({
       }
       console.error(`${logPrefix}: ${passed} passed, ${failed} failed before the silence`)
       try {
+        process.stderr.write('')
+      } catch {}
+      try {
         if (child?.pid) process.kill(-child.pid, 'SIGKILL')
       } catch {}
     },

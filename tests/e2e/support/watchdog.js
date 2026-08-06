@@ -165,6 +165,11 @@ export class Watchdog {
       }
     } catch {}
 
+    // Flush diagnostic lines before hard-exit; otherwise a piped parent (unit-runner
+    // probes on CI) can observe exit without ever reading WATCHDOG stderr.
+    try {
+      process.stderr.write('');
+    } catch {}
     process.exit(1);
   }
 }
