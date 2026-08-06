@@ -57,6 +57,29 @@ export const isMutableScratchPath = (file) => {
 }
 
 
+/**
+ * Host-facing Session adapters may open OpenCode/Process/Infrastructure.
+ * Basename allowlist only — other Session/Application files stay fail-closed.
+ * These files compose Host ports / PromptDispatcher extensions / Pty backends.
+ */
+export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
+  'CompanionHost.fs',
+  'CompanionHostBlogger.fs',
+  'HostForkAgent.fs',
+  'HostForkAgentOwner.fs',
+  'HostForkBusyNudge.fs',
+  'HostForkChildDispatch.fs',
+  'HostForkPty.fs',
+  'HostForkRestart.fs',
+  'HostForkRunLifecycle.fs',
+  'HostForkRuntime.fs',
+])
+
+export const isHostBoundaryOpenPath = (file) => {
+  const base = String(file).replace(/\\/g, '/').split('/').pop()
+  return HOST_BOUNDARY_OPEN_BASENAMES.has(base)
+}
+
 export const FORBIDDEN = [
   { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable', skipIf: isMutableScratchPath },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
@@ -85,6 +108,7 @@ export const FORBIDDEN = [
     pattern:
       /\b(?:open Wanxiangshu\.Infrastructure|open Wanxiangshu\.OpenCode|open Wanxiangshu\.Process)\b/,
     label: 'infrastructure namespace open',
+    skipIf: isHostBoundaryOpenPath,
   },
   {
     gate: 'program-counter',

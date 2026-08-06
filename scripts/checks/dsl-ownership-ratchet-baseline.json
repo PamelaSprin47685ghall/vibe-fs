@@ -30,11 +30,7 @@
     "mutable": 6
   },
   "Session/CompanionHost.fs": {
-    "infrastructure-leak": 1,
     "mutable": 4
-  },
-  "Session/CompanionHostBlogger.fs": {
-    "infrastructure-leak": 1
   },
   "Session/CompletionMailbox.fs": {
     "mutable": 3
@@ -45,29 +41,7 @@
   "Session/ForkRuntime.fs": {
     "mutable": 2
   },
-  "Session/HostForkAgent.fs": {
-    "infrastructure-leak": 1
-  },
-  "Session/HostForkAgentOwner.fs": {
-    "infrastructure-leak": 1
-  },
-  "Session/HostForkBusyNudge.fs": {
-    "infrastructure-leak": 1
-  },
-  "Session/HostForkChildDispatch.fs": {
-    "infrastructure-leak": 2
-  },
-  "Session/HostForkPty.fs": {
-    "infrastructure-leak": 2
-  },
-  "Session/HostForkRestart.fs": {
-    "infrastructure-leak": 1
-  },
-  "Session/HostForkRunLifecycle.fs": {
-    "infrastructure-leak": 1
-  },
   "Session/HostForkRuntime.fs": {
-    "infrastructure-leak": 2,
     "mutable": 1
   },
   "Session/ParkedTransform.fs": {

@@ -18,8 +18,8 @@ const checks = [
 for (const script of checks) {
   const args = [script]
   // --threshold freezes current Direct-CE debt baseline; must only ever decrease.
-  // P0→P2-3b: 157→39. P2-3c Session/Application physical-cell mutable legal: 39→13.
-  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=13')
+  // P0→P2-3c: 157→13. P2-2 Host boundary open allowlist: 13→0.
+  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=0')
   // Per-file ratchet against the frozen baseline (missing baseline fails with a --generate hint).
   if (script.endsWith('dsl-ownership-ratchet.mjs')) {
     args.push(

@@ -178,28 +178,28 @@ Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflo
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
 （「functions, not a Flow AST」+ 直接 `task`/`let!`）。
 
-**冻结债（`scripts/check.mjs --threshold=13`，P2-3c 后实测 13 / 111 files）**：
+**冻结债（`scripts/check.mjs --threshold=0`，P2-2 后实测 0 违规）**：
 
 ```text
-infrastructure-leak      13   ← HostFork*/CompanionHost* 真依赖 open（扩展方法）
-mutable                   0   ← Session/Application 物理 cell 与 Domain/Parallel scratch 合法
+infrastructure-leak       0   ← HostFork*/CompanionHost* basename 白名单（真 Host 边界）
+mutable                   0   ← Domain/Session/Application 物理 cell + Parallel 合法
 behaviour-bool            0
 program-counter           0
 business-interpreter      0
 second-runtime-protocol   0
 ```
 
-P0–P2-3b **done**：第二运行时掐断 + Flow→Parallel + bool/program-counter 清零 + Domain/Parallel
-scratch 豁免（157→39）。  
-P2-3c **done**：Session/Application 物理 cell（map/single-flight/create-task/lock）
-门禁合法化；39→13。Agent 与非 Parallel Kernel 仍 fail-closed 对 `let mutable`。
+P0–P2-3c **done**：第二运行时掐断 + Flow→Parallel + bool/program-counter 清零 +
+合法 mutable 门禁化（157→13）。  
+P2-2 **done**：`HOST_BOUNDARY_OPEN_BASENAMES` 白名单仅 10 个 Host 边界文件可
+`open OpenCode/Process`；其余 Session/Application 仍 fail-closed；13→0。
 
-仍在盘上的债（非「已合法保留」）：
+仍在盘上的非门禁债：
 
 | 位置 | 问题 |
 |------|------|
-| HostFork* / CompanionHost* | 真依赖 `open OpenCode/Process`（P2-2 余下：port 上移或边界白名单） |
-| `Session/BloggerCoordinator.fs` | 与 Runtime cell 分工待继续收敛（P1-1 余下，非门禁债） |
+| `Session/BloggerCoordinator.fs` | 与 Runtime cell 分工待继续收敛（P1-1 余下） |
+| Host 边界 open 白名单 | 新增边界文件须登记 basename；长期可 port 上移再缩白名单 |
 
 ### PENDING TASK：DSL 全面主导化
 
@@ -247,14 +247,14 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 | ID | 任务 | 完成判据 |
 |----|------|----------|
 | P2-1 | `Kernel/Flow.fs` / `DomainFlow.fs` | **done** — `Parallel.fs` + 精简 `DomainFlow`；Flow monad/builder 删除；108→99 |
-| P2-2 | `infrastructure-leak` | **partial** — P2-2a 21→13；余下 HostFork*/CompanionHost* 真依赖 open |
+| P2-2 | `infrastructure-leak` | **done** — 死 open 清理 + Host 边界 basename 白名单；threshold 13→0 |
 | P2-3 | `mutable` / `behaviour-bool` 分拣 | **done** — behaviour-bool=0；Domain/Parallel/Session/Application 合法 mutable 门禁化；Agent/Kernel 仍 fail-closed |
 
 #### P3 — 主导化验收与文档收束
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P3-1 | threshold 阶梯 | `13（仅 infrastructure-leak）→ P2-2 余下 / P3` 每次 PR 下调；禁止「修完不降 threshold」 |
+| P3-1 | threshold 阶梯 | `0（DSL 门禁债清零）`；禁止上调；新增违规须同 PR 清掉 |
 | P3-2 | 发布阶梯 | `npm run check` 绿；目标切片 canary 绿；发布前 `check:release` |
 | P3-3 | 文档只描述现行纪律 | AGENTS.md / TASK.md / spec 表述一致：DSL = 直接 CE；无 Wave M* 施工模板；无「Interpreter 为唯一执行者」 |
 

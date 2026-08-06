@@ -7,7 +7,9 @@ import test from 'node:test'
 import {
   FORBIDDEN,
   GATE_NAMES,
+  HOST_BOUNDARY_OPEN_BASENAMES,
   evaluateThreshold,
+  isHostBoundaryOpenPath,
   scanFiles,
   scanText,
 } from '../../../scripts/checks/dsl-ownership.mjs'
@@ -130,6 +132,18 @@ test('DSL_OWNERSHIP_physical_and_domain_mutable_are_not_gate_red', () => {
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Application/Sample.fs'), [])
   assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'mutable'))
   assert.ok(scanText(source, 'src/Wanxiangshu/Kernel/Outcome.fs').some((h) => h.gate === 'mutable'))
+})
+
+
+test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
+  const source = ['module Sample', 'open Wanxiangshu.OpenCode', 'open Wanxiangshu.Process'].join('\n')
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HostForkRuntime.fs'))
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/HostForkRuntime.fs'), true)
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), [])
+  assert.ok(
+    scanText(source, 'src/Wanxiangshu/Session/BloggerCoordinator.fs').some((h) => h.gate === 'infrastructure-leak'),
+  )
+  assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'infrastructure-leak'))
 })
 
 test('DSL_OWNERSHIP_comment_only_line_is_ignored', () => {
