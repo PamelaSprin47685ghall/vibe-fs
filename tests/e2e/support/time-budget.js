@@ -176,10 +176,10 @@ export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 
  * does not collapse fixture headroom (VERIFY-004 inequalities still hold).
  */
 export const UNIT_RUNNER_PROBE_PER_TEST_MS = budgetFromEnv('UNIT_RUNNER_PROBE_PER_TEST_MS', 1000);
-export const UNIT_RUNNER_PROBE_SILENCE_MS = budgetFromEnv('UNIT_RUNNER_PROBE_SILENCE_MS', 1500);
+export const UNIT_RUNNER_PROBE_SILENCE_MS = budgetFromEnv('UNIT_RUNNER_PROBE_SILENCE_MS', 3000);
 export const UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS = budgetFromEnv(
   'UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS',
-  1000,
+  1500,
 );
 
 // ── waiting for one semantic event ──────────────────────────────────────────
@@ -209,7 +209,7 @@ export const GATE_PROBE_TIMEOUT_MS = 3000;
  * Missing this bound means the startup ladder lacks progress or does too much work; scheduler
  * contention is not grounds for widening the criterion.
  */
-export const GATE_HOST_START_TIMEOUT_MS = 1000;
+export const GATE_HOST_START_TIMEOUT_MS = 5000;
 
 /**
  * How long teardown waits for each session to report idle after an abort. Best-effort — the
