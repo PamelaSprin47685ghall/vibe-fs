@@ -33,9 +33,10 @@ open Wanxiangshu.Session
 module EnforcerHost =
 
     /// ENFORCER-160: the parking lifetime for a continuation transform.
-    /// Shared constant: docs/proposal/strength.md STRENGTH-079 `ParkedTransformLifetime` is the
-    /// one code constant for how long a transform may stay suspended.
-    let ParkedTransformLifetime = StrengthPolicy.Strength.ParkedTransformLifetime
+    /// Owned by the Enforcer domain (GOV-003: no proposal-constant dependency
+    /// in the production graph; the proposal may reference this, never vice
+    /// versa).
+    let ParkedTransformLifetime = TimeSpan.FromMinutes 10.0
 
     /// C4: commit-path UTF-8 safety bounds.
     let MaxBlogTextBytes = 512 * 1024

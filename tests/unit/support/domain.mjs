@@ -104,10 +104,6 @@ const [
   FlowModule,
   OrchestratorRuntime,
   OrchestratorTypes,
-  StrengthTypesModule,
-  StrengthPredictorModule,
-  StrengthControllerModule,
-  StrengthValueModule,
   RuntimeResourcesModule,
   EnforcerCatalogResourceModule,
   PackageResourcesModule,
@@ -115,7 +111,6 @@ const [
   EnforcerCatalogDomainModule,
   EnforcerCodecModule,
   EnforcerCycleModule,
-  StudentTeacherModule,
   BloggerRequestContextModule,
   BloggerRuntimeModule,
   ParkedTransformModule,
@@ -199,10 +194,6 @@ const [
   prod('Kernel/Parallel'),
   prod('Application/Orchestration/Runtime'),
   prod('Application/Orchestration/Types'),
-  prod('Domain/StrengthTypes'),
-  prod('Domain/StrengthPredictor'),
-  prod('Domain/StrengthController'),
-  prod('Domain/StrengthValue'),
   prod('Infrastructure/Resources/RuntimeResources'),
   prod('Infrastructure/Resources/EnforcerCatalogResource'),
   prod('Infrastructure/Resources/PackageResources'),
@@ -210,7 +201,6 @@ const [
   prod('Domain/EnforcerCatalog'),
   prod('Domain/EnforcerCodec'),
   prod('Domain/EnforcerCycle'),
-  prod('Domain/StudentTeacher'),
   prod('Domain/BloggerRequestContext'),
   prod('Session/BloggerRuntimeState'),
   prod('Session/ParkedTransform'),
@@ -1467,10 +1457,7 @@ export const requestKind = (() => {
     bloggerMain: of('BloggerMain'),
     bloggerSquash: of('BloggerSquash'),
     interactionRepair: of('InteractionRepair'),
-    // docs/proposal/student-teacher.md LEARN-050: the Student's two request kinds.
-    studentLearn: of('StudentLearn'),
-    studentCompile: of('StudentCompile'),
-    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair', 'StudentLearn', 'StudentCompile'].map(of),
+    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair'].map(of),
 
     of,
     nameOf: (kind) => caseOf(kind),
@@ -4047,83 +4034,6 @@ export const fallbackController = (() => {
 })()
 
 
-// ── docs/proposal/strength.md: Strength 纯领域内核 ─────────────────────────────────────────────
-
-export const strength = (() => {
-  const types = bind(StrengthTypesModule, 'StrengthTypes', [
-    'satelliteInvariantsHold',
-  ])
-  const predictor = bind(StrengthPredictorModule, 'StrengthPredictor', [
-    'emptyRoleState',
-    'observeRequest',
-    'interpolatedProbability',
-    'predictRead',
-  ])
-  const controller = bind(StrengthControllerModule, 'StrengthController', [
-    'initialState',
-    'hashToUnitInterval',
-    'includedInTraining',
-    'updateProbability',
-    'ewmaAlpha',
-    'onEligibleDecision',
-  ])
-  const value = bind(StrengthValueModule, 'StrengthValue', [
-    'defaultCostModel',
-    'valueK1',
-    'valueK2',
-    'chooseBudget',
-    'batchWithinByteLimit',
-    'decisionWithinByteLimit',
-  ])
-
-  const budgetOf = (b) => caseOf(b)
-  const symbolOf = (s) => caseOf(s)
-  const requestSymbol = (name, payload) => unionCase(StrengthTypesModule.RequestSymbol, 'RequestSymbol')(name, payload ?? [])
-  const readBatch = (fields) => ({
-    Tools: fields.tools ?? [],
-    Parallelism: fields.parallelism ?? 1,
-    ResultBytes: fields.resultBytes ?? 0,
-  })
-
-  return {
-    budgetOf,
-    symbolOf,
-    requestSymbol,
-    readBatch,
-
-    emptyRoleState: () => predictor.emptyRoleState,
-    observeRequest: (state, symbols) => predictor.observeRequest(state, toList(symbols)),
-    predictRead: (state, history, features) => {
-      const [p1, p2] = predictor.predictRead(state, toList(history), features)
-      return { p1, p2 }
-    },
-
-    initialState: () => controller.initialState,
-    hashToUnitInterval: (sha, seed) => controller.hashToUnitInterval(sha, seed),
-    includedInTraining: (sha, decisionId, ordinal, p) => {
-      const [included, u] = controller.includedInTraining(sha, decisionId, ordinal, p)
-      return { included, u }
-    },
-    updateProbability: (alpha, minP, maxP, maxStep, prev, tendency) =>
-      controller.updateProbability(alpha, minP, maxP, maxStep, prev, tendency),
-    ewmaAlpha: (halfLife) => controller.ewmaAlpha(halfLife),
-    onEligibleDecision: (state, t1, t2) => controller.onEligibleDecision(state, t1, t2),
-
-    defaultCostModel: (tierName) => value.defaultCostModel(tier(tierName)),
-    valueK1: (cost, p1, bytes, delay) => value.valueK1(cost, p1, bytes, delay),
-    valueK2: (cost, p1, p2, b1, b2, d1, d2) => value.valueK2(cost, p1, p2, b1, b2, d1, d2),
-    chooseBudget: (v0, v1, v2) => budgetOf(value.chooseBudget(v0, v1, v2)),
-    batchWithinByteLimit: (bytes) => value.batchWithinByteLimit(bytes),
-    decisionWithinByteLimit: (bytes) => value.decisionWithinByteLimit(bytes),
-  }
-})()
-
-const tier = (name) => {
-  if (name === 'Fast') return RolesModule.AgentTier.Fast
-  if (name === 'Deep') return RolesModule.AgentTier.Deep
-  throw new Error(`unknown tier: ${name}`)
-}
-
 // ── Runtime package resources (install once before EnforcerHost / BlogTool / StaticTools) ──
 
 /** Process-local holder: same contract as SpikePlugin init (RuntimeResources.install load). */
@@ -4583,63 +4493,6 @@ export const parkedTransform = (() => {
   }
 })()
 
-// ── docs/proposal/student-teacher.md: Student & Teacher 纯领域内核 ────────────────────────────────────
-
-export const studentTeacher = (() => {
-  const m = bind(StudentTeacherModule, 'StudentTeacher', [
-    'StudentTeacherRole',
-    'StudentTool',
-    'studentToolsFor',
-    'isStudentRequest',
-    'teacherTierFor',
-    'studentAgentName',
-    'teacherAgentName',
-    'isIgnoredTmpPath',
-    'appendEntry',
-    'dedupeTail',
-    'QaAppendOrder',
-    'StudentRunConcurrency',
-    'mayStartTeacherCall',
-    'ReturnDeleteOutcome',
-    'returnMayProceed',
-  ])
-
-  const toolNames = (set) => [...set].map(caseOf).sort()
-  const toolOf = (name) => unionCase(StudentTeacherModule.StudentTool, 'StudentTool')(name, [])
-
-  return {
-    /** LEARN-050：Student 工具面按请求种类原子决定。 */
-    toolsFor: (kindName) => toolNames(m.studentToolsFor(requestKind.of(kindName))),
-    /** LEARN-051：非 Student 请求种类 → 空工具集。 */
-    toolsForKind: (kind) => toolNames(m.studentToolsFor(kind)),
-
-    /** LEARN-017：同 tier 映射。 */
-    teacherTier: (tierName) => caseOf(m.teacherTierFor(tier(tierName))),
-
-    /** LEARN-016：Agent 名。 */
-    studentAgent: (tierName) => m.studentAgentName(tier(tierName)),
-    teacherAgent: (tierName) => m.teacherAgentName(tier(tierName)),
-
-    /** LEARN-032/033/035/036：QA 内容拼接。 */
-    isIgnoredTmpPath: (p) => m.isIgnoredTmpPath(p),
-    append: (existing, entry) => m.appendEntry(existing, entry),
-    dedupeTail: (existing, entry) => m.dedupeTail(existing, entry),
-
-    /** LEARN-075：单飞并发门。 */
-    mayStartTeacherCall: (stateName) => {
-      const state = unionCase(StudentTeacherModule.StudentRunConcurrency, 'StudentRunConcurrency')(stateName, [])
-      return m.mayStartTeacherCall(state)
-    },
-
-    /** LEARN-024：最终 return 删除顺序。 */
-    returnMayProceed: (outcomeName) => {
-      const outcome = unionCase(StudentTeacherModule.ReturnDeleteOutcome, 'ReturnDeleteOutcome')(outcomeName, [])
-      return m.returnMayProceed(outcome)
-    },
-  }
-})()
-
-// ── Session family recovery (RECOVERY-FAMILY / FLOW) ─────────────────────────
 const SessionRecoveryModule = await prod('Domain/SessionRecovery')
 
 export const sessionRecovery = (() => {

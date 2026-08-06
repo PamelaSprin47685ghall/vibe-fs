@@ -330,10 +330,7 @@ test('CTX_010_only_the_work_main_request_may_carry_a_prefix_probe', () => {
 test('PROMPT_008_every_request_kind_has_a_distinct_diagnostic_label', () => {
   const labels = requestKind.all.map(requestKind.label)
 
-  // Every kind a diagnostic label, and no two kinds share one. The exact list
-  // grows with SSOT: LEARN-050 added StudentLearn/StudentCompile.
+  // Every kind has a distinct diagnostic label, and no two kinds share one.
   assert.equal(new Set(labels).size, labels.length)
   assert.ok(labels.includes('work-main'))
-  assert.ok(labels.includes('student-learn'))
-  assert.ok(labels.includes('student-compile'))
 })
