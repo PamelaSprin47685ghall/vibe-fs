@@ -22,10 +22,46 @@ export const PROGRAM_DIRS = [
   `${PRODUCTION_ROOT}/Session/`,
 ]
 
+/**
+ * External-protocol interpreters allowed by spec/14 FLOW-006 (JSON/TOML/Host-wire
+ * codec/parser/interpreter). Boundary is path+semantic, not a blanket `Interpreter`
+ * suffix exemption: a `*Interpreter` module is tolerated only when it interprets an
+ * external data format, signalled by a Codec/Parser/Wire path segment or suffix.
+ */
+export const isExternalProtocolPath = (file) => {
+  const rel = norm(String(file))
+  return (
+    /\/Codec\//.test(rel) ||
+    /\/Parser\//.test(rel) ||
+    /\/Wire\//.test(rel) ||
+    /\.(?:Codec|Parser|Wire)\.fs$/.test(rel) ||
+    /\.(?:Codec|Parser|Wire)\.[A-Za-z]/.test(rel)
+  )
+}
+
 export const FORBIDDEN = [
-  { gate: 'raw-task', pattern: /(?<!\/\/\s*)\btask\s*\{/, label: 'raw task { }' },
   { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable' },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
+  {
+    // FLOW-002/FLOW-006 second-runtime forms. Catches realistic bypass shapes:
+    //   type|and + optional private/internal/public modifier + *Command|*Reply
+    //   (with optional generic params) or *Program (generic only, so a plain
+    //   `type OrchestratorProgramDeps =` record stays clean), a `| Step of` /
+    //   `| Suspend of` union node, and a ProtocolMismatch compensation token.
+    gate: 'second-runtime-protocol',
+    pattern:
+      /\b(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(?:\w*(?:Command|Reply)(?:<[^=>]*>)?|(?:\w*Program)<[^=>]*>)\s*=|\|\s*(?:Step|Suspend)\s+of\b|\bProtocolMismatch\b/,
+    label: 'Command/Reply/Program AST, Step/Suspend node, or ProtocolMismatch compensation',
+  },
+  {
+    // FLOW-006 internal business Interpreter. Allows private/internal/top-level
+    // forms, but never a legitimate external-protocol interpreter (spec/14 FLOW-006:
+    // JSON/TOML/Host-wire codec/parser/interpreter are not second-runtime).
+    gate: 'business-interpreter',
+    pattern: /\bmodule\s+(?:private\s+|internal\s+)?(?:\w+\.)*\w*Interpreter\s*=/,
+    label: 'internal business Interpreter module',
+    skipIf: isExternalProtocolPath,
+  },
   {
     gate: 'infrastructure-leak',
     pattern:
@@ -66,8 +102,9 @@ export const scanText = (text, file = '<synthetic>') => {
     const code = line.replace(/\/\/.*/g, '').trim()
     if (!code) continue
 
-    for (const { gate, pattern } of FORBIDDEN) {
-      if (pattern.exec(code)) {
+    for (const { gate, pattern, skipIf } of FORBIDDEN) {
+      if (skipIf && skipIf(file)) continue
+      if (pattern.test(code)) {
         violations.push({ gate, file, line: i + 1, text: line.trim() })
       }
     }

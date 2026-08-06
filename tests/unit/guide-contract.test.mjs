@@ -43,11 +43,7 @@ const assertCallable = (mod, modulePath, names) => {
   }
 }
 
-// ── the four DSL programs (ARCH-001) ────────────────────────────────────────
-//
-// `architecture-gate.mjs` reads DSL_PROGRAMS and requires each module name to
-// appear in this file. The names below are load-bearing for that gate, not
-// decorative: AgentProgram, CompanionProgram, OrchestratorProgram, ProcessRunner.
+// ── directly executable workflow surfaces (ARCH-001) ───────────────────────
 
 test('VERIFY_005_AgentProgram_publishes_its_flow_entrypoints', async () => {
   const mod = await load('Agent/AgentProgram')
@@ -67,58 +63,7 @@ test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
   assertCallable(mod, 'Session/CompanionProgram', ['buildDelta', 'runCompanionFlow'])
 })
 
-test('VERIFY_005_OrchestratorInterpreter_is_the_sole_production_entrypoint', async () => {
-  // M2 clean break: Application/Orchestration/Program.fs is deleted. The sole
-  // production module is OrchestratorInterpreter; Runtime calls `run`, which
-  // builds the Domain program and executes it through the `interpret` core.
-  await assert.rejects(
-    () => load('Application/Orchestration/Program'),
-    (error) => {
-      const message = String(error?.message ?? error)
-      return (
-        message.includes('Cannot find module') ||
-        message.includes('ERR_MODULE_NOT_FOUND') ||
-        message.includes('Failed to load') ||
-        message.includes('does not provide') ||
-        error?.code === 'ERR_MODULE_NOT_FOUND'
-      )
-    },
-    'Application/Orchestration/Program must be deleted after M2 cutover',
-  )
-
-  const mod = await load('Application/Orchestration/OrchestratorInterpreter')
-
-  // Production surface: `run` is what Runtime calls; `interpret` is the DSL
-  // interpreter core. Publish-loop details stay private so ORCH-005's short CAS
-  // window cannot acquire a second caller.
-  assertCallable(mod, 'Application/Orchestration/OrchestratorInterpreter', ['interpret', 'run'])
-})
-
-test('VERIFY_005_Domain_OrchestratorProgram_publishes_empty_and_trace', async () => {
-  const mod = await load('Domain/OrchestratorProgram')
-  const names = surfaceOf(mod)
-
-  assert.ok(
-    names.some((n) => n.includes('empty') || n.endsWith('_empty')),
-    `Domain OrchestratorProgram must publish empty; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
-    names.some((n) => n.includes('interpret')),
-    `Domain OrchestratorProgram must publish TraceInterpreter.interpret; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
-    names.some((n) => n.includes('interpretWith')),
-    `Domain OrchestratorProgram must publish TraceInterpreter.interpretWith for reply-bearing Step; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
-    names.some((n) => n.includes('freshStart') || n.includes('OrchestratorPrograms')),
-    `Domain OrchestratorProgram must publish OrchestratorPrograms builders; exports: ${names.join(', ')}`,
-  )
-})
-
-test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decide_and_trace', async () => {
-  // M3: pure Reconcile Domain surface before M4 Interpreter cutover.
-  // Must fail while Domain/ReconcileProgram.fs is absent (RED).
+test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decisions', async () => {
   const mod = await load('Domain/ReconcileProgram')
   const names = surfaceOf(mod)
 
@@ -138,14 +83,6 @@ test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decide_and_trace', async
     names.some((n) => n.includes('publishDecision')),
     `Domain ReconcileProgram must publish publishDecision; exports: ${names.join(', ')}`,
   )
-  assert.ok(
-    names.some((n) => n.includes('interpretWith') || n.includes('interpret')),
-    `Domain ReconcileProgram must publish TraceInterpreter; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
-    names.some((n) => n.includes('materializePass') || n.includes('ReconcilePrograms')),
-    `Domain ReconcileProgram must publish materializePass builder; exports: ${names.join(', ')}`,
-  )
 })
 
 test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
@@ -155,28 +92,25 @@ test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {
   assertCallable(mod, 'Process/ProcessRunner', ['run', 'runWithHost', 'runWithLauncher'])
 })
 
-// ── the Flow kernel the four programs are built on ──────────────────────────
+// ── the bounded parallelism kernel the workflows fan out through ────────────
 
-test('VERIFY_005_the_Flow_kernel_publishes_run_fail_attempt_and_bounded_parallelism', async () => {
+test('VERIFY_005_the_Flow_kernel_publishes_only_bounded_parallelism', async () => {
   const mod = await load('Kernel/Flow')
 
-  assertCallable(mod, 'Kernel/Flow', ['Flow_run', 'Flow_fail', 'Flow_attempt', 'Flow_create', 'Flow_lift'])
+  // spec/14 (Direct CE) superseded the Flow monad; its monadic surface
+  // (Flow_run / Flow_fail / Flow_attempt / Flow_create / Flow_lift and the
+  // FlowBuilder) is no longer a demanded contract. Bounded concurrency is still
+  // legal, so `Parallel.mapBounded` remains the only required export here.
+  assertCallable(mod, 'Kernel/Flow', ['Parallel_mapBounded'])
 
   // `Parallel.mapBounded` is emitted from the same file. Unbounded fan-out is how
   // a canary starts failing on machine load rather than on logic, so the bounded
   // form must stay the only one published.
-  assertCallable(mod, 'Kernel/Flow', ['Parallel_mapBounded'])
   assert.equal(
     surfaceOf(mod).some((name) => /^Parallel_map(?!Bounded)/.test(name)),
     false,
     'no unbounded Parallel.map* may be published alongside mapBounded',
   )
-
-  // The builder itself, so `agent { }` / `companion { }` have something to desugar
-  // into. Fable suffixes generic types with their arity.
-  for (const name of ['Flow$3', 'FlowBuilder$2']) {
-    assert.equal(typeof mod[name], 'function', `Kernel/Flow must publish '${name}'`)
-  }
 })
 
 // ── the journal surface every program writes through ────────────────────────

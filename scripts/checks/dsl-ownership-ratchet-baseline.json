@@ -1,42 +1,36 @@
 {
-  "Agent/AgentProgram.fs": {
-    "raw-task": 2
-  },
   "Application/Orchestration/ManagerJob.fs": {
-    "mutable": 2,
-    "raw-task": 3
+    "mutable": 2
   },
-  "Application/Orchestration/Runtime.fs": {
-    "raw-task": 3
-  },
-  "Application/Prompting/PromptDispatcherSend.fs": {
-    "raw-task": 2
+  "Application/Orchestration/OrchestratorInterpreter.fs": {
+    "business-interpreter": 1
   },
   "Application/Reconciliation/BloggerCrashRecovery.fs": {
     "program-counter": 1,
-    "raw-task": 2,
     "mutable": 1
   },
-  "Application/Reconciliation/CompanionTransform.fs": {
-    "raw-task": 1
+  "Application/Reconciliation/ChildRecoveryInterpreter.fs": {
+    "business-interpreter": 1
+  },
+  "Application/Reconciliation/JoinInterpreter.fs": {
+    "business-interpreter": 1
   },
   "Application/Reconciliation/PromptRecovery.fs": {
     "behaviour-bool": 3,
-    "raw-task": 3,
     "mutable": 1
   },
-  "Application/Reconciliation/ReviewSeal.fs": {
-    "raw-task": 1
+  "Application/Reconciliation/ReconcileInterpreter.fs": {
+    "business-interpreter": 1
   },
   "Application/Reconciliation/ReviewerGuardState.fs": {
     "behaviour-bool": 1
   },
   "Application/Reconciliation/SessionRecoveryInterpreter.fs": {
-    "behaviour-bool": 1
+    "behaviour-bool": 1,
+    "business-interpreter": 1
   },
   "Application/Reconciliation/TurnCompletionProgram.fs": {
     "infrastructure-leak": 1,
-    "raw-task": 6,
     "program-counter": 2,
     "behaviour-bool": 1
   },
@@ -46,17 +40,22 @@
   "Application/Reconciliation/XTraceCapture.fs": {
     "mutable": 1
   },
-  "Application/Reconciliation/XWire.fs": {
-    "raw-task": 1
-  },
   "Domain/BloggerDelta.fs": {
     "mutable": 5
   },
   "Domain/LoopDetector.fs": {
     "mutable": 4
   },
+  "Domain/OrchestratorProgram.fs": {
+    "second-runtime-protocol": 3,
+    "business-interpreter": 1
+  },
   "Domain/PromptAuthority.fs": {
     "behaviour-bool": 1
+  },
+  "Domain/ReconcileProgram.fs": {
+    "second-runtime-protocol": 3,
+    "business-interpreter": 1
   },
   "Domain/RecoverySlot.fs": {
     "behaviour-bool": 2
@@ -74,16 +73,20 @@
     "mutable": 4
   },
   "Kernel/Flow.fs": {
-    "raw-task": 11,
     "mutable": 11,
     "behaviour-bool": 1
+  },
+  "Kernel/Program.fs": {
+    "second-runtime-protocol": 1
+  },
+  "Kernel/TraceInterpreter.fs": {
+    "business-interpreter": 1
   },
   "Session/AgentRoleIdentity.fs": {
     "infrastructure-leak": 1
   },
   "Session/BloggerCoordinator.fs": {
     "infrastructure-leak": 1,
-    "raw-task": 3,
     "program-counter": 1
   },
   "Session/BloggerRuntimeState.fs": {
@@ -91,8 +94,7 @@
     "behaviour-bool": 1
   },
   "Session/ChildRun.fs": {
-    "mutable": 2,
-    "raw-task": 1
+    "mutable": 2
   },
   "Session/ChildRunProjection.fs": {
     "behaviour-bool": 2
@@ -103,31 +105,23 @@
   "Session/CompanionHost.fs": {
     "infrastructure-leak": 1,
     "mutable": 4,
-    "behaviour-bool": 16,
-    "raw-task": 2
+    "behaviour-bool": 16
   },
   "Session/CompanionHostBlogger.fs": {
-    "infrastructure-leak": 1,
-    "raw-task": 2
-  },
-  "Session/CompanionProgram.fs": {
-    "raw-task": 2
+    "infrastructure-leak": 1
   },
   "Session/CompletionMailbox.fs": {
     "infrastructure-leak": 1,
-    "mutable": 3,
-    "raw-task": 2
+    "mutable": 3
   },
   "Session/EnforcerHost.fs": {
     "infrastructure-leak": 1,
     "mutable": 7,
-    "raw-task": 2,
     "program-counter": 12
   },
   "Session/ForkRuntime.fs": {
     "infrastructure-leak": 1,
-    "mutable": 2,
-    "raw-task": 4
+    "mutable": 2
   },
   "Session/ForkTypes.fs": {
     "behaviour-bool": 2
@@ -136,40 +130,32 @@
     "infrastructure-leak": 1
   },
   "Session/HostForkAgent.fs": {
-    "infrastructure-leak": 1,
-    "raw-task": 5
+    "infrastructure-leak": 1
   },
   "Session/HostForkAgentOwner.fs": {
-    "infrastructure-leak": 1,
-    "raw-task": 1
+    "infrastructure-leak": 1
   },
   "Session/HostForkBusyNudge.fs": {
-    "infrastructure-leak": 1,
-    "raw-task": 1
+    "infrastructure-leak": 1
   },
   "Session/HostForkChildDispatch.fs": {
     "infrastructure-leak": 2,
-    "raw-task": 2,
     "mutable": 1
   },
   "Session/HostForkPty.fs": {
-    "infrastructure-leak": 2,
-    "raw-task": 2
+    "infrastructure-leak": 2
   },
   "Session/HostForkRestart.fs": {
     "infrastructure-leak": 1,
-    "raw-task": 2,
     "mutable": 1
   },
   "Session/HostForkRunLifecycle.fs": {
-    "infrastructure-leak": 1,
-    "raw-task": 1
+    "infrastructure-leak": 1
   },
   "Session/HostForkRuntime.fs": {
     "infrastructure-leak": 2,
     "program-counter": 2,
-    "mutable": 1,
-    "raw-task": 2
+    "mutable": 1
   },
   "Session/HostPendingRun.fs": {
     "infrastructure-leak": 1

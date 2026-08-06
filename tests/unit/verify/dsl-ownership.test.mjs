@@ -1,5 +1,5 @@
 /**
- * FLOW-009 / TASK stage 1: dsl-ownership gate must go red on each forbidden pattern.
+ * FLOW-006: dsl-ownership gate must go red on each forbidden pattern.
  * Synthetic source only — never mutates production trees.
  */
 import assert from 'node:assert/strict'
@@ -14,18 +14,23 @@ import {
 
 const NEGATIVES = [
   {
-    gate: 'raw-task',
-    source: ['module Sample', 'let run () = task { return 0 }'].join('\n'),
-    line: 2,
-  },
-  {
     gate: 'mutable',
     source: ['module Sample', 'let mutable counter = 0'].join('\n'),
     line: 2,
   },
   {
     gate: 'flow-lift',
-    source: ['module Sample', 'let escape t = Flow.lift t'].join('\n'),
+    source: ['module Sample', 'let escape t = Flow.create t'].join('\n'),
+    line: 2,
+  },
+  {
+    gate: 'second-runtime-protocol',
+    source: ['module Sample', 'type WorkflowCommand =', '    | ReadSnapshot'].join('\n'),
+    line: 2,
+  },
+  {
+    gate: 'business-interpreter',
+    source: ['module Sample', 'module WorkflowInterpreter =', '    let run program = program'].join('\n'),
     line: 2,
   },
   {
@@ -48,22 +53,23 @@ const NEGATIVES = [
 const CLEAN = [
   'module Sample',
   'open Wanxiangshu.Domain',
-  'let decide input =',
-  '    match input with',
-  '    | Ok value -> value',
-  '    | Error e -> failwith e',
+  'let run operation = task {',
+  '    let! result = operation ()',
+  '    return result',
+  '}',
 ].join('\n')
 
-test('DSL_OWNERSHIP_exports_six_named_gates', () => {
+test('DSL_OWNERSHIP_exports_seven_named_gates', () => {
   assert.deepEqual(GATE_NAMES, [
-    'raw-task',
     'mutable',
     'flow-lift',
+    'second-runtime-protocol',
+    'business-interpreter',
     'infrastructure-leak',
     'program-counter',
     'behaviour-bool',
   ])
-  assert.equal(FORBIDDEN.length, 6)
+  assert.equal(FORBIDDEN.length, 7)
 })
 
 for (const sample of NEGATIVES) {
@@ -94,8 +100,8 @@ test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
     { file: 'c.fs', text: NEGATIVES[1].source },
   ])
   const gates = hits.map((v) => v.gate)
-  assert.ok(gates.includes('raw-task'))
   assert.ok(gates.includes('mutable'))
+  assert.ok(gates.includes('flow-lift'))
   assert.equal(
     hits.filter((v) => v.file === 'b.fs').length,
     0,
@@ -103,7 +109,7 @@ test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
 })
 
 test('DSL_OWNERSHIP_comment_only_line_is_ignored', () => {
-  const source = ['module Sample', '// task { return 0 }', '// let mutable x = 1'].join('\n')
+  const source = ['module Sample', '// type HiddenCommand =', '// let mutable x = 1'].join('\n')
   assert.deepEqual(scanText(source), [])
 })
 

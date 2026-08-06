@@ -5,7 +5,7 @@ Binding rules live in [`spec/`](../spec/). This page is orientation only.
 ## Layers
 
 - Kernel / Domain: pure rules, facts, projections — no Host I/O.
-- Application: orchestration, prompting, reconciliation programs (e.g. `Application/Orchestration/Program.fs`).
+- Application: directly executed CE workflows for orchestration, prompting, and reconciliation.
 - Infrastructure: OpenCode hooks and adapters (`Infrastructure/OpenCode/Orchestration/`), Git, codecs, resource loaders (`Infrastructure/Resources/`).
 - Session / Process: runtime cells, fallback, review, PTY ownership.
 
