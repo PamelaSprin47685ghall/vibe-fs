@@ -34,7 +34,9 @@ module FallbackController =
         /// or the run is already exhausted. Nothing was written.
         | AlreadyRecorded of AgentPairCursor.FallbackCursor
         /// FALLBACK-001: no cursor exists, so no Authority Root was accepted for
-        /// this session. Nothing to advance, and nothing may be sent.
+        /// this session. Nothing to advance. Callers may still take their own
+        /// recovery action (e.g. EnforcerHost injects the repair projection — the
+        /// transcript marker, not the cursor, bounds that budget).
         | NoActiveRun
 
     /// Record one confirmed failed provider attempt.

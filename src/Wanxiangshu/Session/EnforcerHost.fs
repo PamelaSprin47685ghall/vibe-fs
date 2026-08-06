@@ -1225,20 +1225,28 @@ module EnforcerHost =
                                 ProviderRunIdentity.create messageId
                             | _ -> ProviderRunIdentity.create "unknown-prose-run"
 
-                        let advance =
-                            FallbackController.recordConfirmedFailure
-                                durable
-                                AgentPairCursor.DefaultAutoRecoveryBudget
-                                owner
-                                providerRun
-                                reason
+                        let advanceOutcome =
+                            match
+                                FallbackController.recordConfirmedFailure
+                                    durable
+                                    AgentPairCursor.DefaultAutoRecoveryBudget
+                                    owner
+                                    providerRun
+                                    reason
+                            with
+                            | Ok outcome -> Some outcome
+                            | Error err ->
+                                Diagnostic.emit
+                                    "enforcer-aabb-bridge"
+                                    [ "session_id", key; "result", "recordConfirmedFailure rejected: " + err ]
 
-                        match advance with
-                        | Ok(FallbackController.AdvanceOutcome.Exhausted _) ->
+                                None
+
+                        match advanceOutcome with
+                        | Some(FallbackController.AdvanceOutcome.Exhausted _) ->
                             Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", reason ]
                             fatalEnd "blog aabb exhausted; auto-recovery budget spent"
-                        | Ok _
-                        | Error _ ->
+                        | _ ->
                             // Advanced / AlreadyRecorded / NoActiveRun: repair continues
                             // (NoActiveRun = no accepted primary root, FALLBACK-001).
                             let fresh =

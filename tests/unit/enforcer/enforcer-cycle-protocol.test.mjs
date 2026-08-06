@@ -1018,7 +1018,9 @@ test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', asyn
     // not a second AABB. The cursor stays at the single advance.
     await run(liveBlog('asst-2', 'c2', { text: '   ' }))
     assert.equal(fatals.length, 1, 'second empty text is coverage/protocol stall → fatal')
-    assert.match(lastFatal()?.result ?? '', /protocol-repair-exhausted|aabb-exhausted/)
+    // ENFORCER-153 marker (transcript) exhausts before the FallbackController
+    // budget of 12 can — the reachable fatal is protocol-repair-exhausted.
+    assert.match(lastFatal()?.result ?? '', /protocol-repair-exhausted/)
     const snapshot2 = AgentJournalModule_snapshot(journal)
     const primary2 = fold.session(snapshot2, MAIN)
     assert.equal(fallbackProjection.read(primary2.Fallback).offset, 1, 'no second advance')
