@@ -161,21 +161,17 @@ module HostForkRestart =
             let recovered = ResizeArray<RecoveredHandle>()
             let waiting = ResizeArray<HandleRecoveryWait>()
             let blocked = ResizeArray<HandleRecoveryBlock>()
-            let mutable sawAgent = false
 
             for record in records do
                 match record.Lifecycle, HandleId.tryAgent record.Handle with
                 | HandleLifecycle.Abandoned _, Some agentHandle ->
-                    sawAgent <- true
                     recovered.Add(recoveredHandle agentHandle record.ChildSessionId "abandoned")
                 | HandleLifecycle.Abandoned _, None
                 | _, None -> ()
                 | HandleLifecycle.Retired, Some agentHandle ->
-                    sawAgent <- true
                     migrateRetiredIfFalseAbort journal parentId record
                     recovered.Add(recoveredHandle agentHandle record.ChildSessionId "retired")
                 | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
-                    sawAgent <- true
                     let agentId = AgentHandleId.value agentHandle
                     let role = AgentRoleIdentity.ofRole record.CanonicalRole
 
@@ -267,7 +263,6 @@ module HostForkRestart =
                               ChildSession = record.ChildSessionId
                               Reason = reason }
                 | HandleLifecycle.Active, Some agentHandle ->
-                    sawAgent <- true
                     let agentId = AgentHandleId.value agentHandle
                     let role = AgentRoleIdentity.ofRole record.CanonicalRole
 
@@ -291,7 +286,7 @@ module HostForkRestart =
                     | Choice3Of3 b -> blocked.Add b
 
             // HandleFamilyRecovery carries Domain.SessionRecovery.NonEmpty.
-            if not sawAgent then
+            if recovered.Count = 0 && waiting.Count = 0 && blocked.Count = 0 then
                 return HandleFamilyRecovery.NoLinkedHandles
             elif blocked.Count > 0 then
                 match Wanxiangshu.Domain.SessionRecovery.NonEmpty.ofList (List.ofSeq blocked) with

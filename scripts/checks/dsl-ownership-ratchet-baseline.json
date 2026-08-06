@@ -23,9 +23,6 @@
   "Domain/ToolResultBound.fs": {
     "mutable": 4
   },
-  "Kernel/Parallel.fs": {
-    "mutable": 3
-  },
   "Session/ChildRun.fs": {
     "mutable": 2
   },
@@ -43,7 +40,7 @@
     "mutable": 3
   },
   "Session/EnforcerHost.fs": {
-    "mutable": 2
+    "mutable": 1
   },
   "Session/ForkRuntime.fs": {
     "mutable": 2
@@ -58,15 +55,13 @@
     "infrastructure-leak": 1
   },
   "Session/HostForkChildDispatch.fs": {
-    "infrastructure-leak": 2,
-    "mutable": 1
+    "infrastructure-leak": 2
   },
   "Session/HostForkPty.fs": {
     "infrastructure-leak": 2
   },
   "Session/HostForkRestart.fs": {
-    "infrastructure-leak": 1,
-    "mutable": 1
+    "infrastructure-leak": 1
   },
   "Session/HostForkRunLifecycle.fs": {
     "infrastructure-leak": 1

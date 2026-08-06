@@ -39,8 +39,14 @@ export const isExternalProtocolPath = (file) => {
   )
 }
 
+/** Local mutable scratch is legal in pure Domain algorithms and Parallel kernel. */
+export const isMutableScratchPath = (file) => {
+  const rel = String(file).replace(/\\/g, '/')
+  return rel.includes('/Domain/') || /(?:^|\/)Kernel\/Parallel\.fs$/.test(rel)
+}
+
 export const FORBIDDEN = [
-  { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable' },
+  { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable', skipIf: isMutableScratchPath },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
   {
     // FLOW-002/FLOW-006 second-runtime forms. Catches realistic bypass shapes:

@@ -121,6 +121,13 @@ test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
   )
 })
 
+
+test('DSL_OWNERSHIP_Domain_pure_scratch_mutable_is_not_gate_red', () => {
+  const source = ['module Sample', 'let scratch () =', '    let mutable acc = 0', '    acc'].join('\n')
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Domain/Sample.fs'), [])
+  assert.ok(scanText(source, 'src/Wanxiangshu/Session/Sample.fs').some((h) => h.gate === 'mutable'))
+})
+
 test('DSL_OWNERSHIP_comment_only_line_is_ignored', () => {
   const source = ['module Sample', '// type HiddenCommand =', '// let mutable x = 1'].join('\n')
   assert.deepEqual(scanText(source), [])

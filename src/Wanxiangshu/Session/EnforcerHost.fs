@@ -207,12 +207,9 @@ module EnforcerHost =
             Map.empty
         else
             let keys: string array = emitJsExpr value "Object.keys($0)"
-            let mutable result = Map.empty
 
-            for key in keys do
-                result <- Map.add key (emitJsExpr (value, key) "$0[$1]") result
-
-            result
+            keys
+            |> Array.fold (fun acc key -> Map.add key (emitJsExpr (value, key) "$0[$1]") acc) Map.empty
 
     /// ENFORCER-042: (PartOrdinal, ToolCallId, CanonicalBlogCall) for one
     /// provider step, in provider-visible order. The ordinal is the part's

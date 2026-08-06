@@ -120,22 +120,25 @@ module HostForkChildDispatch =
     /// synchronously by the caller before the async cleanup begins.
     let teardownChildren (sessions: ISessionHostPort) (childIds: SessionId list) : Task<Result<unit, string>> =
         task {
-            let mutable firstError: string option = None
+            let rec loop remaining firstError =
+                task {
+                    match remaining, firstError with
+                    | [], Some err -> return Error err
+                    | [], None -> return Ok()
+                    | childId :: rest, errOpt ->
+                        try
+                            let! abortResult = sessions.AbortSession childId
 
-            for childId in childIds do
-                try
-                    let! abortResult = sessions.AbortSession childId
+                            match abortResult, errOpt with
+                            | Error err, None -> return! loop rest (Some err)
+                            | _ -> return! loop rest errOpt
+                        with ex ->
+                            match errOpt with
+                            | None -> return! loop rest (Some ex.Message)
+                            | Some _ -> return! loop rest errOpt
+                }
 
-                    match abortResult, firstError with
-                    | Error err, None -> firstError <- Some err
-                    | _ -> ()
-                with ex ->
-                    if firstError.IsNone then
-                        firstError <- Some ex.Message
-
-            match firstError with
-            | Some err -> return Error err
-            | None -> return Ok()
+            return! loop childIds None
         }
 
     /// Cancel parent: fail pending runs, abandon child handles, clear maps.
