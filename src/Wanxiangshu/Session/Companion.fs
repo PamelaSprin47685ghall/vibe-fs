@@ -2,6 +2,7 @@ namespace Wanxiangshu.Session
 
 open System
 open System.Threading.Tasks
+open Fable.Core
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
@@ -11,10 +12,16 @@ open Wanxiangshu.Domain.ProviderProjection
 
 /// A single recovery opportunity. Never re-armed: a real failure creates one,
 /// and the next material either consumes it or a cancellation/loss disarms it.
+///
+/// A plain physical signal, not a waiter: the production consumer decides at
+/// the material boundary (`maySquash` reads `IsRecoveryArmed`) and clears the
+/// slot when a squash starts (`DisarmRecoverySlot`). A `TaskCompletionSource`
+/// here would be a dead tail — nothing in production ever awaits it, and
+/// cancelling an un-awaited promise rejects it into an unhandled rejection.
 [<RequireQualifiedAccess>]
 type RecoveryArming =
     | NotArmed
-    | Armed of waiter: TaskCompletionSource<unit>
+    | Armed
 
 /// Companion state wrapper with a single mutable in-flight Task gate.
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
@@ -112,36 +119,22 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.ArmRecoverySlot() : unit =
         lock lockObj (fun () ->
             match arming with
-            | RecoveryArming.Armed _ -> ()
-            | RecoveryArming.NotArmed -> arming <- RecoveryArming.Armed(TaskCompletionSource<unit>()))
+            | RecoveryArming.Armed -> ()
+            | RecoveryArming.NotArmed -> arming <- RecoveryArming.Armed)
 
-    /// Disarm and cancel an unconsumed recovery slot.
+    /// Clear an unconsumed recovery slot (squash started, opportunity spent).
     member _.DisarmRecoverySlot() : unit =
         lock lockObj (fun () ->
             match arming with
-            | RecoveryArming.Armed tcs ->
-                tcs.TrySetCanceled() |> ignore
-                arming <- RecoveryArming.NotArmed
+            | RecoveryArming.Armed -> arming <- RecoveryArming.NotArmed
             | RecoveryArming.NotArmed -> ())
 
     /// True when a real failure has created an unconsumed recovery slot.
     member _.IsRecoveryArmed: bool =
         lock lockObj (fun () ->
             match arming with
-            | RecoveryArming.Armed _ -> true
+            | RecoveryArming.Armed -> true
             | RecoveryArming.NotArmed -> false)
-
-    /// If a recovery slot is armed, offer this material as its payload and return
-    /// the (already completed) task representing the consumed opportunity.
-    /// Disarms the slot atomically. Returns `None` when not armed.
-    member _.TryConsumeRecoverySlot() : Task<unit> option =
-        lock lockObj (fun () ->
-            match arming with
-            | RecoveryArming.Armed tcs ->
-                tcs.SetResult(())
-                arming <- RecoveryArming.NotArmed
-                Some tcs.Task
-            | RecoveryArming.NotArmed -> None)
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory

@@ -145,10 +145,6 @@ type CompanionHost
 
     member this.DisarmRecoverySlot() = companion.DisarmRecoverySlot()
 
-    /// CTX-006: consume the one-shot recovery slot when a recovery action is about
-    /// to start. Returns `None` if the slot was not armed.
-    member this.TryConsumeRecoverySlot() : Task<unit> option = companion.TryConsumeRecoverySlot()
-
     /// CTX-006: primary session fallback cursor Offset (durable, not cached).
     member this.BloggerCursorOffset() : byte =
         match journal with
