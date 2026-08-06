@@ -26,13 +26,14 @@ what（可观察行为与条款） → shape（所有权与边界） → how（�
 
 ### 1.2 动手之前先读规范与状态
 
-这条是工作顺序约束，不是建议：
+完整标准工作流程：
 
 ```text
-读条款 → 读状态 → 读代码 → 动手
+proposal -> write why -> write what -> write shape -> write how -> check how against why -> write proof
+         -> move proposal to status -> write code -> check proof -> remove proposal from status
 ```
 
-**反过来做的两种典型失败：**
+**两种典型失败：**
 1. **写完才想起看文档**：代码已经按旧语义定型，要么返工，要么把旧语义固化，导致规范与代码偏离。
 2. **一头扎进代码细节，丢掉大局**：症状被修好，条款仍被违反（例如给旧类型补字段、加 adapter、让旧测试继续通过——局部合理，合起来是在维护过渡态）。
 
@@ -59,7 +60,7 @@ what（可观察行为与条款） → shape（所有权与边界） → how（�
 | 任何生产代码改动 | `docs/what/architecture.md` + `docs/shape/architecture.md` | `scripts/checks/architecture.mjs` + `scripts/checks/spec.mjs` |
 | Host 行为存疑 | ARCH-003 | 读 `../opencode` 源码（见 §2.1） |
 
-`docs/README.md` 是主导航。不确定读哪个文件时先读它。执行链：`what → shape → how → code`。
+`docs/README.md` 是主导航。不确定读哪个文件时先读它。
 
 ---
 
