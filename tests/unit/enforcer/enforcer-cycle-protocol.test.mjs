@@ -1025,3 +1025,29 @@ test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', asyn
     assert.equal(fallbackProjection.read(primary2.Fallback).failures, 1)
   })
 })
+
+test('ENFORCER_068_aabb_repair_path_advances_primary_cursor_once', async () => {
+  await withHarness(
+    async ({ journal, scope, fatals, run, main }) => {
+      // FALLBACK-001: an accepted primary root creates the primary cursor.
+      const runtime = promptDispatcher.forJournal(journal)
+      const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+      assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${JSON.stringify(accepted)}`)
+
+      // No session port → interactionNudge falls back to aabbRepair (the
+      // nudge-failure path, NOT the empty-text InjectRepair path). The bridge
+      // records the confirmed failure on the PRIMARY cursor through the one
+      // writer.
+      const out = await run(pureProse('asst-no-port', 'prose'))
+      assert.equal(hasRepairMessage(out), true, 'no port → aabbRepair injects repair')
+      assert.equal(isAabb(messagesOf(out)), true)
+      assert.equal(fatals.length, 0, 'budget permits, repair is silent')
+
+      const primary = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+      assert.ok(primary?.Fallback !== undefined, 'primary fallback cursor exists')
+      assert.equal(fallbackProjection.read(primary.Fallback).offset, 1, 'aabbRepair advances Fork0→Fork1')
+      assert.equal(fallbackProjection.read(primary.Fallback).failures, 1, 'one confirmed failure')
+    },
+    { portMode: 'none' },
+  )
+})
