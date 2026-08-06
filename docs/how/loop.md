@@ -205,6 +205,24 @@ return evaluate（N_eff ≤ 140 → LOOP）
 禁止跨 attempt 复用检测器状态
 ```
 
+### 并发模型
+
+`LoopDetector` 的 `mutable Step`、`mutable PrefixLength`、`Value[][]`、`Cross[][]` 只被单一线程访问：
+
+```text
+每个 provider attempt 恰好一个 SSE 事件泵（单线程事件循环）
+part.delta 由该泵串行投递 → 每次恰好一个 feed 调用
+检测器在 attempt 生命周期内不外泄、不被其它线程读取
+```
+
+因此不需要锁、AIO 结构或 copy-on-write 暴露。让步条件缺一即红线：
+
+1. `part.delta` 不得被并行回调并发进入——事件循环串行化送达（EXEC-024 的 mailbox 语义）。
+2. `LoopDetector` 对象禁止出 attempt 边界共享；读取方不得持有跨 feed 调用的引用。
+3. 诊断字段（LOOP-010）在 attempt 终止后一次性快照读取，禁止就地并发读。
+
+崩溃/重启：检测器是 attempt-local，非持久状态，无恢复单调性要求；`LoopKillArmed` 进程内局部，崩溃丢失（安全侧，允许重复输出）。
+
 ---
 
 ## LOOP-010：诊断

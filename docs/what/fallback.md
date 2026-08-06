@@ -70,3 +70,33 @@ Fallback 不是 Session 永久状态，也不是「模型槽位」。
 ```
 
 `Attempt` 仅可用于诊断日志与唤醒。Host 是否仍会自动继续，只能由 reconcile 后的完整 snapshot 判断。
+
+## FALLBACK-011：槽内维护子请求
+
+一次自动恢复槽最多两个物理 provider request：
+
+1. 维护子请求：`BloggerSquash`  
+2. 业务主请求：`WorkMain` / `BloggerMain`
+
+| 路径 | 结果 |
+|------|------|
+| 维护失败 | 槽失败，不发主请求 |
+| 维护成功 | 不清零 ConsecutiveFailureCount，继续主请求 |
+| 主失败 | 槽失败 |
+| 主成功 | 清零 ConsecutiveFailureCount |
+
+每个失败槽恰好一次 `FallbackCursorAdvanced`，`ProviderRunIdentity` 指向使该槽终止失败的物理 attempt。维护成功单独不算 Logical Run 业务完成。
+
+## FALLBACK-012：armed 合取
+
+恢复槽允许 X prefix probe 或 Y squash，当且仅当：
+
+```text
+1. armedByFailure：本槽由本次自动恢复内紧邻的真实失败推进而来
+2. primed：Offset 为奇数（A′ / B′）
+```
+
+禁止仅根据持久 Offset 奇偶 arm（成功后 Offset 可停在奇数）。  
+`armedByFailure` 是执行局部变量，崩溃后丢失（安全侧）。  
+新 Logical Run 第一槽永不 armed。  
+不变量：任意两次 squash 之间至少隔一次真实失败。

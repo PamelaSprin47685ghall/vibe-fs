@@ -29,6 +29,7 @@ what → shape → how → code/resources
 | Journal / 持久化 | [persist](what/persist.md) | [persist](shape/persist.md) | [persist](how/persist.md) | [persist](proof/persist.md) | [persist](why/persist.md) |
 | 上下文恢复 | [context](what/context.md) | [context](shape/context.md) | [context](how/context.md) | [context](proof/context.md) | [context](why/context.md) |
 | 合成 TOML | [synthetic-toml](what/synthetic-toml.md) | [synthetic-toml](shape/synthetic-toml.md) | [synthetic-toml](how/synthetic-toml.md) | [synthetic-toml](proof/synthetic-toml.md) | [synthetic-toml](why/synthetic-toml.md) |
+| 数据视图隔离 / 会话边界 | — | [security](shape/security.md) | — | [verify](proof/verify.md) | — |
 | 结构化程序 FLOW | [flow](what/flow.md) | [flow](shape/flow.md) | [flow](how/flow.md) | [flow](proof/flow.md) | [flow](why/flow.md) |
 | Blogger / Enforcer | [enforcer](what/enforcer.md) | [enforcer](shape/enforcer.md) | [enforcer](how/enforcer.md) | [enforcer](proof/enforcer.md) | [enforcer](why/enforcer.md) |
 | Projection Algebra | [projection](what/projection.md) | [projection](shape/projection.md) | [projection](how/projection.md) | [projection](proof/projection.md) | [projection](why/projection.md) |

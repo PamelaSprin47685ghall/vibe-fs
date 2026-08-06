@@ -4,17 +4,31 @@
 
 ## FALLBACK-002：Modulo-4 Cursor
 
+Offset 只有 0|1|2|3 四个合法值。用 DU 在类型层面排除非法态（评审修正：byte 允 0–255，`side` 对 8–255 无分支）；byte 只出现在序列化/反序列化边界。
+
 ```fsharp
+type FallbackOffset = Fork0 | Fork1 | Fork2 | Fork3
+
+let toByte = function
+    | Fork0 -> 0uy | Fork1 -> 1uy | Fork2 -> 2uy | Fork3 -> 3uy
+
+let ofByte = function
+    | 0uy -> Fork0 | 1uy -> Fork1 | 2uy -> Fork2 | 3uy -> Fork3
+    | _ -> invalidOp "FallbackOffset 非法字节"   // 反序列化失败 fail closed
+
 type FallbackCursor =
-    { Offset: byte                    // 仅 0|1|2|3
+    { Offset: FallbackOffset
       ConsecutiveFailureCount: int }
 
 let side offset =
     match offset with
-    | 0uy | 1uy -> SideA              // SelectedAgent
-    | 2uy | 3uy -> SideB              // PeerAgent
+    | Fork0 | Fork1 -> SideA              // SelectedAgent
+    | Fork2 | Fork3 -> SideB              // PeerAgent
 
-let advance offset = byte ((int offset + 1) % 4)
+let advance offset =
+    match offset with
+    | Fork0 -> Fork1 | Fork1 -> Fork2
+    | Fork2 -> Fork3 | Fork3 -> Fork0
 
 let effectiveAgent authority cursor =
     match side cursor.Offset with
@@ -88,32 +102,4 @@ FallbackExhausted 之后同 (LogicalRunId, AuthorityRoot) 再收 Advanced → �
 - 不重置 cursor  
 - 不得伪称「无限 AABB 已由 Host 完成」
 
-## FALLBACK-011：槽内维护子请求
-
-一次自动恢复槽最多两个物理 provider request：
-
-1. 维护子请求：`BloggerSquash`  
-2. 业务主请求：`WorkMain` / `BloggerMain`
-
-```text
-维护失败 → 槽失败，不发主请求
-维护成功 → 不清零 ConsecutiveFailureCount，继续主请求
-主失败   → 槽失败
-主成功   → 清零 ConsecutiveFailureCount
-```
-
-每个失败槽恰好一次 `FallbackCursorAdvanced`，`ProviderRunIdentity` 指向使该槽终止失败的物理 attempt。维护成功单独不算 Logical Run 业务完成。
-
-## FALLBACK-012：armed 合取
-
-恢复槽允许 X prefix probe 或 Y squash，当且仅当：
-
-```text
-1. armedByFailure：本槽由本次自动恢复内紧邻的真实失败推进而来
-2. primed：Offset 为奇数（A′ / B′）
-```
-
-禁止仅根据持久 Offset 奇偶 arm（成功后 Offset 可停在奇数）。  
-`armedByFailure` 是执行局部变量，崩溃后丢失（安全侧）。  
-新 Logical Run 第一槽永不 armed。  
-不变量：任意两次 squash 之间至少隔一次真实失败。
+> 槽位规则：FALLBACK-011（槽内维护子请求）与 FALLBACK-012（armed 合取）见 `what/fallback.md`（GOV-011：行为归 what/）。本文件只承担 cursor 算术（FALLBACK-002）、序列示例（006）、持久事实与 fold（007）、Host 停止注解（009）。

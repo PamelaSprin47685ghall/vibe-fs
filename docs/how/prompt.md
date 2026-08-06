@@ -27,11 +27,9 @@ accepted HostMessageId
 
 先匹配者生效；落到 UnknownOrigin 则 fail-closed（PROMPT-004）。
 
-## PROMPT-011：未决发送恢复
+未决发送恢复行为见 `what/prompt.md` PROMPT-011（GOV-011：行为归 what/）。PromptKey 组成与恢复步骤按该条款实现。
 
-Host 已接受 prompt，但插件在写 Submitted / PhysicalAccepted 前崩溃时：
-
-### PromptKey
+### PromptKey 组成
 
 ```fsharp
 PromptKey = digest(
@@ -41,27 +39,4 @@ PromptKey = digest(
 
 `ClaimSequence`：同一 `(SessionId, LogicalRunId, Origin, PayloadDigest)` 下由 journal fold 派生的单调序号——使「同一 Guard 连续发两次」成为两个 key。
 
-### 恢复步骤
-
-对每个 `Claimed` 或 `Submitted` 的 PromptKey：
-
-1. 读目标 Session 尾部 `RecoveryTailWindow = 50` 条消息  
-2. 查找 metadata 含同一 PromptKey 的 `role=user`  
-3. 找到 → 补写 `PhysicalAccepted`（真实 `msg_*`）  
-4. 未找到 → 保持 Pending，**不自动重发**  
-
-### 边界
-
-```text
-RecoveryAttemptBudget = 3   // 跨越 3 次插件启动
-```
-
-第 3 次启动仍无法证明物理落地 → `Abandoned(UnresolvedAfterRecovery)`。
-
-合同：
-
-```text
-at-most-one logical effect + fail-closed unknown outcome
-```
-
-禁止：假装 exactly-once；用时间窗口代替 PromptKey；把 `accepted-*` 当物理落地；为清理挂起而重发。
+实现点：`Claimed`/`Submitted` 恢复检索用 metadata 携带的 PromptKey；写 `PhysicalAccepted` 前复查 Journal 未接受过同 key，幂等（PERSIST-009）。
