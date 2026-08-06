@@ -156,123 +156,70 @@ conformance 账本、STATUS ledger 与旧 gate 森林（见下）。
 
 ### 当前开发阶段
 
-主线从「DSL 纠偏（删第二运行时）」进入「DSL 全面主导化」：
-业务流程的唯一控制流 = 直接执行的 F# `task`/`let!`/`match` + 强类型 ports；
-Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflow。
+**DSL 全面主导化已完成**（门禁债 `157 → 0`；tip 含 `826268eb` / `5e399826`）。
 
-规范：`spec/01` ARCH-001 + `spec/14` FLOW-001…008 + `TASK.md`。
-`spec/16`（PROJ-）承接投影代数，不改控制流形态。
-
-### DSL 纠偏已完成（PR0–PR5，tip `061c8a5f`）
-
-已完成的是**停止造第二运行时**，不是**DSL 已主导全部控制流**。
-
-| 已删 | 证据 |
-|------|------|
-| 通用 Kernel `Program.fs` / `TraceInterpreter.fs` | PR2 `ee6e7732` |
-| Orchestrator AST + Interpreter | PR3 `1bdc2f21` |
-| Reconcile Command/Reply/Program AST；`Reconciler.fs` 直接 CE | PR4 `3ded0d28` |
-| Join AST + Interpreter | PR5 `5d6146c6` |
-| 门禁改向：允许 `task{}`，禁 Command/Reply/Step 与业务 Interpreter | PR1 `bcf66e3a` |
-
-参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
-（「functions, not a Flow AST」+ 直接 `task`/`let!`）。
-
-**冻结债（`scripts/check.mjs --threshold=0`，P2-2 后实测 0 违规）**：
+现行控制流纪律：
 
 ```text
-infrastructure-leak       0   ← HostFork*/CompanionHost* basename 白名单（真 Host 边界）
-mutable                   0   ← Domain/Session/Application 物理 cell + Parallel 合法
-behaviour-bool            0
-program-counter           0
-business-interpreter      0
-second-runtime-protocol   0
+业务流程 = 直接执行的 F# task / let! / match + 强类型 ports
+Domain   = 事实 / 证据 / 决策 / 值对象
+恢复     = Journal facts + projection → 重入普通 workflow
+禁止     = 业务 Program AST、业务 Interpreter、Command/Reply/Step 第二运行时、
+           程序计数器 bool、facade 包旧路径、threshold 上调
 ```
 
-P0–P2-3c **done**：第二运行时掐断 + Flow→Parallel + bool/program-counter 清零 +
-合法 mutable 门禁化（157→13）。  
-P2-2 **done**：`HOST_BOUNDARY_OPEN_BASENAMES` 白名单仅 10 个 Host 边界文件可
-`open OpenCode/Process`；其余 Session/Application 仍 fail-closed；13→0。
-P3-1/P3-2 **done**：DSL 门禁债 0；`npm run check` 绿；`test:e2e --repeat 3` 全绿；package/pack dry-run 绿。
-e2e 修复：`gitConflictProof` 挂 `manager.0`（worktree 已存在）；ProcessHost stop 在 assertNoLeak 前回收残留 listen 端口。
+规范：`spec/01` ARCH-001 + `spec/14` FLOW-001…008。  
+投影：`spec/16`（PROJ-）。  
+历史纠偏施工单见 `TASK.md`（档案，非现行施工指令）。
 
-仍在盘上的非门禁债：
+### 主导化结果（摘要）
 
-| 位置 | 问题 |
+| 阶段 | 结果 |
 |------|------|
-| `Session/BloggerCoordinator.fs` | 主会话 material 入口；seal/blocks 侧效经 `BloggerRuntimeHost`（P1-1b） |
-| Host 边界 open 白名单 | 新增边界文件须登记 basename；长期可 port 上移再缩白名单 |
+| 纠偏 PR0–PR5 | 删通用 Kernel Program/TraceInterpreter；Orchestrator/Reconcile/Join 直接 CE |
+| P0 | Child/Session Recovery → Workflow；`business-interpreter=0`；`second-runtime-protocol=0` |
+| P1 | DrainWindow；`CycleDisposition`；`BloggerRuntimeHost` 统一 seal/blocks；ReconcileSupervisor 薄 facade |
+| P2 | Flow→`Parallel`；Host 边界 open 白名单；合法 mutable 门禁化 |
+| P3 | `threshold=0`；`npm run check`；`test:e2e --repeat 3`；package / pack dry-run |
 
-### PENDING TASK：DSL 全面主导化
+参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`、
+`Application/Reconciliation/ChildRecoveryWorkflow.fs`、
+`Application/Reconciliation/SessionRecoveryWorkflow.fs`。
 
-顺序固定；每步 clean break（同 PR 删旧路径）；禁止新旧双跑、facade 包旧 coordinator、
-把 bool 换成 flags enum、再造通用 Program Kernel。
-
-完成定义（每步都必须满足，对齐 `TASK.md` §十）：
+### 现行门禁契约（`scripts/checks/dsl-ownership.mjs`）
 
 ```text
-1. 业务主流程可自上而下直接阅读（let!/match/return!）
-2. 目标子系统 Command+Reply+Step/Suspend = 0
-3. 目标子系统内部业务 Interpreter = 0
-4. 无大 Reply 导致的「不可能回复」分支
-5. Domain 只剩事实/证据/决策/值对象
-6. 异步/取消/错误用语言运行时
-7. 恢复 = Journal facts + projection → 重入普通 workflow
-8. 测试用 fake ports 验调用顺序与外部结果
-9. unit/integration/e2e 不降级
-10. 旧实现删除；threshold 只降不升
+--threshold=0   （scripts/check.mjs；只允许下调，禁止上调）
 ```
 
-量化门禁：每步合并后 `node scripts/checks/dsl-ownership.mjs` 计数 ≤ 当步目标；
-`scripts/check.mjs` 的 `--threshold=` **只允许下调**。
+| 门 | 规则 |
+|----|------|
+| second-runtime-protocol / business-interpreter | 业务路径禁止 |
+| program-counter / behaviour-bool | 禁止（领域 evidence 名 allowlist） |
+| mutable | **合法**：Domain / Session / Application / `Kernel/Parallel.fs`；**fail-closed**：Agent / 其余 Kernel |
+| infrastructure-leak | **合法 open**：仅 `HOST_BOUNDARY_OPEN_BASENAMES`（10 个 HostFork*/CompanionHost*）；其余 Session/Application fail-closed |
 
-#### P0 — 掐断第二运行时（业务 Interpreter + Program AST）
+新增 Host 边界文件要 `open OpenCode/Process` 时：先登记 basename，再写 `open`。  
+长期可把端口/扩展方法上移以缩小白名单。
 
-| ID | 任务 | 完成判据 |
-|----|------|----------|
-| P0-1 | `ChildRecovery`：Program AST → 纯决策 + 直接 CE workflow | **done** — `ChildRecoveryWorkflow`；sole-owner 门禁已迁；157→155 |
-| P0-2 | `SessionRecovery`：同上 | **done** — `SessionRecoveryWorkflow`；155→153；business-interpreter=0；second-runtime-protocol=0 |
-| P0-3 | 文档/命名清零 | **done** — 生产 `.fs` 无第二运行时标识符；`spec/09` 线性序改为 Workflow/Join CE；门禁仍保留禁止 pattern |
+### 分层分工（Blogger，勿再双写）
 
-P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是纯决策」而保留 Step/continuation 节点。
+| 层 | 职责 |
+|----|------|
+| `BloggerRuntime` | 纯 cell 转移 |
+| `BloggerCoordinator` | 主会话 material 唯一入口（`onMainMaterial`） |
+| `EnforcerHost` | continuation / catch-up / repair |
+| `BloggerRuntimeHost` | 共用 seal / blocks / reactivate 侧效 |
 
-#### P1 — 控制流所有者收敛（Blogger / Reconcile / Enforcer）
+### 施工纪律（常驻）
 
-| ID | 任务 | 完成判据 |
-|----|------|----------|
-| P1-1 | Blogger：`BloggerRuntimeState` + `BloggerCoordinator` 收敛 | **done** — P1-1a DrainWindow；P1-1b `BloggerRuntimeHost` 统一 seal/blocks 侧效（Coordinator+Enforcer 共用） |
-| P1-2 | Reconcile 调度与 pass 分离已落地后，清 `ReconcileSupervisor` 程序计数器 | **done** — 现为 `Reconciler.Scheduler` 薄 facade，无 Dirty/Running |
-| P1-3 | `EnforcerHost`：`commitUnknown`/`injectRepair`/`abandonThenCatchUp` 等 → 穷尽 Decision | **done** — `CycleDisposition`；139→124 |
+Review 三问（`TASK.md` §八）：
 
-#### P2 — Kernel 与分层债收口
-
-| ID | 任务 | 完成判据 |
-|----|------|----------|
-| P2-1 | `Kernel/Flow.fs` / `DomainFlow.fs` | **done** — `Parallel.fs` + 精简 `DomainFlow`；Flow monad/builder 删除；108→99 |
-| P2-2 | `infrastructure-leak` | **done** — 死 open 清理 + Host 边界 basename 白名单；threshold 13→0 |
-| P2-3 | `mutable` / `behaviour-bool` 分拣 | **done** — behaviour-bool=0；Domain/Parallel/Session/Application 合法 mutable 门禁化；Agent/Kernel 仍 fail-closed |
-
-#### P3 — 主导化验收与文档收束
-
-| ID | 任务 | 完成判据 |
-|----|------|----------|
-| P3-1 | threshold 阶梯 | **done** — `0`；禁止上调；新增违规须同 PR 清掉 |
-| P3-2 | 发布阶梯 | **done** — `npm run check` 绿；`test:e2e --repeat 3` 20 canary × 3 轮全绿；`test:package` + `npm pack --dry-run` 绿 |
-| P3-3 | 文档只描述现行纪律 | **partial** — AGENTS §2 已同步主导化完成态；TASK.md 历史纠偏叙述可保留为档案 |
-
-### 施工纪律（主导化期间）
-
-Review 三问（`TASK.md` §八）对每个 PR 强制：
-
-1. 这段能否直接 `let!/match/return!`？能 → 禁造 AST。
-2. 这个 DU 是领域状态还是「程序下一步」？后者删。
+1. 能否直接 `let!/match/return!`？能 → 禁造 AST。  
+2. DU 是领域状态还是「程序下一步」？后者删。  
 3. Interpreter 解外部协议还是把内部 Command 变回函数调用？后者删。
 
-禁止伪修复：`agent{}` 空壳包 `task{}`、长期双跑、facade 包旧路径、只改文档不改门禁、
-threshold 上调、用 skip/known-red 伪装主导化完成。
-
-并行边界：P0-1 与 P0-2 可分 PR 但合并顺序任意其一先合均可，二者皆合完才进 P1；
-P1-1/P1-2/P1-3 可分人准备 characterization tests，**生产切换仍一次一切**，避免双所有者。
+禁止：`agent{}` 空壳包 `task{}`、长期双跑、只改文档不改门禁、skip/known-red 伪装完成。
 
 ### 已退役的 0.5.2 机制（勿重新引入）
 
