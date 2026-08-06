@@ -30,7 +30,7 @@ module PromptDispatcher =
     /// one value, which had two consequences worth naming: a claim made in one
     /// session was visible in another, and the in-memory copy could disagree with
     /// the journal it was supposed to mirror. Both are gone because the state is
-    /// gone — every read goes to the fold, which is the only writer.
+    /// gone - every read goes to the fold, which is the only writer.
     ///
     /// The journal is not optional. A dispatcher with nowhere to persist would
     /// report `Ok` for facts it silently dropped, and PROMPT-005 is a durability
@@ -119,7 +119,7 @@ module PromptDispatcher =
         /// PROMPT-005 `PhysicalAccepted` for an Authority Root claim.
         ///
         /// Two facts in order: the claim resolves, then the root takes effect. The
-        /// order is the clause — an Authority Root may not take effect until a
+        /// order is the clause - an Authority Root may not take effect until a
         /// real physical message is proven, so `PhysicalAccepted` cannot come
         /// second.
         member internal this.AcceptPhysicalAgentOwnerRoot
@@ -154,8 +154,9 @@ module PromptDispatcher =
             match Map.tryFind key projection.PendingClaims with
             | Some claim ->
                 let isAgentOwnerRoot =
-                    claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
+                    claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot(
                                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                                   )
 
                 if not isAgentOwnerRoot then
                     Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key))
@@ -195,7 +196,7 @@ module PromptDispatcher =
         ///
         /// `ActiveLogicalRun` only. The previous version fell back to
         /// `LastAuthorityProfile`, which let a continuation attach to a finished
-        /// run — PROMPT-004 scopes continuations to the active run, and a stale
+        /// run - PROMPT-004 scopes continuations to the active run, and a stale
         /// profile is exactly the thing that must not substitute for one.
         member this.ActiveProfile(sessionId: SessionId) =
             (this.ProjectionFor sessionId).ActiveLogicalRun
@@ -217,7 +218,7 @@ module PromptDispatcher =
         /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a
         /// `RepairClaims` set that no fact ever wrote, so the at-most-once guarantee
         /// lived only in process memory. The budget is now derived from
-        /// `ClaimSequences`, which PROMPT-005 `Claimed` does write — so a repair
+        /// `ClaimSequences`, which PROMPT-005 `Claimed` does write - so a repair
         /// claimed before a crash is still spent after it.
         member this.RepairAlreadyClaimed
             (profile: PromptAuthority.AuthorityExecutionProfile)
