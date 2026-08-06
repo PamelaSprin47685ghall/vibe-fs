@@ -6,12 +6,11 @@ open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
-// OrchestratorProjection lives in Journal (active ManagerJob lookup).
 
-/// Production interpreter for SessionRecoveryProgram (FLOW-003).
+/// Direct-CE family recovery (FLOW-001 / P0-2).
 /// GREEN-4: all ports are mandatory capabilities. Missing work is a query result
 /// (NoLinkedHandles / NoRelatedJobs), never a missing port.
-module SessionRecoveryInterpreter =
+module SessionRecoveryWorkflow =
 
     /// Mandatory recovery ports (GREEN-4). Composition root must inject real queries.
     type SessionRecoveryPorts =
@@ -31,6 +30,45 @@ module SessionRecoveryInterpreter =
 
     let private sequenceOf (journal: AgentJournal) =
         JournalRevision.value (AgentJournal.revision journal)
+
+    let private sessionOfNode =
+        function
+        | RecoveryNode.WorkSession id
+        | RecoveryNode.AgentChild(_, id, _)
+        | RecoveryNode.Companion(_, id)
+        | RecoveryNode.Blogger(_, id)
+        | RecoveryNode.ManagerJob(_, id)
+        | RecoveryNode.Reviewer(_, id) -> id
+
+    let private mergeOutcomes (outcomes: SessionRecovery list) : SessionRecovery =
+        match
+            outcomes
+            |> List.tryPick (function
+                | SessionRecovery.Blocked bs -> Some(SessionRecovery.Blocked bs)
+                | _ -> None)
+        with
+        | Some blocked -> blocked
+        | None ->
+            match
+                outcomes
+                |> List.tryPick (function
+                    | SessionRecovery.Waiting ws -> Some(SessionRecovery.Waiting ws)
+                    | _ -> None)
+            with
+            | Some waiting -> waiting
+            | None ->
+                match
+                    outcomes
+                    |> List.tryPick (function
+                        | SessionRecovery.Recovered r -> Some(SessionRecovery.Recovered r)
+                        | _ -> None)
+                with
+                | Some recovered -> recovered
+                | None ->
+                    match outcomes with
+                    | head :: _ -> head
+                    | [] ->
+                        SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
 
     /// Default RecoverBlogger implementation using BloggerCrashRecovery.
     let defaultRecoverBlogger
@@ -128,99 +166,81 @@ module SessionRecoveryInterpreter =
                         return SessionRecovery.Recovered(RecoveryReceipt.create sessionId sequence None keys [])
             }
 
-    /// Interpret a family recovery program to FamilyRecovery.
-    let interpretFamily
-        (ports: SessionRecoveryPorts)
-        (program: SessionRecoveryProgram<FamilyRecovery>)
-        : Task<FamilyRecovery> =
-        let rec go (program: SessionRecoveryProgram<FamilyRecovery>) : Task<FamilyRecovery> =
-            task {
-                match program with
-                | Return value -> return value
-                | Block blocks -> return FamilyRecovery.FamilyBlocked blocks
-                | DiscoverClosure(sessionId, next) ->
-                    let sequence = sequenceOf ports.Journal
+    let private recoverManagerJobOutcome (ports: SessionRecoveryPorts) (jobId: ManagerJobId) : Task<SessionRecovery> =
+        task {
+            let sequence = sequenceOf ports.Journal
+            let orch = (AgentJournal.snapshot ports.Journal).AgentProjections.Orchestrator
 
-                    let closure =
-                        RecoveryClosureProjection.discover
-                            sessionId
-                            (AgentJournal.snapshot ports.Journal).AgentProjections
-                            sequence
+            match OrchestratorProjection.tryFind jobId orch with
+            | None ->
+                return
+                    sessionRecoveryOfJobFamily
+                        (SessionId.create (ManagerJobId.value jobId))
+                        sequence
+                        JobFamilyRecovery.NoRelatedJobs
+            | Some job ->
+                let! family = ports.RecoverJobs job.ManagerSessionId
+                return sessionRecoveryOfJobFamily job.ManagerSessionId sequence family
+        }
 
-                    return! go (next closure)
-                | ReadSessionSnapshot(sessionId, next) ->
-                    match! ports.Snapshot.GetMessages sessionId with
-                    | Ok _ -> return! go (next ())
-                    | Error reason ->
-                        return
-                            FamilyRecovery.FamilyBlocked(
-                                NonEmpty.one (RecoveryBlock.SnapshotUnreadable(sessionId, reason))
-                            )
-                | RecoverPromptClaims(sessionId, next) ->
-                    let! outcome = ports.RecoverPromptClaims sessionId
+    /// Child-first direct CE for one parent family (RECOVERY-FAMILY-001/002).
+    let recoverFamilyDirect (ports: SessionRecoveryPorts) (parentSession: SessionId) : Task<FamilyRecovery> =
+        task {
+            let sequence = sequenceOf ports.Journal
 
-                    return!
-                        go (
-                            next
-                                { SessionId = sessionId
-                                  Outcome = outcome }
-                        )
-                | RecoverBloggerWindow(sessionId, next) ->
-                    let! outcome = ports.RecoverBlogger sessionId
+            let closure =
+                RecoveryClosureProjection.discover
+                    parentSession
+                    (AgentJournal.snapshot ports.Journal).AgentProjections
+                    sequence
 
-                    return!
-                        go (
-                            next
-                                { SessionId = sessionId
-                                  Outcome = outcome }
-                        )
-                | RestoreLinkedHandles(sessionId, next) ->
-                    let sequence = sequenceOf ports.Journal
-                    let! family = ports.RestoreHandles sessionId
-                    let outcome = sessionRecoveryOfHandleFamily sessionId sequence family
+            match validateClosurePure closure with
+            | Error blocks -> return FamilyRecovery.FamilyBlocked blocks
+            | Ok validated ->
+                let ordered = (ValidatedClosure.value validated).Nodes
 
-                    return!
-                        go (
-                            next
-                                { SessionId = sessionId
-                                  Outcome = outcome }
-                        )
-                | RecoverManagerJob(jobId, next) ->
-                    let sequence = sequenceOf ports.Journal
-                    // Job nodes carry ManagerJobId; session-scoped RecoverJobs is used from
-                    // recoverFamily via manager session id on ManagerJob/Reviewer nodes.
-                    // Single-job: look up durable projection through RecoverJobs(managerSession)
-                    // when known; else treat as NoRelatedJobs (determined, may issue permit).
-                    let orch = (AgentJournal.snapshot ports.Journal).AgentProjections.Orchestrator
+                let rec recoverNodes
+                    (nodes: RecoveryNode list)
+                    (acc: Map<SessionId, SessionRecovery>)
+                    : Task<Map<SessionId, SessionRecovery>> =
+                    task {
+                        match nodes with
+                        | [] -> return acc
+                        | node :: rest ->
+                            let sessionId, maybeJob =
+                                match node with
+                                | RecoveryNode.WorkSession id -> id, None
+                                | RecoveryNode.AgentChild(_, id, _) -> id, None
+                                | RecoveryNode.Companion(_, id) -> id, None
+                                | RecoveryNode.Blogger(_, id) -> id, None
+                                | RecoveryNode.ManagerJob(jobId, id) -> id, Some jobId
+                                | RecoveryNode.Reviewer(jobId, id) -> id, Some jobId
 
-                    let! outcome =
-                        match OrchestratorProjection.tryFind jobId orch with
-                        | None ->
-                            Task.FromResult(
-                                sessionRecoveryOfJobFamily
-                                    (SessionId.create (ManagerJobId.value jobId))
-                                    sequence
-                                    JobFamilyRecovery.NoRelatedJobs
-                            )
-                        | Some job ->
-                            task {
-                                let! family = ports.RecoverJobs job.ManagerSessionId
-                                return sessionRecoveryOfJobFamily job.ManagerSessionId sequence family
-                            }
+                            let! claimOutcome = ports.RecoverPromptClaims sessionId
+                            let! bloggerOutcome = ports.RecoverBlogger sessionId
+                            let! handleFamily = ports.RestoreHandles sessionId
+                            let handleOutcome = sessionRecoveryOfHandleFamily sessionId sequence handleFamily
 
-                    return! go (next { JobId = jobId; Outcome = outcome })
-                | ValidateClosure(closure, next) ->
-                    match validateClosurePure closure with
-                    | Error blocks -> return FamilyRecovery.FamilyBlocked blocks
-                    | Ok validated -> return! go (next validated)
-                | AuthorizeResume(recovered, next) ->
-                    match authorizeFamilyResume recovered.Closure.Root recovered.Closure.JournalSequence recovered with
-                    | FamilyRecovery.FamilyReady permit -> return! go (next permit)
-                    | FamilyRecovery.FamilyWaiting waits -> return FamilyRecovery.FamilyWaiting waits
-                    | FamilyRecovery.FamilyBlocked blocks -> return FamilyRecovery.FamilyBlocked blocks
-            }
+                            let! jobParts =
+                                match maybeJob with
+                                | None -> Task.FromResult([])
+                                | Some jobId ->
+                                    task {
+                                        let! jobOutcome = recoverManagerJobOutcome ports jobId
+                                        return [ jobOutcome ]
+                                    }
 
-        go program
+                            let merged =
+                                mergeOutcomes (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
+
+                            return! recoverNodes rest (Map.add sessionId merged acc)
+                    }
+
+                let! results = recoverNodes ordered Map.empty
+                let closed = ValidatedClosure.value validated
+                let recovered = { Closure = closed; Results = results }
+                return authorizeFamilyResume parentSession closed.JournalSequence recovered
+        }
 
     module Coordinator =
         let private gate = obj ()
@@ -236,7 +256,7 @@ module SessionRecoveryInterpreter =
                     let started =
                         task {
                             try
-                                return! interpretFamily ports (recoverFamily root)
+                                return! recoverFamilyDirect ports root
                             finally
                                 lock gate (fun () -> inflight.Remove key |> ignore)
                         }

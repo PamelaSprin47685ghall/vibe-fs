@@ -94,9 +94,9 @@ module SpikePlugin =
                         { Journal = durable
                           Snapshot = snapshot
                           ParkedHost = scope :> IParkedTransformHost
-                          RecoverPromptClaims = SessionRecoveryInterpreter.defaultRecoverPromptClaims durable snapshot
+                          RecoverPromptClaims = SessionRecoveryWorkflow.defaultRecoverPromptClaims durable snapshot
                           RecoverBlogger =
-                            SessionRecoveryInterpreter.defaultRecoverBlogger
+                            SessionRecoveryWorkflow.defaultRecoverBlogger
                                 durable
                                 (scope :> IParkedTransformHost)
                                 snapshot

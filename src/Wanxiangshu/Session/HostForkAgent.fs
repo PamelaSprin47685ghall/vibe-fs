@@ -125,7 +125,7 @@ module HostForkAgent =
             let isFirstPrompt = defaultArg firstPrompt true
 
             task {
-                // GREEN-4: recovery ownership is SessionRecoveryProgram only.
+                // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 let retired = this.IsRetiredHandle agentId
 
                 let existing =
@@ -291,7 +291,7 @@ module HostForkAgent =
 
         member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
             task {
-                // GREEN-4: recovery ownership is SessionRecoveryProgram only.
+                // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 let retired = this.IsRetiredHandle agentId
 
                 let existing =

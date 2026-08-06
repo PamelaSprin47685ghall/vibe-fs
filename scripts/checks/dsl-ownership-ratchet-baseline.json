@@ -13,8 +13,7 @@
   "Application/Reconciliation/ReviewerGuardState.fs": {
     "behaviour-bool": 1
   },
-  "Application/Reconciliation/SessionRecoveryInterpreter.fs": {
-    "business-interpreter": 1,
+  "Application/Reconciliation/SessionRecoveryWorkflow.fs": {
     "behaviour-bool": 1
   },
   "Application/Reconciliation/TurnCompletionProgram.fs": {
@@ -42,9 +41,6 @@
   },
   "Domain/ReviewWitness.fs": {
     "behaviour-bool": 7
-  },
-  "Domain/SessionRecovery.fs": {
-    "second-runtime-protocol": 1
   },
   "Domain/SyntheticToml.fs": {
     "mutable": 2

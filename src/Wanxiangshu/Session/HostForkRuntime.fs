@@ -76,7 +76,7 @@ type HostForkRuntime
                 // must not turn another runtime's exit into this runtime's join.
                 runtime.PublishPtyCompletion item
                 runtime.UnregisterPty id)
-    // GREEN-4: HostForkRuntime does not own recovery. SessionRecoveryProgram
+    // GREEN-4: HostForkRuntime does not own recovery. SessionRecoveryWorkflow
     // RestoreHandles → HostForkRestart.restoreLinkedChildren is the sole path.
 
     member internal _.Runtime = runtime

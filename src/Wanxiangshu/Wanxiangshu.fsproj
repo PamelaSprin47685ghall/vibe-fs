@@ -186,7 +186,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
     <Compile Include="Session/BloggerCoordinator.fs"/>
     <Compile Include="Application/Reconciliation/BloggerCrashRecovery.fs"/>
-    <Compile Include="Application/Reconciliation/SessionRecoveryInterpreter.fs"/>
+    <Compile Include="Application/Reconciliation/SessionRecoveryWorkflow.fs"/>
     <Compile Include="Application/Reconciliation/Join.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>

@@ -178,27 +178,26 @@ Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflo
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
 （「functions, not a Flow AST」+ 直接 `task`/`let!`）。
 
-**冻结债（`scripts/check.mjs --threshold=155`，P0-1 后实测 155 / 111 files）**：
+**冻结债（`scripts/check.mjs --threshold=153`，P0-2 后实测 153 / 111 files）**：
 
 ```text
 mutable                  60   ← 物理并发/累加器可留；业务决策 mutable 删
 behaviour-bool           40   ← 行为选择 bool → Decision DU
 program-counter          32   ← Dirty/Running/commitUnknown/ReactivatedAfterSeal…
 infrastructure-leak      21   ← Session/Application 误 open OpenCode/Process
-business-interpreter      1   ← SessionRecoveryInterpreter（P0-2）
-second-runtime-protocol   1   ← SessionRecoveryProgram（P0-2）
+business-interpreter      0
+second-runtime-protocol   0
 ```
 
-P0-1 **done**：`ChildRecoveryProgram` AST + `ChildRecoveryInterpreter` 已删；
-`ChildRecoveryWorkflow` 直接 CE；`HostForkRestart`/`HostForkRunLifecycle` 已改线；
-`recordCompletion` sole-owner = `ChildRecoveryWorkflow`；threshold 157→155。
+P0-1 **done**：`ChildRecoveryWorkflow`；sole-owner 门禁已迁；157→155。  
+P0-2 **done**：`SessionRecoveryProgram` AST + `SessionRecoveryInterpreter` 已删；
+`SessionRecoveryWorkflow` 直接 CE + Coordinator single-flight；
+`SpikePlugin`/`PluginRuntimeScope` 已改线；threshold 155→153。
 
 仍在盘上的第二控制流所有者（非「已合法保留」）：
 
 | 位置 | 问题 |
 |------|------|
-| `Application/Reconciliation/SessionRecoveryInterpreter.fs` | 内部业务 Interpreter（FLOW-006）；`SpikePlugin`/`PluginRuntimeScope` 生产接线 |
-| `Domain/SessionRecovery.fs` `SessionRecoveryProgram` | 调用序列 AST，不是领域决策 |
 | `Kernel/Flow.fs` / `Kernel/DomainFlow.fs` | 旧 Flow 框架；并行能力应拆出，不因并行保住整框架 |
 | `Session/BloggerRuntimeState.fs` + `BloggerCoordinator.fs` | 运行时状态机 + coordinator 双轨 |
 | `Application/Reconciliation/ReconcileSupervisor.fs` | Dirty/Running/cont 类调度计数器 |
@@ -232,7 +231,7 @@ P0-1 **done**：`ChildRecoveryProgram` AST + `ChildRecoveryInterpreter` 已删�
 | ID | 任务 | 完成判据 |
 |----|------|----------|
 | P0-1 | `ChildRecovery`：Program AST → 纯决策 + 直接 CE workflow | **done** — `ChildRecoveryWorkflow`；sole-owner 门禁已迁；157→155 |
-| P0-2 | `SessionRecovery`：同上 | 删 `SessionRecoveryProgram`；删 `SessionRecoveryInterpreter`；`SpikePlugin`/`PluginRuntimeScope` 改调 CE；`business-interpreter=0`；`second-runtime-protocol=0` |
+| P0-2 | `SessionRecovery`：同上 | **done** — `SessionRecoveryWorkflow`；155→153；business-interpreter=0；second-runtime-protocol=0 |
 | P0-3 | 文档/命名清零 | 仓内业务路径不再写 Program-is-data / unique interpreter / Trace Interpreter / materialize program / executeCommand / ProtocolMismatch（外部 codec/parser 的 Interpreter 可留） |
 
 P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是纯决策」而保留 Step/continuation 节点。
@@ -257,7 +256,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P3-1 | threshold 阶梯 | `155（P0-1 后）→ P0-2 后 → P1 后 → P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
+| P3-1 | threshold 阶梯 | `153（P0 后）→ P1 后 → P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
 | P3-2 | 发布阶梯 | `npm run check` 绿；目标切片 canary 绿；发布前 `check:release` |
 | P3-3 | 文档只描述现行纪律 | AGENTS.md / TASK.md / spec 表述一致：DSL = 直接 CE；无 Wave M* 施工模板；无「Interpreter 为唯一执行者」 |
 

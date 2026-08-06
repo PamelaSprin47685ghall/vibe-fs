@@ -62,8 +62,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Family recovery coordinator ports (PROMPT-011 + C5 + RECOVERY-FAMILY).
     ///
     /// Attached after `createHost`. First business entry point runs
-    /// SessionRecoveryProgram; later callers await the same single-flight task.
-    let mutable familyRecoveryPorts: SessionRecoveryInterpreter.Ports option = None
+    /// SessionRecoveryWorkflow; later callers await the same single-flight task.
+    let mutable familyRecoveryPorts: SessionRecoveryWorkflow.Ports option = None
     let recoveryGateLock = obj ()
 
     /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
@@ -101,7 +101,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             loopSensor <- Some empty
             empty
 
-    member this.AttachFamilyRecoveryPorts(ports: SessionRecoveryInterpreter.Ports) =
+    member this.AttachFamilyRecoveryPorts(ports: SessionRecoveryWorkflow.Ports) =
         lock recoveryGateLock (fun () -> familyRecoveryPorts <- Some ports)
 
     /// RECOVERY-FAMILY: obtain FamilyRecovery for a parent before business work.
@@ -111,7 +111,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             match lock recoveryGateLock (fun () -> familyRecoveryPorts) with
             | None ->
                 return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
-            | Some ports -> return! SessionRecoveryInterpreter.Coordinator.recoverFamily ports root
+            | Some ports -> return! SessionRecoveryWorkflow.Coordinator.recoverFamily ports root
         }
 
     /// Await family recovery before business effects. Returns FamilyRecovery so

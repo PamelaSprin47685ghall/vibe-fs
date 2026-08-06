@@ -171,7 +171,7 @@ for (const file of productionFs) {
       .filter((l) => !/^\s*\/\//.test(l) && !/^\s*\*/.test(l))
       .join('\n')
     if (/\brecoveryTask\b/.test(codeOnly)) {
-      fail('recovery-family', `${forkRuntime}: recoveryTask must not exist (SessionRecoveryProgram owns restore)`)
+      fail('recovery-family', `${forkRuntime}: recoveryTask must not exist (SessionRecoveryWorkflow owns restore)`)
     }
     if (/member[^\n]*AwaitRecovery/.test(codeOnly) || /EnsureChildRestoreStarted/.test(codeOnly)) {
       fail('recovery-family', `${forkRuntime}: AwaitRecovery / EnsureChildRestoreStarted deleted (GREEN-4)`)

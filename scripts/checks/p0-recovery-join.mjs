@@ -123,14 +123,14 @@ export const RULES = [
   {
     // GREEN-4: option RestoreHandles / RecoverJob must not collapse to NoRecoveryRequired.
     id: 'restore-handles-none-no-recovery',
-    fileHint: 'SessionRecoveryInterpreter.fs',
+    fileHint: 'SessionRecoveryWorkflow.fs',
     pattern:
       /RestoreHandles[\s\S]{0,120}None[\s\S]{0,80}NoRecoveryRequired|None\s*->\s*[\s\S]{0,60}NoRecoveryRequired[\s\S]{0,80}RestoreHandles|match ports\.RestoreHandles/,
     label: 'RestoreHandles must be mandatory; missing port must not map to NoRecoveryRequired',
   },
   {
     id: 'recover-job-none-no-recovery',
-    fileHint: 'SessionRecoveryInterpreter.fs',
+    fileHint: 'SessionRecoveryWorkflow.fs',
     pattern:
       /RecoverJob[\s\S]{0,120}None[\s\S]{0,80}NoRecoveryRequired|match ports\.RecoverJob|RecoverJob:\s*\([^)]*\)\s*option/,
     label: 'RecoverJobs must be mandatory; RecoverJob option → NoRecoveryRequired is forbidden',
@@ -151,7 +151,7 @@ export const RULES = [
     id: 'host-fork-runtime-await-recovery-call',
     fileHint: null,
     pattern: /do!\s*this\.AwaitRecovery\s*\(\s*\)/,
-    label: 'production must not call AwaitRecovery (recovery ownership is SessionRecoveryProgram)',
+    label: 'production must not call AwaitRecovery (recovery ownership is SessionRecoveryWorkflow)',
   },
   {
     id: 'join-tool-family-recovery',
@@ -327,14 +327,14 @@ export const RULES = [
   },
   {
     id: 'session-ports-restore-handles-mandatory',
-    fileHint: 'SessionRecoveryInterpreter.fs',
+    fileHint: 'SessionRecoveryWorkflow.fs',
     pattern: /RestoreHandles:\s*SessionId\s*->\s*Task</,
     label: 'SessionRecoveryPorts.RestoreHandles must be mandatory (not option) (EXEC-023)',
     positive: true,
   },
   {
     id: 'session-ports-recover-jobs-mandatory',
-    fileHint: 'SessionRecoveryInterpreter.fs',
+    fileHint: 'SessionRecoveryWorkflow.fs',
     pattern: /RecoverJobs:\s*SessionId\s*->\s*Task</,
     label: 'SessionRecoveryPorts.RecoverJobs must be mandatory (not option) (EXEC-023)',
     positive: true,

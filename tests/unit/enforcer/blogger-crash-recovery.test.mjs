@@ -24,7 +24,7 @@ const scopeSrc = readFileSync(
   'utf8',
 )
 const interpreterSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs'),
+  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
   'utf8',
 )
 const enforcerSrc = readFileSync(

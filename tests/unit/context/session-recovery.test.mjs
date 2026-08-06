@@ -13,8 +13,7 @@ test('RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
   assert.match(src, /module SessionRecovery/)
   assert.match(src, /type FamilyRecoveryPermit\s*=\s*\n\s*private/)
-  assert.match(src, /type SessionRecoveryProgram/)
-  assert.match(src, /recoverFamily/)
+    assert.match(src, /authorizeFamilyResume/)
   assert.match(src, /authorizeFamilyResume/)
   assert.doesNotMatch(src, /fromTask|Flow\.lift/)
 })
@@ -41,7 +40,7 @@ test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
     'utf8',
   )
   const ports = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs'),
+    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
     'utf8',
   )
   assert.match(spike, /AttachFamilyRecoveryPorts/)
