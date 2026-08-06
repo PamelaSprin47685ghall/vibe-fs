@@ -213,16 +213,17 @@ export const unitRunnerCases = [
       // and it was invisible until the red proof was attempted. Which is the argument for
       // 「门禁必须红过一次才算存在」 stated as cheaply as it can be stated.
       //
-      // Distinguishing input: few long FIXED slices, serial only for this fixture.
-      // Total wall > silence; each slice stays under per-test with headroom.
+      // Distinguishing input: few FIXED slices, serial only for this fixture.
+      // Total wall > silence; each slice ≤ 50% of per-test so GHA timer drift
+      // cannot push one slice past the file timeout (0.75× still cancelled on GHA).
       // Suite-wide concurrency remains true (NODE_TEST_CONCURRENCY unset elsewhere).
       const probeSliceMs = Math.min(
-        Math.floor(UNIT_RUNNER_PROBE_PER_TEST_MS * 0.75),
-        1500,
+        Math.floor(UNIT_RUNNER_PROBE_PER_TEST_MS * 0.5),
+        1000,
       );
       const probeSliceCount = Math.max(
-        3,
-        Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.15) / probeSliceMs),
+        4,
+        Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.2) / probeSliceMs),
       );
       const run = await runFixture('slower-than-the-window.fixture.mjs', {
         ...scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS),
