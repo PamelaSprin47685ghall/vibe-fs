@@ -341,7 +341,17 @@ async function runFlow(scenario, doc, ctx) {
     }
     if (step.awaitRestart) {
       assert.ok(ctx.restartPromise, 'awaitRestart without afterExpectation restart');
-      await ctx.restartPromise;
+      // A Host restart is declared slow work: the silence window widens to the
+      // restart ceiling while the boot races turn advances (orch.2-style
+      // recovered-run answers match mid-restart and re-arm the watchdog). The
+      // restart promise itself is the criterion; background traffic still
+      // never renews it, and a boot past the ceiling still fires.
+      scenario.watchdog?.setWindow(WAIT_FACT_WINDOW_MS);
+      try {
+        await ctx.restartPromise;
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
       continue;
     }
     if (step.assertFacts) {

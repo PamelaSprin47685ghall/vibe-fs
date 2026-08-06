@@ -82,12 +82,16 @@ flow = [
   # absent so a resolved-before-crash run is not held to a resume that never fires.
   { wait = "conflict-resume.0", timeoutMs = 30000 },
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
-  { wait = "barrier-reviewer.0" },
-  { wait = "barrier-reviewer.1" },
-  { wait = "barrier-reviewer.2" },
-  { wait = "reviewer-confirm.0" },
+  # Post-restart review chain: each wait measures a Host round trip under
+  # 63-launch accumulation, and the model answers the Continue prompt through
+  # the recovered run — 20000 matches reviewer-restart's post-restart standard
+  # (a chain step past 5s under load is legitimate work, not a hang).
+  { wait = "reviewer.0", timeoutMs = 20000 },
+  { wait = "reviewer.1", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.1", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.2", timeoutMs = 20000 },
+  { wait = "reviewer-confirm.0", timeoutMs = 20000 },
   { wait = "orch-continue.0", timeoutMs = 30000 },
   { waitFact = { name = "Published", eq = 1 }, timeoutMs = 30000 },
   { wait = "orch-continue.1", timeoutMs = 30000 },
