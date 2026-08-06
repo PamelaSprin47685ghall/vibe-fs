@@ -166,7 +166,7 @@
     <Compile Include="Session/HostForkBusyNudge.fs"/>
     <Compile Include="Session/HandleCompletionCodec.fs"/>
     <Compile Include="Session/JoinDrain.fs"/>
-    <Compile Include="Application/Reconciliation/ChildRecoveryInterpreter.fs"/>
+    <Compile Include="Application/Reconciliation/ChildRecoveryWorkflow.fs"/>
     <Compile Include="Session/HostForkRunLifecycle.fs"/>
     <Compile Include="Session/HostForkChildDispatch.fs"/>
     <Compile Include="Session/HostForkAgentOwner.fs"/>

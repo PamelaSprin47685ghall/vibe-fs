@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 
-/// Restart recovery for linked children. Terminal path: ChildRecoveryInterpreter
+/// Restart recovery for linked children. Terminal path: ChildRecoveryWorkflow
 /// → ChildRecoveryResult → recordCompletion → PulseAgentHandle. Fail closed on proof.
 /// Clean-break: legacy abort blobs never publish; retired false terminals migrate once.
 /// GREEN-4: returns HandleFamilyRecovery (query result), never option/missing-port.
@@ -27,7 +27,7 @@ module HostForkRestart =
         (childSessionId: SessionId)
         (role: AgentRole)
         (agent: string)
-        : ChildRecoveryInterpreter.Ports =
+        : ChildRecoveryWorkflow.Ports =
         { Journal = journal
           ParentId = parentId
           Snapshot = snapshot
@@ -59,7 +59,7 @@ module HostForkRestart =
 
             let p = ports runtime snapshot journal parentId agentId childSessionId role agent
 
-            match! ChildRecoveryInterpreter.resolveAndCommit p with
+            match! ChildRecoveryWorkflow.resolveAndCommit p with
             | Ok result ->
                 match result with
                 | ChildRecoveryResult.RecoveredTerminal _
@@ -308,7 +308,7 @@ module HostForkRestart =
         }
 
     /// Restore without a live ForkRuntime (journal-only parent, no in-process mailbox).
-    /// Still walks durable handles and ChildRecoveryInterpreter for Active/incomplete cells.
+    /// Still walks durable handles and ChildRecoveryWorkflow for Active/incomplete cells.
     let restoreLinkedChildrenWithoutRuntime
         (snapshot: ISessionSnapshotPort)
         (journal: AgentJournal)

@@ -402,7 +402,7 @@ test('P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_structure_stays_gree
   // EXEC-021/024: only fromDecoded + PulseAgentHandle; no tryFromDurableCompleted / PublishCompletion.
   const source = [
     'module HostForkRestart',
-    'match! ChildRecoveryInterpreter.resolveAndCommit ports with',
+    'match! ChildRecoveryWorkflow.resolveAndCommit ports with',
     '| Ok (Joinable proof) -> ()',
     'match HandleCompletionCodec.decodeBody body with',
     '| Current decoded ->',
@@ -421,7 +421,7 @@ test('P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_structure_stays_gree
 
 test('P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
   const owner = [
-    'module ChildRecoveryInterpreter',
+    'module ChildRecoveryWorkflow',
     'let commitJoinable journal parentId proof =',
     '    HandleController.recordCompletion journal parentId proof',
   ].join('\n')
@@ -430,7 +430,7 @@ test('P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_green', () => {
     'let recordCompletion journal parentId completion =',
     '    Ok ()',
   ].join('\n')
-  assert.equal(scanText(owner, 'ChildRecoveryInterpreter.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
+  assert.equal(scanText(owner, 'ChildRecoveryWorkflow.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
   assert.equal(scanText(def, 'HandleController.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
 })
 
@@ -508,7 +508,7 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
     'src/Wanxiangshu/Application/Reconciliation/Join.fs',
     'src/Wanxiangshu/Domain/SessionRecovery.fs',
     'src/Wanxiangshu/Kernel/Fact.fs',
-    'src/Wanxiangshu/Application/Reconciliation/ChildRecoveryInterpreter.fs',
+    'src/Wanxiangshu/Application/Reconciliation/ChildRecoveryWorkflow.fs',
     'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryInterpreter.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs',

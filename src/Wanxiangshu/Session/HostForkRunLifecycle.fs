@@ -98,7 +98,7 @@ module HostForkRunLifecycle =
 
                 // EXEC-009: durable blob + HandleCompleted is the agent fact source (GREEN-5).
                 // Join re-reads Journal; mailbox is wake-only for agents.
-                // P0 §十: sole production owner of recordCompletion is ChildRecoveryInterpreter.
+                // P0 §十: sole production owner of recordCompletion is ChildRecoveryWorkflow.
                 let runId = "run-" + run.AgentId
                 let childId = run.ChildId
 
@@ -106,7 +106,7 @@ module HostForkRunLifecycle =
                     match journal with
                     | None -> agentOutcome
                     | Some _ ->
-                        match ChildRecoveryInterpreter.commitJoinable journal parentId proof with
+                        match ChildRecoveryWorkflow.commitJoinable journal parentId proof with
                         | Ok() -> agentOutcome
                         | Error error ->
                             AgentCompletion.failed

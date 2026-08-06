@@ -242,7 +242,7 @@ export const RULES = [
     fileHint: 'HostForkRestart.fs',
     // Restart recovery must walk interpreter / JoinableCompletion path.
     pattern:
-      /ChildRecoveryInterpreter|tryFromProvenTerminal|JoinableCompletion|recordCompletion|HandleCompletionCodec\.(tryRead|tryReadBody|decodeBody)|fromDecoded|LegacyFalseAbort/,
+      /ChildRecoveryWorkflow|tryFromProvenTerminal|JoinableCompletion|recordCompletion|HandleCompletionCodec\.(tryRead|tryReadBody|decodeBody)|fromDecoded|LegacyFalseAbort/,
     label: 'HostForkRestart must use proven terminal or durable completion structure',
     positive: true,
   },
@@ -259,13 +259,13 @@ export const RULES = [
     label: 'ParentCancelled must not mint makeAborted completion cell',
   },
   {
-    // P0 §十: production recordCompletion call sites must be definition or ChildRecoveryInterpreter.
+    // P0 §十: production recordCompletion call sites must be definition or ChildRecoveryWorkflow.
     // Scanned across all src/Wanxiangshu/**/*.fs (no fileHint). Comments stripped before match.
     id: 'record-completion-single-owner',
     fileHint: null,
     pattern: /\brecordCompletion\b/,
     label:
-      'HandleController.recordCompletion production caller must be only ChildRecoveryInterpreter (or definition)',
+      'HandleController.recordCompletion production caller must be only ChildRecoveryWorkflow (or definition)',
   },
   // —— EXEC-020..024 positive: required shapes must remain ——
   {
@@ -394,7 +394,7 @@ const stripComments = (line) => line.replace(/\/\/.*/g, '')
 /** Basename allowlist for record-completion-single-owner (definition + sole commit owner). */
 const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
   'HandleController.fs',
-  'ChildRecoveryInterpreter.fs',
+  'ChildRecoveryWorkflow.fs',
 ])
 
 /**
@@ -445,7 +445,7 @@ export const scanText = (text, file = '<synthetic>') => {
     let found = false
     for (let i = 0; i < codeLines.length; i++) {
       if (rule.pattern.test(codeLines[i])) {
-        // Sole-owner rule: definition + ChildRecoveryInterpreter may call; others red.
+        // Sole-owner rule: definition + ChildRecoveryWorkflow may call; others red.
         if (
           rule.id === 'record-completion-single-owner' &&
           RECORD_COMPLETION_OWNER_BASENAMES.has(base)
