@@ -152,14 +152,17 @@ module PromptDispatcher =
             let projection = this.ProjectionFor sessionId
 
             match Map.tryFind key projection.PendingClaims with
-            | Some claim when
-                claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                   PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                ->
-                match claim.EffectiveAgent with
-                | None -> Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
-                | Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId agent
-            | Some _ -> Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key))
+            | Some claim ->
+                let isAgentOwnerRoot =
+                    claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
+                                       PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+
+                if not isAgentOwnerRoot then
+                    Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key))
+                else
+                    match claim.EffectiveAgent with
+                    | None -> Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
+                    | Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId agent
             | None ->
                 // Re-delivery of a message whose claim already resolved. Idempotent
                 // only when the run it created is still the active one; otherwise
