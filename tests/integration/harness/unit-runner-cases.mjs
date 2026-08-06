@@ -222,6 +222,8 @@ export const unitRunnerCases = [
         ...scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS),
         UNIT_RUNNER_PROBE_SLICE_MS: String(probeSliceMs),
         UNIT_RUNNER_PROBE_SLICE_COUNT: String(probeSliceCount),
+        // Serial: concurrent slices finish in ~one slice and never outlast silence.
+        NODE_TEST_CONCURRENCY: '1',
       });
 
       assertEq(run.code, 0, `legitimate slow work must complete: ${run.stderr.slice(-400)}`);
