@@ -49,6 +49,15 @@ module EnforcerHost =
         | KnownNotCommitted of reason: string
         | CommitUnknown of reason: string
 
+    /// Local outcome of one continuation cycle body (no program-counter bools).
+    [<RequireQualifiedAccess>]
+    type CycleDisposition =
+        | Working
+        | Committed of afterSquashMain: BloggerRequestContext option
+        | InjectRepair of BloggerRequestContext
+        | CommitUnknown
+        | AbandonThenCatchUp
+
     /// Continuation transform result. Empty message lists are forbidden: Host
     /// forwards them as provider `messages` and rejects with 400.
     /// StopPhysicalRun asks the plugin to AbortSession after projecting messages.
@@ -1427,16 +1436,11 @@ module EnforcerHost =
 
                             return project rawMessages
                 else
-                    let mutable committed = false
-                    let mutable afterSquashMain: BloggerRequestContext option = None
-                    let mutable commitUnknown = false
-                    let mutable injectRepair = false
-                    let mutable repairCtx: BloggerRequestContext option = None
                     // PERSIST-010 precheck / concurrent coverage advance: abandon stale
                     // staged cycle then rebuild from live journal coverage. Must NOT
                     // resumeWithContext(liveCtx) — that freezes PreviousIngestedThrough
                     // at the pre-crash cursor and loops KnownNotCommitted forever.
-                    let mutable abandonThenCatchUp = false
+                    let mutable disposition = CycleDisposition.Working
 
                     let fatalEnd (reason: string) =
                         Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", key; "result", reason ]
@@ -1464,7 +1468,7 @@ module EnforcerHost =
                         | Error _ -> ()
 
                         scope.ClearCurrentRequest key
-                        abandonThenCatchUp <- true
+                        disposition <- CycleDisposition.AbandonThenCatchUp
 
                     match validateCycle messageId calls with
                     | Error reason when
@@ -1475,8 +1479,6 @@ module EnforcerHost =
                         && not (hasIncompleteBlogTool rawMessages)
                         ->
                         // ENFORCER-061: empty text keeps one AABB repair budget (not pure-prose nudge).
-                        injectRepair <- true
-
                         let fresh =
                             tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
                             |> Option.orElse liveCtx
@@ -1484,7 +1486,7 @@ module EnforcerHost =
                         match fresh with
                         | None -> unexpectedEnd (reason + "; aabb-refresh-empty")
                         | Some freshCtx ->
-                            repairCtx <- Some freshCtx
+                            disposition <- CycleDisposition.InjectRepair freshCtx
                             let cell = scope.GetBloggerRuntime key
                             scope.SetBloggerRuntime(key, BloggerRuntime.markAabbRepairConsumed cell)
                             scope.SetCurrentRequest(key, freshCtx)
@@ -1519,8 +1521,7 @@ module EnforcerHost =
                                 commitSquash durable mainSessionId bloggerSessionId providerRun squash merged.MergedText
                             with
                             | CycleCommitOutcome.KnownCommitted ->
-                                committed <- true
-                                afterSquashMain <- None
+                                disposition <- CycleDisposition.Committed None
 
                                 match BloggerRuntime.onSquashCommitted (scope.GetBloggerRuntime key) None with
                                 | Ok(cell, _) -> scope.SetBloggerRuntime(key, cell)
@@ -1529,7 +1530,7 @@ module EnforcerHost =
                                 scope.ClearCurrentRequest key
                             | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
                             | CycleCommitOutcome.CommitUnknown reason ->
-                                commitUnknown <- true
+                                disposition <- CycleDisposition.CommitUnknown
 
                                 Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
                         | Some(BloggerRequestContext.Main main) ->
@@ -1562,7 +1563,7 @@ module EnforcerHost =
                                         (Some main)
                                 with
                                 | CycleCommitOutcome.KnownCommitted ->
-                                    committed <- true
+                                    disposition <- CycleDisposition.Committed None
 
                                     match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
                                     | Ok cell ->
@@ -1582,92 +1583,116 @@ module EnforcerHost =
                                     scope.ClearCurrentRequest key
                                 | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
                                 | CycleCommitOutcome.CommitUnknown reason ->
-                                    commitUnknown <- true
+                                    disposition <- CycleDisposition.CommitUnknown
 
                                     Diagnostic.fatal
                                         "enforcer-cycle-commit-unknown"
                                         [ "session_id", key; "result", reason ]
                         | None -> unexpectedEnd "missing CurrentRequest"
 
-                    if injectRepair then
-                        match repairCtx with
-                        | Some ctx ->
-                            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-                            return project (withRepairInstruction (resumeWithContext ctx) requestKey)
-                        | None -> return project rawMessages
-                    elif commitUnknown then
-                        return project rawMessages
-                    elif abandonThenCatchUp then
+                    match disposition with
+                    | CycleDisposition.InjectRepair ctx ->
+                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+                        return project (withRepairInstruction (resumeWithContext ctx) requestKey)
+                    | CycleDisposition.CommitUnknown -> return project rawMessages
+                    | CycleDisposition.AbandonThenCatchUp ->
                         // Stale staged coverage abandoned: rebuild next window from live
                         // IngestedThroughSequence. resumeCatchUp sets CurrentRequest +
                         // InFlight when material remains; None = true catch-up stop.
                         return resumeCatchUp rawMessages "stale-cycle-catch-up-complete"
-                    elif not committed then
+                    | CycleDisposition.Working ->
                         match liveCtx with
                         | Some ctx -> return project (resumeWithContext ctx)
                         | None -> return project rawMessages
-                    else if mainBlocks () then
-                        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
-                        scope.TryTakePendingOffer key |> ignore
-                        scope.CancelParked key
-                        return stop "main-sealed-after-commit"
-                    else
-                        // Drain contract: after commit, immediately take next ≤200 KiB window
-                        // from durable coverage until catch-up. PendingOffer is a wake signal
-                        // only — never prefer stale frozen context over re-chunk.
-                        scope.TryTakePendingOffer key |> ignore
+                    | CycleDisposition.Committed afterSquashMain ->
+                        if mainBlocks () then
+                            scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
+                            scope.TryTakePendingOffer key |> ignore
+                            scope.CancelParked key
+                            return stop "main-sealed-after-commit"
+                        else
+                            // Drain contract: after commit, immediately take next ≤200 KiB window
+                            // from durable coverage until catch-up. PendingOffer is a wake signal
+                            // only — never prefer stale frozen context over re-chunk.
+                            scope.TryTakePendingOffer key |> ignore
 
-                        match
-                            tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId,
-                            afterSquashMain
-                        with
-                        | Some ctx, _
-                        | None, Some ctx ->
-                            let ctx =
-                                tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
-                                |> Option.defaultValue ctx
+                            match
+                                tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId,
+                                afterSquashMain
+                            with
+                            | Some ctx, _
+                            | None, Some ctx ->
+                                let ctx =
+                                    tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
+                                    |> Option.defaultValue ctx
 
-                            match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
-                            | Ok cell ->
-                                scope.SetBloggerRuntime(key, cell)
-                                scope.SetCurrentRequest(key, ctx)
-                            | Error _ -> ()
+                                match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
+                                | Ok cell ->
+                                    scope.SetBloggerRuntime(key, cell)
+                                    scope.SetCurrentRequest(key, ctx)
+                                | Error _ -> ()
 
-                            return project (resumeWithContext ctx)
-                        | None, None ->
-                            // Caught up now. Durable seal closes DrainWindow permanently.
-                            let cell = scope.GetBloggerRuntime key
+                                return project (resumeWithContext ctx)
+                            | None, None ->
+                                // Caught up now. Durable seal closes DrainWindow permanently.
+                                let cell = scope.GetBloggerRuntime key
 
-                            if
-                                AgentProjection.mainSealedForBlogger
-                                    mainSessionId
-                                    (AgentJournal.snapshot durable).AgentProjections
-                            then
-                                scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
-                                scope.ClearCurrentRequest key
-                                return stop "main-sealed-caught-up"
-                            else
-                                match cell.State with
-                                | BloggerRuntimeState.InFlight _ ->
-                                    match BloggerRuntime.onCycleCommitted cell with
-                                    | Ok parked -> scope.SetBloggerRuntime(key, parked)
-                                    | Error _ -> ()
-                                | _ -> ()
+                                if
+                                    AgentProjection.mainSealedForBlogger
+                                        mainSessionId
+                                        (AgentJournal.snapshot durable).AgentProjections
+                                then
+                                    scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
+                                    scope.ClearCurrentRequest key
+                                    return stop "main-sealed-caught-up"
+                                else
+                                    match cell.State with
+                                    | BloggerRuntimeState.InFlight _ ->
+                                        match BloggerRuntime.onCycleCommitted cell with
+                                        | Ok parked -> scope.SetBloggerRuntime(key, parked)
+                                        | Error _ -> ()
+                                    | _ -> ()
 
-                                let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
+                                    let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
 
-                                if not resumed then
-                                    if mainBlocks () then
-                                        scope.SetBloggerRuntime(
-                                            key,
-                                            BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
-                                        )
+                                    if not resumed then
+                                        if mainBlocks () then
+                                            scope.SetBloggerRuntime(
+                                                key,
+                                                BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
+                                            )
 
-                                        scope.ClearCurrentRequest key
-                                        scope.TryTakePendingOffer key |> ignore
-                                        return stop "park-ended-main-sealed"
+                                            scope.ClearCurrentRequest key
+                                            scope.TryTakePendingOffer key |> ignore
+                                            return stop "park-ended-main-sealed"
+                                        else
+                                            // Re-check gap: InFlight wake may have arrived after last refresh.
+                                            match
+                                                tryRefreshMainContextFromJournal
+                                                    scope
+                                                    durable
+                                                    mainSessionId
+                                                    bloggerSessionId
+                                            with
+                                            | Some ctx ->
+                                                match
+                                                    BloggerRuntime.adoptPendingAsCurrent
+                                                        (scope.GetBloggerRuntime key)
+                                                        ctx
+                                                with
+                                                | Ok next ->
+                                                    scope.SetBloggerRuntime(key, next)
+                                                    scope.SetCurrentRequest(key, ctx)
+                                                | Error _ -> ()
+
+                                                return project (resumeWithContext ctx)
+                                            | None ->
+                                                // True catch-up after park lifetime: quiet stop (not fatal).
+                                                // Never return [] — Host would blank messages → provider 400.
+                                                return stop "park-ended-catch-up-complete"
                                     else
-                                        // Re-check gap: InFlight wake may have arrived after last refresh.
+                                        scope.TryTakePendingOffer key |> ignore
+
                                         match
                                             tryRefreshMainContextFromJournal
                                                 scope
@@ -1676,44 +1701,26 @@ module EnforcerHost =
                                                 bloggerSessionId
                                         with
                                         | Some ctx ->
-                                            match
-                                                BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx
-                                            with
-                                            | Ok next ->
-                                                scope.SetBloggerRuntime(key, next)
-                                                scope.SetCurrentRequest(key, ctx)
-                                            | Error _ -> ()
+                                            if mainBlocks () then
+                                                scope.SetBloggerRuntime(
+                                                    key,
+                                                    BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
+                                                )
 
-                                            return project (resumeWithContext ctx)
-                                        | None ->
-                                            // True catch-up after park lifetime: quiet stop (not fatal).
-                                            // Never return [] — Host would blank messages → provider 400.
-                                            return stop "park-ended-catch-up-complete"
-                                else
-                                    scope.TryTakePendingOffer key |> ignore
+                                                return stop "park-resumed-main-sealed"
+                                            else
+                                                match
+                                                    BloggerRuntime.adoptPendingAsCurrent
+                                                        (scope.GetBloggerRuntime key)
+                                                        ctx
+                                                with
+                                                | Ok next ->
+                                                    scope.SetBloggerRuntime(key, next)
+                                                    scope.SetCurrentRequest(key, ctx)
+                                                | Error _ -> ()
 
-                                    match
-                                        tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
-                                    with
-                                    | Some ctx ->
-                                        if mainBlocks () then
-                                            scope.SetBloggerRuntime(
-                                                key,
-                                                BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
-                                            )
-
-                                            return stop "park-resumed-main-sealed"
-                                        else
-                                            match
-                                                BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx
-                                            with
-                                            | Ok next ->
-                                                scope.SetBloggerRuntime(key, next)
-                                                scope.SetCurrentRequest(key, ctx)
-                                            | Error _ -> ()
-
-                                            return project (resumeWithContext ctx)
-                                    | None -> return project rawMessages
+                                                return project (resumeWithContext ctx)
+                                        | None -> return project rawMessages
             | _ ->
                 // COMPANION-005 first request / non-tool step: rebuild only from
                 // durable frames + typed CurrentRequest. Never extract TOML from

@@ -86,8 +86,7 @@
   },
   "Session/EnforcerHost.fs": {
     "infrastructure-leak": 1,
-    "mutable": 7,
-    "program-counter": 10
+    "mutable": 2
   },
   "Session/ForkRuntime.fs": {
     "infrastructure-leak": 1,
