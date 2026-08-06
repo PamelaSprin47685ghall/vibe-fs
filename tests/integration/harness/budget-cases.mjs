@@ -25,6 +25,9 @@ export const budgetCases = [
         PER_TEST_TIMEOUT_MS: 2500,
         SUITE_BACKSTOP_MS: 300000,
         UNIT_VERDICT_SILENCE_MS: 5000,
+        UNIT_RUNNER_PROBE_PER_TEST_MS: 1000,
+        UNIT_RUNNER_PROBE_SILENCE_MS: 1500,
+        UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS: 1000,
         DEFAULT_AWAIT_TIMEOUT_MS: 1000,
         DEFAULT_NEVER_TIMEOUT_MS: 5000,
         GATE_PROBE_TIMEOUT_MS: 3000,
@@ -80,6 +83,8 @@ export const budgetCases = [
       );
       assertTrue(
         budget.UNIT_VERDICT_SILENCE_MS === budget.WATCHDOG_TIMEOUT_MS,
+        budget.UNIT_RUNNER_PROBE_SILENCE_MS > budget.UNIT_RUNNER_PROBE_PER_TEST_MS,
+        budget.UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS <= budget.UNIT_RUNNER_PROBE_SILENCE_MS,
         'every suite dog starves on the same 3s window as e2e canary',
       );
       assertTrue(

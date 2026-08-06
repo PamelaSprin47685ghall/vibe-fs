@@ -170,6 +170,18 @@ export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
  */
 export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 5000);
 
+/**
+ * Fixed probe lattice for `tests/integration/harness/unit-runner-cases.mjs`.
+ * Independent of production PER_TEST/UNIT_VERDICT so raising production CI headroom
+ * does not collapse fixture headroom (VERIFY-004 inequalities still hold).
+ */
+export const UNIT_RUNNER_PROBE_PER_TEST_MS = budgetFromEnv('UNIT_RUNNER_PROBE_PER_TEST_MS', 1000);
+export const UNIT_RUNNER_PROBE_SILENCE_MS = budgetFromEnv('UNIT_RUNNER_PROBE_SILENCE_MS', 1500);
+export const UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS = budgetFromEnv(
+  'UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS',
+  1000,
+);
+
 // ── waiting for one semantic event ──────────────────────────────────────────
 
 /**
