@@ -203,35 +203,11 @@ module BloggerCoordinator =
                 (Some ctx)
                 reason
 
-    let private durableSealed (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
-        match journal with
-        | None -> false
-        | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
-
-    /// Blocks new Y Start/Offer unless handle unsealed or DrainWindow.Open.
-    let private blocksNew
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (scope: IParkedTransformHost)
-        (key: string)
-        : bool =
-        let cell = scope.GetBloggerRuntime key
-        BloggerRuntime.blocksNewRequest (durableSealed journal mainSessionId) cell
-
-    let private forceSealRuntime (scope: IParkedTransformHost) (key: string) : unit =
-        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
-        scope.ClearCurrentRequest key
-        scope.TryTakePendingOffer key |> ignore
-        scope.CancelParked key
+    let private blocksNew = BloggerRuntimeHost.blocksNew
+    let private forceSealRuntime = BloggerRuntimeHost.forceSealRuntime
 
     /// New Authority Root on main after join/return: allow Blogger again.
-    let reactivateAfterNewRoot (scope: IParkedTransformHost) (bloggerSessionId: SessionId) : unit =
-        let key = SessionId.value bloggerSessionId
-        let cell = scope.GetBloggerRuntime key
-
-        match cell.State with
-        | BloggerRuntimeState.Disposed -> ()
-        | _ -> scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell)
+    let reactivateAfterNewRoot = BloggerRuntimeHost.reactivateAfterNewRoot
 
     let private startFrozen
         (scope: IParkedTransformHost)

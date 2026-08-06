@@ -200,7 +200,7 @@ e2e 修复：`gitConflictProof` 挂 `manager.0`（worktree 已存在）；Proces
 
 | 位置 | 问题 |
 |------|------|
-| `Session/BloggerCoordinator.fs` | 与 Runtime cell 分工待继续收敛（P1-1 余下） |
+| `Session/BloggerCoordinator.fs` | 主会话 material 入口；seal/blocks 侧效经 `BloggerRuntimeHost`（P1-1b） |
 | Host 边界 open 白名单 | 新增边界文件须登记 basename；长期可 port 上移再缩白名单 |
 
 ### PENDING TASK：DSL 全面主导化
@@ -240,7 +240,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P1-1 | Blogger：`BloggerRuntimeState` + `BloggerCoordinator` 收敛 | **partial** — P1-1a `DrainWindow` done（153→139）；余下：Coordinator/Enforcer 旗标 Decision 化 |
+| P1-1 | Blogger：`BloggerRuntimeState` + `BloggerCoordinator` 收敛 | **done** — P1-1a DrainWindow；P1-1b `BloggerRuntimeHost` 统一 seal/blocks 侧效（Coordinator+Enforcer 共用） |
 | P1-2 | Reconcile 调度与 pass 分离已落地后，清 `ReconcileSupervisor` 程序计数器 | **done** — 现为 `Reconciler.Scheduler` 薄 facade，无 Dirty/Running |
 | P1-3 | `EnforcerHost`：`commitUnknown`/`injectRepair`/`abandonThenCatchUp` 等 → 穷尽 Decision | **done** — `CycleDisposition`；139→124 |
 

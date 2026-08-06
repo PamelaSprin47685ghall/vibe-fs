@@ -1059,12 +1059,8 @@ module EnforcerHost =
         (bloggerSessionId: SessionId)
         : BloggerRequestContext option =
         let key = SessionId.value bloggerSessionId
-        let cell = scope.GetBloggerRuntime key
 
-        let durableSealed =
-            AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot journal).AgentProjections
-
-        if BloggerRuntime.blocksNewRequest durableSealed cell then
+        if BloggerRuntimeHost.blocksNew (Some journal) mainSessionId scope key then
             None
         else
             let session =
@@ -1182,9 +1178,7 @@ module EnforcerHost =
                         AgentProjection.mainSealedForBlogger owner (AgentJournal.snapshot durable).AgentProjections
                         && not (BloggerRuntime.isDrainOpen cell)
                     then
-                        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
-                        scope.ClearCurrentRequest key
-                        scope.TryTakePendingOffer key |> ignore
+                        BloggerRuntimeHost.forceSealRuntime scope key
                         project rawMessages
                     else
                         scope.SetBloggerRuntime(key, BloggerRuntime.markAabbRepairConsumed cell)
@@ -1359,23 +1353,14 @@ module EnforcerHost =
                     |> Option.defaultValue rawMessages
 
                 let mainBlocks () =
-                    let cell = scope.GetBloggerRuntime key
-
-                    let durableSealed =
-                        AgentProjection.mainSealedForBlogger
-                            mainSessionId
-                            (AgentJournal.snapshot durable).AgentProjections
-
-                    BloggerRuntime.blocksNewRequest durableSealed cell
+                    BloggerRuntimeHost.blocksNew (Some durable) mainSessionId scope key
 
                 /// Catch-up drain: one ≤200 KiB window from durable coverage; None = caught up.
                 /// Stale PendingOffer is discarded — context must recompute from coverage (COMPANION-008).
                 /// Caught-up / sealed → StopPhysicalRun so Host does not loop on tool calls.
                 let resumeCatchUp (fallback: obj list) (caughtUpReason: string) : ContinuationOutcome =
                     if mainBlocks () then
-                        scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
-                        scope.TryTakePendingOffer key |> ignore
-                        scope.CancelParked key
+                        BloggerRuntimeHost.forceSealRuntime scope key
                         stopPhysicalRun rawMessages fallback "main-sealed-blocks-request"
                     else
                         scope.TryTakePendingOffer key |> ignore
@@ -1398,7 +1383,7 @@ module EnforcerHost =
                                     mainSessionId
                                     (AgentJournal.snapshot durable).AgentProjections
                             then
-                                scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
+                                BloggerRuntimeHost.forceSealCellDropOffer scope key
                             else
                                 match cell.State with
                                 | BloggerRuntimeState.InFlight _ ->
@@ -1571,8 +1556,7 @@ module EnforcerHost =
                                                 (AgentJournal.snapshot durable).AgentProjections
                                             && not (BloggerRuntime.isDrainOpen cell)
                                         then
-                                            scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
-                                            scope.TryTakePendingOffer key |> ignore
+                                            BloggerRuntimeHost.forceSealCellDropOffer scope key
                                         else
                                             scope.SetBloggerRuntime(key, cell)
                                     | Error _ -> ()
@@ -1603,9 +1587,7 @@ module EnforcerHost =
                         | None -> return project rawMessages
                     | CycleDisposition.Committed afterSquashMain ->
                         if mainBlocks () then
-                            scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal (scope.GetBloggerRuntime key))
-                            scope.TryTakePendingOffer key |> ignore
-                            scope.CancelParked key
+                            BloggerRuntimeHost.forceSealRuntime scope key
                             return stop "main-sealed-after-commit"
                         else
                             // Drain contract: after commit, immediately take next ≤200 KiB window
@@ -1639,7 +1621,7 @@ module EnforcerHost =
                                         mainSessionId
                                         (AgentJournal.snapshot durable).AgentProjections
                                 then
-                                    scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
+                                    BloggerRuntimeHost.forceSealCellDropOffer scope key
                                     scope.ClearCurrentRequest key
                                     return stop "main-sealed-caught-up"
                                 else
@@ -1654,13 +1636,7 @@ module EnforcerHost =
 
                                     if not resumed then
                                         if mainBlocks () then
-                                            scope.SetBloggerRuntime(
-                                                key,
-                                                BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
-                                            )
-
-                                            scope.ClearCurrentRequest key
-                                            scope.TryTakePendingOffer key |> ignore
+                                            BloggerRuntimeHost.forceSealRuntime scope key
                                             return stop "park-ended-main-sealed"
                                         else
                                             // Re-check gap: InFlight wake may have arrived after last refresh.
@@ -1699,11 +1675,7 @@ module EnforcerHost =
                                         with
                                         | Some ctx ->
                                             if mainBlocks () then
-                                                scope.SetBloggerRuntime(
-                                                    key,
-                                                    BloggerRuntime.forceSeal (scope.GetBloggerRuntime key)
-                                                )
-
+                                                BloggerRuntimeHost.forceSealRuntime scope key
                                                 return stop "park-resumed-main-sealed"
                                             else
                                                 match
