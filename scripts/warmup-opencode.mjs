@@ -1,0 +1,63 @@
+#!/usr/bin/env node
+/**
+ * Warm the local opencode binary once.
+ *
+ * First launch on a machine (or fresh CI runner) pays package resolution /
+ * native binary extract / OS page-cache costs. Later ProcessHost.serve starts
+ * then compete with per-test timeouts. Call this before npm run check / e2e.
+ *
+ * Exit 0 on success; non-zero if the binary is missing or version fails.
+ */
+
+import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+function resolveBin() {
+  if (process.env.OPENCODE_BIN) return process.env.OPENCODE_BIN
+  const local = path.join(root, 'node_modules', '.bin', 'opencode')
+  if (fs.existsSync(local)) return local
+  return 'opencode'
+}
+
+const bin = resolveBin()
+const started = Date.now()
+console.error(`[warmup-opencode] bin=${bin}`)
+
+const version = spawnSync(bin, ['--version'], {
+  cwd: root,
+  encoding: 'utf8',
+  env: process.env,
+  timeout: 120_000,
+})
+
+if (version.error || version.status !== 0) {
+  console.error(
+    `[warmup-opencode] --version failed status=${version.status} ` +
+      `error=${version.error?.message || ''} stderr=${(version.stderr || '').slice(0, 500)}`,
+  )
+  process.exit(version.status === null ? 1 : version.status)
+}
+
+const ver = String(version.stdout || version.stderr || '').trim().split('\n')[0] || '(unknown)'
+console.error(`[warmup-opencode] version=${ver} in ${Date.now() - started}ms`)
+
+// Second cheap invocation forces any remaining lazy init after --version.
+const help = spawnSync(bin, ['--help'], {
+  cwd: root,
+  encoding: 'utf8',
+  env: process.env,
+  timeout: 60_000,
+})
+if (help.error || (help.status !== 0 && help.status !== null)) {
+  // Some builds exit non-zero on --help; ignore if stdout/stderr non-empty.
+  if (!help.stdout && !help.stderr) {
+    console.error(`[warmup-opencode] --help failed: ${help.error?.message || help.status}`)
+    process.exit(1)
+  }
+}
+
+console.error(`[warmup-opencode] ready in ${Date.now() - started}ms total`)

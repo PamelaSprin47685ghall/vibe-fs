@@ -19,6 +19,27 @@ import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../..')
 
+// Cold opencode binary on a fresh machine / GHA pays multi-second first-launch cost.
+// Warm once before any step that may spawn Host or load Host-adjacent paths.
+{
+  const warm = spawnSync(process.execPath, [path.join(root, 'scripts/warmup-opencode.mjs')], {
+    cwd: root,
+    stdio: 'inherit',
+    env: process.env,
+  })
+  if (warm.status !== 0) {
+    console.error(`integration: opencode warmup failed (exit ${warm.status ?? 1})`)
+    process.exit(warm.status === null ? 1 : warm.status)
+  }
+}
+
+// Plugin suite imports the full plugin graph; first import after warm can still
+// exceed a tight unit-bound on cold runners. Keep silence renewals on verdicts.
+const INTEGRATION_PER_TEST_TIMEOUT_MS = Math.max(
+  Number(process.env.PER_TEST_TIMEOUT_MS) || 0,
+  15_000,
+)
+
 /** node:test files supervised via the shared verdict-silence helper. */
 const nodeTestSteps = [
   {
@@ -60,8 +81,12 @@ for (const step of nodeTestSteps) {
   await superviseNodeTest({
     files: step.files,
     label: `tests/integration/${step.label}`,
-    silenceMs: WATCHDOG_TIMEOUT_MS,
+    silenceMs: Math.max(WATCHDOG_TIMEOUT_MS, INTEGRATION_PER_TEST_TIMEOUT_MS + 5_000),
     logPrefix: `integration:${step.label}`,
+    env: {
+      ...process.env,
+      PER_TEST_TIMEOUT_MS: String(INTEGRATION_PER_TEST_TIMEOUT_MS),
+    },
   })
 }
 

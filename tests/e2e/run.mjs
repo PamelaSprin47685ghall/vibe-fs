@@ -8,8 +8,9 @@
  * Repeat: `node tests/e2e/run.mjs --repeat 3` (default 1, legal 1–3).
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { terminateTree } from "./support/process-lifecycle.js";
 import { recordSpawn, recordExit, RUN_ID } from "./support/spawn-ledger.js";
 import {
@@ -19,6 +20,8 @@ import {
 } from "./support/time-budget.js";
 import { ReadinessLadder, READINESS_STAGES } from "./support/readiness.js";
 import { CANARY_TESTS, CANARY_SUFFIX, CANARY_MAX_PARALLEL } from "./support/manifest.mjs";
+
+const E2E_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 function parsePositiveInt(value, fallback, name) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -227,6 +230,17 @@ function runScenarioChild(file, onBarkSignal) {
 
 async function main() {
   const repeats = parseRepeat(process.argv.slice(2));
+  // Pay cold-binary cost once before any ProcessHost spawn competes for timeouts.
+  {
+    const warm = spawnSync(process.execPath, [path.join(E2E_ROOT, "scripts/warmup-opencode.mjs")], {
+      cwd: E2E_ROOT,
+      stdio: "inherit",
+      env: process.env,
+    });
+    if (warm.status !== 0) {
+      throw new Error(`e2e: opencode warmup failed (exit ${warm.status ?? 1})`);
+    }
+  }
   console.log(
     "Starting " + CANARY_TESTS.length + " e2e scenarios in dynamic event-staggered bounded-parallel mode (" +
       repeats + " iteration(s), max=" + MAX_PARALLEL + ")...\n",

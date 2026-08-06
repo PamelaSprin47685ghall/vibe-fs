@@ -29,8 +29,9 @@
     "test:integration": "node tests/integration/run.mjs",
     "test:package": "node tests/integration/package/run.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
+    "warmup:opencode": "node scripts/warmup-opencode.mjs",
     "check": "npm run lint && npm run build && npm test && npm run test:integration",
-    "check:release": "npm run check && npm run test:e2e -- --repeat 3 && npm run test:package && npm pack --dry-run",
+    "check:release": "npm run warmup:opencode && npm run check && npm run test:e2e -- --repeat 3 && npm run test:package && npm pack --dry-run",
     "gate:dsl-ownership": "node scripts/checks/dsl-ownership.mjs"
   },
   "peerDependencies": {
