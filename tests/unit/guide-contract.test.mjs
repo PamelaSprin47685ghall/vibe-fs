@@ -67,13 +67,53 @@ test('VERIFY_005_CompanionProgram_publishes_its_flow_entrypoints', async () => {
   assertCallable(mod, 'Session/CompanionProgram', ['buildDelta', 'runCompanionFlow'])
 })
 
-test('VERIFY_005_OrchestratorProgram_publishes_exactly_one_entrypoint', async () => {
-  const mod = await load('Application/Orchestration/Program')
+test('VERIFY_005_OrchestratorInterpreter_is_the_sole_production_entrypoint', async () => {
+  // M2 clean break: Application/Orchestration/Program.fs is deleted. The sole
+  // production module is OrchestratorInterpreter; Runtime calls `run`, which
+  // builds the Domain program and executes it through the `interpret` core.
+  await assert.rejects(
+    () => load('Application/Orchestration/Program'),
+    (error) => {
+      const message = String(error?.message ?? error)
+      return (
+        message.includes('Cannot find module') ||
+        message.includes('ERR_MODULE_NOT_FOUND') ||
+        message.includes('Failed to load') ||
+        message.includes('does not provide') ||
+        error?.code === 'ERR_MODULE_NOT_FOUND'
+      )
+    },
+    'Application/Orchestration/Program must be deleted after M2 cutover',
+  )
 
-  // One public `run`. Everything the publish loop does is private, which is what
-  // keeps ORCH-005's short CAS window from acquiring a second caller.
-  assert.deepEqual(surfaceOf(mod).sort(), ['run'])
-  assertCallable(mod, 'Application/Orchestration/Program', ['run'])
+  const mod = await load('Application/Orchestration/OrchestratorInterpreter')
+
+  // Production surface: `run` is what Runtime calls; `interpret` is the DSL
+  // interpreter core. Publish-loop details stay private so ORCH-005's short CAS
+  // window cannot acquire a second caller.
+  assertCallable(mod, 'Application/Orchestration/OrchestratorInterpreter', ['interpret', 'run'])
+})
+
+test('VERIFY_005_Domain_OrchestratorProgram_publishes_empty_and_trace', async () => {
+  const mod = await load('Domain/OrchestratorProgram')
+  const names = surfaceOf(mod)
+
+  assert.ok(
+    names.some((n) => n.includes('empty') || n.endsWith('_empty')),
+    `Domain OrchestratorProgram must publish empty; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('interpret')),
+    `Domain OrchestratorProgram must publish TraceInterpreter.interpret; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('interpretWith')),
+    `Domain OrchestratorProgram must publish TraceInterpreter.interpretWith for reply-bearing Step; exports: ${names.join(', ')}`,
+  )
+  assert.ok(
+    names.some((n) => n.includes('freshStart') || n.includes('OrchestratorPrograms')),
+    `Domain OrchestratorProgram must publish OrchestratorPrograms builders; exports: ${names.join(', ')}`,
+  )
 })
 
 test('VERIFY_005_ProcessRunner_publishes_its_run_entrypoints', async () => {

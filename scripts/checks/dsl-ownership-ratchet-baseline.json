@@ -6,9 +6,6 @@
     "mutable": 2,
     "raw-task": 3
   },
-  "Application/Orchestration/Program.fs": {
-    "raw-task": 14
-  },
   "Application/Orchestration/Runtime.fs": {
     "raw-task": 3
   },

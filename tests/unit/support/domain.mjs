@@ -4724,7 +4724,8 @@ export const sessionRecovery = (() => {
   }
 })()
 
-// ── Orchestrator Program DSL (FLOW pilot) ────────────────────────────────────
+// ── Orchestrator Program DSL (FLOW-002/003, M2 reply-bearing AST) ────────────
+// Lazy resolve for M2 surfaces so RED only fails the new assertions, not suite load.
 const OrchestratorProgramModule = await prod('Domain/OrchestratorProgram')
 
 export const orchestratorProgram = (() => {
@@ -4741,9 +4742,203 @@ export const orchestratorProgram = (() => {
   if (typeof interpret !== 'function') {
     throw new Error('TraceInterpreter.interpret missing')
   }
+
+  const requireFn = (candidates, label) => {
+    const found = candidates.find((fn) => typeof fn === 'function')
+    if (typeof found !== 'function') {
+      throw new Error(
+        `${label} missing on Domain/OrchestratorProgram. Near: ${Object.keys(OrchestratorProgramModule)
+          .filter((k) => /Orchestrator|Trace|Program|Reply|Command/i.test(k))
+          .slice(0, 40)
+          .join(', ')}`,
+      )
+    }
+    return found
+  }
+
+  const resolveInterpretWith = () =>
+    requireFn(
+      [
+        OrchestratorProgramModule.TraceInterpreter_interpretWith,
+        OrchestratorProgramModule.interpretWith,
+      ],
+      'TraceInterpreter.interpretWith',
+    )
+
+  const resolveDefaultReply = () =>
+    requireFn(
+      [
+        OrchestratorProgramModule.TraceInterpreter_defaultReply,
+        OrchestratorProgramModule.defaultReply,
+        OrchestratorProgramModule.OrchestratorReplyModule_defaultFor,
+      ],
+      'TraceInterpreter.defaultReply',
+    )
+
+  const resolveCommandName = () =>
+    requireFn(
+      [
+        OrchestratorProgramModule.TraceInterpreter_commandName,
+        OrchestratorProgramModule.commandName,
+        OrchestratorProgramModule.OrchestratorCommandModule_name,
+      ],
+      'TraceInterpreter.commandName',
+    )
+
+  const replyCase = (name, fields = []) => {
+    const ctor =
+      OrchestratorProgramModule[`OrchestratorReply_${name}`] ??
+      OrchestratorProgramModule[`OrchestratorProgramTypes_OrchestratorReply_${name}`] ??
+      OrchestratorProgramModule[`NewOrchestratorReply_${name}`] ??
+      OrchestratorProgramModule[name]
+    if (typeof ctor === 'function') {
+      return fields.length === 0 ? ctor : fields.length === 1 ? ctor(fields[0]) : ctor(...fields)
+    }
+    // Fable union class path.
+    try {
+      return unionCase(
+        OrchestratorProgramModule.OrchestratorReply ??
+          OrchestratorProgramModule.OrchestratorProgramTypes_OrchestratorReply,
+        'OrchestratorReply',
+      )(name, fields)
+    } catch (error) {
+      throw new Error(`OrchestratorReply.${name} missing: ${error.message}`)
+    }
+  }
+
+  /** Fable may emit multi-arg lets curried (length 1) or uncurried (length N). */
+  const applyArgs = (fn, args) => {
+    if (typeof fn !== 'function') {
+      throw new TypeError('orchestratorProgram: expected function')
+    }
+    if (args.length === 0) return fn()
+    if (fn.length === 0 || fn.length >= args.length) return fn(...args)
+    let cur = fn
+    for (const arg of args) {
+      if (typeof cur !== 'function') {
+        throw new TypeError('orchestratorProgram: curried application exhausted early')
+      }
+      cur = cur(arg)
+    }
+    return cur
+  }
+
+  const callProgram = (candidates, label, args) => {
+    const fn = requireFn(candidates, label)
+    return applyArgs(fn, args)
+  }
+
   return {
     empty,
     interpret: (program) => interpret(program),
+    get interpretWith() {
+      const fn = resolveInterpretWith()
+      return (reply, program) => applyArgs(fn, [reply, program])
+    },
+    interpretWithDefaults: (program) => {
+      const withFn = resolveInterpretWith()
+      const defaults = resolveDefaultReply()
+      return applyArgs(withFn, [defaults, program])
+    },
+    get defaultReply() {
+      return resolveDefaultReply()
+    },
+    get commandName() {
+      return resolveCommandName()
+    },
+    programs: {
+      freshStart: (job) =>
+        callProgram(
+          [
+            OrchestratorProgramModule.OrchestratorPrograms_freshStart,
+            OrchestratorProgramModule.freshStart,
+          ],
+          'OrchestratorPrograms.freshStart',
+          [job.jobId, job.managerSessionId, job.worktree, job.targetRef],
+        ),
+      resumeBackfillPublished: (job, { rebased, resultingHead }) =>
+        callProgram(
+          [
+            OrchestratorProgramModule.OrchestratorPrograms_resumeBackfillPublished,
+            OrchestratorProgramModule.resumeBackfillPublished,
+          ],
+          'OrchestratorPrograms.resumeBackfillPublished',
+          [job.jobId, job.worktree, rebased, resultingHead],
+        ),
+      resumeFailClosed: (reason) =>
+        callProgram(
+          [
+            OrchestratorProgramModule.OrchestratorPrograms_resumeFailClosed,
+            OrchestratorProgramModule.resumeFailClosed,
+          ],
+          'OrchestratorPrograms.resumeFailClosed',
+          [reason],
+        ),
+      resumeCleanUp: (job) =>
+        callProgram(
+          [
+            OrchestratorProgramModule.OrchestratorPrograms_resumeCleanUp,
+            OrchestratorProgramModule.resumeCleanUp,
+          ],
+          'OrchestratorPrograms.resumeCleanUp',
+          [job.worktree],
+        ),
+      resumeAttemptPublish: (job, { expectedHead }) =>
+        callProgram(
+          [
+            OrchestratorProgramModule.OrchestratorPrograms_resumeAttemptPublish,
+            OrchestratorProgramModule.resumeAttemptPublish,
+          ],
+          'OrchestratorPrograms.resumeAttemptPublish',
+          [job.jobId, job.managerSessionId, job.worktree, job.targetRef, expectedHead],
+        ),
+    },
+    reply: {
+      unitOk: () => replyCase('UnitOk'),
+      head: (hash) => replyCase('Head', [hash]),
+      rebaseOk: () => replyCase('RebaseOk'),
+      reviewOk: () => replyCase('ReviewOk'),
+      publishLanded: (hash) => replyCase('PublishLanded', [hash]),
+      publishTargetMoved: () => replyCase('PublishTargetMoved'),
+      publishFailed: (reason) => replyCase('PublishFailed', [reason]),
+      failed: (reason) => replyCase('Failed', [reason]),
+    },
+  }
+})()
+
+// ── Orchestrator production Interpreter (M2 cutover) ─────────────────────────
+export const orchestratorInterpreter = (() => {
+  let cached
+  const load = async () => {
+    if (cached) return cached
+    cached = await prod('Application/Orchestration/OrchestratorInterpreter')
+    return cached
+  }
+  const applyArgs = (fn, args) => {
+    if (typeof fn !== 'function') {
+      throw new TypeError('orchestratorInterpreter: expected function')
+    }
+    if (fn.length === 0 || fn.length >= args.length) return fn(...args)
+    let cur = fn
+    for (const arg of args) {
+      if (typeof cur !== 'function') {
+        throw new TypeError('orchestratorInterpreter: curried application exhausted early')
+      }
+      cur = cur(arg)
+    }
+    return cur
+  }
+  return {
+    interpret: async (deps, job, program) => {
+      const mod = await load()
+      const fn = mod.OrchestratorInterpreter_interpret ?? mod.interpret
+      if (typeof fn !== 'function') {
+        throw new Error(
+          `OrchestratorInterpreter.interpret missing; exports: ${Object.keys(mod).join(', ')}`,
+        )
+      }
+      return applyArgs(fn, [deps, job, program])
+    },
   }
 })()
 

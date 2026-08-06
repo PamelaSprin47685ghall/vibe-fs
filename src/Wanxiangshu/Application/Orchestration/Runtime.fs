@@ -54,7 +54,7 @@ type Orchestrator
         mailbox.StartJob()
 
         task {
-            let! verdict = OrchestratorProgram.run programDeps job
+            let! verdict = OrchestratorInterpreter.run programDeps job
             mailbox.Publish verdict
         }
         |> ignore

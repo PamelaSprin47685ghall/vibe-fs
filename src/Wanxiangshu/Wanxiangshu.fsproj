@@ -121,7 +121,6 @@
     <Compile Include="Process/PtyBackend.fs"/>
     <Compile Include="Process/PtyApi.fs"/>
     <Compile Include="Application/Orchestration/Types.fs"/>
-    <Compile Include="Application/Orchestration/Prompts.fs"/>
     <Compile Include="Infrastructure/Resources/PackageResources.fs"/>
     <Compile Include="Infrastructure/Resources/PromptResources.fs"/>
     <Compile Include="Infrastructure/Resources/EnforcerCatalogResource.fs"/>
@@ -129,7 +128,7 @@
     <Compile Include="Infrastructure/Git/IntegrationGate.fs"/>
     <Compile Include="Infrastructure/Git/WorktreeResource.fs"/>
     <Compile Include="Application/Orchestration/ManagerJob.fs"/>
-    <Compile Include="Application/Orchestration/Program.fs"/>
+    <Compile Include="Application/Orchestration/OrchestratorInterpreter.fs"/>
     <Compile Include="Application/Orchestration/Runtime.fs"/>
     <Compile Include="Infrastructure/Git/GitOperations.fs"/>
     <Compile Include="Session/CompanionTypes.fs"/>
