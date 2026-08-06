@@ -7,12 +7,12 @@
 
 ### 2. 输入输出与规则边界
 - **输入**：Provider Run 物理响应、`blog` 工具调用参数、`resources/enforcer/catalog.json` 静态规则表。
-- **输出**：`BlogEntryCommitted` 事实、`InteractionNudge` Continuation Prompt、Enforcer 状态迁移。
+- **输出**：`BlogEntryCommitted` 事实、`InteractionNudge` Continuation Prompt、基于物理 attempt 证据的恢复决策。
 - **核心边界与不变量**：
   1. 规则载体（ENFORCER-001/030）：规则是静态数据（`catalog.json`），禁止代码内定义 Fallback Catalog 或硬编码 F# 评分算法。
   2. 多调用防御性归并（ENFORCER-025）：同 Run 多个 `blog` 调用按 Rule 优先级与 PartOrdinal 确定性归并为唯一 Canonical Call。
-  3. 有界 Nudge（ENFORCER-067）：每个逻辑 Step 最多允许 1 次 Nudge（`ConsecutiveNudgeCount >= 1` 为硬界），彻底失败后立即切入 FallbackController。
-  4. 表驱动状态转移（ENFORCER-068）：转移逻辑完全受驱动于静态转移表，绝对禁止根据 Provider 错误散文文字分叉。
+  3. 有界 Nudge（ENFORCER-067）：每个逻辑请求最多产生 1 次有身份的 Nudge；相同 terminal run 重入幂等等待，新的 terminal run 仍无效才切入 FallbackController。不保存 Nudge 计数器。
+  4. 规则表决策（ENFORCER-068）：`Evidence → Decision` 完全由有限表决定，绝对禁止根据 Provider 错误散文文字分叉或保存程序阶段。
 
 ---
 
@@ -49,9 +49,9 @@ Cycle 结果从归并后的 canonical call 派生。
 
 ---
 
-## ENFORCER-047：Cycle 后 continuation 与单一状态机
+## ENFORCER-047：Cycle 后 continuation 与单一恢复流程
 
-成功进下一材料或 idle；失败进 nudge/Fallback，不分裂第二状态机。
+成功提交后返回普通材料流程；失败直接选择 nudge/Fallback，不构造业务状态机或第二解释器。
 
 ---
 
@@ -67,10 +67,10 @@ Cycle 结果从归并后的 canonical call 派生。
 
 | 响应结局 | 描述 | 是否进入 InteractionNudge | 后续动作 |
 |---------|------|--------------------------|---------|
-| `ValidCycle` | 成功产生 1 个有效 `blog` 调用 (含归并后) | 否 | 提交 `BlogEntryCommitted` 事实，恢复 `Idle` |
-| `NoToolCall` | 模型仅输出普通文本/代码，未调用 `blog` | **是** | 若 `ConsecutiveNudgeCount < 1` 发送 Nudge Continuation |
-| `InvalidTip` | 提供了 `blog` 调用但 `tip` 缺失或不在 catalog | **是** | 若 `ConsecutiveNudgeCount < 1` 发送 Nudge Continuation |
-| `EmptyText` | 提供了 `blog` 调用但 `text` 规范化后为空 | **是** | 若 `ConsecutiveNudgeCount < 1` 发送 Nudge Continuation |
+| `ValidCycle` | 成功产生 1 个有效 `blog` 调用 (含归并后) | 否 | 提交 `BlogEntryCommitted` 事实 |
+| `NoToolCall` | 模型仅输出普通文本/代码，未调用 `blog` | **是** | `NoRecovery` 时发送 Nudge Continuation |
+| `InvalidTip` | 提供了 `blog` 调用但 `tip` 缺失或不在 catalog | **是** | `NoRecovery` 时发送 Nudge Continuation |
+| `EmptyText` | 提供了 `blog` 调用但 `text` 规范化后为空 | **是** | `NoRecovery` 时发送 Nudge Continuation |
 | `ToolExecutionError` | 工具解析崩溃或语法严重错乱 | **否** | 跳过 Nudge，直接进入 Fallback 流程 |
 
 ---
@@ -83,38 +83,39 @@ nudge 即真正 InteractionRepair（Continuation），不新建 Authority。
 
 ## ENFORCER-067：何时算 nudge 彻底失败
 
-彻底失败判据固定；失败后接 Fallback 或终局，禁止无限 nudge。每个逻辑 Step **最多只允许 1 次 Nudge**（`ConsecutiveNudgeCount >= 1` 为硬界）：
+彻底失败判据固定；失败后接 Fallback 或终局，禁止无限 nudge。每个逻辑请求最多一次 Nudge，其界由携带 terminal `ProviderRunIdentity` 的证据表达：
 
 ```text
-evaluateNudgeResult(outcome):
-    if outcome == ValidCycle:
-        ConsecutiveNudgeCount := 0
-        return StepSuccess
-    else:
-        // Nudge 尝试依然未能产生有效 blog -> 判定为 Nudge 彻底失败 (NudgeFailed)
-        ConsecutiveNudgeCount := 0
-        FallbackController.recordConfirmedFailure(identity)   // 转入 FallbackController 推进
-        return NudgeTerminallyFailed
+canonical cycle 有效
+→ 提交 BlogEntryCommitted
+
+canonical cycle 无效 ∧ Recovery = NoRecovery
+→ 写/恢复带 terminal run 身份的 Nudge claim → 发送一次 InteractionNudge
+
+canonical cycle 无效 ∧ InteractionNudgeIssued(run) ∧ 当前 terminal = run
+→ 同一观察重放；不发送、不推进，等待 Nudge 的新 terminal
+
+canonical cycle 无效 ∧ InteractionNudgeIssued(run) ∧ 当前 terminal ≠ run
+→ FallbackController.recordConfirmedFailure(当前 terminal run)
 ```
 
 彻底失败后立即切入 FallbackController 推进 cursor 或终止于 FallbackExhausted，禁止发起第二次 Nudge。
 
 ---
 
-## ENFORCER-068：状态转移
+## ENFORCER-068：恢复决策表
 
-状态转移表固定，禁止按错误散文分叉。Enforcer 状态机严格受驱动于以下状态转移表：
+规则表固定，禁止按错误散文分叉。表的左侧全是已发生事实/证据，右侧是本次直接执行的决定；不得把任一行保存成 `Idle/Awaiting/Nudging/FallbackArmed` 程序阶段。
 
-| 当前状态 | 输入事件 | 迁移条件 | 目标状态 | 产生副作用/动作 |
-|---------|---------|---------|---------|----------------|
-| `Idle` | `MaterialReceived` | 有待处理 material | `AwaitingCycle` | 发送 Blogger 物理 Prompt |
-| `AwaitingCycle` | `ValidBlogCycle` | Cycle 规范化校验通过 | `Idle` | 提交 `BlogEntryCommitted` 事实 |
-| `AwaitingCycle` | `InvalidBlogCycle(reason)` | `reason ∈ {NoToolCall, InvalidTip, EmptyText}` 且 `NudgeCount == 0` | `Nudging(1)` | 发送 Nudge Continuation Prompt |
-| `AwaitingCycle` | `InvalidBlogCycle(reason)` | `reason == ToolExecutionError` 或 `NudgeCount >= 1` | `FallbackArmed` | 触发 `FallbackController.recordConfirmedFailure` |
-| `Nudging(1)` | `ValidBlogCycle` | Nudge 后产生有效 Cycle | `Idle` | 重置 `NudgeCount = 0`，提交 `BlogEntryCommitted` |
-| `Nudging(1)` | `InvalidBlogCycle(reason)` | Nudge 后仍无效 (NudgeFailed) | `FallbackArmed` | 重置 `NudgeCount = 0`，触发 `FallbackController.recordConfirmedFailure` |
-| `FallbackArmed` | `FallbackAdvanced` | FallbackController 允许重试 | `AwaitingCycle` | 按照 EffectiveAgent 重新发送物理 Prompt |
-| `FallbackArmed` | `FallbackExhausted` | 自动恢复预算耗尽 | `Failed` | 停止自动重试，等待人工干预 |
+| 已发生证据 | 决定 |
+|-----------|------|
+| `ValidBlogCycle` | 提交 `BlogEntryCommitted` |
+| `InvalidBlogCycle(NoToolCall/InvalidTip/EmptyText)` 且 `NoRecovery` | 发送一次 `InteractionNudge`，记录触发它的 terminal run |
+| 上述无效 Cycle 且 terminal run 等于 `InteractionNudgeIssued` 中的 run | 幂等等待，不重复副作用 |
+| 上述无效 Cycle 且 terminal run 不同 | Nudge 已产生新无效响应；调用 `FallbackController.recordConfirmedFailure` |
+| `ToolExecutionError` | 不 Nudge，调用 `FallbackController.recordConfirmedFailure` |
+| Fallback 返回 `MayContinue` | 按新的 `EffectiveAgent` 发送物理 attempt |
+| Fallback 返回 `Exhausted` | 停止自动请求，等待新 Authority Root 或显式恢复 |
 
 ---
 

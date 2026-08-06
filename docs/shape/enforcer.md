@@ -31,9 +31,18 @@ Cycle 有效：可证明 ProviderRunIdentity、至少一个成功 blog、规范�
 
 同一时刻对 Blogger 的 offer 决策唯一；禁止多入口同时 materialize 请求。
 
-## ENFORCER-064：BloggerToolRecovery 状态模型
+## ENFORCER-064：BloggerToolRecovery 证据投影
 
-缺工具/无效调用的恢复状态模型归属 EnforcerHost；不得在 Coordinator 与 Host 各维护一套。
+缺工具/无效调用的恢复证据投影归属 EnforcerHost：
+
+```fsharp
+type BloggerToolRecovery =
+    | NoRecovery
+    | InteractionNudgeIssued of ProviderRunIdentity
+    | AabbRepairConsumed
+```
+
+`InteractionNudgeIssued` 携带触发 Nudge 的真实 terminal run。相同 run 重入只表示同一观察重放；不同 run 再次无效才证明 Nudge 语义失败。不得退化成计数器，Coordinator 与 Host 不得各维护一套。
 
 ## ENFORCER-160：每个 Companion 最多一个悬挂 transform
 

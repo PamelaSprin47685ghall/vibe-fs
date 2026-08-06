@@ -36,7 +36,7 @@
 ## 前缀与包面
 
 1. 平常只增 Y frames；X active prefix 字节不变。  
-2. Epoch 切换只绑：probe 提升 / BlogSquash / ContextReanchored。  
+2. PrefixEpoch 切换只绑 probe 提升 / ContextReanchored；BlogSquash 只推进 FrameEpoch。
 3. 入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`。  
 4. 资源：`resources/prompts/*`、`resources/enforcer/catalog.json`；加载仅 `Infrastructure/Resources/`，fail fast。
 

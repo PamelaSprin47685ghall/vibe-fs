@@ -1,6 +1,6 @@
 # 词汇表
 
-每个术语只指向唯一条款 ID，不复述规则正文。条款定义在 what/shape/how/proof 各主题文件。
+词汇表只做导航，不形成独立条款；一个术语可指向定义其不同侧面的多个正式条款。冲突时以被指向的正式定义为准。
 
 ## A
 
@@ -30,7 +30,7 @@
 |------|------|
 | Canonical Projection | COMPANION-007：Semantic 投影是 canonical digest 的唯一来源 |
 | Canonical Role | AGENT-001：不变角色，与 fast/deep 无关，不决定 Companion |
-| Circuit Breaker | FALLBACK-005：最多 12 连续失败 attempt |
+| Circuit Breaker | FALLBACK-005：达到有限正整数自动恢复预算时熔断；默认预算 12 |
 | Clean Gate | ORCH-002：工作区 dirty 拒绝用户消息 |
 | Companion | COMPANION-001：每个 Work Session 恰好一个叶子 Y |
 | CompanionSession | HOST-008：ManagedSessionKind 的叶子种类 |
@@ -58,7 +58,7 @@
 |------|------|
 | FallbackController | FALLBACK-003：统一 cursor advance 入口 |
 | FallbackCursor | FALLBACK-002：modulo-4，Offset ∈ {0,1,2,3} |
-| FallbackExhausted | FALLBACK-005：12 attempt 上限后的终局 |
+| FallbackExhausted | FALLBACK-005：达到当前 AutoRecoveryBudget 后的终局 |
 | Fire-and-forget | PROMPT-007：调用方不等待 PhysicalAccepted |
 | FrameEpochId | COMPANION-006：只在 squash 提交时变化 |
 | FrozenRecordPrefix | COMPANION-009：Opening + 可覆盖 Y frame prefix 的 epoch 冻结快照 |
@@ -107,7 +107,7 @@
 |------|------|
 | ManagedSessionKind | HOST-008：WorkSession / CompanionSession |
 | Manager Guard | REVIEW-007：Manager terminal 时必须检查 witness |
-| Managed Agent | AGENT-002：0.5.0 中 fast-ROLE 或 deep-ROLE |
+| Managed Agent | AGENT-002：当前 catalog 中的 fast-ROLE 或 deep-ROLE |
 | manual compaction | HOST-006：官方支持的用户动作，效果 best effort |
 
 ## P
@@ -153,11 +153,15 @@
 |------|------|
 | Seal Barrier | COMPANION-009：provider-visible bytes 一旦发出永久 sealed |
 | SealRoot | COMPANION-013：probe 生成后由 committed epoch 原样继承 |
-| SelectedAgent | AGENT-002：用户选择的 Agent |
-| SemanticCursor | CTX-011：TurnIndex + PartIndex |
-| Synthetic | COMPANION-013：hash(sessionId+epochId+semanticKind) |
+| SelectedAgent | PROMPT-002：由 Authority Root 冻结、Fallback 不得改写的 Agent |
+| Synthetic identity | COMPANION-013：由 SealRoot / frameEpoch / ordinal 等领域事实确定性派生 |
+
+## T
+
+| 术语 | 指向 |
+|------|------|
 | TerminalOutputRaw | COMPANION-003：Session 末次 formal text + host-visible reasoning，LWR 末段；不含 raw tool |
-| ToolResultBound | ARCH-010-TOOL-BOUND：自定义 tool result 抢先留尾截断；≤2000 行 / ≤51200 字节 |
+| ToolResultBound | ARCH-012：自定义 tool result 抢先留尾截断；≤2000 行 / ≤51200 字节 |
 
 ## W
 
@@ -166,4 +170,10 @@
 | Witness | REVIEW-006：双 PERFECT 的自包含证据 |
 | WorkSession | HOST-008：ManagedSessionKind 的主种类，恰好一个 Y |
 | Worktree | ORCH-003：一个 Job 一个 worktree |
+
+## X
+
+| 术语 | 指向 |
+|------|------|
 | XTrace | COMPANION-003：X 唯一原始语义轨迹，含 host-visible reasoning |
+| XTraceCursor | HOST-005：lifecycle 内严格单调、独立于 Host 数组下标的语义游标 |

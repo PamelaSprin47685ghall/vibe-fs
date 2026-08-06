@@ -18,6 +18,7 @@
 | 事件/信号边界 | plugin host-hooks、reconcile 相关 unit | ARCH-002、HOST-001/002 |
 | 前缀 / seal | context / review unit | ARCH-004、COMPANION-009 |
 | 合成 TOML / 状态先于表示 | synthetic-toml unit、arch010 harness | ARCH-010、ARCH-011 |
+| Tool 文本结果边界 | `tests/unit/context/tool-result-bound.test.mjs` | ARCH-012 |
 | Host 不改本体 | 仅挂现有 hook；无 Host patch 路径 | ARCH-003 |
 
 ## 失败形态（门禁必须能红）

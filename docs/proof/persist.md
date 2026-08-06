@@ -16,7 +16,7 @@
 | 证明 | 条款 |
 |------|------|
 | 查询 O(1) 积分，不扫全史 | PERSIST-008 |
-| Requested→Accepted 幂等；Accepted 不折回 | PERSIST-009 |
+| Requested-only 先核对领域物理证据；禁止盲重试；Accepted 不折回 | PERSIST-009 |
 | 时间戳 UTC offset 稳定 | PERSIST-001 |
 
 ## 上下文事实 fold

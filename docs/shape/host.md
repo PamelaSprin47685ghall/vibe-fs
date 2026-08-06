@@ -68,6 +68,6 @@ Host 按 directory 实例化插件；worktree 触发第二实例。跨实例因�
 新增跨实例状态必须同时登记共享清单与 `PluginRuntimeScope` 初始化，否则第二实例静默失配。
 
 ### 并发与同步契约 (C2 并发安全)
-- **不可变 Swap 机制**：共享字典（`SessionParents`, `VerdictSessions`, `SessionDirectories`）在运行时为不可变 Map/Set，写操作必须通过 Thread-safe Immutable Swap（原子性指针替换/CAS）完成。
-- **快照读隔离**：读操作获取特定时刻的不可变 Snapshot 引用，保证单次 Reconcile/Projection 过程中的视图一致性，杜绝脏读。
-- **防止更新丢失**：严格禁止直接在共享字典上进行 mutable 就地修改。所有跨实例更新经单写者 CAS 校验，防止 Node.js 事件循环微任务交错导致的更新覆盖。
+- 共享表的并发所有者是单一 Node.js event loop，不假定不存在的跨线程 CAS。
+- 单次查改与枚举必须同步完成，不跨 `await`；需要跨异步边界使用的数据先复制成不可变快照。
+- 禁止“读取 → await → 按旧值回写”的 read-modify-write；若引入 Worker/共享内存，须先新增明确的消息所有者或原子同步端口。

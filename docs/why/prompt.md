@@ -8,9 +8,9 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 
 ## 备选与被拒
 
-**身份类型与错误表达：裸 `string` vs 强类型包装与 DU。** 拒裸 string：用裸 `string` 表示 `SessionId`、`LogicalRunId`、`ToolCallId` 会使不同领域的 ID 能被互相误传而编译器毫无察觉；拒绝在 `SendFailed of error: string` 中使用裸字符串，这会导致下游写出脆弱的错误散文匹配。选单 Case DU 包装（如 `SessionId of string`）与结构化 `DispatchError` DU，确保错误分支与身份类型在编译期完全闭合。
+**身份类型与错误表达：领域身份 vs 诊断详情。** `SessionId`、`LogicalRunId`、`ToolCallId` 等身份用独立包装类型，防止跨域误传。当前 Host 发送边界只提供不透明错误详情，因此 `PromptAbandonReason` 用有限 case 区分 `SendFailed` 与 `UnresolvedAfterRecovery`，内部字符串只供诊断，禁止据其散文分叉。不得在文档中虚构实现并不存在的 `DispatchError`；若 Host 边界未来能闭合分类，应原子修改类型、发送端与证明。
 
-**巨型 Profile 传递 vs 领域子记录拆分。** 拒巨型 Profile 直传：直接把包含 15 个字段的 `AttemptExecutionProfile` 塞给各个子模块，会导致调用方隐式读取不属于己方边界的字段，破坏 ARCH-001/ARCH-008 分层。选按领域拆分：拆为 `AuthorityProfile`、`RequestProfile` 与 `ProjectionContext` 三个聚焦记录，跨模块调用仅传递契约所需部分。
+**独立拼装的子记录 vs 原子 profile + 窄投影。** 拒绝分别构造 `AuthorityProfile`、`RequestProfile`、`ProjectionContext` 后再拼回请求：多写入口会让同一 attempt 的 Authority、Agent、工具面与 probe 互相矛盾。选择由唯一 builder 构造 `AttemptExecutionProfile`，其中嵌套稳定的 `AuthorityExecutionProfile`；跨边界只传所需字段或从完整 profile 做纯投影，不建立第二构造来源。
 
 **恢复语义：exactly-once / 重发 / at-most-one。** 拒 exactly-once：Host 已可能开始 provider run，无法单边保证物理一次性。拒重发：重发在 Host 留下的 `msg_*` 之外产生第二次逻辑效果。选 at-most-once + fail-closed unknown（PROMPT-011）：未证明落地就保持 Pending，不自动补投。
 
@@ -19,4 +19,3 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 **恢复预算与窗口取值。** `RecoveryTailWindow=50`：读取目标 Session 尾部足够判定 PromptKey 是否已物理落地，50 远大于一次 Logical Run 内同 key 可能重复的次数，静态常数不随容量估算（CTX-001）。`RecoveryAttemptBudget=3`：跨 3 次插件启动仍无法证明 → `Abandoned`；有限抑制永挂起，不 pretend 成功。
 
 **载体：metadata vs body 标签。** 拒 body：body 是 provider-visible prompt 的一部分，放恢复键会改变对话字节。放 metadata：不进入模型输入，恢复时按 key 检索（PROMPT-011）。
-

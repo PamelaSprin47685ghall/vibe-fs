@@ -6,21 +6,24 @@
 在 LLM 对话中，当 SelectedAgent 遇到模型偶发故障、超时或输出退化时，系统需要在**不重新选举 Authority** 的前提下，自动在 SelectedAgent 与 PeerAgent 之间按 Modulo-4 Cursor 顺序轮换重试（AABB 策略），同时在达到指定连续失败上限后安全熔断（`FallbackExhausted`），防止无限消耗 Token 与预算。Fallback 模块必须保证该轮换过程具备严格的强类型防错、单一写入口与 Fail-Closed 恢复能力。
 
 ### 2. 输入输出与规则边界
-- **输入**：Reconciler 交付的 `TurnOutcome`（`Completed` | `Failed` | `Abandoned`）、`HostSignal` 唤醒信号与物理尝试身份 `FallbackAttemptIdentity`。
-- **输出**：`FallbackCursorAdvanced` 与 `FallbackExhausted` 领域事实、`FallbackVerdict` 恢复决策（`MayContinue` | `Exhausted`）。
+- **输入**：Reconciler 交付的 provider `TurnOutcome`、`HostSignal` 唤醒信号与物理尝试身份 `FallbackAttemptIdentity`。只有已确认 `Failed` 推进 cursor；`Completed` 清零连续失败数；`Aborted` 仅在 LOOP-006 命中 `LoopKillArmed` 后走等价失败路径。
+- **输出**：`FallbackCursorAdvanced` 与 `FallbackExhausted` 领域事实、`RecoveryVerdict`（`MayContinue` | `Exhausted`）。
 - **核心边界与不变量**：
   1. 单一写入口：`FallbackController` 为提交 cursor 变更事实的唯一写入口（FALLBACK-003）。
-  2. Modulo-4 强类型 DU：`FallbackOffset` 只能为 `Fork0 | Fork1 | Fork2 | Fork3`；反序列化非法字节拦截为 `Error` 并 fold 为 Fail-Closed（`CommitUnknown` / `ReconcileFailed`），严禁抛出异常。
+  2. Modulo-4 强类型 DU：`FallbackOffset` 只能为 `Fork0 | Fork1 | Fork2 | Fork3`；反序列化非法字节返回 typed decode error，Journal 加载拒绝该损坏 envelope，严禁抛出异常或伪装成 Append `CommitUnknown`。
   3. `armedByFailure` 内存隔离：`armed` 标志必须仅在紧邻物理 attempt 失败时为 `true`，崩溃后归零，严禁仅凭奇数 Offset 自动触发 squash（FALLBACK-012）。
 
 ---
 
 ## FALLBACK-002：Modulo-4 Cursor
 
-Offset 只有 0|1|2|3 四个合法值。用 DU 在类型层面排除非法态；byte 只出现在序列化/反序列化边界。在反序列化边界，非法字节属于可预见的数据损坏/版本不兼容场景，**严禁使用 `invalidOp` 抛出异常**，必须返回 `Result`，由 Journal fold 解析为 `CommitUnknown` / `ReconcileFailed` 走 Fail-Closed 路径。
+Offset 只有 0|1|2|3 四个合法值。用 DU 在类型层面排除非法态；byte 只出现在序列化/反序列化边界。在反序列化边界，非法字节属于可预见的数据损坏/版本不兼容，**严禁使用 `invalidOp` 抛出异常**，必须返回 typed `Result.Error`。Journal load/fold 将其作为损坏 envelope 拒绝；`CommitUnknown` 只描述 Append 提交结局（PERSIST-002/003），不得在 decode 路径构造。
 
 ```fsharp
 type FallbackOffset = Fork0 | Fork1 | Fork2 | Fork3
+
+type FallbackOffsetDecodeError =
+    | InvalidFallbackOffset of byte
 
 let toByte = function
     | Fork0 -> 0uy | Fork1 -> 1uy | Fork2 -> 2uy | Fork3 -> 3uy
@@ -30,7 +33,7 @@ let ofByte = function
     | 1uy -> Ok Fork1
     | 2uy -> Ok Fork2
     | 3uy -> Ok Fork3
-    | b -> Error (sprintf "FallbackOffset 非法字节: 0x%02x" b)
+    | b -> Error (InvalidFallbackOffset b)
 
 type FallbackCursor =
     { Offset: FallbackOffset
@@ -100,7 +103,7 @@ FallbackCursorAdvanced =
       ConsecutiveFailureCount }
 
 FallbackExhausted =
-    { LogicalRunId; AuthorityRunRootUserMessageId
+    { LogicalRunId; AuthorityRootUserMessageId
       FinalConsecutiveFailureCount; FinalOffset }
 ```
 

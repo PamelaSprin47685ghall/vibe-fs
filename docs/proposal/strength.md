@@ -1,6 +1,6 @@
 # Proposal: Predict & Reduce Strength
 
-未裁决候选。不是当前规范。条款前缀 `STRENGTH-` 在此文内仅作候选编号，正式裁决前不得被实现当作合同。
+未裁决候选。不是当前规范。条款前缀 `STRENGTH-` 在此文内仅作候选编号，正式裁决前不得被实现当作合同。正文中的 `APPROVED` / “最终架构”是迁移前的 proposal 内部审阅记录，不等于 GOV-006 的正式裁决；生产编译图的既有直连缺口见 `docs/status/proposal-code-isolation-gap.md`。
 
 条款前缀：`STRENGTH-`。Projection Algebra 规范位于 `docs/what/projection.md`（条款前缀 `PROJ-`）；代数语义由本文档 STRENGTH-066…074 与 PROJ- 共同承载（裁决后生效）。
 

@@ -12,7 +12,7 @@ LLM 在流式文本生成过程中偶发进入低多样性退化循环（单字�
   1. 不估算 Token 或上下文窗口容量（CTX-001）。
   2. 不将 delta 文本拼装为领域事实或透传给 Reconciler（ARCH-002）。
   3. 单线程事件泵串行投递假设：每个 provider attempt 对应单事件循环，`LoopDetector` 可变状态物理封入 attempt 内部，严禁跨线程或跨 attempt 复用。
-  4. 强杀与 Fallback 桥接：Host 返回 `TurnAborted` 且 `LoopKillArmed` 命中时，必须重新分类为领域 `TurnFailed`，并唯一通过 `FallbackController.recordConfirmedFailure` 推进恢复槽。
+  4. 强杀与 Fallback 桥接：Host 返回 `TurnAborted` 且 `LoopKillArmed` 命中时，必须进入与 provider failure 相同的恢复函数，并唯一通过 `FallbackController.recordConfirmedFailure` 推进恢复槽；不得改写或删除原始 provider-turn 分类。
 
 ---
 
@@ -249,21 +249,20 @@ return evaluate（N_eff ≤ 140 → LOOP）
 
 ```text
 Step 1: 触发强杀 (Abort Trigger)
-    if is_loop and not LoopKillArmed.contains(sessionId, providerRunIdentity):
-        LoopKillArmed.record(sessionId, providerRunIdentity) // 记录进程内局部标志
+    if is_loop and not LoopKillArmed.contains(sessionId):
+        LoopKillArmed.record(sessionId)                      // 当前单飞 attempt 的进程内局部标志
         HostSDK.abortSession(sessionId)                       // 物理强杀请求
     else:
         ignore (重复 delta 幂等跳过)
 
 Step 2: Reconcile 阶段截获
     when Host 返回 ReconciledTurn，其Outcome 为 TurnAborted (如 MessageAbortedError / finish=aborted):
-        if LoopKillArmed.contains(sessionId, providerRunIdentity):
+        if LoopKillArmed.contains(sessionId):
             LoopKillArmed.clear(sessionId)
-            // 将事件层面的 TurnAborted 重新分类为领域 TurnFailed (原因: "LoopDetectedKill")
-            outcome = TurnFailed("LoopDetectedKill")
+            recovery = LoopKillFailure(providerRunIdentity)
 
 Step 3: 推进 FallbackController (Sole Writer)
-    if outcome == TurnFailed("LoopDetectedKill"):
+    if recovery == LoopKillFailure(providerRunIdentity):
         FallbackController.recordConfirmedFailure(providerRunIdentity) // 推进 Fallback cursor
 
 Step 4: 检查 Fallback 决策与 Continuation 发送

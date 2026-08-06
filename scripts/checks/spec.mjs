@@ -3,20 +3,30 @@
 //
 // Checks:
 //   1. Clause IDs defined once under docs/{why,what,shape,how,proof}
-//   2. References in those trees must resolve
+//   2. Formal/fluid/README references must resolve (including slash lists/range endpoints)
 //   3. Prefix ownership (PREFIX_OWNER → relative path under docs/)
 //   4. docs/README.md navigates every formal file that defines clauses
 //   5. status/ and proposal/ must not define Clause IDs
+//   6. clause-looking references use a known exact PREFIX-NNN (no pseudo suffixes)
+//   7. docs/README.md covers the exact active status and proposal file sets
 //
 // Usage: node scripts/checks/spec.mjs
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import {
+  clauseReferences,
+  fluidNavigationProblems,
+  statusNavigationProblems,
+  unknownClauseReferences,
+} from './spec-rules.mjs'
 
 const DOCS = 'docs'
 const FORMAL_DIRS = ['why', 'what', 'shape', 'how', 'proof']
 const FLUID_DIRS = ['status', 'proposal']
 const NAV_FILE = join(DOCS, 'README.md')
+const STATUS_DIR = join(DOCS, 'status')
+const PROPOSAL_DIR = join(DOCS, 'proposal')
 
 /**
  * Active prefix → owning formal file (path relative to docs/).
@@ -71,7 +81,6 @@ const PREFIX_SPLIT_OWNERS = {
 }
 
 const PREFIX_ALTERNATION = Object.keys(PREFIX_OWNER).join('|')
-const CLAUSE_RE = new RegExp(`\\b(${PREFIX_ALTERNATION})-(\\d{3})\\b`, 'g')
 const DEFINITION_RE = new RegExp(`^##\\s+((?:${PREFIX_ALTERNATION})-\\d{3})\\b`, 'gm')
 
 const failures = []
@@ -99,11 +108,24 @@ const sources = new Map()
 
 const relDocs = (abs) => relative(DOCS, abs).replace(/\\/g, '/')
 
+const rejectUnknownClauseLikeReferences = (key, text) => {
+  for (const { token, line } of unknownClauseReferences(text, Object.keys(PREFIX_OWNER))) {
+    fail(key, line, `未知或伪条款引用：${token}`)
+  }
+}
+
+const collectReferences = (key, text) => {
+  for (const { id, line } of clauseReferences(text, Object.keys(PREFIX_OWNER))) {
+    references.push({ id, file: key, line })
+  }
+}
+
 for (const file of formalFiles) {
   const text = readFileSync(file, 'utf8')
   const key = relDocs(file)
   sources.set(key, text)
-  const lines = text.split('\n')
+  rejectUnknownClauseLikeReferences(key, text)
+  collectReferences(key, text)
 
   for (const match of text.matchAll(DEFINITION_RE)) {
     const id = match[1]
@@ -125,17 +147,12 @@ for (const file of formalFiles) {
       )
     }
   }
-
-  lines.forEach((content, index) => {
-    for (const match of content.matchAll(CLAUSE_RE)) {
-      references.push({ id: match[0], file: key, line: index + 1 })
-    }
-  })
 }
 
 for (const file of fluidFiles) {
   const text = readFileSync(file, 'utf8')
   const key = relDocs(file)
+  collectReferences(key, text)
   for (const match of text.matchAll(DEFINITION_RE)) {
     const id = match[1]
     const line = text.slice(0, match.index).split('\n').length
@@ -143,15 +160,18 @@ for (const file of fluidFiles) {
   }
 }
 
+const navigation = existsSync(NAV_FILE) ? readFileSync(NAV_FILE, 'utf8') : ''
+if (!navigation) {
+  fail('README.md', 0, '缺少 docs/README.md 导航')
+} else {
+  rejectUnknownClauseLikeReferences('README.md', navigation)
+  collectReferences('README.md', navigation)
+}
+
 for (const { id, file, line } of references) {
   if (!definitions.has(id)) {
     fail(file, line, `悬空条款引用：${id} 无定义`)
   }
-}
-
-const navigation = existsSync(NAV_FILE) ? readFileSync(NAV_FILE, 'utf8') : ''
-if (!navigation) {
-  fail('README.md', 0, '缺少 docs/README.md 导航')
 }
 
 const formalWithDefinitions = new Set([...definitions.values()].map((d) => d.file))
@@ -175,10 +195,32 @@ for (const prefix of Object.keys(PREFIX_OWNER)) {
   }
 }
 
+const statusFiles = existsSync(STATUS_DIR)
+  ? walkMarkdown(STATUS_DIR).map(relDocs).sort()
+  : []
+const statusProblems = statusNavigationProblems(navigation, statusFiles)
+for (const file of statusProblems.missing) {
+  fail('README.md', 0, `活跃 status 未进入导航：docs/${file}`)
+}
+for (const { file, line } of statusProblems.stale) {
+  fail('README.md', line, `导航引用不存在的 status：docs/${file}`)
+}
+
+const proposalFiles = existsSync(PROPOSAL_DIR)
+  ? walkMarkdown(PROPOSAL_DIR).map(relDocs).sort()
+  : []
+const proposalProblems = fluidNavigationProblems(navigation, 'proposal', proposalFiles)
+for (const file of proposalProblems.missing) {
+  fail('README.md', 0, `未裁决 proposal 未进入导航：docs/${file}`)
+}
+for (const { file, line } of proposalProblems.stale) {
+  fail('README.md', line, `导航引用不存在的 proposal：docs/${file}`)
+}
+
 const definedCount = definitions.size
 if (failures.length === 0) {
   console.log(
-    `spec-check: OK — ${definedCount} 条款，${references.length} 处引用，${formalFiles.length} 个正式文件`,
+    `spec-check: OK — ${definedCount} 条款，${references.length} 处引用，${formalFiles.length} 个正式文件，${statusFiles.length} 个活跃 status，${proposalFiles.length} 个未裁决 proposal`,
   )
   process.exit(0)
 }

@@ -7,11 +7,11 @@ OpenCode Host 提供了非阻断式 Hook 与 SDK 事件流，但在多实例、�
 
 ### 2. 输入输出与规则边界
 - **输入**：OpenCode 原始 SDK 消息事件、transform hook 输入、tool execute 阶段回调、会话生命周期事件。
-- **输出**：强类型 `HostSignal` 领域信号、`ReconciledTurn` 终态转折对象、`ProviderInputSealed` 身份封印事实。
+- **输出**：强类型 `HostSignal` 领域信号、`ReconciledTurn` snapshot 分类、`ProviderInputSealed` 身份封印事实。
 - **核心边界与不变量**：
   1. 不得改动 Host 源码或引入专用魔改接口（ARCH-003）。
-  2. 传输层取消信号（`TurnAborted`）必须在 Reconciler 边界通过 `LoopKillArmed` 检查精确化分流：命中 LoopKill 转为 `TurnFailed` 推进 Fallback，未命中转为 `TurnAbandoned`（EXEC-020）。
-  3. 跨 Worktree 实例共享单例表必须具备无锁不可变 Atomic Swap 并发保障（HOST-012）。
+  2. Reconciler 保留 provider-turn `TurnAborted` 分类；消费边界再检查 `LoopKillArmed`：命中时走失败/Fallback，未命中时只清理 turn，绝不构造 Agent `RunCompletion`（LOOP-006 / EXEC-020）。
+  3. 跨 Worktree 实例共享表的操作必须在同一 Node.js event loop 上、且不跨 `await` 的同步片段内完成（HOST-012）。
 
 ---
 
@@ -23,40 +23,48 @@ OpenCode Host 提供了非阻断式 Hook 与 SDK 事件流，但在多实例、�
 
 ### 终态对齐（EXEC-020）
 
+这里的 `TurnOutcome` 是 provider turn 的 snapshot 分类，不是 EXEC-020 的 `AgentCompletionOutcome`：
+
 ```fsharp
 type TurnOutcome =
-    | Completed
-    | Failed of reason: string
-    | Abandoned of reason: TurnAbandonReason   // 显式对应 EXEC-020 的 Agent 终态 (Completed | Failed | Abandoned)
+    | TurnInProgress
+    | TurnNeedsContinuation of reason: string
+    | TurnCompleted
+    | TurnAborted of reason: string
+    | TurnFailed of error: string
+    | TurnUnknown
 
 type ReconciledTurn =
     { SessionId: SessionId
-      UserMessageId: MessageId
-      AssistantMessageId: MessageId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      ProviderRun: ProviderRunIdentity
       AgentRole: AgentRole option
-      Directory: string
-      Parts: ProviderVisiblePart array
+      Directory: string option
+      Parts: MessagePart array
+      Finish: string option
+      ErrorName: string option
+      Model: OpencodeModel option
       Outcome: TurnOutcome }
 ```
 
-**终态映射规则**：Host 事件级别的取消/中断信号（`TurnAborted` / `MessageAbortedError` / `finish=aborted`）**严禁**直接暴露给 Agent 领域终态。Reconciler 在消费 Host 事件时，必须按以下两阶段规则进行重构与映射：
+Host 的 `MessageAbortedError` / `finish=aborted` 先被 Reconciler 分类为 `TurnAborted`。`TurnCompletionProgram` 再消费这个控制面结局：
 
 ```text
-Host 事件到达 (TurnAborted / MessageAbortedError / finish=aborted)
+ReconciledTurn.Outcome = TurnAborted
   │
-  ├─► 检查该 sessionId 的进程内局部标识 LoopKillArmed
+  ├─► 检查该 sessionId 的进程内局部事实 LoopKillArmed
   │     │
   │     ├─► 若 LoopKillArmed 命中：
   │     │     1. 清除该 Session 的 LoopKillArmed 标识
-  │     │     2. 将 outcome 重新分类为 TurnFailed("LoopDetectedKill")
-  │     │     3. 显式调用 FallbackController.recordConfirmedFailure 推进 Fallback 恢复槽
+  │     │     2. 走与 provider failure 等价的 FallbackController 路径
   │     │
   │     └─► 若 LoopKillArmed 未命中：
-  │           1. 映射为 TurnAbandoned(UserOrSystemCancelled)
-  │           2. 不触发 FallbackController 自动恢复
+  │           1. 终止/清理该 provider turn
+  │           2. 不构造 RunCompletion，不推进 Fallback
 ```
 
-通过此映射，彻底解决 `TurnAborted` 导致 Fallback 不推进的冲突，同时保证非强杀的中止信号严格遵循 `EXEC-020` 的 `Completed | Failed | Abandoned` 终态代数。
+`TurnAborted` 因而可以存在于 provider-turn 分类中，但绝不成为 Agent `RunCompletion`。把两种代数合并为同一个 DU 会同时破坏 LOOP-006 与 EXEC-020。
 
 ---
 
@@ -82,14 +90,11 @@ Host 按照 Working Directory 实例化插件；在多 worktree 环境中会触�
 - `VerdictSessions`：记录 Review verdict 与验证会话绑定。
 - `SessionDirectories`：记录会话与工作目录的绝对映射。
 
-**并发与同步契约 (C2 并发安全)**：
-- **存储模式**：共享表在 Node.js / Fable 环境中统一采用**不可变 Swap（Thread-safe Immutable Swap）** 机制。任何写操作（如新增 SessionParent 或更新 VerdictSession）均通过产生新的不可变 Map/Set 实例，并使用 CAS / 原子性指针替换完成。
-- **读取模式**：读操作获取的是特定时刻的不可变 Snapshot 引用，保证单次 Reconcile/Projection 视角内的读一致性，无锁、无脏读风险。
-- **写冲突处理**：并发写入采用 Single-Writer 序列化或 CAS 重试，严格禁止就地（in-place）修改可变字典，彻底杜绝丢失更新（Lost Update）。
+**并发与同步契约 (C2 并发安全)**：这些表只由同一 Node.js event loop 访问。每次查询、登记、删除或快照复制必须在一个不跨 `await` 的同步片段内完成；禁止读取后跨 `await` 再按旧值回写。若未来引入 Worker/共享内存，必须先为 HOST-012 增加明确的消息所有者或原子同步协议，不能把“CAS”当作未指定原语的要求。
 
 ### 2. 每实例独立隔离清单（PluginRuntimeScope）
 每次插件实例化时创建独立的 `PluginRuntimeScope`，管理该 worktree 专属的状态：
-- `AgentJournal`：每个实例独占其私有 Path `wanxiangshu-next/runtimes` 下的 Journal 句柄。
+- `AgentJournal`：每个实例独占 `RuntimePath` 给出的私有 Journal 句柄。
 - `Companions/Blogger` 缓存：每个实例只持有属于自己 worktree 的 Companion/Blogger 运行实例。
 - `OwnedSessions`：仅记录当前 worktree 实例发起的 Managed Sessions。
 - `UserMessageBindings`：仅维护当前实例内部的 Prompt/UserMessage 绑定。
