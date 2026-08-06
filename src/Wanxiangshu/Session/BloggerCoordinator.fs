@@ -202,7 +202,7 @@ module BloggerCoordinator =
         | None -> false
         | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
 
-    /// Blocks new Y Start/Offer unless handle unsealed or ReactivatedAfterSeal.
+    /// Blocks new Y Start/Offer unless handle unsealed or DrainWindow.Open.
     let private blocksNew
         (journal: AgentJournal option)
         (mainSessionId: SessionId)
@@ -251,7 +251,7 @@ module BloggerCoordinator =
                     | Error reason -> return DecisionEffect.MaterializeFailed reason
                     | Ok() ->
                         // Re-check after materialize: main may complete during blob write.
-                        // ReactivatedAfterSeal still allows send until next seal cycle ends.
+                        // DrainWindow.Open still allows send until next seal cycle ends.
                         if blocksNew (Some j) mainId scope key then
                             abandonRequest journal ctx "main-sealed-before-send"
                             forceSealRuntime scope key
@@ -361,7 +361,7 @@ module BloggerCoordinator =
                 | BloggerRuntimeState.Disposed -> return DecisionEffect.Disposed
                 | BloggerRuntimeState.Sealed ->
                     // Durable may have been reactivated; state still Sealed is stale.
-                    if cell.ReactivatedAfterSeal then
+                    if BloggerRuntime.isDrainOpen cell then
                         scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell)
                     else
                         ()

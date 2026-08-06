@@ -3,7 +3,6 @@
     "mutable": 2
   },
   "Application/Reconciliation/BloggerCrashRecovery.fs": {
-    "program-counter": 1,
     "mutable": 1
   },
   "Application/Reconciliation/PromptRecovery.fs": {
@@ -59,11 +58,9 @@
     "infrastructure-leak": 1
   },
   "Session/BloggerCoordinator.fs": {
-    "infrastructure-leak": 1,
-    "program-counter": 1
+    "infrastructure-leak": 1
   },
   "Session/BloggerRuntimeState.fs": {
-    "program-counter": 10,
     "behaviour-bool": 1
   },
   "Session/ChildRun.fs": {
@@ -90,7 +87,7 @@
   "Session/EnforcerHost.fs": {
     "infrastructure-leak": 1,
     "mutable": 7,
-    "program-counter": 12
+    "program-counter": 10
   },
   "Session/ForkRuntime.fs": {
     "infrastructure-leak": 1,

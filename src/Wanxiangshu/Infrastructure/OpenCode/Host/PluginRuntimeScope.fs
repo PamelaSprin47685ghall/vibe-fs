@@ -203,7 +203,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     | _ ->
                         bloggerRuntime.[sessionId] <-
                             { BloggerRuntime.empty with
-                                ReactivatedAfterSeal = cell.ReactivatedAfterSeal }
+                                Drain = cell.Drain }
                 | false, _ -> ())
 
         member this.HasParked(sessionId: string) : bool =

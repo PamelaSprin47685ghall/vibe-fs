@@ -18,8 +18,8 @@ const checks = [
 for (const script of checks) {
   const args = [script]
   // --threshold freezes current Direct-CE debt baseline; must only ever decrease.
-  // P0-1 ChildRecovery 157→155; P0-2 SessionRecovery 155→153.
-  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=153')
+  // P0: 157→153. P1-1a DrainWindow: 153→139.
+  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=139')
   // Per-file ratchet against the frozen baseline (missing baseline fails with a --generate hint).
   if (script.endsWith('dsl-ownership-ratchet.mjs')) {
     args.push(

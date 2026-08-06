@@ -1174,7 +1174,7 @@ module EnforcerHost =
 
                     if
                         AgentProjection.mainSealedForBlogger owner (AgentJournal.snapshot durable).AgentProjections
-                        && not cell.ReactivatedAfterSeal
+                        && not (BloggerRuntime.isDrainOpen cell)
                     then
                         scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
                         scope.ClearCurrentRequest key
@@ -1571,7 +1571,7 @@ module EnforcerHost =
                                             AgentProjection.mainSealedForBlogger
                                                 mainSessionId
                                                 (AgentJournal.snapshot durable).AgentProjections
-                                            && not cell.ReactivatedAfterSeal
+                                            && not (BloggerRuntime.isDrainOpen cell)
                                         then
                                             scope.SetBloggerRuntime(key, BloggerRuntime.forceSeal cell)
                                             scope.TryTakePendingOffer key |> ignore
@@ -1635,7 +1635,7 @@ module EnforcerHost =
 
                             return project (resumeWithContext ctx)
                         | None, None ->
-                            // Caught up now. Durable seal closes ReactivatedAfterSeal permanently.
+                            // Caught up now. Durable seal closes DrainWindow permanently.
                             let cell = scope.GetBloggerRuntime key
 
                             if

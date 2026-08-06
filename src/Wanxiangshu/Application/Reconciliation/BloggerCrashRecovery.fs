@@ -221,7 +221,7 @@ module BloggerCrashRecovery =
             { State = state
               PendingOffer = None
               Recovery = recovery
-              ReactivatedAfterSeal = false }
+              Drain = DrainWindow.Closed }
         )
 
     /// C5: one reload path — EnforcerHost.tryReloadRequestContext (full cutoff/digest).

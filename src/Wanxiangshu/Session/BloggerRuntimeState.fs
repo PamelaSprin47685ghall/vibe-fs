@@ -25,6 +25,13 @@ type BloggerRuntimeState =
     | Sealed
     | Disposed
 
+/// After durable handle seal, whether a new Authority Root reopened a drain window.
+/// Closed = seal blocks new Y work; Open = drain until next seal/catch-up.
+[<RequireQualifiedAccess>]
+type DrainWindow =
+    | Closed
+    | Open
+
 /// Host-owned cell: state + pending offer + ENFORCER-064 recovery.
 /// CurrentRequest lives in InFlight payload; Recovery is per logical request.
 type BloggerRuntimeCell =
@@ -33,9 +40,8 @@ type BloggerRuntimeCell =
         PendingOffer: BloggerRequestContext option
         /// ENFORCER-064 / FALLBACK-008: nudge once then optional AABB per logical request.
         Recovery: BloggerToolRecovery
-        /// Handle is CompletedAwaitingJoin/Retired but main received a new Authority Root:
-        /// Blogger may drain until catch-up; host forceSeals when durable sealed and no material.
-        ReactivatedAfterSeal: bool
+        /// Durable handle sealed + new Authority Root may open one drain window.
+        Drain: DrainWindow
     }
 
 [<RequireQualifiedAccess>]
@@ -60,13 +66,13 @@ module BloggerRuntime =
         { State = BloggerRuntimeState.Idle
           PendingOffer = None
           Recovery = BloggerToolRecovery.NoRecovery
-          ReactivatedAfterSeal = false }
+          Drain = DrainWindow.Closed }
 
     let ofState (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { State = state
           PendingOffer = None
           Recovery = BloggerToolRecovery.NoRecovery
-          ReactivatedAfterSeal = false }
+          Drain = DrainWindow.Closed }
 
     let private withState (cell: BloggerRuntimeCell) (state: BloggerRuntimeState) : BloggerRuntimeCell =
         { cell with
@@ -193,19 +199,19 @@ module BloggerRuntime =
             // Mark not reactivated so post-commit paths see the durable seal.
             { cell with
                 PendingOffer = None
-                ReactivatedAfterSeal = false }
+                Drain = DrainWindow.Closed }
         | _ ->
             { State = BloggerRuntimeState.Sealed
               PendingOffer = None
               Recovery = BloggerToolRecovery.NoRecovery
-              ReactivatedAfterSeal = false }
+              Drain = DrainWindow.Closed }
 
     /// Force sealed (no in-flight preserve). Used when dropping offers after join.
     let forceSeal (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Sealed
           PendingOffer = None
           Recovery = BloggerToolRecovery.NoRecovery
-          ReactivatedAfterSeal = false }
+          Drain = DrainWindow.Closed }
 
     /// New Authority Root on this main: Blogger may run again after a handle seal.
     ///
@@ -221,18 +227,16 @@ module BloggerRuntime =
             { State = BloggerRuntimeState.Idle
               PendingOffer = None
               Recovery = BloggerToolRecovery.NoRecovery
-              ReactivatedAfterSeal = true }
+              Drain = DrainWindow.Open }
         | BloggerRuntimeState.InFlight _
         | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked ->
-            { cell with
-                ReactivatedAfterSeal = true }
+        | BloggerRuntimeState.Parked -> { cell with Drain = DrainWindow.Open }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
           PendingOffer = None
           Recovery = BloggerToolRecovery.NoRecovery
-          ReactivatedAfterSeal = false }
+          Drain = DrainWindow.Closed }
 
     let inFlightContext (cell: BloggerRuntimeCell) : BloggerRequestContext option =
         match cell.State with
@@ -244,14 +248,19 @@ module BloggerRuntime =
         | BloggerRuntimeState.Sealed -> true
         | _ -> false
 
-    /// Durable handle seal blocks new work unless ReactivatedAfterSeal.
+    let isDrainOpen (cell: BloggerRuntimeCell) : bool =
+        match cell.Drain with
+        | DrainWindow.Open -> true
+        | DrainWindow.Closed -> false
+
+    /// Durable handle seal blocks new work unless DrainWindow.Open.
     let blocksNewRequest (durableHandleSealed: bool) (cell: BloggerRuntimeCell) : bool =
         match cell.State with
         | BloggerRuntimeState.Disposed
         | BloggerRuntimeState.Sealed -> true
         | BloggerRuntimeState.InFlight _ -> false
         | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked -> durableHandleSealed && not cell.ReactivatedAfterSeal
+        | BloggerRuntimeState.Parked -> durableHandleSealed && not (isDrainOpen cell)
 
     let tryPeekInFlight (cell: BloggerRuntimeCell) : Result<BloggerRequestContext, TransitionError> =
         match cell.State with

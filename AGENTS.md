@@ -178,30 +178,29 @@ Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflo
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
 （「functions, not a Flow AST」+ 直接 `task`/`let!`）。
 
-**冻结债（`scripts/check.mjs --threshold=153`，P0-2 后实测 153 / 111 files）**：
+**冻结债（`scripts/check.mjs --threshold=139`，P1-1a 后实测 139 / 111 files）**：
 
 ```text
 mutable                  60   ← 物理并发/累加器可留；业务决策 mutable 删
 behaviour-bool           40   ← 行为选择 bool → Decision DU
-program-counter          32   ← Dirty/Running/commitUnknown/ReactivatedAfterSeal…
 infrastructure-leak      21   ← Session/Application 误 open OpenCode/Process
+program-counter          18   ← EnforcerHost 旗标 / Turn isContinuation / openReviewBarrier…
 business-interpreter      0
 second-runtime-protocol   0
 ```
 
-P0-1 **done**：`ChildRecoveryWorkflow`；sole-owner 门禁已迁；157→155。  
-P0-2 **done**：`SessionRecoveryProgram` AST + `SessionRecoveryInterpreter` 已删；
-`SessionRecoveryWorkflow` 直接 CE + Coordinator single-flight；
-`SpikePlugin`/`PluginRuntimeScope` 已改线；threshold 155→153。
+P0 **done**：Child/Session Recovery → Workflow 直接 CE；157→153。  
+P1-1a **done**：`ReactivatedAfterSeal: bool` → `DrainWindow` Closed|Open；
+`BloggerRuntime.isDrainOpen`；threshold 153→139。
 
 仍在盘上的第二控制流所有者（非「已合法保留」）：
 
 | 位置 | 问题 |
 |------|------|
-| `Kernel/Flow.fs` / `Kernel/DomainFlow.fs` | 旧 Flow 框架；并行能力应拆出，不因并行保住整框架 |
-| `Session/BloggerRuntimeState.fs` + `BloggerCoordinator.fs` | 运行时状态机 + coordinator 双轨 |
-| `Application/Reconciliation/ReconcileSupervisor.fs` | Dirty/Running/cont 类调度计数器 |
-| `Session/EnforcerHost.fs` | `commitUnknown`/`injectRepair`/`abandonThenCatchUp` 程序计数器 |
+| `Session/EnforcerHost.fs` | `commitUnknown`/`injectRepair`/`abandonThenCatchUp` 程序计数器（P1-3） |
+| `Session/BloggerCoordinator.fs` | 仍是 Blogger 业务决策外壳；与 Runtime cell 分工待继续收敛（P1-1 余下） |
+| `Kernel/Flow.fs` / `Kernel/DomainFlow.fs` | 旧 Flow 框架（P2-1） |
+| `Application/Reconciliation/TurnReconcile.fs` 等 | `isContinuation`/`forceConfirmedReviewer` 参数名程序计数器 |
 
 ### PENDING TASK：DSL 全面主导化
 
@@ -240,7 +239,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P1-1 | Blogger：`BloggerRuntimeState` + `BloggerCoordinator` 收敛为单一 CE 工作流 + 物理 cell | 行为 bool/`ReactivatedAfterSeal` 等程序计数器 → `Evidence → Decision`；coordinator 不再是第二套业务状态机；相关 canary 绿 |
+| P1-1 | Blogger：`BloggerRuntimeState` + `BloggerCoordinator` 收敛 | **partial** — P1-1a `DrainWindow` done（153→139）；余下：Coordinator/Enforcer 旗标 Decision 化 |
 | P1-2 | Reconcile 调度与 pass 分离已落地后，清 `ReconcileSupervisor` 程序计数器 | 队列/single-flight/generation 可留；`Dirty`/`Running`/业务 cont 标志 → 调度结构或 Decision；pass 体只走 `Reconciler` CE |
 | P1-3 | `EnforcerHost`：`commitUnknown`/`injectRepair`/`abandonThenCatchUp` 等 → 穷尽 Decision | 提交/修复/放弃路径可由 Decision 阅读重建；禁止再堆 mutable 旗标决定业务 |
 
@@ -256,7 +255,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P3-1 | threshold 阶梯 | `153（P0 后）→ P1 后 → P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
+| P3-1 | threshold 阶梯 | `139（P1-1a 后）→ P1 余下 → P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
 | P3-2 | 发布阶梯 | `npm run check` 绿；目标切片 canary 绿；发布前 `check:release` |
 | P3-3 | 文档只描述现行纪律 | AGENTS.md / TASK.md / spec 表述一致：DSL = 直接 CE；无 Wave M* 施工模板；无「Interpreter 为唯一执行者」 |
 

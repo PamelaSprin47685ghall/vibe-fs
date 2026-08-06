@@ -4440,7 +4440,7 @@ export const bloggerRuntime = (() => {
         decision: caseOf(pair[1]),
         pending: unwrapOption(pair[0].PendingOffer),
         recovery: recoveryOf(pair[0]),
-        reactivated: pair[0].ReactivatedAfterSeal,
+        reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
     onCycleCommitted: (cell) => {
@@ -4450,7 +4450,7 @@ export const bloggerRuntime = (() => {
             ok: true,
             state: r.value,
             recovery: recoveryOf(r.value),
-            reactivated: r.value.ReactivatedAfterSeal,
+            reactivated: caseOf(r.value.Drain) === 'Open',
           }
         : { ok: false, error: caseOf(r.error) }
     },
@@ -4463,7 +4463,7 @@ export const bloggerRuntime = (() => {
         state: pair[0],
         decision: caseOf(pair[1]),
         recovery: recoveryOf(pair[0]),
-        reactivated: pair[0].ReactivatedAfterSeal,
+        reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
     onFail: (cell) => {
@@ -4473,7 +4473,7 @@ export const bloggerRuntime = (() => {
             ok: true,
             state: r.value,
             recovery: recoveryOf(r.value),
-            reactivated: r.value.ReactivatedAfterSeal,
+            reactivated: caseOf(r.value.Drain) === 'Open',
           }
         : { ok: false, error: caseOf(r.error) }
     },
@@ -4500,7 +4500,7 @@ export const bloggerRuntime = (() => {
     },
     stateOf: (cell) => caseOf(cell.State),
     recoveryOf,
-    reactivatedOf: (cell) => cell.ReactivatedAfterSeal,
+    reactivatedOf: (cell) => caseOf(cell.Drain) === 'Open',
   }
 })()
 
