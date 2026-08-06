@@ -175,11 +175,11 @@ export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 
  * Independent of production PER_TEST/UNIT_VERDICT so raising production CI headroom
  * does not collapse fixture headroom (VERIFY-004 inequalities still hold).
  */
-export const UNIT_RUNNER_PROBE_PER_TEST_MS = budgetFromEnv('UNIT_RUNNER_PROBE_PER_TEST_MS', 2500);
-export const UNIT_RUNNER_PROBE_SILENCE_MS = budgetFromEnv('UNIT_RUNNER_PROBE_SILENCE_MS', 12000);
+export const UNIT_RUNNER_PROBE_PER_TEST_MS = budgetFromEnv('UNIT_RUNNER_PROBE_PER_TEST_MS', 1500);
+export const UNIT_RUNNER_PROBE_SILENCE_MS = budgetFromEnv('UNIT_RUNNER_PROBE_SILENCE_MS', 5000);
 export const UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS = budgetFromEnv(
   'UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS',
-  6000,
+  2500,
 );
 
 // ── waiting for one semantic event ──────────────────────────────────────────
