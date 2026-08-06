@@ -4428,7 +4428,6 @@ export const bloggerRequestContext = (() => {
 
 export const bloggerRuntime = (() => {
   const stateCase = unionCase(BloggerRuntimeModule.BloggerRuntimeState, 'BloggerRuntimeState')
-  const recoveryCase = unionCase(BloggerRuntimeModule.BloggerToolRecovery, 'BloggerToolRecovery')
   const m = bind(BloggerRuntimeModule, 'BloggerRuntime', [
     'empty',
     'ofState',
@@ -4437,8 +4436,6 @@ export const bloggerRuntime = (() => {
     'onCycleCommitted',
     'onSquashCommitted',
     'onFail',
-    'markInteractionNudgeIssued',
-    'markAabbRepairConsumed',
     'onSeal',
     'forceSeal',
     'onReactivate',
@@ -4467,12 +4464,6 @@ export const bloggerRuntime = (() => {
     disposed: m.ofState(stateCase('Disposed', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
-    recovery: {
-      noRecovery: () => recoveryCase('NoRecovery', []),
-      interactionNudgeIssued: (run) => recoveryCase('InteractionNudgeIssued', [providerRun(run)]),
-      aabbRepairConsumed: () => recoveryCase('AabbRepairConsumed', []),
-      of: recoveryOf,
-    },
     onMaterial: (cell, ctx) => {
       const r = resultOf(m.onMaterial(cell, ctx))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
@@ -4482,7 +4473,6 @@ export const bloggerRuntime = (() => {
         state: pair[0],
         decision: caseOf(pair[1]),
         pending: unwrapOption(pair[0].PendingOffer),
-        recovery: recoveryOf(pair[0]),
         reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
@@ -4492,7 +4482,6 @@ export const bloggerRuntime = (() => {
         ? {
             ok: true,
             state: r.value,
-            recovery: recoveryOf(r.value),
             reactivated: caseOf(r.value.Drain) === 'Open',
           }
         : { ok: false, error: caseOf(r.error) }
@@ -4505,23 +4494,18 @@ export const bloggerRuntime = (() => {
         ok: true,
         state: pair[0],
         decision: caseOf(pair[1]),
-        recovery: recoveryOf(pair[0]),
         reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
     onFail: (cell) => {
       const r = resultOf(m.onFail(cell))
-      return r.ok
-        ? {
-            ok: true,
-            state: r.value,
-            recovery: recoveryOf(r.value),
-            reactivated: caseOf(r.value.Drain) === 'Open',
-          }
-        : { ok: false, error: caseOf(r.error) }
+      if (!r.ok) return { ok: false, error: caseOf(r.error) }
+      return {
+        ok: true,
+        state: r.value,
+        reactivated: caseOf(r.value.Drain) === 'Open',
+      }
     },
-    markInteractionNudgeIssued: (cell, run) => m.markInteractionNudgeIssued(cell, providerRun(run)),
-    markAabbRepairConsumed: (cell) => m.markAabbRepairConsumed(cell),
     onSeal: (cell) => m.onSeal(cell),
     forceSeal: (cell) => m.forceSeal(cell),
     onReactivate: (cell) => m.onReactivate(cell),
@@ -4542,7 +4526,6 @@ export const bloggerRuntime = (() => {
       return { ok: true, pending: unwrapOption(pair[0]), state: pair[1] }
     },
     stateOf: (cell) => caseOf(cell.State),
-    recoveryOf,
     reactivatedOf: (cell) => caseOf(cell.Drain) === 'Open',
   }
 })()

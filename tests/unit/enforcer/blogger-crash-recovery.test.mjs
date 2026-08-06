@@ -6,7 +6,8 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { caseOf } from '../support/domain.mjs'
 
@@ -32,17 +33,27 @@ const enforcerSrc = readFileSync(
   'utf8',
 )
 
+const probeModuleSrc = readFileSync(
+  join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+  'utf8',
+)
+
 const loadRecovery = async () => {
-  const mod = await import(
+  // ENFORCER-153 derivation lives in BloggerRecoveryProbe; the crash window
+  // classify/restore stays in BloggerCrashRecovery.
+  const crash = await import(
     new URL('../../../dist/Application/Reconciliation/BloggerCrashRecovery.js', import.meta.url).pathname
   )
-  return mod
+  const probe = await import(
+    new URL('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js', import.meta.url).pathname
+  )
+  return { crash, probe }
 }
 
 const rejudgeFromEvidence = async () => {
-  const mod = await loadRecovery()
+  const { probe: mod } = await loadRecovery()
   const fn =
-    mod.BloggerCrashRecovery_rejudgeFromEvidence ||
+    mod.BloggerRecoveryProbe_rejudgeFromEvidence ||
     mod.rejudgeFromEvidence ||
     Object.values(mod).find((v) => typeof v === 'function' && v.name?.includes('rejudgeFromEvidence'))
   assert.ok(fn, 'rejudgeFromEvidence export present')
@@ -63,9 +74,9 @@ test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(recoverySrc, /RestoredParked/)
   assert.match(recoverySrc, /RestoredInFlight/)
   assert.match(recoverySrc, /crash-window-A/)
-  assert.match(recoverySrc, /rejudgeFromEvidence/)
-  assert.match(recoverySrc, /rejudgeToolRecovery/)
-  assert.match(recoverySrc, /blogger-missing-tool/)
+  assert.match(probeModuleSrc, /rejudgeFromEvidence/)
+  assert.match(probeModuleSrc, /rejudgeToolRecovery/)
+  assert.match(probeModuleSrc, /blogger-missing-tool/)
 })
 
 test('C5_crash_recovery_wired_through_family_ports', () => {
@@ -77,7 +88,7 @@ test('C5_crash_recovery_wired_through_family_ports', () => {
 })
 
 test('C5_classify_open_request_window_A_unsent', async () => {
-  const mod = await loadRecovery()
+  const { crash: mod } = await loadRecovery()
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
     mod.classifyOpenRequest ||
@@ -90,7 +101,7 @@ test('C5_classify_open_request_window_A_unsent', async () => {
 })
 
 test('C5_classify_open_request_window_C_tool_present', async () => {
-  const mod = await loadRecovery()
+  const { crash: mod } = await loadRecovery()
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
     mod.classifyOpenRequest ||
@@ -101,7 +112,7 @@ test('C5_classify_open_request_window_C_tool_present', async () => {
 })
 
 test('C5_classify_open_request_window_B_inflight', async () => {
-  const mod = await loadRecovery()
+  const { crash: mod } = await loadRecovery()
   const classify =
     mod.BloggerCrashRecovery_classifyOpenRequest ||
     mod.classifyOpenRequest ||
@@ -171,22 +182,30 @@ test('ENFORCER_153_claim_with_missing_terminal_in_transcript_keeps_nudge_not_aab
   assert.equal(caseOf(out), 'InteractionNudgeIssued')
 })
 
-test('ENFORCER_153_restoreRuntime_wires_rejudge_not_hardcoded_NoRecovery', () => {
-  // Source contract: restore path must call rejudgeToolRecovery for InFlight open.
-  assert.match(recoverySrc, /rejudgeToolRecovery durable/)
-  assert.match(recoverySrc, /Recovery = recovery/)
-  // Hardcoded NoRecovery only on abandon / parked-success paths, not open InFlight.
-  const inflightRestore = recoverySrc.match(
-    /restoreRuntime[\s\S]*?InFlight ctx[\s\S]*?recovery/,
+test('ENFORCER_153_cell_carries_no_recovery_mirror', () => {
+  // DSL-003: the recovery stage is derived on every read (BloggerRecoveryProbe),
+  // so BloggerRuntimeCell must not carry a Recovery field and BloggerRuntime must
+  // not expose mark* transition writers for it.
+  const runtimeSrc = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Session/BloggerRuntimeState.fs'),
+    'utf8',
   )
-  assert.ok(inflightRestore, 'InFlight restore must pass rejudged recovery')
+  assert.doesNotMatch(runtimeSrc, /Recovery: BloggerToolRecovery/)
+  assert.doesNotMatch(runtimeSrc, /markInteractionNudgeIssued/)
+  assert.doesNotMatch(runtimeSrc, /markAabbRepairConsumed/)
+  // restoreRuntime no longer takes a rejudged recovery: nothing to store.
+  assert.doesNotMatch(recoverySrc, /Recovery = recovery/)
 })
 
 test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
   // AABB is derived from the visible transcript, not a memory mark. Cold rejudge
-  // (rejudgeFromEvidence / rejudgeToolRecovery) must restore InteractionNudgeIssued
-  // at most, never AabbRepairConsumed.
-  const coldRejudge = recoverySrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)
+  // (rejudgeFromEvidence / rejudgeToolRecovery in BloggerRecoveryProbe) must
+  // restore InteractionNudgeIssued at most, never AabbRepairConsumed.
+  const probeSrc = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
+    'utf8',
+  )
+  const coldRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)
   assert.ok(coldRejudge)
   assert.doesNotMatch(coldRejudge[0], /BloggerToolRecovery\.AabbRepairConsumed/)
 })
@@ -198,3 +217,62 @@ test('ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
   assert.match(enforcerSrc, /BloggerToolRecovery\.InteractionNudgeIssued _[\s\S]*?aabbRepair/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairConsumed[\s\S]*?fatalEnd/)
 })
+
+test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run', async () => {
+  // Hot path derivation: a claim on terminal A + a NEW pure-prose terminal B
+  // must read as InteractionNudgeIssued(A) — handleContinuation then takes the
+  // AABB branch (issued run != current terminal), never a second nudge.
+  const { agentFact, agentJournal, authorityRoot, idValue, logicalRunId, payloadOf, promptKey, providerRun, sessionId, stream } = await import('../support/domain.mjs')
+  const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import('../../../dist/Journal/AgentJournal.js')
+  const probe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
+  const repairState =
+    probe.BloggerRecoveryProbe_repairState ||
+    probe.repairState
+
+  const directory = mkdtempSync(join(tmpdir(), 'enforcer-153-repairstate-'))
+  const created = agentJournal.create({ directory })
+  assert.equal(created.ok, true)
+  const journal = created.journal
+  const blog = sessionId('ses-blog')
+  const root = AgentJournalModule_appendAgent(
+    stream.session(blog),
+    undefined,
+    agentFact('AuthorityRootAccepted', {
+      SessionId: blog,
+      LogicalRunId: logicalRunId('blog-run-1'),
+      AuthorityRootUserMessageId: authorityRoot('msg-blog-root'),
+      AuthorityKind: 'AgentOwnerRoot',
+      SelectedAgent: 'fast-blogger',
+      PeerAgent: 'deep-blogger',
+      CanonicalRole: 'blogger',
+      SelectedTier: 'fast',
+    }),
+    journal,
+  )
+  assert.equal(caseOf(root), 'Ok')
+
+  const digest = (await import('../support/domain.mjs')).authority.repairPayloadDigest(providerRun('asst-p1'), 'blogger-missing-tool')
+  const claimed = AgentJournalModule_appendAgent(
+    stream.session(blog),
+    undefined,
+    agentFact('PluginPromptClaimed', {
+      PromptKey: promptKey('pk-claimed'),
+      SessionId: blog,
+      ContinuationKind: 'InteractionRepair',
+      LogicalRunId: logicalRunId('blog-run-1'),
+      AuthorityRootUserMessageId: authorityRoot('msg-blog-root'),
+      EffectiveAgent: 'fast-blogger',
+      PayloadDigest: digest,
+    }),
+    journal,
+  )
+  assert.equal(caseOf(claimed), 'Ok')
+
+  const stage = repairState(journal, blog, 'req-1', providerRun('asst-p2'), [])
+  assert.equal(caseOf(stage), 'InteractionNudgeIssued')
+  const claimedRun = payloadOf(stage)
+  assert.equal(idValue.providerRun(claimedRun), 'asst-p1', 'payload is the CLAIMED run, not the new terminal')
+  created.dispose()
+  rmSync(directory, { recursive: true, force: true })
+})
+

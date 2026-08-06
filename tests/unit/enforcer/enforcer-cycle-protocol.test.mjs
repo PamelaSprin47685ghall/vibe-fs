@@ -18,6 +18,10 @@ import {
   toList,
   listItems,
   caseOf,
+  mapEntries,
+  payloadOf,
+  mapToObject,
+  idValue,
   bloggerRequestContext,
   parkedTransform,
   bloggerRuntime,
@@ -27,6 +31,7 @@ import {
   transportReceipt,
   authorityRoot,
   logicalRunId,
+  providerRun,
 } from '../support/domain.mjs'
 
 // EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
@@ -43,6 +48,8 @@ const {
   resolveCycleContext,
 } = await import('../../../dist/Session/EnforcerHost.js')
 const HostSessionNudge = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js')
+const BloggerRecoveryProbe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
+const { lastAssistantStep } = await import('../../../dist/Session/EnforcerHost.js')
 const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/BlogTool.js')
 
 /**
@@ -165,8 +172,60 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
     }
   }
 
+  // Production probe (SpikePlugin): the recovery stage derives from durable
+  // claim + transcript on every read; the runtime cell carries no mirror.
+  // NOTE: Fable compiles the curried RecoveryStageProbe as a FOUR-argument
+  // direct call (journal, sid, messages, ctx) — a JS closure returning a
+  // function would be matched as a function value and silently take the wrong
+  // branch.
+  const recoveryProbeDirect = (durable, sid, rawMessages, ctx) => {
+    const step = lastAssistantStep(rawMessages)
+    const terminalRun =
+      step !== undefined && step[0] !== undefined && String(step[0]).trim() !== ''
+        ? providerRun(step[0])
+        : providerRun('unknown-prose-run')
+    const requestKey = idValue.bloggerRequest(payloadOf(ctx).RequestId)
+    return BloggerRecoveryProbe.BloggerRecoveryProbe_repairState
+      ? BloggerRecoveryProbe.BloggerRecoveryProbe_repairState(durable, sid, requestKey, terminalRun, rawMessages)
+      : BloggerRecoveryProbe.repairState(durable, sid, requestKey, terminalRun, rawMessages)
+  }
+
+  const recoveryProbe = (durable, sid, rawMessages, ctx) => {
+    const step = lastAssistantStep(rawMessages)
+    const terminalRun =
+      step !== undefined && step[0] !== undefined && String(step[0]).trim() !== ''
+        ? providerRun(step[0])
+        : providerRun('unknown-prose-run')
+    // ctx is the BloggerRequestContext union; the request id lives on the payload
+    // as a BloggerRequestId identity — the probe compares it against the string
+    // requestKey embedded in injected repair messages.
+    const requestKey = idValue.bloggerRequest(payloadOf(ctx).RequestId)
+    return BloggerRecoveryProbe.BloggerRecoveryProbe_repairState
+      ? BloggerRecoveryProbe.BloggerRecoveryProbe_repairState(durable, sid, requestKey, terminalRun, rawMessages)
+      : BloggerRecoveryProbe.repairState(durable, sid, requestKey, terminalRun, rawMessages)
+  }
+
   // Third arg is InteractionRepairNudge option (not raw ISessionHostPort).
-  const run = (messages) => handleContinuation(scope, journal, repairNudge, blog, messages)
+  // The Host transform input is a FULL session snapshot: every earlier run's
+  // output — including an injected AABB repair message — is visible on later
+  // runs. The harness accumulates exactly that (ENFORCER-153: AABB spent is
+  // derived from the transcript, so the repair message IS the budget marker).
+  // Host transform input is the FULL session snapshot: each run's output —
+  // including an injected AABB repair message — becomes visible to later runs.
+  // The harness accumulates outputs, exactly like Host message persistence
+  // (ENFORCER-153: the repair message IS the spent-budget marker).
+  const outcomeMessages = (outcome) => {
+    const tag = caseOf(outcome)
+    if (tag === 'ProjectMessages' || tag === 'StopPhysicalRun') return listItems(outcome.fields[0])
+    return []
+  }
+  let transcript = []
+  const run = async (messages) => {
+    const input = toList([...transcript, ...listItems(messages)])
+    const out = await handleContinuation(scope, journal, repairNudge, recoveryProbe, blog, input)
+    transcript = [...transcript, ...outcomeMessages(out)]
+    return out
+  }
 
   try {
     await fn({
@@ -304,11 +363,18 @@ const stopReasonOf = (outcome) => {
   return outcome.fields[1]
 }
 
-const hasRepairMessage = (outcome) =>
-  messagesOf(outcome).some((msg) => {
-    const text = msg?.parts?.[0]?.text ?? ''
-    return text.includes('Protocol repair') || text === RepairInstruction
-  })
+/**
+ * Whether THIS outcome appended a fresh AABB repair message. Repair injection
+ * always appends to the transcript, and the Host snapshot accumulates earlier
+ * messages — so the check is the LAST message, never a scan (a fatal/project
+ * outcome echoes the transcript including any historical repair).
+ */
+const hasRepairMessage = (outcome) => {
+  const msgs = messagesOf(outcome)
+  if (msgs.length === 0) return false
+  const text = msgs.at(-1)?.parts?.[0]?.text ?? ''
+  return text.includes('Protocol repair') || text === RepairInstruction
+}
 
 const assertNonEmptyMessages = (outcome, label = 'messages') => {
   const msgs = messagesOf(outcome)
@@ -317,10 +383,40 @@ const assertNonEmptyMessages = (outcome, label = 'messages') => {
 }
 
 const runtimeTag = (scope) => caseOf(scope.GetBloggerRuntime(BLOG).State)
-const recoveryTag = (scope) => caseOf(scope.GetBloggerRuntime(BLOG).Recovery)
-const isAabb = (scope) => recoveryTag(scope) === 'AabbRepairConsumed'
-const isNudge = (scope) => recoveryTag(scope) === 'InteractionNudgeIssued'
-const isNoRecovery = (scope) => recoveryTag(scope) === 'NoRecovery'
+
+// DSL-003: the cell carries no Recovery field. The repair stage is inferred
+// from observable evidence, exactly what BloggerRecoveryProbe.repairState reads.
+// `isNudge`   = a durable InteractionRepair claim exists for the blog session
+//               (the nudge/claim was produced — sent or already-present).
+// `isAabb`    = the live transcript carries an injected AABB repair message
+//               (requestKey-tagged interaction-repair with synthetic flag).
+// `isNoRecovery`= neither.
+const isNudgeFromJournal = (journal) => {
+  // ENFORCER-153: a nudge leaves a durable InteractionRepair claim scope in
+  // ClaimSequences. The scope is a `\u001f`-joined string (NOT hashed — see
+  // claimScopeDigest docs), and the repair payload digest embeds the repair
+  // kind, so the claim is identifiable without reaching into F# internals.
+  const snap = AgentJournalModule_snapshot(journal)
+  const session = fold.session(snap, BLOG)
+  if (!session?.PromptAuthority?.ClaimSequences) return false
+  return [...mapEntries(session.PromptAuthority.ClaimSequences)].some(([scope]) =>
+    scope.includes('blogger-missing-tool'),
+  )
+}
+
+const isAabb = (messages) =>
+  messages.some((m) => {
+    const info = m && (m.info ?? m)
+    return (
+      info &&
+      info.source === 'interaction-repair' &&
+      info.synthetic === true &&
+      typeof info.requestKey === 'string'
+    )
+  })
+
+const isNoRecovery = (journal, messages) =>
+  !isNudgeFromJournal(journal) && !isAabb(messages)
 
 // ── BlogTool execute gate (ENFORCER-061) ────────────────────────────────────
 
@@ -383,7 +479,7 @@ test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
     const out = await run(liveBlog('asst-1', 'c1', { text: '' }))
 
     assert.equal(hasRepairMessage(out), true, 'must inject RepairInstruction (not fake spent-only)')
-    assert.equal(isAabb(scope), true)
+    assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(runtimeTag(scope), 'InFlight', 'repair must not clear InFlight')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 0, 'expected repair is silent')
@@ -411,21 +507,21 @@ test('ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ign
     const out = await run(historicalBlog('asst-hist', 'c-hist', { text: '' }))
 
     assert.equal(hasRepairMessage(out), true, 'owned empty cycle must repair once')
-    assert.equal(isAabb(scope), true)
+    assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(runtimeTag(scope), 'InFlight')
     assert.equal(fatals.length, 0)
   })
 })
 
 test('ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
-  await withHarness(async ({ scope, fatals, run }) => {
+  await withHarness(async ({ journal, scope, fatals, run }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
     parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
 
     const out = await run(historicalBlog('asst-orphan-hist', 'c-hist', { text: '' }))
 
     assert.equal(hasRepairMessage(out), false)
-    assert.equal(isNoRecovery(scope), true)
+    assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(fatals.length, 0)
   })
@@ -434,12 +530,12 @@ test('ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
 // ── no blog pure prose (ENFORCER-060 / 064..068) ────────────────────────────
 
 test('ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(pureProse('asst-p', 'I refuse tools'))
 
     assert.equal(hasRepairMessage(out), false, 'first pure prose must not inject AABB transcript repair')
-    assert.equal(isNudge(scope), true, 'stage = InteractionNudgeIssued')
-    assert.equal(isAabb(scope), false)
+    assert.equal(isNudgeFromJournal(journal), true, 'stage = InteractionNudgeIssued')
+    assert.equal(isAabb(messagesOf(out)), false)
     assert.equal(runtimeTag(scope), 'InFlight')
     assert.equal(capturedSends.length, 1, 'exactly one durable InteractionRepair send')
     assert.match(String(capturedSends[0].text), /blog tool exactly once|Protocol repair/)
@@ -448,16 +544,16 @@ test('ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async ()
 })
 
 test('ENFORCER_060_pure_prose_same_terminal_reentry_does_not_aabb', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     await run(pureProse('asst-same', 'no tools'))
     assert.equal(capturedSends.length, 1)
-    assert.equal(isNudge(scope), true)
+    assert.equal(isNudgeFromJournal(journal), true)
 
     // Same assistant id = same provider run: transform re-fire, not semantic failure.
     const out = await run(pureProse('asst-same', 'no tools again'))
 
     assert.equal(hasRepairMessage(out), false, 'same terminal must not AABB')
-    assert.equal(isNudge(scope), true)
+    assert.equal(isNudgeFromJournal(journal), true)
     assert.equal(capturedSends.length, 1, 'must not send a second nudge')
     assert.equal(fatals.length, 0)
   })
@@ -501,33 +597,34 @@ test('ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send',
     const out = await run(pureProse('asst-preclaim', 'prose after durable claim'))
 
     assert.equal(hasRepairMessage(out), false, 'already claimed must not AABB')
-    assert.equal(isNudge(scope), true, 'stage = InteractionNudgeIssued')
-    assert.equal(isAabb(scope), false)
+    assert.equal(isNudgeFromJournal(journal), true, 'stage = InteractionNudgeIssued')
+    assert.equal(isAabb(messagesOf(out)), false)
     assert.equal(capturedSends.length, 0, 'must not re-send nudge when claim exists')
     assert.equal(fatals.length, 0)
   })
 })
 
 test('ENFORCER_060_pure_prose_second_terminal_triggers_aabb', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     await run(pureProse('asst-p1', 'no tools'))
     assert.equal(capturedSends.length, 1)
-    assert.equal(isNudge(scope), true)
+    assert.equal(isNudgeFromJournal(journal), true)
 
     // New assistant id = new pure-prose terminal after nudge → semantic failure → AABB.
     const out = await run(pureProse('asst-p2', 'still no'))
 
     assert.equal(hasRepairMessage(out), true, 'second pure prose is AABB')
-    assert.equal(isAabb(scope), true)
+    assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(capturedSends.length, 1, 'must not send a second nudge')
     assert.equal(fatals.length, 0)
   })
 })
 
 test('ENFORCER_060_pure_prose_after_aabb_fatals', async () => {
-  await withHarness(async ({ scope, fatals, lastFatal, run }) => {
-    await run(pureProse('asst-p1', 'no tools'))
-    await run(pureProse('asst-p2', 'still no')) // AABB
+  await withHarness(async ({ journal, scope, fatals, lastFatal, run, blog }) => {
+    const out1 = await run(pureProse('asst-p1', 'no tools'))
+    const out2 = await run(pureProse('asst-p2', 'still no')) // AABB
+
     const out = await run(pureProse('asst-p3', 'third'))
 
     assert.equal(hasRepairMessage(out), false)
@@ -543,7 +640,7 @@ test('ENFORCER_060_nudge_dispatch_hard_fail_triggers_aabb', async () => {
     async ({ scope, fatals, run }) => {
       const out = await run(pureProse('asst-fail-nudge', 'prose'))
       assert.equal(hasRepairMessage(out), true, 'dispatch failure → immediate AABB')
-      assert.equal(isAabb(scope), true)
+      assert.equal(isAabb(messagesOf(out)), true)
       assert.equal(runtimeTag(scope), 'InFlight')
       assert.equal(fatals.length, 0)
     },
@@ -556,7 +653,7 @@ test('ENFORCER_060_nudge_without_session_port_triggers_aabb', async () => {
     async ({ scope, fatals, run }) => {
       const out = await run(pureProse('asst-no-port', 'prose'))
       assert.equal(hasRepairMessage(out), true, 'no port → AABB')
-      assert.equal(isAabb(scope), true)
+      assert.equal(isAabb(messagesOf(out)), true)
       assert.equal(fatals.length, 0)
     },
     { portMode: 'none' },
@@ -564,11 +661,11 @@ test('ENFORCER_060_nudge_without_session_port_triggers_aabb', async () => {
 })
 
 test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(pendingBlog('asst-pend', 'cp'))
 
     assert.equal(hasRepairMessage(out), false)
-    assert.equal(isNoRecovery(scope), true)
+    assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
     assert.equal(runtimeTag(scope), 'InFlight')
     assert.equal(fatals.length, 0)
@@ -576,11 +673,11 @@ test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
 })
 
 test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(outboundShell('asst-outbound'))
 
     assert.equal(hasRepairMessage(out), false, 'must not inject Protocol repair on outbound shell')
-    assert.equal(isNoRecovery(scope), true)
+    assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
     assert.equal(runtimeTag(scope), 'InFlight', 'keep live request; session content remains')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
@@ -594,12 +691,12 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
 })
 
 test('ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     const out = await run(interruptedBlog('asst-killed', 'blog-hang'))
 
     // Interrupted tool is not pure-prose nudge (ENFORCER-065); original AABB path.
     assert.equal(hasRepairMessage(out), true, 'first interrupt uses AABB repair')
-    assert.equal(isAabb(scope), true)
+    assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(capturedSends.length, 0, 'interrupt must not send InteractionNudge')
     assert.equal(runtimeTag(scope), 'InFlight')
     assert.equal(fatals.length, 0)
@@ -607,7 +704,7 @@ test('ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () 
 })
 
 test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     // Harness starts InFlight. A completed interrupted blog part is Host abort cleanup:
     // AABB once (refresh + repair), not pure-prose nudge.
     const out = await run(
@@ -615,7 +712,7 @@ test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', asy
     )
 
     assert.equal(hasRepairMessage(out), true)
-    assert.equal(isAabb(scope), true)
+    assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
     assert.equal(runtimeTag(scope), 'InFlight')
     assert.equal(fatals.length, 0)
@@ -623,7 +720,7 @@ test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', asy
 })
 
 test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(runtimeTag(scope), 'Idle')
 
@@ -634,7 +731,7 @@ test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () =
     assert.equal(outcomeTag(out), 'StopPhysicalRun')
     assertNonEmptyMessages(out, 'unowned completed prose stop payload')
     assert.match(String(stopReasonOf(out)), /unowned/)
-    assert.equal(isNoRecovery(scope), true)
+    assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
     assert.equal(runtimeTag(scope), 'Idle')
     assert.equal(fatals.length, 0)
@@ -642,7 +739,7 @@ test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () =
 })
 
 test('ENFORCER_060_interrupted_blog_without_live_request_stops_no_repair', async () => {
-  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+  await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     // P0 AbortSession residue: interrupted blog parts remain after stop, but CurrentRequest
     // is gone. Must not re-derive durable open and inject # Protocol repair.
     parkedTransform.clearCurrentRequest(scope, BLOG)
@@ -873,26 +970,12 @@ test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
   })
 })
 
-// ── Recovery stage lifecycle on pure runtime cell ───────────────────────────
-
-test('ENFORCER_064_recovery_stage_nudge_then_aabb_onFail_resets', () => {
-  const ctx = bloggerRequestContext.main({ toml: 'cell' })
-  const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx)
-  assert.equal(started.ok, true)
-  assert.equal(bloggerRuntime.recoveryOf(started.state).tag, 'NoRecovery')
-
-  const nudged = bloggerRuntime.markInteractionNudgeIssued(started.state, 'run-1')
-  assert.equal(bloggerRuntime.recoveryOf(nudged).tag, 'InteractionNudgeIssued')
-  assert.equal(bloggerRuntime.stateOf(nudged), 'InFlight')
-
-  const aabb = bloggerRuntime.markAabbRepairConsumed(nudged)
-  assert.equal(bloggerRuntime.recoveryOf(aabb).tag, 'AabbRepairConsumed')
-
-  const failed = bloggerRuntime.onFail(aabb)
-  assert.equal(failed.ok, true)
-  assert.equal(bloggerRuntime.stateOf(failed.state), 'Idle')
-  assert.equal(bloggerRuntime.recoveryOf(failed.state).tag, 'NoRecovery')
-})
+// ── Recovery stage is derived, not stored (ENFORCER-153 / DSL-003) ────────────
+// `BloggerRuntimeCell` no longer carries a `Recovery` field and exposes no
+// mark* transition writers. The stage is the observable evidence the hot path
+// reads: a durable InteractionRepair claim (nudge) and an injected AABB repair
+// message on the transcript. Those evidence paths are asserted by the turn
+// trajectory tests above, so there is no cell-level state machine left to unit.
 
 test('ENFORCER_RepairInstruction_is_stable_minimal_protocol_text', () => {
   assert.match(RepairInstruction, /Protocol repair/)

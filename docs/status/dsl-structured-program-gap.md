@@ -14,11 +14,15 @@
    - `dsl-ownership-ratchet-baseline.json` 已更新。
 5. `src/Wanxiangshu/Kernel/Fact.fs` 的扁平跨域 `AgentFact`（54 case）已按 bounded context 拆分为 7 个 family：`PromptFactCases` / `FallbackFactCases` / `ReviewFactCases` / `ExecutionFactCases` / `OrchestratorFactCases` / `CompanionFactCases` / `ContextFactCases`。`AgentFact` 变为 7-case 分派联合；同名 family 模块（`PromptFact` 等）提供唯一的构造面（`PromptFact.PluginPromptClaimed payload` 形式），fold 按 family 分派。wire 形状逐字节不变（Thoth 只编码 case 名与 payload，不编码声明类型），无需 journal 迁移。
 6. `src/Wanxiangshu/Session/Companion.fs` 的 `slotArmed` 裸布尔已升级为一次性 `RecoveryArming`（`Armed of TaskCompletionSource<unit>`）：物理 waiter 而非控制流布尔，重启后 `NotArmed` 语义保持。
+7. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 的 `BloggerRuntimeCell.Recovery` 字段与 `BloggerRuntime.markInteractionNudgeIssued` / `markAabbRepairConsumed` 转换器已删除（ENFORCER-153 / DSL-003）：
+   - 推导逻辑移入 `src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs`（`repairState` / `rejudgeToolRecovery` / `rejudgeFromEvidence`）；
+   - 热路径（`EnforcerHost.handleContinuation`）通过注入的 `RecoveryStageProbe` 端口读取推导结果，`BloggerRuntimeCell` 不再携带 Recovery 镜像；
+   - `repairState` 两段式 claim 检查：同一 terminal 重入 → `InteractionNudgeIssued(terminal)`；任一旧 claim 存在且出现新 pure-prose terminal → `InteractionNudgeIssued(claimedRun)`（AABB 语义失败）；transcript 含注入的 repair 消息（同 requestKey）→ `AabbRepairConsumed`；
+   - AABB 消耗的可见证据是注入的 `interaction-repair` synthetic 消息：Host transform 输入是完整 snapshot，后续回合可见该消息（测试 harness 模拟输出累积）。
 
 ## 仍存差距
 
-1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 仍含 `BloggerRuntimeCell` 状态乘积（`State`, `PendingOffer`, `Recovery`, `Drain`）。
-   - `BloggerToolRecovery` 已改为从 Host transcript 纯推导（`BloggerCrashRecovery.repairState`），但 `cell.Recovery` 字段尚未删除。
+1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 仍含 `BloggerRuntimeCell` 状态乘积（`State`, `PendingOffer`, `Drain`）。
    - 后续需拆除 `InFlight/Idle/Parked/Sealed/Disposed` 业务 State，迁移为 single-flight Task ownership。
 2. `src/Wanxiangshu/Session/Companion.fs` 仍暴露 `ArmRecoverySlot/DisarmRecoverySlot/IsRecoveryArmed` 查询/设置式 API；底层虽已是 TCS waiter，接口形态仍未迁移为「失败启动一次结构化恢复机会、材料经由 `TryConsumeRecoverySlot` 消费」的直接 CE 流程。
 
@@ -31,3 +35,4 @@
 - `npm run lint` 通过。
 - `npm run check` 通过。
 - 完成剩余差距后删除本文件。
+- ENFORCER-153 前置 canary：需在 e2e 层证明注入的 `interaction-repair` synthetic 消息在 Host 下一次 transform 输入的完整 snapshot 中仍然存在（当前由 unit 层 harness 的 transcript 累积模拟，真实 Host 持久化行为尚未有 canary 覆盖）。

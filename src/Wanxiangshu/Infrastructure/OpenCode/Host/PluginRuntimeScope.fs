@@ -227,8 +227,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     // Materialize / recovery may re-arm before onCycleCommitted flips state.
                     bloggerRuntime.[sessionId] <-
                         { cell with
-                            State = BloggerRuntimeState.InFlight context
-                            Recovery = cell.Recovery })
+                            State = BloggerRuntimeState.InFlight context })
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
@@ -243,8 +242,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     | BloggerRuntimeState.InFlight _ ->
                         bloggerRuntime.[sessionId] <-
                             { cell with
-                                State = BloggerRuntimeState.Idle
-                                Recovery = BloggerToolRecovery.NoRecovery }
+                                State = BloggerRuntimeState.Idle }
                     | _ -> ()
                 | false, _ -> ())
 
