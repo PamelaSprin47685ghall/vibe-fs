@@ -213,16 +213,16 @@ export const unitRunnerCases = [
       // and it was invisible until the red proof was attempted. Which is the argument for
       // 「门禁必须红过一次才算存在」 stated as cheaply as it can be stated.
       //
-      // The distinguishing input is work that is legitimately slower than the window: five tests at
-      // 80% of the per-test bound each, none near the bound, the total past the window. Only
+      // The distinguishing input is work that is legitimately slower than the window: eight tests at
+      // 50% of the per-test bound each, none near the bound, the total past the window. Only
       // per-verdict renewal survives it. The window must cover first-verdict latency (~700ms,
       // measured) plus one verdict gap, so it stays at UNIT_RUNNER_PROBE_SILENCE_MS rather than TIGHT.
       const run = await runFixture('slower-than-the-window.fixture.mjs', scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS));
 
       assertEq(run.code, 0, `legitimate slow work must complete: ${run.stderr.slice(-400)}`);
       assertTrue(
-        run.stderr.includes('runner: 5 passed, 0 failed'),
-        `all five verdicts must arrive: ${run.stderr.slice(-300)}`,
+        run.stderr.includes('runner: 8 passed, 0 failed'),
+        `all eight verdicts must arrive: ${run.stderr.slice(-300)}`,
       );
       assertTrue(
         !run.stderr.includes('WATCHDOG'),
