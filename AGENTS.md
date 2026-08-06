@@ -178,12 +178,12 @@ Domain 只留事实/证据/决策；恢复从 Journal facts 重入普通 workflo
 参考实现：`Session/AgentProgram.fs`、`Session/CompanionProgram.fs`
 （「functions, not a Flow AST」+ 直接 `task`/`let!`）。
 
-**冻结债（`scripts/check.mjs --threshold=116`，program-counter 清零后实测 116 / 111 files）**：
+**冻结债（`scripts/check.mjs --threshold=108`，P2-2a 后实测 108 / 111 files）**：
 
 ```text
 mutable                  55   ← 物理并发/累加器可留；业务决策 mutable 删
 behaviour-bool           40   ← 行为选择 bool → Decision DU
-infrastructure-leak      21   ← Session/Application 误 open OpenCode/Process
+infrastructure-leak      13   ← HostFork*/CompanionHost* 真依赖 open（扩展方法）
 program-counter           0
 business-interpreter      0
 second-runtime-protocol   0
@@ -191,16 +191,18 @@ second-runtime-protocol   0
 
 P0 **done**：Child/Session Recovery → Workflow 直接 CE；157→153。  
 P1-1a **done**：`ReactivatedAfterSeal` → `DrainWindow`；153→139。  
+P1-2 **done**：`ReconcileSupervisor` 已是 `Reconciler.Scheduler` 薄 facade，无 Dirty/Running。  
 P1-3 **done**：`EnforcerHost` → `CycleDisposition`；139→124。  
-program-counter **done**：重命名 `isContinuation`/`forceConfirmedReviewer`/`openReviewBarrier`；124→116。
+program-counter **done**：124→116。  
+P2-2a **done**：删除无用 `open` + 必要全限定（`HostPendingRun`/`HandleCompletionCodec`/`EnforcerHost`/`AgentRoleIdentity`/`BloggerCoordinator`/`CompletionMailbox`/`ForkRuntime`/`TurnCompletionProgram`）；116→108。
 
 仍在盘上的债（非「已合法保留」）：
 
 | 位置 | 问题 |
 |------|------|
+| HostFork* / CompanionHost* | 真依赖 `open OpenCode/Process`（扩展方法/端口）；继续收需 port 上移或 open 白名单（P2-2 余下） |
 | `Session/BloggerCoordinator.fs` | 与 Runtime cell 分工待继续收敛（P1-1 余下） |
 | `Kernel/Flow.fs` / `Kernel/DomainFlow.fs` | 旧 Flow 框架（P2-1） |
-| Session/Application `open OpenCode/Process` | infrastructure-leak（P2-2） |
 
 ### PENDING TASK：DSL 全面主导化
 
@@ -240,7 +242,7 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 | ID | 任务 | 完成判据 |
 |----|------|----------|
 | P1-1 | Blogger：`BloggerRuntimeState` + `BloggerCoordinator` 收敛 | **partial** — P1-1a `DrainWindow` done（153→139）；余下：Coordinator/Enforcer 旗标 Decision 化 |
-| P1-2 | Reconcile 调度与 pass 分离已落地后，清 `ReconcileSupervisor` 程序计数器 | 队列/single-flight/generation 可留；`Dirty`/`Running`/业务 cont 标志 → 调度结构或 Decision；pass 体只走 `Reconciler` CE |
+| P1-2 | Reconcile 调度与 pass 分离已落地后，清 `ReconcileSupervisor` 程序计数器 | **done** — 现为 `Reconciler.Scheduler` 薄 facade，无 Dirty/Running |
 | P1-3 | `EnforcerHost`：`commitUnknown`/`injectRepair`/`abandonThenCatchUp` 等 → 穷尽 Decision | **done** — `CycleDisposition`；139→124 |
 
 #### P2 — Kernel 与分层债收口
@@ -248,14 +250,14 @@ P0 禁止：把 `*Interpreter` 改名逃避门禁；把 Program AST「证明是�
 | ID | 任务 | 完成判据 |
 |----|------|----------|
 | P2-1 | `Kernel/Flow.fs` / `DomainFlow.fs` | 业务默认 `task{}`；必要并行 → `Kernel/Parallel.fs`（或等价单文件）；删掉仅为「框架感」存在的 Flow 外壳；Flow.lift/create 调用 = 0 |
-| P2-2 | `infrastructure-leak` | Session/Application 对 `OpenCode`/`Process`/`Infrastructure` 的 `open` 降到边界层；domain.mjs 契约不因挪文件而丢 |
+| P2-2 | `infrastructure-leak` | **partial** — P2-2a 21→13；余下 HostFork*/CompanionHost* 真依赖 open |
 | P2-3 | `mutable` / `behaviour-bool` 分拣 | 物理并发 cell、局部累加器可留并注释理由；行为选择 bool 清零或改为 DU；门禁 pattern 收紧避免误伤合法领域名后，threshold 再降 |
 
 #### P3 — 主导化验收与文档收束
 
 | ID | 任务 | 完成判据 |
 |----|------|----------|
-| P3-1 | threshold 阶梯 | `116（program-counter=0）→ P1 余下 / P2 后` 每次 PR 下调；禁止「修完不降 threshold」 |
+| P3-1 | threshold 阶梯 | `108（P2-2a 后）→ P2 余下` 每次 PR 下调；禁止「修完不降 threshold」 |
 | P3-2 | 发布阶梯 | `npm run check` 绿；目标切片 canary 绿；发布前 `check:release` |
 | P3-3 | 文档只描述现行纪律 | AGENTS.md / TASK.md / spec 表述一致：DSL = 直接 CE；无 Wave M* 施工模板；无「Interpreter 为唯一执行者」 |
 

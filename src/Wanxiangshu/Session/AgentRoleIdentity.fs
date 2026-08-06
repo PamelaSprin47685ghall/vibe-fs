@@ -2,7 +2,6 @@ namespace Wanxiangshu.Session
 
 open System
 open Wanxiangshu.Kernel
-open Wanxiangshu.OpenCode
 
 module AgentRoleIdentity =
 
@@ -19,7 +18,7 @@ module AgentRoleIdentity =
         | Role.Executor -> AgentRole.Executor
         | Role.Blogger -> AgentRole.Blogger
 
-    let ofManaged (agent: ManagedAgent) : AgentRole = ofRole agent.Role
+    let ofManaged (agent: Wanxiangshu.OpenCode.ManagedAgent) : AgentRole = ofRole agent.Role
 
     /// `AgentRole` and `Role` are the same ten cases spelled twice.
     ///
@@ -44,7 +43,7 @@ module AgentRoleIdentity =
         if String.IsNullOrWhiteSpace value then
             None
         else
-            ManagedAgent.tryParse value |> Option.map ofManaged
+            Wanxiangshu.OpenCode.ManagedAgent.tryParse value |> Option.map ofManaged
 
     /// The canonical role label persisted in durable facts.
     ///

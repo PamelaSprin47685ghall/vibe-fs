@@ -4,7 +4,6 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
-open Wanxiangshu.OpenCode
 
 type PendingHostRun =
     { Token: obj

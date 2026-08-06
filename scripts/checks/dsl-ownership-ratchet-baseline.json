@@ -16,7 +16,6 @@
     "behaviour-bool": 1
   },
   "Application/Reconciliation/TurnCompletionProgram.fs": {
-    "infrastructure-leak": 1,
     "behaviour-bool": 1
   },
   "Application/Reconciliation/XTraceCapture.fs": {
@@ -50,12 +49,6 @@
     "mutable": 11,
     "behaviour-bool": 1
   },
-  "Session/AgentRoleIdentity.fs": {
-    "infrastructure-leak": 1
-  },
-  "Session/BloggerCoordinator.fs": {
-    "infrastructure-leak": 1
-  },
   "Session/BloggerRuntimeState.fs": {
     "behaviour-bool": 1
   },
@@ -77,22 +70,16 @@
     "infrastructure-leak": 1
   },
   "Session/CompletionMailbox.fs": {
-    "infrastructure-leak": 1,
     "mutable": 3
   },
   "Session/EnforcerHost.fs": {
-    "infrastructure-leak": 1,
     "mutable": 2
   },
   "Session/ForkRuntime.fs": {
-    "infrastructure-leak": 1,
     "mutable": 2
   },
   "Session/ForkTypes.fs": {
     "behaviour-bool": 2
-  },
-  "Session/HandleCompletionCodec.fs": {
-    "infrastructure-leak": 1
   },
   "Session/HostForkAgent.fs": {
     "infrastructure-leak": 1
@@ -120,9 +107,6 @@
   "Session/HostForkRuntime.fs": {
     "infrastructure-leak": 2,
     "mutable": 1
-  },
-  "Session/HostPendingRun.fs": {
-    "infrastructure-leak": 1
   },
   "Session/ParkedTransform.fs": {
     "mutable": 2

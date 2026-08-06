@@ -5,7 +5,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Host
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Journal
@@ -64,7 +63,7 @@ module HandleCompletionCodec =
                   "child_session_id", str ""
                   "agent_id", str agentId ]
 
-        CanonicalJson.canonicalJson (createObj fields)
+        Wanxiangshu.OpenCode.CanonicalJson.canonicalJson (createObj fields)
 
     let private field (raw: obj) (key: string) : string =
         let hasKey: bool =

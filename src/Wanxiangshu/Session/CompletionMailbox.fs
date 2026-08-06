@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Process
 
 /// EXEC-018: single-join batch ceiling. One source of truth for runtime + wire.
 /// Lives in a module: F# namespaces cannot contain values (FS201).
@@ -186,7 +185,7 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
                     elif remainingMs <= 0 then
                         return Error ForkError.TimedOut
                     else
-                        let interrupt = PtyTiming.timerTask remainingMs
+                        let interrupt = Wanxiangshu.Process.PtyTiming.timerTask remainingMs
                         let started = System.DateTimeOffset.UtcNow
                         let! reason = this.WaitForSignal interrupt
                         let elapsed = int (System.DateTimeOffset.UtcNow - started).TotalMilliseconds

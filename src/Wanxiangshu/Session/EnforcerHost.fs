@@ -6,7 +6,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
-open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
@@ -229,7 +228,8 @@ module EnforcerHost =
         match lastAssistantStep rawMessages with
         | None -> None
         | Some(messageId, parts, completed) ->
-            let rules = RuntimeResources.current().EnforcerRules
+            let rules =
+                Wanxiangshu.Infrastructure.Resources.RuntimeResources.current().EnforcerRules
 
             let calls =
                 parts

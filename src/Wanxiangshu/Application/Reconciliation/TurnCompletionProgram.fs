@@ -7,7 +7,6 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
-open Wanxiangshu.Process
 open Wanxiangshu.Session
 
 /// The one production path that turns a reconciled turn into side effects
@@ -323,7 +322,7 @@ module TurnCompletionProgram =
                 continueAfterLoopKill sessionPort eventPort journal turn
             else
                 abortedSessions.Add sessionKey |> ignore
-                Pty.abortParent sessionKey
+                Wanxiangshu.Process.Pty.abortParent sessionKey
                 sessionPort.AbortChildren turn.SessionId |> ignore
 
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
