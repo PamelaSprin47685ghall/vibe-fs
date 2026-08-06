@@ -27,8 +27,38 @@ module AgentPairCursor =
     /// Deliberately no dedupe state here. FALLBACK-003 gives deduplication to
     /// the projection keyed by FallbackAttemptIdentity, so a cursor carrying
     /// "the last attempt I saw" would be a second, weaker dedupe mechanism.
+    /// FALLBACK-002: the modulo-4 offset as a closed DU. byte exists only at
+    /// the codec boundary (`ofByte`/`toByte`) — an illegal byte (4..255) is a
+    /// corrupt line, not a cursor state (how/fallback.md).
+    type FallbackOffset =
+        | Fork0
+        | Fork1
+        | Fork2
+        | Fork3
+
+    /// FALLBACK-002: typed decode error for a corrupt wire byte. Journal load
+    /// refuses the envelope; never `invalidOp`, never a fake `CommitUnknown`.
+    type FallbackOffsetDecodeError = InvalidFallbackOffset of byte
+
+    module FallbackOffsetCodec =
+
+        let toByte (offset: FallbackOffset) : byte =
+            match offset with
+            | FallbackOffset.Fork0 -> 0uy
+            | FallbackOffset.Fork1 -> 1uy
+            | FallbackOffset.Fork2 -> 2uy
+            | FallbackOffset.Fork3 -> 3uy
+
+        let ofByte (value: byte) : Result<FallbackOffset, FallbackOffsetDecodeError> =
+            match value with
+            | 0uy -> Ok FallbackOffset.Fork0
+            | 1uy -> Ok FallbackOffset.Fork1
+            | 2uy -> Ok FallbackOffset.Fork2
+            | 3uy -> Ok FallbackOffset.Fork3
+            | b -> Error(InvalidFallbackOffset b)
+
     type FallbackCursor =
-        { Offset: byte
+        { Offset: FallbackOffset
           ConsecutiveFailureCount: int }
 
     /// The A/B pair fixed by the Authority Root. FALLBACK-004: these never
@@ -58,18 +88,22 @@ module AgentPairCursor =
         | Exhausted of FallbackCursor
 
     let initial: FallbackCursor =
-        { Offset = 0uy
+        { Offset = FallbackOffset.Fork0
           ConsecutiveFailureCount = 0 }
 
-    let side (offset: byte) : ModelSide =
+    let side (offset: FallbackOffset) : ModelSide =
         match offset with
-        | 0uy
-        | 1uy -> SideA
-        | 2uy
-        | 3uy -> SideB
-        | _ -> invalidOp "Fallback offset must be in range 0..3"
+        | FallbackOffset.Fork0
+        | FallbackOffset.Fork1 -> SideA
+        | FallbackOffset.Fork2
+        | FallbackOffset.Fork3 -> SideB
 
-    let advance (offset: byte) : byte = byte ((int offset + 1) % 4)
+    let advance (offset: FallbackOffset) : FallbackOffset =
+        match offset with
+        | FallbackOffset.Fork0 -> FallbackOffset.Fork1
+        | FallbackOffset.Fork1 -> FallbackOffset.Fork2
+        | FallbackOffset.Fork2 -> FallbackOffset.Fork3
+        | FallbackOffset.Fork3 -> FallbackOffset.Fork0
 
     /// CTX-006: is this offset one of the primed slots (A′ / B′).
     ///
@@ -81,7 +115,12 @@ module AgentPairCursor =
     /// parity alone — a success does not reset Offset, so a parked odd cursor would
     /// otherwise arm the first slot of every later sequence. `RecoverySlot.mayRecover`
     /// combines this with the control-flow arming fact.
-    let isRecoverySlot (offset: byte) : bool = offset % 2uy = 1uy
+    let isRecoverySlot (offset: FallbackOffset) : bool =
+        match offset with
+        | FallbackOffset.Fork1
+        | FallbackOffset.Fork3 -> true
+        | FallbackOffset.Fork0
+        | FallbackOffset.Fork2 -> false
 
     /// FALLBACK-004 on failure: Offset advances, budget is consumed by one.
     let recordFailure (cursor: FallbackCursor) : FallbackCursor =
@@ -118,9 +157,16 @@ module AgentPairCursor =
         if count < 0 then
             invalidOp "count must be non-negative"
         else
-            [ 0 .. count - 1 ] |> List.map (fun index -> side (byte (index % 4)))
+            [ 0 .. count - 1 ]
+            |> List.map (fun index ->
+                match index % 4 with
+                | 0 -> FallbackOffset.Fork0
+                | 1 -> FallbackOffset.Fork1
+                | 2 -> FallbackOffset.Fork2
+                | _ -> FallbackOffset.Fork3
+                |> side)
 
-    let atOffset (offset: byte) : FallbackCursor =
+    let atOffset (offset: FallbackOffset) : FallbackCursor =
         { Offset = offset
           ConsecutiveFailureCount = 0 }
 
@@ -132,7 +178,12 @@ module AgentPairCursor =
     /// FALLBACK-007 fold validation: NextOffset must be the modulo-4 successor,
     /// and the count must advance by exactly one. A journal line failing either
     /// check is rejected rather than absorbed.
-    let isValidAdvance (previousOffset: byte) (nextOffset: byte) (previousCount: int) (nextCount: int) : bool =
+    let isValidAdvance
+        (previousOffset: FallbackOffset)
+        (nextOffset: FallbackOffset)
+        (previousCount: int)
+        (nextCount: int)
+        : bool =
         nextOffset = advance previousOffset && nextCount = previousCount + 1
 
     /// The identity used to deduplicate one failed attempt (FALLBACK-003).

@@ -872,24 +872,48 @@ export const kWayMerge = (streams) => listItems(Boots.kWayMerge(toList(streams.m
 
 // ── fallback (docs/what/fallback.md) ───────────────────────────────────────────────────────
 
+/** FALLBACK-002: the facade keeps the historical numeric offset signature; the
+ * closed DU lives only inside the domain. Declared in declaration order, so the
+ * numeric tag is the case index.
+ */
+const FALLBACK_OFFSET_NAMES = ['Fork0', 'Fork1', 'Fork2', 'Fork3']
+const offsetOf = (n) => {
+  // Already a Fable union instance (from `cursor.initial`, `recordFailure`, ...).
+  if (n && typeof n === 'object') return n
+  const idx = Number(n)
+  if (!Number.isInteger(idx) || idx < 0 || idx > 3) {
+    throw new Error(`FallbackOffset 0..3 has no case for ${n}`)
+  }
+  return unionCase(Cursor.FallbackOffset, 'FallbackOffset')(FALLBACK_OFFSET_NAMES[idx], [])
+}
+const offsetValue = (offset) => (offset === undefined ? undefined : offset.tag)
+
+/** A cursor as the tests build it — plain object with a NUMERIC offset — or an
+ * F# record — gets normalised to the F# record shape the domain expects.
+ */
+const cursorOf = (value) => ({
+  Offset: offsetOf(value.Offset),
+  ConsecutiveFailureCount: value.ConsecutiveFailureCount,
+})
+
 export const cursor = {
   initial: Cursor.initial,
-  atOffset: (offset) => Cursor.atOffset(offset),
-  advance: (offset) => Cursor.advance(offset),
-  recordFailure: (value) => Cursor.recordFailure(value),
-  recordSuccess: (value) => Cursor.recordSuccess(value),
-  side: (offset) => caseOf(Cursor.side(offset)),
+  atOffset: (offset) => Cursor.atOffset(offsetOf(offset)),
+  advance: (offset) => offsetValue(Cursor.advance(offsetOf(offset))),
+  recordFailure: (value) => Cursor.recordFailure(cursorOf(value)),
+  recordSuccess: (value) => Cursor.recordSuccess(cursorOf(value)),
+  side: (offset) => caseOf(Cursor.side(offsetOf(offset))),
   sideSequence: (count) => listItems(Cursor.sideSequence(count)).map(caseOf),
-  effectiveAgent: (pair, value) => Cursor.effectiveAgent(pair, value),
+  effectiveAgent: (pair, value) => Cursor.effectiveAgent(pair, cursorOf(value)),
   isValidAdvance: (prevOffset, nextOffset, prevCount, nextCount) =>
-    Cursor.isValidAdvance(prevOffset, nextOffset, prevCount, nextCount),
+    Cursor.isValidAdvance(offsetOf(prevOffset), offsetOf(nextOffset), prevCount, nextCount),
 
   /** CTX-006: is this one of the primed slots (A′ / B′). */
-  isRecoverySlot: (offset) => Cursor.isRecoverySlot(offset),
+  isRecoverySlot: (offset) => Cursor.isRecoverySlot(offsetOf(offset)),
   attemptIdentity: (session, run, root, providerRunId) => Cursor.attemptIdentity(session, run, root, providerRunId),
 
   /** FALLBACK-005: `MayContinue` | `Exhausted`, with the cursor as payload. */
-  recoveryVerdict: (budget, value) => caseOf(Cursor.recoveryVerdict(budget, value)),
+  recoveryVerdict: (budget, value) => caseOf(Cursor.recoveryVerdict(budget, cursorOf(value))),
 
   defaultBudget: Cursor.DefaultAutoRecoveryBudget,
 
@@ -900,7 +924,7 @@ export const cursor = {
    * domain is an F# record instance — so comparing one against `{ Offset, ... }`
    * fails on the class, not on the values, and the diff blames the wrong thing.
    */
-  read: (value) => ({ offset: value.Offset, failures: value.ConsecutiveFailureCount }),
+  read: (value) => ({ offset: offsetValue(value.Offset), failures: value.ConsecutiveFailureCount }),
 }
 
 export const fallbackProjection = (() => {
@@ -917,7 +941,7 @@ export const fallbackProjection = (() => {
 
     /** Rejections carry no payload, so the case name is the whole answer. */
     applyAdvance: (identity, prevOffset, nextOffset, count, current) => {
-      const result = resultOf(m.applyAdvance(identity, prevOffset, nextOffset, count, current))
+      const result = resultOf(m.applyAdvance(identity, offsetOf(prevOffset), offsetOf(nextOffset), count, current))
       return result.ok ? result : { ok: false, error: caseOf(result.error) }
     },
 
@@ -929,7 +953,7 @@ export const fallbackProjection = (() => {
     read: (current) => ({
       logicalRun: idValue.logicalRun(current.LogicalRunId),
       authorityRoot: idValue.authorityRoot(current.AuthorityRootUserMessageId),
-      offset: current.Cursor.Offset,
+      offset: offsetValue(current.Cursor.Offset),
       failures: current.Cursor.ConsecutiveFailureCount,
       dedupeKeys: listItems(current.RecentFailureKeys).length,
       exhausted: current.Exhausted,
@@ -1519,7 +1543,7 @@ export const recoverySlot = (() => {
     isArmed: (arming) => m.isArmed(arming),
 
     /** CTX-006: arming AND an odd (primed) offset AND material to work with. */
-    mayRecover: (arming, offset, hasMaterial) => m.mayRecover(arming, offset, hasMaterial),
+    mayRecover: (arming, offset, hasMaterial) => m.mayRecover(arming, offsetOf(offset), hasMaterial),
 
     /** `{ name, clearsFailureCount, advancesCursor, nextArming }`. */
     onSquash: (outcome) => decisionOf(m.onSquashOutcome(buildOutcome(outcome, []))),
@@ -2862,7 +2886,6 @@ export const authority = {
 
   stableLogicalRunId: (sha256, runtime, session, root) => Authority.stableLogicalRunId(sha256, runtime, session, root),
   agentPair: (profile) => Authority.agentPair(profile),
-  effectiveAgentAt: (profile, offset) => Authority.effectiveAgentAt(profile, offset),
   effectiveAgentFor: (profile, value) => Authority.effectiveAgentFor(profile, value),
   /**
    * PROMPT-011 claim scope. NOT hashed — it is a `\u001f`-joined string, so a test

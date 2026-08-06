@@ -42,6 +42,9 @@ type FallbackAdvanceRejection =
     /// and the count must advance by exactly one. A line failing this is corrupt
     /// or forged and is refused rather than absorbed.
     | InvalidTransition
+    /// FALLBACK-002: the wire byte is outside 0..3 — corrupt/forged line. The
+    /// decode error is a typed value, never an exception.
+    | InvalidFallbackOffset of AgentPairCursor.FallbackOffsetDecodeError
 
 module FallbackProjection =
 
@@ -75,8 +78,8 @@ module FallbackProjection =
     /// line and a duplicate line were indistinguishable from a no-op.
     let applyAdvance
         (identity: FallbackAttemptIdentity)
-        (previousOffset: byte)
-        (nextOffset: byte)
+        (previousOffset: AgentPairCursor.FallbackOffset)
+        (nextOffset: AgentPairCursor.FallbackOffset)
         (consecutiveFailureCount: int)
         (current: FallbackProjection)
         : Result<FallbackProjection, FallbackAdvanceRejection> =

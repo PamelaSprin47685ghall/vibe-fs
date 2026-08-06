@@ -146,13 +146,14 @@ type CompanionHost
     member this.DisarmRecoverySlot() = companion.DisarmRecoverySlot()
 
     /// CTX-006: primary session fallback cursor Offset (durable, not cached).
-    member this.BloggerCursorOffset() : byte =
+    /// FALLBACK-002: the offset leaves this boundary as the closed DU.
+    member this.BloggerCursorOffset() : AgentPairCursor.FallbackOffset =
         match journal with
         | Some j ->
             match DurableFallback.tryCurrentState primaryId (AgentJournal.snapshot j) with
             | Some current -> current.Cursor.Offset
-            | None -> 0uy
-        | None -> 0uy
+            | None -> AgentPairCursor.FallbackOffset.Fork0
+        | None -> AgentPairCursor.FallbackOffset.Fork0
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =

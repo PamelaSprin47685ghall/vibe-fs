@@ -238,10 +238,7 @@ test('an envelope survives NDJSON round trip and still folds', () => {
 
   // FALLBACK-007: the advance is validated, not absorbed — offset and count both
   // move, and asserting the whole cursor means a dropped field cannot pass.
-  assert.deepEqual(
-    { Offset: sessions.ses_rt.Fallback.Cursor.Offset, ConsecutiveFailureCount: sessions.ses_rt.Fallback.Cursor.ConsecutiveFailureCount },
-    { Offset: 1, ConsecutiveFailureCount: 1 },
-  )
+  assert.deepEqual(cursor.read(sessions.ses_rt.Fallback.Cursor), { offset: 1, failures: 1 })
 })
 
 test('journal.deserialize reports a decode failure as data, not an exception', () => {

@@ -92,6 +92,13 @@ module FallbackController =
             | Error FallbackAdvanceRejection.NoCursor -> Ok NoActiveRun
             | Error FallbackAdvanceRejection.InvalidTransition ->
                 Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
+            | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->
+                // FALLBACK-002: reached only via a corrupt wire byte that the
+                // fold decoded before applyAdvance; the controller sees the typed
+                // error, never an exception.
+                match decodeError with
+                | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
+                    Error $"Fallback advance rejected: corrupt offset byte {value} (FALLBACK-002)"
             | Ok _ ->
                 let advanced =
                     FallbackFact.FallbackCursorAdvanced
@@ -99,8 +106,8 @@ module FallbackController =
                            LogicalRunId = current.LogicalRunId
                            AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                            ProviderRun = providerRun
-                           PreviousOffset = current.Cursor.Offset
-                           NextOffset = next.Offset
+                           PreviousOffset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
+                           NextOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset
                            ConsecutiveFailureCount = next.ConsecutiveFailureCount
                            Reason = reason |}
 
@@ -119,7 +126,7 @@ module FallbackController =
                                    LogicalRunId = current.LogicalRunId
                                    AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                                    FinalConsecutiveFailureCount = cursor.ConsecutiveFailureCount
-                                   FinalOffset = cursor.Offset |}
+                                   FinalOffset = AgentPairCursor.FallbackOffsetCodec.toByte cursor.Offset |}
 
                         match
                             AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
