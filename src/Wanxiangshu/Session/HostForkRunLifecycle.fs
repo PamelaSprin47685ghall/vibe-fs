@@ -6,7 +6,9 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Journal
 
@@ -63,7 +65,7 @@ module HostForkRunLifecycle =
         sendAgentOwnerRoot sessions journal childId agent directory prompt
 
     let childPromptSender sessions parentId journal directoryOf =
-        fun agentId childId (_role: AgentRole) agent prompt ->
+        fun agentId childId (_role: Role) agent prompt ->
             sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt
 
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
@@ -218,7 +220,7 @@ module HostForkRunLifecycle =
         (childWorkRecordFor: SessionId -> string option)
         (agentId: string)
         (childId: SessionId)
-        (role: AgentRole)
+        (role: Role)
         =
         let run =
             { Token = obj ()

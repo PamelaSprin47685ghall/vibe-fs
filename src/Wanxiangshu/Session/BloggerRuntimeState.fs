@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Session
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// ENFORCER-064: Blogger missing-tool recovery (NoRecovery | InteractionNudgeIssued | Aabb).

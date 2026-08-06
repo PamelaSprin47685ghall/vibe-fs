@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// One message as the Host transcript has it.

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Journal
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// ENFORCER-045/154: one committed enforcement cycle, derived from BlogEntryCommitted.

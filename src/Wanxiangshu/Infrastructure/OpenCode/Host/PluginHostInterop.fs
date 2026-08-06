@@ -8,6 +8,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open CompanionProjection
@@ -51,7 +52,7 @@ module PluginHostInterop =
         (workspaceDirectory: string option)
         (scope: PluginRuntimeScope)
         (currentPhysicalUserMessage: string -> string option)
-        (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
+        (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> string option) option)
         (childWorkRecordFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)

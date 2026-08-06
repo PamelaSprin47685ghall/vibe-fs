@@ -4,7 +4,9 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -21,7 +23,7 @@ module ChildRecoveryWorkflow =
             AgentId: string
             Handle: HandleId
             ChildSession: SessionId
-            Role: AgentRole
+            Role: Role
             Agent: string
             Observations: HostObservation list
             /// Process-local agent wake after durable commit. None = durable only.

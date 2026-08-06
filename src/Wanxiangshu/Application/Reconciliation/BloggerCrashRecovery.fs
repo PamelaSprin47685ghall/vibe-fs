@@ -1,10 +1,14 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -207,6 +211,46 @@ module BloggerCrashRecovery =
             | None -> claimedRunFromSequences journal bloggerSessionId
 
         rejudgeFromEvidence claimedTerminalRun terminals
+
+    /// True when a raw Host message is an AABB repair instruction we injected for `requestKey`.
+    let private aabbRepairInjected (requestKey: string) (rawMessages: obj list) : bool =
+        rawMessages
+        |> List.choose (fun m ->
+            if isNull m then
+                None
+            else
+                let info = if isNull m?info then m else m?info
+
+                if
+                    not (isNull info)
+                    && not (isNull info?source)
+                    && unbox<string> info?source = "interaction-repair"
+                    && not (isNull info?synthetic)
+                    && unbox<bool> info?synthetic
+                    && not (isNull info?requestKey)
+                    && unbox<string> info?requestKey = requestKey
+                then
+                    Some()
+                else
+                    None)
+        |> List.isEmpty
+        |> not
+
+    /// ENFORCER-153 hot path: derive recovery state from durable claim + visible
+    /// transcript. No mutable runtime field is consulted.
+    let repairState
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (requestKey: string)
+        (terminalRun: ProviderRunIdentity)
+        (rawMessages: obj list)
+        : BloggerToolRecovery =
+        if aabbRepairInjected requestKey rawMessages then
+            BloggerToolRecovery.AabbRepairConsumed
+        elif repairClaimedFor journal bloggerSessionId terminalRun then
+            BloggerToolRecovery.InteractionNudgeIssued terminalRun
+        else
+            BloggerToolRecovery.NoRecovery
 
     let private restoreRuntime
         (host: IParkedTransformHost)

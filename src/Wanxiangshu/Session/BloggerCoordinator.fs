@@ -7,7 +7,9 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// ENFORCER-047/050: the ONE main-session decision entry for Blogger material.

@@ -6,7 +6,9 @@ open System.Threading.Tasks
 open Microsoft.FSharp.Control
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Journal
 
@@ -27,12 +29,12 @@ module HostForkChildDispatch =
         (sessions: ISessionHostPort)
         (childWorkRecordFor: SessionId -> string option)
         (runtime: ForkRuntime)
-        (sendChildPrompt: string -> SessionId -> AgentRole -> string -> string -> Task<Result<unit, string>>)
-        (sendBusyNudge: string -> SessionId -> AgentRole -> string -> string -> Task<Result<unit, string>>)
-        (onRunStarted: SessionId -> AgentRole -> unit)
+        (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (onRunStarted: SessionId -> Role -> unit)
         (agentId: string)
         (childId: SessionId)
-        (role: AgentRole)
+        (role: Role)
         (prompt: string)
         (agent: string)
         (enrichedPrompt: string option)

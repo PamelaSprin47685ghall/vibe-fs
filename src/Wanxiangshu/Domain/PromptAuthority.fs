@@ -2,6 +2,7 @@ namespace Wanxiangshu.Domain
 
 open System
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 [<RequireQualifiedAccess>]

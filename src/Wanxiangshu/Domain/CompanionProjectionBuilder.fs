@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Which physical request the Companion is about to make.

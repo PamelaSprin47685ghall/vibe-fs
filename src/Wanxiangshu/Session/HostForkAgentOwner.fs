@@ -2,6 +2,7 @@ namespace Wanxiangshu.Session
 
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 

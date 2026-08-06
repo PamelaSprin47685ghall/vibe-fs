@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Agent
 
@@ -54,7 +55,7 @@ type ChildRun =
         AgentName: string
 
         /// Canonical role of the agent.
-        Role: AgentRole
+        Role: Role
 
         /// The prompt text sent to the agent.
         Prompt: string
@@ -75,7 +76,7 @@ type ChildRun =
 module ChildRun =
 
     /// Create a new ChildRun with the given identity and agent metadata.
-    let create (agentId: string) (runId: string) (agentName: string) (role: AgentRole) (prompt: string) : ChildRun =
+    let create (agentId: string) (runId: string) (agentName: string) (role: Role) (prompt: string) : ChildRun =
         { AgentId = agentId
           RunId = runId
           AgentName = agentName

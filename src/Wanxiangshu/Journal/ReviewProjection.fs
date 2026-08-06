@@ -1,7 +1,9 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// The skeptical challenge issued by a first PERFECT (REVIEW-003).

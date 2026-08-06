@@ -4,8 +4,11 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Outcome
 
 /// One successful fold after append. Wake payload for revision subscribers.

@@ -1,20 +1,9 @@
 namespace Wanxiangshu.Session
 
 open System
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-
-[<RequireQualifiedAccess>]
-type AgentRole =
-    | Manager
-    | Orchestrator
-    | Coder
-    | Inspector
-    | Browser
-    | Meditator
-    | Reviewer
-    | DevOps
-    | Executor
-    | Blogger
 
 [<RequireQualifiedAccess>]
 type AgentStatus =
@@ -60,7 +49,7 @@ type AgentRecord =
         AgentId: string
         /// Managed agent name (fast-ROLE / deep-ROLE). Required; empty is refused at reuse.
         Agent: string
-        Role: AgentRole
+        Role: Role
         Status: AgentStatus
         CurrentRunId: string option
         TerminalStatusLabel: string option

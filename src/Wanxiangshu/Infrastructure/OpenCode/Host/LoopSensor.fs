@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// LOOP-002 / LOOP-006: edge sensor over Host streaming deltas.

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Kernel
 
 open System
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Completion payload for a successful agent run.

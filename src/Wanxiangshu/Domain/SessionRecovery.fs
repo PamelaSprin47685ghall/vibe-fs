@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// P0-RECOVERY-FAMILY: closed recovery program + private family permit (FLOW-002/007).
@@ -292,26 +293,3 @@ module SessionRecovery =
             match NonEmpty.ofList waits with
             | Some nonEmpty -> FamilyRecovery.FamilyWaiting nonEmpty
             | None -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit(root, journalSequence, recovered.Closure.Digest))
-
-    type RecoveryTrace =
-        | DiscoverClosure of SessionId
-        | RecoverPromptClaims of SessionId
-        | RecoverBloggerWindow of SessionId
-        | RestoreLinkedHandles of SessionId
-        | RecoverManagerJob of ManagerJobId
-        | ValidateClosure of digest: string
-        | FamilyReadyIssued of root: SessionId * digest: string
-        | FamilyWaiting of count: int
-        | FamilyBlocked of count: int
-        | BusinessOperation of name: string
-
-    /// Trace interpreter (FLOW-003): pure walk, no effects.
-    let familyReadyBeforeBusiness (traces: RecoveryTrace list) : bool =
-        let rec walk seenReady =
-            function
-            | [] -> true
-            | RecoveryTrace.FamilyReadyIssued _ :: rest -> walk true rest
-            | RecoveryTrace.BusinessOperation _ :: _ when not seenReady -> false
-            | _ :: rest -> walk seenReady rest
-
-        walk false traces

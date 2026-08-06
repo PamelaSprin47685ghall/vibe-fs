@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Bounded projections one session owns (PERSIST-008).

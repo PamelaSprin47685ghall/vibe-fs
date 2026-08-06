@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Why no probe was built. Every case is a normal outcome, not an error.

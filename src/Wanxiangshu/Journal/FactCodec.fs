@@ -2,6 +2,7 @@ namespace Wanxiangshu.Journal
 
 open System
 open Thoth.Json
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 
 /// Fact serialization (PERSIST-005).

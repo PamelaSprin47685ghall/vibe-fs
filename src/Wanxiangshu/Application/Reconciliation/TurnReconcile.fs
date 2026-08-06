@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Pure `snapshot + binding -> ReconciledTurn option`. Unknown origin is None.
@@ -118,6 +119,6 @@ module TurnReconcile =
                                 (PhysicalUserMessageId.create physical)
                                 (AuthorityRootUserMessageId.create root)
                                 assistant
-                                binding.AgentRole
+                                binding.Role
                                 binding.Directory
                         )

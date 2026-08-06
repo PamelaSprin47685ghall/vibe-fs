@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// P0-RECOVERY-JOIN-001 + clean-break: Aborted is observation, not durable finality.

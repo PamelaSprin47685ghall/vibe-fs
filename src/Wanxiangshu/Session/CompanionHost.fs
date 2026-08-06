@@ -6,6 +6,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Tools
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain

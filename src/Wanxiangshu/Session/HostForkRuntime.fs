@@ -10,7 +10,9 @@ open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Journal
 open Wanxiangshu.Session.AgentRoleIdentity
@@ -22,11 +24,11 @@ type HostForkRuntime
         parentId: SessionId,
         sessions: ISessionHostPort,
         ?journal: AgentJournal,
-        ?onChildCreated: string -> AgentRole -> SessionId -> unit,
+        ?onChildCreated: string -> Role -> SessionId -> unit,
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
         ?ptyPort: PtyPort,
         ?directoryFor: string -> string option,
-        ?onRunStarted: SessionId -> AgentRole -> string option -> unit,
+        ?onRunStarted: SessionId -> Role -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> string option,
         ?childWorkRecordFor: SessionId -> string option,
         ?sessionSnapshot: ISessionSnapshotPort,
@@ -134,7 +136,7 @@ type HostForkRuntime
         // that `HandleController.cancelChildren` writes first.
         HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
 
-    member this.InstallRun(agentId: string, childId: SessionId, role: AgentRole) =
+    member this.InstallRun(agentId: string, childId: SessionId, role: Role) =
         let run =
             HostForkRunLifecycle.installRun
                 gate
@@ -415,14 +417,14 @@ type HostForkRuntime
                 { RunId = payload.RunId
                   AgentId = payload.AgentId
                   AgentName = payload.AgentId
-                  Role = defaultArg payload.Role AgentRole.Executor
+                  Role = defaultArg payload.Role Role.Executor
                   Outcome = AgentFailed payload
                   CompletedAt = DateTimeOffset.UtcNow }
             | AgentItem(AgentAbandonedItem(agentId, reason)) ->
                 { RunId = "abandoned-" + agentId
                   AgentId = agentId
                   AgentName = agentId
-                  Role = AgentRole.Executor
+                  Role = Role.Executor
                   Outcome = AgentAbandoned(agentId, reason)
                   CompletedAt = DateTimeOffset.UtcNow }
             | PtyItem item -> PtyJoinItem.toRunCompletion item

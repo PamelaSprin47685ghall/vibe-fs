@@ -2,7 +2,9 @@ namespace Wanxiangshu.Journal
 
 open System
 open Thoth.Json
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 
 type StreamId =

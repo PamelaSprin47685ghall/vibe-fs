@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// REVIEW-003: the skeptical challenge a first PERFECT issues as its tool result.

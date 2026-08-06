@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// COMPANION-009 / CTX-010: which prefix X sends, as a plan over message positions.

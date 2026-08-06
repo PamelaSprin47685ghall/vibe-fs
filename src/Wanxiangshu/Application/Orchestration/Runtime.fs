@@ -4,7 +4,9 @@ open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Runtime owner for ManagerJob resources. Every job runs the sequential

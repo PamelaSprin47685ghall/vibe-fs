@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Pure A/A/B/B fallback cursor (docs/what/fallback.md). No Host, Journal or Fable dependency.

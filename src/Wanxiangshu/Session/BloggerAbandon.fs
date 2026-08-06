@@ -3,7 +3,9 @@ namespace Wanxiangshu.Session
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// VERIFY-005 single writer for BloggerRequestAbandoned (protocol fail + send-fail + crash-A).

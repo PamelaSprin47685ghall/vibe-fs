@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Journal
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// What actually happened to a ManagerJob, most recent fact only.

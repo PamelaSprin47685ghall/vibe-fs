@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Journal
@@ -36,7 +37,7 @@ module ReconcileSupervisor =
         member _.Kick(sessionId: SessionId) = scheduler.Kick(sessionId)
         member _.Signal(signal: HostSignal) = scheduler.Signal(signal)
 
-        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: AgentRole) =
+        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             scheduler.BindUserMessage(sessionId, physical, ?agentRole = agentRole)
 
         member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =

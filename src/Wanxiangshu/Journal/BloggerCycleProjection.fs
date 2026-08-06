@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Journal
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).

@@ -7,7 +7,9 @@ open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 
@@ -149,7 +151,7 @@ module StaticTools =
     let bloggerAgentConfig () : obj =
         primaryAgent Role.Blogger (Some (prompts ()).BloggerSystemPrompt)
 
-    /// AgentRole.Executor: no tools; system prompt for map/reduce output summarization.
+    /// Role.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
     let executorAgentConfig () : obj =
         primaryAgent Role.Executor (Some (prompts ()).ExecutorSystemPrompt)

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// COMPANION-009: which prefix generation is in force.

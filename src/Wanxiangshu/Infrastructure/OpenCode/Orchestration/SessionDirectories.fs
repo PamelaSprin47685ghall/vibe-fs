@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Collections.Generic
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 

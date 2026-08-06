@@ -3,6 +3,7 @@ namespace Wanxiangshu.Session
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 
@@ -21,7 +22,7 @@ module HostForkBusyNudge =
         (_parentId: SessionId)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (_role: AgentRole)
+        (_role: Role)
         (_agent: string)
         (directory: string option)
         (prompt: string)
@@ -60,5 +61,5 @@ module HostForkBusyNudge =
         }
 
     let sender sessions parentId journal directoryOf =
-        fun agentId childId (role: AgentRole) agent prompt ->
+        fun agentId childId (role: Role) agent prompt ->
             send sessions parentId journal childId role agent (directoryOf agentId) prompt

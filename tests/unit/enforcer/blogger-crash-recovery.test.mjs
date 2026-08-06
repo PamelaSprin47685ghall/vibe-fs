@@ -183,21 +183,18 @@ test('ENFORCER_153_restoreRuntime_wires_rejudge_not_hardcoded_NoRecovery', () =>
 })
 
 test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
-  // AABB is memory-only (markAabbRepairConsumed + transform injection): no durable
-  // journal fact proves aabbRepair executed. Cold rejudge must restore
-  // InteractionNudgeIssued at most, never AabbRepairConsumed — otherwise the hot
-  // path would fatalEnd on the next terminal without ever injecting the AABB repair
-  // (budget stolen across a crash).
-  assert.doesNotMatch(recoverySrc, /BloggerToolRecovery\.AabbRepairConsumed/)
+  // AABB is derived from the visible transcript, not a memory mark. Cold rejudge
+  // (rejudgeFromEvidence / rejudgeToolRecovery) must restore InteractionNudgeIssued
+  // at most, never AabbRepairConsumed.
+  const coldRejudge = recoverySrc.match(/let rejudgeFromEvidence[\s\S]*?let rejudgeToolRecovery/)
+  assert.ok(coldRejudge)
+  assert.doesNotMatch(coldRejudge[0], /BloggerToolRecovery\.AabbRepairConsumed/)
 })
 
-test('ENFORCER_153_rejudged_nudge_feeds_hot_path_aabb_once_then_fatal', () => {
-  // Cold restore = InteractionNudgeIssued(claimed): same claimed run is claim-guarded
-  // (no second nudge, no AABB); a *new* pure-prose terminal (issuedRun <> terminalRun)
-  // runs aabbRepair exactly once (mark inside aabbRepair); only after that mark does a
-  // further pure-prose terminal fatalEnd. AabbRepairConsumed is set by the hot path
-  // alone, never by cold rejudge.
-  assert.match(enforcerSrc, /markAabbRepairConsumed/)
+test('ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
+  // The hot path injects a synthetic repair message with info.requestKey; the next
+  // transform uses its presence (not a mutable flag) to decide AabbRepairConsumed.
+  assert.match(enforcerSrc, /requestKey[\s\S]*?interaction-repair/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.InteractionNudgeIssued _[\s\S]*?aabbRepair/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairConsumed[\s\S]*?fatalEnd/)
 })

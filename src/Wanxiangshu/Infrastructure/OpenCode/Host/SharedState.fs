@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Collections.Generic
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// HOST-012: 跨实例共享状态——模块级单例，所有插件实例同一引用。

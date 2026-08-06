@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 

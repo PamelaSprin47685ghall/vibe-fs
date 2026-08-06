@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Journal
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Durable Companion link. Blog frames and coverage belong to `BlogProjection`.

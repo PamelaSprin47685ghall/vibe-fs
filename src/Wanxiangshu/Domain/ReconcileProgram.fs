@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Domain
 
 open System
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Reconcile pure Domain: Evidence → Decision + publish seals.

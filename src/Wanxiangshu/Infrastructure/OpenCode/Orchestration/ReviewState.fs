@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// REVIEW-007/008: what one reviewer session's guard says about the current tree.

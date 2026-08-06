@@ -1,7 +1,9 @@
 namespace Wanxiangshu.Orchestrator
 
 open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 

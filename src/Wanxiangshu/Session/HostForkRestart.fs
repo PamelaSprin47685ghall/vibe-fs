@@ -7,7 +7,9 @@ open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 
@@ -25,7 +27,7 @@ module HostForkRestart =
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
-        (role: AgentRole)
+        (role: Role)
         (agent: string)
         : ChildRecoveryWorkflow.Ports =
         { Journal = journal
@@ -50,7 +52,7 @@ module HostForkRestart =
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
-        (role: AgentRole)
+        (role: Role)
         (agent: string)
         : Task<ChildRecoveryResult> =
         task {

@@ -1,7 +1,9 @@
 namespace Wanxiangshu.Session
 
 open Wanxiangshu.Domain.ChildRecovery
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 
@@ -52,7 +54,7 @@ module HandleController =
         (agentId: string)
         (childSessionId: SessionId)
         (targetAgent: string)
-        (role: AgentRole)
+        (role: Role)
         : Result<unit, string> =
         match journal with
         | None -> Ok()

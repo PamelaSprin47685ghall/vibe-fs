@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Fable.Core
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 

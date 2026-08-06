@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Durable fallback state for one Logical Run (FALLBACK-007).

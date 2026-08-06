@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// FALLBACK-010: `Attempt` is the Host's own retry counter. Diagnostics only —

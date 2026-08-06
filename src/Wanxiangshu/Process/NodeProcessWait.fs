@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.AsyncSupport
 
 /// EXEC-011: wait for the real exit; on timeout SIGKILL the process tree and then

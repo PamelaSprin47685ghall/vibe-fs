@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Kernel
 
 open System
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Durable domain facts (docs/what/persist.md).

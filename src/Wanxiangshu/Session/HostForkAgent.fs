@@ -3,7 +3,9 @@ namespace Wanxiangshu.Session
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
@@ -114,7 +116,7 @@ module HostForkAgent =
         member this.Fork
             (
                 agentId: string,
-                role: AgentRole,
+                role: Role,
                 agent: string,
                 prompt: string,
                 payload: string option,
@@ -153,7 +155,7 @@ module HostForkAgent =
                             task {
                                 let! requirementsResult =
                                     match role with
-                                    | AgentRole.Reviewer ->
+                                    | Role.Reviewer ->
                                         resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
                                     | _ -> Task.FromResult(Ok [])
 
@@ -232,7 +234,7 @@ module HostForkAgent =
                                 // barriers at the reverify site, and a second writer
                                 // would fight the first over `CurrentBarrierId`.
                                 let barrierOutcome =
-                                    if this.ManagerOpensReviewBarrier && role = AgentRole.Reviewer then
+                                    if this.ManagerOpensReviewBarrier && role = Role.Reviewer then
                                         match this.TreeHashFor agentId with
                                         | None -> Ok()
                                         | Some tree ->

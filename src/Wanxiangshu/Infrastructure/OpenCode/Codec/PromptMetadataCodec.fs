@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Dispatcher correlation metadata carried on the Host prompt boundary.

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Journal
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Rebuilt journal state: durable domain projections plus runtime frontier.

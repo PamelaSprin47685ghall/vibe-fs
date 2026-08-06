@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Kernel
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Domain error / context values used by direct CE programs (not a Flow AST).

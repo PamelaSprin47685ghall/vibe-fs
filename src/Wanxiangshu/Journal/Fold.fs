@@ -1,7 +1,9 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Why a journal line was refused during a fold.

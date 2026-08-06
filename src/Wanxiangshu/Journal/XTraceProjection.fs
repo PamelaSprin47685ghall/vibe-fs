@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// COMPANION-003 / HOST-005: the XTrace's durable projection.

@@ -1,15 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
-
-type TurnOutcome =
-    | TurnInProgress
-    | TurnNeedsContinuation of reason: string
-    | TurnCompleted
-    | TurnAborted of reason: string
-    | TurnFailed of error: string
-    | TurnUnknown
+open Wanxiangshu.Domain
 
 type ReconciledTurn =
     {
@@ -23,7 +17,7 @@ type ReconciledTurn =
         /// field `AssistantMessageId` invited a second identity for the same
         /// thing — and FALLBACK-003 deduplicates failed attempts by this value.
         ProviderRun: ProviderRunIdentity
-        AgentRole: AgentRole option
+        Role: Role option
         /// The worktree this run executed in, when it has one. A Manager child runs
         /// in its own worktree; a top-level session has none.
         Directory: string option
@@ -31,7 +25,7 @@ type ReconciledTurn =
         Finish: string option
         ErrorName: string option
         Model: OpencodeModel option
-        Outcome: TurnOutcome
+        Outcome: ReconcileProgram.TurnOutcome
     }
 
 type ActiveRunBinding =
@@ -42,6 +36,6 @@ type ActiveRunBinding =
         /// Latest physical user message for the active logical run.
         PhysicalUserMessageId: PhysicalUserMessageId option
         ContinuationMessageIds: Set<string>
-        AgentRole: AgentRole option
+        Role: Role option
         Directory: string option
     }

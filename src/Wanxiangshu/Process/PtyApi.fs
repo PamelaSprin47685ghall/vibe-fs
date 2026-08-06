@@ -9,7 +9,7 @@ open System.Text
 /// The per-operation wrappers (`forkPty`, `send`, `complete`, `list`, `close`) are
 /// gone: `HostForkPty` calls `PtyPort` directly, so each wrapper was a second
 /// spelling of one member with no caller. `forkPtyWith` in particular still passed
-/// an optional `AgentRole`, which is the signature EXEC-015 replaced with a
+/// an optional `Role`, which is the signature EXEC-015 replaced with a
 /// required `ManagedAgent` — keeping it would preserve a way to open a PTY without
 /// a managed identity.
 module Pty =

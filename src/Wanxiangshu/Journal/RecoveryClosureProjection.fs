@@ -2,6 +2,7 @@ namespace Wanxiangshu.Journal
 
 open System
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Pure RecoveryClosure discovery from durable projections (RECOVERY-FAMILY-001).

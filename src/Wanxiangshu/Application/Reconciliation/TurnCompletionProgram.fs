@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 open Wanxiangshu.Session
@@ -149,14 +150,14 @@ module TurnCompletionProgram =
         // user message even when the Host omitted agent metadata from `chat.message`,
         // so its AgentOwner Root can be registered here. The managed agent name comes
         // from the durable `HandleLinked.TargetAgent` and nowhere else — rebuilding it
-        // from the child's AgentRole invented tier Fast, so a `deep-coder` child
+        // from the child's Role invented tier Fast, so a `deep-coder` child
         // acquired a root naming `fast-coder` and FALLBACK-002's A/B pair was wrong
         // for the whole Logical Run.
         //
         // A session known only through the in-memory `sessionParents` map has no
         // durable record and therefore no defensible agent name. It is skipped rather
         // than registered from a guess: the turn still completes through its
-        // reconciled AgentRole, and the missing authority stays visibly missing.
+        // reconciled Role, and the missing authority stays visibly missing.
         TerminalPolicy.tryLinkedChild journal sessionKey
         |> Option.iter (fun record ->
             HostSessionNudge.ensureAgentOwnerAuthority
@@ -202,7 +203,7 @@ module TurnCompletionProgram =
             // default. Defaulting to Coder — as the previous `"coder"` string did —
             // reports a completion under a role nobody selected.
             let terminalValid =
-                match turn.AgentRole with
+                match turn.Role with
                 | None ->
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
                     |> ignore
@@ -241,18 +242,18 @@ module TurnCompletionProgram =
             wasAborted, terminalValid
 
         let reviewerAlreadyConfirmed =
-            turn.AgentRole = Some AgentRole.Reviewer
+            turn.Role = Some Role.Reviewer
             && ReviewerGuardState.isConfirmedReviewer journal sessionKey
 
         match turn.Outcome with
-        | TurnUnknown -> AsyncSupport.completedTask ()
-        | TurnInProgress when reviewerAlreadyConfirmed ->
+        | ReconcileProgram.TurnUnknown -> AsyncSupport.completedTask ()
+        | ReconcileProgram.TurnInProgress when reviewerAlreadyConfirmed ->
             // A second PERFECT is frequently a tool-only provider step. Once the
             // witness is Confirmed, finish the physical reviewer run so
             // OrchestratorHost.reverify and Manager `join` observe completion.
             completeReviewerOrAssistant true |> ignore
             AsyncSupport.completedTask ()
-        | TurnInProgress ->
+        | ReconcileProgram.TurnInProgress ->
             // A Manager whose job the Orchestrator has already taken over must not
             // keep its tool loop running. The worktree is released once the job
             // lands (ORCH-006), and a further provider request from the manager
@@ -265,8 +266,8 @@ module TurnCompletionProgram =
             // Orchestrator's barrier owns the review; the guard round's residual
             // tool loop has no work left and must not continue.
             let managerJobHandedOff =
-                match turn.AgentRole with
-                | Some AgentRole.Manager ->
+                match turn.Role with
+                | Some Role.Manager ->
                     match journal with
                     | Some durable ->
                         let snapshot = AgentJournal.snapshot durable
@@ -290,7 +291,7 @@ module TurnCompletionProgram =
             if managerJobHandedOff then
                 completeReviewerOrAssistant false |> ignore
                 AsyncSupport.completedTask ()
-            elif CompletedTurnClassifier.needsInteractionRepair turn.AgentRole turn.Outcome turn.Parts then
+            elif CompletedTurnClassifier.needsInteractionRepair turn.Role turn.Outcome turn.Parts then
                 sendRepair
                     sessionPort
                     eventPort
@@ -300,15 +301,15 @@ module TurnCompletionProgram =
                     "interaction-repair"
             else
                 AsyncSupport.completedTask ()
-        | TurnNeedsContinuation _ when reviewerAlreadyConfirmed ->
+        | ReconcileProgram.TurnNeedsContinuation _ when reviewerAlreadyConfirmed ->
             completeReviewerOrAssistant true |> ignore
             AsyncSupport.completedTask ()
-        | TurnNeedsContinuation _ ->
+        | ReconcileProgram.TurnNeedsContinuation _ ->
             // Absorb text and reasoning into the XTrace even though this turn is
             // not completable, then ask for the missing report. Still not fallback.
             // (The XTrace parts are captured at the transform boundary.)
             sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
-        | TurnAborted reason ->
+        | ReconcileProgram.TurnAborted reason ->
             // LOOP-006: our own kill is bridged into the provider-failure AABB path.
             // User / cleanup aborts still report Aborted and do not advance the cursor.
             let loopKill =
@@ -329,12 +330,12 @@ module TurnCompletionProgram =
                 |> ignore
 
                 AsyncSupport.completedTask ()
-        | TurnFailed error -> continueAfterOrdinaryFailure sessionPort eventPort journal turn error
-        | TurnCompleted ->
+        | ReconcileProgram.TurnFailed error -> continueAfterOrdinaryFailure sessionPort eventPort journal turn error
+        | ReconcileProgram.TurnCompleted ->
             // EXEC-016 first: join-capable roles with outstanding background work
             // must join before Review Guard / terminal Completed.
             let joinOutstanding =
-                TerminalPolicy.outstandingBackground journal hasLivePty turn.AgentRole turn.SessionId
+                TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
 
             // REVIEW-003/007 synchronize before completion: a reviewer awaiting
             // PERFECT confirmation and a manager whose current tree lacks a witness
@@ -344,8 +345,8 @@ module TurnCompletionProgram =
                 if joinOutstanding then
                     None
                 else
-                    match turn.AgentRole with
-                    | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
+                    match turn.Role with
+                    | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
                         Some(HostReviewGuard.missingTree journal gitTreePort sessionKey)
                     | _ -> None
 
@@ -357,7 +358,7 @@ module TurnCompletionProgram =
                     | Some(HostReviewGuard.ReviewGuardMissing _)
                     | Some(HostReviewGuard.ReviewGuardUnavailable _) -> true
                     | _ ->
-                        turn.AgentRole = Some AgentRole.Reviewer
+                        turn.Role = Some Role.Reviewer
                         && not reviewerAlreadyConfirmed
                         && ReviewerGuardState.pendingConfirmation journal sessionKey
 
@@ -385,12 +386,12 @@ module TurnCompletionProgram =
                 }
                 :> Task
             else
-                match turn.AgentRole with
+                match turn.Role with
                 // REVIEW-003: a first PERFECT must enter its causal confirmation
                 // round-trip before the generic missing-verdict branch.
                 // `verdictSessions` is terminal bookkeeping only and must never
                 // suppress the pending confirmation transition.
-                | Some AgentRole.Reviewer when ReviewerGuardState.pendingConfirmation journal sessionKey ->
+                | Some Role.Reviewer when ReviewerGuardState.pendingConfirmation journal sessionKey ->
                     verdictSessions.Remove sessionKey |> ignore
 
                     task {
@@ -411,7 +412,7 @@ module TurnCompletionProgram =
                         | _ -> ()
                     }
                     :> Task
-                | Some AgentRole.Reviewer when
+                | Some Role.Reviewer when
                     not (verdictSessions.Remove sessionKey)
                     && not (ReviewerGuardState.submitted journal sessionKey)
                     ->
@@ -422,7 +423,7 @@ module TurnCompletionProgram =
                         ()
                     }
                     :> Task
-                | Some AgentRole.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
+                | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
                     match managerGuard with
                     | Some(HostReviewGuard.ReviewGuardMissing treeHash) ->
                         task {

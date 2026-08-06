@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Domain
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// PROMPT-008 / CTX-006 / CTX-010: everything one provider request needs, decided once.

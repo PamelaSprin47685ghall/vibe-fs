@@ -19,8 +19,11 @@ export const PROGRAM_DIRS = [
   `${PRODUCTION_ROOT}/Application/`,
   `${PRODUCTION_ROOT}/Domain/`,
   `${PRODUCTION_ROOT}/Kernel/`,
+  `${PRODUCTION_ROOT}/Process/`,
   `${PRODUCTION_ROOT}/Session/`,
 ]
+
+const norm = (p) => p.replace(/\\/g, '/')
 
 /**
  * External-protocol interpreters allowed by FLOW-006 (JSON/TOML/Host-wire
@@ -37,6 +40,21 @@ export const isExternalProtocolPath = (file) => {
     /\.(?:Codec|Parser|Wire)\.fs$/.test(rel) ||
     /\.(?:Codec|Parser|Wire)\.[A-Za-z]/.test(rel)
   )
+}
+
+/** Process/ is the PTY/process physical layer; its mutable fields and wire
+ *  command DUs are runtime resources / external protocol messages, not business
+ *  program counters. */
+export const isProcessPhysicalPath = (file) => {
+  const rel = norm(String(file))
+  return rel.includes('/Process/')
+}
+
+/** Pty/Node protocol command types are external protocol messages (FLOW-006),
+ *  not a business Command/Reply second runtime. */
+export const isProcessCommandPath = (file) => {
+  const rel = norm(String(file))
+  return /\/Process\/(?:ProcessRequest|PtyTypes)\.fs$/.test(rel)
 }
 
 /**
@@ -81,7 +99,7 @@ export const isHostBoundaryOpenPath = (file) => {
 }
 
 export const FORBIDDEN = [
-  { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable', skipIf: isMutableScratchPath },
+  { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable', skipIf: (file) => isMutableScratchPath(file) || isProcessPhysicalPath(file) },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
   {
     // FLOW-002/FLOW-006 second-runtime forms. Catches realistic bypass shapes:
@@ -93,6 +111,7 @@ export const FORBIDDEN = [
     pattern:
       /\b(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(?:\w*(?:Command|Reply)(?:<[^=>]*>)?|(?:\w*Program)<[^=>]*>)\s*=|\|\s*(?:Step|Suspend)\s+of\b|\bProtocolMismatch\b/,
     label: 'Command/Reply/Program AST, Step/Suspend node, or ProtocolMismatch compensation',
+    skipIf: isProcessCommandPath,
   },
   {
     // FLOW-006 internal business Interpreter. Allows private/internal/top-level
@@ -108,7 +127,7 @@ export const FORBIDDEN = [
     pattern:
       /\b(?:open Wanxiangshu\.Infrastructure|open Wanxiangshu\.OpenCode|open Wanxiangshu\.Process)\b/,
     label: 'infrastructure namespace open',
-    skipIf: isHostBoundaryOpenPath,
+    skipIf: (file) => isHostBoundaryOpenPath(file) || isProcessPhysicalPath(file),
   },
   {
     gate: 'program-counter',
@@ -123,12 +142,11 @@ export const FORBIDDEN = [
     pattern:
       /\b(?!TddPhase\b|parseTddPhase\b|UnknownTddPhase\b|PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
+    skipIf: isProcessPhysicalPath,
   },
 ]
 
 export const GATE_NAMES = FORBIDDEN.map((item) => item.gate)
-
-const norm = (p) => p.replace(/\\/g, '/')
 
 export const isProgramFile = (path) => {
   const rel = norm(relative('.', path))

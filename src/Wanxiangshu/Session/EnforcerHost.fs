@@ -8,7 +8,9 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -912,6 +914,25 @@ module EnforcerHost =
                    | Some "running" -> false
                    | _ -> blogPartInterrupted part)
 
+    /// Extract the requestKey from an interaction-repair synthetic user message.
+    let private repairRequestKey (message: obj) : string option =
+        if isNull message then
+            None
+        else
+            let info = if isNull message?info then message else message?info
+
+            if
+                not (isNull info)
+                && not (isNull info?source)
+                && unbox<string> info?source = "interaction-repair"
+                && not (isNull info?synthetic)
+                && unbox<bool> info?synthetic
+                && not (isNull info?requestKey)
+            then
+                Some(unbox<string> info?requestKey)
+            else
+                None
+
     /// ENFORCER-060/061: stable InteractionRepair user message (item 15 — fixed text only).
     let private withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
         let msgId =
@@ -926,7 +947,8 @@ module EnforcerHost =
                           [ "id", box msgId
                             "role", box "user"
                             "synthetic", box true
-                            "source", box "interaction-repair" ]
+                            "source", box "interaction-repair"
+                            "requestKey", box requestKey ]
                   )
                   "parts", box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
 

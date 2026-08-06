@@ -119,7 +119,7 @@ module ExecutorSummarize =
             let id = agentId processId level startChunk endChunk
             // Track before fork so sibling cancel covers in-flight map/reduce agents.
             forkedIds.Add id
-            let! fork = runtime.Fork(id, AgentRole.Executor, prompt, payload)
+            let! fork = runtime.Fork(id, Role.Executor, prompt, payload)
 
             match fork with
             | Error error -> return raise (InvalidOperationException error)

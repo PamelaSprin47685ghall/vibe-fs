@@ -7,6 +7,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 

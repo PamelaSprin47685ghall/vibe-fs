@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// COMPANION-005: what a frame is. Entry and Squash are interchangeable inputs to

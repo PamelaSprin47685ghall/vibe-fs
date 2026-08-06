@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Applies ownership and source routing to HostEventCodec output. Raw host

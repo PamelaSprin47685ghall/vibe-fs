@@ -13,7 +13,7 @@ module ExecutorSummarizeRuntime =
     type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>
 
     type IExecutorRuntime =
-        abstract Fork: string * AgentRole * string * string option -> Task<Result<ForkResult, string>>
+        abstract Fork: string * Role * string * string option -> Task<Result<ForkResult, string>>
         /// Agent join: require fresh permit → HostForkRuntime.JoinWithPermit. No bare Join.
         abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Cancel one owned map/reduce agent without tearing down the runtime.

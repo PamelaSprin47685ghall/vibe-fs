@@ -3,8 +3,11 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Outcome
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 
 /// PROMPT-005's four-fact send protocol, in one place.

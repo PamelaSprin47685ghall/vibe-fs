@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.AsyncSupport
 
 module ProcessRunner =

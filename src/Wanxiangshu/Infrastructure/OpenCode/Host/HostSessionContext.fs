@@ -8,7 +8,7 @@ open Wanxiangshu.Session
 
 module HostSessionContext =
 
-    /// Resolve AgentRole from Host Agent identity (fast-ROLE / deep-ROLE) or Canonical Role.
+    /// Resolve Role from Host Agent identity (fast-ROLE / deep-ROLE) or Canonical Role.
     /// build/plan aliases remain rejected.
     let roleOf (agent: string) =
         if isNull agent || String.IsNullOrWhiteSpace agent then

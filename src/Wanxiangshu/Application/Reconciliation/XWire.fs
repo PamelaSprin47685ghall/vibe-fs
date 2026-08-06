@@ -7,7 +7,9 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -243,12 +245,12 @@ module XWire =
         | Some durable, Some plan ->
             let outcome =
                 match turn.Outcome with
-                | TurnCompleted -> AttemptOutcome.Completed
-                | TurnFailed _ -> AttemptOutcome.Failed
-                | TurnAborted _ -> AttemptOutcome.Aborted
-                | TurnNeedsContinuation _
-                | TurnInProgress
-                | TurnUnknown -> AttemptOutcome.CompletedInvalid
+                | ReconcileProgram.TurnCompleted -> AttemptOutcome.Completed
+                | ReconcileProgram.TurnFailed _ -> AttemptOutcome.Failed
+                | ReconcileProgram.TurnAborted _ -> AttemptOutcome.Aborted
+                | ReconcileProgram.TurnNeedsContinuation _
+                | ReconcileProgram.TurnInProgress
+                | ReconcileProgram.TurnUnknown -> AttemptOutcome.CompletedInvalid
 
             match AttemptPlanner.promotableProbe plan outcome with
             | Some probe ->

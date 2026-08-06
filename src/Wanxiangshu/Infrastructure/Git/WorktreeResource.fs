@@ -3,6 +3,7 @@ namespace Wanxiangshu.Orchestrator
 open System
 open System.Threading.Tasks
 open Fable.Core
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 

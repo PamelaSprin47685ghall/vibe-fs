@@ -12,6 +12,7 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open PluginHostInterop
@@ -148,7 +149,7 @@ module SpikePlugin =
                                     // Register ownership + ActiveRun so idle→reconcile
                                     // emits TerminalOutcome.Completed for this child.
                                     wired.RegisterOwned(SessionId.value bloggerId)
-                                    wired.BindActiveRun bloggerId AgentRole.Blogger None))
+                                    wired.BindActiveRun bloggerId Role.Blogger None))
                                 SharedState.RootWorkspace
                                 inObj
                                 outObj

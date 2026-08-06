@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Decodes the raw chat.message hook payload before authority policy sees it.

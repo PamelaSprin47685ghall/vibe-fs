@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.AsyncSupport
 
 /// Single-holder large-process gate with cancelable FIFO waiters.

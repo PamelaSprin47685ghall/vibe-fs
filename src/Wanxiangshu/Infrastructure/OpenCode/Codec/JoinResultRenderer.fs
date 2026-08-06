@@ -148,14 +148,14 @@ module JoinResultRenderer =
                     { RunId = p.RunId
                       AgentId = p.AgentId
                       AgentName = ""
-                      Role = defaultArg p.Role AgentRole.Executor
+                      Role = defaultArg p.Role Role.Executor
                       Outcome = AgentFailed p
                       CompletedAt = DateTimeOffset.UtcNow }
                 | AgentAbandonedItem(agentId, reason) ->
                     { RunId = "abandoned-" + agentId
                       AgentId = agentId
                       AgentName = ""
-                      Role = AgentRole.Executor
+                      Role = Role.Executor
                       Outcome = AgentAbandoned(agentId, reason)
                       CompletedAt = DateTimeOffset.UtcNow }
 

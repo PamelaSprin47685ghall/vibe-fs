@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// EXEC-018: single-join batch ceiling. One source of truth for runtime + wire.

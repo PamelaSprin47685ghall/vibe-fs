@@ -1,7 +1,9 @@
 namespace Wanxiangshu.Journal
 
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// EXEC-009: a handle's durable lifecycle has four states, and they must be

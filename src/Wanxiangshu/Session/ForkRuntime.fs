@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Agent
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Runtime for managing child agent runs and PTY sessions.
@@ -16,7 +17,7 @@ open Wanxiangshu.Kernel.Identity
 /// All public members are thread-safe (lockObj synchronizes map/mailbox access).
 type ForkRuntime
     (
-        ?runner: string -> AgentRole -> string option -> Task<AgentCompletionOutcome>,
+        ?runner: string -> Role -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
         ?cleanup: string -> unit
     ) =
@@ -46,7 +47,7 @@ type ForkRuntime
     let startRun
         (agentId: string)
         (agentName: string)
-        (role: AgentRole)
+        (role: Role)
         (promptOpt: string option)
         (workOpt: (unit -> Task<AgentCompletionOutcome>) option)
         =
@@ -103,13 +104,8 @@ type ForkRuntime
     ///   - Nudged   for an existing agent (busy or idle)
     ///   - NotFound if the runtime is cancelled
     member this.Fork
-        (
-            agentId: string,
-            role: AgentRole,
-            agent: string,
-            ?prompt: string,
-            ?runWork: unit -> Task<AgentCompletionOutcome>
-        ) : ForkResult =
+        (agentId: string, role: Role, agent: string, ?prompt: string, ?runWork: unit -> Task<AgentCompletionOutcome>)
+        : ForkResult =
         // PROMPT-008: the managed agent name is required, never defaulted.
         // Defaulting to `fast-ROLE` invented a tier nobody selected, and the
         // invented name then flowed into the completion record and the Host send
@@ -189,7 +185,7 @@ type ForkRuntime
     // Public API — agent lifecycle for restart recovery
     // -----------------------------------------------------------------------
 
-    member _.Restore(agentId: string, role: AgentRole, agent: string) : unit =
+    member _.Restore(agentId: string, role: Role, agent: string) : unit =
         let agentName = agent.Trim()
 
         lock lockObj (fun () ->

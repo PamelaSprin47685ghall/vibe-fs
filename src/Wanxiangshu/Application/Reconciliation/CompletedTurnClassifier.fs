@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -12,16 +13,16 @@ module CompletedTurnClassifier =
 
     let private supportsInteractionRepair =
         function
-        | Some AgentRole.Manager
-        | Some AgentRole.Orchestrator
-        | Some AgentRole.Coder
-        | Some AgentRole.Reviewer
-        | Some AgentRole.Inspector
-        | Some AgentRole.DevOps
-        | Some AgentRole.Browser
-        | Some AgentRole.Meditator -> true
-        | Some AgentRole.Executor
-        | Some AgentRole.Blogger
+        | Some Role.Manager
+        | Some Role.Orchestrator
+        | Some Role.Coder
+        | Some Role.Reviewer
+        | Some Role.Inspector
+        | Some Role.DevOps
+        | Some Role.Browser
+        | Some Role.Meditator -> true
+        | Some Role.Executor
+        | Some Role.Blogger
         | None -> false
 
     /// Formal visible assistant text only (no reasoning/thinking).
@@ -73,23 +74,23 @@ module CompletedTurnClassifier =
         (finish: string option)
         (errorName: string option)
         (parts: MessagePart array)
-        : TurnOutcome =
+        : ReconcileProgram.TurnOutcome =
         if isAbortErrorName errorName then
-            TurnAborted(defaultArg errorName "aborted")
+            ReconcileProgram.TurnAborted(defaultArg errorName "aborted")
         elif completed && Option.isSome errorName then
-            TurnFailed(defaultArg errorName "assistant completed with error")
+            ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error")
         elif
             finish
             |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase))
         then
-            TurnAborted("finish=aborted")
+            ReconcileProgram.TurnAborted("finish=aborted")
         else
             match finish with
             | Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->
                 if isAbortErrorName errorName then
-                    TurnAborted(defaultArg errorName "aborted")
+                    ReconcileProgram.TurnAborted(defaultArg errorName "aborted")
                 else
-                    TurnFailed(defaultArg errorName "assistant finish=error")
+                    ReconcileProgram.TurnFailed(defaultArg errorName "assistant finish=error")
             | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
                 // CTX-004: a terminal provider step is not a final answer unless
                 // it carries usable formal text. `TerminalValidity` is the single
@@ -98,31 +99,34 @@ module CompletedTurnClassifier =
                 // tool-call markup, and both cases earn interaction repair rather
                 // than durable provider fallback.
                 match TerminalValidity.check (partsText parts) with
-                | Ok() -> TurnCompleted
+                | Ok() -> ReconcileProgram.TurnCompleted
                 | Error rejection ->
-                    TurnNeedsContinuation(sprintf "assistant stop with %s" (TerminalValidity.describe rejection))
-            | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) -> TurnInProgress
+                    ReconcileProgram.TurnNeedsContinuation(
+                        sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
+                    )
+            | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) ->
+                ReconcileProgram.TurnInProgress
             | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
-                TurnNeedsContinuation "assistant finish=length"
-            | Some value -> TurnFailed(sprintf "assistant finish=%s" value)
+                ReconcileProgram.TurnNeedsContinuation "assistant finish=length"
+            | Some value -> ReconcileProgram.TurnFailed(sprintf "assistant finish=%s" value)
             // No finish yet: Unknown. Never invent Completed from parts alone —
             // abort/error may still be racing the idle wake-up.
-            | None -> TurnUnknown
+            | None -> ReconcileProgram.TurnUnknown
 
     /// ARCH-011: named for the typed occasion (unfinished interaction), not for any
     /// character feature of the repair payload. `_parts` is deliberately ignored: a
     /// `TurnInProgress`/`TurnNeedsContinuation` outcome already carries the decision.
-    let needsInteractionRepair (role: AgentRole option) (outcome: TurnOutcome) (_parts: MessagePart array) =
+    let needsInteractionRepair (role: Role option) (outcome: ReconcileProgram.TurnOutcome) (_parts: MessagePart array) =
         supportsInteractionRepair role
         && (match outcome with
-            | TurnInProgress
-            | TurnNeedsContinuation _ -> true
-            | TurnCompleted
-            | TurnAborted _
-            | TurnFailed _
-            | TurnUnknown -> false)
+            | ReconcileProgram.TurnInProgress
+            | ReconcileProgram.TurnNeedsContinuation _ -> true
+            | ReconcileProgram.TurnCompleted
+            | ReconcileProgram.TurnAborted _
+            | ReconcileProgram.TurnFailed _
+            | ReconcileProgram.TurnUnknown -> false)
 
-    let roleOfAgent (agent: string option) (fallback: AgentRole option) =
+    let roleOfAgent (agent: string option) (fallback: Role option) =
         match agent with
         | Some value -> HostSessionContext.roleOf value |> Option.orElse fallback
         | None -> fallback
@@ -132,7 +136,7 @@ module CompletedTurnClassifier =
         (physicalUserMessageId: PhysicalUserMessageId)
         (authorityRoot: AuthorityRootUserMessageId)
         (assistant: SessionMessage)
-        (roleFallback: AgentRole option)
+        (roleFallback: Role option)
         (directory: string option)
         : ReconciledTurn =
         let role = roleOfAgent assistant.Agent roleFallback
@@ -145,7 +149,7 @@ module CompletedTurnClassifier =
           AuthorityRootUserMessageId = authorityRoot
           // HOST-010: the assistant message IS the provider run.
           ProviderRun = ProviderRunIdentity.create assistant.Id
-          AgentRole = role
+          Role = role
           Directory = directory
           Parts = assistant.Parts
           Finish = assistant.Finish

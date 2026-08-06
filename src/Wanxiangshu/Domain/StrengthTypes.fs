@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Domain
 
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// docs/proposal/strength.md — Predict & Reduce Strength：纯领域类型（STRENGTH-006…025）。

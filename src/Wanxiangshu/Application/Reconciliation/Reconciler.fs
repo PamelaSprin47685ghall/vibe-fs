@@ -7,6 +7,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Journal
@@ -40,20 +41,12 @@ module Reconciler =
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
 
-    let private domainOutcome (outcome: TurnOutcome) : ReconcileProgram.TurnOutcome =
-        match outcome with
-        | TurnInProgress -> ReconcileProgram.TurnInProgress
-        | TurnNeedsContinuation reason -> ReconcileProgram.TurnNeedsContinuation reason
-        | TurnCompleted -> ReconcileProgram.TurnCompleted
-        | TurnAborted reason -> ReconcileProgram.TurnAborted reason
-        | TurnFailed error -> ReconcileProgram.TurnFailed error
-        | TurnUnknown -> ReconcileProgram.TurnUnknown
 
     let private publishTurnOf (turn: ReconciledTurn) : ReconcileProgram.PublishTurn =
         { SessionId = turn.SessionId
           PhysicalUserMessageId = turn.PhysicalUserMessageId
           ProviderRun = turn.ProviderRun
-          Outcome = domainOutcome turn.Outcome }
+          Outcome = turn.Outcome }
 
     let private evidenceOf (turn: ReconciledTurn option) : ReconcileProgram.ReconcileEvidence =
         match turn with
@@ -62,12 +55,12 @@ module Reconciler =
             let observed = ReconcileProgram.observedTurn (publishTurnOf value)
 
             match value.Outcome with
-            | TurnCompleted
-            | TurnAborted _
-            | TurnFailed _ -> ReconcileProgram.ReconcileEvidence.Terminal observed
-            | TurnInProgress
-            | TurnNeedsContinuation _ -> ReconcileProgram.ReconcileEvidence.Provisional observed
-            | TurnUnknown -> ReconcileProgram.ReconcileEvidence.Unknown(Some observed)
+            | ReconcileProgram.TurnCompleted
+            | ReconcileProgram.TurnAborted _
+            | ReconcileProgram.TurnFailed _ -> ReconcileProgram.ReconcileEvidence.Terminal observed
+            | ReconcileProgram.TurnInProgress
+            | ReconcileProgram.TurnNeedsContinuation _ -> ReconcileProgram.ReconcileEvidence.Provisional observed
+            | ReconcileProgram.TurnUnknown -> ReconcileProgram.ReconcileEvidence.Unknown(Some observed)
 
     type Scheduler
         (
@@ -385,7 +378,7 @@ module Reconciler =
             | ProviderRetry retry -> this.Kick(retry.SessionId)
             | SessionDeleted sessionId -> this.ClearSession(sessionId)
 
-        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: AgentRole) =
+        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             lock gate (fun () -> cleared.Remove(SessionId.value sessionId) |> ignore)
             binding.BindUserMessage(sessionId, physical, ?agentRole = agentRole)
 

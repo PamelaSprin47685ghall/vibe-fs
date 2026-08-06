@@ -3,6 +3,7 @@ namespace Wanxiangshu.Journal
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 module private NodeFsBoot =

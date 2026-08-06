@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Session
 
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Rebuilds physical ChildRun aggregates from durable linkage after restart.

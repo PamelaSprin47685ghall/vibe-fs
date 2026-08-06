@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.AsyncSupport
 
 /// JS-host process adapter. All Node/Bun interop for child-process spawn and

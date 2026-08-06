@@ -2,6 +2,7 @@ namespace Wanxiangshu.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 type AgentFailurePayload =
@@ -12,7 +13,7 @@ type AgentFailurePayload =
         /// one union.
         ChildSessionId: SessionId option
         RunId: string
-        Role: AgentRole option
+        Role: Role option
         Code: string
         Message: string
     }
@@ -39,7 +40,7 @@ type AgentCompletionPayload =
         AgentId: string
         ChildSessionId: SessionId option
         RunId: string
-        Role: AgentRole
+        Role: Role
         AuthorityRoot: AuthorityRootUserMessageId option
         ProviderRun: ProviderRunIdentity option
         /// The final LifecycleWorkRecord, materialised at terminal.
@@ -118,7 +119,7 @@ module AgentCompletion =
         (agentId: string)
         (childSessionId: SessionId)
         (runId: string)
-        (role: AgentRole)
+        (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
         (providerRun: ProviderRunIdentity)
         (workRecord: string)
@@ -134,14 +135,7 @@ module AgentCompletion =
               WorkRecord = workRecord
               Directory = directory }
 
-    let failed
-        (agentId: string)
-        (runId: string)
-        (role: AgentRole option)
-        (childSessionId: SessionId option)
-        code
-        message
-        =
+    let failed (agentId: string) (runId: string) (role: Role option) (childSessionId: SessionId option) code message =
         AgentFailed
             { AgentId = agentId
               ChildSessionId = childSessionId
@@ -159,7 +153,7 @@ module AgentCompletion =
     ///
     /// The work record is the run's plain text: a PTY has no LWR, and its completion
     /// schema stays deliberately minimal (EXEC-004).
-    let ofSimpleText (agentId: string) (runId: string) (role: AgentRole) (text: string) =
+    let ofSimpleText (agentId: string) (runId: string) (role: Role) (text: string) =
         AgentCompleted
             { AgentId = agentId
               ChildSessionId = None
@@ -170,12 +164,12 @@ module AgentCompletion =
               WorkRecord = text
               Directory = None }
 
-    let ofSimpleError (agentId: string) (runId: string) (role: AgentRole) (message: string) =
+    let ofSimpleError (agentId: string) (runId: string) (role: Role) (message: string) =
         failed agentId runId (Some role) None "ERROR" message
 
     let abandoned (agentId: string) (reason: string) = AgentAbandoned(agentId, reason)
 
-    let withRunIdentity (agentId: string) (runId: string) (role: AgentRole) (outcome: AgentCompletionOutcome) =
+    let withRunIdentity (agentId: string) (runId: string) (role: Role) (outcome: AgentCompletionOutcome) =
         match outcome with
         | AgentCompleted payload ->
             AgentCompleted
@@ -207,7 +201,7 @@ type RunCompletion =
         AgentName: string
 
         /// Canonical role of the agent.
-        Role: AgentRole
+        Role: Role
 
         /// Agent finality only: completed | failed | abandoned (no aborted).
         Outcome: AgentCompletionOutcome
@@ -233,7 +227,7 @@ module PtyJoinItem =
 
     let toRunCompletion (item: PtyJoinItem) : RunCompletion =
         let id = ptyId item
-        let role = AgentRole.DevOps
+        let role = Role.DevOps
 
         match item with
         | PtyExited e ->

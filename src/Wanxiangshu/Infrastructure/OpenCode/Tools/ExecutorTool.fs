@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open ToolHostCodec
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 

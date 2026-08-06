@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// The only module that unwraps raw host `obj` events.

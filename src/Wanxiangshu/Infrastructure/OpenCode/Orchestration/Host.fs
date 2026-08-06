@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 open Wanxiangshu.Session
@@ -15,8 +16,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
-    let onChildCreated (agentId: string) (role: AgentRole) (childId: SessionId) =
-        if role = AgentRole.Reviewer then
+    let onChildCreated (agentId: string) (role: Role) (childId: SessionId) =
+        if role = Role.Reviewer then
             match worktrees.TryGetValue agentId with
             | true, path -> deps.RegisterReviewerTree (SessionId.value childId) (GitTree.create path)
             | false, _ -> ()
@@ -66,7 +67,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     ///
     /// The session comes from the runtime's own child map, not from the fork result:
     /// only the Host can issue a session id, and ORCH-006 requires the real one.
-    let forkChild (agentId: string) (role: AgentRole) (agent: string) (worktree: WorktreePath) (prompt: string) =
+    let forkChild (agentId: string) (role: Role) (agent: string) (worktree: WorktreePath) (prompt: string) =
         task {
             worktrees.[agentId] <- WorktreePath.value worktree
 
@@ -88,7 +89,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // ── ManagerPort ─────────────────────────────────────────────────────────
 
     let startManager (start: ManagerStart) : Task<Result<SessionId, string>> =
-        forkChild (managerAgentId start.JobId) AgentRole.Manager start.ManagerAgent start.Worktree start.Prompt
+        forkChild (managerAgentId start.JobId) Role.Manager start.ManagerAgent start.Worktree start.Prompt
 
     /// Await the Manager, then stage its work into a candidate commit.
     ///
@@ -119,9 +120,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 let agentId = managerAgentId jobId
                 worktrees.[agentId] <- WorktreePath.value worktree
 
-                match!
-                    runtime.Fork(agentId, AgentRole.Manager, record.ManagerAgent, prompt, None, firstPrompt = false)
-                with
+                match! runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false) with
                 | Error error -> return Error error
                 | Ok _ -> return! awaitManager jobId
         }
@@ -167,14 +166,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         OrchestratorHostReview.reverify
             deps.Journal
             (fun _ path prompt ->
-                forkChild reviewerAgentId AgentRole.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt)
+                forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt)
             (fun _ -> awaitChild reviewerAgentId)
             (fun _ prompt ->
                 task {
                     match!
                         runtime.Fork(
                             reviewerAgentId,
-                            AgentRole.Reviewer,
+                            Role.Reviewer,
                             OrchestratorHostReview.DeepReviewerAgent,
                             prompt,
                             None,

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 open Wanxiangshu.Session
@@ -16,7 +17,7 @@ open Wanxiangshu.Kernel
 /// against transcript addresses during reconcile, where role is not yet known.
 module TurnBinding =
 
-    let private canonicalRoleOf (role: Role) : AgentRole option =
+    let private canonicalRoleOf (role: Role) : Role option =
         Wanxiangshu.Session.AgentRoleIdentity.roleOfString (PromptAuthority.roleLabel role)
 
     /// Build an ActiveRunBinding from the journal PromptAuthority projection.
@@ -52,7 +53,7 @@ module TurnBinding =
                   AuthorityRootUserMessageId = Some run.AuthorityRootUserMessageId
                   PhysicalUserMessageId = physical
                   ContinuationMessageIds = continuationIds
-                  AgentRole = canonicalRoleOf run.CanonicalRole
+                  Role = canonicalRoleOf run.CanonicalRole
                   Directory = None }
 
     /// Mutable store for in-memory bindings. Durable recovery uses the journal.
@@ -68,7 +69,7 @@ module TurnBinding =
         ///
         /// The caller hands over the physical message that opened the run; the root
         /// is derived from it by PROMPT-002 promotion, never parsed separately.
-        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: AgentRole) =
+        member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
                 let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
@@ -80,7 +81,7 @@ module TurnBinding =
                         { binding with
                             AuthorityRootUserMessageId = Some root
                             PhysicalUserMessageId = Some physical
-                            AgentRole = agentRole |> Option.orElse binding.AgentRole }
+                            Role = agentRole |> Option.orElse binding.Role }
                 | false, _ ->
                     activeBindings.[key] <-
                         { SessionId = sessionId
@@ -88,7 +89,7 @@ module TurnBinding =
                           AuthorityRootUserMessageId = Some root
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = Set.empty
-                          AgentRole = agentRole
+                          Role = agentRole
                           Directory = None })
 
         /// Bind a continuation physical message to the active logical run.
@@ -118,7 +119,7 @@ module TurnBinding =
                           AuthorityRootUserMessageId = None
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = continuations
-                          AgentRole = None
+                          Role = None
                           Directory = None })
 
         /// Register a host-provided active run (e.g. child session start).

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Session
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 
@@ -9,7 +10,7 @@ type PendingHostRun =
     { Token: obj
       AgentId: string
       ChildId: SessionId
-      Role: AgentRole
+      Role: Role
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Finished: bool }

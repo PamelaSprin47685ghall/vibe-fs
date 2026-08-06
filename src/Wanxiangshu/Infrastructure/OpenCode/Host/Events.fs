@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 open Wanxiangshu.Kernel

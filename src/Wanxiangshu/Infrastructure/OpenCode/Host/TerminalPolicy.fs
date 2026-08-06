@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Collections.Generic
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -14,7 +15,7 @@ module TerminalPolicy =
         | Some j -> j.IsPoisoned
         | None -> false
 
-    let roleName (role: Wanxiangshu.Session.AgentRole option) =
+    let roleName (role: Wanxiangshu.Kernel.Role option) =
         role |> Option.map (fun value -> value.ToString().ToLowerInvariant())
 
     /// The durable handle record for a child session, across all parents.
@@ -84,11 +85,11 @@ module TerminalPolicy =
     let outstandingBackground
         (journal: AgentJournal option)
         (hasLivePty: string -> bool)
-        (role: AgentRole option)
+        (role: Role option)
         (sessionId: SessionId)
         : bool =
         match role with
-        | Some AgentRole.Manager ->
+        | Some Role.Manager ->
             match journal with
             | None -> false
             | Some durable ->
@@ -96,7 +97,7 @@ module TerminalPolicy =
                 |> HandleProjection.listable
                 |> List.isEmpty
                 |> not
-        | Some AgentRole.DevOps ->
+        | Some Role.DevOps ->
             let durableOutstanding =
                 match journal with
                 | None -> false
@@ -107,7 +108,7 @@ module TerminalPolicy =
                     |> not
 
             durableOutstanding || hasLivePty (SessionId.value sessionId)
-        | Some AgentRole.Orchestrator ->
+        | Some Role.Orchestrator ->
             match journal with
             | None -> false
             | Some durable ->

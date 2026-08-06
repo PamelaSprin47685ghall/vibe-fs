@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
@@ -43,7 +44,7 @@ module ToolRegistry =
         (currentPhysicalUserMessage: string -> string option)
         (verdictSessions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
-        (onRunStarted: (SessionId -> AgentRole -> string option -> unit) option)
+        (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> string option) option)
         (childWorkRecordFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)

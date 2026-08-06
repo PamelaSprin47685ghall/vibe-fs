@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Host raw object → `ProviderWireProjection` (VERIFY-005 adapter boundary).

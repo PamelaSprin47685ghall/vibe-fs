@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Session
 
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// Shared Host-side side effects around BloggerRuntime cells (P1-1).

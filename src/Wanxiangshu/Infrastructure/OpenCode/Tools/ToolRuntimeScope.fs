@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Session
@@ -27,7 +28,7 @@ type ToolRuntimeScope
         currentPhysicalUserMessage: string -> string option,
         verdictSessions: HashSet<string>,
         sessionDirectories: Dictionary<string, string>,
-        onRunStarted: (SessionId -> AgentRole -> string option -> unit) option,
+        onRunStarted: (SessionId -> Role -> string option -> unit) option,
         parentWorkRecordFor: (string -> string option) option,
         childWorkRecordFor: (string -> string option) option,
         snapshot: ISessionSnapshotPort option,
@@ -50,7 +51,7 @@ type ToolRuntimeScope
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
 
-    let registerChild parentSid (_role: AgentRole) childId =
+    let registerChild parentSid (_role: Role) childId =
         sessionParents.[SessionId.value childId] <- parentSid
 
     let directoryFor sid =

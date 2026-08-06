@@ -25,6 +25,7 @@ import {
 } from '../support/domain.mjs'
 import * as TerminalPolicyModule from '../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js'
 import * as ForkTypesModule from '../../../dist/Session/ForkTypes.js'
+import * as RolesModule from '../../../dist/Kernel/Roles.js'
 
 const outstandingBackground = (() => {
   const names = Object.keys(TerminalPolicyModule)
@@ -40,8 +41,9 @@ const outstandingBackground = (() => {
 })()
 
 const agentRole = (name) => {
-  const value = ForkTypesModule.AgentRole?.[name]
-  if (value === undefined) throw new Error(`unknown AgentRole '${name}'`)
+  const role = ForkTypesModule.AgentRole ?? RolesModule.Role
+  const value = role?.[name]
+  if (value === undefined) throw new Error(`unknown Role '${name}'`)
   return value
 }
 

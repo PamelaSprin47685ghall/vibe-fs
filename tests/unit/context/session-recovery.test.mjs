@@ -131,20 +131,9 @@ test('RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', async 
   assert.match(src, /\| Waiting of NonEmpty<RecoveryBlock>/)
 })
 
-test('RECOVERY_FAMILY_trace_ready_before_business_property', async () => {
-  const { sessionRecovery } = await import('../support/domain.mjs')
-
-  const ok = sessionRecovery.familyReadyBeforeBusiness([
-    sessionRecovery.traceDiscover('p'),
-    sessionRecovery.traceFamilyReady('p', 'd'),
-    sessionRecovery.traceBusiness('fork'),
-  ])
-  assert.equal(ok, true)
-
-  const bad = sessionRecovery.familyReadyBeforeBusiness([
-    sessionRecovery.traceDiscover('p'),
-    sessionRecovery.traceBusiness('fork'),
-    sessionRecovery.traceFamilyReady('p', 'd'),
-  ])
-  assert.equal(bad, false)
+test('RECOVERY_FAMILY_ready_before_business_is_type_enforced', async () => {
+  const { caseOf, sessionRecovery, sessionId } = await import('../support/domain.mjs')
+  const root = sessionId('p')
+  const family = sessionRecovery.authorizeFamilyResume(root, 7, sessionRecovery.recoveredClosure(root, {}))
+  assert.equal(caseOf(family), 'FamilyReady')
 })

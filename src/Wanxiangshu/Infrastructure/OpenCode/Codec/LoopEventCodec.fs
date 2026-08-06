@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// LOOP-002 / LOOP-009: extract streaming text deltas from Host events.

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Domain
 
 open System
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// The two provider projections (VERIFY-007).

@@ -3615,9 +3615,9 @@ export const forkRuntime = (() => {
   if (Runtime === undefined) {
     throw new Error('Session/ForkRuntime did not export ForkRuntime')
   }
-  const AgentRole = ForkTypesModule.AgentRole
+  const AgentRole = ForkTypesModule.AgentRole ?? RolesModule.Role
   if (AgentRole === undefined) {
-    throw new Error('Session/ForkTypes.AgentRole missing')
+    throw new Error('Session/ForkTypes.AgentRole or Kernel/Roles.Role missing')
   }
 
   const forkFn = fableInstanceMethod(ForkRuntimeModule, 'ForkRuntime', 'Fork')
@@ -3627,7 +3627,7 @@ export const forkRuntime = (() => {
 
   const roleOf = (name) => {
     const value = AgentRole[name]
-    if (value === undefined) throw new Error(`unknown AgentRole '${name}'`)
+    if (value === undefined) throw new Error(`unknown Role '${name}'`)
     return value
   }
 
@@ -4643,15 +4643,12 @@ const SessionRecoveryModule = await prod('Domain/SessionRecovery')
 
 export const sessionRecovery = (() => {
   const authorize = member(SessionRecoveryModule, 'SessionRecovery', 'authorizeFamilyResume')
-  const familyReadyBeforeBusiness = member(SessionRecoveryModule, 'SessionRecovery', 'familyReadyBeforeBusiness')
   const permitRoot = member(SessionRecoveryModule, 'FamilyRecoveryPermit', 'root')
 
   const RecoveryBlockClass =
     SessionRecoveryModule.RecoveryBlock ?? SessionRecoveryModule.SessionRecovery_RecoveryBlock
   const SessionRecoveryClass =
     SessionRecoveryModule.SessionRecovery ?? SessionRecoveryModule.SessionRecovery_SessionRecovery
-  const RecoveryTraceClass =
-    SessionRecoveryModule.RecoveryTrace ?? SessionRecoveryModule.SessionRecovery_RecoveryTrace
   const NonEmptyClass =
     SessionRecoveryModule.NonEmpty$1 ??
     SessionRecoveryModule.SessionRecovery_NonEmpty$1 ??
@@ -4663,13 +4660,9 @@ export const sessionRecovery = (() => {
   if (typeof SessionRecoveryClass !== 'function') {
     throw new Error('SessionRecovery.SessionRecovery missing')
   }
-  if (typeof RecoveryTraceClass !== 'function') {
-    throw new Error('SessionRecovery.RecoveryTrace missing')
-  }
 
   const blockOf = unionCase(RecoveryBlockClass, 'RecoveryBlock')
   const recoveryOf = unionCase(SessionRecoveryClass, 'SessionRecovery')
-  const traceOf = unionCase(RecoveryTraceClass, 'RecoveryTrace')
 
   const nonEmptyOne = (value) => {
     // F# record { Head; Tail } for NonEmpty<'a>
@@ -4687,13 +4680,13 @@ export const sessionRecovery = (() => {
 
   return {
     authorizeFamilyResume: (root, sequence, recovered) => authorize(root, sequence, recovered),
-    familyReadyBeforeBusiness: (traces) => familyReadyBeforeBusiness(toList(traces)),
     permitRoot: (permit) => permitRoot(permit),
 
     snapshotUnreadable: (session, reason) => blockOf('SnapshotUnreadable', [session, reason]),
     childRecoveryFailed: (session, reason) => blockOf('ChildRecoveryFailed', [session, reason]),
     blocked: (block) => recoveryOf('Blocked', [nonEmptyOne(block)]),
     waiting: (block) => recoveryOf('Waiting', [nonEmptyOne(block)]),
+    recovered: (session) => recoveryOf('Recovered', [nonEmptyOne(sessionRecovery.childRecoveryFailed(session, 'test'))]),
 
     recoveredClosure: (root, resultsBySession = {}) => {
       const pairs = Object.entries(resultsBySession).map(([id, outcome]) => [sessionId(id), outcome])
@@ -4718,9 +4711,7 @@ export const sessionRecovery = (() => {
       }
     },
 
-    traceDiscover: (id) => traceOf('DiscoverClosure', [sessionId(id)]),
-    traceFamilyReady: (id, digest) => traceOf('FamilyReadyIssued', [sessionId(id), digest]),
-    traceBusiness: (name) => traceOf('BusinessOperation', [name]),
+
   }
 })()
 
@@ -4792,7 +4783,7 @@ export const agentCompletion = (() => {
   const joinItemOfRunCompletionFn = member(AgentCompletionModule, 'JoinItem', 'ofRunCompletion')
 
   const roleOf = (name) => {
-    const value = ForkTypesModule.AgentRole?.[name]
+    const value = (ForkTypesModule.AgentRole ?? RolesModule.Role)?.[name]
     if (value === undefined) throw new Error(`unknown AgentRole '${name}'`)
     return value
   }

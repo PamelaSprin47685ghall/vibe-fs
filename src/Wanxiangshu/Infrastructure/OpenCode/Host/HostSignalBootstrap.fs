@@ -7,7 +7,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Journal
 open Wanxiangshu.Process
@@ -27,7 +29,7 @@ module HostSignalBootstrap =
         {
             RegisterOwned: string -> unit
             CancelSignals: SessionId seq -> unit
-            BindActiveRun: SessionId -> AgentRole -> string option -> unit
+            BindActiveRun: SessionId -> Role -> string option -> unit
             CurrentPhysicalUserMessage: string -> string option
             ChatMessageHook: obj
             ObserveEvent: obj -> unit
@@ -89,8 +91,8 @@ module HostSignalBootstrap =
                             | _ -> gitTreePort
 
                         match turn.Outcome with
-                        | TurnFailed _
-                        | TurnAborted _ ->
+                        | ReconcileProgram.TurnFailed _
+                        | ReconcileProgram.TurnAborted _ ->
                             scope.ArmRecovery turn.SessionId
 
                             // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
@@ -101,10 +103,10 @@ module HostSignalBootstrap =
                                 match companion.BloggerSession with
                                 | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
                                 | _ -> ()
-                        | TurnCompleted
-                        | TurnNeedsContinuation _
-                        | TurnInProgress
-                        | TurnUnknown -> ()
+                        | ReconcileProgram.TurnCompleted
+                        | ReconcileProgram.TurnNeedsContinuation _
+                        | ReconcileProgram.TurnInProgress
+                        | ReconcileProgram.TurnUnknown -> ()
 
                         XWire.reconcileAttempt journal scope turn
 
@@ -292,7 +294,7 @@ module HostSignalBootstrap =
                     let d = unbox<string> input?directory
                     if String.IsNullOrWhiteSpace d then None else Some d
 
-            let bindActiveRun (sessionId: SessionId) (role: AgentRole) (directory: string option) =
+            let bindActiveRun (sessionId: SessionId) (role: Role) (directory: string option) =
                 let key = SessionId.value sessionId
                 registerOwned key
 
@@ -318,7 +320,7 @@ module HostSignalBootstrap =
                       AuthorityRootUserMessageId = physical |> Option.map PhysicalUserMessageId.promoteToAuthorityRoot
                       PhysicalUserMessageId = physical
                       ContinuationMessageIds = Set.empty
-                      AgentRole = Some role
+                      Role = Some role
                       Directory = directory }
 
             let onAuthorityRoot (mainSessionId: SessionId) =
