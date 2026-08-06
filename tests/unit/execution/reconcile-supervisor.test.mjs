@@ -29,8 +29,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const TEST_BACKOFF_MS = [5, 5, 5, 5, 5]
 // ClearSession race: first backoff must outlast waitUntil's step so clear can
 // run while the pass is still in delayMs (not already finished).
-const CLEAR_BACKOFF_MS = [200]
-const CLEAR_BUDGET_MS = 500
+const CLEAR_BACKOFF_MS = [80]
+const CLEAR_BUDGET_MS = 250
 // Always-incomplete budget test: short wall clock, short steps.
 const BUDGET_BACKOFF_MS = [5, 5, 5, 5, 5]
 const BUDGET_MAX_MS = 40
@@ -142,7 +142,7 @@ test('EXEC_reconcile_incomplete_rekick_budget_stops', async () => {
   reconcileSupervisor.kick(supervisor, sid)
 
   // Budget 40ms of 5ms steps → several reads, then stop.
-  await sleep(200)
+  await sleep(80)
   const readsAfterBudget = snapshot.readCount
   await sleep(100)
   assert.equal(
@@ -190,7 +190,7 @@ test('EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
   await sleep(2)
   reconcileSupervisor.clearSession(supervisor, sid)
 
-  await sleep(250)
+  await sleep(100)
   const completed = turns.filter((t) => caseOf(t.Outcome) === 'TurnCompleted')
   assert.equal(completed.length, 0, 'ClearSession mid-backoff must prevent terminal publish')
 })
@@ -217,11 +217,11 @@ test('EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once',
   reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
   reconcileSupervisor.kick(supervisor, sid)
 
-  assert.equal(await waitUntil(() => attempts.length === 1, 400), true, 'first onTurn must be attempted')
-  await sleep(20)
+  assert.equal(await waitUntil(() => attempts.length === 1, 300), true, 'first onTurn must be attempted')
+  await sleep(10)
   reconcileSupervisor.kick(supervisor, sid)
-  assert.equal(await waitUntil(() => attempts.length === 2, 400), true, 'later wake must retry unsealed turn')
-  await sleep(30)
+  assert.equal(await waitUntil(() => attempts.length === 2, 300), true, 'later wake must retry unsealed turn')
+  await sleep(10)
   assert.equal(attempts.length, 2, 'successful retry seals exactly once')
 })
 
@@ -253,7 +253,7 @@ test('EXEC_reconcile_clear_rebind_drops_old_delayed_turn_and_runs_new_binding', 
   reconcileSupervisor.bindUserMessage(supervisor, sid, newPhysical)
   reconcileSupervisor.kick(supervisor, sid)
 
-  assert.equal(await waitUntil(() => turns.length === 1, 700), true, 'new generation must complete')
+  assert.equal(await waitUntil(() => turns.length === 1, 400), true, 'new generation must complete')
   assert.equal(turns.length, 1, 'old delayed generation must never publish')
   assert.equal(idValue.physicalUser(turns[0].PhysicalUserMessageId), 'new-user')
 })

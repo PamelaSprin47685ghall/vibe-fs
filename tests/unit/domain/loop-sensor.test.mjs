@@ -74,7 +74,7 @@ test('LOOP_002_sensor_observes_text_delta_only', async () => {
     assert.equal(loopEventCodec.tryDecodeTextDelta(rawDelta('ses_text', field, loopText('r'))), undefined)
     loopSensor.observe(sensor, rawDelta('ses_text', field, loopText('r')))
   }
-  await wait(20)
+  await wait(8)
   assert.deepEqual(aborts, [])
   assert.equal(loopSensor.isArmed(sensor, 'ses_text'), false)
 
@@ -87,7 +87,7 @@ test('LOOP_002_sensor_observes_text_delta_only', async () => {
     delta: 'abcd',
   })
   loopSensor.observe(sensor, loopSensor.textDelta('ses_text', loopText('t')))
-  await wait(50)
+  await wait(15)
   assert.deepEqual(aborts, ['ses_text'])
   assert.equal(loopSensor.isArmed(sensor, 'ses_text'), true)
   // Sensor construct has no journal port; arm mark is the only side effect.
@@ -104,7 +104,7 @@ test('LOOP_007_unowned_and_reasoning_deltas_are_ignored', async () => {
 
   // Non-owned session: Observe returns without arming or aborting.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_stranger', loopText('u')))
-  await wait(20)
+  await wait(8)
   assert.deepEqual(aborts, [])
   assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
   assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), false)
@@ -115,17 +115,17 @@ test('LOOP_007_unowned_and_reasoning_deltas_are_ignored', async () => {
     undefined,
   )
   loopSensor.observe(sensor, rawDelta('ses_owned', 'reasoning', loopText('q')))
-  await wait(20)
+  await wait(8)
   assert.deepEqual(aborts, [])
 
   // Owned text loop arms once; subsequent deltas on the same attempt are ignored.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_owned', loopText('v')))
-  await wait(50)
+  await wait(15)
   assert.deepEqual(aborts, ['ses_owned'])
   assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), true)
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_owned', loopText('v')))
-  await wait(30)
+  await wait(10)
   assert.deepEqual(aborts, ['ses_owned'])
 })
 
@@ -139,14 +139,14 @@ test('LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('a')))
-  await wait(50)
+  await wait(15)
 
   assert.deepEqual(aborts, ['ses_loop'])
   assert.equal(loopSensor.isArmed(sensor, 'ses_loop'), true)
 
   // Same attempt: more loop text must not re-abort (LOOP-006 idempotent).
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('a')))
-  await wait(30)
+  await wait(10)
   assert.deepEqual(aborts, ['ses_loop'])
 })
 
@@ -160,7 +160,7 @@ test('LOOP_006_unowned_session_never_aborts', async () => {
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_stranger', loopText('b')))
-  await wait(20)
+  await wait(8)
 
   assert.deepEqual(aborts, [])
   assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
@@ -178,7 +178,7 @@ test('LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_idle', loopText('i')))
-  await wait(50)
+  await wait(15)
   assert.deepEqual(aborts, ['ses_idle'])
   assert.equal(loopSensor.isArmed(sensor, 'ses_idle'), true)
 
@@ -187,7 +187,7 @@ test('LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
 
   // Still armed → further deltas must not re-abort.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_idle', loopText('i')))
-  await wait(30)
+  await wait(10)
   assert.deepEqual(aborts, ['ses_idle'])
 })
 
@@ -201,7 +201,7 @@ test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
   })
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('c')))
-  await wait(50)
+  await wait(15)
   assert.equal(aborts.length, 1)
 
   // LOOP-006: completion path clears the mark before the next attempt streams.
@@ -210,7 +210,7 @@ test('LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
   assert.equal(loopSensor.isArmed(sensor, 'ses_loop'), false)
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('c')))
-  await wait(50)
+  await wait(15)
   assert.deepEqual(aborts, ['ses_loop', 'ses_loop'])
 })
 

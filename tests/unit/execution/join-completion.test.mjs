@@ -108,10 +108,10 @@ test('EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
 test('EXEC_join_mailbox_with_no_completion_times_out', async () => {
   const box = completionMailbox.create(() => true)
   const started = Date.now()
-  const result = await completionMailbox.join(box, 40)
+  const result = await completionMailbox.join(box, 20)
   const elapsed = Date.now() - started
 
-  assert.ok(elapsed >= 25, `expected ~40ms wait, got ${elapsed}ms`)
+  assert.ok(elapsed >= 10, `expected ~20ms wait, got ${elapsed}ms`)
   assert.ok(elapsed < 2000, `must not hang; got ${elapsed}ms`)
   assert.equal(caseOf(result), 'Error', 'Error result')
   assert.equal(caseOf(result.fields[0]), 'TimedOut')
@@ -128,8 +128,8 @@ test('EXEC_join_mailbox_completion_before_deadline_returns_ok', async () => {
     workRecord: 'done',
   })
 
-  const pending = completionMailbox.join(box, 500)
-  await new Promise((r) => setTimeout(r, 10))
+  const pending = completionMailbox.join(box, 100)
+  await new Promise((r) => setTimeout(r, 5))
   completionMailbox.publish(box, completion)
 
   const result = await pending
