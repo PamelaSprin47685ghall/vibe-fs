@@ -422,7 +422,7 @@ test('EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
   const waitSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessWait.fs'), 'utf8')
 
   assert.match(waitSrc, /let KillAckGraceMs = /, 'named kill-ack constant required')
-  assert.match(waitSrc, /waitSegment KillAckGraceMs/, 'post-kill wait uses kill-ack, not MaxTimerWaitMs')
+  assert.match(waitSrc, /waitForSignal child KillAckGraceMs/, 'post-kill wait uses kill-ack, not MaxTimerWaitMs')
   assert.doesNotMatch(
     waitSrc,
     /killSent then[\s\S]{0,80}waitSegment Deadline\.MaxTimerWaitMs/,
@@ -433,7 +433,7 @@ test('EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
     /ExitCode = -1[\s\S]{0,40}TimedOut = true/,
     'kill-ack expiry returns TimedOut with unknown exit code, not fake success',
   )
-  assert.match(waitSrc, /killAckExpired/, 'kill-ack expiry exits the wait loop')
+  assert.match(waitSrc, /KillNotAcknowledged/, 'kill-ack expiry exits the wait loop')
 })
 
 test('EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {

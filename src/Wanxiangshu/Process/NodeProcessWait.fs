@@ -96,11 +96,7 @@ module NodeProcessWait =
 
     /// Wait for the child to exit on its own, or for the business deadline to fire.
     /// Returns `ExitedBeforeDeadline` with the real code, or `DeadlineReached`.
-    let private awaitExitOrDeadline
-        (child: NodeProcessHost.ChildProcess)
-        (deadline: Deadline)
-        (ct: CancellationToken)
-        =
+    let private awaitExitOrDeadline (child: NodeProcessHost.ChildProcess) (deadline: Deadline) (ct: CancellationToken) =
         task {
             let clock = fun () -> DateTimeOffset.UtcNow
 
@@ -124,10 +120,7 @@ module NodeProcessWait =
 
     /// After kill, wait for the real exit up to `KillAckGraceMs`.
     /// Returns `ExitedAfterKill` with the real code, or `KillNotAcknowledged`.
-    let private awaitKillAcknowledgement
-        (child: NodeProcessHost.ChildProcess)
-        (ct: CancellationToken)
-        =
+    let private awaitKillAcknowledgement (child: NodeProcessHost.ChildProcess) (ct: CancellationToken) =
         task {
             if child.Exited.Value then
                 let! exitCode = child.Exit.Task
@@ -153,22 +146,26 @@ module NodeProcessWait =
         task {
             if ct.IsCancellationRequested then
                 child.Kill()
-                return raise (OperationCanceledException(ct))
+                raise (OperationCanceledException(ct))
 
             match! awaitExitOrDeadline child deadline ct with
             | ExitedBeforeDeadline exitCode ->
-                return { ExitCode = exitCode; TimedOut = false }
+                return
+                    { ExitCode = exitCode
+                      TimedOut = false }
 
             | DeadlineReached ->
                 if child.Exited.Value then
                     let! exitCode = child.Exit.Task
-                    return { ExitCode = exitCode; TimedOut = false }
+
+                    return
+                        { ExitCode = exitCode
+                          TimedOut = false }
                 else
                     child.Kill()
 
                     match! awaitKillAcknowledgement child ct with
-                    | ExitedAfterKill exitCode ->
-                        return { ExitCode = exitCode; TimedOut = true }
+                    | ExitedAfterKill exitCode -> return { ExitCode = exitCode; TimedOut = true }
 
                     | KillNotAcknowledged ->
                         // Kill unconfirmed: do not hang on Exit.Task; report TimedOut with

@@ -51,6 +51,7 @@ const PREFIX_OWNER = {
   ENFORCER: 'what/enforcer.md',
   PROJ: 'what/projection.md',
   LOOP: 'what/loop.md',
+  DSL: 'what/dsl-structured-program.md',
 }
 
 /** Prefixes allowed to split definitions across listed files (still unique IDs). */
@@ -76,6 +77,13 @@ const PREFIX_SPLIT_OWNERS = {
   ],
   PROJ: ['what/projection.md', 'shape/projection.md', 'how/projection.md'],
   LOOP: ['what/loop.md', 'shape/loop.md', 'how/loop.md', 'proof/loop.md'],
+  DSL: [
+    'what/dsl-structured-program.md',
+    'shape/dsl-structured-program.md',
+    'how/dsl-structured-program.md',
+    'proof/dsl-structured-program.md',
+    'why/dsl-structured-program.md',
+  ],
   GOV: ['what/document-governance.md'],
   VERIFY: ['proof/verify.md'],
 }

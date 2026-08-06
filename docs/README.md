@@ -91,6 +91,7 @@ why（设计理由与被拒方案；不直接约束实现）
 | 合成 TOML | [synthetic-toml](what/synthetic-toml.md) | [synthetic-toml](shape/synthetic-toml.md) | [synthetic-toml](how/synthetic-toml.md) | [synthetic-toml](proof/synthetic-toml.md) | [synthetic-toml](why/synthetic-toml.md) |
 | 数据视图隔离 / 会话边界 | — | [security](shape/security.md) | — | [verify](proof/verify.md) | — |
 | 结构化程序 FLOW | [flow](what/flow.md) | [flow](shape/flow.md) | [flow](how/flow.md) | [flow](proof/flow.md) | [flow](why/flow.md) |
+| 结构化程序 DSL | [dsl-structured-program](what/dsl-structured-program.md) | [dsl-structured-program](shape/dsl-structured-program.md) | [dsl-structured-program](how/dsl-structured-program.md) | [dsl-structured-program](proof/dsl-structured-program.md) | [dsl-structured-program](why/dsl-structured-program.md) |
 | Blogger / Enforcer | [enforcer](what/enforcer.md) | [enforcer](shape/enforcer.md) | [enforcer](how/enforcer.md) | [enforcer](proof/enforcer.md) | [enforcer](why/enforcer.md) |
 | Projection Algebra | [projection](what/projection.md) | [projection](shape/projection.md) | [projection](how/projection.md) | [projection](proof/projection.md) | [projection](why/projection.md) |
 | 循环检测 | [loop](what/loop.md) | [loop](shape/loop.md) | [loop](how/loop.md) | [loop](proof/loop.md) | [loop](why/loop.md) |
@@ -119,6 +120,7 @@ why（设计理由与被拒方案；不直接约束实现）
 | `ENFORCER-` | `what/enforcer.md` / `shape/enforcer.md` / `how/enforcer.md` / `proof/enforcer.md` |
 | `PROJ-` | `what/projection.md` / `shape/projection.md` / `how/projection.md` |
 | `LOOP-` | `what/loop.md` / `shape/loop.md` / `how/loop.md` / `proof/loop.md` |
+| `DSL-` | `what/dsl-structured-program.md` / `shape/dsl-structured-program.md` / `how/dsl-structured-program.md` / `proof/dsl-structured-program.md` / `why/dsl-structured-program.md` |
 
 检查器以全文唯一 `## PREFIX-NNN` 定义为准；上表为导航，不复制条款正文。
 
@@ -133,6 +135,7 @@ why（设计理由与被拒方案；不直接约束实现）
 | [projection-algebra-gap.md](status/projection-algebra-gap.md) | 收敛 Legacy 拼接到纯 Projection Planner，并覆盖现行投影 intent |
 | [gov-behavior-migration.md](status/gov-behavior-migration.md) | 按照 GOV-011 将 `how/` 中遗留的行为定义升迁至 `what/` |
 | [proposal-code-isolation-gap.md](status/proposal-code-isolation-gap.md) | 清除生产编译图对未裁决 Strength / Student-Teacher proposal 的直接依赖 |
+| [dsl-structured-program-gap.md](status/dsl-structured-program-gap.md) | 消除 `NodeProcessWait`、`Companion` 恢复槽、`BloggerRuntime` 等处的隐性状态机，对齐 `DSL-001..011` |
 
 ---
 
@@ -142,7 +145,6 @@ why（设计理由与被拒方案；不直接约束实现）
 |------|------|
 | [strength.md](proposal/strength.md) | Predict & Reduce Strength 旁路投机执行 |
 | [student-teacher.md](proposal/student-teacher.md) | Student / Teacher 知识生产流程 |
-| [F# 结构化流程 DSL 治理加固](<proposal/ChatGPT-F# DSL 规范问题.md>) | 结构化程序语义审计与门禁加固；原始研究结论须按当前 HEAD 复核 |
 
 Proposal 仅供讨论，不是实现依据。裁决流程与最小模板见 [document-governance](how/document-governance.md)。
 
