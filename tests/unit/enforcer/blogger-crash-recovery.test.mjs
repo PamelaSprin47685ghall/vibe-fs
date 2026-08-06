@@ -71,7 +71,7 @@ test('C5_crash_recovery_module_exists_with_window_outcomes', () => {
   assert.match(recoverySrc, /module BloggerCrashRecovery/)
   assert.match(recoverySrc, /AbandonedUnsent/)
   assert.match(recoverySrc, /Recommitted/)
-  assert.match(recoverySrc, /RestoredParked/)
+  assert.match(recoverySrc, /ReceiptedIdle/)
   assert.match(recoverySrc, /RestoredInFlight/)
   assert.match(recoverySrc, /crash-window-A/)
   assert.match(probeModuleSrc, /rejudgeFromEvidence/)
@@ -276,3 +276,27 @@ test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run'
   rmSync(directory, { recursive: true, force: true })
 })
 
+
+test('C5_window_D_never_forces_parked_without_a_waiter', () => {
+  // DSL-003: forcing `Parked` at restore with no ParkedTransform and
+  // NotArmed arming stages the next material as an un-resumable PendingOffer
+  // (mayRecover is false after restart, so no squash path starts) — the
+  // session stalls. Window D must leave the cell Idle; receipts are re-checked
+  // by the drain path after the next commit.
+  const windowD = recoverySrc.slice(
+    recoverySrc.indexOf('hasAnyReceipt && not hasOpen'),
+    recoverySrc.indexOf('for mainSessionId, openReq in openRequests durable'),
+  )
+  assert.ok(
+    !/restoreRuntime/.test(windowD),
+    'window D must not call restoreRuntime (no state to restore)',
+  )
+  assert.ok(
+    /ReceiptedIdle/.test(recoverySrc),
+    'window D still reports the touched session as ReceiptedIdle',
+  )
+  assert.ok(
+    !/BloggerRuntimeState\.Parked/.test(windowD),
+    'window D must not mention Parked at all',
+  )
+})

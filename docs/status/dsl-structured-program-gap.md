@@ -35,17 +35,25 @@
     - `onReactivate` / `reactivateAfterNewRoot` 现在接收 root id，`PromptIngress` 的 `onAuthorityRoot` 信号携带 `promoteToAuthorityRoot physicalMessageId`；
     - 窗口记录「谁重开的」：更旧的 root 迟到不能重开更新的 seal；
     - `DrainPermit = private DrainPermit of AuthorityRootUserMessageId`：只有 reactivation 路径（新 root 到达 main）能铸造 permit，外部无法为任意 root 伪造 Open 窗口——「谁开的」由类型保证，不再依赖值断言。
+13. `Companion.RecoveryArming` 已去掉 `TaskCompletionSource<unit>` 载荷，`TryConsumeRecoverySlot` 已删除（CTX-006 / DSL-003）：
+    - `TryConsumeRecoverySlot` 生产零调用（有定义无调用），唯一读 TCS 的路径不存在；
+    - 取消未 await 的 Promise 会产生 unhandledRejection，且 Fable 的 `TaskCompletionSource` 只有 `SetCancelled`（无 `TrySetCanceled`，§4.6 盲区）——生产 squash 启动路径一旦触发即崩；
+    - 槽现在是纯一次性物理信号：`ArmRecoverySlot`（真实失败置位）/ `IsRecoveryArmed`（squash 决策查询）/ `DisarmRecoverySlot`（squash 启动清位），补了此前零覆盖的契约测试；
+14. 崩溃恢复窗口 D 不再 `restoreRuntime Parked`（DSL-003 / ENFORCER-063）：
+    - 窗口 D（receipt 存在 + 无 open request + 无 park waiter）置 `Parked` 且不创建 `ParkedTransform`：arming 重启后 `NotArmed` → `mayRecover` 恒 false → 无 squash 路径启动；下个 material 走 `onMaterial` 的 Offer 分支 → `SetPendingOffer` 粘槽 → `TryTakePendingOffer` 全部位于 cycle 提交路径（无人提交）→ 会话 material 永久停摆；
+    - 置 `Idle` 时 material 直接 `startFrozen` 推进，cycle 提交后 drain 路径（`tryRefreshMainContextFromJournal`）重查 receipt——恢复语义不丢；
+    - `WindowOutcome.RestoredParked` 改名 `ReceiptedIdle`，补防回归断言。
 
 ## 仍存差距
 
-1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 仍含 `BloggerRuntimeCell` 状态乘积（`State`, `Drain`）。
-   - 后续需拆除 `InFlight/Idle/Parked` 业务 State，迁移为 single-flight Task ownership；
-
-2. `src/Wanxiangshu/Session/Companion.fs` 仍暴露 `ArmRecoverySlot/DisarmRecoverySlot/IsRecoveryArmed` 查询/设置式 API；底层虽已是 TCS waiter，接口形态仍未迁移为「失败启动一次结构化恢复机会、材料经由 `TryConsumeRecoverySlot` 消费」的直接 CE 流程。
+1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 的 `InFlight/Idle/Parked` 三态：
+   - 已量化：`Parked` 的区分性读点 `onMaterial`（Parked → Offer vs Idle → Start）在正常路径（cycle 提交 → 同 tick `ParkTransform`）无触发缝隙；但崩溃恢复窗口 D 曾是其真实触发点——经修复（差距 14）后该触发点已消除；
+   - 当前三态均为物理事实（busy / 有 park waiter / 空闲），且 `onMaterial` 的 Offer 分支依赖「有 park 记录」这一进程内事实（`IParkedTransformHost` 是 Host 回调边界，无法在纯函数内查询）——保持 callback adapter 形态，属 proposal 承认的 Host 边界例外；
+   - 后续若要彻底拆除，需先把 `onMaterial` 的 Offer 决策改为显式传入 `hasParkedWaiter` 参数（移除对 cell 状态的依赖），再以 single-flight Task ownership 替代——涉及并发生命周期接口与多个 Host 调用点，应作为独立 PR。
 
 ## 阻塞
 
- BloggerRuntimeCell 拆除与 Companion slotArmed 改造涉及并发生命周期接口与多个 Host 调用点，应作为后续独立 PR；当前 `npm run lint` 与 `npm run check` 全绿，不阻塞主线验证。
+ BloggerRuntimeCell 三态拆除（差距 1）涉及并发生命周期接口与多个 Host 调用点，应作为后续独立 PR；当前 `npm run lint` 与 `npm run check` 全绿，不阻塞主线验证。
 
 ## 验收标准
 

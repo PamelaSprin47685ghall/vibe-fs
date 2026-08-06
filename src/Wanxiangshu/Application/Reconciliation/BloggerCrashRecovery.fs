@@ -32,8 +32,9 @@ module BloggerCrashRecovery =
         | AbandonedUnsent of BloggerRequestId
         /// C: tool results present, no receipt → restore InFlight for re-entry.
         | Recommitted of ProviderRunIdentity
-        /// D: receipt present, no waiter → restore Parked in memory.
-        | RestoredParked of SessionId
+        /// D: receipt present, no waiter → nothing to restore; next material
+        /// flows through startFrozen and the drain re-checks receipts.
+        | ReceiptedIdle of SessionId
         /// E: Parked, new material exists → leave for next coordinator offer.
         | PendingMaterial of SessionId
         /// Still open and Host still running — restore InFlight in memory.
@@ -122,8 +123,15 @@ module BloggerCrashRecovery =
                             | BloggerRuntimeState.Parked -> ()
                             | BloggerRuntimeState.Idle when hasAnyReceipt && not hasOpen && not (host.HasParked key) ->
                                 // Cycle already receipted → NoRecovery (ENFORCER-063 success path).
-                                restoreRuntime host bloggerId BloggerRuntimeState.Parked
-                                results.Add(WindowOutcome.RestoredParked bloggerId)
+                                //
+                                // Nothing to restore: forcing `Parked` here would stage the next
+                                // material as a PendingOffer with no ParkedTransform to resume it
+                                // (arming is NotArmed after restart, so no squash path starts
+                                // either) — the session would stall on its next material. Leaving
+                                // the cell Idle lets the material flow through startFrozen, and
+                                // the drain path after its commit re-checks receipts via
+                                // tryRefreshMainContextFromJournal.
+                                results.Add(WindowOutcome.ReceiptedIdle bloggerId)
                             | BloggerRuntimeState.Idle -> ()
                     | _ -> ()
 

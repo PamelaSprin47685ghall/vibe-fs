@@ -103,7 +103,7 @@ module SessionRecoveryWorkflow =
                 let touched =
                     outcomes
                     |> List.exists (function
-                        | BloggerCrashRecovery.WindowOutcome.RestoredParked id
+                        | BloggerCrashRecovery.WindowOutcome.ReceiptedIdle id
                         | BloggerCrashRecovery.WindowOutcome.PendingMaterial id
                         | BloggerCrashRecovery.WindowOutcome.RestoredInFlight id
                         | BloggerCrashRecovery.WindowOutcome.AlreadyLive id
