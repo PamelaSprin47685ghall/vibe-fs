@@ -89,6 +89,10 @@ ScoreVector 删除与版本化 clean break。
 
 旧评分条款废止，不得作为运行时分支。
 
+## ENFORCER-071：work record 呈现 previous_enforcer_tip
+
+work record 以低信任 `previous_enforcer_tip` 块呈现；不得伪装 parent instruction。
+
 ## ENFORCER-170：规则 catalog
 
 规则 catalog：schemaVersion + rules；`id`/`field` 发布后稳定；校验非空、唯一、ordinal 连续 1..N。

@@ -131,7 +131,6 @@ why（设计理由与被拒方案；不直接约束实现）
 | 差距记录文件 | 主题与消除目标 |
 |------|------|
 | [projection-algebra-gap.md](status/projection-algebra-gap.md) | 收敛 Legacy 拼接到纯 Projection Planner，并覆盖现行投影 intent |
-| [gov-behavior-migration.md](status/gov-behavior-migration.md) | 按照 GOV-011 将 `how/` 中遗留的行为定义升迁至 `what/` |
 
 ---
 

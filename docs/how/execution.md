@@ -57,18 +57,10 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 
 ---
 
-## EXEC-021：completion blob v2
+## completion blob 机制（行为见 what/execution.md EXEC-021/022）
 
-schemaVersion=2；finality 仅 completed|failed。  
-`LegacyFalseAbort` **永不**成为 RunCompletion。  
-`fromDecoded` 唯一构造。
-
----
-
-## EXEC-022：假 completion 补偿
-
-HandleFalseCompletionRejected → 确定性 replacement → parent correction。  
-禁止把历史假 abort 洗成成功。
+行为定义（finality 仅 completed|failed、LegacyFalseAbort 永不 RunCompletion、假 completion 确定性补偿）见 `what/execution.md` EXEC-021/022。  
+本处只留机制：`fromDecoded` 是 completion blob 的唯一构造入口，wire 形状见 Join wire 一节。
 
 ---
 

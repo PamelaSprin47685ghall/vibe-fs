@@ -64,3 +64,14 @@ Completed | Failed | Abandoned
 ```
 
 **ABORTED 不是 agent 终态。** 取消是控制面。
+
+## EXEC-021：completion blob v2
+
+schemaVersion=2；finality 仅 `completed|failed`。  
+`LegacyFalseAbort` **永不**成为 RunCompletion。  
+`fromDecoded` 唯一构造。
+
+## EXEC-022：假 completion 补偿
+
+`HandleFalseCompletionRejected` → 确定性 replacement → parent correction。  
+禁止把历史假 abort 洗成成功。
