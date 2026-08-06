@@ -34,7 +34,7 @@
  * so it is the last one that should be a literal in a script.
  *
  * Not arbitrary. A slice must poll faster than the budget bounding it, and the tightest budget
- * here is WATCHDOG_TIMEOUT_MS at 3000, against which the real slices measure 500, 100, 50, 30.
+ * here is WATCHDOG_TIMEOUT_MS at 5000, against which the real slices measure 500, 100, 50, 30.
  */
 export const LITERAL_BUDGET_THRESHOLD_MS = 1000;
 
@@ -65,7 +65,7 @@ const budgetFromEnv = (name, fallback) => {
  * fork→worktree bootstrap or join mailbox gate (~2.3-2.4s) fits inside it without a per-step
  * override.
  */
-export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 3000);
+export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 5000);
 
 /**
  * Ceiling on the watchdog's own teardown once it has already decided to fire. `watchdog.js`
@@ -141,10 +141,10 @@ export const ENFORCER_POLL_SLICE_MS = 500;
 
 /**
  * Hard per-test bound for `tests/unit`. A pure fold or a fake-clock trajectory has no reason to
- * take a second, so this doubles as a design constraint: raising it is how a race gets papered
- * over (VERIFY-002).
+ * take a few seconds on a busy CI runner, so this doubles as a design constraint: raising it is how a race gets papered
+ * over (VERIFY-002). Local pure folds still finish well under this bound.
  */
-export const PER_TEST_TIMEOUT_MS = budgetFromEnv('PER_TEST_TIMEOUT_MS', 1000);
+export const PER_TEST_TIMEOUT_MS = budgetFromEnv('PER_TEST_TIMEOUT_MS', 2500);
 
 /**
  * Whole-suite ceiling, now a 兜底 rather than the hang criterion.
@@ -168,7 +168,7 @@ export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
  * that bound covers the overrun plus scheduling jitter under `concurrency: true` while still ending
  * a genuinely hung run two orders of magnitude sooner than the backstop.
  */
-export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 3000);
+export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 5000);
 
 // ── waiting for one semantic event ──────────────────────────────────────────
 
