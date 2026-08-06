@@ -39,11 +39,23 @@ export const isExternalProtocolPath = (file) => {
   )
 }
 
-/** Local mutable scratch is legal in pure Domain algorithms and Parallel kernel. */
+/**
+ * Legal mutable (TASK.md / FLOW):
+ * - Domain pure algorithm scratch
+ * - Kernel/Parallel bounded concurrency cells
+ * - Session / Application physical runtime cells (maps, single-flight, create tasks, locks)
+ * Agent and non-Parallel Kernel remain fail-closed on `let mutable`.
+ */
 export const isMutableScratchPath = (file) => {
   const rel = String(file).replace(/\\/g, '/')
-  return rel.includes('/Domain/') || /(?:^|\/)Kernel\/Parallel\.fs$/.test(rel)
+  return (
+    rel.includes('/Domain/') ||
+    rel.includes('/Session/') ||
+    rel.includes('/Application/') ||
+    /(?:^|\/)Kernel\/Parallel\.fs$/.test(rel)
+  )
 }
+
 
 export const FORBIDDEN = [
   { gate: 'mutable', pattern: /(?<!\/\/\s*)\blet mutable\b/, label: 'let mutable', skipIf: isMutableScratchPath },

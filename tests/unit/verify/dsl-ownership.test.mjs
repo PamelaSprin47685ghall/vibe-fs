@@ -74,11 +74,12 @@ test('DSL_OWNERSHIP_exports_seven_named_gates', () => {
 
 for (const sample of NEGATIVES) {
   test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
-    const hits = scanText(sample.source, `Domain/Negative_${sample.gate}.fs`)
+    const file = sample.file ?? `Agent/Negative_${sample.gate}.fs`
+    const hits = scanText(sample.source, file)
     const ofGate = hits.filter((v) => v.gate === sample.gate)
     assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
     assert.equal(ofGate[0].line, sample.line)
-    assert.equal(ofGate[0].file, `Domain/Negative_${sample.gate}.fs`)
+    assert.equal(ofGate[0].file, file)
   })
 }
 
@@ -122,10 +123,13 @@ test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
 })
 
 
-test('DSL_OWNERSHIP_Domain_pure_scratch_mutable_is_not_gate_red', () => {
+test('DSL_OWNERSHIP_physical_and_domain_mutable_are_not_gate_red', () => {
   const source = ['module Sample', 'let scratch () =', '    let mutable acc = 0', '    acc'].join('\n')
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Domain/Sample.fs'), [])
-  assert.ok(scanText(source, 'src/Wanxiangshu/Session/Sample.fs').some((h) => h.gate === 'mutable'))
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/Sample.fs'), [])
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Application/Sample.fs'), [])
+  assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'mutable'))
+  assert.ok(scanText(source, 'src/Wanxiangshu/Kernel/Outcome.fs').some((h) => h.gate === 'mutable'))
 })
 
 test('DSL_OWNERSHIP_comment_only_line_is_ignored', () => {
