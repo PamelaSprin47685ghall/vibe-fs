@@ -68,6 +68,14 @@ const budgetFromEnv = (name, fallback) => {
 export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 5000);
 
 /**
+ * Integration harness case-silence (VERIFY-004). Must exceed the longest
+ * single harness case wall time. Unit-runner renew probes intentionally last
+ * longer than the e2e canary silence (WATCHDOG_TIMEOUT_MS); if the harness dog
+ * reused that budget, the last open case would be killed mid-work.
+ */
+export const HARNESS_CASE_SILENCE_MS = budgetFromEnv('HARNESS_CASE_SILENCE_MS', 20000);
+
+/**
  * Ceiling on the watchdog's own teardown once it has already decided to fire. `watchdog.js`
  * and `scenario-parallel.js` each held this as an independent 3000 literal for one idea: the
  * diagnostic dump and `host.stop` must not themselves hang, so they race a timer. Larger than

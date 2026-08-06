@@ -31,7 +31,7 @@ import { projectionCases } from './projection-cases.mjs';
 import { runtimeKeyCases } from './runtime-key-cases.mjs';
 import { timeoutCases } from './timeout-cases.mjs';
 import { Watchdog } from '../../e2e/support/watchdog.js';
-import { WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js';
+import { HARNESS_CASE_SILENCE_MS } from '../../e2e/support/time-budget.js';
 import { bindHarnessFeed } from './progress.mjs';
 
 // The worker pool admits at most GATE_CASE_CONCURRENCY cases. Per-spawn environment
@@ -68,14 +68,14 @@ const allCases = [
 
 console.log(
   `Running tests/integration harness tests (${allCases.length} cases, ${GATE_CASE_CONCURRENCY} at a time, ` +
-    `${WATCHDOG_TIMEOUT_MS}ms case-silence window)...\n`,
+    `${HARNESS_CASE_SILENCE_MS}ms case-silence window)...\n`,
 );
 
 const outstanding = new Set(allCases.map((c) => c.name));
 let finished = 0;
 
 const watchdog = new Watchdog({
-  timeoutMs: WATCHDOG_TIMEOUT_MS,
+  timeoutMs: HARNESS_CASE_SILENCE_MS,
   label: 'tests/integration/harness',
   onTimeout: () => {
     console.error(

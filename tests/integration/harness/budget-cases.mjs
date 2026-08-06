@@ -15,6 +15,7 @@ export const budgetCases = [
       const expected = {
         LITERAL_BUDGET_THRESHOLD_MS: 1000,
         WATCHDOG_TIMEOUT_MS: 5000,
+        HARNESS_CASE_SILENCE_MS: 20000,
         DIAGNOSTIC_RACE_MS: 3000,
         CANARY_READY_MS: 10000,
         READINESS_STAGE_MS: 4000,
@@ -83,6 +84,7 @@ export const budgetCases = [
       );
       assertTrue(
         budget.UNIT_VERDICT_SILENCE_MS === budget.WATCHDOG_TIMEOUT_MS,
+        budget.HARNESS_CASE_SILENCE_MS >= budget.UNIT_RUNNER_PROBE_SILENCE_MS,
         budget.UNIT_RUNNER_PROBE_SILENCE_MS > budget.UNIT_RUNNER_PROBE_PER_TEST_MS,
         budget.UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS <= budget.UNIT_RUNNER_PROBE_SILENCE_MS,
         'every suite dog starves on the same 3s window as e2e canary',
