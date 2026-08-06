@@ -43,17 +43,20 @@
     - 窗口 D（receipt 存在 + 无 open request + 无 park waiter）置 `Parked` 且不创建 `ParkedTransform`：arming 重启后 `NotArmed` → `mayRecover` 恒 false → 无 squash 路径启动；下个 material 走 `onMaterial` 的 Offer 分支 → `SetPendingOffer` 粘槽 → `TryTakePendingOffer` 全部位于 cycle 提交路径（无人提交）→ 会话 material 永久停摆；
     - 置 `Idle` 时 material 直接 `startFrozen` 推进，cycle 提交后 drain 路径（`tryRefreshMainContextFromJournal`）重查 receipt——恢复语义不丢；
     - `WindowOutcome.RestoredParked` 改名 `ReceiptedIdle`，补防回归断言。
+15. `BloggerRuntimeState.Parked` case 已删除（DSL-003）：
+    - `Parked` 唯一区分性读点是 `onMaterial`（Parked → Offer vs Idle → Start），其余读点全部与 `Idle` 或 `InFlight` 合并——它是「有 park waiter」这一物理事实的 cell 镜像（权威在 `PluginRuntimeScope.parked` dictionary）；
+    - `onMaterial` 增加显式 `hasParkedWaiter: bool` 参数（调用方从 `IParkedTransformHost.HasParked` 读取）：Idle + waiter → Offer、Idle + 无 waiter → Start、InFlight → Skip——Offer 语义不丢；
+    - `onCycleCommitted` / `onSquashCommitted`（无 pending）→ `Idle`；`TransitionError.NotParked` 随删；
+    - 历史教训（demoting Parked→Idle 曾导致 material 直接 Start 绕过 offer）由 `hasParkedWaiter` 参数承接——dictionary 是权威，不再依赖 cell 状态镜像；
+    - 三态 → 二态（`InFlight`/`Idle`），unit/integration/e2e 全量轮验证通过。
 
 ## 仍存差距
 
-1. `src/Wanxiangshu/Session/BloggerRuntimeState.fs` 的 `InFlight/Idle/Parked` 三态：
-   - 已量化：`Parked` 的区分性读点 `onMaterial`（Parked → Offer vs Idle → Start）在正常路径（cycle 提交 → 同 tick `ParkTransform`）无触发缝隙；但崩溃恢复窗口 D 曾是其真实触发点——经修复（差距 14）后该触发点已消除；
-   - 当前三态均为物理事实（busy / 有 park waiter / 空闲），且 `onMaterial` 的 Offer 分支依赖「有 park 记录」这一进程内事实（`IParkedTransformHost` 是 Host 回调边界，无法在纯函数内查询）——保持 callback adapter 形态，属 proposal 承认的 Host 边界例外；
-   - 后续若要彻底拆除，需先把 `onMaterial` 的 Offer 决策改为显式传入 `hasParkedWaiter` 参数（移除对 cell 状态的依赖），再以 single-flight Task ownership 替代——涉及并发生命周期接口与多个 Host 调用点，应作为独立 PR。
+无。所有已登记差距均已消除或量化为设计约束；本文件完成使命后可删除。
 
 ## 阻塞
 
- BloggerRuntimeCell 三态拆除（差距 1）涉及并发生命周期接口与多个 Host 调用点，应作为后续独立 PR；当前 `npm run lint` 与 `npm run check` 全绿，不阻塞主线验证。
+无。
 
 ## 验收标准
 

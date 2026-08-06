@@ -217,8 +217,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                     bloggerRuntime.[sessionId] <-
                         { cell with
                             State = BloggerRuntimeState.InFlight context }
-                | BloggerRuntimeState.Idle
-                | BloggerRuntimeState.Parked ->
+                | BloggerRuntimeState.Idle ->
                     // Materialize / recovery may re-arm before onCycleCommitted flips state.
                     bloggerRuntime.[sessionId] <-
                         { cell with
@@ -228,7 +227,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             lock parkedGate (fun () -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
 
         member this.ClearCurrentRequest(sessionId: string) : unit =
-            // Success path already moved the cell to Parked/Idle via onCycleCommitted/onFail.
+            // Success path already moved the cell to Idle via onCycleCommitted/onFail.
             // If still InFlight (abandon / timeout without transition), drop to Idle.
             lock parkedGate (fun () ->
                 match bloggerRuntime.TryGetValue sessionId with

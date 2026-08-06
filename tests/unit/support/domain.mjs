@@ -4453,11 +4453,10 @@ export const bloggerRuntime = (() => {
 
   return {
     idle: m.ofState(stateCase('Idle', [])),
-    parked: m.ofState(stateCase('Parked', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
-    onMaterial: (cell, ctx) => {
-      const r = resultOf(m.onMaterial(cell, ctx))
+    onMaterial: (hasParked, cell, ctx) => {
+      const r = resultOf(m.onMaterial(hasParked, cell, ctx))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
       return {

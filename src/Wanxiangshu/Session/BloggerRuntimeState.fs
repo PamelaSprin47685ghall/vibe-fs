@@ -15,7 +15,10 @@ type BloggerToolRecovery =
 /// ENFORCER-047: single Blogger coordinator state.
 ///
 /// InFlight = provider still working on an uncommitted request (the only busy definition).
-/// Parked = last cycle committed; waiting for future material (not busy).
+/// Idle = no request running. Whether a parked transform waits for the next
+/// material is the host dictionary's physical fact
+/// (`IParkedTransformHost.HasParked`), passed into `onMaterial` explicitly — the
+/// cell carries no mirror of it.
 /// There is deliberately NO Sealed case: handle seal is a durable journal fact
 /// (AgentProjection.mainSealedForBlogger), read on every decision — a sealed cell
 /// mirror would only ever duplicate it and drift stale on reactivation.
@@ -25,7 +28,6 @@ type BloggerToolRecovery =
 type BloggerRuntimeState =
     | Idle
     | InFlight of BloggerRequestContext
-    | Parked
 
 /// One drain-window opening. Module-private constructor: only the reactivation
 /// path (a new Authority Root arriving on the main) can mint it, so no caller
@@ -58,7 +60,6 @@ module BloggerRuntime =
     type TransitionError =
         | AlreadyInFlight
         | NotInFlight
-        | NotParked
         | NoContext
 
     type Decision =
@@ -79,13 +80,17 @@ module BloggerRuntime =
         { cell with State = state }
 
     /// Main-session material arrived. InFlight never queues (XTrace keeps backlog).
-    /// Parked: Decision.Offer only — physical PendingOffer is the host dictionary.
-    /// Handle seal is the durable journal check at every entry, not a cell case.
+    /// `hasParkedWaiter` is the host dictionary's physical fact: when a
+    /// ParkedTransform waits for this material, Decision.Offer only — the
+    /// dictionary stages the offer (ENFORCER-050 physical slot). Handle seal is
+    /// the durable journal check at every entry, not a cell case.
     let onMaterial
+        (hasParkedWaiter: bool)
         (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
         : Result<BloggerRuntimeCell * Decision, TransitionError> =
         match cell.State with
+        | BloggerRuntimeState.Idle when hasParkedWaiter -> Ok(cell, Decision.Offer ctx)
         | BloggerRuntimeState.Idle ->
             Ok(
                 { cell with
@@ -93,16 +98,13 @@ module BloggerRuntime =
                 Decision.Start ctx
             )
         | BloggerRuntimeState.InFlight _ -> Ok(cell, Decision.Skip)
-        | BloggerRuntimeState.Parked ->
-            // The host dictionary stages the offer (ENFORCER-050 physical slot).
-            Ok(cell, Decision.Offer ctx)
 
     let onCycleCommitted (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { cell with
-                    State = BloggerRuntimeState.Parked }
+                    State = BloggerRuntimeState.Idle }
         | _ -> Error TransitionError.NotInFlight
 
     let onSquashCommitted
@@ -121,7 +123,7 @@ module BloggerRuntime =
             | None ->
                 Ok(
                     { cell with
-                        State = BloggerRuntimeState.Parked },
+                        State = BloggerRuntimeState.Idle },
                     Decision.Ignore
                 )
         | _ -> Error TransitionError.NotInFlight
@@ -145,15 +147,13 @@ module BloggerRuntime =
     /// New Authority Root on this main: Blogger may run again after a handle seal.
     ///
     /// Reactivation is a durable journal fact (the new root), so the cell has no
-    /// seal flag to flip — only the drain window reopens. Parked/Idle/InFlight
-    /// keep their state: demoting Parked→Idle made the next material
-    /// Decision.Start while the Host step loop was still parked on the prior
-    /// request, so the new send never reached the provider.
+    /// seal flag to flip — only the drain window reopens. State stays as-is:
+    /// the next material decides Start-vs-Offer from the host's parked-waiter
+    /// fact, never from a demoted cell mirror.
     let onReactivate (cell: BloggerRuntimeCell) (root: AuthorityRootUserMessageId) : BloggerRuntimeCell =
         match cell.State with
         | BloggerRuntimeState.InFlight _
-        | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked ->
+        | BloggerRuntimeState.Idle ->
             { cell with
                 Drain = DrainWindow.Open(DrainPermit root) }
 
@@ -173,8 +173,7 @@ module BloggerRuntime =
     let blocksNewRequest (durableHandleSealed: bool) (cell: BloggerRuntimeCell) : bool =
         match cell.State with
         | BloggerRuntimeState.InFlight _ -> false
-        | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked -> durableHandleSealed && not (isDrainOpen cell)
+        | BloggerRuntimeState.Idle -> durableHandleSealed && not (isDrainOpen cell)
 
     let adoptPendingAsCurrent
         (cell: BloggerRuntimeCell)
@@ -182,8 +181,7 @@ module BloggerRuntime =
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
-        | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked ->
+        | BloggerRuntimeState.Idle ->
             Ok
                 { cell with
                     State = BloggerRuntimeState.InFlight ctx }

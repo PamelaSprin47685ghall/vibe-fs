@@ -119,8 +119,7 @@ module BloggerCrashRecovery =
                             let live = host.GetBloggerRuntime key
 
                             match live.State with
-                            | BloggerRuntimeState.InFlight _
-                            | BloggerRuntimeState.Parked -> ()
+                            | BloggerRuntimeState.InFlight _ -> ()
                             | BloggerRuntimeState.Idle when hasAnyReceipt && not hasOpen && not (host.HasParked key) ->
                                 // Cycle already receipted → NoRecovery (ENFORCER-063 success path).
                                 //

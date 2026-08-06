@@ -141,13 +141,13 @@ test('ENFORCER_047_CurrentRequest_is_InFlight_payload_not_a_parallel_dict', () =
   assert.equal(peeked?.toml, 'coverage-delta')
   assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'InFlight')
 
-  // Commit success path: onCycleCommitted → Parked, then ClearCurrentRequest is a no-op on Parked.
+  // Commit success path: onCycleCommitted → Idle, then ClearCurrentRequest is a no-op on Idle.
   const committed = bloggerRuntime.onCycleCommitted(parkedTransform.getRuntime(scope, key))
   assert.equal(committed.ok, true)
   parkedTransform.setRuntime(scope, key, committed.state)
   parkedTransform.clearCurrentRequest(scope, key)
   assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
-  assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'Parked')
+  assert.equal(bloggerRuntime.stateOf(parkedTransform.getRuntime(scope, key)), 'Idle')
 
   // Fail path: Clear while still InFlight drops to Idle.
   parkedTransform.setCurrentRequest(scope, key, main('fail-me'))

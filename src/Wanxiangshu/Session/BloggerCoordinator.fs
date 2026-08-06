@@ -305,7 +305,7 @@ module BloggerCoordinator =
                 match CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog with
                 | None -> return None
                 | Some squashCtx ->
-                    match BloggerRuntime.onMaterial cell squashCtx with
+                    match BloggerRuntime.onMaterial (scope.HasParked key) cell squashCtx with
                     | Ok(nextCell, BloggerRuntime.Decision.Start startCtx)
                     | Ok(nextCell, BloggerRuntime.Decision.Offer startCtx) ->
                         host.DisarmRecoverySlot()
@@ -340,8 +340,7 @@ module BloggerCoordinator =
 
                 match cell.State with
                 | BloggerRuntimeState.InFlight _ -> return DecisionEffect.SkippedInFlight
-                | BloggerRuntimeState.Idle
-                | BloggerRuntimeState.Parked ->
+                | BloggerRuntimeState.Idle ->
                     // No sealed mirror: blocksNew above already applied the durable
                     // seal (DecisionEffect.Sealed) before this point.
                     let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
@@ -355,7 +354,7 @@ module BloggerCoordinator =
                         match nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace projection with
                         | None -> return DecisionEffect.NoMaterial
                         | Some ctx ->
-                            match BloggerRuntime.onMaterial (scope.GetBloggerRuntime key) ctx with
+                            match BloggerRuntime.onMaterial (scope.HasParked key) (scope.GetBloggerRuntime key) ctx with
                             | Ok(nextCell, BloggerRuntime.Decision.Start startCtx) ->
                                 return! startFrozen scope host journal key nextCell startCtx
                             | Ok(nextCell, BloggerRuntime.Decision.Offer offerCtx) ->

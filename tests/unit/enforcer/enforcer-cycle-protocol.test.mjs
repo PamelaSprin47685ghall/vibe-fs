@@ -146,7 +146,7 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
   })
   // InFlight + CurrentRequest: owned cycle. Without InFlight cell, commit still
   // peeks CurrentRequest, but runtime transitions need a real cell.
-  const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx)
+  const started = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, ctx)
   assert.equal(started.ok, true)
   parkedTransform.setRuntime(scope, BLOG, started.state)
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
@@ -464,7 +464,7 @@ test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
       nextDigest: 'd1',
       deltaDigest: digestForToml(toml),
     })
-    const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx)
+    const started = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, ctx)
     assert.equal(started.ok, true)
     parkedTransform.setRuntime(scope, BLOG, started.state)
     parkedTransform.setCurrentRequest(scope, BLOG, ctx)
@@ -808,7 +808,7 @@ test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
       nextDigest: 'd1',
       deltaDigest: 'sha-NOT-matching-toml',
     })
-    const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, bad)
+    const started = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, bad)
     assert.equal(started.ok, true)
     parkedTransform.setRuntime(scope, BLOG, started.state)
     parkedTransform.setCurrentRequest(scope, BLOG, bad)
@@ -871,8 +871,8 @@ test('ENFORCER_host_completed_blog_with_live_request_commits_and_advances_covera
     assert.equal(session.Blog.Coverage.CoverableTurnCutoffExclusive, 1)
     assert.equal(session.Enforcement?.ByProviderRun?.size ?? 0, 1, 'enforcement receipt by ProviderRun')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined, 'CurrentRequest cleared on commit')
-    // After cancel of empty park, cell stays Parked (caught-up, waiting material).
-    assert.equal(runtimeTag(scope), 'Parked')
+    // After cancel of empty park, cell stays Idle (caught-up, waiting material).
+    assert.equal(runtimeTag(scope), 'Idle')
   })
 })
 
@@ -934,7 +934,7 @@ test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', 
       nextDigest: 'd2',
       deltaDigest: digestForToml(toml2),
     })
-    const started2 = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx2)
+    const started2 = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, ctx2)
     assert.equal(started2.ok, true)
     parkedTransform.setRuntime(scope, BLOG, started2.state)
     parkedTransform.setCurrentRequest(scope, BLOG, ctx2)
