@@ -24,7 +24,16 @@ import {
   stream,
 } from '../support/domain.mjs'
 
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+// Lazy: top-level await import races the 2.5s file timeout under full-suite
+// concurrency on GHA (file cancelled before any test body runs).
+let appendAgentFn = null
+const appendAgent = async (...args) => {
+  if (!appendAgentFn) {
+    const mod = await import('../../../dist/Journal/AgentJournal.js')
+    appendAgentFn = mod.AgentJournalModule_appendAgent
+  }
+  return appendAgentFn(...args)
+}
 
 const withJournal = (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
@@ -122,10 +131,14 @@ test('COMPANION_007_capture_projection_provenance_is_stored_verbatim', () => {
   })
 })
 
-test('HOST_006_capture_projection_after_reanchor_uses_next_generation', () => {
+test('HOST_006_capture_projection_after_reanchor_uses_next_generation', async () => {
   // Pre-reanchor turns reuse Host indices after ContextReanchored. Provenance
   // must open g:1 so turn:0/part:0 appends instead of colliding with g:0.
-  withJournal((journal) => {
+  const dir = mkdtempSync(join(tmpdir(), 'xtrace-'))
+  const created = agentJournal.create({ directory: dir })
+  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
+  try {
+    const journal = created.journal
     const first = xTraceCapture.captureProjection(
       journal,
       SEM,
@@ -142,7 +155,7 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', () => {
       ['g:0/turn:0/part:0', 'g:0/turn:1/part:0'],
     )
 
-    const reanchor = AgentJournalModule_appendAgent(
+    const reanchor = await appendAgent(
       streamSession(SEM),
       undefined,
       agentFact('ContextReanchored', {
@@ -182,7 +195,10 @@ test('HOST_006_capture_projection_after_reanchor_uses_next_generation', () => {
       parts.map((part) => Number(part.Cursor.Sequence)),
       [1, 2, 3, 4],
     )
-  })
+  } finally {
+    created.dispose()
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('COMPANION_003_capture_opening_takes_authoritative_requirements', () => {
