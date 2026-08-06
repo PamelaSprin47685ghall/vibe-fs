@@ -213,16 +213,22 @@ export const unitRunnerCases = [
       // and it was invisible until the red proof was attempted. Which is the argument for
       // 「门禁必须红过一次才算存在」 stated as cheaply as it can be stated.
       //
-      // Distinguishing input: many short FIXED wall-clock slices (not a fraction of
-      // PER_TEST). GHA stretches proportional slices into the per-test bound. Fixed 80ms
-      // slices stay short; count is chosen so total exceeds silence.
-      const probeSliceMs = 80;
-      const probeSliceCount = Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.25) / probeSliceMs);
+      // Distinguishing input: few long FIXED slices, serial only for this fixture.
+      // Total wall > silence; each slice stays under per-test with headroom.
+      // Suite-wide concurrency remains true (NODE_TEST_CONCURRENCY unset elsewhere).
+      const probeSliceMs = Math.min(
+        Math.floor(UNIT_RUNNER_PROBE_PER_TEST_MS * 0.75),
+        1500,
+      );
+      const probeSliceCount = Math.max(
+        3,
+        Math.ceil((UNIT_RUNNER_PROBE_SILENCE_MS * 1.15) / probeSliceMs),
+      );
       const run = await runFixture('slower-than-the-window.fixture.mjs', {
         ...scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS),
         UNIT_RUNNER_PROBE_SLICE_MS: String(probeSliceMs),
         UNIT_RUNNER_PROBE_SLICE_COUNT: String(probeSliceCount),
-        // Serial: concurrent slices finish in ~one slice and never outlast silence.
+        // Local to this fixture only — not a global suite serialisation.
         NODE_TEST_CONCURRENCY: '1',
       });
 
