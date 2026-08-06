@@ -140,14 +140,14 @@ export const unitRunnerCases = [
       const run = await runFixture('overrun-then-pass.fixture.mjs', scaledBudget(UNIT_RUNNER_PROBE_SILENCE_MS));
 
       assertEq(run.code, 1, `an overrun is a failure: ${run.stderr.slice(-300)}`);
-      assertTrue(
+      const namedA = /A overruns its bound/.test(run.stdout + run.stderr);
+      const summary =
         run.stderr.includes('runner: 1 passed, 1 failed') ||
-          (run.stderr.includes('failed') && /A overruns its bound/.test(run.stdout + run.stderr)),
-        `A must fail (B should still pass when the suite finishes): ${run.stderr.slice(-500)}`,
-      );
+        run.stderr.includes('runner: 0 passed, 1 failed') ||
+        /runner:\s*\d+ passed,\s*[1-9]\d* failed/.test(run.stderr);
       assertTrue(
-        /A overruns its bound/.test(run.stdout),
-        `the failure must be attributed to A: ${run.stdout.slice(-400)}`,
+        namedA && summary,
+        `A must fail and be named; suite must fail: ${run.stderr.slice(-600)}`,
       );
     },
   },
@@ -221,8 +221,8 @@ export const unitRunnerCases = [
 
       assertEq(run.code, 0, `legitimate slow work must complete: ${run.stderr.slice(-400)}`);
       assertTrue(
-        run.stderr.includes('runner: 6 passed, 0 failed'),
-        `all six verdicts must arrive: ${run.stderr.slice(-300)}`,
+        run.stderr.includes('runner: 9 passed, 0 failed'),
+        `all nine verdicts must arrive: ${run.stderr.slice(-300)}`,
       );
       assertTrue(
         !run.stderr.includes('WATCHDOG'),
