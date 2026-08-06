@@ -4,8 +4,11 @@ import test from 'node:test'
 import {
   bloggerRuntime,
   bloggerRequestContext,
+  authorityRoot,
   handleProjection,
   handleId,
+  idValue,
+  payloadOf,
   sessionId,
   roles,
 } from '../support/domain.mjs'
@@ -66,10 +69,15 @@ test('BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true, 'durable seal blocks')
   assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false, 'no mirror: unsealed durable unblocks')
 
-  const live = bloggerRuntime.onReactivate(idle)
+  const live = bloggerRuntime.onReactivate(idle, authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.stateOf(live), 'Idle')
   assert.equal(bloggerRuntime.reactivatedOf(live), true)
   assert.equal(bloggerRuntime.blocksNewRequest(true, live), false, 'drain window lets the cycle through')
+  assert.equal(
+    idValue.authorityRoot(payloadOf(live.Drain)),
+    'root-r1',
+    'the drain window records WHICH root reopened it',
+  )
 
   const started = bloggerRuntime.onMaterial(live, ctx())
   assert.equal(started.ok, true)
@@ -82,7 +90,7 @@ test('BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false)
   assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true)
 
-  const reactivated = bloggerRuntime.onReactivate(idle)
+  const reactivated = bloggerRuntime.onReactivate(idle, authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.stateOf(reactivated), 'Idle')
   assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
 })
@@ -94,7 +102,7 @@ test('BLOGGER_RUNTIME_Parked_survives_onReactivate_so_offer_not_start', () => {
   const parked = bloggerRuntime.parked
   assert.equal(bloggerRuntime.stateOf(parked), 'Parked')
 
-  const reactivated = bloggerRuntime.onReactivate(parked)
+  const reactivated = bloggerRuntime.onReactivate(parked, authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.stateOf(reactivated), 'Parked')
   assert.equal(bloggerRuntime.reactivatedOf(reactivated), true)
 
@@ -107,7 +115,7 @@ test('BLOGGER_RUNTIME_Parked_survives_onReactivate_so_offer_not_start', () => {
 test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
   // Durable handle sealed + DrainWindow.Open lets one drain window through;
   // once caught up, host forceSeal must permanently re-block.
-  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.forceSeal(bloggerRuntime.idle))
+  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.forceSeal(bloggerRuntime.idle), authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
 
   const started = bloggerRuntime.onMaterial(reactivated, ctx())

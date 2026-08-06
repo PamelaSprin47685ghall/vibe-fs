@@ -4502,7 +4502,7 @@ export const bloggerRuntime = (() => {
       }
     },
     forceSeal: (cell) => m.forceSeal(cell),
-    onReactivate: (cell) => m.onReactivate(cell),
+    onReactivate: (cell, root) => m.onReactivate(cell, root),
     onDispose: (cell) => m.onDispose(cell),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
     blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),

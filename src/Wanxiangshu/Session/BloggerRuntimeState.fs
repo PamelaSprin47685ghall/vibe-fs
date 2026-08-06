@@ -28,12 +28,14 @@ type BloggerRuntimeState =
     | Parked
     | Disposed
 
-/// After durable handle seal, whether a new Authority Root reopened a drain window.
-/// Closed = seal blocks new Y work; Open = drain until next seal/catch-up.
+/// After a durable handle seal, whether a new Authority Root reopened a drain
+/// window. The handle lifecycle NEVER unseals (CompletedAwaitingJoin/Abandoned/
+/// Retired stay sealed), so a reactivation can only be observed in-process — the
+/// drain window carries the root that opened it. Closed = seal blocks new Y work.
 [<RequireQualifiedAccess>]
 type DrainWindow =
     | Closed
-    | Open
+    | Open of AuthorityRootUserMessageId
 
 /// Host-owned cell: state + drain window. CurrentRequest lives in the InFlight
 /// payload; the next-Main-material slot is the host dictionary (ENFORCER-050).
@@ -161,12 +163,14 @@ module BloggerRuntime =
     /// keep their state: demoting Parked→Idle made the next material
     /// Decision.Start while the Host step loop was still parked on the prior
     /// request, so the new send never reached the provider.
-    let onReactivate (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+    let onReactivate (cell: BloggerRuntimeCell) (root: AuthorityRootUserMessageId) : BloggerRuntimeCell =
         match cell.State with
         | BloggerRuntimeState.Disposed -> cell
         | BloggerRuntimeState.InFlight _
         | BloggerRuntimeState.Idle
-        | BloggerRuntimeState.Parked -> { cell with Drain = DrainWindow.Open }
+        | BloggerRuntimeState.Parked ->
+            { cell with
+                Drain = DrainWindow.Open root }
 
     let onDispose (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         { State = BloggerRuntimeState.Disposed
@@ -179,7 +183,7 @@ module BloggerRuntime =
 
     let isDrainOpen (cell: BloggerRuntimeCell) : bool =
         match cell.Drain with
-        | DrainWindow.Open -> true
+        | DrainWindow.Open _ -> true
         | DrainWindow.Closed -> false
 
     /// Durable handle seal blocks new work unless the drain window is open.

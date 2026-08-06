@@ -323,7 +323,7 @@ module HostSignalBootstrap =
                       Role = Some role
                       Directory = directory }
 
-            let onAuthorityRoot (mainSessionId: SessionId) =
+            let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with
                 | None -> ()
                 | Some durable ->
@@ -332,7 +332,7 @@ module HostSignalBootstrap =
                     match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
                     | None -> ()
                     | Some bloggerId ->
-                        BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId
+                        BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId root
 
             let chatMessageHook =
                 PromptIngress.createHook
