@@ -132,7 +132,7 @@ export const FORBIDDEN = [
   {
     gate: 'program-counter',
     pattern:
-      /\b(?:Dirty|Running|RepairSpent|ReactivatedAfterSeal|injectRepair|commitUnknown|abandonThenCatchUp|forceConfirmedReviewer|isContinuation|publishToMailbox|openReviewBarrier)\b/,
+      /\b(?:Dirty|Running|RepairSpent|ReactivatedAfterSeal|injectRepair|commitUnknown|abandonThenCatchUp|forceConfirmedReviewer|isContinuation|publishToMailbox|openReviewBarrier|CurrentStage|CurrentMode|RuntimeCondition|LifecyclePosition|InFlightFlag|ParkedMarker)\b/,
     label: 'program counter field/parameter',
   },
   {
@@ -143,6 +143,14 @@ export const FORBIDDEN = [
       /\b(?!TddPhase\b|parseTddPhase\b|UnknownTddPhase\b|PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
     skipIf: isProcessPhysicalPath,
+  },
+  {
+    // PR 9 item 4: multi-bool loop is a FILE-level pattern (two mutable false
+    // booleans + a while loop), enforced in scanFiles. Registered here so
+    // GATE_NAMES / counts stay authoritative.
+    gate: 'bool-loop',
+    pattern: /$^/,
+    label: 'multi mutable-false booleans with a while loop',
   },
 ]
 
@@ -179,6 +187,23 @@ export const scanFiles = (entries) => {
     const file = entry.file
     const text = entry.text
     for (const v of scanText(text, file)) violations.push(v)
+    if (!isProcessPhysicalPath(file)) {
+      // PR 9 item 4: multi-bool loop detection — two or more `let mutable x = false`
+      // program-counter booleans together with a `while` loop is a state-machine
+      // smell. Single resource-ownership flags (released/disposed) are not loops.
+      const code = text.split('\n').map((l) => l.replace(/\/\/.*/g, ''))
+      const bools = code.filter((l) => /\blet mutable\s+\w+\s*=\s*false\b/.test(l)).length
+      const hasWhile = code.some((l) => /\bwhile\s/.test(l))
+      if (bools >= 2 && hasWhile) {
+        const first = code.findIndex((l) => /\blet mutable\s+\w+\s*=\s*false\b/.test(l))
+        violations.push({
+          gate: 'bool-loop',
+          file,
+          line: first + 1,
+          text: `${bools} mutable false booleans with a while loop`,
+        })
+      }
+    }
   }
   return violations
 }

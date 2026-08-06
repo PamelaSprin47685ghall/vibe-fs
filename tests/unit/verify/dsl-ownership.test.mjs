@@ -46,6 +46,23 @@ const NEGATIVES = [
     line: 2,
   },
   {
+    gate: 'program-counter',
+    source: ['module Sample', 'type Runtime = { CurrentStage: bool }'].join('\n'),
+    line: 2,
+  },
+  {
+    gate: 'bool-loop',
+    file: 'Agent/Negative_bool_loop.fs',
+    source: ['module Sample', 'let mutable armed = false', 'let mutable spent = false', 'while not done do', '    ()'].join('\n'),
+    line: 2,
+  },
+  {
+    gate: 'bool-loop',
+    file: 'src/Wanxiangshu/Process/Negative_bool_loop.fs',
+    source: ['module Sample', 'let mutable a = false', 'let mutable b = false', 'while x do', '    ()'].join('\n'),
+    line: 2,
+  },
+  {
     gate: 'behaviour-bool',
     source: ['module Sample', 'type State = { HasPendingCompletion: bool }'].join('\n'),
     line: 2,
@@ -61,7 +78,7 @@ const CLEAN = [
   '}',
 ].join('\n')
 
-test('DSL_OWNERSHIP_exports_seven_named_gates', () => {
+test('DSL_OWNERSHIP_exports_eight_named_gates', () => {
   assert.deepEqual(GATE_NAMES, [
     'mutable',
     'flow-lift',
@@ -70,11 +87,13 @@ test('DSL_OWNERSHIP_exports_seven_named_gates', () => {
     'infrastructure-leak',
     'program-counter',
     'behaviour-bool',
+    'bool-loop',
   ])
-  assert.equal(FORBIDDEN.length, 7)
+  assert.equal(FORBIDDEN.length, 8)
 })
 
 for (const sample of NEGATIVES) {
+  if (sample.gate === 'bool-loop') continue
   test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
     const file = sample.file ?? `Agent/Negative_${sample.gate}.fs`
     const hits = scanText(sample.source, file)
@@ -82,6 +101,19 @@ for (const sample of NEGATIVES) {
     assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
     assert.equal(ofGate[0].line, sample.line)
     assert.equal(ofGate[0].file, file)
+  })
+}
+
+for (const sample of NEGATIVES.filter((s) => s.gate === 'bool-loop')) {
+  test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
+    const hits = scanFiles([{ file: sample.file, text: sample.source }])
+    const ofGate = hits.filter((v) => v.gate === sample.gate)
+    if (sample.file.startsWith('Process/') || sample.file.includes('/Process/')) {
+      assert.equal(ofGate.length, 0, 'Process physical paths are exempt from bool-loop')
+    } else {
+      assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
+      assert.equal(ofGate[0].line, sample.line)
+    }
   })
 }
 
