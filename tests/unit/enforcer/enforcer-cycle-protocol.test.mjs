@@ -32,7 +32,12 @@ import {
   authorityRoot,
   logicalRunId,
   providerRun,
+  physicalUser,
+  fallbackProjection,
+  fallbackController,
 } from '../support/domain.mjs'
+
+import * as PromptDispatcher from '../../../dist/Application/Prompting/PromptDispatcher.js'
 
 // EnforcerHost.extractCalls reads RuntimeResources.current().EnforcerRules.
 // Production installs at SpikePlugin.init; this suite drives Host without init.
@@ -982,4 +987,41 @@ test('ENFORCER_RepairInstruction_is_stable_minimal_protocol_text', () => {
   assert.match(RepairInstruction, /blog tool exactly once/)
   assert.equal(RepairInstruction.includes('{{'), false, 'no dynamic template')
   assert.equal(RepairInstruction.includes('toml'), false)
+})
+
+test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', async () => {
+  await withHarness(async ({ journal, scope, fatals, lastFatal, run, main, blog }) => {
+    // FALLBACK-001: an accepted primary root creates the primary cursor (Fork0).
+    // PromptDispatcher.Runtime__AcceptHumanRoot is the proven seed (loop-sensor
+    // drives the same bridge this way) — a raw appendAgent root differs in the
+    // serialized SessionId shape the fold keys on.
+    const runtime = promptDispatcher.forJournal(journal)
+    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+    assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${accepted.fields?.[0] ?? JSON.stringify(accepted)}`)
+
+    // Empty-text repair path → the bridge records the confirmed failure on the
+    // PRIMARY cursor (ENFORCER-062/067/068), through FallbackController — the
+    // one writer.
+    const out = await run(liveBlog('asst-1', 'c1', { text: '' }))
+    assert.equal(hasRepairMessage(out), true, 'budget permits, repair still injected')
+
+    const snapshot = AgentJournalModule_snapshot(journal)
+    const primary = fold.session(snapshot, MAIN)
+    assert.notEqual(primary, undefined, 'main session projection exists')
+    assert.ok(primary?.Fallback !== undefined, 'primary fallback cursor exists')
+    const primaryCursor = fallbackProjection.read(primary.Fallback).offset
+    assert.equal(primaryCursor, 1, 'Fork0 advanced to Fork1')
+    assert.equal(fallbackProjection.read(primary.Fallback).failures, 1, 'one confirmed failure')
+
+    // ENFORCER-153: the injected repair message is the spent budget marker — a
+    // NEW empty-text terminal on the same cycle is protocol-repair-exhausted,
+    // not a second AABB. The cursor stays at the single advance.
+    await run(liveBlog('asst-2', 'c2', { text: '   ' }))
+    assert.equal(fatals.length, 1, 'second empty text is coverage/protocol stall → fatal')
+    assert.match(lastFatal()?.result ?? '', /protocol-repair-exhausted|aabb-exhausted/)
+    const snapshot2 = AgentJournalModule_snapshot(journal)
+    const primary2 = fold.session(snapshot2, MAIN)
+    assert.equal(fallbackProjection.read(primary2.Fallback).offset, 1, 'no second advance')
+    assert.equal(fallbackProjection.read(primary2.Fallback).failures, 1)
+  })
 })
