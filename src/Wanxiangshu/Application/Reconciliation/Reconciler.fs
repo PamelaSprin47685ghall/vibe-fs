@@ -11,9 +11,10 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Journal
 
-/// Production interpreter for Domain.ReconcileProgram. Host signals enqueue
-/// observation work; the Domain program alone determines the next action.
-module ReconcileInterpreter =
+/// Direct-CE reconcile scheduler (FLOW-001 / PR4).
+/// Owns queue / generation / single-flight / clear-session runtime state.
+/// Pass body is task CE over pure Domain decisions — no Command/Reply AST.
+module Reconciler =
 
     [<RequireQualifiedAccess>]
     type private Dispatch =
@@ -48,7 +49,7 @@ module ReconcileInterpreter =
         | TurnFailed error -> ReconcileProgram.TurnFailed error
         | TurnUnknown -> ReconcileProgram.TurnUnknown
 
-    let private publishTurn (turn: ReconciledTurn) : ReconcileProgram.PublishTurn =
+    let private publishTurnOf (turn: ReconciledTurn) : ReconcileProgram.PublishTurn =
         { SessionId = turn.SessionId
           PhysicalUserMessageId = turn.PhysicalUserMessageId
           ProviderRun = turn.ProviderRun
@@ -58,7 +59,7 @@ module ReconcileInterpreter =
         match turn with
         | None -> ReconcileProgram.ReconcileEvidence.NoTurn
         | Some value ->
-            let observed = ReconcileProgram.observedTurn (publishTurn value)
+            let observed = ReconcileProgram.observedTurn (publishTurnOf value)
 
             match value.Outcome with
             | TurnCompleted
@@ -68,7 +69,7 @@ module ReconcileInterpreter =
             | TurnNeedsContinuation _ -> ReconcileProgram.ReconcileEvidence.Provisional observed
             | TurnUnknown -> ReconcileProgram.ReconcileEvidence.Unknown(Some observed)
 
-    type Interpreter
+    type Scheduler
         (
             snapshot: ISessionSnapshotPort,
             binding: TurnBinding.Store,
@@ -166,166 +167,193 @@ module ReconcileInterpreter =
         let recordMaps (sessionId: SessionId) (maps: ReconcileProgram.PublishMaps) =
             lock gate (fun () -> published.[SessionId.value sessionId] <- maps)
 
-        member private _.Interpret
-            (sessionId: SessionId, generation: int, program: ReconcileProgram.ReconcileProgram)
+        let publishIfAllowed
+            (sessionId: SessionId)
+            (generation: int)
+            (maps: ReconcileProgram.PublishMaps)
+            (turn: ReconcileProgram.PublishTurn option)
+            (turns: Map<string, ReconciledTurn>)
+            (lastSnapshot: SessionMessage list option)
             : Task =
-            let rec go
-                (current: ReconcileProgram.ReconcileProgram)
-                (activeBinding: ActiveRunBinding option)
-                (lastSnapshot: SessionMessage list option)
-                (turns: Map<string, ReconciledTurn>)
-                : Task =
-                task {
-                    match current with
-                    | ReconcileProgram.Return() -> return ()
-                    | ReconcileProgram.Step(command, next) ->
-                        if not (isCurrent sessionId generation) then
-                            return ()
-                        else
-                            match command with
-                            | ReconcileProgram.ReconcileCommand.ReadActiveBinding _ ->
-                                let found =
-                                    if not (isCurrent sessionId generation) || isCleared sessionId then
+            task {
+                match turn with
+                | None ->
+                    match lastSnapshot with
+                    | Some messages when isCurrent sessionId generation -> do! observeSnapshot sessionId messages
+                    | _ -> ()
+                | Some value ->
+                    let decision = ReconcileProgram.publishDecision maps value
+
+                    if decision.shouldPublish && isCurrent sessionId generation then
+                        match Map.tryFind (ReconcileProgram.consumeKey value) turns with
+                        | Some reconciled ->
+                            do! onTurn reconciled
+
+                            if isCurrent sessionId generation then
+                                recordMaps sessionId decision.maps
+                        | None -> logError "RECONCILE-PUBLISH" "publish token missing from observed turns"
+
+                    if isCurrent sessionId generation then
+                        match lastSnapshot with
+                        | Some messages -> do! observeSnapshot sessionId messages
+                        | None -> ()
+            }
+
+        let rec materializeActive
+            (sessionId: SessionId)
+            (generation: int)
+            (budgetRemaining: int)
+            (backoffIndex: int)
+            (candidate: ReconcileProgram.PublishTurn option)
+            (maps: ReconcileProgram.PublishMaps)
+            (activeBinding: ActiveRunBinding)
+            (turns: Map<string, ReconciledTurn>)
+            (lastSnapshot: SessionMessage list option)
+            : Task =
+            task {
+                if not (isCurrent sessionId generation) then
+                    return ()
+                elif budgetRemaining <= 0 then
+                    let evidence = ReconcileProgram.ReconcileEvidence.BudgetExhausted candidate.IsSome
+
+                    match ReconcileProgram.decideStep evidence with
+                    | ReconcileProgram.ReconcileDecision.Publish ->
+                        do! publishIfAllowed sessionId generation maps candidate turns lastSnapshot
+                    | ReconcileProgram.ReconcileDecision.StopPass
+                    | ReconcileProgram.ReconcileDecision.RereadWithBackoff _ ->
+                        match lastSnapshot with
+                        | Some messages when isCurrent sessionId generation -> do! observeSnapshot sessionId messages
+                        | _ -> ()
+                else if isCleared sessionId || not (isCurrent sessionId generation) then
+                    return ()
+                else
+                    let! result = snapshot.GetMessages sessionId
+
+                    if not (isCurrent sessionId generation) then
+                        return ()
+                    else
+                        match result with
+                        | Error error ->
+                            logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
+                            let nextIdx = ReconcileProgram.nextBackoffIndex backoffIndex false
+                            let delay = ReconcileProgram.pickDelay delays backoffIndex budgetRemaining
+
+                            if delay <= 0 || not (isCurrent sessionId generation) then
+                                return ()
+                            else
+                                do! delayMs delay
+
+                                if isCurrent sessionId generation then
+                                    return!
+                                        materializeActive
+                                            sessionId
+                                            generation
+                                            (budgetRemaining - delay)
+                                            nextIdx
+                                            candidate
+                                            maps
+                                            activeBinding
+                                            turns
+                                            lastSnapshot
+                                else
+                                    return ()
+                        | Ok messages ->
+                            let turn = TurnReconcile.reconcile messages activeBinding
+                            let evidence = evidenceOf turn
+
+                            let observedTurns =
+                                match turn with
+                                | Some value -> Map.add (ReconcileProgram.consumeKey (publishTurnOf value)) value turns
+                                | None -> turns
+
+                            let afterOk = ReconcileProgram.nextBackoffIndex backoffIndex true
+                            let decision = ReconcileProgram.decideStep evidence
+
+                            match decision with
+                            | ReconcileProgram.ReconcileDecision.Publish ->
+                                let publishable =
+                                    match evidence with
+                                    | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
+                                    | ReconcileProgram.ReconcileEvidence.BudgetExhausted _ -> candidate
+                                    | _ -> candidate
+
+                                do! publishIfAllowed sessionId generation maps publishable observedTurns (Some messages)
+                            | ReconcileProgram.ReconcileDecision.StopPass ->
+                                if isCurrent sessionId generation then
+                                    do! observeSnapshot sessionId messages
+                            | ReconcileProgram.ReconcileDecision.RereadWithBackoff clearCandidate ->
+                                let candidate' =
+                                    if clearCandidate then
                                         None
                                     else
-                                        binding.ActiveRunBinding(sessionId, ?projection = resolveProjection sessionId)
+                                        match evidence with
+                                        | ReconcileProgram.ReconcileEvidence.Provisional observed ->
+                                            observed.PublishTurn
+                                        | _ -> candidate
 
-                                let reply =
-                                    match found with
-                                    | Some _ -> ReconcileProgram.ReconcileReply.BindingPresent
-                                    | None -> ReconcileProgram.ReconcileReply.BindingAbsent
+                                let delay = ReconcileProgram.pickDelay delays afterOk budgetRemaining
+                                let nextIdx = afterOk + 1
 
-                                return! go (next reply) found lastSnapshot turns
-
-                            | ReconcileProgram.ReconcileCommand.ReadSnapshot _ ->
-                                if not (isCurrent sessionId generation) || isCleared sessionId then
-                                    return!
-                                        go
-                                            (next (
-                                                ReconcileProgram.ReconcileReply.SnapshotOk
-                                                    ReconcileProgram.ReconcileEvidence.SessionCleared
-                                            ))
-                                            activeBinding
-                                            lastSnapshot
-                                            turns
+                                if delay <= 0 then
+                                    if isCurrent sessionId generation then
+                                        do! observeSnapshot sessionId messages
                                 else
-                                    let! result = snapshot.GetMessages sessionId
+                                    do! delayMs delay
 
-                                    if not (isCurrent sessionId generation) then
-                                        return ()
+                                    if isCurrent sessionId generation then
+                                        return!
+                                            materializeActive
+                                                sessionId
+                                                generation
+                                                (budgetRemaining - delay)
+                                                nextIdx
+                                                candidate'
+                                                maps
+                                                activeBinding
+                                                observedTurns
+                                                (Some messages)
                                     else
-                                        match result with
-                                        | Error error ->
-                                            logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
+                                        return ()
+            }
 
-                                            return!
-                                                go
-                                                    (next (ReconcileProgram.ReconcileReply.SnapshotError(string error)))
-                                                    activeBinding
-                                                    lastSnapshot
-                                                    turns
-                                        | Ok messages ->
-                                            let turn = activeBinding |> Option.bind (TurnReconcile.reconcile messages)
-                                            let evidence = evidenceOf turn
+        member private _.RunPass(sessionId: SessionId, generation: int) : Task =
+            task {
+                if not (isCurrent sessionId generation) || isCleared sessionId then
+                    return ()
+                else
+                    let activeBinding =
+                        binding.ActiveRunBinding(sessionId, ?projection = resolveProjection sessionId)
 
-                                            let observedTurns =
-                                                match turn with
-                                                | Some value ->
-                                                    Map.add
-                                                        (ReconcileProgram.consumeKey (publishTurn value))
-                                                        value
-                                                        turns
-                                                | None -> turns
+                    match activeBinding with
+                    | None ->
+                        // HOST-006: still read + observe when no active run.
+                        let! result = snapshot.GetMessages sessionId
 
-                                            return!
-                                                go
-                                                    (next (ReconcileProgram.ReconcileReply.SnapshotOk evidence))
-                                                    activeBinding
-                                                    (Some messages)
-                                                    observedTurns
-
-                            | ReconcileProgram.ReconcileCommand.Delay milliseconds ->
-                                do! delayMs milliseconds
-
-                                if isCurrent sessionId generation then
-                                    return!
-                                        go
-                                            (next ReconcileProgram.ReconcileReply.DelayDone)
-                                            activeBinding
-                                            lastSnapshot
-                                            turns
-                                else
-                                    return ()
-
-                            | ReconcileProgram.ReconcileCommand.StorePublishMaps(_, maps) ->
-                                if isCurrent sessionId generation then
-                                    recordMaps sessionId maps
-
-                                    return!
-                                        go
-                                            (next ReconcileProgram.ReconcileReply.PublishMapsStored)
-                                            activeBinding
-                                            lastSnapshot
-                                            turns
-                                else
-                                    return ()
-
-                            | ReconcileProgram.ReconcileCommand.PublishTurn value ->
-                                if isCurrent sessionId generation then
-                                    let turn = Map.find (ReconcileProgram.consumeKey value) turns
-                                    do! onTurn turn
-
-                                if isCurrent sessionId generation then
-                                    return!
-                                        go
-                                            (next ReconcileProgram.ReconcileReply.PublishDone)
-                                            activeBinding
-                                            lastSnapshot
-                                            turns
-                                else
-                                    return ()
-
-                            | ReconcileProgram.ReconcileCommand.ObserveSnapshot _ ->
-                                match lastSnapshot with
-                                | Some messages when isCurrent sessionId generation ->
-                                    do! observeSnapshot sessionId messages
-                                | None -> ()
-                                | Some _ -> ()
-
-                                if isCurrent sessionId generation then
-                                    return!
-                                        go
-                                            (next ReconcileProgram.ReconcileReply.ObserveDone)
-                                            activeBinding
-                                            lastSnapshot
-                                            turns
-                                else
-                                    return ()
-
-                            | ReconcileProgram.ReconcileCommand.ProtocolMismatch(expected, actual) ->
-                                logError "RECONCILE-PROTOCOL" (sprintf "expected %s, received %s" expected actual)
-
-                                return!
-                                    go (next ReconcileProgram.ReconcileReply.UnitOk) activeBinding lastSnapshot turns
-                }
-
-            go program None None Map.empty
+                        if isCurrent sessionId generation then
+                            match result with
+                            | Ok messages -> do! observeSnapshot sessionId messages
+                            | Error error ->
+                                logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
+                    | Some bound ->
+                        return!
+                            materializeActive
+                                sessionId
+                                generation
+                                budget
+                                0
+                                None
+                                (mapsFor sessionId)
+                                bound
+                                Map.empty
+                                None
+            }
 
         member private this.Drain(sessionId: SessionId, generation: int) : Task =
             task {
                 match takeWork sessionId generation with
                 | Work.Drained -> return ()
                 | Work.Wake ->
-                    do!
-                        this.Interpret(
-                            sessionId,
-                            generation,
-                            ReconcileProgram.materializePassWithMaps
-                                (SessionId.value sessionId)
-                                delays
-                                budget
-                                (mapsFor sessionId)
-                        )
+                    do! this.RunPass(sessionId, generation)
 
                     if isCurrent sessionId generation then
                         return! this.Drain(sessionId, generation)
@@ -338,7 +366,7 @@ module ReconcileInterpreter =
                 try
                     do! this.Drain(sessionId, generation)
                 with error ->
-                    logError "RECONCILE-INTERPRETER" error.Message
+                    logError "RECONCILE-SCHEDULER" error.Message
 
                 match releaseAfterPass sessionId generation with
                 | Release.ResumeDrain -> return! this.Run(sessionId, generation)

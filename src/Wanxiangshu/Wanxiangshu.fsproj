@@ -198,7 +198,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostReviewGuard.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostJoinGuard.fs"/>
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
-    <Compile Include="Application/Reconciliation/ReconcileInterpreter.fs"/>
+    <Compile Include="Application/Reconciliation/Reconciler.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
     <Compile Include="Application/Reconciliation/ReviewerGuardState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/TerminalPolicy.fs"/>

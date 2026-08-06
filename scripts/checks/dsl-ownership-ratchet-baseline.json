@@ -16,10 +16,6 @@
     "behaviour-bool": 3,
     "mutable": 1
   },
-  "Application/Reconciliation/ReconcileInterpreter.fs": {
-    "business-interpreter": 1,
-    "second-runtime-protocol": 1
-  },
   "Application/Reconciliation/ReviewerGuardState.fs": {
     "behaviour-bool": 1
   },
@@ -52,10 +48,6 @@
   },
   "Domain/PromptAuthority.fs": {
     "behaviour-bool": 1
-  },
-  "Domain/ReconcileProgram.fs": {
-    "second-runtime-protocol": 7,
-    "business-interpreter": 1
   },
   "Domain/RecoverySlot.fs": {
     "behaviour-bool": 2

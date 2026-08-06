@@ -1,14 +1,14 @@
-// tests/unit/domain/reconcile-program.test.mjs — M3 Reconcile Domain pure extract.
+// tests/unit/domain/reconcile-program.test.mjs — PR4 pure Reconcile Domain.
 //
-// Locks Evidence → Decision → Program AST + Trace before Application Interpreter
-// (M4) deletes Dirty/Running/cont/terminalFound from ReconcileSupervisor.
-// Production Domain/ReconcileProgram is the missing surface this file forces RED.
+// Locks Evidence → Decision + publish seals. Command/Reply/Step AST and
+// TraceInterpreter are deleted; workflow CE lives in Application/Reconciliation/Reconciler.fs
+// and is covered by tests/unit/execution/reconcile-supervisor.test.mjs.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { listItems, reconcileProgram } from '../support/domain.mjs'
+import { reconcileProgram } from '../support/domain.mjs'
 
-// ── pure classifiers moved out of ReconcileSupervisor ────────────────────────
+// ── pure classifiers ─────────────────────────────────────────────────────────
 
 test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', () => {
   assert.equal(typeof reconcileProgram.isTerminalOutcome, 'function')
@@ -147,92 +147,7 @@ test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal an
   assert.equal(cleared.provisionalHas(provisional), false)
 })
 
-// ── Program AST + Trace: materialize pass order ──────────────────────────────
-
-test('RECONCILE_PROGRAM_005: materialize pass trace is ReadBinding → ReadSnapshot → Delay → ReadSnapshot → Publish → Observe', () => {
-  assert.equal(typeof reconcileProgram.programs.materializePass, 'function')
-  assert.equal(typeof reconcileProgram.interpretWith, 'function')
-
-  // Scripted replies: binding present → first snapshot provisional → delay →
-  // second snapshot terminal → publish → observe.
-  const terminalTurn = reconcileProgram.turnFixture({
-    session: 'ses-trace',
-    physical: 'user-1',
-    providerRun: 'asst-1',
-    outcome: 'TurnCompleted',
-  })
-  let snapshotN = 0
-  const reply = (step) => {
-    const name = reconcileProgram.stepName(step)
-    switch (name) {
-      case 'ReadActiveBinding':
-        return reconcileProgram.reply.bindingPresent()
-      case 'ReadSnapshot': {
-        snapshotN += 1
-        if (snapshotN === 1) {
-          return reconcileProgram.reply.snapshotOk(
-            reconcileProgram.evidence.provisional('TurnInProgress'),
-          )
-        }
-        return reconcileProgram.reply.snapshotOk(
-          reconcileProgram.evidence.observedTerminal(terminalTurn),
-        )
-      }
-      case 'Delay':
-        return reconcileProgram.reply.delayDone()
-      case 'PublishTurn':
-        return reconcileProgram.reply.publishDone()
-      case 'StorePublishMaps':
-        return reconcileProgram.reply.publishMapsStored()
-      case 'ObserveSnapshot':
-        return reconcileProgram.reply.observeDone()
-      default:
-        return reconcileProgram.reply.unitOk()
-    }
-  }
-
-  const program = reconcileProgram.programs.materializePass({
-    session: 'ses-trace',
-    backoffDelaysMs: [5, 5, 5],
-    maxBudgetMs: 400,
-  })
-  const trace = listItems(reconcileProgram.interpretWith(reply, program))
-
-  assert.ok(trace.includes('ReadActiveBinding'), `trace: ${trace.join(' → ')}`)
-  assert.ok(
-    trace.filter((s) => s === 'ReadSnapshot' || s.startsWith('ReadSnapshot')).length >= 2,
-    `need ≥2 ReadSnapshot; trace: ${trace.join(' → ')}`,
-  )
-  assert.ok(
-    trace.some((s) => s === 'Delay' || s.startsWith('Delay')),
-    `Delay missing; trace: ${trace.join(' → ')}`,
-  )
-  assert.ok(
-    trace.some((s) => s === 'PublishTurn' || s.startsWith('PublishTurn')),
-    `PublishTurn missing; trace: ${trace.join(' → ')}`,
-  )
-  assert.ok(
-    trace.some((s) => s === 'ObserveSnapshot' || s.startsWith('ObserveSnapshot')),
-    `ObserveSnapshot (HOST-006) missing; trace: ${trace.join(' → ')}`,
-  )
-
-  const bindingAt = trace.findIndex((s) => s === 'ReadActiveBinding' || s.startsWith('ReadActiveBinding'))
-  const firstSnap = trace.findIndex((s) => s === 'ReadSnapshot' || s.startsWith('ReadSnapshot'))
-  const delayAt = trace.findIndex((s) => s === 'Delay' || s.startsWith('Delay'))
-  const secondSnap = trace.findIndex(
-    (s, i) => i > firstSnap && (s === 'ReadSnapshot' || s.startsWith('ReadSnapshot')),
-  )
-  const publishAt = trace.findIndex((s) => s === 'PublishTurn' || s.startsWith('PublishTurn'))
-  const observeAt = trace.findIndex((s) => s === 'ObserveSnapshot' || s.startsWith('ObserveSnapshot'))
-
-  assert.ok(bindingAt >= 0 && bindingAt < firstSnap, 'ReadActiveBinding before first ReadSnapshot')
-  assert.ok(firstSnap < delayAt, 'first ReadSnapshot before Delay')
-  assert.ok(delayAt < secondSnap, 'Delay before second ReadSnapshot')
-  assert.ok(secondSnap < publishAt, 'second ReadSnapshot before PublishTurn')
-  assert.ok(publishAt < observeAt, 'PublishTurn before ObserveSnapshot (HOST-006 order)')
-})
-
-test('RECONCILE_PROGRAM_006: SnapshotError does not reset backoff index in decideBackoff', () => {
+test('RECONCILE_PROGRAM_005: SnapshotError does not reset backoff index', () => {
   assert.equal(typeof reconcileProgram.nextBackoffIndex, 'function')
 
   // Ok snapshot → reset to 0 after a successful classify path.
@@ -242,28 +157,14 @@ test('RECONCILE_PROGRAM_006: SnapshotError does not reset backoff index in decid
   assert.equal(reconcileProgram.nextBackoffIndex({ previous: 0, snapshotOk: false }), 1)
 })
 
-test('RECONCILE_PROGRAM_007: non-positive delay configuration terminates at ObserveSnapshot', () => {
-  const reply = (step) => {
-    switch (reconcileProgram.stepName(step)) {
-      case 'ReadActiveBinding':
-        return reconcileProgram.reply.bindingPresent()
-      case 'ReadSnapshot':
-        return reconcileProgram.reply.snapshotOk(
-          reconcileProgram.evidence.provisional('TurnInProgress'),
-        )
-      case 'ObserveSnapshot':
-        return reconcileProgram.reply.observeDone()
-      default:
-        return reconcileProgram.reply.unitOk()
-    }
-  }
-
-  const program = reconcileProgram.programs.materializePass({
-    session: 'ses-zero-delay',
-    backoffDelaysMs: [0],
-    maxBudgetMs: 400,
-  })
-  const trace = listItems(reconcileProgram.interpretWith(reply, program))
-
-  assert.deepEqual(trace, ['ReadActiveBinding', 'ReadSnapshot', 'ObserveSnapshot'])
+test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {
+  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
+  assert.equal(
+    names.some((n) => /Command|Reply|materializePass|interpretWith|TraceInterpreter|ProtocolMismatch/.test(n)),
+    false,
+    `second-runtime exports leaked: ${names.join(', ')}`,
+  )
+  assert.ok(names.some((n) => n.includes('decideStep')), `decideStep missing; ${names.join(', ')}`)
+  assert.ok(names.some((n) => n.includes('publishDecision')), `publishDecision missing; ${names.join(', ')}`)
 })

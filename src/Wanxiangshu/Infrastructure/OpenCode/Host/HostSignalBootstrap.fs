@@ -188,7 +188,7 @@ module HostSignalBootstrap =
                 }
 
             let reconciler =
-                ReconcileInterpreter.Interpreter(
+                Reconciler.Scheduler(
                     snapshot,
                     binding,
                     onTurn,

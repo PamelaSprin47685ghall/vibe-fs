@@ -3,8 +3,9 @@ namespace Wanxiangshu.Domain
 open System
 open Wanxiangshu.Kernel.Identity
 
-/// M3 pure Reconcile Domain: Evidence → Decision → Program AST + Trace.
-/// Zero task, zero mutable, zero I/O (FLOW-002 / FLOW-008).
+/// Reconcile pure Domain: Evidence → Decision + publish seals.
+/// Zero task, zero mutable, zero I/O (FLOW-001 / FLOW-004).
+/// Workflow CE lives in Application/Reconciliation/Reconciler.fs.
 module ReconcileProgram =
 
     // ── outcomes (Domain-owned; Application maps wire into these) ─────────────
@@ -24,8 +25,8 @@ module ReconcileProgram =
           ProviderRun: ProviderRunIdentity
           Outcome: TurnOutcome }
 
-    /// A snapshot can be classified without a publishable turn in trace-only
-    /// tests. Production classification always supplies `Some PublishTurn`.
+    /// A snapshot can be classified without a publishable turn in pure tests.
+    /// Production classification always supplies `Some PublishTurn`.
     type ObservedTurn =
         { Outcome: TurnOutcome
           PublishTurn: PublishTurn option }
@@ -170,7 +171,7 @@ module ReconcileProgram =
           ProviderRun = ProviderRunIdentity.create providerRun
           Outcome = outcome }
 
-    // ── evidence / reply constructors (facade + tests) ───────────────────────
+    // ── evidence constructors (facade + tests) ───────────────────────────────
 
     let evidenceSnapshotError (reason: string) = ReconcileEvidence.SnapshotError reason
     let evidenceNoTurn () = ReconcileEvidence.NoTurn
@@ -179,17 +180,17 @@ module ReconcileProgram =
         { Outcome = turn.Outcome
           PublishTurn = Some turn }
 
-    let private traceObservation (outcome: TurnOutcome) : ObservedTurn =
+    let private pureObservation (outcome: TurnOutcome) : ObservedTurn =
         { Outcome = outcome
           PublishTurn = None }
 
     let evidenceProvisional (outcome: TurnOutcome) =
-        ReconcileEvidence.Provisional(traceObservation outcome)
+        ReconcileEvidence.Provisional(pureObservation outcome)
 
     let evidenceUnknown () = ReconcileEvidence.Unknown None
 
     let evidenceTerminal (outcome: TurnOutcome) =
-        ReconcileEvidence.Terminal(traceObservation outcome)
+        ReconcileEvidence.Terminal(pureObservation outcome)
 
     let evidenceObservedTerminal (turn: PublishTurn) =
         ReconcileEvidence.Terminal(observedTurn turn)
@@ -198,343 +199,3 @@ module ReconcileProgram =
         ReconcileEvidence.BudgetExhausted hasCandidate
 
     let evidenceSessionCleared () = ReconcileEvidence.SessionCleared
-
-    // ── Program AST ──────────────────────────────────────────────────────────
-
-    [<RequireQualifiedAccess>]
-    type ReconcileCommand =
-        | ReadActiveBinding of SessionId
-        | ReadSnapshot of SessionId
-        | Delay of delayMs: int
-        | StorePublishMaps of SessionId * PublishMaps
-        | PublishTurn of PublishTurn
-        | ObserveSnapshot of SessionId
-        | ProtocolMismatch of expected: string * actual: string
-
-    [<RequireQualifiedAccess>]
-    type ReconcileReply =
-        | BindingPresent
-        | BindingAbsent
-        | SnapshotOk of ReconcileEvidence
-        | SnapshotError of reason: string
-        | DelayDone
-        | PublishMapsStored
-        | PublishDone
-        | ObserveDone
-        | UnitOk
-
-    type ReconcileProgram =
-        | Return of unit
-        | Step of ReconcileCommand * (ReconcileReply -> ReconcileProgram)
-
-    let replyBindingPresent () = ReconcileReply.BindingPresent
-    let replyBindingAbsent () = ReconcileReply.BindingAbsent
-    let replySnapshotOk (evidence: ReconcileEvidence) = ReconcileReply.SnapshotOk evidence
-    let replySnapshotError (reason: string) = ReconcileReply.SnapshotError reason
-    let replyDelayDone () = ReconcileReply.DelayDone
-    let replyPublishMapsStored () = ReconcileReply.PublishMapsStored
-    let replyPublishDone () = ReconcileReply.PublishDone
-    let replyObserveDone () = ReconcileReply.ObserveDone
-    let replyUnitOk () = ReconcileReply.UnitOk
-
-    let private replyName (reply: ReconcileReply) : string =
-        match reply with
-        | ReconcileReply.BindingPresent -> "BindingPresent"
-        | ReconcileReply.BindingAbsent -> "BindingAbsent"
-        | ReconcileReply.SnapshotOk _ -> "SnapshotOk"
-        | ReconcileReply.SnapshotError _ -> "SnapshotError"
-        | ReconcileReply.DelayDone -> "DelayDone"
-        | ReconcileReply.PublishMapsStored -> "PublishMapsStored"
-        | ReconcileReply.PublishDone -> "PublishDone"
-        | ReconcileReply.ObserveDone -> "ObserveDone"
-        | ReconcileReply.UnitOk -> "UnitOk"
-
-    let private protocolMismatch (expected: string) (reply: ReconcileReply) : ReconcileProgram =
-        Step(
-            ReconcileCommand.ProtocolMismatch(expected, replyName reply),
-            function
-            | ReconcileReply.UnitOk -> Return()
-            | ReconcileReply.BindingPresent -> Return()
-            | ReconcileReply.BindingAbsent -> Return()
-            | ReconcileReply.SnapshotOk _ -> Return()
-            | ReconcileReply.SnapshotError _ -> Return()
-            | ReconcileReply.DelayDone -> Return()
-            | ReconcileReply.PublishMapsStored -> Return()
-            | ReconcileReply.PublishDone -> Return()
-            | ReconcileReply.ObserveDone -> Return()
-        )
-
-    let private observeThenEnd (sessionId: SessionId) : ReconcileProgram =
-        Step(
-            ReconcileCommand.ObserveSnapshot sessionId,
-            function
-            | ReconcileReply.ObserveDone -> Return()
-            | ReconcileReply.BindingPresent -> protocolMismatch "ObserveDone" ReconcileReply.BindingPresent
-            | ReconcileReply.BindingAbsent -> protocolMismatch "ObserveDone" ReconcileReply.BindingAbsent
-            | ReconcileReply.SnapshotOk evidence -> protocolMismatch "ObserveDone" (ReconcileReply.SnapshotOk evidence)
-            | ReconcileReply.SnapshotError reason ->
-                protocolMismatch "ObserveDone" (ReconcileReply.SnapshotError reason)
-            | ReconcileReply.DelayDone -> protocolMismatch "ObserveDone" ReconcileReply.DelayDone
-            | ReconcileReply.PublishMapsStored -> protocolMismatch "ObserveDone" ReconcileReply.PublishMapsStored
-            | ReconcileReply.PublishDone -> protocolMismatch "ObserveDone" ReconcileReply.PublishDone
-            | ReconcileReply.UnitOk -> protocolMismatch "ObserveDone" ReconcileReply.UnitOk
-        )
-
-    let private sealThenObserve (sessionId: SessionId) (maps: PublishMaps) : ReconcileProgram =
-        Step(
-            ReconcileCommand.StorePublishMaps(sessionId, maps),
-            function
-            | ReconcileReply.PublishMapsStored -> observeThenEnd sessionId
-            | ReconcileReply.BindingPresent -> protocolMismatch "PublishMapsStored" ReconcileReply.BindingPresent
-            | ReconcileReply.BindingAbsent -> protocolMismatch "PublishMapsStored" ReconcileReply.BindingAbsent
-            | ReconcileReply.SnapshotOk evidence ->
-                protocolMismatch "PublishMapsStored" (ReconcileReply.SnapshotOk evidence)
-            | ReconcileReply.SnapshotError reason ->
-                protocolMismatch "PublishMapsStored" (ReconcileReply.SnapshotError reason)
-            | ReconcileReply.DelayDone -> protocolMismatch "PublishMapsStored" ReconcileReply.DelayDone
-            | ReconcileReply.PublishDone -> protocolMismatch "PublishMapsStored" ReconcileReply.PublishDone
-            | ReconcileReply.ObserveDone -> protocolMismatch "PublishMapsStored" ReconcileReply.ObserveDone
-            | ReconcileReply.UnitOk -> protocolMismatch "PublishMapsStored" ReconcileReply.UnitOk
-        )
-
-    let private publishThenSealThenObserve
-        (sessionId: SessionId)
-        (turn: PublishTurn)
-        (maps: PublishMaps)
-        : ReconcileProgram =
-        Step(
-            ReconcileCommand.PublishTurn turn,
-            function
-            | ReconcileReply.PublishDone -> sealThenObserve sessionId maps
-            | ReconcileReply.BindingPresent -> protocolMismatch "PublishDone" ReconcileReply.BindingPresent
-            | ReconcileReply.BindingAbsent -> protocolMismatch "PublishDone" ReconcileReply.BindingAbsent
-            | ReconcileReply.SnapshotOk evidence -> protocolMismatch "PublishDone" (ReconcileReply.SnapshotOk evidence)
-            | ReconcileReply.SnapshotError reason ->
-                protocolMismatch "PublishDone" (ReconcileReply.SnapshotError reason)
-            | ReconcileReply.DelayDone -> protocolMismatch "PublishDone" ReconcileReply.DelayDone
-            | ReconcileReply.PublishMapsStored -> protocolMismatch "PublishDone" ReconcileReply.PublishMapsStored
-            | ReconcileReply.ObserveDone -> protocolMismatch "PublishDone" ReconcileReply.ObserveDone
-            | ReconcileReply.UnitOk -> protocolMismatch "PublishDone" ReconcileReply.UnitOk
-        )
-
-    let private publishIfAllowed
-        (sessionId: SessionId)
-        (maps: PublishMaps)
-        (turn: PublishTurn option)
-        : ReconcileProgram =
-        match turn with
-        | None -> observeThenEnd sessionId
-        | Some value ->
-            let decision = publishDecision maps value
-
-            if decision.shouldPublish then
-                publishThenSealThenObserve sessionId value decision.maps
-            else
-                observeThenEnd sessionId
-
-    /// One active-run materialization pass as data (FLOW-002).
-    /// Interpreter supplies binding/snapshot/delay/publish/observe effects.
-    let rec private materializeActive
-        (sessionId: SessionId)
-        (delays: int array)
-        (budgetRemaining: int)
-        (backoffIndex: int)
-        (candidate: PublishTurn option)
-        (maps: PublishMaps)
-        : ReconcileProgram =
-        if budgetRemaining <= 0 then
-            publishIfAllowed sessionId maps candidate
-        else
-            Step(
-                ReconcileCommand.ReadSnapshot sessionId,
-                function
-                | ReconcileReply.SnapshotError _ ->
-                    let nextIdx = nextBackoffIndex backoffIndex false
-                    let delayMs = pickDelay delays backoffIndex budgetRemaining
-
-                    if delayMs <= 0 then
-                        observeThenEnd sessionId
-                    else
-                        Step(
-                            ReconcileCommand.Delay delayMs,
-                            function
-                            | ReconcileReply.DelayDone ->
-                                materializeActive sessionId delays (budgetRemaining - delayMs) nextIdx candidate maps
-                            | ReconcileReply.BindingPresent ->
-                                protocolMismatch "DelayDone" ReconcileReply.BindingPresent
-                            | ReconcileReply.BindingAbsent -> protocolMismatch "DelayDone" ReconcileReply.BindingAbsent
-                            | ReconcileReply.SnapshotOk evidence ->
-                                protocolMismatch "DelayDone" (ReconcileReply.SnapshotOk evidence)
-                            | ReconcileReply.SnapshotError reason ->
-                                protocolMismatch "DelayDone" (ReconcileReply.SnapshotError reason)
-                            | ReconcileReply.PublishMapsStored ->
-                                protocolMismatch "DelayDone" ReconcileReply.PublishMapsStored
-                            | ReconcileReply.PublishDone -> protocolMismatch "DelayDone" ReconcileReply.PublishDone
-                            | ReconcileReply.ObserveDone -> protocolMismatch "DelayDone" ReconcileReply.ObserveDone
-                            | ReconcileReply.UnitOk -> protocolMismatch "DelayDone" ReconcileReply.UnitOk
-                        )
-                | ReconcileReply.SnapshotOk evidence ->
-                    // Successful I/O resets escalation; classify then decide.
-                    let afterOk = nextBackoffIndex backoffIndex true
-                    let decision = decideStep evidence
-
-                    match decision with
-                    | ReconcileDecision.Publish ->
-                        let turn =
-                            match evidence with
-                            | ReconcileEvidence.Terminal observed -> observed.PublishTurn
-                            | ReconcileEvidence.BudgetExhausted _ -> candidate
-                            | _ -> candidate
-
-                        publishIfAllowed sessionId maps turn
-                    | ReconcileDecision.StopPass -> observeThenEnd sessionId
-                    | ReconcileDecision.RereadWithBackoff clearCandidate ->
-                        let candidate' =
-                            if clearCandidate then
-                                None
-                            else
-                                match evidence with
-                                | ReconcileEvidence.Provisional observed -> observed.PublishTurn
-                                | _ -> candidate
-
-                        // After Ok, backoff index is 0; production then increments after delay.
-                        let delayMs = pickDelay delays afterOk budgetRemaining
-                        let nextIdx = afterOk + 1
-
-                        if delayMs <= 0 then
-                            observeThenEnd sessionId
-                        else
-                            Step(
-                                ReconcileCommand.Delay delayMs,
-                                function
-                                | ReconcileReply.DelayDone ->
-                                    materializeActive
-                                        sessionId
-                                        delays
-                                        (budgetRemaining - delayMs)
-                                        nextIdx
-                                        candidate'
-                                        maps
-                                | ReconcileReply.BindingPresent ->
-                                    protocolMismatch "DelayDone" ReconcileReply.BindingPresent
-                                | ReconcileReply.BindingAbsent ->
-                                    protocolMismatch "DelayDone" ReconcileReply.BindingAbsent
-                                | ReconcileReply.SnapshotOk evidence ->
-                                    protocolMismatch "DelayDone" (ReconcileReply.SnapshotOk evidence)
-                                | ReconcileReply.SnapshotError reason ->
-                                    protocolMismatch "DelayDone" (ReconcileReply.SnapshotError reason)
-                                | ReconcileReply.PublishMapsStored ->
-                                    protocolMismatch "DelayDone" ReconcileReply.PublishMapsStored
-                                | ReconcileReply.PublishDone -> protocolMismatch "DelayDone" ReconcileReply.PublishDone
-                                | ReconcileReply.ObserveDone -> protocolMismatch "DelayDone" ReconcileReply.ObserveDone
-                                | ReconcileReply.UnitOk -> protocolMismatch "DelayDone" ReconcileReply.UnitOk
-                            )
-                | ReconcileReply.BindingPresent ->
-                    protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.BindingPresent
-                | ReconcileReply.BindingAbsent ->
-                    protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.BindingAbsent
-                | ReconcileReply.DelayDone -> protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.DelayDone
-                | ReconcileReply.PublishMapsStored ->
-                    protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.PublishMapsStored
-                | ReconcileReply.PublishDone -> protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.PublishDone
-                | ReconcileReply.ObserveDone -> protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.ObserveDone
-                | ReconcileReply.UnitOk -> protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.UnitOk
-            )
-
-    let materializePassWithMaps
-        (session: string)
-        (backoffDelaysMs: int array)
-        (maxBudgetMs: int)
-        (maps: PublishMaps)
-        : ReconcileProgram =
-        let sessionId = SessionId.create session
-        let delays = if isNull backoffDelaysMs then [||] else backoffDelaysMs
-
-        Step(
-            ReconcileCommand.ReadActiveBinding sessionId,
-            function
-            | ReconcileReply.BindingAbsent ->
-                // HOST-006: still read + observe when no active run.
-                Step(
-                    ReconcileCommand.ReadSnapshot sessionId,
-                    function
-                    | ReconcileReply.SnapshotOk _ -> observeThenEnd sessionId
-                    | ReconcileReply.SnapshotError _ -> observeThenEnd sessionId
-                    | ReconcileReply.BindingPresent ->
-                        protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.BindingPresent
-                    | ReconcileReply.BindingAbsent ->
-                        protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.BindingAbsent
-                    | ReconcileReply.DelayDone -> protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.DelayDone
-                    | ReconcileReply.PublishMapsStored ->
-                        protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.PublishMapsStored
-                    | ReconcileReply.PublishDone ->
-                        protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.PublishDone
-                    | ReconcileReply.ObserveDone ->
-                        protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.ObserveDone
-                    | ReconcileReply.UnitOk -> protocolMismatch "SnapshotOk|SnapshotError" ReconcileReply.UnitOk
-                )
-            | ReconcileReply.BindingPresent -> materializeActive sessionId delays maxBudgetMs 0 None maps
-            | ReconcileReply.SnapshotOk evidence ->
-                protocolMismatch "BindingPresent|BindingAbsent" (ReconcileReply.SnapshotOk evidence)
-            | ReconcileReply.SnapshotError reason ->
-                protocolMismatch "BindingPresent|BindingAbsent" (ReconcileReply.SnapshotError reason)
-            | ReconcileReply.DelayDone -> protocolMismatch "BindingPresent|BindingAbsent" ReconcileReply.DelayDone
-            | ReconcileReply.PublishMapsStored ->
-                protocolMismatch "BindingPresent|BindingAbsent" ReconcileReply.PublishMapsStored
-            | ReconcileReply.PublishDone -> protocolMismatch "BindingPresent|BindingAbsent" ReconcileReply.PublishDone
-            | ReconcileReply.ObserveDone -> protocolMismatch "BindingPresent|BindingAbsent" ReconcileReply.ObserveDone
-            | ReconcileReply.UnitOk -> protocolMismatch "BindingPresent|BindingAbsent" ReconcileReply.UnitOk
-        )
-
-    let materializePass (session: string) (backoffDelaysMs: int array) (maxBudgetMs: int) : ReconcileProgram =
-        materializePassWithMaps session backoffDelaysMs maxBudgetMs (publishMapsEmpty ())
-
-    // ── Trace interpreter ────────────────────────────────────────────────────
-
-    module TraceInterpreter =
-
-        let commandName (command: ReconcileCommand) : string =
-            match command with
-            | ReconcileCommand.ReadActiveBinding _ -> "ReadActiveBinding"
-            | ReconcileCommand.ReadSnapshot _ -> "ReadSnapshot"
-            | ReconcileCommand.Delay _ -> "Delay"
-            | ReconcileCommand.StorePublishMaps _ -> "StorePublishMaps"
-            | ReconcileCommand.PublishTurn _ -> "PublishTurn"
-            | ReconcileCommand.ObserveSnapshot _ -> "ObserveSnapshot"
-            | ReconcileCommand.ProtocolMismatch _ -> "ProtocolMismatch"
-
-        let stepName (program: ReconcileProgram) : string =
-            match program with
-            | Return _ -> "Return"
-            | Step(command, _) -> commandName command
-
-        let defaultReply (program: ReconcileProgram) : ReconcileReply =
-            match program with
-            | Step(ReconcileCommand.ReadActiveBinding _, _) -> ReconcileReply.BindingAbsent
-            | Step(ReconcileCommand.ReadSnapshot _, _) -> ReconcileReply.SnapshotOk ReconcileEvidence.NoTurn
-            | Step(ReconcileCommand.Delay _, _) -> ReconcileReply.DelayDone
-            | Step(ReconcileCommand.StorePublishMaps _, _) -> ReconcileReply.PublishMapsStored
-            | Step(ReconcileCommand.PublishTurn _, _) -> ReconcileReply.PublishDone
-            | Step(ReconcileCommand.ObserveSnapshot _, _) -> ReconcileReply.ObserveDone
-            | Step(ReconcileCommand.ProtocolMismatch _, _) -> ReconcileReply.UnitOk
-            | Return _ -> ReconcileReply.UnitOk
-
-        let rec interpretWith (replyOf: ReconcileProgram -> ReconcileReply) (program: ReconcileProgram) : string list =
-            match program with
-            | Return _ -> []
-            | Step(command, next) as step -> commandName command :: interpretWith replyOf (next (replyOf step))
-
-        let interpret (program: ReconcileProgram) : string list = interpretWith defaultReply program
-
-    let stepName (program: ReconcileProgram) = TraceInterpreter.stepName program
-
-    let interpretWith (replyOf: ReconcileProgram -> ReconcileReply) (program: ReconcileProgram) : string list =
-        TraceInterpreter.interpretWith replyOf program
-
-    let interpret (program: ReconcileProgram) : string list = TraceInterpreter.interpret program
-
-/// Program builders (facade looks for ReconcilePrograms_materializePass).
-module ReconcilePrograms =
-
-    let materializePass (session: string) (backoffDelaysMs: int array) (maxBudgetMs: int) =
-        ReconcileProgram.materializePass session backoffDelaysMs maxBudgetMs

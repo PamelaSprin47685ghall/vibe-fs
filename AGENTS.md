@@ -178,8 +178,8 @@ Trace Interpreter」并要求业务程序只能构造 Program、副作用只由 
 | PR 0 | SUPERSEDED 声明 + `spec/14` 改写为直接 CE | **done** | `TASK.md` 头、`spec/14` FLOW-001…008；commit `03223a1b` |
 | PR 1 | 门禁改向：允许 `task{}`、禁止 Command/Reply/Step 与业务 Interpreter | **done** | `scripts/checks/dsl-ownership.mjs` + `direct-ce-contract.test.mjs`；commit `bcf66e3a` |
 | PR 2 | 删除 `Kernel/Program.fs` + `Kernel/TraceInterpreter.fs` 及 facade/测试 | **done** | commit `ee6e7732`；threshold 曾冻结 174 |
-| PR 3 | Orchestrator 垂直切片：直接 CE，删 AST/Interpreter | **done** | 恢复 `Application/Orchestration/Program.fs` + `Prompts.fs`；删 Domain AST/`OrchestratorInterpreter`；Runtime 调 `OrchestratorProgram.run`；threshold 169 |
-| PR 4 | Reconcile 垂直切片：保留纯决策，删 Command/Reply/Program AST | **todo** | `ReconcileEvidence/Decision` 可保留；AST + `ProtocolMismatch` + `TraceInterpreter` 仍在（`6fe3a9b3`） |
+| PR 3 | Orchestrator 垂直切片：直接 CE，删 AST/Interpreter | **done** | commit `1bdc2f21`；threshold 曾冻结 169 |
+| PR 4 | Reconcile 垂直切片：保留纯决策，删 Command/Reply/Program AST | **done** | Domain 只留 Evidence/Decision；`Reconciler.fs` 直接 CE；删 Interpreter AST；threshold 159 |
 | PR 5 | Join / SessionRecovery / ChildRecovery 小型 AST 清理 | **todo** | `*Interpreter.fs` 与 `JoinProgram` 仍在 |
 | PR 6 | 文档/命名收尾：去掉 Program-is-data / unique interpreter 表述 | **todo** | AGENTS 后半仍残留旧 Wave/M* 叙述，待与代码同步清理 |
 
