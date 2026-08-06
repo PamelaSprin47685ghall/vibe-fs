@@ -75,6 +75,74 @@ PR 8 AgentFact            → 已落地（family 拆分）
 PR 9 dsl-ownership        → 已落地（9 门 + 1 报告）
 ```
 
+## 三种可直接照抄的 CE 模板
+
+### 模板 A：线性流程
+
+```fsharp
+let run ports input =
+    task {
+        let evidence = buildEvidence input
+
+        match decide evidence with
+        | Reject reason ->
+            return Rejected reason
+
+        | Proceed command ->
+            let! result = ports.Execute command
+            return Completed result
+    }
+```
+
+适用：一次发送、一次读取、一次提交、一次资源操作。
+
+### 模板 B：失败即结束的多步流程
+
+```fsharp
+let run ports input =
+    task {
+        match! ports.First input with
+        | Error error -> return Failed error
+        | Ok first ->
+            match! ports.Second first with
+            | Error error -> return Failed error
+            | Ok second ->
+                match! ports.Third second with
+                | Error error -> return Failed error
+                | Ok final -> return Completed final
+    }
+```
+
+每一个失败出口和副作用顺序都清楚。不要为了减少缩进马上发明新 builder。
+
+### 模板 C：重试或继续循环
+
+```fsharp
+let rec runRound ports round input =
+    task {
+        match! ports.TryOnce round input with
+        | Completed result -> return result
+        | Retry nextInput -> return! runRound ports (round + 1) nextInput
+        | Failed error -> return raiseFailure error
+    }
+```
+
+递归参数必须是实际下一轮输入、有界预算、round identity、剩余集合——不能是 `currentStage` / `nextAction` / `isRunning`。可能无限等待的 runtime 生命周期，等待必须发生在 `let! awaitSignal` 上，而不是高速递归或 sleep 轮询。
+
+## 自定义 builder 的评审条件
+
+本轮迁移不应先做自定义 builder。只有同时满足以下条件才进入评审：
+
+1. 至少三个独立 workflow 出现完全相同的 `Task<Result<_,_>>` plumbing；
+2. builder 不构造 AST；
+3. builder 不储存 continuation；
+4. builder 不隐藏副作用顺序；
+5. builder 展开后仍等价于普通 `let!`、`match`、`return!`；
+6. stack trace 和调试体验不显著恶化；
+7. 不允许出现 `Step`、`Suspend`、`Command`、`Reply`、`Interpreter`。
+
+即使最终定义 `resultTask { let! x = ...; return y }`，它也只能负责短路 `Result`——不能决定业务的下一阶段。
+
 ## 迁移验收表（提交前逐项回答）
 
 ### 业务所有权
