@@ -20,14 +20,15 @@
     "mutable": 1
   },
   "Application/Reconciliation/ReconcileInterpreter.fs": {
-    "business-interpreter": 1
+    "business-interpreter": 1,
+    "second-runtime-protocol": 1
   },
   "Application/Reconciliation/ReviewerGuardState.fs": {
     "behaviour-bool": 1
   },
   "Application/Reconciliation/SessionRecoveryInterpreter.fs": {
-    "behaviour-bool": 1,
-    "business-interpreter": 1
+    "business-interpreter": 1,
+    "behaviour-bool": 1
   },
   "Application/Reconciliation/TurnCompletionProgram.fs": {
     "infrastructure-leak": 1,
@@ -43,6 +44,12 @@
   "Domain/BloggerDelta.fs": {
     "mutable": 5
   },
+  "Domain/ChildRecovery.fs": {
+    "second-runtime-protocol": 1
+  },
+  "Domain/JoinProgram.fs": {
+    "second-runtime-protocol": 1
+  },
   "Domain/LoopDetector.fs": {
     "mutable": 4
   },
@@ -54,7 +61,7 @@
     "behaviour-bool": 1
   },
   "Domain/ReconcileProgram.fs": {
-    "second-runtime-protocol": 3,
+    "second-runtime-protocol": 7,
     "business-interpreter": 1
   },
   "Domain/RecoverySlot.fs": {
@@ -62,6 +69,9 @@
   },
   "Domain/ReviewWitness.fs": {
     "behaviour-bool": 7
+  },
+  "Domain/SessionRecovery.fs": {
+    "second-runtime-protocol": 1
   },
   "Domain/SyntheticToml.fs": {
     "mutable": 2
@@ -75,12 +85,6 @@
   "Kernel/Flow.fs": {
     "mutable": 11,
     "behaviour-bool": 1
-  },
-  "Kernel/Program.fs": {
-    "second-runtime-protocol": 1
-  },
-  "Kernel/TraceInterpreter.fs": {
-    "business-interpreter": 1
   },
   "Session/AgentRoleIdentity.fs": {
     "infrastructure-leak": 1

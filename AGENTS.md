@@ -161,13 +161,29 @@ DSL 是**直接执行的 F# computation expression** + 领域命名的强类型�
 不是待解释的业务 AST。早期 spec/14 曾把 DSL 误写成「封闭指令 AST + 唯一 Interpreter +
 Trace Interpreter」并要求业务程序只能构造 Program、副作用只由 Interpreter 执行；该方向
 与 spec/01 的 ARCH-001（直接用 computation expression 写流程）相悖，已 SUPERSEDED
-（见 `TASK.md` 头部声明与 spec/14 的历史纠偏）。应删除通用 `Kernel/Program.fs`、
-`Kernel/TraceInterpreter.fs` 与 `Command/Reply/Step` 内部协议，禁止再造第二套运行时——
-`AgentProgram`、`CompanionProgram` 那类「functions, not a Flow AST」、直接以 `task`/`let!`/
-异常映射执行的写法正是参考实现。旧设计里值得保留的价值（纯决策、有界递归、命名组合子、
+（见 `TASK.md` 头部声明与 spec/14 的历史纠偏）。通用 `Kernel/Program.fs` /
+`Kernel/TraceInterpreter.fs` 已删除；下一步删除业务侧 `Command/Reply/Step` 内部协议，
+禁止再造第二套运行时——`AgentProgram`、`CompanionProgram` 那类「functions, not a Flow AST」、
+直接以 `task`/`let!`/异常映射执行的写法正是参考实现。旧设计里值得保留的价值（纯决策、有界递归、命名组合子、
 可检查轨迹、规则 DSL、从 Journal 恢复）由 direct CE / fake ports 承载而非 AST。`spec/16`
 （PROJ-，Projection Algebra）承接 `spec/08` 的 `COMPANION-007` 与 `spec/10` 的 `VERIFY-007`，
 作为投影的正式规范。
+
+### DSL 纠偏进度（TASK PR0–PR6）
+
+以 git tip `bcf66e3a` 与生产源码实测为准。完成 = 旧路径已删 + 新路径可跑 + 测试/门禁锁住。
+
+| PR | 内容 | 状态 | 证据 |
+|----|------|------|------|
+| PR 0 | SUPERSEDED 声明 + `spec/14` 改写为直接 CE | **done** | `TASK.md` 头、`spec/14` FLOW-001…008；commit `03223a1b` |
+| PR 1 | 门禁改向：允许 `task{}`、禁止 Command/Reply/Step 与业务 Interpreter | **done** | `scripts/checks/dsl-ownership.mjs` + `direct-ce-contract.test.mjs`；commit `bcf66e3a` |
+| PR 2 | 删除 `Kernel/Program.fs` + `Kernel/TraceInterpreter.fs` 及 facade/测试 | **done** | 已删源文件/fsproj；facade 早在 `bcf66e3a` 移除；ratchet baseline 重生（去掉内核两项，并按现行扫描补回 Join/SessionRecovery/ChildRecovery 既有债务） |
+| PR 3 | Orchestrator 垂直切片：Ops + 直接 CE，删 AST/Interpreter | **todo** | 仍是 `OrchestratorCommand/Reply/Step` + `OrchestratorInterpreter`（`37ddce30` 走了错误 M2 方向） |
+| PR 4 | Reconcile 垂直切片：保留纯决策，删 Command/Reply/Program AST | **todo** | `ReconcileEvidence/Decision` 可保留；AST + `ProtocolMismatch` + `TraceInterpreter` 仍在（`6fe3a9b3`） |
+| PR 5 | Join / SessionRecovery / ChildRecovery 小型 AST 清理 | **todo** | `*Interpreter.fs` 与 `JoinProgram` 仍在 |
+| PR 6 | 文档/命名收尾：去掉 Program-is-data / unique interpreter 表述 | **todo** | AGENTS 后半仍残留旧 Wave/M* 叙述，待与代码同步清理 |
+
+历史误入（已 SUPERSEDED，勿继续）：`M1` 通用 Program Kernel（`07f659d4`）、`M2` Orchestrator via Interpreter（`37ddce30`）、`M3` Reconcile Program AST（`6fe3a9b3`）。它们与现行 `TASK.md`/`spec/14` 相悖；纠偏是删除第二运行时，不是完善 Interpreter。
 
 ### 已退役的 0.5.2 机制（勿重新引入）
 
