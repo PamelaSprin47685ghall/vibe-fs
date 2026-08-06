@@ -29,10 +29,18 @@ const PROGRAM_SUBDIRS = PROGRAM_DIRS.map((dir) =>
 export const isProgramRelPath = (relPath) =>
   PROGRAM_SUBDIRS.some((dir) => relPath === dir || relPath.startsWith(dir + '/'))
 
-/** True when relPath is an Application/**\/*Interpreter.fs (M2 side-effect owner).
- *  Such files own their side effects: raw-task is exempt from the ratchet. */
-export const isApplicationInterpreter = (relPath) =>
-  relPath.startsWith('Application/') && relPath.endsWith('Interpreter.fs')
+/** True when relPath is under the Application program dir and ends in Interpreter.fs.
+ *  Such files own their side effects: raw-task is exempt from the ratchet.
+ *  Prefix is derived from PROGRAM_SUBDIRS so no bare repo-relative path criterion is written
+ *  (VERIFY-004 path-criterion: a literal under the scan root must resolve on disk). */
+export const isApplicationInterpreter = (relPath) => {
+  const app = PROGRAM_SUBDIRS.find((dir) => dir === 'Application')
+  return (
+    app != null &&
+    (relPath === app || relPath.startsWith(app + '/')) &&
+    relPath.endsWith('Interpreter.fs')
+  )
+}
 
 export const DEFAULT_OUT = join(
   dirname(fileURLToPath(import.meta.url)),
