@@ -16,7 +16,9 @@ type BloggerToolRecovery =
 ///
 /// InFlight = provider still working on an uncommitted request (the only busy definition).
 /// Parked = last cycle committed; waiting for future material (not busy).
-/// Sealed = fork-child main handle is joinable/retired AND not reactivated by a new root.
+/// There is deliberately NO Sealed case: handle seal is a durable journal fact
+/// (AgentProjection.mainSealedForBlogger), read on every decision — a sealed cell
+/// mirror would only ever duplicate it and drift stale on reactivation.
 /// The next-Main-material slot lives in the host dictionary (ENFORCER-050), not on
 /// the cell — the cell never carries a PendingOffer mirror.
 [<RequireQualifiedAccess>]
@@ -24,7 +26,6 @@ type BloggerRuntimeState =
     | Idle
     | InFlight of BloggerRequestContext
     | Parked
-    | Sealed
     | Disposed
 
 /// After durable handle seal, whether a new Authority Root reopened a drain window.
@@ -52,7 +53,6 @@ module BloggerRuntime =
         | NotInFlight
         | NotParked
         | Disposed
-        | Sealed
         | NoContext
 
     type Decision =
@@ -74,7 +74,7 @@ module BloggerRuntime =
 
     /// Main-session material arrived. InFlight never queues (XTrace keeps backlog).
     /// Parked: Decision.Offer only — physical PendingOffer is the host dictionary.
-    /// Sealed ignores all material until onReactivate.
+    /// Handle seal is the durable journal check at every entry, not a cell case.
     let onMaterial
         (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
@@ -90,7 +90,6 @@ module BloggerRuntime =
         | BloggerRuntimeState.Parked ->
             // The host dictionary stages the offer (ENFORCER-050 physical slot).
             Ok(cell, Decision.Offer ctx)
-        | BloggerRuntimeState.Sealed -> Ok(cell, Decision.Ignore)
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
 
     /// Physical send is about to leave: freeze CurrentRequest (InFlight payload).
@@ -100,7 +99,6 @@ module BloggerRuntime =
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->
@@ -115,7 +113,6 @@ module BloggerRuntime =
                 { cell with
                     State = BloggerRuntimeState.Parked }
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NotInFlight
 
     let onSquashCommitted
@@ -124,7 +121,6 @@ module BloggerRuntime =
         : Result<BloggerRuntimeCell * Decision, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | BloggerRuntimeState.InFlight _ ->
             match pendingMain with
             | Some ctx ->
@@ -145,7 +141,6 @@ module BloggerRuntime =
     let onFail (cell: BloggerRuntimeCell) : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Ok cell
         | BloggerRuntimeState.InFlight _ ->
             Ok
                 { cell with
@@ -153,35 +148,22 @@ module BloggerRuntime =
         | _ -> Error TransitionError.NotInFlight
 
     /// Fork-child handle became joinable/retired: stop new Y requests.
-    let onSeal (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
-        match cell.State with
-        | BloggerRuntimeState.Disposed -> cell
-        | BloggerRuntimeState.InFlight _ ->
-            // Let the in-flight cycle finish; seal after commit via coordinator re-check.
-            // Mark not reactivated so post-commit paths see the durable seal.
-            { cell with Drain = DrainWindow.Closed }
-        | _ ->
-            { State = BloggerRuntimeState.Sealed
-              Drain = DrainWindow.Closed }
-
-    /// Force sealed (no in-flight preserve). Used when dropping offers after join.
-    let forceSeal (_cell: BloggerRuntimeCell) : BloggerRuntimeCell =
-        { State = BloggerRuntimeState.Sealed
-          Drain = DrainWindow.Closed }
+    /// Seal is a durable journal fact; forceSeal only closes the in-memory drain
+    /// window so the next durable check re-blocks. No Sealed mirror is written —
+    /// a cell state could only ever duplicate (and drift from) the journal.
+    let forceSeal (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
+        { cell with Drain = DrainWindow.Closed }
 
     /// New Authority Root on this main: Blogger may run again after a handle seal.
     ///
-    /// Parked/Idle/InFlight keep their state — only the seal flag flips. Demoting
-    /// Parked→Idle made the next material Decision.Start (new prompt_async) while
-    /// the Host step loop was still parked on the prior request, so the new send
-    /// never reached the provider and the parked waiter never received an Offer.
-    /// Sealed alone must reopen to Idle so material can Start after join/return.
+    /// Reactivation is a durable journal fact (the new root), so the cell has no
+    /// seal flag to flip — only the drain window reopens. Parked/Idle/InFlight
+    /// keep their state: demoting Parked→Idle made the next material
+    /// Decision.Start while the Host step loop was still parked on the prior
+    /// request, so the new send never reached the provider.
     let onReactivate (cell: BloggerRuntimeCell) : BloggerRuntimeCell =
         match cell.State with
         | BloggerRuntimeState.Disposed -> cell
-        | BloggerRuntimeState.Sealed ->
-            { State = BloggerRuntimeState.Idle
-              Drain = DrainWindow.Open }
         | BloggerRuntimeState.InFlight _
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked -> { cell with Drain = DrainWindow.Open }
@@ -195,21 +177,17 @@ module BloggerRuntime =
         | BloggerRuntimeState.InFlight ctx -> Some ctx
         | _ -> None
 
-    let isSealed (cell: BloggerRuntimeCell) : bool =
-        match cell.State with
-        | BloggerRuntimeState.Sealed -> true
-        | _ -> false
-
     let isDrainOpen (cell: BloggerRuntimeCell) : bool =
         match cell.Drain with
         | DrainWindow.Open -> true
         | DrainWindow.Closed -> false
 
-    /// Durable handle seal blocks new work unless DrainWindow.Open.
+    /// Durable handle seal blocks new work unless the drain window is open.
+    /// `durableHandleSealed` is the journal truth (AgentProjection.mainSealedForBlogger);
+    /// the cell carries no sealed mirror, so it can never drift stale.
     let blocksNewRequest (durableHandleSealed: bool) (cell: BloggerRuntimeCell) : bool =
         match cell.State with
-        | BloggerRuntimeState.Disposed
-        | BloggerRuntimeState.Sealed -> true
+        | BloggerRuntimeState.Disposed -> true
         | BloggerRuntimeState.InFlight _ -> false
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked -> durableHandleSealed && not (isDrainOpen cell)
@@ -218,7 +196,6 @@ module BloggerRuntime =
         match cell.State with
         | BloggerRuntimeState.InFlight ctx -> Ok ctx
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NoContext
 
     let tryTakeInFlight
@@ -232,7 +209,6 @@ module BloggerRuntime =
                     State = BloggerRuntimeState.Parked }
             )
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | _ -> Error TransitionError.NoContext
 
     let adoptPendingAsCurrent
@@ -241,7 +217,6 @@ module BloggerRuntime =
         : Result<BloggerRuntimeCell, TransitionError> =
         match cell.State with
         | BloggerRuntimeState.Disposed -> Error TransitionError.Disposed
-        | BloggerRuntimeState.Sealed -> Error TransitionError.Sealed
         | BloggerRuntimeState.InFlight _ -> Error TransitionError.AlreadyInFlight
         | BloggerRuntimeState.Idle
         | BloggerRuntimeState.Parked ->

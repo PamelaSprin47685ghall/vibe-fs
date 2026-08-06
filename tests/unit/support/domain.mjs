@@ -4436,12 +4436,10 @@ export const bloggerRuntime = (() => {
     'onCycleCommitted',
     'onSquashCommitted',
     'onFail',
-    'onSeal',
     'forceSeal',
     'onReactivate',
     'onDispose',
     'inFlightContext',
-    'isSealed',
     'blocksNewRequest',
     'tryPeekInFlight',
     'tryTakeInFlight',
@@ -4459,7 +4457,6 @@ export const bloggerRuntime = (() => {
   return {
     idle: m.ofState(stateCase('Idle', [])),
     parked: m.ofState(stateCase('Parked', [])),
-    sealed: m.ofState(stateCase('Sealed', [])),
     disposed: m.ofState(stateCase('Disposed', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
@@ -4504,12 +4501,10 @@ export const bloggerRuntime = (() => {
         reactivated: caseOf(r.value.Drain) === 'Open',
       }
     },
-    onSeal: (cell) => m.onSeal(cell),
     forceSeal: (cell) => m.forceSeal(cell),
     onReactivate: (cell) => m.onReactivate(cell),
     onDispose: (cell) => m.onDispose(cell),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
-    isSealed: (cell) => m.isSealed(cell),
     blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),
     tryTakeInFlight: (cell) => {
       const r = resultOf(m.tryTakeInFlight(cell))

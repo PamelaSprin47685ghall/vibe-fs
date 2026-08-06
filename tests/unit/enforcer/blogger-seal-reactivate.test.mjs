@@ -56,21 +56,20 @@ test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
   assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, abandoned.value)), true)
 })
 
-test('BLOGGER_RUNTIME_Sealed_ignores_material_until_reactivate', () => {
-  const sealed = bloggerRuntime.forceSeal(bloggerRuntime.idle)
-  assert.equal(bloggerRuntime.stateOf(sealed), 'Sealed')
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true)
-  assert.equal(bloggerRuntime.blocksNewRequest(false, sealed), true)
+test('BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
+  // DSL-003: handle seal is a durable journal fact read at every entry
+  // (blocksNew in the Coordinator), so the cell has no Sealed case. forceSeal
+  // only closes the in-memory drain window; a cell mirror could only duplicate
+  // — and drift from — the journal.
+  const idle = bloggerRuntime.forceSeal(bloggerRuntime.idle)
+  assert.equal(bloggerRuntime.stateOf(idle), 'Idle', 'forceSeal leaves the state alone')
+  assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true, 'durable seal blocks')
+  assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false, 'no mirror: unsealed durable unblocks')
 
-  const ignored = bloggerRuntime.onMaterial(sealed, ctx())
-  assert.equal(ignored.ok, true)
-  assert.equal(ignored.decision, 'Ignore')
-  assert.equal(bloggerRuntime.stateOf(ignored.state), 'Sealed')
-
-  const live = bloggerRuntime.onReactivate(sealed)
+  const live = bloggerRuntime.onReactivate(idle)
   assert.equal(bloggerRuntime.stateOf(live), 'Idle')
   assert.equal(bloggerRuntime.reactivatedOf(live), true)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, live), false)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, live), false, 'drain window lets the cycle through')
 
   const started = bloggerRuntime.onMaterial(live, ctx())
   assert.equal(started.ok, true)
@@ -105,15 +104,6 @@ test('BLOGGER_RUNTIME_Parked_survives_onReactivate_so_offer_not_start', () => {
   assert.equal(bloggerRuntime.stateOf(offered.state), 'Parked')
 })
 
-test('BLOGGER_RUNTIME_InFlight_survives_onSeal_flag_clear_only', () => {
-  const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx())
-  assert.equal(started.decision, 'Start')
-  const sealedSoft = bloggerRuntime.onSeal(started.state)
-  assert.equal(bloggerRuntime.stateOf(sealedSoft), 'InFlight')
-  assert.equal(bloggerRuntime.reactivatedOf(sealedSoft), false)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealedSoft), false)
-})
-
 test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
   // Durable handle sealed + DrainWindow.Open lets one drain window through;
   // once caught up, host forceSeal must permanently re-block.
@@ -130,7 +120,7 @@ test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(true, committed.state), false)
 
   const sealed = bloggerRuntime.forceSeal(committed.state)
-  assert.equal(bloggerRuntime.stateOf(sealed), 'Sealed')
+  assert.equal(bloggerRuntime.stateOf(sealed), 'Parked', 'forceSeal only closes the drain window')
   assert.equal(bloggerRuntime.reactivatedOf(sealed), false)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true, 'durable seal re-blocks after catch-up')
 })

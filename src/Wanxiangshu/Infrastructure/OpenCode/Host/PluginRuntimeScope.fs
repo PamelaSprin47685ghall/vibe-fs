@@ -195,16 +195,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
                 pendingOffer.Remove sessionId |> ignore
                 // Park cancel/timeout leaves the logical Blogger idle, not disposed.
-                // Sealed/Disposed stick; otherwise clear to empty Idle.
+                // Disposed sticks; seal is durable so a cancel always clears to Idle.
                 match bloggerRuntime.TryGetValue sessionId with
                 | true, cell ->
                     match cell.State with
-                    | BloggerRuntimeState.Disposed
-                    | BloggerRuntimeState.Sealed ->
-                        bloggerRuntime.[sessionId] <-
-                            { cell with
-                                State = BloggerRuntimeState.Sealed }
+                    | BloggerRuntimeState.Disposed -> ()
                     | _ ->
+                        // Seal is durable: park cancel always clears to Idle; the
+                        // next entry's durable check re-blocks when still sealed.
                         bloggerRuntime.[sessionId] <-
                             { BloggerRuntime.empty with
                                 Drain = cell.Drain }
@@ -219,8 +217,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 let cell = this.GetBloggerRuntimeUnlocked sessionId
 
                 match cell.State with
-                | BloggerRuntimeState.Disposed
-                | BloggerRuntimeState.Sealed -> ()
+                | BloggerRuntimeState.Disposed -> ()
                 | BloggerRuntimeState.InFlight _ ->
                     bloggerRuntime.[sessionId] <-
                         { cell with
