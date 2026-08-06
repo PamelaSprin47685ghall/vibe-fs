@@ -8,9 +8,12 @@ import {
   FORBIDDEN,
   GATE_NAMES,
   HOST_BOUNDARY_OPEN_BASENAMES,
+  DSL_CLASSES,
+  LARGE_DU_THRESHOLD,
   evaluateThreshold,
   isHostBoundaryOpenPath,
   scanFiles,
+  scanLargeDus,
   scanText,
 } from '../../../scripts/checks/dsl-ownership.mjs'
 
@@ -89,6 +92,38 @@ const CLEAN = [
   '    return result',
   '}',
 ].join('\n')
+
+test('DSL_OWNERSHIP_large_du_without_class_annotation_is_reported', () => {
+  const src = ['module Sample', 'type Big =', '    | C01', '    | C02', '    | C03', '    | C04', '    | C05', '    | C06', '    | C07', '    | C08', '    | C09', '    | C10'].join('\n')
+  const reported = scanLargeDus(src, 'Agent/Large.fs')
+  assert.equal(reported.length, 1)
+  assert.equal(reported[0].name, 'Big')
+  assert.equal(reported[0].cases, 10)
+})
+
+test('DSL_OWNERSHIP_large_du_with_class_annotation_is_clean', () => {
+  const src = [
+    'module Sample',
+    '/// DSL-class: Vocabulary — fixed catalog.',
+    'type Big =',
+    '    | C01',
+    '    | C02',
+    '    | C03',
+    '    | C04',
+    '    | C05',
+    '    | C06',
+    '    | C07',
+    '    | C08',
+    '    | C09',
+    '    | C10',
+  ].join('\n')
+  assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
+})
+
+test('DSL_OWNERSHIP_small_du_is_never_reported', () => {
+  const src = ['module Sample', 'type Small =', '    | A', '    | B'].join('\n')
+  assert.deepEqual(scanLargeDus(src, 'Agent/Small.fs'), [])
+})
 
 test('DSL_OWNERSHIP_exports_nine_named_gates', () => {
   assert.deepEqual(GATE_NAMES, [

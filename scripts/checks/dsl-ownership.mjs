@@ -200,6 +200,56 @@ export const scanText = (text, file = '<synthetic>') => {
   return violations
 }
 
+/** PR 9 item 5: large-DU classification report.
+ *
+ * A DU with >= 10 cases must carry a `/// DSL-class:` doc annotation naming
+ * its vocabulary category (Vocabulary / DurableFact / Evidence / Decision /
+ * ExternalSignal / ControlState). ControlState classes must additionally
+ * explain why ordinary CE / call stack / scoped wait cannot express them.
+ *
+ * Report-only: the CLI prints unclassified large DUs but does not fail the
+ * gate (PR 9 item 5: "不直接失败，但要求分类"). Tests assert the report
+ * function itself.
+ */
+export const LARGE_DU_THRESHOLD = 10
+export const DSL_CLASSES = ['Vocabulary', 'DurableFact', 'Evidence', 'Decision', 'ExternalSignal', 'ControlState']
+
+/** Returns [{ file, line, name, cases }] for large DUs lacking a DSL-class annotation. */
+export const scanLargeDus = (text, file) => {
+  const lines = text.split('\n')
+  const duRe = /^\s*(?:type|and)\s+(\w+)\s*=\s*/
+  const caseRe = /^\s*\| ([A-Z]\w+)/
+  const missing = []
+  let cur = null
+  for (let i = 0; i < lines.length; i++) {
+    const code = lines[i].replace(/\/\/.*/g, '')
+    const dm = duRe.exec(code)
+    if (dm) {
+      const docAbove = []
+      for (let j = i - 1; j >= 0 && /^\s*\/\/\//.test(lines[j]); j--) docAbove.unshift(lines[j])
+      const classified = docAbove.some((l) => DSL_CLASSES.some((c) => l.includes(`DSL-class: ${c}`)))
+      cur = { name: dm[1], cases: [], line: i + 1, classified }
+      for (const c of code.matchAll(/\| ([A-Z]\w+)/g)) cur.cases.push(c[1])
+      continue
+    }
+    if (cur) {
+      const cm = caseRe.exec(code)
+      if (cm) {
+        cur.cases.push(cm[1])
+      } else if (code.trim() && !/^\s*[{}]/.test(code) && !code.includes('of ')) {
+        if (cur.cases.length >= LARGE_DU_THRESHOLD && !cur.classified) {
+          missing.push({ file, line: cur.line, name: cur.name, cases: cur.cases.length })
+        }
+        cur = null
+      }
+    }
+  }
+  if (cur && cur.cases.length >= LARGE_DU_THRESHOLD && !cur.classified) {
+    missing.push({ file, line: cur.line, name: cur.name, cases: cur.cases.length })
+  }
+  return missing
+}
+
 /** Scan {file, text} entries. */
 export const scanFiles = (entries) => {
   const violations = []
@@ -306,6 +356,21 @@ const runCli = () => {
   const violations = scanFiles(entries)
   const byGate = groupByGate(violations)
   const write = threshold >= 0 ? console.log : console.error
+
+  // PR 9 item 5: large-DU classification report (warning only, never fails).
+  const unclassifiedLarge = []
+  for (const entry of entries) {
+    unclassifiedLarge.push(...scanLargeDus(entry.text, entry.file))
+  }
+  if (unclassifiedLarge.length > 0) {
+    write(
+      `dsl-ownership: ${unclassifiedLarge.length} large DU(s) without DSL-class annotation (PR 9 item 5 report)\n`,
+    )
+    for (const d of unclassifiedLarge) {
+      write(`  ${d.file}:${d.line}  ${d.name} (${d.cases} cases) — add /// DSL-class: <Vocabulary|DurableFact|Evidence|Decision|ExternalSignal|ControlState>`)
+    }
+    write('')
+  }
 
   if (violations.length === 0) {
     write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files`)
