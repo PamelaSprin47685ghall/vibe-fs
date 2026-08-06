@@ -76,7 +76,7 @@
     "mutable": 2
   },
   "Domain/TddPhase.fs": {
-    "behaviour-bool": 5
+    "behaviour-bool": 2
   },
   "Domain/ToolResultBound.fs": {
     "mutable": 4

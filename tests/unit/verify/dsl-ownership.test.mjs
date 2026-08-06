@@ -81,6 +81,12 @@ test('DSL_OWNERSHIP_clean_source_stays_green', () => {
   assert.deepEqual(hits, [])
 })
 
+test('DSL_OWNERSHIP_TddPhase_domain_type_is_not_behaviour_bool', () => {
+  const source = ['module Sample', 'let payload = { TddPhase: TddPhase option }'].join('\n')
+  const hits = scanText(source, 'Domain/Clean.fs')
+  assert.deepEqual(hits, [])
+})
+
 test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
   const hits = scanFiles([
     { file: 'a.fs', text: NEGATIVES[0].source },

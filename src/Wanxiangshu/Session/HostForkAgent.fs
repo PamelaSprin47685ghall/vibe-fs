@@ -105,14 +105,22 @@ module HostForkAgent =
         /// PROMPT-008: `agent` is the managed agent name the caller selected, and
         /// it is required. Defaulting it to `fast-ROLE` invented a tier, and the
         /// invented name then travelled to the Host send boundary as if chosen.
+        ///
+        /// `renderedPrompt` (PENDING 7): the caller already rendered the first-prompt
+        /// ARCH-010 payload and wants it sent verbatim instead of the Host's own relay
+        /// envelope. Used by `ForkTool` when a Coder TDD phase must reach the child as
+        /// the durable `[tdd]` table. `prompt` stays the original assignment so opening
+        /// capture and journal facts keep the task text, not the envelope.
         member this.Fork
-            (agentId: string, role: AgentRole, agent: string, prompt: string, payload: string option, ?firstPrompt: bool) : Task<
-                                                                                                                                Result<
-                                                                                                                                    ForkResult,
-                                                                                                                                    string
-                                                                                                                                 >
-                                                                                                                             >
-            =
+            (
+                agentId: string,
+                role: AgentRole,
+                agent: string,
+                prompt: string,
+                payload: string option,
+                ?firstPrompt: bool,
+                ?renderedPrompt: string
+            ) : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
             let isFirstPrompt = defaultArg firstPrompt true
 
@@ -133,25 +141,32 @@ module HostForkAgent =
                 // (measured: the post-restart review fork sent the raw opening
                 // prompt and every barrier-reviewer declaration failed to match).
                 // Continuations (busy nudge, challenge, manager resume) opt out.
+                //
+                // PENDING 7: `?renderedPrompt: string` (not `string option`) so the
+                // body sees `string option`. Caller supplies a pre-rendered ARCH-010
+                // document when present; otherwise Host builds the relay envelope.
                 let! enrichedResult =
                     if isFirstPrompt then
-                        task {
-                            let! requirementsResult =
-                                match role with
-                                | AgentRole.Reviewer ->
-                                    resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
-                                | _ -> Task.FromResult(Ok [])
+                        match renderedPrompt with
+                        | Some rendered -> Task.FromResult(Ok([], rendered))
+                        | None ->
+                            task {
+                                let! requirementsResult =
+                                    match role with
+                                    | AgentRole.Reviewer ->
+                                        resolveReviewerRequirements this.Journal this.SessionSnapshot this.ParentId
+                                    | _ -> Task.FromResult(Ok [])
 
-                            return
-                                requirementsResult
-                                |> Result.map (fun requirements ->
-                                    requirements,
-                                    ForkChildPayload.relay
-                                        prompt
-                                        (this.ParentWorkRecordOf this.ParentId)
-                                        requirements
-                                        payload)
-                        }
+                                return
+                                    requirementsResult
+                                    |> Result.map (fun requirements ->
+                                        requirements,
+                                        ForkChildPayload.relay
+                                            prompt
+                                            (this.ParentWorkRecordOf this.ParentId)
+                                            requirements
+                                            payload)
+                            }
                     else
                         Task.FromResult(Ok([], prompt))
 

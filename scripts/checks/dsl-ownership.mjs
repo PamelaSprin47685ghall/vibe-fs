@@ -40,8 +40,10 @@ export const FORBIDDEN = [
   },
   {
     gate: 'behaviour-bool',
+    // Exact `TddPhase` identifier is the closed DU Red|Green domain type (PENDING 7),
+    // not a program-counter field; every other *Phase/stage/bool name still fires.
     pattern:
-      /\b[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
+      /\b(?!TddPhase\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
   },
 ]

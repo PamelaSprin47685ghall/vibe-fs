@@ -926,13 +926,14 @@ export const forkChildPayload = (() => {
     parentWorkRecordInstruction: m.ParentWorkRecordInstruction,
     requirementsInstruction: m.RequirementsInstruction,
 
-    render: ({ assignment, parentWorkRecord, originalUserRequirements = [], payload }) =>
+    render: ({ assignment, parentWorkRecord, originalUserRequirements = [], payload, tdd }) =>
       m.render(
         new ForkChildPayloadModule.ForkChildAssignment(
           assignment,
           parentWorkRecord,
           toList(originalUserRequirements),
           payload,
+          tdd === undefined ? undefined : tddPhase.parse(tdd).value,
         ),
       ),
 

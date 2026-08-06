@@ -50,8 +50,8 @@
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Domain/LoopDetector.fs"/>
-    <Compile Include="Domain/ForkChildPayload.fs"/>
     <Compile Include="Domain/TddPhase.fs"/>
+    <Compile Include="Domain/ForkChildPayload.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/CompanionPrompt.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>

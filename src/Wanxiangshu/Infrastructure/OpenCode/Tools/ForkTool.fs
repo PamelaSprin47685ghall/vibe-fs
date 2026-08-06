@@ -23,14 +23,16 @@ module ForkTool =
     let private error (message: string) =
         ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString message ]
 
-    /// Optional tdd: absent → prompt unchanged; present → fail-closed parse then compose.
-    let private childPrompt (request: Request) : Result<string, string> =
+    /// Optional tdd: absent → prompt unchanged + no phase; present → fail-closed parse, then
+    /// compose the phase constraint into the assignment text (reused by Reuse/nudge paths) and
+    /// retain the typed phase for first-prompt `ForkChildPayload.render`.
+    let private childPrompt (request: Request) : Result<string * TddPhase option, string> =
         match request.Tdd with
-        | None -> Ok request.Prompt
+        | None -> Ok(request.Prompt, None)
         | Some raw ->
             match TddPhase.parseTddPhase raw with
             | Error parseError -> Error parseError
-            | Ok phase -> Ok(TddPhase.composeAssignment phase request.Prompt)
+            | Ok phase -> Ok(TddPhase.composeAssignment phase request.Prompt, Some phase)
 
     let private forkPayload (agentId: string) (managed: ManagedAgent) (extra: (string * ToolHostCodec.TomlValue) list) =
         let peer = ManagedAgent.peer managed
@@ -75,7 +77,7 @@ module ForkTool =
             else
                 match childPrompt request with
                 | Error tddError -> return error tddError
-                | Ok prompt ->
+                | Ok(assignment, tddPhase) ->
                     match scope.RuntimeFor context with
                     | Error runtimeError -> return error runtimeError
                     | Ok runtime ->
@@ -92,7 +94,8 @@ module ForkTool =
                         | _, None ->
                             match runtime.TryFindAgent request.Agent with
                             | Some record ->
-                                match! runtime.Reuse(request.Agent, prompt) with
+                                // Reuse / busy nudge: no first-prompt envelope — keep composed assignment text.
+                                match! runtime.Reuse(request.Agent, assignment) with
                                 | Error reuseError -> return error reuseError
                                 | Ok result ->
                                     match managedForRecord record with
@@ -118,9 +121,33 @@ module ForkTool =
                                     && List.contains managed.Name ManagedAgent.publicForkableNames
                                     ->
                                     let role = AgentRoleIdentity.ofManaged managed
+                                    // PENDING 7: the Manager fork owns the first-prompt payload for
+                                    // Coder children. When `tdd` is present, render the full ARCH-010
+                                    // document here so the durable `[tdd]` table reaches the child wire;
+                                    // `assignment` (the composed TDD text) stays the record's Assignment
+                                    // field. HostForkAgent keeps session creation, opening capture and the
+                                    // review barrier, and sends this rendered document verbatim via
+                                    // `renderedPrompt`. Without a phase the Host's own relay envelope is
+                                    // used, byte-identical to the pre-PENDING-7 shape.
+                                    let renderedPrompt =
+                                        tddPhase
+                                        |> Option.map (fun _ ->
+                                            ForkChildPayload.render
+                                                { Assignment = assignment
+                                                  ParentWorkRecord = scope.ParentWorkRecordFor context.SessionId
+                                                  OriginalUserRequirements = []
+                                                  Payload = None
+                                                  TddPhase = tddPhase })
 
                                     match!
-                                        runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, prompt, None)
+                                        runtime.Fork(
+                                            ToolHostCodec.newHandleId (),
+                                            role,
+                                            managed.Name,
+                                            assignment,
+                                            None,
+                                            ?renderedPrompt = renderedPrompt
+                                        )
                                     with
                                     | Ok result -> return forkPayload result.AgentId managed []
                                     | Error forkError -> return error forkError

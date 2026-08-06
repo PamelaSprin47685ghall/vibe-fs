@@ -5,6 +5,9 @@
 //   - the unconditional report-format instruction follows the assignment
 //   - `parent_work_record` and `[[original_user_requirement]]` are data, not prose
 //   - an optional `Payload` is carried as the `content` field at the front of the body
+//   - an optional Coder TDD phase (PENDING 7) is carried as the `[tdd]` table with
+//     `phase = "red" | "green"`; TOML places bare fields before tables, so `[tdd]`
+//     follows `content`/`parent_work_record` and precedes `[[original_user_requirement]]`
 //
 // Exact-byte assertions are derived from ForkChildPayload.fs and SyntheticToml.fs
 // using the same string rules, not by round-tripping through `syntheticToml` in the
@@ -34,7 +37,7 @@ const basicString = (value) => {
   return `"${value}"`
 }
 
-const expectedBytes = (assignment, { payload, parentWorkRecord, requirements = [] }) => {
+const expectedBytes = (assignment, { payload, parentWorkRecord, requirements = [], tdd } = {}) => {
   const instructions = [instructionComment(REPORT_INSTRUCTION)]
 
   if (assignment.trim() !== '') {
@@ -58,6 +61,12 @@ const expectedBytes = (assignment, { payload, parentWorkRecord, requirements = [
 
   if (parentWorkRecord !== undefined && parentWorkRecord.trim() !== '') {
     body.push(`parent_work_record = ${basicString(parentWorkRecord.trim())}`)
+  }
+
+  // PENDING 7: `[tdd]` is a table, so SyntheticToml.document sorts it after the bare
+  // fields above and before the `[[original_user_requirement]]` table array.
+  if (tdd !== undefined) {
+    body.push(`[tdd]\nphase = ${basicString(tdd)}`)
   }
 
   for (let i = 0; i < requirements.length; i += 1) {
@@ -225,4 +234,59 @@ test('FORK_CHILD_PAYLOAD_assignment_shaped_like_toml_stays_inside_instruction_co
   assert.equal(parsed.original_user_requirement.length, 1)
   assert.equal(parsed.original_user_requirement[0].ordinal, 1)
   assert.equal(parsed.original_user_requirement[0].text, `${injection}\n`)
+})
+
+// ── PENDING 7: Coder TDD phase as the durable `[tdd]` table ───────────────────
+
+test('FORK_CHILD_PAYLOAD_tdd_green_renders_phase_table', () => {
+  const document = fork.render({ assignment: ASSIGNMENT, tdd: 'green' })
+  const parsed = parseToml(document)
+
+  assert.equal(document, expectedBytes(ASSIGNMENT, { tdd: 'green' }))
+  assert.deepEqual(parsed.tdd, { phase: 'green' })
+  assert.ok(document.includes('[tdd]\nphase = "green"'))
+})
+
+test('FORK_CHILD_PAYLOAD_tdd_red_renders_phase_table', () => {
+  const document = fork.render({ assignment: ASSIGNMENT, tdd: 'red' })
+  const parsed = parseToml(document)
+
+  assert.equal(document, expectedBytes(ASSIGNMENT, { tdd: 'red' }))
+  assert.deepEqual(parsed.tdd, { phase: 'red' })
+  assert.ok(document.includes('[tdd]\nphase = "red"'))
+})
+
+test('FORK_CHILD_PAYLOAD_tdd_table_sorts_after_bare_fields_before_requirements', () => {
+  const document = fork.render({
+    assignment: ASSIGNMENT,
+    payload: 'hello',
+    parentWorkRecord: RECORD,
+    originalUserRequirements: REQUIREMENTS,
+    tdd: 'red',
+  })
+  const parsed = parseToml(document)
+
+  assert.equal(
+    document,
+    expectedBytes(ASSIGNMENT, {
+      payload: 'hello',
+      parentWorkRecord: RECORD,
+      requirements: REQUIREMENTS,
+      tdd: 'red',
+    }),
+  )
+  assert.deepEqual(parsed.tdd, { phase: 'red' })
+  assert.deepEqual(Object.keys(parsed), ['content', 'parent_work_record', 'tdd', 'original_user_requirement'])
+})
+
+test('FORK_CHILD_PAYLOAD_tdd_absent_omits_phase_table_and_keeps_prior_bytes', () => {
+  for (const tdd of [undefined]) {
+    const document = fork.render({ assignment: ASSIGNMENT, tdd })
+    const parsed = parseToml(document)
+
+    assert.equal(document, expectedBytes(ASSIGNMENT, {}))
+    assert.equal(parsed.tdd, undefined)
+    assert.ok(!document.includes('[tdd]'))
+    assert.ok(!document.includes('phase ='))
+  }
 })

@@ -16,6 +16,9 @@ type ForkChildAssignment =
         OriginalUserRequirements: string list
         /// ARCH-010: machine-readable data that the child may read but must not mistake for the task.
         Payload: string option
+        /// PENDING 7: Coder TDD phase when Manager `fork` / named coder supplied `tdd`.
+        /// Absent for non-Coder forks and for callers that never set a phase.
+        TddPhase: TddPhase option
     }
 
 /// The first prompt of a forked child, as one ARCH-010 payload.
@@ -77,9 +80,11 @@ module ForkChildPayload =
     /// model cannot mistake the task for a field value. `Payload` is runtime data and is rendered as a
     /// `content` field when present.
     ///
-    /// Field order is `content` first (if any), then `parent_work_record`, then the requirement
-    /// entries. `SyntheticToml.document` emits bare fields before table arrays regardless of the order
-    /// given here, which keeps `[[original_user_requirement]]` from swallowing a field written after it.
+    /// Body list order is optional `[tdd]` (PENDING 7), then `content`, then `parent_work_record`,
+    /// then requirement entries. `SyntheticToml.document` emits bare fields before tables regardless
+    /// of the order given here, which keeps `[[original_user_requirement]]` from swallowing a field
+    /// written after it; `[tdd]` is itself a table, so in the final document it follows the bare
+    /// `content`/`parent_work_record` fields and precedes the requirement table array.
     let render (input: ForkChildAssignment) : string =
         let requirements =
             input.OriginalUserRequirements
@@ -106,11 +111,21 @@ module ForkChildPayload =
                else
                    [ RequirementsInstruction ])
 
+        let tddSection =
+            match input.TddPhase with
+            | Some phase ->
+                [ String.concat
+                      "\n"
+                      [ "[tdd]"
+                        SyntheticToml.field "phase" (SyntheticToml.renderString (TddPhase.wireName phase)) ] ]
+            | None -> []
+
         let body =
-            (match input.Payload with
-             | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
-                 [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
-             | _ -> [])
+            tddSection
+            @ (match input.Payload with
+               | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
+                   [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
+               | _ -> [])
             @ (match parentRecord with
                | Some record -> [ SyntheticToml.field "parent_work_record" (SyntheticToml.renderString record) ]
                | None -> [])
@@ -134,4 +149,5 @@ module ForkChildPayload =
             { Assignment = assignment
               ParentWorkRecord = parentWorkRecord
               OriginalUserRequirements = requirements
-              Payload = payload }
+              Payload = payload
+              TddPhase = None }
