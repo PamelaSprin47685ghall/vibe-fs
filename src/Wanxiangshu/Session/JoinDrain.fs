@@ -85,7 +85,7 @@ module JoinDrain =
                 appendFact
                     durable
                     parentId
-                    (AgentFact.HandleFalseCompletionRejected
+                    (ExecutionFact.HandleFalseCompletionRejected
                         {| ParentSessionId = parentId
                            Handle = record.Handle
                            ExpectedCompletionRef = blobRef
@@ -123,7 +123,7 @@ module JoinDrain =
                 appendFact
                     durable
                     parentId
-                    (AgentFact.HandleFalseTerminalReported
+                    (ExecutionFact.HandleFalseTerminalReported
                         {| ParentSessionId = parentId
                            Handle = record.Handle
                            BadCompletionRef = blobRef
@@ -133,7 +133,7 @@ module JoinDrain =
                     appendFact
                         durable
                         parentId
-                        (AgentFact.HandleLinked
+                        (ExecutionFact.HandleLinked
                             {| ParentSessionId = parentId
                                ChildSessionId = record.ChildSessionId
                                Handle = replacement
@@ -143,7 +143,7 @@ module JoinDrain =
                     appendFact
                         durable
                         parentId
-                        (AgentFact.ParentJoinCorrectionRequested
+                        (ExecutionFact.ParentJoinCorrectionRequested
                             {| ParentSessionId = parentId
                                OriginalHandle = record.Handle
                                ReplacementHandle = replacement

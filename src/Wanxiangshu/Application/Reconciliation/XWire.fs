@@ -262,7 +262,7 @@ module XWire =
                     |> Option.defaultValue PrefixEpochProjection.empty
 
                 let fact =
-                    AgentFact.PrefixRebaseCommitted
+                    ContextFact.PrefixRebaseCommitted
                         {| SessionId = turn.SessionId
                            PreviousEpochId = probe.BasedOnEpochId
                            NextEpochId = PrefixEpochId.next probe.BasedOnEpochId

@@ -61,10 +61,10 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
             append
                 sessionId
                 None
-                (AgentFact.CompanionBloggerLinked
+                (CompanionFact.CompanionBloggerLinked
                     {| SessionId = sessionId
                        BloggerSessionId = bloggerSessionId
                        BloggerAgent = bloggerAgent |})
 
         member _.CloseBlogger(sessionId) =
-            append sessionId None (AgentFact.CompanionBloggerClosed {| SessionId = sessionId |})
+            append sessionId None (CompanionFact.CompanionBloggerClosed {| SessionId = sessionId |})

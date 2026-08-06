@@ -68,10 +68,18 @@ module Fact =
     [<RequireQualifiedAccess>]
     type FalseCompletionReason = | LegacyAbortWasObservation
 
-    [<RequireQualifiedAccess>]
-    type AgentFact =
+    /// Durable agent facts by bounded context (DSL-003). The journal's single
+    /// top-level dispatch is `AgentFact` over these families: each family owns
+    /// its cases and fold branch, so no caller depends on a 54-case global event
+    /// catalogue. The wire shape is byte-identical to the former flat union —
+    /// Thoth encodes a case name and payload, never the declaring type — so no
+    /// journal migration is needed. Each family ships with a same-named module
+    /// of `PluginPromptClaimed`-style functions, which are the ONLY way to build
+    /// an `AgentFact`: they wrap the family case so every existing construction
+    /// site keeps its exact source form.
 
-        // ── Prompt dispatch (PROMPT-005) ────────────────────────────────────
+    type PromptFactCases =
+
         // Exactly four facts. Claimed → Submitted → PhysicalAccepted, or
         // Claimed → Abandoned, or Claimed → Submitted → Abandoned.
 
@@ -125,7 +133,8 @@ module Fact =
                CanonicalRole: string
                SelectedTier: string |}
 
-        // ── Fallback (FALLBACK-007) ─────────────────────────────────────────
+    type FallbackFactCases =
+
 
         /// One confirmed failed attempt advanced the cursor.
         ///
@@ -153,7 +162,8 @@ module Fact =
                FinalConsecutiveFailureCount: int
                FinalOffset: byte |}
 
-        // ── Review (REVIEW-003, REVIEW-006, REVIEW-010) ─────────────────────
+    type ReviewFactCases =
+
         //
         // Every review fact carries ReviewerSessionId, and the ReviewGuard
         // projection is keyed by it. The review conversation happens in the
@@ -234,7 +244,8 @@ module Fact =
                SecondProviderInputDigest: SealDigest
                SecondToolCallId: ToolCallId |}
 
-        // ── Execution handles (EXEC-009) ────────────────────────────────────
+    type ExecutionFactCases =
+
         // Three facts, three states: active, completed-awaiting-join, retired.
         // The previous Linked/Unlinked pair could not express the middle state,
         // so a completed-but-unjoined child was indistinguishable from a live
@@ -321,7 +332,8 @@ module Fact =
                ProviderRun: ProviderRunIdentity option
                ObservedAt: DateTimeOffset |}
 
-        // ── Orchestrator (ORCH-006) ─────────────────────────────────────────
+    type OrchestratorFactCases =
+
         // Each fact determines exactly one recovery action (ORCH-007). The old
         // set was stage-like: CandidateRegistered could mean "waiting for
         // review" or "ready to publish", which is precisely the branch ORCH-006
@@ -375,7 +387,24 @@ module Fact =
 
         | JobAbandoned of {| ManagerJobId: ManagerJobId |}
 
-        // ── Companion (docs/what/companion.md) ─────────────────────────────────────────────
+        // ── Durable effects (PERSIST-009) ───────────────────────────────────
+        // Typed domain facts, same protocol: Requested → effect → Accepted.
+        // Effect identity = WorktreeIdentity (`WorktreeCommands.identityOf`).
+        // After a crash, Requested-without-Created is treated as not happened;
+        // reconcile is git worktree list --porcelain / OrchestratorSweep.
+
+        | WorktreeCreateRequested of
+            {| ManagerJobId: ManagerJobId
+               WorktreeIdentity: WorktreeIdentity
+               WorktreePath: WorktreePath |}
+
+        | WorktreeCreated of
+            {| ManagerJobId: ManagerJobId
+               WorktreeIdentity: WorktreeIdentity
+               WorktreePath: WorktreePath |}
+
+    type CompanionFactCases =
+
 
         /// COMPANION-003: Y is X's long-lived companion Blogger Session, so which
         /// session that is must survive a restart.
@@ -393,7 +422,7 @@ module Fact =
         /// fresh one rather than reviving this session.
         | CompanionBloggerClosed of {| SessionId: SessionId |}
 
-        // ── lifecycle work record (docs/what/companion.md, HOST-005) ───────────────────────
+        // ── lifecycle work record (HOST-005) ───────────────────────────────────────
 
         /// COMPANION-003: the Session's opening task prompt, captured verbatim at
         /// the physical acceptance point. Idempotent and never overwritten
@@ -442,7 +471,8 @@ module Fact =
                TextDigest: BlobDigest
                ProviderRun: ProviderRunIdentity |}
 
-        // ── failure-driven context recovery (docs/what/context.md) ───────────────────────
+    type ContextFactCases =
+
 
         /// COMPANION-008: one Blogger entry landed, and the coverage it proves
         /// advanced. ONE fact, not two: the clause makes frame append and
@@ -556,28 +586,168 @@ module Fact =
                NextEpochId: PrefixEpochId
                ObservedCompactionRun: ProviderRunIdentity |}
 
-        // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
-        // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
-        // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
-        // FrozenRecordPrefix text inline and was written from a token-budget comparison, which
-        // CTX-001 and CTX-002 both forbid. Its replacements carry a `BlobRef` instead
-        // (PERSIST-007) and are driven by a real attempt outcome.
+    // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
+    // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
+    // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
+    // FrozenRecordPrefix text inline and was written from a token-budget comparison, which
+    // CTX-001 and CTX-002 both forbid. Its replacements carry a `BlobRef` instead
+    // (PERSIST-007) and are driven by a real attempt outcome.
 
-        // ── Durable effects (PERSIST-009) ───────────────────────────────────
-        // Typed domain facts, same protocol: Requested → effect → Accepted.
-        // Effect identity = WorktreeIdentity (`WorktreeCommands.identityOf`).
-        // After a crash, Requested-without-Created is treated as not happened;
-        // reconcile is git worktree list --porcelain / OrchestratorSweep.
+    /// One journal line for the agent domain: exactly one family. The family
+    /// case is dispatch data for replay, not a program counter (PERSIST-010).
+    [<RequireQualifiedAccess>]
+    type AgentFact =
+        | Prompt of PromptFactCases
+        | Fallback of FallbackFactCases
+        | Review of ReviewFactCases
+        | Execution of ExecutionFactCases
+        | Orchestrator of OrchestratorFactCases
+        | Companion of CompanionFactCases
+        | Context of ContextFactCases
 
-        | WorktreeCreateRequested of
-            {| ManagerJobId: ManagerJobId
-               WorktreeIdentity: WorktreeIdentity
-               WorktreePath: WorktreePath |}
+    /// Constructor surface for the PromptFact family: each function wraps its
+    /// family case in the single-case Prompt dispatch.
+    module PromptFact =
+        let inline PluginPromptClaimed payload =
+            AgentFact.Prompt(PromptFactCases.PluginPromptClaimed payload)
 
-        | WorktreeCreated of
-            {| ManagerJobId: ManagerJobId
-               WorktreeIdentity: WorktreeIdentity
-               WorktreePath: WorktreePath |}
+        let inline PluginPromptSubmitted payload =
+            AgentFact.Prompt(PromptFactCases.PluginPromptSubmitted payload)
+
+        let inline PluginPromptPhysicalAccepted payload =
+            AgentFact.Prompt(PromptFactCases.PluginPromptPhysicalAccepted payload)
+
+        let inline PluginPromptAbandoned payload =
+            AgentFact.Prompt(PromptFactCases.PluginPromptAbandoned payload)
+
+        let inline AuthorityRootAccepted payload =
+            AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)
+
+    /// Constructor surface for the FallbackFact family: each function wraps its
+    /// family case in the single-case Fallback dispatch.
+    module FallbackFact =
+        let inline FallbackCursorAdvanced payload =
+            AgentFact.Fallback(FallbackFactCases.FallbackCursorAdvanced payload)
+
+        let inline FallbackExhausted payload =
+            AgentFact.Fallback(FallbackFactCases.FallbackExhausted payload)
+
+    /// Constructor surface for the ReviewFact family: each function wraps its
+    /// family case in the single-case Review dispatch.
+    module ReviewFact =
+        let inline ReviewBarrierStarted payload =
+            AgentFact.Review(ReviewFactCases.ReviewBarrierStarted payload)
+
+        let inline ReviewVerdictRecorded payload =
+            AgentFact.Review(ReviewFactCases.ReviewVerdictRecorded payload)
+
+        let inline PerfectChallengeIssued payload =
+            AgentFact.Review(ReviewFactCases.PerfectChallengeIssued payload)
+
+        let inline ProviderInputSealed payload =
+            AgentFact.Review(ReviewFactCases.ProviderInputSealed payload)
+
+        let inline ConfirmedReviewWitness payload =
+            AgentFact.Review(ReviewFactCases.ConfirmedReviewWitness payload)
+
+    /// Constructor surface for the ExecutionFact family: each function wraps its
+    /// family case in the single-case Execution dispatch.
+    module ExecutionFact =
+        let inline HandleLinked payload =
+            AgentFact.Execution(ExecutionFactCases.HandleLinked payload)
+
+        let inline HandleCompleted payload =
+            AgentFact.Execution(ExecutionFactCases.HandleCompleted payload)
+
+        let inline HandleRetired payload =
+            AgentFact.Execution(ExecutionFactCases.HandleRetired payload)
+
+        let inline HandleAbandoned payload =
+            AgentFact.Execution(ExecutionFactCases.HandleAbandoned payload)
+
+        let inline HandleFalseCompletionRejected payload =
+            AgentFact.Execution(ExecutionFactCases.HandleFalseCompletionRejected payload)
+
+        let inline HandleFalseTerminalReported payload =
+            AgentFact.Execution(ExecutionFactCases.HandleFalseTerminalReported payload)
+
+        let inline ParentJoinCorrectionRequested payload =
+            AgentFact.Execution(ExecutionFactCases.ParentJoinCorrectionRequested payload)
+
+        let inline HostTurnObserved payload =
+            AgentFact.Execution(ExecutionFactCases.HostTurnObserved payload)
+
+    /// Constructor surface for the OrchestratorFact family: each function wraps its
+    /// family case in the single-case Orchestrator dispatch.
+    module OrchestratorFact =
+        let inline ManagerJobCreated payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.ManagerJobCreated payload)
+
+        let inline CandidateReady payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.CandidateReady payload)
+
+        let inline ConflictDetected payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.ConflictDetected payload)
+
+        let inline RebasedCandidateReady payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.RebasedCandidateReady payload)
+
+        let inline PublishClaimed payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.PublishClaimed payload)
+
+        let inline Published payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.Published payload)
+
+        let inline JobFailed payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.JobFailed payload)
+
+        let inline JobAbandoned payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.JobAbandoned payload)
+
+        let inline WorktreeCreateRequested payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreateRequested payload)
+
+        let inline WorktreeCreated payload =
+            AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreated payload)
+
+    /// Constructor surface for the CompanionFact family: each function wraps its
+    /// family case in the single-case Companion dispatch.
+    module CompanionFact =
+        let inline CompanionBloggerLinked payload =
+            AgentFact.Companion(CompanionFactCases.CompanionBloggerLinked payload)
+
+        let inline CompanionBloggerClosed payload =
+            AgentFact.Companion(CompanionFactCases.CompanionBloggerClosed payload)
+
+        let inline OpeningPromptCaptured payload =
+            AgentFact.Companion(CompanionFactCases.OpeningPromptCaptured payload)
+
+        let inline XTracePartAppended payload =
+            AgentFact.Companion(CompanionFactCases.XTracePartAppended payload)
+
+        let inline TerminalOutputCaptured payload =
+            AgentFact.Companion(CompanionFactCases.TerminalOutputCaptured payload)
+
+    /// Constructor surface for the ContextFact family: each function wraps its
+    /// family case in the single-case Context dispatch.
+    module ContextFact =
+        let inline BlogEntryCommitted payload =
+            AgentFact.Context(ContextFactCases.BlogEntryCommitted payload)
+
+        let inline BlogSquashCommitted payload =
+            AgentFact.Context(ContextFactCases.BlogSquashCommitted payload)
+
+        let inline BloggerRequestMaterialized payload =
+            AgentFact.Context(ContextFactCases.BloggerRequestMaterialized payload)
+
+        let inline BloggerRequestAbandoned payload =
+            AgentFact.Context(ContextFactCases.BloggerRequestAbandoned payload)
+
+        let inline PrefixRebaseCommitted payload =
+            AgentFact.Context(ContextFactCases.PrefixRebaseCommitted payload)
+
+        let inline ContextReanchored payload =
+            AgentFact.Context(ContextFactCases.ContextReanchored payload)
 
     type Fact =
         | Runtime of RuntimeFact

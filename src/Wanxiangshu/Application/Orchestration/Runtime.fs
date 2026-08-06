@@ -87,7 +87,7 @@ type Orchestrator
                 let identity = WorktreeCommands.identityOf jobId
 
                 let requestFact =
-                    AgentFact.WorktreeCreateRequested
+                    OrchestratorFact.WorktreeCreateRequested
                         {| ManagerJobId = jobId
                            WorktreeIdentity = identity
                            WorktreePath = path |}
@@ -113,7 +113,7 @@ type Orchestrator
                             )
                     | Ok worktree ->
                         let createdFact =
-                            AgentFact.WorktreeCreated
+                            OrchestratorFact.WorktreeCreated
                                 {| ManagerJobId = jobId
                                    WorktreeIdentity = worktree.Identity
                                    WorktreePath = path |}
@@ -153,7 +153,7 @@ type Orchestrator
                                     )
                             | Ok managerSessionId ->
                                 let fact =
-                                    AgentFact.ManagerJobCreated
+                                    OrchestratorFact.ManagerJobCreated
                                         {| ManagerJobId = jobId
                                            ManagerSessionId = managerSessionId
                                            ManagerAgent = managerAgent

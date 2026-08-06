@@ -31,7 +31,7 @@ module ReviewBarrier =
         | None -> Error "Review barrier requires an AgentJournal"
         | Some durable ->
             let fact =
-                AgentFact.ReviewBarrierStarted
+                ReviewFact.ReviewBarrierStarted
                     {| ReviewerSessionId = reviewerSessionId
                        ManagerSessionId = managerSessionId
                        BarrierId = barrierId

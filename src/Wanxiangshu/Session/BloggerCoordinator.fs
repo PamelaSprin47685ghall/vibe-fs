@@ -176,7 +176,7 @@ module BloggerCoordinator =
                 | Error error -> Error error
                 | Ok(contextRef, contextDigest) ->
                     let fact =
-                        AgentFact.BloggerRequestMaterialized
+                        ContextFact.BloggerRequestMaterialized
                             {| RequestId = requestId
                                MainSessionId = mainSessionId
                                BloggerSessionId = bloggerSessionId

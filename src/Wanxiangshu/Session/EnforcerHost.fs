@@ -403,7 +403,7 @@ module EnforcerHost =
                                 let tip = merged.CanonicalTip
 
                                 let fact =
-                                    AgentFact.BlogEntryCommitted
+                                    ContextFact.BlogEntryCommitted
                                         {| SessionId = mainSessionId
                                            BloggerSessionId = bloggerSessionId
                                            RequestId = coverage.RequestId
@@ -480,7 +480,7 @@ module EnforcerHost =
                             | Error error -> CycleCommitOutcome.KnownNotCommitted error
                             | Ok blob ->
                                 let fact =
-                                    AgentFact.BlogSquashCommitted
+                                    ContextFact.BlogSquashCommitted
                                         {| SessionId = mainSessionId
                                            BloggerSessionId = bloggerSessionId
                                            RequestId = squash.RequestId

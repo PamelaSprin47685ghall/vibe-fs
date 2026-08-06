@@ -461,7 +461,36 @@ const unionCase = (unionClass, label) => {
   }
 }
 
-const buildAgentFact = unionCase(FactModule.AgentFact, 'AgentFact')
+const buildAgentFactDispatch = unionCase(FactModule.AgentFact, 'AgentFact')
+
+// DSL-003: AgentFact is a 7-case dispatch union over per-bounded-context
+// *FactCases families. The facade keeps the flat construction surface — a test
+// names the business case, the family lookup wraps it — so no test learns the
+// nesting, and the wire shape (case name + payload) is unchanged.
+const AGENT_FACT_FAMILIES = [
+  ['Prompt', FactModule.PromptFactCases],
+  ['Fallback', FactModule.FallbackFactCases],
+  ['Review', FactModule.ReviewFactCases],
+  ['Execution', FactModule.ExecutionFactCases],
+  ['Orchestrator', FactModule.OrchestratorFactCases],
+  ['Companion', FactModule.CompanionFactCases],
+  ['Context', FactModule.ContextFactCases],
+]
+
+const buildAgentFact = (() => {
+  const familyBuilders = AGENT_FACT_FAMILIES.map(([dispatchCase, unionClass]) => {
+    const build = unionCase(unionClass, `${dispatchCase}FactCases`)
+    return [dispatchCase, caseNames(unionClass), build]
+  })
+  return (caseName, fields) => {
+    for (const [dispatchCase, names, build] of familyBuilders) {
+      if (names.includes(caseName)) return buildAgentFactDispatch(dispatchCase, [build(caseName, fields)])
+    }
+    throw new Error(
+      `no AgentFact family has case '${caseName}'. Available: ${familyBuilders.flatMap(([, names]) => names).join(', ')}`,
+    )
+  }
+})()
 const buildFact = unionCase(FactModule.Fact, 'Fact')
 const buildRuntimeFact = unionCase(FactModule.RuntimeFact, 'RuntimeFact')
 const buildStream = unionCase(EnvelopeModule.StreamId, 'StreamId')
@@ -470,7 +499,8 @@ const buildAbandonReason = unionCase(FactModule.PromptAbandonReason, 'PromptAban
 const buildCompletionKind = unionCase(FactModule.HandleCompletionKind, 'HandleCompletionKind')
 const buildHandleAbandonReason = unionCase(FactModule.HandleAbandonReason, 'HandleAbandonReason')
 
-export const agentFactCaseNames = () => caseNames(FactModule.AgentFact)
+/** Flat case-name catalogue across all AgentFact families (DSL-003). */
+export const agentFactCaseNames = () => AGENT_FACT_FAMILIES.flatMap(([, unionClass]) => caseNames(unionClass))
 
 // ── identity ─────────────────────────────────────────────────────────────────
 // PROMPT-001: no generic message id. `role=user` on the wire is a
@@ -618,6 +648,19 @@ export const handleAbandonReason = {
 
 /** Build an AgentFact by case name with an anonymous-record payload. */
 export const agentFact = (caseName, payload) => buildAgentFact(caseName, [payload])
+
+/**
+ * The business case name of an AgentFact, with the DSL-003 family dispatch
+ * peeled. `agentFact('FallbackCursorAdvanced', ...)` round-trips to
+ * 'FallbackCursorAdvanced' — tests never learn the family nesting.
+ */
+export const agentFactCaseOf = (value) => {
+  const dispatch = caseOf(value)
+  if (dispatch === undefined) return undefined
+  const family = AGENT_FACT_FAMILIES.find(([name]) => name === dispatch)
+  if (!family) throw new TypeError(`agentFactCaseOf: '${dispatch}' is not an AgentFact family dispatch`)
+  return caseOf(payloadOf(value))
+}
 
 /** Wrap an AgentFact as the top-level Fact union. */
 export const asFact = (inner) => buildFact('Agent', [inner])

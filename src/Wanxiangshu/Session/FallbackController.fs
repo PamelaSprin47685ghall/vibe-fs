@@ -94,7 +94,7 @@ module FallbackController =
                 Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
             | Ok _ ->
                 let advanced =
-                    AgentFact.FallbackCursorAdvanced
+                    FallbackFact.FallbackCursorAdvanced
                         {| SessionId = sessionId
                            LogicalRunId = current.LogicalRunId
                            AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
@@ -114,7 +114,7 @@ module FallbackController =
                     | AgentPairCursor.MayContinue cursor -> Ok(Advanced cursor)
                     | AgentPairCursor.Exhausted cursor ->
                         let exhausted =
-                            AgentFact.FallbackExhausted
+                            FallbackFact.FallbackExhausted
                                 {| SessionId = sessionId
                                    LogicalRunId = current.LogicalRunId
                                    AuthorityRootUserMessageId = current.AuthorityRootUserMessageId

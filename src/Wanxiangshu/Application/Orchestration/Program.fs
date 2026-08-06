@@ -76,7 +76,7 @@ module OrchestratorProgram =
                     append
                         deps
                         job
-                        (AgentFact.CandidateReady
+                        (OrchestratorFact.CandidateReady
                             {| ManagerJobId = job.JobId
                                CandidateCommit = candidate
                                PreRebaseReviewBarrierId = barrierId job "pre-rebase" round |})
@@ -96,7 +96,7 @@ module OrchestratorProgram =
                     append
                         deps
                         job
-                        (AgentFact.RebasedCandidateReady
+                        (OrchestratorFact.RebasedCandidateReady
                             {| ManagerJobId = job.JobId
                                RebasedCommit = rebased
                                TargetHeadSnapshot = targetHead
@@ -113,7 +113,7 @@ module OrchestratorProgram =
         append
             deps
             job
-            (AgentFact.ConflictDetected
+            (OrchestratorFact.ConflictDetected
                 {| ManagerJobId = job.JobId
                    CandidateCommit = candidate
                    TargetHeadSnapshot = targetHead
@@ -181,7 +181,7 @@ module OrchestratorProgram =
             | Ok current when current <> expectedHead -> return Ok TargetMoved
             | Ok current ->
                 let claim =
-                    AgentFact.PublishClaimed
+                    OrchestratorFact.PublishClaimed
                         {| ManagerJobId = job.JobId
                            TargetRef = job.TargetRef
                            ExpectedHead = current |}
@@ -194,7 +194,7 @@ module OrchestratorProgram =
                     | Error error -> return Error(failed job (sprintf "FF merge failed: %s" error))
                     | Ok landed ->
                         let published =
-                            AgentFact.Published
+                            OrchestratorFact.Published
                                 {| ManagerJobId = job.JobId
                                    CandidateCommit = landed
                                    ResultingTargetHead = landed |}
@@ -300,7 +300,7 @@ module OrchestratorProgram =
                     append
                         deps
                         job
-                        (AgentFact.Published
+                        (OrchestratorFact.Published
                             {| ManagerJobId = job.JobId
                                CandidateCommit = landed.RebasedCommit
                                ResultingTargetHead = landed.ResultingTargetHead |})

@@ -77,7 +77,7 @@ module XTraceCapture =
             let existing = xTraceOf durable sessionId
 
             if existing.Opening.IsNone && not (String.IsNullOrWhiteSpace assignmentText) then
-                AgentFact.OpeningPromptCaptured
+                CompanionFact.OpeningPromptCaptured
                     {| SessionId = sessionId
                        AssignmentText = assignmentText
                        AuthoritativeRequirements = authoritativeRequirements
@@ -108,7 +108,7 @@ module XTraceCapture =
                         // silently produce an LWR missing its Final output.
                         raise (InvalidOperationException(sprintf "XTrace terminal blob write failed: %s" error))
                     | Ok blob ->
-                        AgentFact.TerminalOutputCaptured
+                        CompanionFact.TerminalOutputCaptured
                             {| SessionId = turn.SessionId
                                TextRef = blob.BlobRef
                                TextDigest = blob.BlobDigest
@@ -288,7 +288,7 @@ module XTraceCapture =
                             // provider projection and later rejects BlogEntryCommitted.
                             raise (InvalidOperationException(sprintf "XTrace part blob write failed: %s" error))
                         | Ok blob ->
-                            AgentFact.XTracePartAppended
+                            CompanionFact.XTracePartAppended
                                 {| SessionId = sessionId
                                    CursorSequence = cursor
                                    Role = message.Role

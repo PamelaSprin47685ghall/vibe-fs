@@ -21,7 +21,7 @@ module BloggerAbandon =
         (reason: string)
         : unit =
         let fact =
-            AgentFact.BloggerRequestAbandoned
+            ContextFact.BloggerRequestAbandoned
                 {| RequestId = requestId
                    MainSessionId = mainSessionId
                    BloggerSessionId = bloggerSessionId

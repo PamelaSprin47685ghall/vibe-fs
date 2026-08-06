@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   caseOf,
+  agentFactCaseOf,
   clockAt,
   envelope,
   fact,
@@ -36,11 +37,11 @@ test('EXEC_HostTurnObserved_serializes_round_trip_with_provider_run', () => {
 
   const decoded = journal.deserializeFact(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(caseOf(payloadOf(decoded.value)), 'HostTurnObserved')
+  assert.equal(agentFactCaseOf(payloadOf(decoded.value)), 'HostTurnObserved')
   // Full structure via re-serialize: field rename would change bytes.
   assert.equal(journal.serializeFact(decoded.value), line)
 
-  const payload = payloadOf(payloadOf(decoded.value))
+  const payload = payloadOf(payloadOf(payloadOf(decoded.value)))
   assert.equal(idValue.session(payload.SessionId), 'ses_obs')
   assert.equal(idValue.providerRun(payload.ProviderRun), 'run_abc')
 })
@@ -54,7 +55,7 @@ test('EXEC_HostTurnObserved_serializes_round_trip_without_provider_run', () => {
   const line = journal.serializeFact(value)
   const decoded = journal.deserializeFact(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(caseOf(payloadOf(decoded.value)), 'HostTurnObserved')
+  assert.equal(agentFactCaseOf(payloadOf(decoded.value)), 'HostTurnObserved')
   assert.equal(journal.serializeFact(decoded.value), line)
 })
 
@@ -91,7 +92,7 @@ test('EXEC_HostTurnObserved_identity_key_is_session_plus_provider_run', () => {
   })
 
   const keyOf = (f) => {
-    const p = payloadOf(payloadOf(f))
+    const p = payloadOf(payloadOf(payloadOf(f)))
     return `${idValue.session(p.SessionId)}|${idValue.providerRun(p.ProviderRun)}`
   }
 

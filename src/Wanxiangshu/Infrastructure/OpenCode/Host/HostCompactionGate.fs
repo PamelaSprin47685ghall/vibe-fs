@@ -149,7 +149,7 @@ module HostCompactionGate =
         | None -> Ok None
         | Some run ->
             let fact =
-                AgentFact.ContextReanchored
+                ContextFact.ContextReanchored
                     {| SessionId = sessionId
                        PreviousEpochId = epoch.EpochId
                        NextEpochId = PrefixEpochId.next epoch.EpochId
