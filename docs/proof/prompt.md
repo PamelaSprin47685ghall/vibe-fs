@@ -32,3 +32,13 @@
 
 Continuation 不得改 SelectedAgent / 新 Run / 重置 Fallback（PROMPT-003、PROMPT-010）。  
 UnknownOrigin fail-closed（PROMPT-004）。
+
+## Student / Teacher
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| HumanRoot 首次进入 Student | QA 原文先落盘；request kind=`StudentLearn` | PROMPT-012、PERSIST-011 |
+| Teacher 首次/后续/idle | AgentOwnerRoot / TeacherQuestion / TeacherIdleNudge；SessionId 不变 | PROMPT-005、PROMPT-012 |
+| Student learning idle | 同一 Run/tier 的 `StudentCompile`；完整 tools override | PROMPT-008、PROMPT-012、AGENT-021 |
+| 编译 idle | `StudentCompileNudge`；不回到 Learn | PROMPT-003、PROMPT-012 |
+| 任一插件发送失败或 unknown | 无旁路重发；按 PROMPT-011 保持或关闭 | PROMPT-005、PROMPT-011 |

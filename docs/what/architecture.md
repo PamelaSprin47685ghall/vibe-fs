@@ -45,6 +45,8 @@ PrefixEpoch 只在下列**已发生事实**提交时切换（冷边界）：
 
 1. X prefix probe 提升（CTX-012）  
 2. Host compaction 后重锚（HOST-006）
+3. StudentLearn → StudentCompile 的 typed request-kind 切换（AGENT-020 / PROMPT-012）；只允许
+   provider tools 从学习面切到编译面，model、system 与既有 message prefix 必须不变。
 
 Y BlogSquash 只推进 `FrameEpoch`（COMPANION-006），不得改 `PrefixEpoch`。
 
@@ -112,3 +114,15 @@ string ↛ origin / authority / phase / next action
 - 计量与截断只认 UTF-8 字节和换行，不按字符数、token 或 provider 容量估算。
 
 该边界只限制 tool 返回 wire，不改变内部完整结果的事实来源。
+
+## ARCH-013：Student 知识与控制分离
+
+Student/Teacher runtime 只可靠地执行：维持 Session、转交自由文本、冻结 request profile、观察 idle、
+原子持久化 QA、清理临时资源。发现未知、判断信息价值/收敛、建立第一性原理、保留语义差异和划分
+SKILL 边界全部留给模型 Prompt；禁止增加问卷、coverage 表、知识图谱、决策表或内容分类器。
+
+QA 是知识状态；`ManagedSessionKind`、request kind、single-flight、PromptKey 和 pending return 是控制身份。
+两者不得互相反解析：QA 不记录控制字段，runtime 不从自然语言推测阶段/完成/下一问题。
+
+Teacher 必须复用统一 SatelliteRuntime（HOST-008/EXEC-026）；禁止为 Teacher 复制一套 parent/child map、
+恢复、取消或 retire 框架。Host 本体不修改（ARCH-003）。

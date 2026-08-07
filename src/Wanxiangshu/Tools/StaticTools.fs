@@ -43,7 +43,7 @@ module StaticTools =
 
     open Wanxiangshu.Kernel
 
-    let private toolName (p: ToolPermission) =
+    let toolName (p: ToolPermission) =
         match p with
         | ToolPermission.Fork -> "fork"
         | ToolPermission.Join -> "join"
@@ -62,34 +62,46 @@ module StaticTools =
         | ToolPermission.Network -> "network"
         | ToolPermission.Verdict -> "verdict"
         | ToolPermission.Blog -> "blog"
+        | ToolPermission.Teacher -> "teacher"
+        | ToolPermission.Return -> "return"
         | ToolPermission.Finality -> "suicide"
 
     /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
+    let knownToolNames =
+        [ "fork"
+          "fork-manager"
+          "fork-pty"
+          "join"
+          "list"
+          "read"
+          "write"
+          "edit"
+          "glob"
+          "grep"
+          "mv"
+          "rm"
+          "inspector"
+          "coder"
+          "executor"
+          "network"
+          "verdict"
+          "blog"
+          "teacher"
+          "return"
+          "suicide" ]
+
+    /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
+    let requestToolMap (allowed: Set<ToolPermission>) : Map<string, bool> =
+        let allowedNames = allowed |> Set.map toolName
+
+        knownToolNames
+        |> List.map (fun name -> name, Set.contains name allowedNames)
+        |> Map.ofList
+
     let permissionObj (role: Role) : obj =
         let allowed = Roles.permissions role |> Set.map toolName
-
-        let known =
-            [ "fork"
-              "fork-manager"
-              "fork-pty"
-              "join"
-              "list"
-              "read"
-              "write"
-              "edit"
-              "glob"
-              "grep"
-              "mv"
-              "rm"
-              "inspector"
-              "coder"
-              "executor"
-              "network"
-              "verdict"
-              "blog"
-              "suicide" ]
 
         // Host defaults set external_directory:* = ask (agent.ts). Rulesets merge by
         // flat concat + findLast, so this trailing allow cancels the Host ask and
@@ -97,7 +109,7 @@ module StaticTools =
         let pairs =
             [ yield "*", box "deny"
               yield "external_directory", box "allow"
-              for name in known do
+              for name in knownToolNames do
                   match name, role with
                   // Manager owns "fork"; must not see Orchestrator's narrow tool.
                   | "fork-manager", Role.Manager -> yield name, box "deny"
@@ -121,6 +133,13 @@ module StaticTools =
         | Some text when not (String.IsNullOrWhiteSpace text) ->
             createObj [ "mode", box "primary"; "permission", permissionObj role; "prompt", box text ]
         | _ -> createObj [ "mode", box "primary"; "permission", permissionObj role ]
+
+    let private hiddenAgent (role: Role) (systemPrompt: string) : obj =
+        createObj
+            [ "mode", box "primary"
+              "hidden", box true
+              "permission", permissionObj role
+              "prompt", box systemPrompt ]
 
     /// The only values accepted by the OpenCode reviewer tool.  Keep this
     /// parser deliberately independent of assistant text: a verdict is a tool
@@ -151,12 +170,18 @@ module StaticTools =
     /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
     /// System prompt for B-record distillation with blog tool protocol.
     let bloggerAgentConfig () : obj =
-        primaryAgent Role.Blogger (Some (prompts ()).BloggerSystemPrompt)
+        hiddenAgent Role.Blogger (prompts ()).BloggerSystemPrompt
 
     /// Role.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
     let executorAgentConfig () : obj =
-        primaryAgent Role.Executor (Some (prompts ()).ExecutorSystemPrompt)
+        hiddenAgent Role.Executor (prompts ()).ExecutorSystemPrompt
+
+    let studentAgentConfig () : obj =
+        primaryAgent Role.Student (Some (prompts ()).StudentSystemPrompt)
+
+    let teacherAgentConfig () : obj =
+        hiddenAgent Role.Teacher (prompts ()).TeacherSystemPrompt
 
     let meditatorAgentConfig () : obj =
         primaryAgent Role.Meditator (Some (prompts ()).MeditatorSystemPrompt)

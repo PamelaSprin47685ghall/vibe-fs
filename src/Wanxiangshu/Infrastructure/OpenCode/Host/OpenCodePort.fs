@@ -10,10 +10,14 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Outcome
 
 type OpenCodePromptOptions =
-    { Model: OpencodeModel option
-      Agent: string option
-      Directory: string option
-      Metadata: obj option }
+    {
+        Model: OpencodeModel option
+        Agent: string option
+        Directory: string option
+        Metadata: obj option
+        /// PROMPT-012: complete request-local provider tool surface.
+        Tools: Map<string, bool> option
+    }
 
 type IPromptPort =
     abstract SendPrompt:
@@ -24,10 +28,17 @@ type OpenCodeChildOptions =
       Agent: string option
       Directory: string option }
 
+type OpenCodeChildInfo =
+    { SessionId: SessionId
+      ParentSessionId: SessionId option
+      Agent: string option
+      Title: string option }
+
 type IOpenCodePort =
     inherit IPromptPort
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
     abstract CreateChildSession: parentId: SessionId -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+    abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
     abstract CloseChildSession: childId: SessionId -> Task<Result<unit, string>>
 
 module OpenCodePort =
@@ -65,6 +76,16 @@ module OpenCodePort =
                            |> Option.defaultValue [])
                         @ (opts.Metadata
                            |> Option.map (fun metadata -> [ "metadata", metadata ])
+                           |> Option.defaultValue [])
+                        @ (opts.Tools
+                           |> Option.map (fun tools ->
+                               [ "tools",
+                                 box (
+                                     tools
+                                     |> Map.toList
+                                     |> List.map (fun (name, enabled) -> name, box enabled)
+                                     |> createObj
+                                 ) ])
                            |> Option.defaultValue [])
 
                     let payload =
@@ -134,6 +155,57 @@ module OpenCodePort =
                         return Error ex.Message
                 }
 
+            member _.ListChildren(parentId: SessionId) =
+                task {
+                    let pId = SessionId.value parentId
+
+                    try
+                        let sessObj = client?session
+                        let childrenFn = sessObj?children
+
+                        let payload =
+                            createObj [ "path", box (createObj [ "id", box pId ]); "headers", box (headersObj None) ]
+
+                        let! res = unbox<Task<obj>> (childrenFn?call (sessObj, payload))
+
+                        let body =
+                            if not (isNull res) && not (isNull res?data) then
+                                res?data
+                            else
+                                res
+
+                        let items: obj array = if isNull body then [||] else unbox body
+
+                        return
+                            Ok(
+                                items
+                                |> Array.choose (fun item ->
+                                    if isNull item || isNull item?id then
+                                        None
+                                    else
+                                        Some
+                                            { SessionId = SessionId.create (unbox<string> item?id)
+                                              ParentSessionId =
+                                                if isNull item?parentID then
+                                                    None
+                                                else
+                                                    Some(SessionId.create (unbox<string> item?parentID))
+                                              Agent =
+                                                if isNull item?agent then
+                                                    None
+                                                else
+                                                    Some(unbox<string> item?agent)
+                                              Title =
+                                                if isNull item?title then
+                                                    None
+                                                else
+                                                    Some(unbox<string> item?title) })
+                                |> Array.toList
+                            )
+                    with ex ->
+                        return Error ex.Message
+                }
+
             member _.CloseChildSession(childId: SessionId) =
                 task {
                     let cId = SessionId.value childId
@@ -191,6 +263,28 @@ module OpenCodePort =
                     return Error ex.Message
             }
 
+        let getJson (endpoint: string) : Task<Result<obj, string>> =
+            task {
+                try
+                    let! response = jsFetch (cleanBaseUrl + endpoint) {| method = "GET" |}
+                    let status = unbox<int> response?status
+
+                    if status >= 200 && status < 300 then
+                        let! body = unbox<Task<string>> (response?text ())
+
+                        return
+                            Ok(
+                                if String.IsNullOrWhiteSpace body then
+                                    box [||]
+                                else
+                                    Fable.Core.JS.JSON.parse body
+                            )
+                    else
+                        return Error $"HTTP {status}"
+                with ex ->
+                    return Error ex.Message
+            }
+
         interface IOpenCodePort with
             member _.SendPrompt (sessionId: SessionId) text opts =
                 task {
@@ -213,6 +307,16 @@ module OpenCodePort =
                            |> Option.defaultValue [])
                         @ (opts.Metadata
                            |> Option.map (fun metadata -> [ "metadata", metadata ])
+                           |> Option.defaultValue [])
+                        @ (opts.Tools
+                           |> Option.map (fun tools ->
+                               [ "tools",
+                                 box (
+                                     tools
+                                     |> Map.toList
+                                     |> List.map (fun (name, enabled) -> name, box enabled)
+                                     |> createObj
+                                 ) ])
                            |> Option.defaultValue [])
 
                     let! res = postJson $"/session/{sId}/prompt_async" (createObj bodyFields)
@@ -263,6 +367,46 @@ module OpenCodePort =
                         else
                             return Error "Missing session id in response"
                     | Error err -> return Error err
+                }
+
+            member _.ListChildren(parentId: SessionId) =
+                task {
+                    let! res = getJson $"/session/{SessionId.value parentId}/children"
+
+                    match res with
+                    | Error err -> return Error err
+                    | Ok data ->
+                        try
+                            let items: obj array = if isNull data then [||] else unbox data
+
+                            return
+                                Ok(
+                                    items
+                                    |> Array.choose (fun item ->
+                                        if isNull item || isNull item?id then
+                                            None
+                                        else
+                                            Some
+                                                { SessionId = SessionId.create (unbox<string> item?id)
+                                                  ParentSessionId =
+                                                    if isNull item?parentID then
+                                                        None
+                                                    else
+                                                        Some(SessionId.create (unbox<string> item?parentID))
+                                                  Agent =
+                                                    if isNull item?agent then
+                                                        None
+                                                    else
+                                                        Some(unbox<string> item?agent)
+                                                  Title =
+                                                    if isNull item?title then
+                                                        None
+                                                    else
+                                                        Some(unbox<string> item?title) })
+                                    |> Array.toList
+                                )
+                        with ex ->
+                            return Error ex.Message
                 }
 
             member _.CloseChildSession(childId: SessionId) =

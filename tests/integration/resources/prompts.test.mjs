@@ -1,6 +1,6 @@
 // tests/integration/resources/prompts.test.mjs — package prompt load contract.
 //
-// 10 role system prompts under resources/prompts/*-system.md load via
+// 12 role system prompts under resources/prompts/*-system.md load via
 // PromptResources / RuntimeResources; path is import.meta.url-relative, not cwd.
 //
 // Not discovered by tests/unit/runner.mjs. Run standalone:
@@ -20,27 +20,29 @@ const PROMPT_FIELDS = [
   'BrowserSystemPrompt',
   'MeditatorSystemPrompt',
   'OrchestratorSystemPrompt',
+  'StudentSystemPrompt',
+  'TeacherSystemPrompt',
   'ExecutorSystemPrompt',
   'BloggerSystemPrompt',
 ]
 
-const assertTenNonEmpty = (catalog, label) => {
+const assertTwelveNonEmpty = (catalog, label) => {
   for (const field of PROMPT_FIELDS) {
     const text = catalog[field]
     assert.equal(typeof text, 'string', `${label}: ${field} must be string`)
     assert.ok(text.trim().length > 0, `${label}: ${field} must be non-empty`)
   }
-  assert.equal(PROMPT_FIELDS.length, 10)
+  assert.equal(PROMPT_FIELDS.length, 12)
 }
 
-test('ENFORCER_resource_ten_prompts_load_via_PromptResources', () => {
+test('AGENT_002_resource_twelve_prompts_load_via_PromptResources', () => {
   const catalog = promptResources.load()
-  assertTenNonEmpty(catalog, 'PromptResources.load')
+  assertTwelveNonEmpty(catalog, 'PromptResources.load')
 })
 
-test('ENFORCER_resource_ten_prompts_load_via_RuntimeResources', () => {
+test('AGENT_002_resource_twelve_prompts_load_via_RuntimeResources', () => {
   const bundle = runtimeResources.load()
-  assertTenNonEmpty(bundle.Prompts, 'RuntimeResources.load().Prompts')
+  assertTwelveNonEmpty(bundle.Prompts, 'RuntimeResources.load().Prompts')
   assert.ok(bundle.EnforcerRules !== undefined)
 })
 
@@ -49,9 +51,9 @@ test('ENFORCER_resource_prompts_load_independent_of_process_cwd', () => {
   try {
     process.chdir('/')
     const catalog = promptResources.load()
-    assertTenNonEmpty(catalog, 'PromptResources.load after chdir(/)')
+    assertTwelveNonEmpty(catalog, 'PromptResources.load after chdir(/)')
     const bundle = runtimeResources.load()
-    assertTenNonEmpty(bundle.Prompts, 'RuntimeResources.load after chdir(/)')
+    assertTwelveNonEmpty(bundle.Prompts, 'RuntimeResources.load after chdir(/)')
   } finally {
     process.chdir(previous)
   }

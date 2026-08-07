@@ -66,6 +66,10 @@ type ProviderRequestKind =
     | BloggerSquash
     /// FALLBACK-008's one repair for an unusable terminal.
     | InteractionRepair
+    /// AGENT-020: Student learning request; provider tools exactly { teacher }.
+    | StudentLearn
+    /// AGENT-020: same Student run compiling QA into SKILL files.
+    | StudentCompile
 
 [<RequireQualifiedAccess>]
 module ProviderRequestKind =
@@ -76,6 +80,8 @@ module ProviderRequestKind =
         | ProviderRequestKind.BloggerMain -> "blogger-main"
         | ProviderRequestKind.BloggerSquash -> "blogger-squash"
         | ProviderRequestKind.InteractionRepair -> "interaction-repair"
+        | ProviderRequestKind.StudentLearn -> "student-learn"
+        | ProviderRequestKind.StudentCompile -> "student-compile"
 
     /// CTX-008 / FALLBACK-011: does a success on this kind clear the consecutive
     /// failure count.
@@ -87,7 +93,9 @@ module ProviderRequestKind =
     let clearsFailureCountOnSuccess (kind: ProviderRequestKind) =
         match kind with
         | ProviderRequestKind.WorkMain
-        | ProviderRequestKind.BloggerMain -> true
+        | ProviderRequestKind.BloggerMain
+        | ProviderRequestKind.StudentLearn
+        | ProviderRequestKind.StudentCompile -> true
         | ProviderRequestKind.BloggerSquash
         | ProviderRequestKind.InteractionRepair -> false
 
@@ -100,4 +108,6 @@ module ProviderRequestKind =
         | ProviderRequestKind.WorkMain -> true
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.InteractionRepair -> false
+        | ProviderRequestKind.InteractionRepair
+        | ProviderRequestKind.StudentLearn
+        | ProviderRequestKind.StudentCompile -> false

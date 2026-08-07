@@ -29,7 +29,13 @@
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
 import { equals } from '../../../dist/fable_modules/fable-library-js.5.13.0/Util.js';
 
-export const BOUNDARY_KINDS = ['epoch-switch', 'fallback-side', 'prefix-probe', 'frame-commit'];
+export const BOUNDARY_KINDS = [
+  'epoch-switch',
+  'fallback-side',
+  'prefix-probe',
+  'frame-commit',
+  'request-kind-switch',
+];
 
 // ── declaration lookup ──────────────────────────────────────────────────────
 
@@ -71,6 +77,10 @@ export function boundaryFor(boundaries, entry) {
  */
 const messagesStillAppendOnly = (previousWire, nextWire) =>
   isAppendOnlyPrefix(withModelOf(previousWire, nextWire), nextWire);
+
+/** Student Learn→Compile keeps model/system/messages and replaces only tools. */
+const requestKindKeepsPrefix = (previousWire, nextWire) =>
+  isAppendOnlyPrefix({ ...previousWire, Tools: nextWire.Tools }, nextWire);
 
 /** `previous` with `next`'s model fields, so only the messages/tools/system differ. */
 const withModelOf = (previousWire, nextWire) => ({
@@ -176,6 +186,13 @@ export function sealDecision({ previousWire, body, boundary }) {
       return probeKeepsFixedParts(previousWire, nextWire)
         ? { resealed: 'frame-commit' }
         : { broken: 'frame-commit-rewrote-fixed' };
+
+    // AGENT-020 / PROMPT-012: one typed Student run switches from the
+    // StudentLearn schema to StudentCompile without replacing its transcript.
+    case 'request-kind-switch':
+      return requestKindKeepsPrefix(previousWire, nextWire)
+        ? { resealed: 'request-kind-switch' }
+        : { broken: 'request-kind-switch-rewrote-prefix' };
 
     default:
       throw new Error(`unknown cold boundary kind '${boundary.kind}'`);

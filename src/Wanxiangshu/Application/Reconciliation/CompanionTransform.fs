@@ -51,7 +51,8 @@ module CompanionTransform =
                             (fun bloggerId -> onBloggerCreated |> Option.iter (fun callback -> callback bloggerId)),
                         ?restoredBloggerId = restoredBloggerId,
                         ?journal = journal,
-                        ?bloggerDirectory = workspaceDirectory
+                        ?bloggerDirectory = workspaceDirectory,
+                        satelliteRuntime = scope.Satellites
                     )
 
                 companions.[sessionId] <- value
@@ -141,15 +142,15 @@ module CompanionTransform =
                 && not (String.IsNullOrWhiteSpace sessionId)
                 && not (isNull rawOutObj?messages)
             then
-                let isCompanionSession =
+                let isSatelliteSession =
                     match journal with
                     | None -> true
                     | Some j ->
-                        SessionAssociationProjection.isCompanion
+                        SessionAssociationProjection.isSatellite
                             (SessionId.create sessionId)
                             (AgentJournal.snapshot j).AgentProjections.Associations
 
-                if not isCompanionSession then
+                if not isSatelliteSession then
                     let companion =
                         ensureCompanion
                             companions
@@ -164,8 +165,23 @@ module CompanionTransform =
                     // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
                     companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
 
+                    // PERSIST-011: a Student transcript contains the private QA
+                    // stream (HumanRoot, teacher arguments and teacher results).
+                    // The Work Session still owns its conceptual Companion, but
+                    // this request has no Blogger/XTrace material at all.
+                    let isPrivateStudentView =
+                        messageContext
+                        |> Option.bind snd
+                        |> Option.bind ManagedAgent.tryParse
+                        |> Option.exists (fun agent -> agent.Role = Role.Student)
+
                     let projection =
-                        Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+                        if isPrivateStudentView then
+                            None
+                        else
+                            Projection.decodeMessageView rawMessages
+                            |> ProviderProjection.toSemantic
+                            |> Some
 
                     // No child until there is a real X gap. Empty fixture transforms
                     // (HOST-009 positional hooks) must not require Host transport.
@@ -208,24 +224,29 @@ module CompanionTransform =
                     // nothing past the ingest cursor. Birth gate (Next>Prev) still
                     // runs inside onMainMaterial via mainContextFromChunk.
                     let hasMaterial =
-                        BloggerDelta.nextChunk
-                            BloggerDelta.DeltaLimitBytes
-                            ingestCursor
-                            blog.Coverage.CoverableTurnCutoffExclusive
-                            projection.Messages
+                        projection
+                        |> Option.bind (fun view ->
+                            BloggerDelta.nextChunk
+                                BloggerDelta.DeltaLimitBytes
+                                ingestCursor
+                                blog.Coverage.CoverableTurnCutoffExclusive
+                                view.Messages)
                         |> Option.isSome
 
                     if hasMaterial then
-                        let! bloggerId = companion.EnsureBloggerAsync()
+                        match projection with
+                        | None -> ()
+                        | Some view ->
+                            let! bloggerId = companion.EnsureBloggerAsync()
 
-                        let! _ =
-                            BloggerCoordinator.onMainMaterial
-                                (scope :> IParkedTransformHost)
-                                companion
-                                journal
-                                (SessionId.create sessionId)
-                                bloggerId
-                                projection
+                            let! _ =
+                                BloggerCoordinator.onMainMaterial
+                                    (scope :> IParkedTransformHost)
+                                    companion
+                                    journal
+                                    (SessionId.create sessionId)
+                                    bloggerId
+                                    view
 
-                        ()
+                            ()
         }

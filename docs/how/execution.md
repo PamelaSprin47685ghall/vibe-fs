@@ -69,3 +69,29 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 ## Join wire（与 ARCH-010）
 
 LLM-visible join：顶层 status+count，再 `[[result]]` 表数组；agent 项前 entry-local LWR 注释。详见 synthetic-toml §9.6 与 EXEC-004。
+
+---
+
+## Student / Teacher（EXEC-025/026）
+
+`teacher` 工具程序：
+
+```text
+claim StudentRun single-flight
+→ QA.atomicAppend(question)
+→ SatelliteRuntime.ensureTeacher(owner,tier)
+→ install return waiter before send
+→ first: SendAgentOwnerRoot / later: SendContinuation(TeacherQuestion)
+→ await return；idle 由 reconcile 发送 TeacherIdleNudge
+→ QA.atomicAppend(answer)
+→ abort Teacher current turn
+→ release flight；answer 作为 tool result
+```
+
+Student learning idle 构造完整 `StudentCompile` profile 与 tools map后才发送正式编译 Prompt。Compile idle
+重复发送固定 continuation，但 claim sequence 保证每次是独立 PromptKey；同一时刻只能有一个未决发送。
+
+最终 `return`：`deleteQa` 成功或 absent → 保存 pending final message → 返回要求同一 Assistant completion
+逐字输出该 message 的 tool result。`experimental.text.complete` 只校正该 pending Student session 的最终
+text part；普通 session、Teacher 和非 pending part 原样通过。terminal reconcile 核对最终正文后清理
+pending/run；失败或 abort 保留明确未完成结局，不伪造成功。

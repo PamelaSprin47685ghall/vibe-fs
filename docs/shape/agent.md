@@ -4,14 +4,16 @@
 
 ## AGENT-007：工具权限双层边界
 
-两层都必须存在，且都只读 `AttemptExecutionProfile.CanonicalRole`：
+两层都必须存在，且都只读同一个 `AttemptExecutionProfile`：
 
 | 层 | 职责 |
 |----|------|
 | Host-final Agent permission | 无权工具不进入 provider-visible schema |
 | ToolRegistry execution gate | Host 配置异常时仍拒绝越权执行 |
 
-Role 无法确定 → 模型可见插件工具集为空。  
+普通角色从 `CanonicalRole` 取固定工具集；Student 从
+`CanonicalRole × RequestKind` 取 AGENT-020 的两种工具面。Role、RequestKind 或 profile 无法确定
+→ 模型可见插件工具集为空。
 禁止「role unresolved 时暂时允许 inspector」类放行。
 
 本条只约束**角色工具**。Host 元权限（`external_directory`、`doom_loop`、`question` 等）不进 `ToolPermission` / AGENT-006。
@@ -44,3 +46,13 @@ external_directory = "allow"
 
 Companion 是否存在由 Session 种类决定，不由 Role、Tier、工具面或当前 Logical Run 决定（COMPANION-001/002）。  
 Agent 矩阵不得隐含「某角色无 Companion」。
+
+## AGENT-021：Student request-specific 双门
+
+Student 每次请求的 provider schema 与 ToolRegistry execution gate 必须消费同一个不可变
+`AttemptExecutionProfile.ToolCapabilitySet`。`StudentLearn` / `StudentCompile` 的 Host Session permission
+是该 profile 的 wire 投影，不是第二份权限来源。
+
+切换到编译必须在发送 continuation 前先构造完整 profile 并安装整套 permission；任一步失败都不得发送
+一个工具面不完整的请求。执行时 `ToolContext.messageID` 必须命中该 attempt；旧 Learn attempt 伪造
+`return`、Compile attempt 伪造 `teacher` 均 fail closed。

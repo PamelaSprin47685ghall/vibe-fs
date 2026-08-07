@@ -124,6 +124,8 @@ export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
   'HostForkRestart.fs',
   'HostForkRunLifecycle.fs',
   'HostForkRuntime.fs',
+  'SatelliteRuntime.fs',
+  'StudentTeacherRuntime.fs',
 ])
 
 export const isHostBoundaryOpenPath = (file) => {

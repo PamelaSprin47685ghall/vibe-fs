@@ -17,6 +17,8 @@ type Role =
     | Meditator
     | Reviewer
     | DevOps
+    | Student
+    | Teacher
     | Executor
     | Blogger
 
@@ -40,6 +42,10 @@ type ToolPermission =
     | Network
     | Verdict
     | Blog
+    /// AGENT-020: Student learning request's only tool.
+    | Teacher
+    /// AGENT-020: Teacher response and Student compilation terminal tool.
+    | Return
     /// GLORY-036: the Manager's own end-of-life tool (`suicide`).
     | Finality
 
@@ -99,6 +105,23 @@ module Roles =
                   ToolPermission.Grep
                   ToolPermission.Inspector
                   ToolPermission.Coder ]
+        // AGENT-020: static HumanRoot face. StudentCompile overrides the whole
+        // request permission set from AttemptExecutionProfile.RequestKind.
+        | Role.Student -> set [ ToolPermission.Teacher ]
+        | Role.Teacher ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Write
+                  ToolPermission.Edit
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove
+                  ToolPermission.Inspector
+                  ToolPermission.Coder
+                  ToolPermission.Exec
+                  ToolPermission.Network
+                  ToolPermission.Return ]
         | Role.Executor -> Set.empty
         // ENFORCER-010: Blogger's tool set is exactly { blog }.
         | Role.Blogger -> set [ ToolPermission.Blog ]
@@ -170,6 +193,14 @@ module RoleDefinitions =
         + "Tools: read / glob / grep / verdict.\n"
         + "Read-only. Re-inspect the current tree; PERFECT only for flawless work and REVISE for any defect."
 
+    let studentPrompt =
+        "Student system prompt SSOT: resources/prompts/student-system.md\n"
+        + "StudentLearn tools: teacher only. StudentCompile tools are request-specific."
+
+    let teacherPrompt =
+        "Teacher system prompt SSOT: resources/prompts/teacher-system.md\n"
+        + "Investigate with ordinary execution tools; answer only through return."
+
     let all =
         let mgrTools = Roles.permissions Role.Manager
         let cdrTools = Roles.permissions Role.Coder
@@ -181,6 +212,8 @@ module RoleDefinitions =
         let orchTools = Roles.permissions Role.Orchestrator
         let execTools = Roles.permissions Role.Executor
         let blgTools = Roles.permissions Role.Blogger
+        let studentTools = Roles.permissions Role.Student
+        let teacherTools = Roles.permissions Role.Teacher
 
         [ { Role = Role.Manager
             Prompt = managerPrompt
@@ -209,6 +242,12 @@ module RoleDefinitions =
               + "Tools: fork-manager / join.\n"
               + "Parallel ManagerJobs, serial integration, host-owned dual PERFECT."
             Tools = orchTools }
+          { Role = Role.Student
+            Prompt = studentPrompt
+            Tools = studentTools }
+          { Role = Role.Teacher
+            Prompt = teacherPrompt
+            Tools = teacherTools }
           { Role = Role.Executor
             Prompt =
               "Executor agent system prompt SSOT: prompts/executor-system.md\n"

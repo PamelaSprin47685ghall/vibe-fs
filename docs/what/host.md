@@ -23,7 +23,9 @@ session.status = retry
 session.deleted
 ```
 
-`chat.message` 只走 Prompt acknowledgement，不得拼装 terminal turn，不得驱动普通业务流程。
+`chat.message` 通常只走 Prompt acknowledgement，不得拼装 terminal turn。唯一额外用途是
+PROMPT-012 的 Student HumanRoot bootstrap：在 Host 保存消息、调用 provider 前同步创建 QA 并写入原文；
+该 hook 不从正文判断意图，只认已解析的显式 Student Agent 与 Authority Root 身份。
 
 ## HOST-005：XTrace 是唯一原始语义轨迹
 
@@ -78,3 +80,18 @@ Transform 可在 provider-facing 历史上注入固定中文 synthetic assistant
 3. 同一 epoch 内 provider-visible wire 必须保持 append-only 稳定（全锚点重放 + 稳定 id）。  
 
 构造与链序见 `how/host.md`。
+
+## HOST-014：Student / Teacher Host 行为
+
+匹配生产依赖的 OpenCode `v1.18.14` 必须通过下列 source + runtime canary：
+
+1. `chat.message` 在用户消息保存与 provider effect 前完成，允许 PERSIST-011 先落盘。
+2. Prompt `tools` 被完整写为 Session permission；每个 provider step 由 Agent + Session permission
+   裁剪 provider-visible schema，并在执行时按同一 ruleset ask/deny。
+3. 普通 tool result 后同一 Host loop 会继续到 Assistant completion；Student `return` 可先删除 QA，
+   再把其 message 约束为用户最终回复。
+4. Teacher `return` 先完成等待中的父 `teacher` 工具；父工具随后 abort 当前 Teacher provider turn。
+   abort 是内部 turn 控制面，不是 Teacher 答案，也不 retire Session；下一问题继续同一 Session。
+5. idle 只作 wake；Student/Teacher 策略必须从完整 snapshot、request profile 与 Satellite 关联决定 nudge。
+
+任一 canary 失败 → `HostContractUnsupported`，Student 功能 fail closed；不得影响其它 Agent。

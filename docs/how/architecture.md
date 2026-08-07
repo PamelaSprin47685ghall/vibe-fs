@@ -39,3 +39,18 @@
 ## 合成文本
 
 统一 string owner + renderer；inventory 与 golden 守 ARCH-010（`how/synthetic-toml.md`）。
+
+---
+
+## Student/Teacher 边界
+
+`StudentQaStore` 不解析正文，只做 bytes 校验、换行拼接、尾部去重和原子 replace。`StudentRun` 的 typed
+request kind 决定 Learn/Compile；idle reconcile 只读 typed profile 和 Satellite return waiter，不读
+assistant 正文推测状态。Prompt 文本是模型指令，绝不反向解析成控制流（ARCH-011/013）。
+
+Student provider view 仍属于 Work Session，但 `CompanionTransform` 对 Student 视图直接裁成无 material：
+不执行 Companion decode、不写 XTrace、不创建 Blogger child。Learn → Compile 保持同一 message prefix，
+只以 typed AttemptExecutionProfile 原子替换 tools；canary 将该位置声明为 request-kind 冷边界。
+
+SatelliteRuntime 以 `(owner SessionId, SatelliteKind)` 为唯一键，Companion 与 Teacher 共享 create/query/
+link/abort/retire 程序；kind-specific 代码只提供 Agent、首个 Prompt 与 terminal handler。

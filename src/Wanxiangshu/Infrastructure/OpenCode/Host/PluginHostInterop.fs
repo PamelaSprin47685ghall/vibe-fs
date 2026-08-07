@@ -77,6 +77,7 @@ module PluginHostInterop =
                 cancelSignals
                 eventPort
                 (Some(scope :> IParkedTransformHost))
+                scope.StudentTeacherRuntime
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)

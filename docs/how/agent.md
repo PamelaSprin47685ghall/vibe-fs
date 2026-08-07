@@ -12,7 +12,7 @@
 
 ## 启动装配
 
-1. 枚举 AGENT-002 二十名；缺一 fail fast。  
+1. 枚举 AGENT-002 二十四名；缺一 fail fast。
 2. 校验 `peer(fast)=deep` 对称；model 字符串非空且 pair 内互异。  
 3. 非法旧名（AGENT-004）在配置验证阶段拒绝，无 alias。
 
@@ -29,6 +29,17 @@
 
 ## 可见性
 
-1. Blogger/Executor 从一切 provider-visible enum/schema 剔除（AGENT-008）。  
+1. Blogger/Executor/Teacher 从一切 provider-visible enum/schema 剔除（AGENT-008）。
 2. fork schema 可见集合按 AGENT-009 **静态**构造，不从运行时「当前有哪些 agent」反推。  
 3. list() 只暴露 running handle，不是可创建目录。
+
+---
+
+## Student 请求工具面
+
+1. HumanRoot 选择 Student 时，Agent 静态 permission 安装严格 `{ teacher }`。
+2. 学习 idle 后先构造 `StudentCompile` attempt，再经 PromptDispatcher 发送 continuation；发送 body 的
+   `tools` 对完整已知工具集显式 allow/deny，使 Host Session permission 原子替换为编译面。
+3. `PromptAuthority.toolCapabilitiesFor(role, requestKind)` 是两层权限的唯一纯函数；静态 Agent 配置、
+   provider request 与执行 gate 只做投影或校验。
+4. Teacher Agent 设置 `hidden=true`，并从所有可创建 enum 中剔除；Student 保持公开 primary。

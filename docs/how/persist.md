@@ -54,6 +54,11 @@ Requested / Claimed
 
 崩溃后：Requested 未 Accepted → **结局未知**。先执行表中 Reconcile；仅当物理证据证明效果不存在且该效果的合同允许幂等重试时才重试。Prompt 例外地保持 Pending，按 PROMPT-011 检索 `PromptKey`，不得自动重发。Accepted → 该领域合同已确认物理完成；重复 Accepted 幂等；不得把 Accepted 折回 Requested。
 
+QA 不是 Journal durable effect；它自身是权威文件。更新算法固定为：fatal UTF-8 read → 计算尾部去重后的
+完整新 bytes → 在同目录创建 `0600` 临时文件 → write/fsync/close → rename → fsync directory。rename 前
+失败删除临时文件并保留旧 QA；rename 结局不确定时重新读取完整 QA，只在字节等于预期时接受，否则
+fail closed。日志只记路径摘要、字节数、operation/result/error。
+
 ### Session 创建例外
 
 Host 在 `session.create` 返回前不分配 child SessionId → 不引入 `SessionCreateRequested`。  

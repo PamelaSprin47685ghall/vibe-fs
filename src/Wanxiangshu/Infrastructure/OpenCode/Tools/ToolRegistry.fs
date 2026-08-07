@@ -33,6 +33,8 @@ module ToolRegistry =
         | "rm" -> fun r -> Roles.isAllowed r ToolPermission.Remove
         | "coder" -> fun r -> r = Role.DevOps
         | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
+        | "teacher" -> fun r -> r = Role.Student
+        | "return" -> fun r -> r = Role.Student || r = Role.Teacher
         | _ -> fun _ -> false
 
     let create
@@ -52,6 +54,7 @@ module ToolRegistry =
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
         (parkedHost: IParkedTransformHost option)
+        (studentTeacherRuntime: StudentTeacherRuntime option)
         =
         let factory = ToolHostCodec.factory toolModule
 
@@ -74,23 +77,28 @@ module ToolRegistry =
             )
 
         let baseSpecs =
-            [ ForkTool.managerSpec factory runtime
-              PtyTool.spec factory runtime
-              ForkTool.orchestratorSpec factory runtime
-              JoinTool.spec runtime
-              ListTool.spec runtime
-              VerdictTool.spec factory runtime
+            [ yield ForkTool.managerSpec factory runtime
+              yield PtyTool.spec factory runtime
+              yield ForkTool.orchestratorSpec factory runtime
+              yield JoinTool.spec runtime
+              yield ListTool.spec runtime
+              yield VerdictTool.spec factory runtime
               // GLORY-034/036: the Manager's end-of-life tool.
-              FinalityTool.spec factory runtime
-              ExecutorTool.spec factory runtime
-              InspectorTool.spec factory runtime
-              CoderTool.spec factory runtime
+              yield FinalityTool.spec factory runtime
+              yield ExecutorTool.spec factory runtime
+              yield InspectorTool.spec factory runtime
+              yield CoderTool.spec factory runtime
               // AGENT-016/017/018: Coder-only POSIX mv/rm.
-              FileMutationTools.mvSpec factory
-              FileMutationTools.rmSpec factory
+              yield FileMutationTools.mvSpec factory
+              yield FileMutationTools.rmSpec factory
               // ENFORCER-010: Blogger's tool set is exactly { blog }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
-              BlogTool.spec factory runtime parkedHost ]
+              yield BlogTool.spec factory runtime parkedHost
+              match studentTeacherRuntime with
+              | Some studentTeacher ->
+                  yield StudentTeacherTools.teacherSpec factory studentTeacher
+                  yield StudentTeacherTools.returnSpec factory studentTeacher
+              | None -> () ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on
         // CanonicalRole. blog is request-scoped on top of Role=Blogger: no live

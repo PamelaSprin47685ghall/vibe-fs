@@ -45,6 +45,10 @@ ReviewerGuard
 ReviewConfirmation
 BusyAgentNudge
 ProviderRetryAttempt
+TeacherQuestion
+TeacherIdleNudge
+StudentCompile
+StudentCompileNudge
 ```
 
 Continuation 只延续已有 Logical Run：
@@ -127,3 +131,18 @@ at-most-one logical effect + fail-closed unknown outcome
 把 accepted-* 当物理落地
 为清理挂起而重发
 ```
+
+## PROMPT-012：Student / Teacher Prompt 身份
+
+用户显式选择 `fast-student` / `deep-student` 的原始消息是 HumanRoot；它创建 Student Logical Run，
+固定 tier，并在任何 provider effect 前把原文写成 QA 的第一条内容。
+
+Student 首次 `teacher(message)` 为 Teacher Session 创建 AgentOwnerRoot；后续问题是同一 Teacher Run 的
+`TeacherQuestion` Continuation。Teacher 未 `return` 的 idle 使用 `TeacherIdleNudge`；两者都不得改变
+Teacher Agent/tier/model、创建新 Logical Run、重置 Fallback 或写入 QA。
+
+Student 学习 idle 后的编译请求是 `StudentCompile` Continuation；编译 idle 使用
+`StudentCompileNudge`。二者保持同一 Student Run、Agent 和 tier，只把 request kind 从
+`StudentLearn` 固定为 `StudentCompile`。第一版不允许从 Compile 返回 Learn。
+
+上述所有插件产生的 user-shaped message 都经 PROMPT-005；不得直接调用 `prompt_async`。
