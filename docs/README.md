@@ -53,5 +53,4 @@ what → shape → how → code/resources → proof
 | `GLORY-` / `SURFACE-` Glory | [what](what/glory.md) · [shape](shape/glory.md) · [how](how/glory.md) · [proof](proof/glory.md) · [why](why/glory.md) |
 | Synthetic TOML（`ARCH-010` / `ARCH-011`） | [what](what/synthetic-toml.md) · [shape](shape/synthetic-toml.md) · [how](how/synthetic-toml.md) · [proof](proof/synthetic-toml.md) · [why](why/synthetic-toml.md) |
 | Security 边界 | [shape](shape/security.md) |
-| Kolmogorov 原则 | [why](why/kolmogorov.md) |
 
