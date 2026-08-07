@@ -16,35 +16,43 @@
 执行链为：
 
 ```text
-what → shape → how → status → code/resources → proof
+what → shape → how → code/resources → proof
 ```
 
-`why` 解释理由；`proposal` 是未裁决候选；`status` 只记录实现相对正式规范的活跃差距。
+`why` 只解释理由。`changes/` 保存已批准变更的生命周期记录，不属于正式规范链。
 从 `docs/README.md` 按主题找到相关层。开始修改前，必须阅读相关 `what`、`shape`、
-`how`、活跃 `status` 和 `proof`；不确定主题时先读词汇表 `docs/what/glossary.md`。
+`how` 和 `proof`；若用户指定了 Active Change，再读取其中冻结的 Proposal、剩余工作和
+完成条件。不确定主题时先读词汇表 `docs/what/glossary.md`。
 
 代码注释、测试断言、根 README 和本文件都不是产品规范正文。发生冲突时遵循
 `GOV-009`，不得让代码或个人偏好替正式规范选边。
 
-## 2. Proposal 与 Status
+## 2. Change 生命周期
 
-产品行为变更遵循 `GOV-006`、`GOV-007` 和
-`docs/how/document-governance.md`：
+生命周期合同见 `changes/README.md`、`GOV-006`、`GOV-007` 和
+`docs/how/document-governance.md`。
 
-1. 未裁决设计只写入 `docs/proposal/`，不得直接实现。
-2. 未经用户同意，不删除仍未实现的 Proposal。
-3. 接受的 Delta 先原子分发到相应正式层；若实现尚未完成，将剩余物理差距写入
-   `docs/status/`，不得把 Proposal 正文原样搬成第二份规范。
-4. 实现对齐并通过 proof 后删除对应 Status；完成历史交给 Git 和 CHANGELOG。
+- `changes/proposed/` 由用户管理。进入其中的 Proposal 已完成人工裁决并获批准；Agent
+  不重新执行 Admission、寻找批准证据或判断 Accepted/Rejected。
+- Agent 默认不得在 `changes/proposed/` 创建、修改、重命名、移动或删除文件，也不得扫描
+  后自行选择工作。只有用户明确要求启动指定 Proposal 时，才可将该文件移动到
+  `changes/active/`；该请求本身就是充分授权。
+- 启动时保留并冻结 Proposal 原文，在同一文件追加 `Active work`。Active Change 只限定
+  已批准范围、剩余关闭条件和 blocker，不能代替正式规范。
+- 完成正式规范、实现与 proof 闭环后，在同一文件追加 `Final outcome`，再移动到
+  `changes/completed/`。不得创建平行的 Proposal、Status、Decision 或 Outcome 文件。
+- 普通小型修复、局部重构、测试或格式修复不要求自动创建 Change；能在一次修改内完整
+  对齐 docs、实现和 proof 的工作可直接完成。
 
-线上事故的原子修补仅按 `GOV-012` 豁免独立 Proposal，不豁免规范、证明和兼容性裁决。
+Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由用户或负责人管理。
 
 ## 3. 修改纪律
 
 - 保持 Clause ID 稳定；移动定义时保留编号，不回收空号。
 - 一项知识只有一个定义。其它位置只引用 Clause ID、链接权威文件或描述本地应用。
-- 不在同一改动中顺手采用未裁决 Proposal，也不为迎合当前代码而降低正式条款。
-- 发现无法由正式层判定的语义冲突时，记录位置、影响和可选裁决，交给 Decision Owner。
+- 不主动采用 Proposed Change，也不为迎合当前代码而降低正式条款。
+- 发现无法由正式层判定的语义冲突时，记录位置、影响和可选裁决，报告用户；不得自行
+  改写已批准范围。
 - 工作区可能包含用户改动。修改前查看 `git status` 和相关 diff；保留无关改动。
 - 同一语义所有权或同一文件的补丁串行完成。并行工作只用于相互独立且不会覆盖的范围。
 - 编辑文本使用精确补丁；禁止用无差别批量改写代替语义审查。

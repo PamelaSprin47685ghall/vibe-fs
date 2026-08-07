@@ -1,7 +1,7 @@
 # DSL 结构化程序规则 — 边界
 
-行为不变量见 `what/dsl-structured-program.md`；活跃实现差距见
-`status/dsl-structured-program-gap.md`。
+行为不变量见 `what/dsl-structured-program.md`；相关未闭环工作见
+[`changes/active/dsl-structured-program-gap.md`](../../changes/active/dsl-structured-program-gap.md)。
 
 ## DSL-008：分层所有权
 
@@ -24,7 +24,8 @@ Infrastructure 只适配外部协议，不解释业务命令。
 - `SessionRecovery` 从 Journal evidence 派生 permit，再重入普通 workflow。
 - `AgentFact` 只负责 bounded-context family 分派；各 family 的纯 fold 拥有本域投影。
 
-不得为了兼容旧流程位置而建立第二个 writer。当前尚未对齐部分只在 Status 描述。
+不得为了兼容旧流程位置而建立第二个 writer。工作范围可以由 Active Change 限定，目标
+语义仍只由正式条款定义。
 
 ## DSL-010：Host 边界白名单
 

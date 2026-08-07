@@ -1,22 +1,30 @@
-# 文档治理 — 边界
+# 文档治理 — 所有权与边界
 
-规则定义在 `what/document-governance.md`。执行程序在 `how/document-governance.md`。
+规则见 `what/document-governance.md`；执行程序见 `how/document-governance.md`。
 
 ## 权威边界
 
-| 面 | 可写内容 | 不可写 |
-|----|----------|--------|
-| 规范面 why/what/shape/how/proof | 理由、行为、边界、目标实现、证明要求 | 实现进度百分比、提交列表 |
-| 流动面 proposal | 未裁决候选 | 被代码当现行合同 |
-| 流动面 status | 活跃差距与阻塞 | 条款定义（`## ID`）、完成墓地 |
-| 实现面 code/resources | 可执行实现与实例数据 | 发明文档未声明语义 |
+| 面 | writer | 可写内容 | 不可写 |
+|---|---|---|---|
+| 正式 docs | 对应 Clause owner | 理由、行为、边界、算法、证明 | 实施进度与历史 Proposal |
+| `changes/proposed` | 用户 | 已批准、等待启动的 Proposal 原文 | Agent 自选、重裁决、正式 Clause 定义 |
+| `changes/active` | 实施该指定 Change 的 Agent/用户 | 冻结原文、Remaining work、blocker、完成条件 | 新设计、持续日志、正式 Clause 定义 |
+| `changes/completed` | 关闭该 Change 的 Agent/用户 | 原文、批准修订、Final outcome | 当前产品规范、事后改写原文 |
+| code/resources | 实现 owner | 对齐 how 的可执行实现 | 从 Changes 发明未进入正式 docs 的语义 |
 
-## 写入口
+## 文件所有权
 
-- 产品行为变更：生命周期由 GOV-006 定义；本层只要求每个受影响主题明确行为、边界、算法和证明的写入口。
-- 条款定义：每个 ID 恰好一处 `## ID` 标题  
-- 导航：`docs/README.md` 与 `scripts/checks/spec.mjs` 同步  
+- 每项 Change 的唯一 writer 目标是它自己的单文件；生命周期转换只做目录移动。
+- 不存在独立 Status、Decision、Outcome 或 Change manifest writer。
+- Original proposal 的写权限在进入 Active 时关闭；后续章节只能追加。
+- `docs/README.md` 拥有正式文档导航，`changes/README.md` 拥有变更工作协议。
+- `AGENTS.md` 拥有 Agent 执行协议，不成为产品 Clause writer。
 
-## 与工程入口
+## 依赖方向
 
-`AGENTS.md` 只拥有 Agent 工作协议；`docs/README.md` 只拥有文档导航。两者不得成为正式条款 writer。
+```text
+changes/active ──范围──► docs 正式层 ──目标──► code/resources
+                                   └──证明──► proof
+```
+
+正式 docs 和实现不得反向依赖 Proposed 或 Completed。Active 可以定位工作范围，但不能替代正式目标。

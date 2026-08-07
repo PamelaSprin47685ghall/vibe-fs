@@ -378,7 +378,7 @@ Review confirmed                           → 只能派生，不能赋值
 
 | 载体 | 当前覆盖 |
 |------|----------|
-| `scripts/checks/spec.mjs` | 条款唯一/引用/前缀/导航、伪条款 ID、流动面定义禁令 |
+| `scripts/checks/spec.mjs` | 条款唯一/引用/前缀/导航、Change 禁止定义正式条款、废止路径与实现依赖禁令 |
 | `scripts/checks/architecture.mjs` | 源码根、fsproj 完整性、Kernel/Domain 依赖、资源读取、无 `.gen.fs`、旧路径、recovery ownership |
 | `scripts/checks/dsl-ownership.mjs` | 第二运行时、业务 Interpreter、程序计数器模式、mutable 与 infrastructure-open 边界 |
 | `scripts/checks/p0-recovery-join.mjs` | Agent false finality、recovery/join 特定单一 owner 与正负模式 |

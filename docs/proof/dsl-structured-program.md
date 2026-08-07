@@ -1,7 +1,8 @@
 # DSL 结构化程序规则 — 证明
 
 行为见 `what/dsl-structured-program.md`；边界见 `shape/dsl-structured-program.md`；
-算法见 `how/dsl-structured-program.md`；活跃差距见 `status/dsl-structured-program-gap.md`。
+算法见 `how/dsl-structured-program.md`；相关未闭环工作见
+[`changes/active/dsl-structured-program-gap.md`](../../changes/active/dsl-structured-program-gap.md)。
 
 ## 静态义务
 
@@ -9,7 +10,7 @@
 |---|---|
 | `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
-| `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或流动面伪定义 |
+| `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
 
 每项新增静态规则必须有永久 fixture，并曾用故意反例证明仓库入口会失败。
 
@@ -25,7 +26,7 @@
 
 ## 完成判据
 
-1. `status/dsl-structured-program-gap.md` 所列物理差距关闭并删除。
+1. Active Change 所列完成条件全部满足，并在同一文件追加 Final outcome 后移入 Completed。
 2. 静态门禁无阈值上调或永久豁免逃逸。
 3. 相关 unit、integration 与 canary 按 `proof/verify.md` 通过。
 4. 删除旧状态后不存在双写、adapter facade 或仅为旧测试保留的旁路。

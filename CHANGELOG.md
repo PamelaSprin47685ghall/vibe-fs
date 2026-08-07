@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 文档体系 clean break：废止根 `spec/` 与旧 `docs/rfcs`/`docs/decisions` 权威路径；产品规范迁入 `docs/{why,what,shape,how,proof}`，流动面为 `proposal/`、`status/`。
+- 文档变更工作流改为单文件生命周期：当前规范保留在 `docs/{why,what,shape,how,proof}`；已批准变更在 `changes/{proposed,active,completed}` 间移动，不再创建平行 Proposal 与 Status 文件。
 - 条款 ID（`ARCH-`/`PROMPT-`/…）保留且唯一归属一层；`scripts/checks/spec.mjs` 扫描正式层；导航见 `docs/README.md`。
 - 工程入口（`AGENTS.md`、根 README、VERIFY-004 退化清单）改指向新路径；无运行时协议变更。
 - `PENDING.md` 收口为 COMPLETED/HISTORICAL：Join v2 / sub-session 复用 / Blogger InteractionRepair / Enforcer tip v2 / Coder TDD / HOST-013 marker 均有正式条款与自动化证据；删除未勾选假待办。
