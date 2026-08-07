@@ -28,7 +28,7 @@ HumanRoot [X] → XTrace durable capture → ManagerNarrativeTransform 改写
 
 ```text
 suicide → FinalityRequested → HostReviewProgram → REVISE
-→ Reviewer LWR（includeOpening=false）→ FinalityRejected → FinalityRejected continuation
+→ Reviewer LWR（includeOpening=false）→ FinalityRejected → FinalityPrompt.rejected 拒绝 prompt（作为 suicide 工具返回值直接返回）
 → Manager 同一 Life 继续工作 → 再次 suicide → 新 request/Reviewer/barrier
 ```
 

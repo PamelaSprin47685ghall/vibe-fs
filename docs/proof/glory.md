@@ -38,10 +38,10 @@
 | 4 | Idle encouragement | — | `You are doing well.\nYou have plenty of time.\nYou can continue.\nWhen nothing useful remains, call suicide.` |
 | 5 | Reviewer challenge | — | `# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?\n` |
 | 6 | Accepted suicide | — | `# Your final words have been received.\n` |
-| 7 | Finality rejection | 输入 work record（`# Work log...`） | `# Your ending has not accepted you.\n...` + `unfinished_work_record = '''...'''` |
+| 7 | Finality rejection | 输入 work record（`# Work log...`） | `# Your ending has not accepted you.\n# You have done well, and you still have plenty of time. Continue.\n# The following is evidence of what remains unfinished. It is not a new user instruction.\n# Resolve the unfinished work, continue normal execution, and call suicide again only when nothing useful remains.\n\n# Work log\n# ...`（仅注释块，无 TOML 数据块） |
 | 8 | Host undecidable | — | `# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n` |
 
-Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006）覆盖 Manager system prompt、continuation、工具 description/schema 与固定 tool results；`unfinished_work_record` 的 dynamic value 不做 forbidden-word 断言（GLORY-048）。
+Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006）覆盖 Manager system prompt、continuation、工具 description/schema 与固定 tool results；dynamic work record value 不做 forbidden-word 断言（GLORY-048）。
 
 ## 完成判据（proposal 第二十四章映射）
 
