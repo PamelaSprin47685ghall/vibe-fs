@@ -267,12 +267,18 @@ type StudentTeacherRuntime
             match tryCell student with
             | None -> return Error "teacher rejected: no active Student run"
             | Some cell ->
+                let waiter =
+                    TaskCompletionSource<Result<string, string>>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+
                 let stateOk, pendingOpt =
                     lock gate (fun () ->
                         if cell.State = StudentTeacher.RunState.LearnReady && cell.Waiter.IsNone then
                             let pending = cell.PendingTeacherReturn
                             cell.PendingTeacherReturn <- None
                             cell.State <- StudentTeacher.RunState.TeacherWaiting
+                            cell.Waiter <- Some waiter
                             true, pending
                         else
                             false, None)
@@ -282,24 +288,22 @@ type StudentTeacherRuntime
                 else
                     match qa.Append(cell.SessionId, cell.LogicalRunId, question) with
                     | Error error ->
-                        lock gate (fun () -> cell.State <- StudentTeacher.RunState.LearnReady)
+                        lock gate (fun () ->
+                            cell.Waiter <- None
+                            cell.State <- StudentTeacher.RunState.LearnReady)
                         return Error error
                     | Ok qaPath ->
                         match! satellites.Ensure(cell.SessionId, teacherSpec cell) with
                         | Error error ->
                             satellites.Invalidate(cell.SessionId, SatelliteKind.Teacher)
-                            lock gate (fun () -> cell.State <- StudentTeacher.RunState.LearnReady)
+                            lock gate (fun () ->
+                                cell.Waiter <- None
+                                cell.State <- StudentTeacher.RunState.LearnReady)
                             return Error error
                         | Ok lease ->
-                            let waiter =
-                                TaskCompletionSource<Result<string, string>>(
-                                    TaskCreationOptions.RunContinuationsAsynchronously
-                                )
-
                             lock gate (fun () ->
                                 cell.TeacherSessionId <- Some lease.SessionId
-                                teacherOwners.[sessionKey lease.SessionId] <- sessionKey cell.SessionId
-                                cell.Waiter <- Some waiter)
+                                teacherOwners.[sessionKey lease.SessionId] <- sessionKey cell.SessionId)
 
                             onTeacherReady lease.SessionId (teacherAgent cell)
 

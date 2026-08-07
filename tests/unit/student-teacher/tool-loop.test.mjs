@@ -56,21 +56,17 @@ test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_
     ]
 
     for (let index = 0; index < exchanges.length; index += 1) {
-      console.log(`[LOOP] start index=${index}`)
       const [question, answer] = exchanges[index]
       const studentRun = hooks.tool.teacher.execute(
         { message: question },
         toolContext(student, `asst_student_${index}`, `call_teacher_${index}`),
       )
-      console.log(`[LOOP] studentRun started index=${index}`)
 
       if (index === 0) {
         while (runtime.prompts.length <= index) await new Promise((resolve) => setImmediate(resolve))
-        console.log(`[LOOP] prompt received index=${index}`)
         const teacher = createdIds[0]
         assert.ok(teacher, 'first call must create the private Teacher')
         await awaitPrompted(teacher)
-        console.log(`[LOOP] awaitPrompted index=${index}`)
 
         const prompt = runtime.prompts[index]
         const promptKey = promptKeyOf(prompt)
@@ -117,24 +113,19 @@ test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_
             },
           ],
         })
-        console.log(`[LOOP] chat.message pushed index=${index}`)
       }
 
       const teacher = createdIds[0]
-      console.log(`[LOOP] calling return.execute index=${index}`)
       const teacherReturnPromise = hooks.tool.return.execute(
         { message: answer },
         toolContext(teacher, `asst_teacher_${index}`, `call_return_${index}`),
       ).catch(() => {})
 
-      console.log(`[LOOP] awaiting studentRun index=${index}`)
       const delivered = parseToml(await studentRun)
-      console.log(`[LOOP] studentRun finished index=${index}, answer=${delivered.answer}`)
       assert.equal(delivered.answer, answer)
       assert.equal(createdIds.length, 1, 'all calls must reuse exactly one Teacher Session')
       assert.deepEqual(runtime.abortedIds, [], 'successful Teacher returns must never abort the Session')
     }
-    console.log('[LOOP] loop completed')
 
     const privateGitDir = execFileSync(
       'git',
