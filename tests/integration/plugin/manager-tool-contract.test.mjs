@@ -1080,3 +1080,16 @@ test('EXEC_002_the_fixture_delivers_the_real_journal_and_terminal_port', async (
     assert.deepEqual(envelope.RuntimeId, ['RuntimeId', runtime.runtimeId])
   })
 })
+
+test('GLORY_034_suicide_tool_executes_synchronously', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-suicide-sync', 'fast-manager')
+    const context = { sessionID: 'manager-suicide-sync', agent: 'fast-manager' }
+
+    // Calling suicide before activation returns precondition error synchronously:
+    const preActivation = parseToml(
+      await hooks.tool.suicide.execute({ last_words: 'Task completed.' }, context),
+    )
+    assert.equal(preActivation.error, 'Your work has not yet begun.\nContinue.\n')
+  })
+})

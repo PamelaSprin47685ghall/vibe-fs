@@ -41,11 +41,6 @@ module FinalityTool =
     let private outstandingWork (scope: ToolRuntimeScope) (context: HostToolContext) =
         match scope.RuntimeFor context with
         | Ok runtime ->
-            // TEMP DIAG: outstanding work (removed before merge).
-            emitJsExpr
-                (sprintf "ow run=%d comp=%d" runtime.PendingRunCount runtime.PendingCompletionCount)
-                "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
             runtime.PendingRunCount > 0
             || runtime.PendingCompletionCount > 0
             || scope.HasLivePty context.SessionId
@@ -170,15 +165,7 @@ module FinalityTool =
                                 // GLORY-037.7: an open request. The same ToolCallId is a
                                 // replay (idempotent); a different one is still in motion.
                                 match life.ActiveFinality with
-                                // TEMP DIAG: finality request (removed before merge).
                                 | Some request when not request.Rejected && not request.Confirmed ->
-                                    emitJsExpr
-                                        (sprintf
-                                            "af-open req=%s rev=%b call=%A"
-                                            (FinalityRequestId.value request.RequestId)
-                                            (Option.isSome request.ReviewerSessionId)
-                                            context.ToolCallId)
-                                        "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
 
                                     match context.ToolCallId with
                                     | Some callId when callId = request.ToolCallId ->
@@ -194,25 +181,21 @@ module FinalityTool =
                                         // fold keeps the request open until the
                                         // restart lands a terminal fact.
                                         if request.ReviewerSessionId.IsNone then
-                                            FinalityController.start
-                                                scope
-                                                sid
-                                                life.LifeId
-                                                request.RequestId
-                                                request.GitTreeHash
-                                                request.LastWordsRef
-                                                request.LastWordsDigest
-                                                request.ProviderRun
-                                            |> ignore
+                                            do!
+                                                FinalityController.start
+                                                    scope
+                                                    sid
+                                                    life.LifeId
+                                                    request.RequestId
+                                                    request.GitTreeHash
+                                                    request.LastWordsRef
+                                                    request.LastWordsDigest
+                                                    request.ProviderRun
 
                                         return
                                             ToolHostCodec.tomlObject
                                                 [ "error", tString "Your ending is already in motion." ]
                                 | other ->
-                                    emitJsExpr
-                                        (sprintf "af-other=%b" (Option.isSome other))
-                                        "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
                                     if String.IsNullOrWhiteSpace lastWords then
                                         return ToolHostCodec.tomlObject [ "error", tString "Final words are required." ]
                                     elif context.ToolCallId.IsNone then
@@ -226,14 +209,6 @@ module FinalityTool =
                                                 [ "error",
                                                   tString "The ending cannot be entered without a run identity." ]
                                     elif outstandingWork scope context then
-                                        // TEMP DIAG: suicide rejection (removed before merge).
-                                        emitJsExpr
-                                            (sprintf
-                                                "outstanding sid=%s call=%A run=%A"
-                                                context.SessionId
-                                                context.ToolCallId
-                                                context.ProviderRunId)
-                                            "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
                                         // GLORY-038: background work still walks the world.
                                         return
                                             ToolHostCodec.tomlObject
@@ -244,36 +219,20 @@ module FinalityTool =
                                         // GLORY-037.14/15: the tree must be readable.
                                         match treeOf scope sessionId with
                                         | None ->
-                                            // TEMP DIAG: finality tree (removed before merge).
-                                            emitJsExpr
-                                                ()
-                                                "require('node:fs').appendFileSync('/tmp/fc.log', 'no-tree\\n')"
-
                                             return
                                                 ToolHostCodec.tomlObject
                                                     [ "error", tString "Your ending could not be entered.\nContinue." ]
                                         | Some tree ->
                                             match journal.WriteBlob lastWords with
                                             | Error err ->
-                                                // TEMP DIAG: finality blob (removed before merge).
-                                                emitJsExpr
-                                                    (sprintf "blob-ERR=%s" (string err))
-                                                    "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
                                                 return
                                                     ToolHostCodec.tomlObject
                                                         [ "error",
                                                           tString "Your ending could not be entered.\nContinue." ]
                                             | Ok blob ->
-                                                // GLORY-040: accept in order. The Finality
-                                                // workflow is fire-and-forget; every outcome
-                                                // lands on the journal before any side effect.
+                                                // GLORY-040: accept in order. Synchronously wait for the Finality
+                                                // workflow to complete; every outcome lands on the journal before any side effect.
                                                 let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
-
-                                                // TEMP DIAG: finality append (removed before merge).
-                                                emitJsExpr
-                                                    (sprintf "append-ok=%b" true)
-                                                    "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
 
                                                 AgentJournal.appendManagerLifecycle
                                                     (StreamId.Session sid)
@@ -288,13 +247,6 @@ module FinalityTool =
                                                            ToolCallId = context.ToolCallId.Value |})
                                                     journal
                                                 |> Result.mapError (fun failure ->
-                                                    // TEMP DIAG: finality append (removed before merge).
-                                                    emitJsExpr
-                                                        (sprintf
-                                                            "append-ERR=%s"
-                                                            (JournalAppendFailure.describe failure))
-                                                        "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
                                                     raise (
                                                         InvalidOperationException(
                                                             sprintf
@@ -304,16 +256,16 @@ module FinalityTool =
                                                     ))
                                                 |> ignore
 
-                                                FinalityController.start
-                                                    scope
-                                                    sid
-                                                    life.LifeId
-                                                    requestId
-                                                    tree
-                                                    blob.BlobRef
-                                                    blob.BlobDigest
-                                                    context.ProviderRunId.Value
-                                                |> ignore
+                                                do!
+                                                    FinalityController.start
+                                                        scope
+                                                        sid
+                                                        life.LifeId
+                                                        requestId
+                                                        tree
+                                                        blob.BlobRef
+                                                        blob.BlobDigest
+                                                        context.ProviderRunId.Value
 
                                                 // GLORY-041: the Manager sees only the
                                                 // narrative; the physical run stops here.
@@ -326,32 +278,14 @@ module FinalityTool =
                         match effectiveLife with
                         // GLORY-039: still no Life — the HumanRoot Manager is planning.
                         | None ->
-                            // TEMP DIAG: suicide rejection (removed before merge).
-                            emitJsExpr () "require('node:fs').appendFileSync('/tmp/fc.log', 'no-life\\n')"
-
                             return
                                 ToolHostCodec.tomlObject [ "error", tString "Your work has not yet begun.\nContinue." ]
                         | Some life when life.ProtectedPrefixEnd.IsNone ->
-                            // TEMP DIAG: suicide rejection (removed before merge).
-                            emitJsExpr
-                                (sprintf "not-activated")
-                                "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
                             return
                                 ToolHostCodec.tomlObject [ "error", tString "Your work has not yet begun.\nContinue." ]
                         | Some life when life.Completed ->
                             return ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
-                        | Some life ->
-                            // TEMP DIAG: suicide rejection (removed before merge).
-                            emitJsExpr
-                                (sprintf
-                                    "accepting sid=%s call=%A run=%A"
-                                    context.SessionId
-                                    context.ToolCallId
-                                    context.ProviderRunId)
-                                "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
-                            return! acceptSuicide life
+                        | Some life -> return! acceptSuicide life
             | Some _ -> return ToolHostCodec.tomlObject [ "error", tString "The ending is not yours to call." ]
             | None ->
                 return

@@ -112,6 +112,31 @@ module ManagerNarrativeTransform =
         |> List.tryPick id
         |> Option.map PromptKey.create
 
+    let private isMessageFromCompletedLife (traceState: XTraceProjectionState option) (messageId: string) =
+        match traceState with
+        | None -> false
+        | Some state ->
+            match state.Terminal with
+            | None -> false
+            | Some _ -> state.Parts |> List.exists (fun part -> part.Provenance = messageId)
+
+    let private hasSuicideAfter (rawMessages: obj list) (messageIndex: int) =
+        if messageIndex >= List.length rawMessages - 1 then
+            false
+        else
+            rawMessages
+            |> List.skip (messageIndex + 1)
+            |> List.exists (fun raw ->
+                match Projection.decodeMessage raw with
+                | Some message ->
+                    message.Parts
+                    |> List.exists (function
+                        | WireToolCall(_callId, name, _args) -> name = "suicide"
+                        | WireToolResult(_callId, result) -> result.Contains("Your final words have been received")
+                        | WireText text -> text.Contains("Your final words have been received")
+                        | _ -> false)
+                | None -> false)
+
     /// Replace the text of the user message at `messageIndex` with the narrative
     /// text. Only text parts are touched; reasoning/tool/activity parts pass
     /// through unchanged.
@@ -263,10 +288,14 @@ module ManagerNarrativeTransform =
                         // a compaction replay.
                         if isTitleRequest || isCompactionMarker raw then
                             None
-                        elif isAcceptedContinuation durable sid messageId then
+                        elif
+                            isAcceptedContinuation durable sid messageId
+                            || isMessageFromCompletedLife traceState messageId
+                            || hasSuicideAfter rawMessages messageIndex
+                        then
                             // GLORY-0xx: after a Life completed, a continuation
-                            // (e.g. the join guard) must still see the same
-                            // opening rewrite as the previous request, or the
+                            // (e.g. the join guard) or a post-completion step of the completed Life
+                            // must still see the same opening rewrite as the previous request, or the
                             // ARCH-004 seal breaks (measured: msg[1] reverted to
                             // the raw assignment on the second join-guard turn
                             // once CurrentLife became None).
@@ -302,7 +331,12 @@ module ManagerNarrativeTransform =
                                         // guard's second delivery broke the seal
                                         // when this branch switched to the
                                         // reawakening narrative).
-                                        let narrative = ManagerNarrative.firstBirth rawText
+                                        let narrative =
+                                            if List.length lifecycle.CompletedLives = 1 then
+                                                ManagerNarrative.firstBirth rawText
+                                            else
+                                                ManagerNarrative.reawakening rawText
+
                                         Some(rewriteMessage rawMessages messageIndex narrative))
                         else
                             let messageIdValue = PhysicalUserMessageId.create messageId

@@ -160,7 +160,7 @@ Manager 调用 `fork("fast-reviewer", ...)`、`fork("deep-reviewer", ...)`、`fo
 
 ## GLORY-040：受理顺序
 
-验证前置条件 → 读取 tree hash → 写 last_words blob → append `FinalityRequested` → 停放 Manager completion → 启动 HostReviewProgram。Reviewer session 尚不存在，所以 barrier 不能在步骤 4 之前打开。
+验证前置条件 → 读取 tree hash → 写 last_words blob → append `FinalityRequested` → 同步启动 HostReviewProgram 并等待 Reviewer 返回 → 停放 Manager completion。Reviewer session 尚不存在，所以 barrier 不能在步骤 4 之前打开。
 
 ## GLORY-041：工具调用后的 Manager 行为
 

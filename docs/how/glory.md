@@ -30,7 +30,7 @@
 2. `ToolRegistry.rolePredicate` 加 `"suicide" -> fun r -> r = Role.Manager`；`baseSpecs` 加 `FinalityTool.spec factory runtime`。
 3. `FinalityTool.execute`（GLORY-034/035/037-041）：
    - 前置条件 1-16 按序检查，失败返回 GLORY-038/039 或对应拒绝文本（禁止泄漏内部细节）；
-   - 合法受理：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → `scope.MarkVerdictSubmitted`-式停靠（deferred completion 由 TurnCompletionProgram 的 FinalityRequested gate 保证）→ fire-and-forget 启动 `HostReviewProgram` 流程；
+   - 合法受理：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → `scope.MarkVerdictSubmitted`-式停靠（deferred completion 由 TurnCompletionProgram 的 FinalityRequested gate 保证）→ 启动 `HostReviewProgram` 流程（同步等待 Reviewer 返回）；
    - tool result：`# Your final words have been received.`（golden fixture 6）。
 4. `ForkTool.executeManager`：解析 `agent` 为 `Role.Reviewer` 时（读 durable/canonical role，GLORY-031）返回 `That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.`；`ToolRuntimeScope.RuntimeFor` 创建 `HostForkRuntime` 时 `managerOpensReviewBarrier` 置 false（GLORY-033），`HostForkAgent.fork` 的 `ManagerOpensReviewBarrier && role = Role.Reviewer` 分支随之成为死代码，删除。
 5. 自动 Reviewer 隐藏：HostReviewProgram 使用独立 `HostForkRuntime`（同 OrchestratorHost 模式，不注册进 Manager 的 `Children`），其 completion 不进 Manager `join`/`list`（GLORY-002）。

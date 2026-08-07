@@ -290,8 +290,7 @@ module FinalityController =
         }
 
     /// GLORY-040 step 6: start the Finality workflow after a legal suicide was
-    /// accepted. Fire-and-forget: the Manager's physical run has already been
-    /// stopped, and every outcome lands on the journal before any side effect.
+    /// accepted. Synchronous execution: every outcome lands on the journal before any side effect.
     let start
         (scope: ToolRuntimeScope)
         (managerSessionId: SessionId)
@@ -303,11 +302,6 @@ module FinalityController =
         (providerRun: ProviderRunIdentity)
         : Task =
         task {
-            // TEMP DIAG: finality start (removed before merge).
-            emitJsExpr
-                (sprintf "start sid=%s jnl=%b" (SessionId.value managerSessionId) (Option.isSome scope.Journal))
-                "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-
             match scope.Journal with
             | None -> ()
             | Some journal ->
@@ -345,11 +339,6 @@ module FinalityController =
                             HostReviewPrompt.OpeningAssignment,
                             None
                         )
-
-                    // TEMP DIAG: finality start (removed before merge).
-                    emitJsExpr
-                        (sprintf "fork-result sid=%s ok=%b" (SessionId.value managerSessionId) (Result.isOk forkResult))
-                        "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
 
                     match forkResult, runtime.TryChildSession reviewerAgentId with
                     | Error _, _
@@ -484,11 +473,7 @@ module FinalityController =
 
                                 ()
                 with ex ->
-                    // TEMP DIAG: finality start (removed before merge).
-                    emitJsExpr
-                        (sprintf "start-EX sid=%s err=%s" (SessionId.value managerSessionId) (string ex.Message))
-                        "require('node:fs').appendFileSync('/tmp/fc.log', $0 + '\\n')"
-                    // Fire-and-forget boundary: never leak an exception out of
+                    // Exception boundary: never leak an exception out of
                     // the tool call that accepted the suicide.
                     Diagnostic.emit "finality" [ "session_id", SessionId.value managerSessionId; "error", ex.Message ]
         }
