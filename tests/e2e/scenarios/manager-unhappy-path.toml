@@ -1,0 +1,132 @@
+scenario = "manager-unhappy-path"
+description = "Manager boundary canary: rejected planning calls, premature suicide, and confirmed finality"
+pass = "Manager unhappy path canary passed: all boundary nodes traversed."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "manager unhappy path canary\n", "src/main.txt" = "target\n" } } }
+session = { agent = "fast-manager", bind = ["mgr-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "Run the full unhappy path traversal in one turn." }
+
+must = ["mgr.0", "mgr-activation", "finality-reviewer.0", "finality-reviewer.1"]
+
+flow = [
+  { wait = "mgr.0" },
+  { wait = "mgr-activation" },
+  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
+  { wait = "finality-reviewer.0" },
+  { wait = "finality-reviewer.1" },
+  { wait = "finality-reviewer.2" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { waitFact = { name = "ReviewVerdictRecorded", gte = 2 } },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "mgr-title"
+lane = "mgr-title"
+kind = "title"
+user = "Run the full unhappy path traversal in one turn."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Manager Unhappy Path" }
+
+[[turn]]
+id = "mgr"
+lane = "fast-manager"
+user = "Run the full unhappy path traversal in one turn."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "manager", prompt = "illegal old name" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-nonexistent", prompt = "no such agent" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "list", args = {} }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Planning complete; continue the work yourself." }
+
+[[turn]]
+id = "child-coder"
+internal = true
+user = "# TDD phase: GREEN. Implement the smallest production change."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder: src/main.txt written with 'done'." }
+
+[[turn]]
+id = "mgr-activation"
+internal = true
+user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write src/main.txt with 'done'." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "premature" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "all boundary nodes traversed." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager ended with a confirmed suicide." }
+
+[[turn]]
+id = "finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary traversal.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary traversal continued.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary cycle 2.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary cycle 3.", tip = "primitive-obsession" } }
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 3
+reason = "frame-commit"
