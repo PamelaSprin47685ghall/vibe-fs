@@ -186,3 +186,10 @@ Reconciler 语义迁移已完成：`RereadWithBackoff`/`pickDelay`/`nextBackoffI
 - **测试**：`reconcile-idle-early.test.mjs` 三回归改为因果重读次数；`reconcile-supervisor.test.mjs` 清理 `maxBudgetMs`/`backoffDelaysMs` 残留、1c 改因果重读语义；新增 `EXEC_reconcile_persistent_errors_stop_pass_bounded`（连续错误有界终止）、`timer-port.test.mjs`（ITimerPort 虚拟时钟契约）；`p0-recovery-join-gate.test.mjs` 绿路径 fixture 更新。
 - **验证**：`npm run check`（lint/build/test/integration）全绿；unit 1074/0；lint 含 spec-check/architecture/dsl-ownership/dsl-ownership-ratchet/p0-recovery-join 全绿。
 - **已知限制**：SSE 心跳用 Node timer 而非 ITimerPort 注入（字面偏离，结构断言守卫）；D 类 IntegrationGate 未处理；无更强 Host happens-after 顺序保证（HOST-004 上限与 early-idle 保护保留）。
+
+## Final outcome (REVISE 收尾)
+
+- **Executor 契约测试**：`tests/unit/execution/executor-summarize.test.mjs` 新增 `summarizeSpool`/`AwaitAgentWithPermit` 行为契约测试（每 chunk 恰好一次定向 await、乱序完成只返回目标 agent、TimedOut/NotFound 失败收集 + cancelOwned、FamilyWaiting→TimedOut 不误报成功）。Proof plan #3 闭环。乱序用例用短 setTimeout（~30ms）确定性通过，非虚拟时钟但非墙钟敏感。
+- **文档一致性修订**：`docs/how/dsl-structured-program.md` 明确 SSE 心跳属 C 类 one-shot silence deadline、经 Node timer 实现（语义等价 ITimerPort nodeTimerPort 的 ref/unref policy），注明 emitJsExpr 限制与 ITimerPort 注入面由 PtyTiming 虚拟时钟 + timer-port.test.mjs 覆盖；`docs/how/host.md` HOST-004 消除「等…之外」措辞歧义（改为「保持 Dirty，等下一粗粒度信号（idle/retry/deleted）重新入队」）；`docs/proof/verify.md` ITimerPort 条补「SSE 心跳经 Node timer 语义等价，不由 ITimerPort 注入」。
+- **domain.mjs 注释清理**：`tests/unit/support/domain.mjs` `reconcileSupervisor` 注释从旧墙钟语义（timer-backoff/wall-clock budget）改为 `maxCausalRereads`/`maxConsecutiveErrors`（无墙钟/timer backoff）。
+- **已知独立 flaky**：`EXEC_025_three_teacher_calls_...`（student-teacher tool-loop）2500ms 超时为 student-teacher 链路（hanging-return 改造）引入的负载敏感 flaky，与本次改造零因果关联（该测试不经过本改造文件），当前连续多跑全绿；如再 flaky 应在 student-teacher 侧收紧确定性。
