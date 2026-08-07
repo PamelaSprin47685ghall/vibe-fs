@@ -59,8 +59,13 @@ flow = [
   # reviewer's answer races the restart and legitimately never lands
   # pre-restart. The guard round resumes and confirms on the recovered run.
   { wait = "barrier-reviewer.2" },
-  { wait = "conflict-resume.0" },
-
+  # Post-restart resume: restart + cold start + journal fold exceed the default
+  # 5s silence window under forest pressure. The wait sits AFTER awaitRestart:
+  # the recovered rebase request can only fire once the engine booted, so the
+  # 30000ms window measures the resume action, not the restart itself (waiting
+  # before awaitRestart made the window span an unbounded restart and timed out
+  # even at 30000 under 63-launch accumulation). 30000 is the ceiling for the
+  # resume chain; beyond it a structural fix is the next step, not another raise.
   { awaitRestart = true },
 
   # Continue drives recovery (Host has no auto-recovery). Causal order on the common path:
@@ -73,13 +78,15 @@ flow = [
   # second conflict-resume arrives. Both timelines converge on `Published`, which is
   # the restart-phase criterion — the conflict-resume wait below is deliberately
   # absent so a resolved-before-crash run is not held to a resume that never fires.
+  { wait = "conflict-resume.0", timeoutMs = 30000 },
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
-  { wait = "barrier-reviewer.0" },
-  { wait = "barrier-reviewer.1" },
-  { wait = "barrier-reviewer.2" },
-  { wait = "orch-continue.0" },
-  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 20000 },
-  { wait = "orch-continue.1" },
+  { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.1", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.2", timeoutMs = 20000 },
+  { wait = "orch-continue.0", timeoutMs = 30000 },
+  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 30000 },
+  { wait = "orch-continue.1", timeoutMs = 30000 },
 
   { awaitTerminal = true, requireAssistantTerminal = false },
   { assertFacts = { name = "Published", eq = 1 } },

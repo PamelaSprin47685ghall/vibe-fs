@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   bloggerRuntime,
   bloggerRequestContext,
+  authorityRoot,
   handleProjection,
   handleId,
   sessionId,
@@ -56,23 +57,26 @@ test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
   assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, abandoned.value)), true)
 })
 
-test('BLOGGER_RUNTIME_Sealed_ignores_material_until_reactivate', () => {
-  const sealed = bloggerRuntime.forceSeal(bloggerRuntime.idle)
-  assert.equal(bloggerRuntime.stateOf(sealed), 'Sealed')
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true)
-  assert.equal(bloggerRuntime.blocksNewRequest(false, sealed), true)
+test('BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
+  // DSL-003: handle seal is a durable journal fact read at every entry
+  // (blocksNew in the Coordinator), so the cell has no Sealed case. forceSeal
+  // only closes the in-memory drain window; a cell mirror could only duplicate
+  // — and drift from — the journal.
+  const idle = bloggerRuntime.forceSeal(bloggerRuntime.idle)
+  assert.equal(bloggerRuntime.stateOf(idle), 'Idle', 'forceSeal leaves the state alone')
+  assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true, 'durable seal blocks')
+  assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false, 'no mirror: unsealed durable unblocks')
 
-  const ignored = bloggerRuntime.onMaterial(sealed, ctx())
-  assert.equal(ignored.ok, true)
-  assert.equal(ignored.decision, 'Ignore')
-  assert.equal(bloggerRuntime.stateOf(ignored.state), 'Sealed')
-
-  const live = bloggerRuntime.onReactivate(sealed)
+  const live = bloggerRuntime.onReactivate(idle, authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.stateOf(live), 'Idle')
   assert.equal(bloggerRuntime.reactivatedOf(live), true)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, live), false)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, live), false, 'drain window lets the cycle through')
+  // The drain window holds an unforgeable DrainPermit (module-private
+  // constructor): no caller can mint an open window for an arbitrary root, so
+  // the recorded root is guaranteed by the type, not asserted by value.
+  assert.equal(bloggerRuntime.reactivatedOf(live), true)
 
-  const started = bloggerRuntime.onMaterial(live, ctx())
+  const started = bloggerRuntime.onMaterial(false, live, ctx())
   assert.equal(started.ok, true)
   assert.equal(started.decision, 'Start')
   assert.equal(bloggerRuntime.stateOf(started.state), 'InFlight')
@@ -83,54 +87,43 @@ test('BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
   assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false)
   assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true)
 
-  const reactivated = bloggerRuntime.onReactivate(idle)
+  const reactivated = bloggerRuntime.onReactivate(idle, authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.stateOf(reactivated), 'Idle')
   assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
 })
 
-test('BLOGGER_RUNTIME_Parked_survives_onReactivate_so_offer_not_start', () => {
-  // Authority Root on main must not demote Parked→Idle. Idle+material = Start
-  // (new prompt_async) while Host still parks the prior transform; Offer is the
-  // only path that SetPendingOffer-resumes the waiter (ENFORCER-050).
-  const parked = bloggerRuntime.parked
-  assert.equal(bloggerRuntime.stateOf(parked), 'Parked')
-
-  const reactivated = bloggerRuntime.onReactivate(parked)
-  assert.equal(bloggerRuntime.stateOf(reactivated), 'Parked')
+test('BLOGGER_RUNTIME_parked_waiter_survives_onReactivate_so_offer_not_start', () => {
+  // Authority Root on main must not demote the waiter fact. Idle + parked
+  // waiter = Start (new prompt_async) only when nothing waits; with a waiter
+  // the material Offer-resumes it (ENFORCER-050). The cell itself stays Idle —
+  // the waiter is the host dictionary's physical fact.
+  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.idle, authorityRoot('root-r1'))
+  assert.equal(bloggerRuntime.stateOf(reactivated), 'Idle')
   assert.equal(bloggerRuntime.reactivatedOf(reactivated), true)
 
-  const offered = bloggerRuntime.onMaterial(reactivated, ctx())
+  const offered = bloggerRuntime.onMaterial(true, reactivated, ctx())
   assert.equal(offered.ok, true)
   assert.equal(offered.decision, 'Offer')
-  assert.equal(bloggerRuntime.stateOf(offered.state), 'Parked')
-})
-
-test('BLOGGER_RUNTIME_InFlight_survives_onSeal_flag_clear_only', () => {
-  const started = bloggerRuntime.onMaterial(bloggerRuntime.idle, ctx())
-  assert.equal(started.decision, 'Start')
-  const sealedSoft = bloggerRuntime.onSeal(started.state)
-  assert.equal(bloggerRuntime.stateOf(sealedSoft), 'InFlight')
-  assert.equal(bloggerRuntime.reactivatedOf(sealedSoft), false)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealedSoft), false)
+  assert.equal(bloggerRuntime.stateOf(offered.state), 'Idle')
 })
 
 test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
   // Durable handle sealed + DrainWindow.Open lets one drain window through;
   // once caught up, host forceSeal must permanently re-block.
-  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.forceSeal(bloggerRuntime.idle))
+  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.forceSeal(bloggerRuntime.idle), authorityRoot('root-r1'))
   assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
 
-  const started = bloggerRuntime.onMaterial(reactivated, ctx())
+  const started = bloggerRuntime.onMaterial(false, reactivated, ctx())
   assert.equal(started.decision, 'Start')
   const committed = bloggerRuntime.onCycleCommitted(started.state)
   assert.equal(committed.ok, true)
-  assert.equal(bloggerRuntime.stateOf(committed.state), 'Parked')
+  assert.equal(bloggerRuntime.stateOf(committed.state), 'Idle')
   // Flag still true after commit — host must forceSeal when tryRefresh returns None.
   assert.equal(bloggerRuntime.reactivatedOf(committed.state), true)
   assert.equal(bloggerRuntime.blocksNewRequest(true, committed.state), false)
 
   const sealed = bloggerRuntime.forceSeal(committed.state)
-  assert.equal(bloggerRuntime.stateOf(sealed), 'Sealed')
+  assert.equal(bloggerRuntime.stateOf(sealed), 'Idle', 'forceSeal only closes the drain window')
   assert.equal(bloggerRuntime.reactivatedOf(sealed), false)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true, 'durable seal re-blocks after catch-up')
 })

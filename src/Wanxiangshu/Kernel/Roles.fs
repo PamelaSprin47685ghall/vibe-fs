@@ -5,6 +5,8 @@ type AgentTier =
     | Fast
     | Deep
 
+/// DSL-class: Vocabulary — the fixed set of managed agent roles (one
+/// vocabulary, no control-flow reading).
 [<RequireQualifiedAccess>]
 type Role =
     | Manager
@@ -18,6 +20,7 @@ type Role =
     | Executor
     | Blogger
 
+/// DSL-class: Vocabulary — the fixed tool-permission catalog keyed by Role.
 [<RequireQualifiedAccess>]
 type ToolPermission =
     | Fork

@@ -66,10 +66,6 @@ type ProviderRequestKind =
     | BloggerSquash
     /// FALLBACK-008's one repair for an unusable terminal.
     | InteractionRepair
-    /// docs/proposal/student-teacher.md LEARN-050: the Student's learning phase request (only `teacher`).
-    | StudentLearn
-    /// docs/proposal/student-teacher.md LEARN-050: the Student's compile phase request (read/write/return).
-    | StudentCompile
 
 [<RequireQualifiedAccess>]
 module ProviderRequestKind =
@@ -80,8 +76,6 @@ module ProviderRequestKind =
         | ProviderRequestKind.BloggerMain -> "blogger-main"
         | ProviderRequestKind.BloggerSquash -> "blogger-squash"
         | ProviderRequestKind.InteractionRepair -> "interaction-repair"
-        | ProviderRequestKind.StudentLearn -> "student-learn"
-        | ProviderRequestKind.StudentCompile -> "student-compile"
 
     /// CTX-008 / FALLBACK-011: does a success on this kind clear the consecutive
     /// failure count.
@@ -95,9 +89,7 @@ module ProviderRequestKind =
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain -> true
         | ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.InteractionRepair
-        | ProviderRequestKind.StudentLearn
-        | ProviderRequestKind.StudentCompile -> false
+        | ProviderRequestKind.InteractionRepair -> false
 
     /// CTX-010: only the work session's main request substitutes a prefix.
     ///
@@ -108,6 +100,4 @@ module ProviderRequestKind =
         | ProviderRequestKind.WorkMain -> true
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.InteractionRepair
-        | ProviderRequestKind.StudentLearn
-        | ProviderRequestKind.StudentCompile -> false
+        | ProviderRequestKind.InteractionRepair -> false

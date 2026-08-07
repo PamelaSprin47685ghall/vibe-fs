@@ -29,6 +29,7 @@ type ForkRuntime
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
 
+    // DSL-MUTABLE: resource — live child/pty registries under lockObj
     let mutable agents: Map<string, ChildRun> = Map.empty
     let mutable ptys: Map<string, PtyRecord> = Map.empty
     let lockObj = obj ()

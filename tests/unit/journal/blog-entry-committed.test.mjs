@@ -178,7 +178,7 @@ test('ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
         EvidenceRef: undefined,
         ObservedPrefixEpochId: prefixEpochId(0),
       }),
-    /no case 'EnforcementCycleCommitted'/,
+    /no AgentFact family has case 'EnforcementCycleCommitted'/,
     'EnforcementCycleCommitted is not a valid AgentFact case',
   )
 })

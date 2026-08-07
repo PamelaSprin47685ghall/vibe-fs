@@ -13,3 +13,16 @@
 
 阻塞：
 - 无。按 PROJ-008 计划分阶段完成 DSL 迁移并对比 Canonical Digest。
+
+## 量化评估（2026-08）
+
+`rg ProjectionIntent|ProjectionSnapshot src/Wanxiangshu` 零匹配——DU、Planner、Renderer 三层均未落地，差距真实且完全未实施。
+
+工程规模（按 PROJ-008 计划）：
+1. `ProjectionIntent` 密封 DU（keepPhysicalPrefix / activatePrefixEpoch / insertBlogFrames / insertPairProgrammingThought）+ `ProjectionConflict` 判定（PROJ-005/006）——Domain 层，可独立测试；
+2. `ProjectionSnapshot` 结构（PROJ-002 的只读 Host snapshot 形状）；
+3. Pure Planner（canonical order 锚定当前投影前缀锚 + fail-closed 冲突）；
+4. Canonical Renderer 迁移（替换 `ProviderProjection.fs` / `Codec/Projection.fs` / `EnforcerHost.fs` / `XTraceCapture.fs` 的直接组装）；
+5. canonical digest 前后对比（REVIEW seal / 前缀缓存字节相等不回归）+ e2e 全量。
+
+性质：架构演进（现状 digest/seal 工作正常，e2e 全绿），非缺陷修复。核心 transform 路径重构，风险高，应作为独立排期的多阶段项目，不宜在单次差距清理会话中半途实施（intent 无人消费 = DSL-003 零调用点死代码；Renderer 未迁移 = 双写）。

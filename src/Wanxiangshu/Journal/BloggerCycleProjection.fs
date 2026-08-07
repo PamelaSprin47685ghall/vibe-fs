@@ -4,14 +4,11 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).
-[<RequireQualifiedAccess>]
-type BloggerCycleKind =
-    | Entry
-    | Squash
-
+/// Kind reuses BlogFrameKind — the frame-vs-cycle distinction is the same
+/// Entry|Squash vocabulary (DSL-003: no duplicate case sets).
 type BloggerCycleReceipt =
     { ProviderRun: ProviderRunIdentity
-      Kind: BloggerCycleKind
+      Kind: BlogFrameKind
       RequestId: BloggerRequestId }
 
 /// Open request materialization (pre-send). O(1) by RequestId and by BloggerSession.

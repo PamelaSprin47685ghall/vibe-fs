@@ -95,13 +95,13 @@ module HostSignalBootstrap =
                         | ReconcileProgram.TurnAborted _ ->
                             scope.ArmRecovery turn.SessionId
 
-                            // CTX-006 step 1 (Y half): a failed Blogger turn arms the recovery
-                            // slot of the Companion that owns it, through the same failure event.
-                            // The Companion's single-flight gate serialises the slot sequence,
-                            // so this flag cannot race a squash decision.
+                            // CTX-006 step 1 (Y half): a failed Blogger turn opens a one-shot
+                            // recovery opportunity on the Companion that owns it. Opportunity
+                            // = pending material waiter Task; material Offer consumes it once.
                             for KeyValue(_, companion) in scope.Companions do
                                 match companion.BloggerSession with
-                                | Some bloggerId when bloggerId = turn.SessionId -> companion.ArmRecoverySlot()
+                                | Some bloggerId when bloggerId = turn.SessionId ->
+                                    companion.StartRecoveryOpportunity() |> ignore
                                 | _ -> ()
                         | ReconcileProgram.TurnCompleted
                         | ReconcileProgram.TurnNeedsContinuation _
@@ -323,7 +323,7 @@ module HostSignalBootstrap =
                       Role = Some role
                       Directory = directory }
 
-            let onAuthorityRoot (mainSessionId: SessionId) =
+            let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with
                 | None -> ()
                 | Some durable ->
@@ -332,7 +332,7 @@ module HostSignalBootstrap =
                     match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
                     | None -> ()
                     | Some bloggerId ->
-                        BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId
+                        BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId root
 
             let chatMessageHook =
                 PromptIngress.createHook

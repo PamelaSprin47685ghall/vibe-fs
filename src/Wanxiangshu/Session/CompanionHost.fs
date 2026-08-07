@@ -28,11 +28,15 @@ type CompanionHost
 
     let bloggerEffectiveAgent = ManagedAgent.nameOf AgentTier.Fast Role.Blogger
 
+    // DSL-MUTABLE: single-flight — memoized blogger create task
     let mutable bloggerCreateTask: Task<SessionId> option = None
+    // DSL-MUTABLE: resource — resolved blogger session id
     let mutable bloggerId: SessionId option = None
+    // DSL-MUTABLE: resource — create-failure latch, cleared on retry
     let mutable bloggerCreateFailed = false
     let bloggerRequestKind = ref ProviderRequestKind.BloggerMain
     let bloggerSquashFrameCount = ref None
+    // DSL-MUTABLE: resource — one-shot restored-blogger id consumption
     let mutable restoredBloggerIdOpt = restoredBloggerId
 
     let ensureBlogger () =
@@ -138,25 +142,22 @@ type CompanionHost
             bloggerCreateFailed <- true
             companion.RecordBloggerClosed())
 
-    /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
-    member this.ArmRecoverySlot() = companion.ArmRecoverySlot()
+    /// CTX-006 / FALLBACK-012: open a one-shot recovery opportunity (physical waiter).
+    member this.StartRecoveryOpportunity() : Task = companion.StartRecoveryOpportunity()
 
-    member this.IsRecoveryArmed: bool = companion.IsRecoveryArmed
-
-    member this.DisarmRecoverySlot() = companion.DisarmRecoverySlot()
-
-    /// CTX-006: consume the one-shot recovery slot when a recovery action is about
-    /// to start. Returns `None` if the slot was not armed.
-    member this.TryConsumeRecoverySlot() : Task<unit> option = companion.TryConsumeRecoverySlot()
+    /// Material boundary: offer main material to a pending recovery waiter.
+    /// True when a waiter was taken (recovery path may consume this material).
+    member this.OfferRecoveryMaterial() : bool = companion.OfferRecoveryMaterial()
 
     /// CTX-006: primary session fallback cursor Offset (durable, not cached).
-    member this.BloggerCursorOffset() : byte =
+    /// FALLBACK-002: the offset leaves this boundary as the closed DU.
+    member this.BloggerCursorOffset() : AgentPairCursor.FallbackOffset =
         match journal with
         | Some j ->
             match DurableFallback.tryCurrentState primaryId (AgentJournal.snapshot j) with
             | Some current -> current.Cursor.Offset
-            | None -> 0uy
-        | None -> 0uy
+            | None -> AgentPairCursor.FallbackOffset.Fork0
+        | None -> AgentPairCursor.FallbackOffset.Fork0
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =

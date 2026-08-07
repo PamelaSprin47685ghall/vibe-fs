@@ -125,9 +125,9 @@ RecentTips 投影覆盖 normal / squash / restart / recovery / compaction 后路
 
 ---
 
-## ENFORCER-071：work record 呈现 previous_enforcer_tip
+## previous_enforcer_tip 呈现（行为见 what/enforcer.md ENFORCER-071）
 
-work record 以低信任 `previous_enforcer_tip` 块呈现；不得伪装 parent instruction。
+行为（低信任呈现、不得伪装 parent instruction）权威定义见 `what/enforcer.md` ENFORCER-071。
 
 ---
 

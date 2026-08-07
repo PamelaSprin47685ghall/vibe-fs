@@ -116,7 +116,7 @@ module RecoverySlot =
     /// An armed odd slot with no material is normal and not an error: CTX-011 says to
     /// send the ordinary main request rather than construct an empty probe. That is
     /// why such a slot is "a slot that MAY recover", not "a slot that compresses".
-    let mayRecover (arming: SlotArming) (offset: byte) (hasMaterial: bool) =
+    let mayRecover (arming: SlotArming) (offset: AgentPairCursor.FallbackOffset) (hasMaterial: bool) =
         isArmed arming && AgentPairCursor.isRecoverySlot offset && hasMaterial
 
     /// CTX-007 for a `BloggerSquash` sub-request.

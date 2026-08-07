@@ -53,6 +53,7 @@ module PtyBackend =
     /// yields a port with fully isolated backend state.
     let createPort () : PtyPort =
         let super = create ()
+        // DSL-MUTABLE: resource — back-reference to the created port (cycle closure)
         let mutable portRef: PtyPort option = None
 
         let handler (id: PtyId) (command: PtyCommand) : Task<Result<unit, string>> =

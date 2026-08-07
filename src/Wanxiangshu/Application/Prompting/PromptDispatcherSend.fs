@@ -67,7 +67,7 @@ module PromptDispatcherSend =
                 | PromptDispatcher.AwaitMode.Await -> onAccepted
 
             let submitted (receipt: TransportReceipt) =
-                AgentFact.PluginPromptSubmitted
+                PromptFact.PluginPromptSubmitted
                     {| PromptKey = key
                        SessionId = sessionId
                        Receipt = receipt |}
@@ -131,7 +131,7 @@ module PromptDispatcherSend =
                 | Error error -> return Error error
                 | Ok claim ->
                     let claimed =
-                        AgentFact.PluginPromptClaimed
+                        PromptFact.PluginPromptClaimed
                             {| PromptKey = key
                                SessionId = sessionId
                                ContinuationKind = PromptDispatcher.originLabel origin
@@ -201,7 +201,7 @@ module PromptDispatcherSend =
                     PromptAuthorityRun.claimContinuation key sessionId continuation profile effectiveAgent payloadDigest
 
                 let claimed =
-                    AgentFact.PluginPromptClaimed
+                    PromptFact.PluginPromptClaimed
                         {| PromptKey = key
                            SessionId = sessionId
                            ContinuationKind = originLabel

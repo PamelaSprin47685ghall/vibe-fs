@@ -36,11 +36,15 @@ module BloggerRuntimeHost =
         scope.SetBloggerRuntime(bloggerKey, BloggerRuntime.forceSeal (scope.GetBloggerRuntime bloggerKey))
         scope.TryTakePendingOffer bloggerKey |> ignore
 
-    /// New Authority Root: reopen DrainWindow / unseal for next material.
-    let reactivateAfterNewRoot (scope: IParkedTransformHost) (bloggerSessionId: SessionId) : unit =
+    /// New Authority Root: reopen the drain window for next material. The root
+    /// identity is recorded on the window so a stale reactivation (an older root
+    /// arriving after a newer seal) cannot reopen a window it no longer owns.
+    let reactivateAfterNewRoot
+        (scope: IParkedTransformHost)
+        (bloggerSessionId: SessionId)
+        (root: AuthorityRootUserMessageId)
+        : unit =
         let key = SessionId.value bloggerSessionId
         let cell = scope.GetBloggerRuntime key
 
-        match cell.State with
-        | BloggerRuntimeState.Disposed -> ()
-        | _ -> scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell)
+        scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell root)

@@ -181,7 +181,7 @@ module FinalityController =
                             AgentJournal.appendAgent
                                 (StreamId.Session managerSessionId)
                                 (Some providerRun)
-                                (AgentFact.TerminalOutputCaptured
+                                (CompanionFact.TerminalOutputCaptured
                                     {| SessionId = managerSessionId
                                        TextRef = lastWordsRef
                                        TextDigest = lastWordsDigest

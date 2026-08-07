@@ -63,6 +63,25 @@ armed ∧ primed ∧ hasMaterial
 
 Work Session 从不向主模型发送「请压缩历史」类请求。压缩只发生在 Y 的 squash 或 X 的 prefix 替换投影。
 
+## CTX-010：attempt-local prefix probe
+
+恢复槽中替换 X 前缀时，**不**立即改 ActivePrefixEpoch。候选只进不可变 `AttemptExecutionProfile.ProjectionChoice`。
+
+```text
+probe 成功 → 提升为 ActivePrefixEpoch（写 PrefixRebaseCommitted）
+probe 失败 → 丢弃候选；后续非 probe 槽用旧 epoch
+```
+
+禁止先提交再回滚；故无 PrefixProbeRolledBack 类事实。  
+`A′` 失败不禁止 `B′` 用等价候选重试。
+
+## CTX-013：Blogger delta TOML
+
+- data-only TOML 冻结进 blob；instruction header 投影时加。  
+- 硬上限 200 KiB 渲染后字节；超限确定性切块/截断策略保持可复现。  
+- 含 decision-relevant host-visible reasoning；无 hidden reasoning 伪造。  
+- 与 LWR gap 分投影，禁止混用 renderer 输出当 canonical digest。
+
 ## CTX-014：诊断边界
 
 可观测诊断不得变成控制输入：不得用日志字段驱动 Fallback/probe/squash 分支。

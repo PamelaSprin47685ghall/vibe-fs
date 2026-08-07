@@ -30,15 +30,24 @@ module NodeProcessWait =
     /// bounded by `KillAckGraceMs` so kill-unconfirmed does not hang callers.
     type WaitOutcome = { ExitCode: int; TimedOut: bool }
 
+    /// Who won the first race: natural exit, business deadline, or cancellation.
+    /// Three distinct events must not share a bool — cancellation is not exit.
+    type private WaitSignal =
+        | ProcessExited
+        | TimerElapsed
+        | Cancelled
+
     /// Result of waiting for the process to exit on its own before the deadline.
     type private ExitOrDeadline =
         | ExitedBeforeDeadline of exitCode: int
         | DeadlineReached
+        | WaitCancelled
 
     /// Result of waiting for the process to exit after SIGKILL.
     type private KillResult =
         | ExitedAfterKill of exitCode: int
         | KillNotAcknowledged
+        | KillWaitCancelled
 
     /// Management bound after SIGKILL for the OS close/onExit path to settle.
     /// Not a second business deadline on the estimate: the business budget already
@@ -47,15 +56,17 @@ module NodeProcessWait =
     /// Plain `let` so layer-1 tests can read the export (same pattern as Deadline.MaxTimerWaitMs).
     let KillAckGraceMs = 5_000
 
-    /// One `setTimeout` race between "the child exited" and "ms elapsed".
-    /// Returns `true` when the timer won, `false` when the child `OnExited` fired first.
+    /// One race among process exit, timer, and cancellation.
+    /// Does not Kill — only reports which signal arrived first.
     ///
     /// The mutable `timerId` and `timerCleared` are physical resource ownership
     /// (JS timer handle and idempotency guard), not business stage.
     let private waitForSignal (child: NodeProcessHost.ChildProcess) (ms: int) (ct: CancellationToken) =
         task {
-            let settled = TaskCompletionSource<bool>()
+            let settled = TaskCompletionSource<WaitSignal>()
+            // DSL-MUTABLE: resource — JS timer handle
             let mutable timerId = None
+            // DSL-MUTABLE: resource — clearTimeout idempotency
             let mutable timerCleared = false
 
             let clearTimer () =
@@ -68,25 +79,25 @@ module NodeProcessWait =
 
             let onExited _ =
                 clearTimer ()
-                trySetResult settled false |> ignore
+                trySetResult settled ProcessExited |> ignore
 
             child.OnExited.Add onExited
 
             if child.Exited.Value then
                 clearTimer ()
                 child.OnExited.Remove onExited |> ignore
-                return false
+                return ProcessExited
             else
                 let onTimeout _ =
                     clearTimer ()
-                    trySetResult settled true |> ignore
+                    trySetResult settled TimerElapsed |> ignore
 
                 timerId <- Some(emitJsExpr (ms, onTimeout) "setTimeout($1, $0)")
 
                 use _ =
                     ct.Register(fun () ->
                         clearTimer ()
-                        trySetResult settled false |> ignore)
+                        trySetResult settled Cancelled |> ignore)
 
                 try
                     return! settled.Task
@@ -96,7 +107,7 @@ module NodeProcessWait =
         }
 
     /// Wait for the child to exit on its own, or for the business deadline to fire.
-    /// Returns `ExitedBeforeDeadline` with the real code, or `DeadlineReached`.
+    /// Cancellation is a third outcome — never folded into ProcessExited.
     let private awaitExitOrDeadline (child: NodeProcessHost.ChildProcess) (deadline: Deadline) (ct: CancellationToken) =
         task {
             let clock = fun () -> DateTimeOffset.UtcNow
@@ -110,35 +121,39 @@ module NodeProcessWait =
                     // Budget already exhausted.
                     return DeadlineReached
                 | ms ->
-                    let! fired = waitForSignal child ms ct
-
-                    if fired then
-                        return DeadlineReached
-                    else
+                    match! waitForSignal child ms ct with
+                    | ProcessExited ->
                         let! exitCode = child.Exit.Task
                         return ExitedBeforeDeadline exitCode
+
+                    | TimerElapsed -> return DeadlineReached
+
+                    | Cancelled -> return WaitCancelled
         }
 
     /// After kill, wait for the real exit up to `KillAckGraceMs`.
-    /// Returns `ExitedAfterKill` with the real code, or `KillNotAcknowledged`.
+    /// Cancellation during kill-ack is KillWaitCancelled — not a hang on Exit.Task.
     let private awaitKillAcknowledgement (child: NodeProcessHost.ChildProcess) (ct: CancellationToken) =
         task {
             if child.Exited.Value then
                 let! exitCode = child.Exit.Task
                 return ExitedAfterKill exitCode
             else
-                let! fired = waitForSignal child KillAckGraceMs ct
-
-                if fired then
-                    return KillNotAcknowledged
-                else
+                match! waitForSignal child KillAckGraceMs ct with
+                | ProcessExited ->
                     let! exitCode = child.Exit.Task
                     return ExitedAfterKill exitCode
+
+                | TimerElapsed -> return KillNotAcknowledged
+
+                | Cancelled -> return KillWaitCancelled
         }
 
     /// Public entry: wait for real exit, then kill, then wait for kill-ack.
     /// Cancellation is propagated as `OperationCanceledException`; the process is
-    /// still killed before the exception is raised.
+    /// still killed before the exception is raised. Kill only happens in this
+    /// top-level workflow (entry cancel, mid-wait cancel, deadline), never inside
+    /// waitForSignal.
     let waitForExit
         (child: NodeProcessHost.ChildProcess)
         (deadline: Deadline)
@@ -154,6 +169,10 @@ module NodeProcessWait =
                 return
                     { ExitCode = exitCode
                       TimedOut = false }
+
+            | WaitCancelled ->
+                child.Kill()
+                return raise (OperationCanceledException(ct))
 
             | DeadlineReached ->
                 if child.Exited.Value then
@@ -172,4 +191,9 @@ module NodeProcessWait =
                         // Kill unconfirmed: do not hang on Exit.Task; report TimedOut with
                         // unknown code. Real close may still arrive later on the process.
                         return { ExitCode = -1; TimedOut = true }
+
+                    | KillWaitCancelled ->
+                        // Already killed above; only propagate cancellation.
+                        child.Kill()
+                        return raise (OperationCanceledException(ct))
         }

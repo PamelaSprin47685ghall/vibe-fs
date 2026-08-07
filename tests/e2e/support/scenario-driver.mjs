@@ -186,7 +186,16 @@ async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
   for (const step of flow) {
     if (step.wait) {
-      await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
+      // VERIFY-004: an explicitly-bounded wait is a declared slow step — the
+      // watchdog silence window widens to its timeoutMs so a legitimate
+      // recovery chain is not mistaken for a hang. Background traffic never
+      // renews the window; only a blocking advance does.
+      scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+      try {
+        await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
       if (step.watchdog !== false) {
         scenario.watchdog?.advance({
           reason: step.wait,
@@ -332,7 +341,17 @@ async function runFlow(scenario, doc, ctx) {
     }
     if (step.awaitRestart) {
       assert.ok(ctx.restartPromise, 'awaitRestart without afterExpectation restart');
-      await ctx.restartPromise;
+      // A Host restart is declared slow work: the silence window widens to the
+      // restart ceiling while the boot races turn advances (orch.2-style
+      // recovered-run answers match mid-restart and re-arm the watchdog). The
+      // restart promise itself is the criterion; background traffic still
+      // never renews it, and a boot past the ceiling still fires.
+      scenario.watchdog?.setWindow(WAIT_FACT_WINDOW_MS);
+      try {
+        await ctx.restartPromise;
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
       continue;
     }
     if (step.assertFacts) {

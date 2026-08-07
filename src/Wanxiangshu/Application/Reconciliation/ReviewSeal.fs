@@ -112,7 +112,7 @@ module ReviewSeal =
         | false, _ -> Error NoPendingSeal
         | true, pending ->
             let fact =
-                AgentFact.ProviderInputSealed
+                ReviewFact.ProviderInputSealed
                     {| SessionId = pending.SessionId
                        ProviderRun = providerRun
                        PhysicalUserMessageId = pending.PhysicalUserMessageId

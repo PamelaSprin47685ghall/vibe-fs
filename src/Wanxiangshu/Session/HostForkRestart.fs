@@ -198,7 +198,7 @@ module HostForkRestart =
                                 AgentJournal.appendAgent
                                     (StreamId.Session parentId)
                                     None
-                                    (AgentFact.HandleFalseCompletionRejected
+                                    (ExecutionFact.HandleFalseCompletionRejected
                                         {| ParentSessionId = parentId
                                            Handle = record.Handle
                                            ExpectedCompletionRef = blobRef

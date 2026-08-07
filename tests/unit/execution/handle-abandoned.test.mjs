@@ -11,6 +11,7 @@ import test from 'node:test'
 import {
   agentJournal,
   caseOf,
+  agentFactCaseOf,
   clockAt,
   envelope,
   fact,
@@ -82,8 +83,9 @@ test('EXEC_009_HandleAbandoned_serializes_round_trip', () => {
 
   const decoded = journal.deserializeFact(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(caseOf(payloadOf(decoded.value)), 'HandleAbandoned')
-  const payload = payloadOf(payloadOf(decoded.value))
+  // DSL-003: Fact → Agent dispatch → Execution family dispatch → payload.
+  assert.equal(agentFactCaseOf(payloadOf(decoded.value)), 'HandleAbandoned')
+  const payload = payloadOf(payloadOf(payloadOf(decoded.value)))
   assert.equal(handleId.describe(payload.Handle), 'agent:h1')
   assert.equal(caseOf(payload.Reason), 'ParentCancelled')
   assert.equal(journal.serializeFact(decoded.value), line)

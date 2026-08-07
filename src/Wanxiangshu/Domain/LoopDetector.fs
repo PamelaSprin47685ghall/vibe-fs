@@ -80,6 +80,7 @@ module LoopDetector =
 
     /// Stable bucket for one 4-gram (four Unicode code units).
     let bucketOfGram (a: char) (b: char) (c: char) (d: char) : int =
+        // DSL-MUTABLE: algorithm-scratch — FNV-ish rolling hash accumulator
         let mutable h = 5381u
         h <- ((h <<< 5) + h) ^^^ uint32 (int a)
         h <- ((h <<< 5) + h) ^^^ uint32 (int b)
@@ -101,11 +102,13 @@ module LoopDetector =
         detector.Value.[bucket]
 
     let evaluate (detector: Detector) : Evaluation =
+        // DSL-MUTABLE: algorithm-scratch — sum-of-weights accumulator
         let mutable totalWeight = 0.0
 
         for j = 0 to K - 1 do
             totalWeight <- totalWeight + Coef.[j] * detector.Total.[j]
 
+        // DSL-MUTABLE: algorithm-scratch — cross-term variance accumulator
         let mutable squared = 0.0
 
         for j = 0 to K - 1 do
@@ -181,6 +184,7 @@ module LoopDetector =
         if isNull text || text.Length = 0 then
             evaluate detector
         else
+            // DSL-MUTABLE: algorithm-scratch — rolling evaluation accumulator
             let mutable latest = evaluate detector
 
             for c in text do

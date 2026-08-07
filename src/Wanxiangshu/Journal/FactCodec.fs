@@ -99,15 +99,15 @@ module FactCodec =
                     {| started with
                         StartedAt = started.StartedAt.ToOffset TimeSpan.Zero |}
             )
-        | Agent(AgentFact.HandleAbandoned payload) ->
+        | Agent(AgentFact.Execution(ExecutionFactCases.HandleAbandoned payload)) ->
             Agent(
-                AgentFact.HandleAbandoned
+                ExecutionFact.HandleAbandoned
                     {| payload with
                         AbandonedAt = payload.AbandonedAt.ToOffset TimeSpan.Zero |}
             )
-        | Agent(AgentFact.HostTurnObserved payload) ->
+        | Agent(AgentFact.Execution(ExecutionFactCases.HostTurnObserved payload)) ->
             Agent(
-                AgentFact.HostTurnObserved
+                ExecutionFact.HostTurnObserved
                     {| payload with
                         ObservedAt = payload.ObservedAt.ToOffset TimeSpan.Zero |}
             )

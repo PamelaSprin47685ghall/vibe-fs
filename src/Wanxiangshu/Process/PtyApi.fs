@@ -23,6 +23,7 @@ module Pty =
 
     let private parentGate = obj ()
     let private parentAborters = Dictionary<string, Dictionary<int, unit -> unit>>()
+    // DSL-MUTABLE: resource — monotonic abort-token counter under parentGate
     let mutable private nextAbortToken = 0
 
     let registerParentAbort (parentId: string) (abort: unit -> unit) =

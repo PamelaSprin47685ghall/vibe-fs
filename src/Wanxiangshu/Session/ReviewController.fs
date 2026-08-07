@@ -84,7 +84,7 @@ module ReviewController =
         | Error failure -> Error(JournalAppendFailure.describe failure)
 
     let private verdictFact (submission: VerdictSubmission) =
-        AgentFact.ReviewVerdictRecorded
+        ReviewFact.ReviewVerdictRecorded
             {| ReviewerSessionId = submission.ReviewerSessionId
                ManagerSessionId = submission.ManagerSessionId
                BarrierId = submission.BarrierId
@@ -154,7 +154,7 @@ module ReviewController =
                         append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
                         |> Result.bind (fun _ ->
                             let issued =
-                                AgentFact.PerfectChallengeIssued
+                                ReviewFact.PerfectChallengeIssued
                                     {| BarrierId = submission.BarrierId
                                        GitTreeHash = submission.GitTreeHash
                                        ReviewerSessionId = submission.ReviewerSessionId
@@ -176,7 +176,7 @@ module ReviewController =
                         append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
                         |> Result.bind (fun _ ->
                             let witness =
-                                AgentFact.ConfirmedReviewWitness
+                                ReviewFact.ConfirmedReviewWitness
                                     {| ManagerJobId = submission.ManagerJobId
                                        ManagerSessionId = submission.ManagerSessionId
                                        ReviewerSessionId = submission.ReviewerSessionId

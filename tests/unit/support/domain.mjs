@@ -104,10 +104,6 @@ const [
   FlowModule,
   OrchestratorRuntime,
   OrchestratorTypes,
-  StrengthTypesModule,
-  StrengthPredictorModule,
-  StrengthControllerModule,
-  StrengthValueModule,
   RuntimeResourcesModule,
   EnforcerCatalogResourceModule,
   PackageResourcesModule,
@@ -115,7 +111,6 @@ const [
   EnforcerCatalogDomainModule,
   EnforcerCodecModule,
   EnforcerCycleModule,
-  StudentTeacherModule,
   BloggerRequestContextModule,
   BloggerRuntimeModule,
   ParkedTransformModule,
@@ -199,10 +194,6 @@ const [
   prod('Kernel/Parallel'),
   prod('Application/Orchestration/Runtime'),
   prod('Application/Orchestration/Types'),
-  prod('Domain/StrengthTypes'),
-  prod('Domain/StrengthPredictor'),
-  prod('Domain/StrengthController'),
-  prod('Domain/StrengthValue'),
   prod('Infrastructure/Resources/RuntimeResources'),
   prod('Infrastructure/Resources/EnforcerCatalogResource'),
   prod('Infrastructure/Resources/PackageResources'),
@@ -210,7 +201,6 @@ const [
   prod('Domain/EnforcerCatalog'),
   prod('Domain/EnforcerCodec'),
   prod('Domain/EnforcerCycle'),
-  prod('Domain/StudentTeacher'),
   prod('Domain/BloggerRequestContext'),
   prod('Session/BloggerRuntimeState'),
   prod('Session/ParkedTransform'),
@@ -242,7 +232,13 @@ const [
   prod('Infrastructure/OpenCode/Signals/HostSignalSubscribe'),
   prod('Infrastructure/OpenCode/Host/ManagedAgentConfig'),
 ])
-    
+
+const [NodeProcessWaitModule, NodeProcessHostModule, FableTask, FableTypes] = await Promise.all([
+  prod('Process/NodeProcessWait'),
+  prod('Process/NodeProcessHost'),
+  lib('Task.js'),
+  lib('Types.js'),
+])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
 //
@@ -461,7 +457,36 @@ const unionCase = (unionClass, label) => {
   }
 }
 
-const buildAgentFact = unionCase(FactModule.AgentFact, 'AgentFact')
+const buildAgentFactDispatch = unionCase(FactModule.AgentFact, 'AgentFact')
+
+// DSL-003: AgentFact is a 7-case dispatch union over per-bounded-context
+// *FactCases families. The facade keeps the flat construction surface — a test
+// names the business case, the family lookup wraps it — so no test learns the
+// nesting, and the wire shape (case name + payload) is unchanged.
+const AGENT_FACT_FAMILIES = [
+  ['Prompt', FactModule.PromptFactCases],
+  ['Fallback', FactModule.FallbackFactCases],
+  ['Review', FactModule.ReviewFactCases],
+  ['Execution', FactModule.ExecutionFactCases],
+  ['Orchestrator', FactModule.OrchestratorFactCases],
+  ['Companion', FactModule.CompanionFactCases],
+  ['Context', FactModule.ContextFactCases],
+]
+
+const buildAgentFact = (() => {
+  const familyBuilders = AGENT_FACT_FAMILIES.map(([dispatchCase, unionClass]) => {
+    const build = unionCase(unionClass, `${dispatchCase}FactCases`)
+    return [dispatchCase, caseNames(unionClass), build]
+  })
+  return (caseName, fields) => {
+    for (const [dispatchCase, names, build] of familyBuilders) {
+      if (names.includes(caseName)) return buildAgentFactDispatch(dispatchCase, [build(caseName, fields)])
+    }
+    throw new Error(
+      `no AgentFact family has case '${caseName}'. Available: ${familyBuilders.flatMap(([, names]) => names).join(', ')}`,
+    )
+  }
+})()
 const buildFact = unionCase(FactModule.Fact, 'Fact')
 const buildRuntimeFact = unionCase(FactModule.RuntimeFact, 'RuntimeFact')
 const buildStream = unionCase(EnvelopeModule.StreamId, 'StreamId')
@@ -470,7 +495,8 @@ const buildAbandonReason = unionCase(FactModule.PromptAbandonReason, 'PromptAban
 const buildCompletionKind = unionCase(FactModule.HandleCompletionKind, 'HandleCompletionKind')
 const buildHandleAbandonReason = unionCase(FactModule.HandleAbandonReason, 'HandleAbandonReason')
 
-export const agentFactCaseNames = () => caseNames(FactModule.AgentFact)
+/** Flat case-name catalogue across all AgentFact families (DSL-003). */
+export const agentFactCaseNames = () => AGENT_FACT_FAMILIES.flatMap(([, unionClass]) => caseNames(unionClass))
 
 // ── identity ─────────────────────────────────────────────────────────────────
 // PROMPT-001: no generic message id. `role=user` on the wire is a
@@ -622,6 +648,19 @@ export const handleAbandonReason = {
 
 /** Build an AgentFact by case name with an anonymous-record payload. */
 export const agentFact = (caseName, payload) => buildAgentFact(caseName, [payload])
+
+/**
+ * The business case name of an AgentFact, with the DSL-003 family dispatch
+ * peeled. `agentFact('FallbackCursorAdvanced', ...)` round-trips to
+ * 'FallbackCursorAdvanced' — tests never learn the family nesting.
+ */
+export const agentFactCaseOf = (value) => {
+  const dispatch = caseOf(value)
+  if (dispatch === undefined) return undefined
+  const family = AGENT_FACT_FAMILIES.find(([name]) => name === dispatch)
+  if (!family) throw new TypeError(`agentFactCaseOf: '${dispatch}' is not an AgentFact family dispatch`)
+  return caseOf(payloadOf(value))
+}
 
 /** Wrap an AgentFact as the top-level Fact union. */
 export const asFact = (inner) => buildFact('Agent', [inner])
@@ -849,24 +888,48 @@ export const kWayMerge = (streams) => listItems(Boots.kWayMerge(toList(streams.m
 
 // ── fallback (docs/what/fallback.md) ───────────────────────────────────────────────────────
 
+/** FALLBACK-002: the facade keeps the historical numeric offset signature; the
+ * closed DU lives only inside the domain. Declared in declaration order, so the
+ * numeric tag is the case index.
+ */
+const FALLBACK_OFFSET_NAMES = ['Fork0', 'Fork1', 'Fork2', 'Fork3']
+const offsetOf = (n) => {
+  // Already a Fable union instance (from `cursor.initial`, `recordFailure`, ...).
+  if (n && typeof n === 'object') return n
+  const idx = Number(n)
+  if (!Number.isInteger(idx) || idx < 0 || idx > 3) {
+    throw new Error(`FallbackOffset 0..3 has no case for ${n}`)
+  }
+  return unionCase(Cursor.FallbackOffset, 'FallbackOffset')(FALLBACK_OFFSET_NAMES[idx], [])
+}
+const offsetValue = (offset) => (offset === undefined ? undefined : offset.tag)
+
+/** A cursor as the tests build it — plain object with a NUMERIC offset — or an
+ * F# record — gets normalised to the F# record shape the domain expects.
+ */
+const cursorOf = (value) => ({
+  Offset: offsetOf(value.Offset),
+  ConsecutiveFailureCount: value.ConsecutiveFailureCount,
+})
+
 export const cursor = {
   initial: Cursor.initial,
-  atOffset: (offset) => Cursor.atOffset(offset),
-  advance: (offset) => Cursor.advance(offset),
-  recordFailure: (value) => Cursor.recordFailure(value),
-  recordSuccess: (value) => Cursor.recordSuccess(value),
-  side: (offset) => caseOf(Cursor.side(offset)),
+  atOffset: (offset) => Cursor.atOffset(offsetOf(offset)),
+  advance: (offset) => offsetValue(Cursor.advance(offsetOf(offset))),
+  recordFailure: (value) => Cursor.recordFailure(cursorOf(value)),
+  recordSuccess: (value) => Cursor.recordSuccess(cursorOf(value)),
+  side: (offset) => caseOf(Cursor.side(offsetOf(offset))),
   sideSequence: (count) => listItems(Cursor.sideSequence(count)).map(caseOf),
-  effectiveAgent: (pair, value) => Cursor.effectiveAgent(pair, value),
+  effectiveAgent: (pair, value) => Cursor.effectiveAgent(pair, cursorOf(value)),
   isValidAdvance: (prevOffset, nextOffset, prevCount, nextCount) =>
-    Cursor.isValidAdvance(prevOffset, nextOffset, prevCount, nextCount),
+    Cursor.isValidAdvance(offsetOf(prevOffset), offsetOf(nextOffset), prevCount, nextCount),
 
   /** CTX-006: is this one of the primed slots (A′ / B′). */
-  isRecoverySlot: (offset) => Cursor.isRecoverySlot(offset),
+  isRecoverySlot: (offset) => Cursor.isRecoverySlot(offsetOf(offset)),
   attemptIdentity: (session, run, root, providerRunId) => Cursor.attemptIdentity(session, run, root, providerRunId),
 
   /** FALLBACK-005: `MayContinue` | `Exhausted`, with the cursor as payload. */
-  recoveryVerdict: (budget, value) => caseOf(Cursor.recoveryVerdict(budget, value)),
+  recoveryVerdict: (budget, value) => caseOf(Cursor.recoveryVerdict(budget, cursorOf(value))),
 
   defaultBudget: Cursor.DefaultAutoRecoveryBudget,
 
@@ -877,7 +940,7 @@ export const cursor = {
    * domain is an F# record instance — so comparing one against `{ Offset, ... }`
    * fails on the class, not on the values, and the diff blames the wrong thing.
    */
-  read: (value) => ({ offset: value.Offset, failures: value.ConsecutiveFailureCount }),
+  read: (value) => ({ offset: offsetValue(value.Offset), failures: value.ConsecutiveFailureCount }),
 }
 
 export const fallbackProjection = (() => {
@@ -894,7 +957,7 @@ export const fallbackProjection = (() => {
 
     /** Rejections carry no payload, so the case name is the whole answer. */
     applyAdvance: (identity, prevOffset, nextOffset, count, current) => {
-      const result = resultOf(m.applyAdvance(identity, prevOffset, nextOffset, count, current))
+      const result = resultOf(m.applyAdvance(identity, offsetOf(prevOffset), offsetOf(nextOffset), count, current))
       return result.ok ? result : { ok: false, error: caseOf(result.error) }
     },
 
@@ -906,7 +969,7 @@ export const fallbackProjection = (() => {
     read: (current) => ({
       logicalRun: idValue.logicalRun(current.LogicalRunId),
       authorityRoot: idValue.authorityRoot(current.AuthorityRootUserMessageId),
-      offset: current.Cursor.Offset,
+      offset: offsetValue(current.Cursor.Offset),
       failures: current.Cursor.ConsecutiveFailureCount,
       dedupeKeys: listItems(current.RecentFailureKeys).length,
       exhausted: current.Exhausted,
@@ -1434,10 +1497,7 @@ export const requestKind = (() => {
     bloggerMain: of('BloggerMain'),
     bloggerSquash: of('BloggerSquash'),
     interactionRepair: of('InteractionRepair'),
-    // docs/proposal/student-teacher.md LEARN-050: the Student's two request kinds.
-    studentLearn: of('StudentLearn'),
-    studentCompile: of('StudentCompile'),
-    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair', 'StudentLearn', 'StudentCompile'].map(of),
+    all: ['WorkMain', 'BloggerMain', 'BloggerSquash', 'InteractionRepair'].map(of),
 
     of,
     nameOf: (kind) => caseOf(kind),
@@ -1499,7 +1559,7 @@ export const recoverySlot = (() => {
     isArmed: (arming) => m.isArmed(arming),
 
     /** CTX-006: arming AND an odd (primed) offset AND material to work with. */
-    mayRecover: (arming, offset, hasMaterial) => m.mayRecover(arming, offset, hasMaterial),
+    mayRecover: (arming, offset, hasMaterial) => m.mayRecover(arming, offsetOf(offset), hasMaterial),
 
     /** `{ name, clearsFailureCount, advancesCursor, nextArming }`. */
     onSquash: (outcome) => decisionOf(m.onSquashOutcome(buildOutcome(outcome, []))),
@@ -2842,7 +2902,6 @@ export const authority = {
 
   stableLogicalRunId: (sha256, runtime, session, root) => Authority.stableLogicalRunId(sha256, runtime, session, root),
   agentPair: (profile) => Authority.agentPair(profile),
-  effectiveAgentAt: (profile, offset) => Authority.effectiveAgentAt(profile, offset),
   effectiveAgentFor: (profile, value) => Authority.effectiveAgentFor(profile, value),
   /**
    * PROMPT-011 claim scope. NOT hashed — it is a `\u001f`-joined string, so a test
@@ -3792,6 +3851,63 @@ export const parallel = {
 export const liveToken = () => new AsyncBuilder.CancellationToken(false)
 export const cancelledToken = () => new AsyncBuilder.CancellationToken(true)
 
+/**
+ * EXEC-011 process wait surface. Mock ChildProcess only — never touches real OS spawn.
+ *
+ * Fable shapes absorbed here: ChildProcess record fields, FSharpRef.contents for Exited,
+ * TaskCompletionSource.get_Task / SetResult, OnExited as a JS array (ResizeArray).
+ */
+export const processWait = (() => {
+  const waitForExitFn = NodeProcessWaitModule.waitForExit
+  if (typeof waitForExitFn !== 'function') {
+    throw new Error('NodeProcessWait.waitForExit missing from dist — run npm run build')
+  }
+  const notifyExitedFn = NodeProcessHostModule.notifyExited
+  if (typeof notifyExitedFn !== 'function') {
+    throw new Error('NodeProcessHost.notifyExited missing from dist — run npm run build')
+  }
+  const ChildProcess = NodeProcessHostModule.ChildProcess
+  if (typeof ChildProcess !== 'function') {
+    throw new Error('NodeProcessHost.ChildProcess missing from dist — run npm run build')
+  }
+
+  return {
+    killAckGraceMs: NodeProcessWaitModule.KillAckGraceMs,
+    /** Business wait entry: ChildProcess → Deadline → CancellationToken → Promise<WaitOutcome>. */
+    waitForExit: (child, dl, ct) => waitForExitFn(child, dl, ct),
+    /**
+     * In-memory child: Kill is a counter; exit is explicit via `exit(code)`.
+     * Optional `onKill` runs after each Kill (e.g. schedule a delayed real exit).
+     */
+    mockChild: ({ onKill } = {}) => {
+      const exitTcs = new FableTask.TaskCompletionSource()
+      const exited = new FableTypes.FSharpRef(false)
+      const onExited = []
+      let killCount = 0
+      const child = new ChildProcess(
+        null,
+        exitTcs,
+        () => {
+          killCount += 1
+          if (typeof onKill === 'function') onKill()
+        },
+        exited,
+        onExited,
+      )
+      return {
+        child,
+        killCount: () => killCount,
+        /** Mark exited + complete Exit.Task + fire OnExited waiters (same order as Host). */
+        exit: (code) => {
+          exited.contents = true
+          exitTcs.SetResult(code | 0)
+          notifyExitedFn(child)
+        },
+      }
+    },
+  }
+})()
+
 // ── outcomes ─────────────────────────────────────────────────────────────────
 
 export const outcome = {
@@ -4013,83 +4129,6 @@ export const fallbackController = (() => {
   }
 })()
 
-
-// ── docs/proposal/strength.md: Strength 纯领域内核 ─────────────────────────────────────────────
-
-export const strength = (() => {
-  const types = bind(StrengthTypesModule, 'StrengthTypes', [
-    'satelliteInvariantsHold',
-  ])
-  const predictor = bind(StrengthPredictorModule, 'StrengthPredictor', [
-    'emptyRoleState',
-    'observeRequest',
-    'interpolatedProbability',
-    'predictRead',
-  ])
-  const controller = bind(StrengthControllerModule, 'StrengthController', [
-    'initialState',
-    'hashToUnitInterval',
-    'includedInTraining',
-    'updateProbability',
-    'ewmaAlpha',
-    'onEligibleDecision',
-  ])
-  const value = bind(StrengthValueModule, 'StrengthValue', [
-    'defaultCostModel',
-    'valueK1',
-    'valueK2',
-    'chooseBudget',
-    'batchWithinByteLimit',
-    'decisionWithinByteLimit',
-  ])
-
-  const budgetOf = (b) => caseOf(b)
-  const symbolOf = (s) => caseOf(s)
-  const requestSymbol = (name, payload) => unionCase(StrengthTypesModule.RequestSymbol, 'RequestSymbol')(name, payload ?? [])
-  const readBatch = (fields) => ({
-    Tools: fields.tools ?? [],
-    Parallelism: fields.parallelism ?? 1,
-    ResultBytes: fields.resultBytes ?? 0,
-  })
-
-  return {
-    budgetOf,
-    symbolOf,
-    requestSymbol,
-    readBatch,
-
-    emptyRoleState: () => predictor.emptyRoleState,
-    observeRequest: (state, symbols) => predictor.observeRequest(state, toList(symbols)),
-    predictRead: (state, history, features) => {
-      const [p1, p2] = predictor.predictRead(state, toList(history), features)
-      return { p1, p2 }
-    },
-
-    initialState: () => controller.initialState,
-    hashToUnitInterval: (sha, seed) => controller.hashToUnitInterval(sha, seed),
-    includedInTraining: (sha, decisionId, ordinal, p) => {
-      const [included, u] = controller.includedInTraining(sha, decisionId, ordinal, p)
-      return { included, u }
-    },
-    updateProbability: (alpha, minP, maxP, maxStep, prev, tendency) =>
-      controller.updateProbability(alpha, minP, maxP, maxStep, prev, tendency),
-    ewmaAlpha: (halfLife) => controller.ewmaAlpha(halfLife),
-    onEligibleDecision: (state, t1, t2) => controller.onEligibleDecision(state, t1, t2),
-
-    defaultCostModel: (tierName) => value.defaultCostModel(tier(tierName)),
-    valueK1: (cost, p1, bytes, delay) => value.valueK1(cost, p1, bytes, delay),
-    valueK2: (cost, p1, p2, b1, b2, d1, d2) => value.valueK2(cost, p1, p2, b1, b2, d1, d2),
-    chooseBudget: (v0, v1, v2) => budgetOf(value.chooseBudget(v0, v1, v2)),
-    batchWithinByteLimit: (bytes) => value.batchWithinByteLimit(bytes),
-    decisionWithinByteLimit: (bytes) => value.decisionWithinByteLimit(bytes),
-  }
-})()
-
-const tier = (name) => {
-  if (name === 'Fast') return RolesModule.AgentTier.Fast
-  if (name === 'Deep') return RolesModule.AgentTier.Deep
-  throw new Error(`unknown tier: ${name}`)
-}
 
 // ── Runtime package resources (install once before EnforcerHost / BlogTool / StaticTools) ──
 
@@ -4395,27 +4434,18 @@ export const bloggerRequestContext = (() => {
 
 export const bloggerRuntime = (() => {
   const stateCase = unionCase(BloggerRuntimeModule.BloggerRuntimeState, 'BloggerRuntimeState')
-  const recoveryCase = unionCase(BloggerRuntimeModule.BloggerToolRecovery, 'BloggerToolRecovery')
   const m = bind(BloggerRuntimeModule, 'BloggerRuntime', [
     'empty',
     'ofState',
     'onMaterial',
-    'beginRequest',
     'onCycleCommitted',
     'onSquashCommitted',
     'onFail',
-    'markInteractionNudgeIssued',
-    'markAabbRepairConsumed',
-    'onSeal',
     'forceSeal',
     'onReactivate',
-    'onDispose',
     'inFlightContext',
-    'isSealed',
     'blocksNewRequest',
-    'tryPeekInFlight',
-    'tryTakeInFlight',
-    'tryTakePending',
+
     'adoptPendingAsCurrent',
   ])
 
@@ -4429,27 +4459,16 @@ export const bloggerRuntime = (() => {
 
   return {
     idle: m.ofState(stateCase('Idle', [])),
-    parked: m.ofState(stateCase('Parked', [])),
-    sealed: m.ofState(stateCase('Sealed', [])),
-    disposed: m.ofState(stateCase('Disposed', [])),
     empty: m.empty,
     inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
-    recovery: {
-      noRecovery: () => recoveryCase('NoRecovery', []),
-      interactionNudgeIssued: (run) => recoveryCase('InteractionNudgeIssued', [providerRun(run)]),
-      aabbRepairConsumed: () => recoveryCase('AabbRepairConsumed', []),
-      of: recoveryOf,
-    },
-    onMaterial: (cell, ctx) => {
-      const r = resultOf(m.onMaterial(cell, ctx))
+    onMaterial: (hasParked, cell, ctx) => {
+      const r = resultOf(m.onMaterial(hasParked, cell, ctx))
       if (!r.ok) return { ok: false, error: caseOf(r.error) }
       const pair = r.value
       return {
         ok: true,
         state: pair[0],
         decision: caseOf(pair[1]),
-        pending: unwrapOption(pair[0].PendingOffer),
-        recovery: recoveryOf(pair[0]),
         reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
@@ -4459,7 +4478,6 @@ export const bloggerRuntime = (() => {
         ? {
             ok: true,
             state: r.value,
-            recovery: recoveryOf(r.value),
             reactivated: caseOf(r.value.Drain) === 'Open',
           }
         : { ok: false, error: caseOf(r.error) }
@@ -4472,44 +4490,23 @@ export const bloggerRuntime = (() => {
         ok: true,
         state: pair[0],
         decision: caseOf(pair[1]),
-        recovery: recoveryOf(pair[0]),
         reactivated: caseOf(pair[0].Drain) === 'Open',
       }
     },
     onFail: (cell) => {
       const r = resultOf(m.onFail(cell))
-      return r.ok
-        ? {
-            ok: true,
-            state: r.value,
-            recovery: recoveryOf(r.value),
-            reactivated: caseOf(r.value.Drain) === 'Open',
-          }
-        : { ok: false, error: caseOf(r.error) }
+      if (!r.ok) return { ok: false, error: caseOf(r.error) }
+      return {
+        ok: true,
+        state: r.value,
+        reactivated: caseOf(r.value.Drain) === 'Open',
+      }
     },
-    markInteractionNudgeIssued: (cell, run) => m.markInteractionNudgeIssued(cell, providerRun(run)),
-    markAabbRepairConsumed: (cell) => m.markAabbRepairConsumed(cell),
-    onSeal: (cell) => m.onSeal(cell),
     forceSeal: (cell) => m.forceSeal(cell),
-    onReactivate: (cell) => m.onReactivate(cell),
-    onDispose: (cell) => m.onDispose(cell),
+    onReactivate: (cell, root) => m.onReactivate(cell, root),
     inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
-    isSealed: (cell) => m.isSealed(cell),
     blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),
-    tryTakeInFlight: (cell) => {
-      const r = resultOf(m.tryTakeInFlight(cell))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const pair = r.value
-      return { ok: true, context: pair[0], state: pair[1] }
-    },
-    tryTakePending: (cell) => {
-      const r = resultOf(m.tryTakePending(cell))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const pair = r.value
-      return { ok: true, pending: unwrapOption(pair[0]), state: pair[1] }
-    },
     stateOf: (cell) => caseOf(cell.State),
-    recoveryOf,
     reactivatedOf: (cell) => caseOf(cell.Drain) === 'Open',
   }
 })()
@@ -4582,6 +4579,8 @@ export const parkedTransform = (() => {
     // Back-compat alias used by parked-transform tests (PendingOffer path).
     offerParked: (scope, sessionId, context) => scope.SetPendingOffer(sessionId, context),
     hasParked: (scope, sessionId) => scope.HasParked(sessionId),
+    hasFlight: (scope, sessionId) => scope.HasFlight(sessionId),
+    tryGetFlight: (scope, sessionId) => projectContext(scope.TryGetFlight(sessionId)),
     consumeStaged: (scope, sessionId) => projectContext(scope.TryTakePendingOffer(sessionId)),
     setCurrentRequest: (scope, sessionId, context) => scope.SetCurrentRequest(sessionId, context),
     peekCurrentRequest: (scope, sessionId) => projectContext(scope.TryPeekCurrentRequest(sessionId)),
@@ -4592,63 +4591,6 @@ export const parkedTransform = (() => {
   }
 })()
 
-// ── docs/proposal/student-teacher.md: Student & Teacher 纯领域内核 ────────────────────────────────────
-
-export const studentTeacher = (() => {
-  const m = bind(StudentTeacherModule, 'StudentTeacher', [
-    'StudentTeacherRole',
-    'StudentTool',
-    'studentToolsFor',
-    'isStudentRequest',
-    'teacherTierFor',
-    'studentAgentName',
-    'teacherAgentName',
-    'isIgnoredTmpPath',
-    'appendEntry',
-    'dedupeTail',
-    'QaAppendOrder',
-    'StudentRunConcurrency',
-    'mayStartTeacherCall',
-    'ReturnDeleteOutcome',
-    'returnMayProceed',
-  ])
-
-  const toolNames = (set) => [...set].map(caseOf).sort()
-  const toolOf = (name) => unionCase(StudentTeacherModule.StudentTool, 'StudentTool')(name, [])
-
-  return {
-    /** LEARN-050：Student 工具面按请求种类原子决定。 */
-    toolsFor: (kindName) => toolNames(m.studentToolsFor(requestKind.of(kindName))),
-    /** LEARN-051：非 Student 请求种类 → 空工具集。 */
-    toolsForKind: (kind) => toolNames(m.studentToolsFor(kind)),
-
-    /** LEARN-017：同 tier 映射。 */
-    teacherTier: (tierName) => caseOf(m.teacherTierFor(tier(tierName))),
-
-    /** LEARN-016：Agent 名。 */
-    studentAgent: (tierName) => m.studentAgentName(tier(tierName)),
-    teacherAgent: (tierName) => m.teacherAgentName(tier(tierName)),
-
-    /** LEARN-032/033/035/036：QA 内容拼接。 */
-    isIgnoredTmpPath: (p) => m.isIgnoredTmpPath(p),
-    append: (existing, entry) => m.appendEntry(existing, entry),
-    dedupeTail: (existing, entry) => m.dedupeTail(existing, entry),
-
-    /** LEARN-075：单飞并发门。 */
-    mayStartTeacherCall: (stateName) => {
-      const state = unionCase(StudentTeacherModule.StudentRunConcurrency, 'StudentRunConcurrency')(stateName, [])
-      return m.mayStartTeacherCall(state)
-    },
-
-    /** LEARN-024：最终 return 删除顺序。 */
-    returnMayProceed: (outcomeName) => {
-      const outcome = unionCase(StudentTeacherModule.ReturnDeleteOutcome, 'ReturnDeleteOutcome')(outcomeName, [])
-      return m.returnMayProceed(outcome)
-    },
-  }
-})()
-
-// ── Session family recovery (RECOVERY-FAMILY / FLOW) ─────────────────────────
 const SessionRecoveryModule = await prod('Domain/SessionRecovery')
 
 export const sessionRecovery = (() => {

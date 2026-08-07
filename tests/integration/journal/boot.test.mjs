@@ -12,7 +12,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, envelope, fact, idValue, journal, journalStore, payloadOf, sessionId, stream } from '../../unit/support/domain.mjs'
+import { agentFactCaseOf, caseOf, envelope, fact, idValue, journal, journalStore, payloadOf, sessionId, stream } from '../../unit/support/domain.mjs'
 
 const SESSION = sessionId('ses_a')
 const CLOSED = fact('CompanionBloggerClosed', { SessionId: SESSION })
@@ -107,7 +107,7 @@ test('PERSIST_002_a_committed_append_reached_the_file_before_it_returned', () =>
     assert.deepEqual(
       {
         seq: Number(idValue.localSeq(decoded.value.LocalSeq)),
-        fact: caseOf(payloadOf(decoded.value.Fact)),
+        fact: agentFactCaseOf(payloadOf(decoded.value.Fact)),
         run: idValue.providerRun(decoded.value.ProviderRun),
       },
       { seq: 2, fact: 'CompanionBloggerClosed', run: 'run_1' },

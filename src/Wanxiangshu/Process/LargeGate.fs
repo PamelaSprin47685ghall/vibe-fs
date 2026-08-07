@@ -12,6 +12,7 @@ module LargeGate =
 
     type private Waiter(ct: CancellationToken) =
         let tcs = TaskCompletionSource<unit>()
+        // DSL-MUTABLE: cancellation — cancel-observed latch for the waiter
         let mutable canceled = ct.IsCancellationRequested
 
         do
@@ -34,6 +35,7 @@ module LargeGate =
                 true
 
     let private waiters = Queue<Waiter>()
+    // DSL-MUTABLE: resource — single-holder permit flag for the large-process gate
     let mutable private held = false
     let private gate = obj ()
 

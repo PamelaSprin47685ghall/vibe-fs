@@ -401,9 +401,7 @@ module PromptAuthority =
             )
         )
 
-    let effectiveAgentAt (profile: AuthorityExecutionProfile) (offset: byte) : string =
-        AgentPairCursor.effectiveAgent (agentPair profile) (AgentPairCursor.atOffset offset)
-
+    /// FALLBACK-001: the profile's agent pair for a given cursor.
     let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
         AgentPairCursor.effectiveAgent (agentPair profile) cursor
 

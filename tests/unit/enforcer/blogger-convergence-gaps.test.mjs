@@ -58,36 +58,45 @@ test('C0_BloggerRuntime_onMaterial_has_production_call_site', () => {
 })
 
 test('C0_BloggerRuntimeState_is_the_only_busy_definition', () => {
+  // Companion send Task must not decide busy. Production busy is host HasFlight
+  // (physical ownership); State.InFlight remains dual-write shadow (PR7 PARTIAL).
   const companion = prodText('src/Wanxiangshu/Session/Companion.fs')
   assert.equal(
     /mutable inFlightTask/.test(companion),
     false,
-    'Companion.inFlightTask must not decide Blogger busy; BloggerRuntimeState.InFlight is the sole busy definition',
+    'Companion.inFlightTask must not decide Blogger busy',
   )
   assert.equal(
     /mutable inFlightCompleted/.test(companion),
     false,
     'Companion.inFlightCompleted must not decide Blogger busy',
   )
+  const coordinator = prodText('src/Wanxiangshu/Session/BloggerCoordinator.fs')
+  assert.match(
+    coordinator,
+    /scope\.HasFlight key/,
+    'onMainMaterial busy must prefer HasFlight over cell.State match',
+  )
 })
 
 test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
-  // Dual slots without dual storage: PendingOffer is a dictionary;
-  // CurrentRequest is the InFlight payload. A parallel currentRequest dict
-  // dual-wrote and drifted into "missing CurrentRequest".
+  // Dual slots: PendingOffer dictionary + flight ownership registry.
+  // Forbidden: a drifted `currentRequest` dict that is not dual-written with State.
   const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
   assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
   assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
+  assert.match(scope, /bloggerFlights/, 'physical flight registry required')
   assert.equal(
     /\blet currentRequest\b/.test(scope),
     false,
-    'CurrentRequest must not be a second dictionary; InFlight payload is sole authority',
+    'CurrentRequest must not be a second dictionary named currentRequest',
   )
   assert.match(
     scope,
     /BloggerRuntime\.inFlightContext|inFlightContext \(this\.GetBloggerRuntimeUnlocked/,
-    'TryPeekCurrentRequest must read InFlight payload',
+    'TryPeekCurrentRequest must still fall back to InFlight shadow',
   )
+  assert.match(scope, /HasFlight/, 'HasFlight ownership API required')
 })
 
 test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {

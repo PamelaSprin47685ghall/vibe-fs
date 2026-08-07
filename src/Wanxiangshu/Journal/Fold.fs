@@ -43,6 +43,10 @@ module Fold =
             reject factName "cursor advance has no cursor to advance: FALLBACK-001 requires an accepted Authority Root"
         | Error InvalidTransition ->
             reject factName "cursor advance violates FALLBACK-007 (offset or count is not the successor)"
+        | Error(InvalidFallbackOffset decodeError) ->
+            match decodeError with
+            | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
+                reject factName $"cursor advance rejected: corrupt offset byte {value} (FALLBACK-002)"
 
     let private verdictOutcome factName projection result =
         match result with
@@ -212,699 +216,742 @@ module Fold =
             projection
 
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
+        // DSL-003: one dispatch per bounded-context family; each family folds
+        // through its own branch so no fold depends on the whole catalogue.
         match fact with
+        | AgentFact.Prompt prompt ->
+            match prompt with
+            // ── prompt dispatch ─────────────────────────────────────────────────
 
-        // ── prompt dispatch ─────────────────────────────────────────────────
-
-        | AgentFact.PluginPromptClaimed payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptClaimed authority payload)
-                    projection
-            )
-
-        | AgentFact.PluginPromptSubmitted payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptSubmitted authority payload)
-                    projection
-            )
-
-        | AgentFact.PluginPromptPhysicalAccepted payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptPhysicalAccepted authority payload)
-                    projection
-            )
-
-        | AgentFact.PluginPromptAbandoned payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptAbandoned authority payload)
-                    projection
-            )
-
-        // ── authority ───────────────────────────────────────────────────────
-
-        | AgentFact.AuthorityRootAccepted payload ->
-            // FALLBACK-001: a new Authority Root starts a fresh cursor. Done here
-            // rather than by a separate reset fact, because the reset is not an
-            // independent event — it IS this fact.
-            //
-            // REVIEW-007: a HumanRoot also creates a review requirement. An
-            // AgentOwnerRoot does not: the agent that forked the work is
-            // accountable for it, and requiring review of every internal prompt
-            // would make the Guard fire on its own continuations.
-            let withAuthority =
-                updateSession
-                    payload.SessionId
-                    (fun session ->
-                        { session with
-                            PromptAuthority =
-                                Some(
-                                    PromptAuthorityLedger.foldAuthorityRootAccepted
-                                        (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)
-                                        payload
-                                )
-                            Fallback =
-                                Some(
-                                    FallbackProjection.forAuthority
-                                        payload.LogicalRunId
-                                        payload.AuthorityRootUserMessageId
-                                ) })
-                    projection
-
-            if payload.AuthorityKind = "HumanRoot" then
+            | PromptFactCases.PluginPromptClaimed payload ->
                 Ok(
-                    updateRequirements
+                    updateAuthority
                         payload.SessionId
-                        (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
-                        withAuthority
+                        (fun authority -> PromptAuthorityLedger.foldPromptClaimed authority payload)
+                        projection
                 )
-            else
-                Ok withAuthority
+
+            | PromptFactCases.PluginPromptSubmitted payload ->
+                Ok(
+                    updateAuthority
+                        payload.SessionId
+                        (fun authority -> PromptAuthorityLedger.foldPromptSubmitted authority payload)
+                        projection
+                )
+
+            | PromptFactCases.PluginPromptPhysicalAccepted payload ->
+                Ok(
+                    updateAuthority
+                        payload.SessionId
+                        (fun authority -> PromptAuthorityLedger.foldPromptPhysicalAccepted authority payload)
+                        projection
+                )
+
+            | PromptFactCases.PluginPromptAbandoned payload ->
+                Ok(
+                    updateAuthority
+                        payload.SessionId
+                        (fun authority -> PromptAuthorityLedger.foldPromptAbandoned authority payload)
+                        projection
+                )
+
+            // ── authority ───────────────────────────────────────────────────────
+
+            | PromptFactCases.AuthorityRootAccepted payload ->
+                // FALLBACK-001: a new Authority Root starts a fresh cursor. Done here
+                // rather than by a separate reset fact, because the reset is not an
+                // independent event — it IS this fact.
+                //
+                // REVIEW-007: a HumanRoot also creates a review requirement. An
+                // AgentOwnerRoot does not: the agent that forked the work is
+                // accountable for it, and requiring review of every internal prompt
+                // would make the Guard fire on its own continuations.
+                let withAuthority =
+                    updateSession
+                        payload.SessionId
+                        (fun session ->
+                            { session with
+                                PromptAuthority =
+                                    Some(
+                                        PromptAuthorityLedger.foldAuthorityRootAccepted
+                                            (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)
+                                            payload
+                                    )
+                                Fallback =
+                                    Some(
+                                        FallbackProjection.forAuthority
+                                            payload.LogicalRunId
+                                            payload.AuthorityRootUserMessageId
+                                    ) })
+                        projection
+
+                if payload.AuthorityKind = "HumanRoot" then
+                    Ok(
+                        updateRequirements
+                            payload.SessionId
+                            (ReviewRequirementProjection.addRequirement
+                                payload.SessionId
+                                payload.AuthorityRootUserMessageId)
+                            withAuthority
+                    )
+                else
+                    Ok withAuthority
 
         // ── fallback ────────────────────────────────────────────────────────
 
-        | AgentFact.FallbackCursorAdvanced payload ->
-            let identity =
-                { SessionId = payload.SessionId
-                  LogicalRunId = payload.LogicalRunId
-                  AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                  ProviderRun = payload.ProviderRun }
+        | AgentFact.Fallback fallback ->
+            match fallback with
+            | FallbackFactCases.FallbackCursorAdvanced payload ->
+                let identity =
+                    { SessionId = payload.SessionId
+                      LogicalRunId = payload.LogicalRunId
+                      AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                      ProviderRun = payload.ProviderRun }
 
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    // An advance for a run with no cursor cannot be validated:
-                    // FALLBACK-001 says the cursor is created by the Authority
-                    // Root, so its absence means the root fact is missing.
-                    match session.Fallback with
-                    | None -> Error NoCursor
-                    | Some current ->
-                        FallbackProjection.applyAdvance
-                            identity
-                            payload.PreviousOffset
-                            payload.NextOffset
-                            payload.ConsecutiveFailureCount
-                            current
-                        |> Result.map (fun updated -> { session with Fallback = Some updated }))
-                projection
-            |> fallbackOutcome "FallbackCursorAdvanced" projection
-
-        | AgentFact.FallbackExhausted payload ->
-            Ok(
-                updateSession
+                AgentProjection.tryUpdate
                     payload.SessionId
                     (fun session ->
-                        { session with
-                            Fallback = session.Fallback |> Option.map FallbackProjection.applyExhausted })
+                        // An advance for a run with no cursor cannot be validated:
+                        // FALLBACK-001 says the cursor is created by the Authority
+                        // Root, so its absence means the root fact is missing.
+                        match session.Fallback with
+                        | None -> Error NoCursor
+                        | Some current ->
+                            // FALLBACK-002 codec boundary: an illegal wire byte is a
+                            // corrupt/forged line — typed refusal, never an exception
+                            // and never a fake Append CommitUnknown.
+                            match
+                                AgentPairCursor.FallbackOffsetCodec.ofByte payload.PreviousOffset,
+                                AgentPairCursor.FallbackOffsetCodec.ofByte payload.NextOffset
+                            with
+                            | Error decodeError, _
+                            | _, Error decodeError -> Error(InvalidFallbackOffset decodeError)
+                            | Ok previousOffset, Ok nextOffset ->
+                                FallbackProjection.applyAdvance
+                                    identity
+                                    previousOffset
+                                    nextOffset
+                                    payload.ConsecutiveFailureCount
+                                    current
+                                |> Result.map (fun updated -> { session with Fallback = Some updated }))
                     projection
-            )
+                |> fallbackOutcome "FallbackCursorAdvanced" projection
+
+            | FallbackFactCases.FallbackExhausted payload ->
+                Ok(
+                    updateSession
+                        payload.SessionId
+                        (fun session ->
+                            { session with
+                                Fallback = session.Fallback |> Option.map FallbackProjection.applyExhausted })
+                        projection
+                )
 
         // ── review ──────────────────────────────────────────────────────────
 
-        | AgentFact.ReviewBarrierStarted payload ->
-            let startBarrier =
-                ReviewProjection.startBarrier payload.BarrierId payload.GitTreeHash
+        | AgentFact.Review review ->
+            match review with
+            | ReviewFactCases.ReviewBarrierStarted payload ->
+                let startBarrier =
+                    ReviewProjection.startBarrier payload.BarrierId payload.GitTreeHash
 
-            projection
-            |> updateReviewGuard payload.ReviewerSessionId startBarrier
-            |> updateReviewGuard payload.ManagerSessionId startBarrier
-            |> Ok
-
-        | AgentFact.PerfectChallengeIssued payload ->
-            let challenge =
-                { BarrierId = payload.BarrierId
-                  GitTreeHash = payload.GitTreeHash
-                  ReviewerSessionId = payload.ReviewerSessionId
-                  FirstProviderRun = payload.FirstProviderRun
-                  FirstToolCallId = payload.FirstToolCallId
-                  ChallengeTextVersion = payload.ChallengeTextVersion
-                  ChallengeContentDigest = payload.ChallengeContentDigest }
-
-            Ok(updateReviewGuard payload.ReviewerSessionId (ReviewProjection.applyChallengeIssued challenge) projection)
-
-        | AgentFact.ProviderInputSealed payload ->
-            let seal =
-                { SessionId = payload.SessionId
-                  ProviderRun = payload.ProviderRun
-                  PhysicalUserMessageId = payload.PhysicalUserMessageId
-                  SealDigest = payload.SealDigest
-                  CanonicalVersion = payload.CanonicalVersion
-                  IncludedToolResultDigests =
-                    payload.IncludedToolResultDigests |> List.map SealDigest.value |> Set.ofList }
-
-            Ok(updateReviewGuard payload.SessionId (ReviewProjection.applySeal seal) projection)
-
-        | AgentFact.ReviewVerdictRecorded payload ->
-            let attempt =
-                { ReviewBarrierId = payload.BarrierId
-                  GitTreeHash = payload.GitTreeHash
-                  ReviewerSessionId = payload.ReviewerSessionId
-                  ProviderRun = payload.ProviderRun
-                  ToolCallId = payload.ToolCallId }
-
-            AgentProjection.tryUpdate
-                payload.ReviewerSessionId
-                (fun session ->
-                    ReviewProjection.applyVerdict
-                        attempt
-                        payload.Verdict
-                        (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
-                    |> Result.map (fun updated ->
-                        { session with
-                            ReviewGuard = Some updated }))
                 projection
-            |> verdictOutcome "ReviewVerdictRecorded" projection
+                |> updateReviewGuard payload.ReviewerSessionId startBarrier
+                |> updateReviewGuard payload.ManagerSessionId startBarrier
+                |> Ok
 
-        | AgentFact.ConfirmedReviewWitness payload ->
-            // The witness lands on the reviewer session, where the rest of the
-            // review facts live; the requirement clearance lands on the Manager,
-            // where REVIEW-007's Guard asks. Two sessions, two updates — the
-            // previous version only did the second, so a confirmed dual-PERFECT
-            // never became a `Confirmed` witness anywhere and the Guard could not
-            // pass no matter how many PERFECT verdicts the reviewer submitted.
-            //
-            // The third update is the Guard's own mirror: `missingTree` reads the
-            // MANAGER session's ReviewGuard, and nothing else ever writes it — so
-            // without this mirror the guard stayed missing forever and the Manager
-            // was nudged on every completion even after its Reviewer confirmed
-            // (measured on Host 1.18.10: `guard.IsConfirmed` never true).
-            let first =
-                { ProviderRun = payload.FirstProviderRun
-                  ToolCallId = payload.FirstToolCallId
-                  GitTreeHash = payload.GitTreeHash
-                  ReviewerSessionId = payload.ReviewerSessionId }
+            | ReviewFactCases.PerfectChallengeIssued payload ->
+                let challenge =
+                    { BarrierId = payload.BarrierId
+                      GitTreeHash = payload.GitTreeHash
+                      ReviewerSessionId = payload.ReviewerSessionId
+                      FirstProviderRun = payload.FirstProviderRun
+                      FirstToolCallId = payload.FirstToolCallId
+                      ChallengeTextVersion = payload.ChallengeTextVersion
+                      ChallengeContentDigest = payload.ChallengeContentDigest }
 
-            let second =
-                { ProviderRun = payload.SecondProviderRun
-                  ToolCallId = payload.SecondToolCallId
-                  GitTreeHash = payload.GitTreeHash
-                  ReviewerSessionId = payload.ReviewerSessionId }
+                Ok(
+                    updateReviewGuard
+                        payload.ReviewerSessionId
+                        (ReviewProjection.applyChallengeIssued challenge)
+                        projection
+                )
 
-            AgentProjection.tryUpdate
-                payload.ReviewerSessionId
-                (fun session ->
-                    ReviewProjection.applyConfirmedWitness
-                        payload.BarrierId
-                        payload.ChallengeResultDigest
-                        payload.SecondProviderInputDigest
-                        first
-                        second
-                        (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
-                    |> Result.map (fun updated ->
-                        { session with
-                            ReviewGuard = Some updated }))
-                projection
-            |> verdictOutcome "ConfirmedReviewWitness" projection
-            |> Result.map (
-                updateRequirements
-                    payload.ManagerSessionId
-                    (ReviewRequirementProjection.clearOnConfirmation payload.SecondProviderRun)
-            )
-            |> Result.map (fun updated ->
-                // REVIEW-007 mirror, non-blocking: the reviewer's witness is the
-                // durable fact; this copy only lets the Manager's guard answer
-                // "is the current tree confirmed" from its own projection. A
-                // refusal here must not fail the journal — the confirmation
-                // already happened on the reviewer side.
-                match
-                    AgentProjection.tryUpdate
+            | ReviewFactCases.ProviderInputSealed payload ->
+                let seal =
+                    { SessionId = payload.SessionId
+                      ProviderRun = payload.ProviderRun
+                      PhysicalUserMessageId = payload.PhysicalUserMessageId
+                      SealDigest = payload.SealDigest
+                      CanonicalVersion = payload.CanonicalVersion
+                      IncludedToolResultDigests =
+                        payload.IncludedToolResultDigests |> List.map SealDigest.value |> Set.ofList }
+
+                Ok(updateReviewGuard payload.SessionId (ReviewProjection.applySeal seal) projection)
+
+            | ReviewFactCases.ReviewVerdictRecorded payload ->
+                let attempt =
+                    { ReviewBarrierId = payload.BarrierId
+                      GitTreeHash = payload.GitTreeHash
+                      ReviewerSessionId = payload.ReviewerSessionId
+                      ProviderRun = payload.ProviderRun
+                      ToolCallId = payload.ToolCallId }
+
+                AgentProjection.tryUpdate
+                    payload.ReviewerSessionId
+                    (fun session ->
+                        ReviewProjection.applyVerdict
+                            attempt
+                            payload.Verdict
+                            (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
+                        |> Result.map (fun updated ->
+                            { session with
+                                ReviewGuard = Some updated }))
+                    projection
+                |> verdictOutcome "ReviewVerdictRecorded" projection
+
+            | ReviewFactCases.ConfirmedReviewWitness payload ->
+                // The witness lands on the reviewer session, where the rest of the
+                // review facts live; the requirement clearance lands on the Manager,
+                // where REVIEW-007's Guard asks. Two sessions, two updates — the
+                // previous version only did the second, so a confirmed dual-PERFECT
+                // never became a `Confirmed` witness anywhere and the Guard could not
+                // pass no matter how many PERFECT verdicts the reviewer submitted.
+                //
+                // The third update is the Guard's own mirror: `missingTree` reads the
+                // MANAGER session's ReviewGuard, and nothing else ever writes it — so
+                // without this mirror the guard stayed missing forever and the Manager
+                // was nudged on every completion even after its Reviewer confirmed
+                // (measured on Host 1.18.10: `guard.IsConfirmed` never true).
+                let first =
+                    { ProviderRun = payload.FirstProviderRun
+                      ToolCallId = payload.FirstToolCallId
+                      GitTreeHash = payload.GitTreeHash
+                      ReviewerSessionId = payload.ReviewerSessionId }
+
+                let second =
+                    { ProviderRun = payload.SecondProviderRun
+                      ToolCallId = payload.SecondToolCallId
+                      GitTreeHash = payload.GitTreeHash
+                      ReviewerSessionId = payload.ReviewerSessionId }
+
+                AgentProjection.tryUpdate
+                    payload.ReviewerSessionId
+                    (fun session ->
+                        ReviewProjection.applyConfirmedWitness
+                            payload.BarrierId
+                            payload.ChallengeResultDigest
+                            payload.SecondProviderInputDigest
+                            first
+                            second
+                            (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
+                        |> Result.map (fun updated ->
+                            { session with
+                                ReviewGuard = Some updated }))
+                    projection
+                |> verdictOutcome "ConfirmedReviewWitness" projection
+                |> Result.map (
+                    updateRequirements
                         payload.ManagerSessionId
-                        (fun session ->
-                            ReviewProjection.applyConfirmedWitness
-                                payload.BarrierId
-                                payload.ChallengeResultDigest
-                                payload.SecondProviderInputDigest
-                                first
-                                second
-                                (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
-                            |> Result.map (fun mirrored ->
-                                { session with
-                                    ReviewGuard = Some mirrored }))
-                        updated
-                with
-                | Ok mirrored -> mirrored
-                | Error _ -> updated)
+                        (ReviewRequirementProjection.clearOnConfirmation payload.SecondProviderRun)
+                )
+                |> Result.map (fun updated ->
+                    // REVIEW-007 mirror, non-blocking: the reviewer's witness is the
+                    // durable fact; this copy only lets the Manager's guard answer
+                    // "is the current tree confirmed" from its own projection. A
+                    // refusal here must not fail the journal — the confirmation
+                    // already happened on the reviewer side.
+                    match
+                        AgentProjection.tryUpdate
+                            payload.ManagerSessionId
+                            (fun session ->
+                                ReviewProjection.applyConfirmedWitness
+                                    payload.BarrierId
+                                    payload.ChallengeResultDigest
+                                    payload.SecondProviderInputDigest
+                                    first
+                                    second
+                                    (Option.defaultValue ReviewProjection.empty session.ReviewGuard)
+                                |> Result.map (fun mirrored ->
+                                    { session with
+                                        ReviewGuard = Some mirrored }))
+                            updated
+                    with
+                    | Ok mirrored -> mirrored
+                    | Error _ -> updated)
 
         // ── execution handles ───────────────────────────────────────────────
 
-        | AgentFact.HandleLinked payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.link
-                        payload.Handle
-                        payload.ChildSessionId
-                        payload.TargetAgent
-                        payload.CanonicalRole
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleLinked" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+        | AgentFact.Execution execution ->
+            match execution with
+            | ExecutionFactCases.HandleLinked payload ->
+                AgentProjection.tryUpdate
+                    payload.ParentSessionId
+                    (fun session ->
+                        HandleProjection.link
+                            payload.Handle
+                            payload.ChildSessionId
+                            payload.TargetAgent
+                            payload.CanonicalRole
+                            (Option.defaultValue HandleProjection.empty session.Handles)
+                        |> Result.map (fun updated -> { session with Handles = Some updated }))
+                    projection
+                |> handleOutcome "HandleLinked" projection
+                |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
-        | AgentFact.HandleCompleted payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.complete
-                        payload.Handle
-                        { Kind = payload.Kind
-                          CompletionRef = payload.CompletionRef
-                          CompletionDigest = payload.CompletionDigest }
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleCompleted" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            | ExecutionFactCases.HandleCompleted payload ->
+                AgentProjection.tryUpdate
+                    payload.ParentSessionId
+                    (fun session ->
+                        HandleProjection.complete
+                            payload.Handle
+                            { Kind = payload.Kind
+                              CompletionRef = payload.CompletionRef
+                              CompletionDigest = payload.CompletionDigest }
+                            (Option.defaultValue HandleProjection.empty session.Handles)
+                        |> Result.map (fun updated -> { session with Handles = Some updated }))
+                    projection
+                |> handleOutcome "HandleCompleted" projection
+                |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
-        | AgentFact.HandleRetired payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.retire payload.Handle (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleRetired" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            | ExecutionFactCases.HandleRetired payload ->
+                AgentProjection.tryUpdate
+                    payload.ParentSessionId
+                    (fun session ->
+                        HandleProjection.retire
+                            payload.Handle
+                            (Option.defaultValue HandleProjection.empty session.Handles)
+                        |> Result.map (fun updated -> { session with Handles = Some updated }))
+                    projection
+                |> handleOutcome "HandleRetired" projection
+                |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
-        | AgentFact.HandleAbandoned payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.abandon
-                        payload.Handle
-                        payload.Reason
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleAbandoned" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            | ExecutionFactCases.HandleAbandoned payload ->
+                AgentProjection.tryUpdate
+                    payload.ParentSessionId
+                    (fun session ->
+                        HandleProjection.abandon
+                            payload.Handle
+                            payload.Reason
+                            (Option.defaultValue HandleProjection.empty session.Handles)
+                        |> Result.map (fun updated -> { session with Handles = Some updated }))
+                    projection
+                |> handleOutcome "HandleAbandoned" projection
+                |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
-        // Clean-break: false abort cell → Active only when ref/digest match.
-        | AgentFact.HandleFalseCompletionRejected payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.rejectFalseCompletion
-                        payload.Handle
-                        payload.ExpectedCompletionRef
-                        payload.ExpectedCompletionDigest
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleFalseCompletionRejected" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            // Clean-break: false abort cell → Active only when ref/digest match.
 
-        // Clean-break: retired false terminal report. Projection keeps original
-        // Retired tombstone; replacement is linked by a separate HandleLinked.
-        | AgentFact.HandleFalseTerminalReported _ -> Ok projection
+            | ExecutionFactCases.HandleFalseCompletionRejected payload ->
+                AgentProjection.tryUpdate
+                    payload.ParentSessionId
+                    (fun session ->
+                        HandleProjection.rejectFalseCompletion
+                            payload.Handle
+                            payload.ExpectedCompletionRef
+                            payload.ExpectedCompletionDigest
+                            (Option.defaultValue HandleProjection.empty session.Handles)
+                        |> Result.map (fun updated -> { session with Handles = Some updated }))
+                    projection
+                |> handleOutcome "HandleFalseCompletionRejected" projection
+                |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
-        // Clean-break: parent correction notice. No handle lifecycle change.
-        | AgentFact.ParentJoinCorrectionRequested _ -> Ok projection
+            // Clean-break: retired false terminal report. Projection keeps original
+            // Retired tombstone; replacement is linked by a separate HandleLinked.
 
-        // HostTurnObserved is a durable observation inbox fact. CompletionReactor
-        // (later batch) consumes it; LinkageProjection has no fold effect yet.
-        | AgentFact.HostTurnObserved _ -> Ok projection
+            | ExecutionFactCases.HandleFalseTerminalReported _ -> Ok projection
+
+            // Clean-break: parent correction notice. No handle lifecycle change.
+
+            | ExecutionFactCases.ParentJoinCorrectionRequested _ -> Ok projection
+
+            // HostTurnObserved is a durable observation inbox fact. CompletionReactor
+            // (later batch) consumes it; LinkageProjection has no fold effect yet.
+
+            | ExecutionFactCases.HostTurnObserved _ -> Ok projection
 
         // ── orchestrator ────────────────────────────────────────────────────
 
-        | AgentFact.ManagerJobCreated payload ->
-            Ok(updateOrchestrator (OrchestratorProjection.createJob payload) projection)
+        | AgentFact.Orchestrator orchestrator ->
+            match orchestrator with
+            | OrchestratorFactCases.ManagerJobCreated payload ->
+                Ok(updateOrchestrator (OrchestratorProjection.createJob payload) projection)
 
-        | AgentFact.CandidateReady payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordProgress
-                        payload.ManagerJobId
-                        (JobProgress.CandidateReady
-                            {| CandidateCommit = payload.CandidateCommit
-                               PreRebaseReviewBarrierId = payload.PreRebaseReviewBarrierId |}))
-                    projection
-            )
-
-        | AgentFact.ConflictDetected payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordProgress
-                        payload.ManagerJobId
-                        (JobProgress.ConflictPending
-                            {| CandidateCommit = payload.CandidateCommit
-                               TargetHeadSnapshot = payload.TargetHeadSnapshot
-                               ConflictFiles = payload.ConflictFiles
-                               DiagnosticsDigest = payload.DiagnosticsDigest |}))
-                    projection
-            )
-
-        | AgentFact.RebasedCandidateReady payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordProgress
-                        payload.ManagerJobId
-                        (JobProgress.RebasedCandidateReady
-                            {| RebasedCommit = payload.RebasedCommit
-                               TargetHeadSnapshot = payload.TargetHeadSnapshot
-                               PostRebaseReviewBarrierId = payload.PostRebaseReviewBarrierId |}))
-                    projection
-            )
-
-        | AgentFact.PublishClaimed payload ->
-            // ORCH-007 needs the rebased commit to recognise "already published".
-            // It comes from the job's current progress rather than the claim
-            // fact, because the claim is written inside the CAS window where the
-            // rebased candidate is already established.
-            let rebasedCommit =
-                OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
-                |> Option.bind (fun job ->
-                    match job.Progress with
-                    | JobProgress.RebasedCandidateReady rebased -> Some rebased.RebasedCommit
-                    | _ -> None)
-
-            match rebasedCommit with
-            | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
-            | Some commit ->
+            | OrchestratorFactCases.CandidateReady payload ->
                 Ok(
                     updateOrchestrator
                         (OrchestratorProjection.recordProgress
                             payload.ManagerJobId
-                            (JobProgress.PublishClaimed
-                                {| RebasedCommit = commit
-                                   ExpectedHead = payload.ExpectedHead |}))
+                            (JobProgress.CandidateReady
+                                {| CandidateCommit = payload.CandidateCommit
+                                   PreRebaseReviewBarrierId = payload.PreRebaseReviewBarrierId |}))
                         projection
                 )
 
-        | AgentFact.Published payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordProgress
-                        payload.ManagerJobId
-                        (JobProgress.Published
-                            {| CandidateCommit = payload.CandidateCommit
-                               ResultingTargetHead = payload.ResultingTargetHead |}))
-                    projection
-            )
+            | OrchestratorFactCases.ConflictDetected payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordProgress
+                            payload.ManagerJobId
+                            (JobProgress.ConflictPending
+                                {| CandidateCommit = payload.CandidateCommit
+                                   TargetHeadSnapshot = payload.TargetHeadSnapshot
+                                   ConflictFiles = payload.ConflictFiles
+                                   DiagnosticsDigest = payload.DiagnosticsDigest |}))
+                        projection
+                )
 
-        | AgentFact.JobFailed payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordProgress payload.ManagerJobId (JobProgress.Failed payload.Reason))
-                    projection
-            )
+            | OrchestratorFactCases.RebasedCandidateReady payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordProgress
+                            payload.ManagerJobId
+                            (JobProgress.RebasedCandidateReady
+                                {| RebasedCommit = payload.RebasedCommit
+                                   TargetHeadSnapshot = payload.TargetHeadSnapshot
+                                   PostRebaseReviewBarrierId = payload.PostRebaseReviewBarrierId |}))
+                        projection
+                )
 
-        | AgentFact.JobAbandoned payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordProgress payload.ManagerJobId JobProgress.Abandoned)
-                    projection
-            )
+            | OrchestratorFactCases.PublishClaimed payload ->
+                // ORCH-007 needs the rebased commit to recognise "already published".
+                // It comes from the job's current progress rather than the claim
+                // fact, because the claim is written inside the CAS window where the
+                // rebased candidate is already established.
+                let rebasedCommit =
+                    OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
+                    |> Option.bind (fun job ->
+                        match job.Progress with
+                        | JobProgress.RebasedCandidateReady rebased -> Some rebased.RebasedCommit
+                        | _ -> None)
 
-        // ── companion ───────────────────────────────────────────────────────
+                match rebasedCommit with
+                | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
+                | Some commit ->
+                    Ok(
+                        updateOrchestrator
+                            (OrchestratorProjection.recordProgress
+                                payload.ManagerJobId
+                                (JobProgress.PublishClaimed
+                                    {| RebasedCommit = commit
+                                       ExpectedHead = payload.ExpectedHead |}))
+                            projection
+                    )
 
-        | AgentFact.CompanionBloggerLinked payload ->
-            // HOST-008 / COMPANION-002: one fact, two projections.
-            //
-            // The Companion cache records "my Y is this session"; the association
-            // records both directions of the relation, which is what makes "is this
-            // session itself a Companion" answerable without a scan (PERSIST-008).
-            //
-            // Both or neither. A cache entry without the association would leave the
-            // Y looking like an ordinary work session, and the next transform on it
-            // would give it a Y of its own — the recursion COMPANION-002 forbids.
-            SessionAssociationProjection.link payload.SessionId payload.BloggerSessionId None projection.Associations
-            |> Result.map (fun associations ->
-                updateCompanion
+            | OrchestratorFactCases.Published payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordProgress
+                            payload.ManagerJobId
+                            (JobProgress.Published
+                                {| CandidateCommit = payload.CandidateCommit
+                                   ResultingTargetHead = payload.ResultingTargetHead |}))
+                        projection
+                )
+
+            | OrchestratorFactCases.JobFailed payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordProgress payload.ManagerJobId (JobProgress.Failed payload.Reason))
+                        projection
+                )
+
+            | OrchestratorFactCases.JobAbandoned payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordProgress payload.ManagerJobId JobProgress.Abandoned)
+                        projection
+                )
+
+            // ── durable effects (PERSIST-009 typed worktree) ────────────────────
+
+            | OrchestratorFactCases.WorktreeCreateRequested payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.requestWorktree
+                            payload.WorktreeIdentity
+                            payload.WorktreePath
+                            payload.ManagerJobId)
+                        projection
+                )
+
+            | OrchestratorFactCases.WorktreeCreated payload ->
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.acceptWorktree
+                            payload.WorktreeIdentity
+                            payload.WorktreePath
+                            payload.ManagerJobId)
+                        projection
+                )
+
+        | AgentFact.Companion companion ->
+            match companion with
+            | CompanionFactCases.CompanionBloggerLinked payload ->
+                // HOST-008 / COMPANION-002: one fact, two projections.
+                //
+                // The Companion cache records "my Y is this session"; the association
+                // records both directions of the relation, which is what makes "is this
+                // session itself a Companion" answerable without a scan (PERSIST-008).
+                //
+                // Both or neither. A cache entry without the association would leave the
+                // Y looking like an ordinary work session, and the next transform on it
+                // would give it a Y of its own — the recursion COMPANION-002 forbids.
+                SessionAssociationProjection.link
                     payload.SessionId
-                    (CompanionProjection.linkBlogger payload.BloggerSessionId)
-                    { projection with
-                        Associations = associations })
-            |> associationOutcome "CompanionBloggerLinked"
+                    payload.BloggerSessionId
+                    None
+                    projection.Associations
+                |> Result.map (fun associations ->
+                    updateCompanion
+                        payload.SessionId
+                        (CompanionProjection.linkBlogger payload.BloggerSessionId)
+                        { projection with
+                            Associations = associations })
+                |> associationOutcome "CompanionBloggerLinked"
 
-        | AgentFact.CompanionBloggerClosed payload ->
-            // `unlink` is total: an unknown session or one with no Y is already in the
-            // state this fact describes, so replaying it changes nothing.
-            Ok(
-                updateCompanion
+            | CompanionFactCases.CompanionBloggerClosed payload ->
+                // `unlink` is total: an unknown session or one with no Y is already in the
+                // state this fact describes, so replaying it changes nothing.
+                Ok(
+                    updateCompanion
+                        payload.SessionId
+                        CompanionProjection.closeBlogger
+                        { projection with
+                            Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
+                )
+
+            // ── lifecycle work record (docs/what/companion.md, HOST-005) ──────────────────────
+
+            | CompanionFactCases.OpeningPromptCaptured payload ->
+                // COMPANION-003 / PERSIST-010: idempotent capture. Replaying the same
+                // text is the crash-recovery path; a DIFFERENT text is a line no
+                // correct writer produces, so it fails the fold closed.
+                AgentProjection.tryUpdate
                     payload.SessionId
-                    CompanionProjection.closeBlogger
-                    { projection with
-                        Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
-            )
+                    (fun session ->
+                        XTraceProjection.applyOpening
+                            payload.AssignmentText
+                            payload.AuthoritativeRequirements
+                            (Option.defaultValue XTraceProjection.empty session.XTrace)
+                        |> Result.map (fun updated -> { session with XTrace = Some updated }))
+                    projection
+                |> function
+                    | Ok updated -> Ok updated
+                    | Error XTraceFoldRejection.OpeningAlreadyCaptured ->
+                        reject "OpeningPromptCaptured" "opening was already captured with different text (PERSIST-010)"
+                    | Error rejection ->
+                        reject "OpeningPromptCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
 
-        // ── lifecycle work record (docs/what/companion.md, HOST-005) ──────────────────────
+            | CompanionFactCases.XTracePartAppended payload ->
+                // COMPANION-003 / PERSIST-010: append-only, strictly monotonic cursor.
+                // The provenance is stored VERBATIM from the writer, so the recorded
+                // set and the writer's dedupe check share one namespace.
+                AgentProjection.tryUpdate
+                    payload.SessionId
+                    (fun session ->
+                        XTraceProjection.applyPart
+                            payload.CursorSequence
+                            payload.Role
+                            payload.Provenance
+                            payload.Turn
+                            payload.PartIndex
+                            payload.Kind
+                            payload.ToolName
+                            payload.TextRef
+                            payload.TextDigest
+                            (Option.defaultValue XTraceProjection.empty session.XTrace)
+                        |> Result.map (fun updated -> { session with XTrace = Some updated }))
+                    projection
+                |> function
+                    | Ok updated -> Ok updated
+                    | Error(XTraceFoldRejection.CursorNotAfterHead(expected, actual)) ->
+                        reject
+                            "XTracePartAppended"
+                            (sprintf "cursor %d is not after the head %d (PERSIST-010)" actual expected)
+                    | Error rejection ->
+                        reject "XTracePartAppended" (sprintf "unexpected XTrace rejection: %A" rejection)
 
-        | AgentFact.OpeningPromptCaptured payload ->
-            // COMPANION-003 / PERSIST-010: idempotent capture. Replaying the same
-            // text is the crash-recovery path; a DIFFERENT text is a line no
-            // correct writer produces, so it fails the fold closed.
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    XTraceProjection.applyOpening
-                        payload.AssignmentText
-                        payload.AuthoritativeRequirements
-                        (Option.defaultValue XTraceProjection.empty session.XTrace)
-                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error XTraceFoldRejection.OpeningAlreadyCaptured ->
-                    reject "OpeningPromptCaptured" "opening was already captured with different text (PERSIST-010)"
-                | Error rejection ->
-                    reject "OpeningPromptCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
-
-        | AgentFact.XTracePartAppended payload ->
-            // COMPANION-003 / PERSIST-010: append-only, strictly monotonic cursor.
-            // The provenance is stored VERBATIM from the writer, so the recorded
-            // set and the writer's dedupe check share one namespace.
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    XTraceProjection.applyPart
-                        payload.CursorSequence
-                        payload.Role
-                        payload.Provenance
-                        payload.Turn
-                        payload.PartIndex
-                        payload.Kind
-                        payload.ToolName
-                        payload.TextRef
-                        payload.TextDigest
-                        (Option.defaultValue XTraceProjection.empty session.XTrace)
-                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error(XTraceFoldRejection.CursorNotAfterHead(expected, actual)) ->
-                    reject
-                        "XTracePartAppended"
-                        (sprintf "cursor %d is not after the head %d (PERSIST-010)" actual expected)
-                | Error rejection -> reject "XTracePartAppended" (sprintf "unexpected XTrace rejection: %A" rejection)
-
-        | AgentFact.TerminalOutputCaptured payload ->
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    XTraceProjection.applyTerminal
-                        payload.TextRef
-                        payload.TextDigest
-                        (Option.defaultValue XTraceProjection.empty session.XTrace)
-                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
-                    reject "TerminalOutputCaptured" "terminal was already captured with a different blob (PERSIST-010)"
-                | Error rejection ->
-                    reject "TerminalOutputCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
+            | CompanionFactCases.TerminalOutputCaptured payload ->
+                AgentProjection.tryUpdate
+                    payload.SessionId
+                    (fun session ->
+                        XTraceProjection.applyTerminal
+                            payload.TextRef
+                            payload.TextDigest
+                            (Option.defaultValue XTraceProjection.empty session.XTrace)
+                        |> Result.map (fun updated -> { session with XTrace = Some updated }))
+                    projection
+                |> function
+                    | Ok updated -> Ok updated
+                    | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
+                        reject
+                            "TerminalOutputCaptured"
+                            "terminal was already captured with a different blob (PERSIST-010)"
+                    | Error rejection ->
+                        reject "TerminalOutputCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
 
         // ── failure-driven context recovery (docs/what/context.md) ───────────────────────
 
-        | AgentFact.BloggerRequestMaterialized payload ->
-            let apply session =
-                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+        | AgentFact.Context context ->
+            match context with
+            | ContextFactCases.BloggerRequestMaterialized payload ->
+                let apply session =
+                    let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
-                BloggerCycleProjection.materialize
-                    { RequestId = payload.RequestId
-                      MainSessionId = payload.MainSessionId
-                      BloggerSessionId = payload.BloggerSessionId
-                      RequestKind = payload.RequestKind
-                      ContextRef = payload.ContextRef
-                      ContextDigest = payload.ContextDigest
-                      ObservedPrefixEpochId = payload.ObservedPrefixEpochId
-                      PreviousIngestedThroughSequence = payload.PreviousIngestedThroughSequence
-                      NextIngestedThroughSequence = payload.NextIngestedThroughSequence
-                      FrameEpochId = payload.FrameEpochId
-                      SelectedFrameDigests = payload.SelectedFrameDigests
-                      PromptKey = payload.PromptKey }
-                    cycles
-                |> Result.map (fun updated ->
-                    { session with
-                        BloggerCycles = Some updated })
+                    BloggerCycleProjection.materialize
+                        { RequestId = payload.RequestId
+                          MainSessionId = payload.MainSessionId
+                          BloggerSessionId = payload.BloggerSessionId
+                          RequestKind = payload.RequestKind
+                          ContextRef = payload.ContextRef
+                          ContextDigest = payload.ContextDigest
+                          ObservedPrefixEpochId = payload.ObservedPrefixEpochId
+                          PreviousIngestedThroughSequence = payload.PreviousIngestedThroughSequence
+                          NextIngestedThroughSequence = payload.NextIngestedThroughSequence
+                          FrameEpochId = payload.FrameEpochId
+                          SelectedFrameDigests = payload.SelectedFrameDigests
+                          PromptKey = payload.PromptKey }
+                        cycles
+                    |> Result.map (fun updated ->
+                        { session with
+                            BloggerCycles = Some updated })
 
-            match AgentProjection.tryUpdate payload.MainSessionId apply projection with
-            | Error reason -> reject "BloggerRequestMaterialized" reason
-            | Ok updated -> Ok updated
+                match AgentProjection.tryUpdate payload.MainSessionId apply projection with
+                | Error reason -> reject "BloggerRequestMaterialized" reason
+                | Ok updated -> Ok updated
 
-        | AgentFact.BloggerRequestAbandoned payload ->
-            let apply session =
-                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+            | ContextFactCases.BloggerRequestAbandoned payload ->
+                let apply session =
+                    let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
-                Ok
-                    { session with
-                        BloggerCycles =
-                            Some(BloggerCycleProjection.abandon payload.RequestId payload.BloggerSessionId cycles) }
+                    Ok
+                        { session with
+                            BloggerCycles =
+                                Some(BloggerCycleProjection.abandon payload.RequestId payload.BloggerSessionId cycles) }
 
-            match AgentProjection.tryUpdate payload.MainSessionId apply projection with
-            | Error reason -> reject "BloggerRequestAbandoned" reason
-            | Ok updated -> Ok updated
+                match AgentProjection.tryUpdate payload.MainSessionId apply projection with
+                | Error reason -> reject "BloggerRequestAbandoned" reason
+                | Ok updated -> Ok updated
 
-        | AgentFact.BlogEntryCommitted payload ->
-            // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
-            let applyEnforcementAndReceipt session =
-                let enforcement =
-                    Option.defaultValue EnforcementProjection.empty session.Enforcement
+            | ContextFactCases.BlogEntryCommitted payload ->
+                // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
+                let applyEnforcementAndReceipt session =
+                    let enforcement =
+                        Option.defaultValue EnforcementProjection.empty session.Enforcement
 
-                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+                    let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
-                EnforcementProjection.applyFromEntry
-                    enforcement
-                    { MainSessionId = payload.SessionId
-                      BloggerSessionId = payload.BloggerSessionId
-                      ProviderRun = payload.ProviderRun
-                      ToolCallIds = payload.ToolCallIds
-                      CycleTextRef = payload.TextRef
-                      CycleTextDigest = payload.TextDigest
-                      TipRuleId = payload.TipRuleId
-                      FieldNameAtCommit = payload.FieldNameAtCommit
-                      CycleEvidenceRef = payload.EvidenceRef
-                      ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
-                |> Result.bind (fun enfUpdated ->
+                    EnforcementProjection.applyFromEntry
+                        enforcement
+                        { MainSessionId = payload.SessionId
+                          BloggerSessionId = payload.BloggerSessionId
+                          ProviderRun = payload.ProviderRun
+                          ToolCallIds = payload.ToolCallIds
+                          CycleTextRef = payload.TextRef
+                          CycleTextDigest = payload.TextDigest
+                          TipRuleId = payload.TipRuleId
+                          FieldNameAtCommit = payload.FieldNameAtCommit
+                          CycleEvidenceRef = payload.EvidenceRef
+                          ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
+                    |> Result.bind (fun enfUpdated ->
+                        BloggerCycleProjection.recordReceipt
+                            { ProviderRun = payload.ProviderRun
+                              Kind = BlogFrameKind.Entry
+                              RequestId = payload.RequestId }
+                            cycles
+                        |> Result.map (fun cycleUpdated ->
+                            { session with
+                                Enforcement = Some enfUpdated
+                                BloggerCycles = Some cycleUpdated }))
+
+                match AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection with
+                | Error reason -> reject "BlogEntryCommitted" reason
+                | Ok updated ->
+                    tryUpdateBlog
+                        payload.SessionId
+                        (BlogProjection.applyEntry
+                            payload.FrameEpochId
+                            payload.PreviousIngestedThroughSequence
+                            payload.NextIngestedThroughSequence
+                            payload.PreviousCoverableTurnCutoffExclusive
+                            payload.NextCoverableTurnCutoffExclusive
+                            payload.NextCoveredPrefixDigest
+                            { Kind = BlogFrameKind.Entry
+                              Digest = payload.TextDigest
+                              TextRef = payload.TextRef })
+                        updated
+                    |> blogOutcome "BlogEntryCommitted"
+
+            | ContextFactCases.BlogSquashCommitted payload ->
+                let applyReceipt session =
+                    let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+
                     BloggerCycleProjection.recordReceipt
                         { ProviderRun = payload.ProviderRun
-                          Kind = BloggerCycleKind.Entry
+                          Kind = BlogFrameKind.Squash
                           RequestId = payload.RequestId }
                         cycles
-                    |> Result.map (fun cycleUpdated ->
+                    |> Result.map (fun updated ->
                         { session with
-                            Enforcement = Some enfUpdated
-                            BloggerCycles = Some cycleUpdated }))
+                            BloggerCycles = Some updated })
 
-            match AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection with
-            | Error reason -> reject "BlogEntryCommitted" reason
-            | Ok updated ->
-                tryUpdateBlog
+                match AgentProjection.tryUpdate payload.SessionId applyReceipt projection with
+                | Error reason -> reject "BlogSquashCommitted" reason
+                | Ok updated ->
+                    tryUpdateBlog
+                        payload.SessionId
+                        (BlogProjection.applySquash
+                            payload.PreviousFrameEpochId
+                            payload.NextFrameEpochId
+                            payload.CoveredFrameCount
+                            { Kind = BlogFrameKind.Squash
+                              Digest = payload.TextDigest
+                              TextRef = payload.TextRef })
+                        updated
+                    |> blogOutcome "BlogSquashCommitted"
+
+            | ContextFactCases.PrefixRebaseCommitted payload ->
+                tryUpdatePrefix
                     payload.SessionId
-                    (BlogProjection.applyEntry
-                        payload.FrameEpochId
-                        payload.PreviousIngestedThroughSequence
-                        payload.NextIngestedThroughSequence
-                        payload.PreviousCoverableTurnCutoffExclusive
-                        payload.NextCoverableTurnCutoffExclusive
-                        payload.NextCoveredPrefixDigest
-                        { Kind = BlogFrameKind.Entry
-                          Digest = payload.TextDigest
-                          TextRef = payload.TextRef })
-                    updated
-                |> blogOutcome "BlogEntryCommitted"
-
-        | AgentFact.BlogSquashCommitted payload ->
-            let applyReceipt session =
-                let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
-
-                BloggerCycleProjection.recordReceipt
-                    { ProviderRun = payload.ProviderRun
-                      Kind = BloggerCycleKind.Squash
-                      RequestId = payload.RequestId }
-                    cycles
-                |> Result.map (fun updated ->
-                    { session with
-                        BloggerCycles = Some updated })
-
-            match AgentProjection.tryUpdate payload.SessionId applyReceipt projection with
-            | Error reason -> reject "BlogSquashCommitted" reason
-            | Ok updated ->
-                tryUpdateBlog
-                    payload.SessionId
-                    (BlogProjection.applySquash
-                        payload.PreviousFrameEpochId
-                        payload.NextFrameEpochId
-                        payload.CoveredFrameCount
-                        { Kind = BlogFrameKind.Squash
-                          Digest = payload.TextDigest
-                          TextRef = payload.TextRef })
-                    updated
-                |> blogOutcome "BlogSquashCommitted"
-
-        | AgentFact.PrefixRebaseCommitted payload ->
-            tryUpdatePrefix
-                payload.SessionId
-                (PrefixEpochProjection.applyRebase
-                    payload.PreviousEpochId
-                    payload.NextEpochId
-                    { FrozenRecordPrefixRef = payload.FrozenRecordPrefixRef
-                      FrozenRecordPrefixDigest = payload.FrozenRecordPrefixDigest
-                      CutoffExclusive = payload.CutoffExclusive
-                      CoveredPrefixDigest = payload.CoveredPrefixDigest
-                      SealRoot = payload.SealRoot
-                      SyntheticMessageId = payload.SyntheticMessageId })
-                projection
-            |> prefixOutcome "PrefixRebaseCommitted" projection
-
-        | AgentFact.ContextReanchored payload ->
-            // HOST-006: one physical event, two projections. The prefix retires and
-            // PrefixCoverage returns to the origin; both must land or neither — a
-            // retired prefix beside a cutoff claim in the voided numbering is the
-            // state the single fact exists to prevent.
-            //
-            // Hence one session-level update rather than two chained ones: the
-            // atomicity is structural, not something a reader has to verify by
-            // tracing whether the second step was reached.
-            //
-            // Frames and RecordCoverage (IngestedThrough) survive. Only the Host
-            // prefix mapping is zeroed (BlogProjection.applyReanchor / COMPANION-008).
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    session.PrefixEpoch
-                    |> Option.defaultValue PrefixEpochProjection.empty
-                    |> PrefixEpochProjection.applyReanchor
+                    (PrefixEpochProjection.applyRebase
                         payload.PreviousEpochId
                         payload.NextEpochId
-                        payload.ObservedCompactionRun
-                    |> Result.map (fun retired ->
-                        { session with
-                            PrefixEpoch = Some retired
-                            Blog = session.Blog |> Option.map BlogProjection.applyReanchor }))
-                projection
-            |> prefixOutcome "ContextReanchored" projection
-
-        // ── durable effects (PERSIST-009 typed worktree) ────────────────────
-
-        | AgentFact.WorktreeCreateRequested payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.requestWorktree
-                        payload.WorktreeIdentity
-                        payload.WorktreePath
-                        payload.ManagerJobId)
+                        { FrozenRecordPrefixRef = payload.FrozenRecordPrefixRef
+                          FrozenRecordPrefixDigest = payload.FrozenRecordPrefixDigest
+                          CutoffExclusive = payload.CutoffExclusive
+                          CoveredPrefixDigest = payload.CoveredPrefixDigest
+                          SealRoot = payload.SealRoot
+                          SyntheticMessageId = payload.SyntheticMessageId })
                     projection
-            )
+                |> prefixOutcome "PrefixRebaseCommitted" projection
 
-        | AgentFact.WorktreeCreated payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.acceptWorktree
-                        payload.WorktreeIdentity
-                        payload.WorktreePath
-                        payload.ManagerJobId)
+            | ContextFactCases.ContextReanchored payload ->
+                // HOST-006: one physical event, two projections. The prefix retires and
+                // PrefixCoverage returns to the origin; both must land or neither — a
+                // retired prefix beside a cutoff claim in the voided numbering is the
+                // state the single fact exists to prevent.
+                //
+                // Hence one session-level update rather than two chained ones: the
+                // atomicity is structural, not something a reader has to verify by
+                // tracing whether the second step was reached.
+                //
+                // Frames and RecordCoverage (IngestedThrough) survive. Only the Host
+                // prefix mapping is zeroed (BlogProjection.applyReanchor / COMPANION-008).
+                AgentProjection.tryUpdate
+                    payload.SessionId
+                    (fun session ->
+                        session.PrefixEpoch
+                        |> Option.defaultValue PrefixEpochProjection.empty
+                        |> PrefixEpochProjection.applyReanchor
+                            payload.PreviousEpochId
+                            payload.NextEpochId
+                            payload.ObservedCompactionRun
+                        |> Result.map (fun retired ->
+                            { session with
+                                PrefixEpoch = Some retired
+                                Blog = session.Blog |> Option.map BlogProjection.applyReanchor }))
                     projection
-            )
+                |> prefixOutcome "ContextReanchored" projection
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with

@@ -143,8 +143,11 @@ module BloggerDelta =
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both
             // change the rendered size non-linearly, so only rendering can measure it.
+            // DSL-MUTABLE: algorithm-scratch — binary-search low bound
             let mutable low = 0
+            // DSL-MUTABLE: algorithm-scratch — binary-search high bound
             let mutable high = normalized.Length
+            // DSL-MUTABLE: algorithm-scratch — binary-search best-so-far bound
             let mutable best = rendered 0
 
             while low <= high do
@@ -190,12 +193,14 @@ module BloggerDelta =
             // accumulation each time — rather than summing per-item sizes — is what
             // makes the limit exact: `renderChunk` adds the header, separators and a trailing newline
             // that a per-item sum would miss.
+            // DSL-MUTABLE: algorithm-scratch — accumulate accepted items until limit
             let mutable accepted
                 : {| Turn: int
                      Part: int
                      Item: BloggerDeltaItem |} list =
                 []
 
+            // DSL-MUTABLE: algorithm-scratch — stop flag for accumulation loop
             let mutable stopped = false
 
             for entry in pending do

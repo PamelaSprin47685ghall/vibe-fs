@@ -35,6 +35,7 @@ const {
   providerRun,
   idValue,
   agentFactCaseNames,
+  agentFactCaseOf,
 } = domain
 
 // ── hazard 1: DateTimeOffset without an offset ──────────────────────────────
@@ -156,8 +157,10 @@ test('facts are built by case name, and an unknown name fails loudly', () => {
     ProviderAttempt: '1',
   })
 
-  assert.equal(caseOf(built), 'FallbackCursorAdvanced')
-  assert.throws(() => agentFact('FallbackCursorAdvancedTypo', {}), /has no case/)
+  // DSL-003: the dispatch case is the family; the business case is one payload in.
+  assert.equal(caseOf(built), 'Fallback')
+  assert.equal(agentFactCaseOf(built), 'FallbackCursorAdvanced')
+  assert.throws(() => agentFact('FallbackCursorAdvancedTypo', {}), /no AgentFact family has case/)
 })
 
 test('asFact wraps an AgentFact as the top-level Agent case', () => {
@@ -165,7 +168,7 @@ test('asFact wraps an AgentFact as the top-level Agent case', () => {
   const wrapped = asFact(agentFact('CompanionBloggerClosed', { SessionId: session }))
 
   assert.equal(caseOf(wrapped), 'Agent')
-  assert.equal(caseOf(payloadOf(wrapped)), 'CompanionBloggerClosed')
+  assert.equal(agentFactCaseOf(payloadOf(wrapped)), 'CompanionBloggerClosed')
 })
 
 test('caseOf refuses a non-union value instead of returning undefined', () => {
@@ -223,7 +226,8 @@ test('an envelope survives NDJSON round trip and still folds', () => {
 
   const decoded = journal.deserialize(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : String(decoded.error))
-  assert.equal(idValue.session(payloadOf(payloadOf(decoded.value.Fact)).SessionId), 'ses_rt')
+  // DSL-003: Fact → Agent dispatch → family dispatch → payload.
+  assert.equal(idValue.session(payloadOf(payloadOf(payloadOf(decoded.value.Fact))).SessionId), 'ses_rt')
   assert.equal(idValue.localSeq(decoded.value.LocalSeq), 7n)
 
   const projection = fold.replay([root, advanced])
@@ -234,10 +238,7 @@ test('an envelope survives NDJSON round trip and still folds', () => {
 
   // FALLBACK-007: the advance is validated, not absorbed — offset and count both
   // move, and asserting the whole cursor means a dropped field cannot pass.
-  assert.deepEqual(
-    { Offset: sessions.ses_rt.Fallback.Cursor.Offset, ConsecutiveFailureCount: sessions.ses_rt.Fallback.Cursor.ConsecutiveFailureCount },
-    { Offset: 1, ConsecutiveFailureCount: 1 },
-  )
+  assert.deepEqual(cursor.read(sessions.ses_rt.Fallback.Cursor), { offset: 1, failures: 1 })
 })
 
 test('journal.deserialize reports a decode failure as data, not an exception', () => {

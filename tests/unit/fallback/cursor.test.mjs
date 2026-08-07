@@ -110,7 +110,7 @@ test('FALLBACK_002_offset_is_modulo_four_and_never_stops_advancing', () => {
   const walked = []
   for (let i = 0; i < 12; i += 1) {
     value = cursor.recordFailure(value)
-    walked.push(value.Offset)
+    walked.push(cursor.read(value).offset)
   }
 
   assert.deepEqual(walked, [1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0])
@@ -188,7 +188,7 @@ test('FALLBACK_004_success_leaves_a_parked_odd_offset_in_place', () => {
   for (const offset of [1, 3]) {
     const parked = cursor.recordSuccess({ Offset: offset, ConsecutiveFailureCount: 5 })
     assert.deepEqual(cursor.read(parked), { offset, failures: 0 })
-    assert.equal(cursor.isRecoverySlot(parked.Offset), true)
+    assert.equal(cursor.isRecoverySlot(cursor.read(parked).offset), true)
   }
 })
 

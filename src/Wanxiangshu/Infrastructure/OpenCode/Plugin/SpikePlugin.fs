@@ -206,11 +206,38 @@ module SpikePlugin =
                                         let repairNudge: InteractionRepairNudge =
                                             HostSessionNudge.trySendInteractionRepair sessionPort
 
+                                        // ENFORCER-153: the recovery stage probe derives
+                                        // nudge/AABB state from durable claim + transcript.
+                                        let recoveryProbe
+                                            (durable: AgentJournal)
+                                            (sid: SessionId)
+                                            (rawMessages: obj list)
+                                            : EnforcerHost.RecoveryStageProbe =
+                                            fun ctx ->
+                                                let terminalRun =
+                                                    match EnforcerHost.lastAssistantStep rawMessages with
+                                                    | Some(messageId, _, _) when
+                                                        not (String.IsNullOrWhiteSpace messageId)
+                                                        ->
+                                                        ProviderRunIdentity.create messageId
+                                                    | _ -> ProviderRunIdentity.create "unknown-prose-run"
+
+                                                let requestKey =
+                                                    BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+
+                                                BloggerRecoveryProbe.repairState
+                                                    durable
+                                                    sid
+                                                    requestKey
+                                                    terminalRun
+                                                    rawMessages
+
                                         let! outcome =
                                             EnforcerHost.handleContinuation
                                                 scope
                                                 journal
                                                 (Some repairNudge)
+                                                recoveryProbe
                                                 sid
                                                 bloggerMessages
 

@@ -167,6 +167,7 @@ module PromptRecovery =
     type RecoveryGate(journal: AgentJournal option, snapshotOpt: ISessionSnapshotPort option) =
 
         let gate = obj ()
+        // DSL-MUTABLE: single-flight — memoized reconcile task (latch, not a stage)
         let mutable pass: Task<Reconciled list> option = None
 
         /// First caller starts the single pass; every later caller awaits the

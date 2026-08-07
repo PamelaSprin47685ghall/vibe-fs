@@ -22,7 +22,6 @@ module BloggerCoordinator =
         | OfferedParked of resumed: bool
         | NoMaterial
         | Sealed
-        | Disposed
         | StartFailed of string
         | MaterializeFailed of string
 
@@ -184,7 +183,7 @@ module BloggerCoordinator =
                 | Error error -> Error error
                 | Ok(contextRef, contextDigest) ->
                     let fact =
-                        AgentFact.BloggerRequestMaterialized
+                        ContextFact.BloggerRequestMaterialized
                             {| RequestId = requestId
                                MainSessionId = mainSessionId
                                BloggerSessionId = bloggerSessionId
@@ -228,7 +227,7 @@ module BloggerCoordinator =
         (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
         task {
-            // Order (C2/C5): materialize durable → CurrentRequest → InFlight → send.
+            // Order (C2/C5): materialize durable → flight ownership (SetCurrentRequest dual-writes State shadow) → send.
             let mainId = BloggerRequestContext.mainSessionId ctx
 
             match journal with
@@ -299,36 +298,37 @@ module BloggerCoordinator =
         (blog: BlogProjectionState)
         : Task<DecisionEffect option> =
         task {
-            let maySquash =
-                RecoverySlot.mayRecover
-                    (if host.IsRecoveryArmed then
-                         SlotArming.ArmedByAdvance
-                     else
-                         SlotArming.NotArmed)
-                    (host.BloggerCursorOffset())
-                    (List.length blog.Frames > 0)
-
-            if not maySquash then
+            // Material wakes the recovery waiter first. Presence of the waiter is the
+            // opportunity (physical possession), not a cross-call Armed flag.
+            if not (host.OfferRecoveryMaterial()) then
                 return None
             else
-                match CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog with
-                | None -> return None
-                | Some squashCtx ->
-                    match BloggerRuntime.onMaterial cell squashCtx with
-                    | Ok(nextCell, BloggerRuntime.Decision.Start startCtx)
-                    | Ok(nextCell, BloggerRuntime.Decision.Offer startCtx) ->
-                        host.DisarmRecoverySlot()
-                        let! effect = startFrozen scope host journal key nextCell startCtx
-                        return Some effect
-                    | Ok(nextCell, BloggerRuntime.Decision.Skip) ->
-                        scope.SetBloggerRuntime(key, nextCell)
-                        return Some DecisionEffect.SkippedInFlight
-                    | Ok(nextCell, _) ->
-                        scope.SetBloggerRuntime(key, nextCell)
-                        return Some DecisionEffect.NoMaterial
-                    | Error BloggerRuntime.TransitionError.Disposed -> return Some DecisionEffect.Disposed
-                    | Error BloggerRuntime.TransitionError.Sealed -> return Some DecisionEffect.Sealed
-                    | Error _ -> return Some DecisionEffect.SkippedInFlight
+                let maySquash =
+                    RecoverySlot.mayRecover
+                        SlotArming.ArmedByAdvance
+                        (host.BloggerCursorOffset())
+                        (List.length blog.Frames > 0)
+
+                if not maySquash then
+                    return None
+                else
+                    match
+                        CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog
+                    with
+                    | None -> return None
+                    | Some squashCtx ->
+                        match BloggerRuntime.onMaterial (scope.HasParked key) cell squashCtx with
+                        | Ok(nextCell, BloggerRuntime.Decision.Start startCtx)
+                        | Ok(nextCell, BloggerRuntime.Decision.Offer startCtx) ->
+                            let! effect = startFrozen scope host journal key nextCell startCtx
+                            return Some effect
+                        | Ok(nextCell, BloggerRuntime.Decision.Skip) ->
+                            scope.SetBloggerRuntime(key, nextCell)
+                            return Some DecisionEffect.SkippedInFlight
+                        | Ok(nextCell, _) ->
+                            scope.SetBloggerRuntime(key, nextCell)
+                            return Some DecisionEffect.NoMaterial
+                        | Error _ -> return Some DecisionEffect.SkippedInFlight
         }
 
     /// Unique production entry for main-session material → Blogger lifecycle.
@@ -361,99 +361,47 @@ module BloggerCoordinator =
             if blocksNew journal mainSessionId scope key then
                 forceSealRuntime scope key
                 return DecisionEffect.Sealed
+            elif scope.HasFlight key then
+                // Busy = physical flight ownership, not cell.State match.
+                return DecisionEffect.SkippedInFlight
             else
                 let cell = scope.GetBloggerRuntime key
+                // No sealed mirror: blocksNew above already applied the durable
+                // seal (DecisionEffect.Sealed) before this point.
+                let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
 
-                match cell.State with
-                | BloggerRuntimeState.Disposed -> return DecisionEffect.Disposed
-                | BloggerRuntimeState.Sealed ->
-                    // Durable may have been reactivated; state still Sealed is stale.
-                    if BloggerRuntime.isDrainOpen cell then
-                        scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell)
-                    else
-                        ()
+                let! squashEffect =
+                    tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key cell blog
 
-                    let cell2 = scope.GetBloggerRuntime key
-
-                    match cell2.State with
-                    | BloggerRuntimeState.Sealed -> return DecisionEffect.Sealed
-                    | _ ->
-                        // fall through by tail-calling logic via Idle path
-                        let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
-
-                        match
-                            nextMainContext
-                                mainSessionId
-                                bloggerSessionId
-                                observedEpoch
-                                blog
-                                xTrace
-                                floorSequence
-                                projection
-                        with
-                        | None -> return DecisionEffect.NoMaterial
-                        | Some ctx ->
-                            match BloggerRuntime.onMaterial (scope.GetBloggerRuntime key) ctx with
-                            | Ok(nextCell, BloggerRuntime.Decision.Start startCtx) ->
-                                return! startFrozen scope host journal key nextCell startCtx
-                            | Ok(nextCell, BloggerRuntime.Decision.Offer offerCtx) ->
-                                scope.SetBloggerRuntime(key, nextCell)
-                                let resumed = scope.SetPendingOffer(key, offerCtx)
-                                return DecisionEffect.OfferedParked resumed
-                            | Ok(nextCell, BloggerRuntime.Decision.Skip) ->
-                                scope.SetBloggerRuntime(key, nextCell)
-                                return DecisionEffect.SkippedInFlight
-                            | Ok(nextCell, _) ->
-                                scope.SetBloggerRuntime(key, nextCell)
-                                return DecisionEffect.NoMaterial
-                            | Error BloggerRuntime.TransitionError.Disposed -> return DecisionEffect.Disposed
-                            | Error BloggerRuntime.TransitionError.Sealed -> return DecisionEffect.Sealed
-                            | Error _ -> return DecisionEffect.SkippedInFlight
-                | BloggerRuntimeState.InFlight _ -> return DecisionEffect.SkippedInFlight
-                | BloggerRuntimeState.Idle
-                | BloggerRuntimeState.Parked ->
-                    let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
-
-                    let! squashEffect =
-                        tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key cell blog
-
-                    match squashEffect with
-                    | Some effect -> return effect
-                    | None ->
-                        match
-                            nextMainContext
-                                mainSessionId
-                                bloggerSessionId
-                                observedEpoch
-                                blog
-                                xTrace
-                                floorSequence
-                                projection
-                        with
-                        | None -> return DecisionEffect.NoMaterial
-                        | Some ctx ->
-                            match BloggerRuntime.onMaterial (scope.GetBloggerRuntime key) ctx with
-                            | Error BloggerRuntime.TransitionError.Disposed -> return DecisionEffect.Disposed
-                            | Error BloggerRuntime.TransitionError.Sealed -> return DecisionEffect.Sealed
-                            | Error _ -> return DecisionEffect.SkippedInFlight
-                            | Ok(nextCell, decision) ->
-                                match decision with
-                                | BloggerRuntime.Decision.Skip ->
-                                    scope.SetBloggerRuntime(key, nextCell)
-                                    return DecisionEffect.SkippedInFlight
-                                | BloggerRuntime.Decision.Offer offerCtx ->
-                                    if blocksNew journal mainSessionId scope key then
-                                        forceSealRuntime scope key
-                                        return DecisionEffect.Sealed
-                                    else
-                                        scope.SetBloggerRuntime(key, nextCell)
-                                        let resumed = scope.SetPendingOffer(key, offerCtx)
-                                        return DecisionEffect.OfferedParked resumed
-                                | BloggerRuntime.Decision.Start startCtx ->
-                                    return! startFrozen scope host journal key nextCell startCtx
-                                | BloggerRuntime.Decision.Ignore ->
-                                    scope.SetBloggerRuntime(key, nextCell)
-                                    return DecisionEffect.NoMaterial
+                match squashEffect with
+                | Some effect -> return effect
+                | None ->
+                    match
+                        nextMainContext
+                            mainSessionId
+                            bloggerSessionId
+                            observedEpoch
+                            blog
+                            xTrace
+                            floorSequence
+                            projection
+                    with
+                    | None -> return DecisionEffect.NoMaterial
+                    | Some ctx ->
+                        match BloggerRuntime.onMaterial (scope.HasParked key) (scope.GetBloggerRuntime key) ctx with
+                        | Ok(nextCell, BloggerRuntime.Decision.Start startCtx) ->
+                            return! startFrozen scope host journal key nextCell startCtx
+                        | Ok(nextCell, BloggerRuntime.Decision.Offer offerCtx) ->
+                            scope.SetBloggerRuntime(key, nextCell)
+                            let resumed = scope.SetPendingOffer(key, offerCtx)
+                            return DecisionEffect.OfferedParked resumed
+                        | Ok(nextCell, BloggerRuntime.Decision.Skip) ->
+                            scope.SetBloggerRuntime(key, nextCell)
+                            return DecisionEffect.SkippedInFlight
+                        | Ok(nextCell, _) ->
+                            scope.SetBloggerRuntime(key, nextCell)
+                            return DecisionEffect.NoMaterial
+                        | Error _ -> return DecisionEffect.SkippedInFlight
         }
 
     /// AABB: rebuild Main context from latest projection at the same prev ingest.

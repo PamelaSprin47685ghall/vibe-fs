@@ -62,7 +62,7 @@ module HandleController =
             append
                 durable
                 parentId
-                (AgentFact.HandleLinked
+                (ExecutionFact.HandleLinked
                     {| ParentSessionId = parentId
                        ChildSessionId = childSessionId
                        Handle = agentHandle agentId
@@ -100,7 +100,7 @@ module HandleController =
                 append
                     durable
                     parentId
-                    (AgentFact.HandleCompleted
+                    (ExecutionFact.HandleCompleted
                         {| ParentSessionId = parentId
                            Handle = agentHandle agentId
                            Kind = kind
@@ -128,7 +128,7 @@ module HandleController =
             append
                 durable
                 parentId
-                (AgentFact.HandleAbandoned
+                (ExecutionFact.HandleAbandoned
                     {| ParentSessionId = parentId
                        Handle = agentHandle agentId
                        Reason = reason
@@ -146,7 +146,7 @@ module HandleController =
             append
                 durable
                 parentId
-                (AgentFact.HandleRetired
+                (ExecutionFact.HandleRetired
                     {| ParentSessionId = parentId
                        Handle = agentHandle agentId |})
 
@@ -174,7 +174,7 @@ module HandleController =
                 AgentJournal.appendAgent
                     (StreamId.Session parentId)
                     None
-                    (AgentFact.HandleRetired
+                    (ExecutionFact.HandleRetired
                         {| ParentSessionId = parentId
                            Handle = handle |})
                     journal

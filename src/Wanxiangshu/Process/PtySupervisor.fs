@@ -26,6 +26,7 @@ module PtySupervisor =
         lock supervisor.Gate (fun () -> supervisor.Sessions.[id] <- session)
 
     let private tryGetUnlocked (supervisor: PtySupervisor) (id: PtyId) : PtySession option =
+        // DSL-MUTABLE: buffer — byref out-slot for TryGetValue
         let mutable value = Unchecked.defaultof<PtySession>
 
         if supervisor.Sessions.TryGetValue(id, &value) then
@@ -152,6 +153,7 @@ module PtySupervisor =
         (id: PtyId)
         : (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list =
         lock supervisor.Gate (fun () ->
+            // DSL-MUTABLE: buffer — byref out-slot for TryGetValue in drop
             let mutable session = Unchecked.defaultof<PtySession>
 
             if supervisor.Sessions.TryGetValue(id, &session) then

@@ -1,0 +1,96 @@
+# enforcer-repair-persist — ENFORCER-153 / DSL-003 canary.
+#
+# The injected `interaction-repair` synthetic user message must survive real
+# Host persistence: the transform returns it as part of the projected
+# messages, the Host stores that history, and the NEXT provider request carries
+# it. The unit layer simulates this with transcript accumulation
+# (enforcer-cycle-protocol.test.mjs); this is the real-Host evidence.
+#
+# Trigger: the Blogger child answers the first blog cycle with an EMPTY
+# assistant text (emptyAssistant). The empty merge is the ENFORCER-061
+# condition — the AABB repair path injects the synthetic RepairInstruction
+# message. The Host tool-loop then continues automatically, so the SECOND
+# blogger request must contain the injected message in its messages array.
+#
+# The custom step asserts exactly that on the provider wire.
+
+scenario = "enforcer-repair-persist"
+description = "ENFORCER-153 interaction-repair synthetic message survives into the next provider request"
+pass = "Injected interaction-repair message visible in a later provider request"
+session = { agent = "fast-manager", bind = ["manager-title", "manager"] }
+prompt = { agent = "fast-manager", text = "Start repair persistence check." }
+
+must = ["manager-title", "manager", "blogger", "blogger-repair"]
+
+flow = [
+  { prompt = { text = "Start repair persistence check." } },
+  { wait = "blogger-repair.0" },
+  { custom = "assertRepairPersisted" },
+  { abort = true },
+]
+
+[[turn]]
+id = "manager-title"
+lane = "manager-title"
+kind = "title"
+user = "Start repair persistence check."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Repair Persist" }
+
+[[turn]]
+id = "manager"
+lane = "manager"
+user = "Start repair persistence check."
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Repair persist paragraph.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Second blogger material.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager settled." }
+
+# Blogger child session, production-composed prompt (same as manager-companion).
+# Step 0: a blog tool call with EMPTY text → ENFORCER-061 empty-text cycle →
+# AABB repair injects the synthetic interaction-repair message. The tool
+# completion drives the Host's automatic continuation.
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "", tip = "primitive-obsession" } }
+
+# The follow-up request after the injection: its history carries the synthetic
+# message (RepairInstruction is the last user turn).
+[[turn]]
+id = "blogger-repair"
+internal = true
+user = "# Protocol repair"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Repair acknowledged." }
+
+# Host may inject a review-guard continuation after the manager turn settles
+# (RuntimeNudge.managerReviewGuard). Production-composed → internal.
+[[turn]]
+id = "manager-guard"
+internal = true
+user = ["# Review is required before completion.", "# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."]
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager review guard acknowledged." }
+
+# The repair injection rebuilds the Blogger provider view (synthetic
+# interaction-repair user message appended to the reconstructed history): the
+# message prefix moves while the system prompt and the blog-only tool set stay
+# fixed — the same shape ENFORCER-030 admits as a frame-commit cold boundary.
+[[epoch]]
+turn = "blogger-repair"
+step = 0
+reason = "frame-commit"

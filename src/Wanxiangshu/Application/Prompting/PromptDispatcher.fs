@@ -67,7 +67,7 @@ module PromptDispatcher =
         /// it from this fact's `AuthorityKind`, so a HumanRoot cannot be recorded
         /// without its requirement appearing with it.
         member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Result<unit, string> =
-            AgentFact.AuthorityRootAccepted
+            PromptFact.AuthorityRootAccepted
                 {| SessionId = profile.SessionId
                    LogicalRunId = profile.LogicalRunId
                    AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
@@ -112,7 +112,7 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (reason: PromptAbandonReason)
             : Result<unit, string> =
-            AgentFact.PluginPromptAbandoned
+            PromptFact.PluginPromptAbandoned
                 {| PromptKey = key
                    SessionId = sessionId
                    Reason = reason |}
@@ -138,7 +138,7 @@ module PromptDispatcher =
                 physicalMessageId
                 agent
             |> Result.bind (fun profile ->
-                AgentFact.PluginPromptPhysicalAccepted
+                PromptFact.PluginPromptPhysicalAccepted
                     {| PromptKey = key
                        SessionId = sessionId
                        PhysicalUserMessageId = physicalMessageId |}
@@ -182,7 +182,7 @@ module PromptDispatcher =
                 | Some { Origin = PromptAuthority.PromptOrigin.Continuation c } -> Some c
                 | _ -> None
 
-            AgentFact.PluginPromptPhysicalAccepted
+            PromptFact.PluginPromptPhysicalAccepted
                 {| PromptKey = key
                    SessionId = sessionId
                    PhysicalUserMessageId = physicalMessageId |}

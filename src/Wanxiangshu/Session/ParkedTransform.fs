@@ -16,15 +16,18 @@ module internal ParkedTransformInterop =
 
 /// Parking + dual request slots (ENFORCER-047/050/160).
 ///
-/// CurrentRequest = BloggerRuntimeState.InFlight payload (sole authority).
+/// CurrentRequest ownership = physical flight registry (HasFlight / TryGetFlight).
+/// BloggerRuntimeState.InFlight is dual-write shadow for transition-cell compat —
+/// busy decisions must prefer HasFlight, not cell.State.
 /// PendingOffer = the next Main material staged only while Parked (own slot).
-/// Never reintroduce a parallel CurrentRequest dictionary — that dual-write
-/// drifted into "missing CurrentRequest" while InFlight still held context.
 type IParkedTransformHost =
     abstract ParkTransform: string * TimeSpan -> Task<bool>
     abstract ResumeParked: string -> bool
     abstract CancelParked: string -> unit
     abstract HasParked: string -> bool
+    /// Physical single-flight: entry present = a Blogger request owns this session.
+    abstract HasFlight: string -> bool
+    abstract TryGetFlight: string -> BloggerRequestContext option
     abstract SetCurrentRequest: string * BloggerRequestContext -> unit
     abstract TryPeekCurrentRequest: string -> BloggerRequestContext option
     abstract ClearCurrentRequest: string -> unit
@@ -39,7 +42,9 @@ type ParkedTransform(sessionId: string, lifetime: TimeSpan) as this =
     let completion =
         TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+    // DSL-MUTABLE: resource — one-shot settle latch for the transform wait
     let mutable settled = false
+    // DSL-MUTABLE: resource — JS timeout handle (cleared on settle)
     let mutable timerHandle: obj option = None
 
     do

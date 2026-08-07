@@ -228,7 +228,7 @@ Domain   = 事实 / 证据 / 决策 / 值对象
 |----|------|
 | second-runtime-protocol / business-interpreter | 业务路径禁止 |
 | program-counter / behaviour-bool | 禁止（领域 evidence 名 allowlist） |
-| mutable | **合法**：Domain / Session / Application / `Kernel/Parallel.fs`；**fail-closed**：Agent / 其余 Kernel |
+| mutable | **声明式豁免**：Domain / Session / Application / Process / `Kernel/Parallel.fs` 的 `let mutable` 必须在前 1–2 行带 `// DSL-MUTABLE: <resource\|algorithm-scratch\|single-flight\|buffer\|subscription\|cancellation>` 声明；无声明即红。**fail-closed**：Agent / 其余 Kernel（声明也不能豁免） |
 | infrastructure-leak | **合法 open**：仅 `HOST_BOUNDARY_OPEN_BASENAMES`（10 个 HostFork*/CompanionHost*）；其余 Session/Application fail-closed |
 
 新增 Host 边界文件要 `open OpenCode/Process` 时：先登记 basename，再写 `open`。长期可把端口/扩展方法上移以缩小白名单。
@@ -407,6 +407,8 @@ Fable 的两条语义在 `dotnet build` 下完全不可见，两者都已实证�
 #### Canary 判据静默与事件间隔处理原则
 - 判据事件静默超时触发 watchdog 时，不要放宽断言、删除 canary，也不要把 `repeat-until-pass` 当作成功证据。
 - 应检查被测代码在长时间步骤中是否显式发射进度信号，或调整 canary 等待判据（如改用 Journal 事实而非 `awaitTerminal`）。
+- **声明慢工作，而非默认容忍**：`wait` 步骤若可能合法地超过 5s 默认静默窗口（restart 恢复链、重负载下的 Host 往返），必须显式 `timeoutMs`——`Watchdog.setWindow` 会把静默窗口放大到该界（`null` 恢复默认）。`awaitRestart` 已自动放大到 `WAIT_FACT_WINDOW_MS`；`waitFact` 按观察续期。背景流量永不续期。
+- **Provider 记录查询按会话作用域**：`provider.requests` 跨会话累积（companion Blogger/guard 请求也带 tools），`find` 必须带 `request.sessionID` 过滤，否则 3 轮连续模式竞态会误取。
 
 ---
 

@@ -33,9 +33,10 @@ open Wanxiangshu.Session
 module EnforcerHost =
 
     /// ENFORCER-160: the parking lifetime for a continuation transform.
-    /// Shared constant: docs/proposal/strength.md STRENGTH-079 `ParkedTransformLifetime` is the
-    /// one code constant for how long a transform may stay suspended.
-    let ParkedTransformLifetime = StrengthPolicy.Strength.ParkedTransformLifetime
+    /// Owned by the Enforcer domain (GOV-003: no proposal-constant dependency
+    /// in the production graph; the proposal may reference this, never vice
+    /// versa).
+    let ParkedTransformLifetime = TimeSpan.FromMinutes 10.0
 
     /// C4: commit-path UTF-8 safety bounds.
     let MaxBlogTextBytes = 512 * 1024
@@ -168,7 +169,9 @@ module EnforcerHost =
 
             not (isNull (timeCompleted info)) || not (isNull (timeCompleted message))
 
-    let private lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
+    /// Last assistant terminal as (messageId, calls, completed); public so the
+    /// Application-layer recovery probe can bind a claim to the same terminal.
+    let lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
         rawMessages
         |> List.choose (fun message ->
             if isNull message then
@@ -403,7 +406,7 @@ module EnforcerHost =
                                 let tip = merged.CanonicalTip
 
                                 let fact =
-                                    AgentFact.BlogEntryCommitted
+                                    ContextFact.BlogEntryCommitted
                                         {| SessionId = mainSessionId
                                            BloggerSessionId = bloggerSessionId
                                            RequestId = coverage.RequestId
@@ -480,7 +483,7 @@ module EnforcerHost =
                             | Error error -> CycleCommitOutcome.KnownNotCommitted error
                             | Ok blob ->
                                 let fact =
-                                    AgentFact.BlogSquashCommitted
+                                    ContextFact.BlogSquashCommitted
                                         {| SessionId = mainSessionId
                                            BloggerSessionId = bloggerSessionId
                                            RequestId = squash.RequestId
@@ -827,7 +830,6 @@ module EnforcerHost =
                 | None -> None
                 | Some ctx ->
                     match scope.GetBloggerRuntime(key).State with
-                    | BloggerRuntimeState.Disposed -> None
                     | _ -> Some ctx
 
     let private tryOpenByBlogger
@@ -1121,10 +1123,18 @@ module EnforcerHost =
     /// ENFORCER-051) has no assistant message yet — it must never park; the
     /// request has to go out. Only a continuation (assistant step present)
     /// parks.
+    /// ENFORCER-153 / DSL-003: the recovery stage probe, injected by the caller
+    /// (Application layer owns the derivation; Session cannot reference it by
+    /// compile order). Derived from the durable repair claim + provider-visible
+    /// transcript on every read — `BloggerRuntimeCell` carries no Recovery
+    /// mirror, and this module must never grow one.
+    type RecoveryStageProbe = BloggerRequestContext -> BloggerToolRecovery
+
     let handleContinuation
         (scope: IParkedTransformHost)
         (journal: AgentJournal option)
         (repairNudge: InteractionRepairNudge option)
+        (recoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe)
         (bloggerSessionId: SessionId)
         (rawMessages: obj list)
         : Task<ContinuationOutcome> =
@@ -1190,7 +1200,8 @@ module EnforcerHost =
                     scope.ClearCurrentRequest key
                     project rawMessages
 
-                /// ENFORCER-068 AABB: refresh transcript + inject repair. Marks AabbRepairConsumed.
+                /// ENFORCER-068 AABB: refresh transcript + inject repair. The injected
+                /// synthetic message IS the consumed marker (ENFORCER-153 derivation).
                 /// Not used on first pure-prose (that is InteractionNudge). Used for: nudge
                 /// hard-fail, second pure prose, interrupted tool, ENFORCER-061 empty text.
                 let aabbRepair (ctx: BloggerRequestContext) (reason: string) =
@@ -1203,34 +1214,66 @@ module EnforcerHost =
                         BloggerRuntimeHost.forceSealRuntime scope key
                         project rawMessages
                     else
-                        scope.SetBloggerRuntime(key, BloggerRuntime.markAabbRepairConsumed cell)
+                        // ENFORCER-062/067/068 bridge: the confirmed failure advances the
+                        // primary A/A/B/B cursor through the ONE writer. Exhaustion forbids
+                        // the next automatic attempt — the repair projection is then NOT
+                        // injected (it would re-arm the same run). The same terminal run
+                        // observed twice stays AlreadyRecorded: it advances once.
+                        let providerRun =
+                            match lastAssistantStep rawMessages with
+                            | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
+                                ProviderRunIdentity.create messageId
+                            | _ -> ProviderRunIdentity.create "unknown-prose-run"
 
-                        let fresh =
-                            tryRefreshMainContextFromJournal scope durable owner bloggerSessionId
-                            |> Option.defaultValue ctx
+                        let advanceOutcome =
+                            match
+                                FallbackController.recordConfirmedFailure
+                                    durable
+                                    AgentPairCursor.DefaultAutoRecoveryBudget
+                                    owner
+                                    providerRun
+                                    reason
+                            with
+                            | Ok outcome -> Some outcome
+                            | Error err ->
+                                Diagnostic.emit
+                                    "enforcer-aabb-bridge"
+                                    [ "session_id", key; "result", "recordConfirmedFailure rejected: " + err ]
 
-                        scope.SetCurrentRequest(key, fresh)
+                                None
 
-                        match scope.GetBloggerRuntime key with
-                        | c ->
-                            match c.State with
-                            | BloggerRuntimeState.InFlight _ ->
-                                scope.SetBloggerRuntime(
-                                    key,
-                                    { c with
-                                        State = BloggerRuntimeState.InFlight fresh
-                                        Recovery = BloggerToolRecovery.AabbRepairConsumed }
-                                )
-                            | _ -> ()
+                        match advanceOutcome with
+                        | Some(FallbackController.AdvanceOutcome.Exhausted _) ->
+                            Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", reason ]
+                            fatalEnd "blog aabb exhausted; auto-recovery budget spent"
+                        | _ ->
+                            // Advanced / AlreadyRecorded / NoActiveRun: repair continues
+                            // (NoActiveRun = no accepted primary root, FALLBACK-001).
+                            let fresh =
+                                tryRefreshMainContextFromJournal scope durable owner bloggerSessionId
+                                |> Option.defaultValue ctx
 
-                        Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
-                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
+                            scope.SetCurrentRequest(key, fresh)
 
-                        let rebuilt =
-                            tryRebuildFromContext durable bloggerSessionId fresh
-                            |> Option.defaultValue rawMessages
+                            match scope.GetBloggerRuntime key with
+                            | c ->
+                                match c.State with
+                                | BloggerRuntimeState.InFlight _ ->
+                                    scope.SetBloggerRuntime(
+                                        key,
+                                        { c with
+                                            State = BloggerRuntimeState.InFlight fresh }
+                                    )
+                                | _ -> ()
 
-                        project (withRepairInstruction rebuilt requestKey)
+                            Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+                            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
+
+                            let rebuilt =
+                                tryRebuildFromContext durable bloggerSessionId fresh
+                                |> Option.defaultValue rawMessages
+
+                            project (withRepairInstruction rebuilt requestKey)
 
                 /// ENFORCER-066: durable InteractionRepair. No AABB transcript refresh.
                 /// repairNudge is injected from HostSessionNudge (compile-order port).
@@ -1253,27 +1296,15 @@ module EnforcerHost =
 
                             match sent with
                             | Ok _ ->
-                                scope.SetBloggerRuntime(
-                                    key,
-                                    BloggerRuntime.markInteractionNudgeIssued (scope.GetBloggerRuntime key) terminalRun
-                                )
-
+                                // The durable claim written by the send is the nudge
+                                // marker (ENFORCER-153); nothing mirrors it in memory.
                                 Diagnostic.emit "enforcer-cycle-nudge" [ "session_id", key; "result", reason ]
 
                                 // Nudge is a durable prompt_async; transform projects current view only.
                                 return project rawMessages
                             | Error err when err.IndexOf("already claimed", StringComparison.OrdinalIgnoreCase) >= 0 ->
                                 // ENFORCER-067: claim exists / pending — not failure; no AABB.
-                                match (scope.GetBloggerRuntime key).Recovery with
-                                | BloggerToolRecovery.NoRecovery ->
-                                    scope.SetBloggerRuntime(
-                                        key,
-                                        BloggerRuntime.markInteractionNudgeIssued
-                                            (scope.GetBloggerRuntime key)
-                                            terminalRun
-                                    )
-                                | _ -> ()
-
+                                // The existing durable claim already identifies this nudge.
                                 Diagnostic.emit "enforcer-cycle-nudge-pending" [ "session_id", key; "result", err ]
 
                                 return project rawMessages
@@ -1291,7 +1322,7 @@ module EnforcerHost =
                     // Original recovery: one AABB, then exhaust.
                     match liveCtx with
                     | Some ctx ->
-                        match (scope.GetBloggerRuntime key).Recovery with
+                        match recoveryProbe durable bloggerSessionId rawMessages ctx with
                         | BloggerToolRecovery.AabbRepairConsumed ->
                             return fatalEnd "blog tool interrupted; aabb exhausted"
                         | _ -> return aabbRepair ctx "blog tool interrupted without completed call"
@@ -1305,8 +1336,6 @@ module EnforcerHost =
                     return project (rebuild ())
                 else
                     // ENFORCER-060/064..068: completed assistant, zero blog parts → pure prose.
-                    let cell = scope.GetBloggerRuntime key
-
                     let terminalRun =
                         match lastAssistantStep rawMessages with
                         | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
@@ -1316,7 +1345,7 @@ module EnforcerHost =
                     match liveCtx with
                     | None -> return stop "unowned-completed-prose-without-CurrentRequest"
                     | Some ctx ->
-                        match cell.Recovery with
+                        match recoveryProbe durable bloggerSessionId rawMessages ctx with
                         | BloggerToolRecovery.NoRecovery ->
                             return! interactionNudge ctx terminalRun "no completed blog calls (ENFORCER-060)"
                         | BloggerToolRecovery.InteractionNudgeIssued issuedRun when issuedRun = terminalRun ->
@@ -1444,6 +1473,7 @@ module EnforcerHost =
                     // staged cycle then rebuild from live journal coverage. Must NOT
                     // resumeWithContext(liveCtx) — that freezes PreviousIngestedThrough
                     // at the pre-crash cursor and loops KnownNotCommitted forever.
+                    // DSL-MUTABLE: algorithm-scratch — mutable cycle-disposition accumulator
                     let mutable disposition = CycleDisposition.Working
 
                     let fatalEnd (reason: string) =
@@ -1474,12 +1504,19 @@ module EnforcerHost =
                         scope.ClearCurrentRequest key
                         disposition <- CycleDisposition.AbandonThenCatchUp
 
+                    // ENFORCER-153: the AABB budget is derived from the transcript
+                    // (the injected repair message for the live request IS the spent
+                    // marker), never from a runtime mirror.
+                    let aabbConsumed () =
+                        match liveCtx with
+                        | Some ctx ->
+                            (recoveryProbe durable bloggerSessionId rawMessages ctx) = BloggerToolRecovery.AabbRepairConsumed
+                        | None -> false
+
                     match validateCycle messageId calls with
                     | Error reason when
                         isEmptyTextCycleFailure reason
-                        && (match (scope.GetBloggerRuntime key).Recovery with
-                            | BloggerToolRecovery.AabbRepairConsumed -> false
-                            | _ -> true)
+                        && not (aabbConsumed ())
                         && not (hasIncompleteBlogTool rawMessages)
                         ->
                         // ENFORCER-061: empty text keeps one AABB repair budget (not pure-prose nudge).
@@ -1491,8 +1528,6 @@ module EnforcerHost =
                         | None -> unexpectedEnd (reason + "; aabb-refresh-empty")
                         | Some freshCtx ->
                             disposition <- CycleDisposition.InjectRepair freshCtx
-                            let cell = scope.GetBloggerRuntime key
-                            scope.SetBloggerRuntime(key, BloggerRuntime.markAabbRepairConsumed cell)
                             scope.SetCurrentRequest(key, freshCtx)
 
                             match scope.GetBloggerRuntime key with
@@ -1502,19 +1537,13 @@ module EnforcerHost =
                                     scope.SetBloggerRuntime(
                                         key,
                                         { c with
-                                            State = BloggerRuntimeState.InFlight freshCtx
-                                            Recovery = BloggerToolRecovery.AabbRepairConsumed }
+                                            State = BloggerRuntimeState.InFlight freshCtx }
                                     )
                                 | _ -> ()
 
                             Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                     | Error reason ->
-                        if
-                            isEmptyTextCycleFailure reason
-                            && match (scope.GetBloggerRuntime key).Recovery with
-                               | BloggerToolRecovery.AabbRepairConsumed -> true
-                               | _ -> false
-                        then
+                        if isEmptyTextCycleFailure reason && aabbConsumed () then
                             unexpectedEnd "protocol-repair-exhausted"
                         else
                             unexpectedEnd reason
@@ -1595,8 +1624,39 @@ module EnforcerHost =
 
                     match disposition with
                     | CycleDisposition.InjectRepair ctx ->
-                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-                        return project (withRepairInstruction (resumeWithContext ctx) requestKey)
+                        // ENFORCER-062/067/068 bridge (empty text): the confirmed
+                        // failure advances the primary A/A/B/B cursor through the ONE
+                        // writer. Exhaustion forbids the automatic next attempt — no
+                        // repair projection is injected. Replay of the same terminal
+                        // run stays AlreadyRecorded and advances once.
+                        let advanceOutcome =
+                            match
+                                FallbackController.recordConfirmedFailure
+                                    durable
+                                    AgentPairCursor.DefaultAutoRecoveryBudget
+                                    mainSessionId
+                                    (ProviderRunIdentity.create messageId)
+                                    "blog empty text (ENFORCER-061)"
+                            with
+                            | Ok outcome -> Some outcome
+                            | Error err ->
+                                Diagnostic.emit
+                                    "enforcer-aabb-bridge"
+                                    [ "session_id", key; "result", "recordConfirmedFailure rejected: " + err ]
+
+                                None
+
+                        match advanceOutcome with
+                        | Some(FallbackController.AdvanceOutcome.Exhausted _) ->
+                            Diagnostic.emit
+                                "enforcer-aabb-exhausted"
+                                [ "session_id", key; "result", "blog empty text (ENFORCER-061)" ]
+
+                            fatalEnd "blog aabb exhausted; auto-recovery budget spent"
+                            return failwith "unreachable: fatalEnd ends the cycle"
+                        | _ ->
+                            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
+                            return project (withRepairInstruction (resumeWithContext ctx) requestKey)
                     | CycleDisposition.CommitUnknown -> return project rawMessages
                     | CycleDisposition.AbandonThenCatchUp ->
                         // Stale staged coverage abandoned: rebuild next window from live

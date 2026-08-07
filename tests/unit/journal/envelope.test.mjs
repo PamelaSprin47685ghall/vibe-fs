@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
+import { agentFactCaseOf,
   caseOf,
   envelope,
   fact,
@@ -38,7 +38,7 @@ const readEnvelope = (value) => ({
   seq: Number(idValue.localSeq(value.LocalSeq)),
   event: idValue.event(value.EventId),
   stream: caseOf(value.Stream),
-  fact: caseOf(payloadOf(value.Fact)),
+  fact: agentFactCaseOf(payloadOf(value.Fact)),
 })
 
 // ── PERSIST-001: the envelope is one self-contained line ─────────────────────

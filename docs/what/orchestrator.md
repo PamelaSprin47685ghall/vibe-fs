@@ -26,3 +26,42 @@ Orchestrator 只有 `fork-manager` 与 `join`。
 
 目标 branch 在 fork 时冻结。读取 target head 失败 → fail closed，不得静默落到 `HEAD`。  
 ff-only publish 必须同时满足：当前 branch == 冻结 target，且 current head == expected head。
+
+## ORCH-007：恢复
+
+Fold 取每个活跃 Job 的最后事实，决定**唯一**恢复动作。
+
+```text
+Published / JobAbandoned → 清理 worktree，移出活跃 Map
+JobFailed                → 清理 worktree，明确失败
+无事实                   → Job 不存在
+```
+
+### PublishClaimed（固定三分支，顺序不可换）
+
+```text
+currentHead = GetTargetHead(TargetRef)     // 失败 → fail closed
+rebasedCommit = 最后 RebasedCandidateReady.RebasedCommit
+
+1. currentHead = rebasedCommit
+       → ff 已完成，补写 Published（幂等）
+
+2. currentHead = ExpectedHead
+       → 从未 ff；短 gate + 再确认 head → ff-only → Published
+
+3. 其它
+       → claim 过期；丢弃旧 post-rebase witness
+       → 回 rebaseReviewPublishLoop
+```
+
+### 其它事实
+
+```text
+RebasedCandidateReady → 进 CAS：head 仍为 snapshot 则 ff，否则重 rebase+review
+ConflictDetected      → 同 worktree/同 Manager 恢复冲突解决
+CandidateReady        → 进 rebaseReviewPublishLoop
+ManagerJobCreated     → 从 worktree 恢复同一 Manager 继续
+```
+
+禁止：恢复时新建 worktree 或换 Manager；跳过 post-rebase review；用文件系统状态代替事实。  
+崩溃恢复完全依赖 Journal 最后一条事实折叠，严禁扫描磁盘文件状态反推进度。
