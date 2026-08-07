@@ -806,3 +806,5 @@ resources/prompts/blogger-system.md
 
 **Close conditions**: All Active work close conditions 1–6 satisfied.
 
+**Docs**: Added `CHANGELOG.md` Unreleased entry documenting the Enforcer rebase docs close (tip-v2 baseline alignment, physical ownership axes, §13 proof inventory, lifecycle record in `changes/completed/enforcer.md`).
+

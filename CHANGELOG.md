@@ -7,6 +7,7 @@
 - 工程入口（`AGENTS.md`、根 README、VERIFY-004 退化清单）改指向新路径；无运行时协议变更。
 - `PENDING.md` 收口为 COMPLETED/HISTORICAL：Join v2 / sub-session 复用 / Blogger InteractionRepair / Enforcer tip v2 / Coder TDD / HOST-013 marker 均有正式条款与自动化证据；删除未勾选假待办。
 - `AGENTS.md`：修正 `architecture` 文件数 226、`gate:dsl-ownership` 契约为 `--threshold=0`（删除陈旧 322）。
+- Enforcer / Blogger-as-Enforcer rebase 文档收口：`how`/`shape`/`proof` 对齐 tip-v2 基线（PartOrdinal-first 多调用 tip、物理所有权轴取代 Runtime cell 的 DU 叙事、`§13` 证明清单）。变更生命周期见 `changes/completed/enforcer.md`；未恢复 wire/runtime score 路径，生产本就 tip-v2。
 
 ## 0.5.4
 
