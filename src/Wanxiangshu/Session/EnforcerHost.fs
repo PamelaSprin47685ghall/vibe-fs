@@ -592,8 +592,7 @@ module EnforcerHost =
                             CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
                         "normal", 0, Some(messageId, main.Toml)
-                    | BloggerRequestContext.Squash squash ->
-                        "squash", squash.CoveredFrameCount, None
+                    | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
 
                 // ENFORCER-070/071: RecentTips from main session (oldest → newest).
                 // Same source for normal / squash / restart / recovery / compaction rebuilds.
@@ -635,8 +634,7 @@ module EnforcerHost =
                 | Error _ -> None
                 | Ok ordered ->
                     // Algebra wire view (Role+Text). MessageId lives only on Host obj.
-                    let wire =
-                        ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
+                    let wire = ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
 
                     // Single shape source for Host ids: same Builder applyBlogFrames uses.
                     // Real sha256 so COMPANION-013 ids stay stable across rebuilds.
@@ -1005,9 +1003,7 @@ module EnforcerHost =
     /// Host `createObj` 只写回 id / source / requestKey 侧信道；id 规则保持
     /// `enforcer-repair-` + sha256(requestKey + "|" + RepairInstruction).Substring(0, 24)。
     let private withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
-        let baseWire =
-            rawMessages
-            |> List.choose Projection.decodeMessage
+        let baseWire = rawMessages |> List.choose Projection.decodeMessage
 
         let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
             { ProviderId = None
@@ -1024,16 +1020,14 @@ module EnforcerHost =
               TransportMessages = Set.empty
               HostReanchor = None }
 
-        let intents =
-            [ ProjectionIntent.InsertRepair { RequestKey = requestKey } ]
+        let intents = [ ProjectionIntent.InsertRepair { RequestKey = requestKey } ]
 
         match ProjectionPlanner.plan intents with
         | Error _ ->
             // fail-closed: 不注入手写 list；返回未改 raw（调用方仍 project 原视图）
             rawMessages
         | Ok ordered ->
-            let wire =
-                ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
+            let wire = ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
 
             let msgId =
                 "enforcer-repair-"

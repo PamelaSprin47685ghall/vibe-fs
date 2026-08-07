@@ -39,15 +39,17 @@ type HostReanchorFact =
 /// 帧正文在 `Snapshot.BlogFrames`。Tips / delta / session 身份不能仅从帧列表推出，
 /// 故放在意图载荷；渲染委托 `CompanionProjectionBuilder.build`（唯一形状源）。
 type BlogFramesIntent =
-    { RequestKind: string
-      /// Squash 时截取的帧数；normal 忽略。
-      SquashFrameCount: int
-      BloggerSessionId: string
-      FrameEpoch: int64
-      /// Normal 路径的 combined delta：`(messageId, toml)`。Squash 为 `None`。
-      PhysicalDelta: (string * string) option
-      /// ENFORCER-071：`(tipField, cycleId)`，oldest → newest。
-      PreviousTips: (string * string) list }
+    {
+        RequestKind: string
+        /// Squash 时截取的帧数；normal 忽略。
+        SquashFrameCount: int
+        BloggerSessionId: string
+        FrameEpoch: int64
+        /// Normal 路径的 combined delta：`(messageId, toml)`。Squash 为 `None`。
+        PhysicalDelta: (string * string) option
+        /// ENFORCER-071：`(tipField, cycleId)`，oldest → newest。
+        PreviousTips: (string * string) list
+    }
 
 /// `InsertRepair` 载荷：InteractionRepair 的幂等键。
 type RepairIntent = { RequestKey: string }
@@ -207,7 +209,10 @@ module ProjectionPlanner =
                     | ProjectionIntent.InsertBlogFrames other -> other = head
                     | _ -> false)
 
-            if same then Ok(Some first) else Error ProjectionConflict.ConflictingBlogFrames
+            if same then
+                Ok(Some first)
+            else
+                Error ProjectionConflict.ConflictingBlogFrames
         | first :: _ -> Ok(Some first)
 
     let private reduceRepair (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
@@ -221,7 +226,10 @@ module ProjectionPlanner =
                     | ProjectionIntent.InsertRepair other -> other = head
                     | _ -> false)
 
-            if same then Ok(Some first) else Error ProjectionConflict.ConflictingRepair
+            if same then
+                Ok(Some first)
+            else
+                Error ProjectionConflict.ConflictingRepair
         | first :: _ -> Ok(Some first)
 
     let private reduceChallenge (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
@@ -363,8 +371,24 @@ module ProjectionRenderer =
 
     let private isUserAnchor (message: ProviderProjection.WireMessage) = message.Role = "user"
 
+    /// Fable/JS 边界：Parts 可能为 null/undefined 或非 F# list。此时视为无 part，
+    /// 不当 tool-result anchor / pair marker，禁止对缺失 list 调 IsEmpty/tail。
+    let private safeParts (message: ProviderProjection.WireMessage) : ProviderProjection.WirePart list =
+        let parts = message.Parts
+
+        if isNull (box parts) then
+            []
+        else
+            // 非 F# list（例如 JS Array）在 Fable List 原语上会崩；仅接受有 tail 的 list 形状。
+            try
+                // 触达 head/tail 形状：空 list 与非空 list 均可；非法形状进 catch。
+                ignore (List.isEmpty parts)
+                parts
+            with _ ->
+                []
+
     let private isToolResultAnchor (message: ProviderProjection.WireMessage) =
-        message.Parts
+        safeParts message
         |> List.exists (function
             | ProviderProjection.WireToolResult _ -> true
             | _ -> false)
@@ -411,6 +435,7 @@ module ProjectionRenderer =
         : ProviderProjection.WireMessage list =
         let hasDelta = Option.isSome intent.PhysicalDelta
         let hasTips = not (List.isEmpty intent.PreviousTips)
+
         let isSquash =
             intent.RequestKind.Equals("squash", System.StringComparison.OrdinalIgnoreCase)
 
@@ -426,8 +451,7 @@ module ProjectionRenderer =
                     CompanionRequestKind.Normal
 
             let frameBodies =
-                frames
-                |> List.map (fun frame -> BlobDigest.create frame.Digest, frame.Body)
+                frames |> List.map (fun frame -> BlobDigest.create frame.Digest, frame.Body)
 
             let bloggerSessionId = SessionId.create intent.BloggerSessionId
             let frameEpoch = FrameEpochId.create intent.FrameEpoch
@@ -443,8 +467,7 @@ module ProjectionRenderer =
                     intent.PreviousTips
 
             let companionWires: ProviderProjection.WireMessage list =
-                plan.Messages
-                |> List.map (fun msg -> textMessage msg.Role msg.Text)
+                plan.Messages |> List.map (fun msg -> textMessage msg.Role msg.Text)
 
             if fullCompanionRebuild then
                 companionWires
@@ -455,7 +478,7 @@ module ProjectionRenderer =
 
     let private isPairMarker (message: ProviderProjection.WireMessage) : bool =
         message.Role = "assistant"
-        && message.Parts
+        && safeParts message
            |> List.exists (function
                | ProviderProjection.WireReasoning text when text = ProjectionConstants.PairProgrammingThoughtText ->
                    true
@@ -491,8 +514,7 @@ module ProjectionRenderer =
         | ProjectionIntent.ActivatePrefixEpoch activation ->
             renderMessages messages (RenderedPrefix.SyntheticPrefix activation)
         | ProjectionIntent.InsertBlogFrames payload -> applyBlogFrames snapshot payload messages
-        | ProjectionIntent.InsertRepair _ ->
-            messages @ [ textMessage "user" ProjectionConstants.RepairInstruction ]
+        | ProjectionIntent.InsertRepair _ -> messages @ [ textMessage "user" ProjectionConstants.RepairInstruction ]
         | ProjectionIntent.SuppressTransportOnly -> applySuppress snapshot messages
         | ProjectionIntent.AppendReviewChallenge _ ->
             // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。

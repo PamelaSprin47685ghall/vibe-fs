@@ -77,11 +77,7 @@ module PairProgrammingThoughtTransform =
 
     /// 将 algebra wire 视图与 base raw 对齐写回 Host obj：保留非 marker 的原始
     /// raw（含 id）；新 marker 用稳定 id；已有 pair marker raw 字节保持。
-    let private mergeHostMarkers
-        (sessionId: string option)
-        (baseRaw: obj list)
-        (wire: WireMessage list)
-        : obj list =
+    let private mergeHostMarkers (sessionId: string option) (baseRaw: obj list) (wire: WireMessage list) : obj list =
         // 建立 base raw 的消费游标：按顺序匹配非 marker wire 项。
         // DSL-MUTABLE: merge 游标
         let mutable baseIdx = 0
@@ -107,10 +103,7 @@ module PairProgrammingThoughtTransform =
                     if baseIdx < baseRaw.Length then
                         let raw = baseRaw.[baseIdx]
 
-                        if isPairProgrammingThought raw then
-                            Some raw
-                        else
-                            None
+                        if isPairProgrammingThought raw then Some raw else None
                     else
                         None
 
@@ -187,8 +180,7 @@ module PairProgrammingThoughtTransform =
             match ProjectionPlanner.plan intents with
             | Error _ -> None
             | Ok ordered ->
-                let wire =
-                    ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
+                let wire = ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
 
                 if wire = baseWire then
                     None

@@ -234,8 +234,7 @@ module XWire =
                                     // Activate + Reanchor 冲突由 plan fail-closed 覆盖（unit 已证明）。
                                     let intents =
                                         match hostReanchor with
-                                        | Some _ ->
-                                            [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
+                                        | Some _ -> [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
                                         | None -> [ prefixIntent ]
 
                                     let transformed =
