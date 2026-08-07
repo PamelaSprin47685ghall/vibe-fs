@@ -151,6 +151,7 @@ async function sendPrompt(scenario, sessionId, prompt) {
  */
 export async function awaitFactBarrier(scenario, step) {
   const name = step.waitFact.name;
+  const renewOn = step.waitFact.renewOn ?? [];
   const need = step.waitFact.eq !== undefined ? step.waitFact.eq : step.waitFact.gte !== undefined ? step.waitFact.gte : 1;
   const cmp = step.waitFact.eq !== undefined
     ? (n) => n === need
@@ -158,7 +159,7 @@ export async function awaitFactBarrier(scenario, step) {
   const lane = step.lane || `fact:${name}`;
   const deadline = Date.now() + (step.timeoutMs || WAIT_FACT_WINDOW_MS);
 
-  let observed = readJournal(scenario.host.workDir, name);
+  let observed = readJournal(scenario.host.workDir, name, renewOn);
   while (!cmp(observed.named) && Date.now() < deadline) {
     const remaining = Math.max(1, deadline - Date.now());
     // The observable is a file on disk, so the wait is a poll rather than an event await. Kept
@@ -166,11 +167,23 @@ export async function awaitFactBarrier(scenario, step) {
     // not tell a stalled chain from a coarse poll, since the watchdog would fire mid-slice.
     await pollSlice(Math.min(remaining, FACT_POLL_SLICE_MS));
 
-    const next = readJournal(scenario.host.workDir, name);
+    const next = readJournal(scenario.host.workDir, name, renewOn);
+    // VERIFY-004 / waitFact causal renewal: only the awaited count OR an explicitly
+    // declared renewOn fact is causal blocking progress. Any other journal growth is
+    // background traffic — recorded for diagnosis, never renewing the silence window.
     if (next.named > observed.named) {
       scenario.watchdog?.advance({ reason: `fact-count:${name}=${next.named}`, lane });
+    } else if (renewOn.length > 0 && next.renew > observed.renew) {
+      scenario.watchdog?.advance({
+        reason: `renewOn:${name}=${next.named},intermediate=${next.renew}`,
+        lane,
+      });
     } else if (next.total > observed.total) {
-      scenario.watchdog?.advance({ reason: `journal-append-while-awaiting:${name}`, lane });
+      scenario.watchdog?.advance({
+        reason: `journal-append-while-awaiting:${name}`,
+        lane,
+        blocking: false,
+      });
     }
     observed = next;
   }

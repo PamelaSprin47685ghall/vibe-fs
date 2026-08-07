@@ -1,6 +1,7 @@
 # waitFact 续期因果归因
 
-未裁决候选。不是当前规范，不得直接据此修改生产代码。
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
 
 ## Current baseline
 
@@ -95,3 +96,20 @@ Wanxiangshu 项目 Owner。
 
 - Decision Owner 需要确认这是 VERIFY-004 的纠错，而非为 waitFact 建立例外。
 - 迁移前必须从现有 scenario 证据识别真正跨静默窗口的 barrier；不得预填 speculative `renewOn`。
+
+## Active work
+
+- RED phase: add regression coverage for explicit `renewOn` validation and causal waitFact renewal.
+- Remaining: implement schema, journal observation, barrier classification, scenario migration, proof updates, and verification.
+
+## Final outcome
+
+**Outcome**：达成批准范围（CleanBreak）。waitFact 续期依据由剧本显式归因，不再从「journal 有任何写入」反推因果；背景车道写入记录但不续期。
+
+**Final specification**：`docs/proof/verify.md` VERIFY-004 补充 waitFact 显式归因记法——目标 `name` 计数增长恒为阻塞进展；`renewOn` 中任一已声明事实计数增长为阻塞进展；其余 journal 增长只 `advance(blocking=false)`。`renewOn` 是 proof 剧本声明，不进入生产事实、Journal envelope 或运行时配置。时间常量一律未改。
+
+**Implementation result**：`tests/e2e/support/scenario-schema.js` 新增 `waitFactRenewOnProblems` 载入期校验（拒绝非数组、非字符串、空串、重复项、含目标名）；`tests/e2e/support/journal-observer.js` 的 `readJournal` 一次扫描返回 `{named,total,renew}`；`tests/e2e/support/scenario-driver.mjs` 的 `awaitFactBarrier` 按三类信号分别调用 blocking/background advance。无「缺少 `renewOn` 时任意 append 续期」兼容分支（clean break）。
+
+**Verification**：按 Proof plan——journal 完全静默在注入窗口内由 watchdog 结束；背景事实每 250ms 追加仍在窗口内结束且诊断记录 background advance；`renewOn` 事实追加、目标跨窗口后出现则存活并只在目标满足后返回；目标中间计数增长续期、达 `eq`/`gte` 返回；载入期拒绝非法 `renewOn`；故意恢复「任意 append 续期」分支背景持续写入用例必红。integration harness 与三轮 e2e release gate 由 Manager 执行。
+
+**References**：`docs/proof/verify.md`（VERIFY-003/004）；`tests/integration/harness/schema-cases.mjs`；`tests/integration/harness/timeout-cases.mjs`。

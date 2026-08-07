@@ -126,6 +126,34 @@ const afterExpectationProblems = (flow) =>
     return problems;
   });
 
+/**
+ * `waitFact.renewOn` — the causal intermediate facts that renew the barrier
+ * (VERIFY-004 / waitfact-causal-renewal). An empty or absent list is a simple
+ * barrier that only follows the target. Rejected: non-array, non-string entries,
+ * empty strings, duplicates, or an entry repeating the awaited `name` (a
+ * fact that renews itself is the old any-append bug in a costume).
+ */
+const waitFactRenewOnProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const wf = flowStep?.waitFact;
+    if (wf === undefined || wf.renewOn === undefined) return [];
+    const problems = [];
+    if (!Array.isArray(wf.renewOn) || wf.renewOn.some((entry) => typeof entry !== 'string')) {
+      problems.push(`flow[${index}] renewOn must be an array of fact names`);
+      return problems;
+    }
+    if (wf.renewOn.some((entry) => entry.trim() === '')) {
+      problems.push(`flow[${index}] renewOn entries must be non-empty strings`);
+    }
+    if (new Set(wf.renewOn).size !== wf.renewOn.length) {
+      problems.push(`flow[${index}] renewOn entries must be unique`);
+    }
+    if (typeof wf.name === 'string' && wf.renewOn.includes(wf.name)) {
+      problems.push(`flow[${index}] renewOn must not contain the target fact`);
+    }
+    return problems;
+  });
+
 const ASSERT_DELIVERIES_KEYS = new Set(['id', 'eq', 'gte', 'lte']);
 
 const assertDeliveriesProblems = (flow) =>
@@ -642,6 +670,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     ...unknownFlowVerbs(raw.flow),
     ...bindChildProblems(raw.flow),
     ...afterExpectationProblems(raw.flow),
+    ...waitFactRenewOnProblems(raw.flow),
     ...assertDeliveriesProblems(raw.flow),
     ...malformedFaults(raw),
     ...providerErrorProblems(raw),

@@ -7,7 +7,7 @@
 
 | 门 | 必须判红的反例 |
 |---|---|
-| `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak |
+| `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak、record 中≥2 个独立状态轴且无 `DSL-state-combination` 分类、无结构化理由的 `ControlState` |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
 
@@ -16,8 +16,11 @@
 ## 正交组合证明（引用 DSL-005，人工）
 
 > 本节约 DSL-005（定义见 `what/dsl-structured-program.md`）的人工证明。
-> 因完整类型解析的自动组合计数尚未实现（见 `scripts/checks/dsl-ownership.mjs` 对 long-lived record/DU 字段的 NOT IMPLEMENTED 说明），
-> 按 Active Change blocker 保留人工 proof，不降低 DSL-005，也不以高误报正则冒充类型级证据。
+> 自动化下限现已含结构化 `state-product` 门禁：`scripts/checks/dsl-ownership.mjs` 解析
+> record 的字段类型结构（本地 DU/`option`/`bool`），识别 ≥2 个独立状态轴并要求显式
+> `/// DSL-state-combination: domain|physical` 分类；判定与字段名无关。`ControlState`
+> 分类要求机器可校验的 `/// DSL-control-state-reason:` 理由。下表仍是架构级语义枚举，
+> 门禁只守卫「未分类即红」，不替代 DSL-002/DSL-005 的人工语义判断。
 
 ### 正交轴与物理归属（当前生产）
 
@@ -43,16 +46,17 @@
 
 因此：DSL-005 要求的“组合总数”在当前架构下为**槽位笛卡尔积的可观测子集**，每种可达组合均对应上表真实物理语义；不可达组合（例如“用 cell.State 表示下一步”）已通过删除 `BloggerRuntimeState`/`BloggerRuntimeCell` 与 C0 永久测试禁止。
 
-### 自动化下限（非类型级）
+### 自动化下限
 
-以下永久门禁防止**重新引入**程序计数字段与影子状态，但不能替代上表人工枚举：
+以下永久门禁防止**重新引入**程序计数字段与影子状态，并守卫「未分类即红」的组合与理由义务：
 
-- `scripts/checks/dsl-ownership.mjs --threshold=0`（program-counter / large-DU / ControlState 等词法门）
+- `scripts/checks/dsl-ownership.mjs --threshold=0`（program-counter / large-DU / ControlState 理由 / `state-product` 组合轴等结构门）
 - `scripts/checks/dsl-ownership-ratchet.mjs`（基线防回归）
 - `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`（`HasFlight` 唯一 busy、无 shadow state API）
-- `tests/unit/verify/dsl-ownership.test.mjs` 与 `dsl-ownership-ratchet.test.mjs`
+- `tests/unit/verify/dsl-ownership.test.mjs`（含 `state-axes-{illegal,domain,physical}.fs` 与 `ControlState` reason fixtures）与 `dsl-ownership-ratchet.test.mjs`
 
-类型级自动组合计数仍属后续增强；在落地前以本节人工 proof 满足 DSL-005，且不降低条款。
+`state-product` 门禁在字段名无关的结构层面识别 record 状态轴乘积；它不替代上表人工枚举
+的架构级语义，只把「未分类组合」变成构建期失败。
 
 ## 动态义务
 
