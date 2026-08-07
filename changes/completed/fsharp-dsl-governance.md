@@ -1,6 +1,7 @@
 # F# DSL 静态治理增强
 
-未裁决候选。不是当前规范，不得直接据此修改生产代码。
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
 
 ## Current baseline
 
@@ -67,3 +68,20 @@ Wanxiangshu 项目 Owner。
 
 - 需要先选择能稳定解析当前 F# 方言和 Fable 条件编译的语法来源。
 - 需要 Decision Owner 确认“理由文本”的最小机械格式，避免把自然语言质量伪装成可判定事实。
+
+## Active work
+
+- RED 阶段：新增双状态轴、合法组合分类及结构化 `ControlState` 理由的永久回归 fixture。
+- 剩余工作：选择结构扫描来源，完成窄规则实现，更新 `docs/proof/dsl-structured-program.md`，执行 proof 后追加 `Final outcome`。
+
+## Final outcome
+
+**Outcome**：达成批准范围。DSL proof 门禁获得字段名无关的结构化识别，`ControlState` 分类获得机器可校验理由；产品 DSL 语义未变。
+
+**Final specification**：`docs/proof/dsl-structured-program.md` 静态义务表与自动化下限新增两项义务——record 中 ≥2 个独立状态轴（本地 DU/`option`/`bool`）必须带 `/// DSL-state-combination: domain|physical` 分类；`DSL-class: ControlState` 必须带 `/// DSL-control-state-reason:` 理由（要求 `ce-equivalent=none` 且 `blockers=` 覆盖 function-call/match!/return!/resource-scope/waiter/bounded-recursion）。
+
+**Implementation result**：`scripts/checks/dsl-ownership.mjs` 新增 `scanStateProducts`（结构解析，字段名无关）与 `hasValidControlStateReason`（机械理由校验）；`state-product` 作为新 gate 独立于 FORBIDDEN/GATE_NAMES 输出，不改变既有 9 项门清单。永久 fixtures：`tests/unit/verify/fixtures/state-axes-{illegal,domain,physical}.fs`。未引入 FCS 依赖，按 Acceptance blocker 采用轻量结构解析。
+
+**Verification**：按 Proof plan 逐项——非法双轴判红（`state-axes-illegal.fs`）；领域/物理组合不误报（domain/physical fixtures）；字段改名不改变判定（fixture 用 Availability/Confirmation 非黑名单名）；缺失或空泛 ControlState 理由判红、结构化理由通过；故意恢复非法 fixture 门禁红、恢复后 `npm run lint` 绿（由 Manager 执行验证）。
+
+**References**：`docs/proof/dsl-structured-program.md`；`tests/unit/verify/dsl-ownership.test.mjs`；`changes/completed/dsl-structured-program-gap.md`。

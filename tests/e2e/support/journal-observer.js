@@ -25,21 +25,31 @@ const journalLines = (workDir) => {
       .map((line) => ({ file, line })));
 };
 
-export function readJournal(workDir, factName) {
+export function readJournal(workDir, factName, renewOn = []) {
   const directory = runtimeDirectory(workDir);
-  if (!fs.existsSync(directory)) return { named: 0, total: 0 };
+  if (!fs.existsSync(directory)) return { named: 0, total: 0, renew: 0 };
 
   let named = 0;
   let total = 0;
+  let renew = 0;
+  const renewNames = renewOn.length > 0 ? new Set(renewOn) : null;
   for (const file of fs.readdirSync(directory)) {
     if (!file.endsWith('.ndjson')) continue;
     for (const line of fs.readFileSync(path.join(directory, file), 'utf8').split('\n')) {
       if (line.trim() === '') continue;
       total += 1;
       if (factName !== undefined && line.includes(factName)) named += 1;
+      if (renewNames !== null) {
+        for (const name of renewNames) {
+          if (line.includes(name)) {
+            renew += 1;
+            break;
+          }
+        }
+      }
     }
   }
-  return { named, total };
+  return { named, total, renew };
 }
 
 export function journalFactTail(workDir, limit) {

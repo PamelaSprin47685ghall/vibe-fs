@@ -865,6 +865,25 @@ user = "go"
   },
 
   {
+    name: 'VERIFY-003 waitFact renewOn is a unique non-empty fact list distinct from the target',
+    fn: () => {
+      const withWaitFact = (claim) => minimal().replace(
+        'flow = [ { prompt = { text = "go" } } ]',
+        `flow = [
+  { prompt = { text = "go" } },
+  { waitFact = ${claim} },
+]`,
+      );
+
+      rejects(withWaitFact('{ name = "Published", renewOn = ["", "CandidateReady"] }'), 'renewOn entries must be non-empty strings');
+      rejects(withWaitFact('{ name = "Published", renewOn = ["CandidateReady", "CandidateReady"] }'), 'renewOn entries must be unique');
+      rejects(withWaitFact('{ name = "Published", renewOn = ["Published"] }'), 'renewOn must not contain the target fact');
+      rejects(withWaitFact('{ name = "Published", renewOn = "CandidateReady" }'), 'renewOn must be an array of fact names');
+      accepts(withWaitFact('{ name = "Published", eq = 1, renewOn = ["CandidateReady"] }'));
+    },
+  },
+
+  {
     name: 'VERIFY-003 a scenario needs a name, and a turn needs user text and a step',
     fn: () => {
       rejects('[[turn]]\nid = "a"\nuser = "go"\n\n  [[turn.step]]\n  respond = { type = "text" }\n', 'scenario name');

@@ -224,10 +224,17 @@ wall-clock 上限可以作为兜底存在，但不得是唯一或首要的判据
 
 ```text
 算作进展：被消费的剧本步、显式语义检查点（turn 活动、assistant terminal、
-          idle-after-activity）、Host 重启的各个阶段
+          idle-after-activity）、Host 重启的各个阶段、
+          waitFact 的目标事实计数增长、waitFact.renewOn 声明的中间事实计数增长
 不算进展：原始 SSE、provider HTTP 流量、session.created 之类的生命周期噪声、
+          waitFact 等待期间其它 journal 写入（仅 advance(blocking=false) 记录）、
           任何「有字节在动」的证据
 ```
+
+`waitFact` 的续期依据由剧本显式归因，不从「journal 有任何写入」反推因果：目标
+`name` 计数增长恒为阻塞进展；`renewOn` 中任一已声明事实计数增长为阻塞进展；其余
+journal 增长只记录背景 activity 而不续期静默窗口。`renewOn` 是 proof 剧本声明，不
+进入生产事实、Journal envelope 或运行时配置。
 
 区分标准是：该事件是否证明被测因果链前进了一步。传输层有动静不等于语义有进展——一个反复重连的 SSE 读者能永久续期一个错误的 watchdog。
 

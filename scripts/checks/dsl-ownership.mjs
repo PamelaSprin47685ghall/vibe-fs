@@ -227,18 +227,164 @@ export const isProgramFile = (path) => {
   return PROGRAM_DIRS.some((dir) => rel.startsWith(dir)) && rel.endsWith('.fs')
 }
 
+/**
+ * DSL-state-combination: the categories that legalize a record whose fields
+ * form >= 2 independent state axes (DSL-005). `domain` = a true domain
+ * combination; `physical` = a physical resource combination. Absence means the
+ * author has not classified the product, so it fires fail-closed.
+ */
+export const STATE_COMBINATION_CATEGORIES = ['domain', 'physical']
+
+/**
+ * ControlState must carry a machine-checkable reason for why ordinary CE
+ * constructs cannot express the same flow. A bare `DSL-class: ControlState`
+ * remains a program counter unless the reason line declares:
+ *
+ *   - `ce-equivalent=none`  — no ordinary CE expression exists
+ *   - `blockers=<list>`     — names every rejected expression means
+ *                             (function-call, match!, return!, resource-scope,
+ *                             waiter, bounded-recursion)
+ *
+ * `evidence=<...>` is diagnostic and not mechanically constrained.
+ */
+const CONTROL_STATE_REASON_REQUIRED = ['ce-equivalent=none']
+const CONTROL_STATE_REASON_BLOCKERS = [
+  'function-call',
+  'match!',
+  'return!',
+  'resource-scope',
+  'waiter',
+  'bounded-recursion',
+]
+
+/** True when `lines` carries, near `index`, a structurally valid ControlState reason. */
+export const hasValidControlStateReason = (lines, index) => {
+  const from = Math.max(0, index - 8)
+  const to = Math.min(lines.length - 1, index + 8)
+  for (let j = from; j <= to; j++) {
+    const m = /\/\/\/\s*DSL-control-state-reason:\s*(.+)/.exec(lines[j])
+    if (!m) continue
+    const reason = m[1]
+    if (!CONTROL_STATE_REASON_REQUIRED.every((r) => reason.includes(r))) return false
+    const blockerMatch = /blockers=([^;]+)/.exec(reason)
+    if (!blockerMatch) return false
+    const blockers = blockerMatch[1].split(',').map((b) => b.trim())
+    if (!CONTROL_STATE_REASON_BLOCKERS.every((b) => blockers.includes(b))) return false
+    return true
+  }
+  return false
+}
+
+/**
+ * state-product (DSL-005): a record whose fields form >= 2 independent state
+ * axes (locally-defined DUs with >= 2 cases, `option`, or `bool`) is an
+ * unclassified orthogonal state product unless it carries a
+ * `/// DSL-state-combination: domain|physical` annotation. Field-name
+ * independent by construction — it parses structure, not blacklists.
+ */
+export function scanStateProducts(text, file = '<synthetic>') {
+  const lines = text.split('\n')
+  const violations = []
+
+  // Collect locally-defined DUs (type/and declarations whose body opens a case list).
+  const definedDus = new Set()
+  const duDecl = /^\s*(?:type|and)\s+(\w+)\s*=\s*$/
+  const caseLine = /^\s*\| /
+  let cur = null
+  for (const line of lines) {
+    const dm = duDecl.exec(line)
+    if (dm) {
+      // A new type/and declaration flushes the previous DU candidate before the
+      // new one starts (else `type Availability` would be shadowed by the next
+      // `type` and never registered).
+      if (cur && cur.isDu) definedDus.add(cur.name)
+      cur = { name: dm[1], isDu: false }
+      continue
+    }
+    if (!cur) continue
+    if (caseLine.test(line)) {
+      cur.isDu = true
+      continue
+    }
+    if (line.trim() !== '') {
+      if (cur.isDu) definedDus.add(cur.name)
+      cur = null
+    }
+  }
+
+  // Walk each record definition and classify its state-typed fields.
+  const recordStart = /^\s*(?:type|and)\s+(\w+)\s*=\s*\{\s*$/
+  const recordEnd = /^\s*\}\s*$/
+  const fieldLine = /^\s*(\w+)\s*:\s*([^=\[\]{}]+?)\s*$/
+  const stateType = (type) => {
+    const t = type.trim()
+    if (t === 'bool') return true
+    if (/^[\w.]+ option$/i.test(t)) return true
+    return definedDus.has(t)
+  }
+
+  let rec = null
+  for (let i = 0; i < lines.length; i++) {
+    const sm = recordStart.exec(lines[i])
+    if (sm) {
+      rec = { name: sm[1], fields: [], line: i + 1, doc: [] }
+      for (let j = i - 1; j >= 0; j--) {
+        const t = lines[j].trim()
+        if (t === '') continue
+        if (/^\[</.test(t)) continue
+        if (/^\/\//.test(t) && !/^\/\/\//.test(t)) continue
+        if (!/^\/\/\//.test(t)) break
+        rec.doc.unshift(lines[j])
+      }
+      continue
+    }
+    if (!rec) continue
+    if (recordEnd.test(lines[i])) {
+      const stateFields = rec.fields.filter((f) => stateType(f.type))
+      const classified = rec.doc.some((l) =>
+        STATE_COMBINATION_CATEGORIES.some((c) => l.includes(`DSL-state-combination: ${c}`)),
+      )
+      if (stateFields.length >= 2 && !classified) {
+        violations.push({
+          gate: 'state-product',
+          file,
+          line: rec.line,
+          text:
+            `record '${rec.name}' combines ${stateFields.length} independent state axes ` +
+            `(${stateFields.map((f) => f.name).join(', ')}) without a ` +
+            '/// DSL-state-combination: domain|physical classification',
+        })
+      }
+      rec = null
+      continue
+    }
+    const fm = fieldLine.exec(lines[i])
+    if (fm) rec.fields.push({ name: fm[1], type: fm[2] })
+  }
+  return violations
+}
+
 /** Scan one source text. Returns [{gate, file, line, text}, ...]. */
 export const scanText = (text, file = '<synthetic>') => {
   const violations = []
   const lines = text.split('\n')
+
+  // state-product is a structure parse, independent of field names, so it runs
+  // once over the whole text rather than per line.
+  violations.push(...scanStateProducts(text, file))
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const code = line.replace(/\/\/.*/g, '').trim()
 
-    // ControlState (PR 9 C): a stored DU field tagged `/// DSL-class:
-    // ControlState` is a program counter unless an explicit exemption admits it.
+    // ControlState (PR 9 C / DSL-005): a stored DU tagged `/// DSL-class:
+    // ControlState` is a program counter unless an explicit exemption admits it
+    // OR a structurally valid `/// DSL-control-state-reason:` line explains why
+    // ordinary CE constructs cannot express the flow.
     if (!CONTROL_STATE_EXEMPT.has(file) && /DSL-class:\s*ControlState\b/.test(line)) {
-      violations.push({ gate: 'program-counter', file, line: i + 1, text: line.trim() })
+      if (!hasValidControlStateReason(lines, i)) {
+        violations.push({ gate: 'program-counter', file, line: i + 1, text: line.trim() })
+      }
     }
 
     if (!code) continue

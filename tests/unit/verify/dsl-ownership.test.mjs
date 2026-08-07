@@ -3,6 +3,7 @@
  * Synthetic source only — never mutates production trees.
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   FORBIDDEN,
@@ -16,6 +17,8 @@ import {
   scanLargeDus,
   scanText,
 } from '../../../scripts/checks/dsl-ownership.mjs'
+
+const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
 const NEGATIVES = [
   {
@@ -330,6 +333,36 @@ test('DSL_OWNERSHIP_control_state_class_is_a_program_counter', () => {
     '    | B',
   ].join('\n')
   assert.ok(scanText(source, 'src/Wanxiangshu/Session/Sample.fs').some((h) => h.gate === 'program-counter'))
+})
+
+test('DSL_OWNERSHIP_renamed_record_state_axes_are_reported', () => {
+  const hits = scanText(readFixture('state-axes-illegal.fs'), 'src/Wanxiangshu/Domain/StateAxes.fs')
+  assert.ok(
+    hits.some((hit) => hit.gate === 'state-product'),
+    'independent state axes must be reported without relying on field names',
+  )
+})
+
+test('DSL_OWNERSHIP_domain_state_combination_is_explicitly_allowed', () => {
+  const hits = scanText(readFixture('state-axes-domain.fs'), 'src/Wanxiangshu/Domain/StateAxes.fs')
+  assert.deepEqual(hits, [])
+})
+
+test('DSL_OWNERSHIP_physical_state_combination_is_explicitly_allowed', () => {
+  const hits = scanText(readFixture('state-axes-physical.fs'), 'src/Wanxiangshu/Process/StateAxes.fs')
+  assert.deepEqual(hits, [])
+})
+
+test('DSL_OWNERSHIP_control_state_requires_structured_reason', () => {
+  const source = [
+    'module Sample',
+    '/// DSL-class: ControlState',
+    '/// DSL-control-state-reason: ce-equivalent=none; blockers=function-call,match!,return!,resource-scope,waiter,bounded-recursion; evidence=process-restart-reconciliation',
+    'type Mode =',
+    '    | A',
+    '    | B',
+  ].join('\n')
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/Sample.fs'), [])
 })
 
 

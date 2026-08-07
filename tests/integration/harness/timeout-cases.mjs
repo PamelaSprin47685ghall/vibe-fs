@@ -305,10 +305,12 @@ async function runTimerDoesNotHoldEventLoop() {
  *   nothing observed        the fake event source answers every slice — the transport saying
  *                           bytes moved — and the journal never gains a line. The barrier must
  *                           be ended by the silence budget, not by the WAIT_FACT_WINDOW_MS 兜底.
- *   journal appending       lines land steadily and the awaited fact only at the end, past two
- *                           silence windows. The barrier must survive on those appends and then
- *                           return, because a production reducer committing durable facts is
- *                           the causal chain moving.
+ *   background appending    lines land steadily while the awaited fact never appears. The barrier
+ *                           must be killed by the silence budget and its dump must record
+ *                           background progress without renewing the window.
+ *   renewOn appending       an explicitly declared intermediate fact lands steadily and the
+ *                           awaited fact appears past two silence windows. The barrier survives
+ *                           only on that declared causal fact, then returns on the target.
  *
  * The kill deadline in the first child is what turns red if renewal goes back on the clock: a
  * barrier that renews unconditionally reaches it and comes back killed by signal rather than
@@ -369,9 +371,8 @@ async function runWaitFactRenewsOnlyOnObservation() {
   );
   assertEq(
     appending.code,
-    0,
-    `journal appends are the production reducer committing facts, so the barrier must survive ` +
-      `them: ${appending.stderr}`,
+    1,
+    `background journal appends must not renew the barrier: ${appending.stderr}`,
   );
   assertTrue(
     appending.elapsedMs > scaledWatchdogMs,
@@ -379,9 +380,39 @@ async function runWaitFactRenewsOnlyOnObservation() {
   );
   assertEq(
     appending.stdout.trim(),
-    `barrier returned after ${appendsBeforeFact} appends`,
-    `the barrier must return on the awaited fact, not on an earlier one: ${appending.stdout}`,
+    '',
+    `background-only renewal must not reach the awaited fact: ${appending.stdout}`,
   );
+}
+
+async function runWaitFactRenewsOnDeclaredFactAndCountsPrecisely() {
+  const scaledWatchdogMs = 1000;
+  const budgetEnv = { WATCHDOG_TIMEOUT_MS: String(scaledWatchdogMs) };
+  const workDir = tmpScenarioDir();
+  execFileSync('git', ['-C', workDir, 'init', '-q'], { encoding: 'utf8' });
+  const journalDir = join(workDir, '.git', 'wanxiangshu-next', 'runtimes');
+  mkdirSync(journalDir, { recursive: true });
+  const journalFile = join(journalDir, 'gate.ndjson');
+  writeFileSync(journalFile, '');
+  const result = await runWatchdogChild(
+    `import { appendFileSync } from 'node:fs';\n` +
+      `let appended = 0;\n` +
+      `const iv = setInterval(() => {\n` +
+      `  appended += 1;\n` +
+      `  const fact = appended < 6 ? 'CandidateReady' : appended < 8 ? 'Published' : 'UnrelatedProgressFact';\n` +
+      `  appendFileSync(${JSON.stringify(journalFile)}, JSON.stringify({ type: fact, n: appended }) + '\\n');\n` +
+      `}, ${Math.floor(scaledWatchdogMs / 4)});\n` +
+      factBarrierScript(workDir, 'Published', 'gate-wait-fact-renew-on').replace(
+        `{ waitFact: { name: ${JSON.stringify('Published')}, eq: 1 }, lane: 'fact-lane' }`,
+        `{ waitFact: { name: 'Published', eq: 2, renewOn: ['CandidateReady'] }, lane: 'fact-lane' }`,
+      ) +
+      `clearInterval(iv);\n` +
+      `console.log('barrier returned after ' + appended + ' appends');\n`,
+    WAIT_FACT_WINDOW_MS,
+    budgetEnv,
+  );
+  assertEq(result.code, 0, `renewOn facts must keep the barrier alive: ${result.stderr}`);
+  assertEq(result.stdout.trim(), 'barrier returned after 7 appends', 'eq must wait for the exact target count');
 }
 
 /** The child body both halves share: the real barrier, a real watchdog, a fake event source. */
@@ -413,4 +444,5 @@ export const timeoutCases = [
   { name: 'VERIFY-004 the timeout dump separates causal progress from background', fn: runDiagnosticDumpIsComplete },
   { name: 'VERIFY-004 a clean scenario is not held to the end of the silence window', fn: runTimerDoesNotHoldEventLoop },
   { name: 'VERIFY-004 waitFact renews only on an observation', fn: runWaitFactRenewsOnlyOnObservation },
+  { name: 'VERIFY-004 waitFact renews on declared facts and preserves exact counts', fn: runWaitFactRenewsOnDeclaredFactAndCountsPrecisely },
 ];
