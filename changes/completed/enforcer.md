@@ -770,12 +770,12 @@ resources/prompts/blogger-system.md
 **Approved scope**: Per §0–§16 of this frozen Proposal. Semantic alignment + documentation reconstruction on baseline 0.5.4 + Unreleased. Do not redefine formal `ENFORCER-*` clauses inside this Change file. Do not revive score / throttle / Main overlay / Runtime State DU. Do not change wire/journal production semantics under the guise of documentation rebase.
 
 **Remaining close conditions**:
-1. Fix Gap A — `docs/how/enforcer.md` ENFORCER-025 multi-call tip selection: document PartOrdinal-first only (match `EnforcerCycle.fs` + unit tests); remove catalog-ordinal secondary sort.
-2. Fix Gap B — `docs/shape/enforcer.md`: replace `BloggerRuntime | 纯 cell 转移` with physical ownership axes (`HasFlight` / `HasParked` / `PendingOffer` / `DrainWindow` / recovery evidence) and keep component responsibilities accurate.
-3. Strengthen `docs/proof/enforcer.md` so §13 verification contract is explicit (catalog/codec, cycle PartOrdinal-first, atomic commit/recovery, RecentTips bound 8, runtime ownership, repair/fallback, no score path).
-4. Confirm `docs/what` / `docs/why` need no residual score/throttle/Main-overlay fixes (already clean if still true).
-5. `npm run lint` passes after doc changes; run relevant `tests/unit/enforcer/*` if proof references require it.
-6. Append `Final outcome` and move this file to `changes/completed/`.
+1. [x] DONE — Fix Gap A — `docs/how/enforcer.md` ENFORCER-025 multi-call tip selection: document PartOrdinal-first only (match `EnforcerCycle.fs` + unit tests); remove catalog-ordinal secondary sort.
+2. [x] DONE — Fix Gap B — `docs/shape/enforcer.md`: replace `BloggerRuntime | 纯 cell 转移` with physical ownership axes (`HasFlight` / `HasParked` / `PendingOffer` / `DrainWindow` / recovery evidence) and keep component responsibilities accurate.
+3. [x] DONE — Strengthen `docs/proof/enforcer.md` so §13 verification contract is explicit (catalog/codec, cycle PartOrdinal-first, atomic commit/recovery, RecentTips bound 8, runtime ownership, repair/fallback, no score path).
+4. [x] DONE — Confirm `docs/what` / `docs/why` need no residual score/throttle/Main-overlay fixes (already clean if still true).
+5. [x] DONE — `npm run lint` passes after doc changes; run relevant `tests/unit/enforcer/*` if proof references require it.
+6. [x] DONE — Append `Final outcome` and move this file to `changes/completed/`.
 
 **Blockers**: None. Gaps are documentation; implementation already PartOrdinal-first and physical-ownership.
 
@@ -799,6 +799,17 @@ resources/prompts/blogger-system.md
 - `npm run lint` — pass (exit 0)
 - `npm run build` — pass (exit 0; required for unit tests via dist)
 - `node --test tests/unit/enforcer/*.test.mjs` — 143/143 pass (exit 0), including PartOrdinal-first multi-call tip, RecentTips cap 8, physical HasFlight busy, throttle/nudge tombstones, catalog 120 rules, and `bounds.test.mjs` 4 pass locking the §13.2 size/count fail-closed bounds (`MaxMergedToolCalls=32` / text 512KiB / evidence 128KiB).
+
+**Commits**:
+- `dec23fcb` — docs close `how` / `shape` / `proof` (Gap A PartOrdinal-first, Gap B physical ownership axes, §13 proof inventory).
+- `fa9c8f07` — `CHANGELOG.md` Unreleased entry documenting the Enforcer rebase docs close.
+- `646140ac` — `bounds.test.mjs` permanent regression + `docs/proof/enforcer.md` §13.2 bounds rows + CHANGELOG/lifecycle test-count sync to 143/143.
+
+**Tests**:
+- lint — pass
+- build — pass
+- enforcer unit suite — 143/143 pass
+- bounds — 4/4 pass
 
 **Limitations**:
 - Full monorepo integration/e2e suites were not re-run under this Change (out of scope for documentation rebase).
