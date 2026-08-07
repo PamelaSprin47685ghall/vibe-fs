@@ -633,70 +633,62 @@ module EnforcerHost =
                 match ProjectionPlanner.plan intents with
                 | Error _ -> None
                 | Ok ordered ->
-                    // Algebra wire view (Role+Text). MessageId lives only on Host obj.
-                    let wire = ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
+                    // PROJ-004：Canonical Renderer 单次产出 wire + Host id 侧信道。
+                    // 禁止二次 CompanionProjectionBuilder.build。
+                    let rendered =
+                        ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
 
-                    // Single shape source for Host ids: same Builder applyBlogFrames uses.
-                    // Real sha256 so COMPANION-013 ids stay stable across rebuilds.
-                    let kind =
-                        match ctx with
-                        | BloggerRequestContext.Main _ -> CompanionRequestKind.Normal
-                        | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount
+                    let n = List.length rendered.Messages
 
-                    let frameBodies =
-                        resolvedFrames
-                        |> List.map (fun frame -> BlobDigest.create frame.Digest, frame.Body)
-
-                    let plan =
-                        CompanionProjectionBuilder.build
-                            HostDigest.sha256Hex
-                            bloggerSessionId
-                            frameEpoch
-                            kind
-                            frameBodies
-                            delta
-                            previousTips
-
-                    // Fail closed if algebra text sequence drifts from Builder (digest source of truth).
-                    let wireTexts =
-                        wire
-                        |> List.map (fun msg ->
-                            let text =
-                                msg.Parts
-                                |> List.tryPick (function
-                                    | ProviderProjection.WireText t -> Some t
-                                    | _ -> None)
-                                |> Option.defaultValue ""
-
-                            msg.Role, text)
-
-                    let planTexts = plan.Messages |> List.map (fun msg -> msg.Role, msg.Text)
-
-                    if wireTexts <> planTexts then
+                    if
+                        List.length rendered.HostMessageIds <> n
+                        || List.length rendered.HostIsPhysical <> n
+                    then
                         None
                     else
                         // C6: rebuild frames/instruction are synthetic projections, not new
                         // user authority. New Work delta is marked physical for diagnostics;
                         // HOST-010 still binds authority pre-transform.
-                        plan.Messages
-                        |> List.map (fun msg ->
-                            createObj
-                                [ "info",
-                                  box (
-                                      createObj
-                                          [ "id", box msg.MessageId
-                                            "role", box msg.Role
-                                            "synthetic", box (not msg.IsPhysical)
-                                            "source",
-                                            box (
-                                                if msg.IsPhysical then
-                                                    "physical-delta"
-                                                else
-                                                    "synthetic-projection"
-                                            ) ]
-                                  )
-                                  "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
-                        |> Some
+                        // Fail-closed：每条 rebuild 消息必须带代数 MessageId。
+                        let zipped =
+                            List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+
+                        let rec toHost
+                            (acc: obj list)
+                            (items: (ProviderProjection.WireMessage * string option * bool) list)
+                            =
+                            match items with
+                            | [] -> Some(List.rev acc)
+                            | (msg, None, _) :: _ -> None
+                            | (msg, Some messageId, isPhysical) :: tail ->
+                                let text =
+                                    msg.Parts
+                                    |> List.tryPick (function
+                                        | ProviderProjection.WireText t -> Some t
+                                        | _ -> None)
+                                    |> Option.defaultValue ""
+
+                                let hostMsg =
+                                    createObj
+                                        [ "info",
+                                          box (
+                                              createObj
+                                                  [ "id", box messageId
+                                                    "role", box msg.Role
+                                                    "synthetic", box (not isPhysical)
+                                                    "source",
+                                                    box (
+                                                        if isPhysical then
+                                                            "physical-delta"
+                                                        else
+                                                            "synthetic-projection"
+                                                    ) ]
+                                          )
+                                          "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
+
+                                toHost (hostMsg :: acc) tail
+
+                        toHost [] zipped
 
     /// Dead-code hygiene: never default a rebuild miss to []. Callers that still
     /// need a list must pass the Host rawMessages as fallback.

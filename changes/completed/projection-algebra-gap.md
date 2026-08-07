@@ -19,8 +19,8 @@
 
 - [x] Companion BloggerMain / BloggerSquash / BloggerDelta 接入 `insertBlogFrames`，
       并将 `BlogFrames` 纳入 snapshot。
-      （`suppressTransportOnly`：Domain 骨架 + unit 证明已落地；生产路径
-      `TransportMessages` 恒 `Set.empty`、未声明该 intent——不虚报生产接入。）
+      （`suppressTransportOnly`：**正式完成标准 = Domain 骨架 + unit 证明**；
+      生产 host-id 全量 suppress 接线**降级出本 Change**，不虚报。）
 - [x] InteractionRepair 接入 `insertRepair`。
 - [x] ReviewConfirmation 与 skeptical challenge seal 接入 `appendReviewChallenge`、
       `insertPairProgrammingThought`。
@@ -65,11 +65,13 @@ REVISE 后正式层已诚实对齐：PROJ-002 为消费者驱动字段子集；p
   `InsertPairProgrammingThought`、`ReanchorAfterCompaction`）；Planner Canonical Rank；
   Renderer 逐步 fold。
 - 生产接线：EnforcerHost rebuild/repair；PairThought tryInject；HostReviewGuard challenge
-  字节；XWire reanchor；`InsertBlogFrames` → `CompanionProjectionBuilder` 单形状源。
-- **`SuppressTransportOnly`**：仅 Domain + unit 骨架。生产路径 `TransportMessages`
-  恒 `Set.empty`、从不声明该 intent；`applySuppress` 在空集上 no-op。COMPANION-012
-  字段级 transport 过滤由模型边界 / `toSemantic` 路径承担；消息级 Suppress intent
-  待后续变更（需 WireMessage host-id 侧信道）。
+  字节；XWire reanchor；`InsertBlogFrames` → `CompanionProjectionBuilder` 仅在 Renderer
+  内调用一次（`renderMessagesWithHostIds` + 侧信道 MessageId；Host 禁止二次 Builder）。
+- **`SuppressTransportOnly`**：本 Change **正式完成标准**仅 Domain 骨架 + unit；
+  生产 host-id 全量 suppress 接线**已正式降级出本 Change**（不实现、不虚报）。
+  生产路径 `TransportMessages` 恒 `Set.empty`、从不声明该 intent；空集 no-op。
+  COMPANION-012 字段级 transport 过滤由模型边界 / `toSemantic` 承担；消息级
+  Suppress 全量接线属后续独立变更。
 - 刻意保留：`replaceMessagesInPlace` 作为 Host 适配写回原语（SpikePlugin / XWire /
   CompanionTransform）；`CompanionHost.TransformRaw` 恒等（主会话 Host 视图）；
   ManagerNarrative 不在本变更范围。

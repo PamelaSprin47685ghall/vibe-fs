@@ -312,6 +312,13 @@ type RenderedPrefix =
     /// 合成前缀：`PrefixActivation` 头部替换前 `DropLeading` 条。
     | SyntheticPrefix of PrefixActivation
 
+/// PROJ-004：Canonical Renderer 一次产出——wire 正文 + Host 写回侧信道。
+/// `HostMessageIds` / `HostIsPhysical` 与 `Messages` 等长；None = 本条无代数合成 id。
+type RenderedMessages =
+    { Messages: ProviderProjection.WireMessage list
+      HostMessageIds: string option list
+      HostIsPhysical: bool list }
+
 [<RequireQualifiedAccess>]
 module ProjectionRenderer =
 
@@ -396,44 +403,19 @@ module ProjectionRenderer =
     let private isAnchor (message: ProviderProjection.WireMessage) =
         isUserAnchor message || isToolResultAnchor message
 
-    /// SuppressTransportOnly 骨架：生产路径从未声明该 intent，TransportMessages 恒空 → no-op。
-    /// WireMessage 无 host id。非空时丢弃至多 |TransportMessages| 条 assistant（unit 骨架行为；
-    /// 完整 id 级剔除待 host-id 侧信道后续变更）。COMPANION-012 字段级过滤不在此路径。
-    let private applySuppress
-        (snapshot: ProjectionSnapshot)
-        (messages: ProviderProjection.WireMessage list)
-        : ProviderProjection.WireMessage list =
-        if Set.isEmpty snapshot.TransportMessages then
-            messages
-        else
-            let budget = Set.count snapshot.TransportMessages
-
-            let rec loop
-                (remaining: ProviderProjection.WireMessage list)
-                (toDrop: int)
-                (acc: ProviderProjection.WireMessage list)
-                =
-                match remaining, toDrop with
-                | [], _ -> List.rev acc
-                | _, 0 -> List.rev acc @ remaining
-                | msg :: tail, n when msg.Role = "assistant" -> loop tail (n - 1) acc
-                | msg :: tail, n -> loop tail n (msg :: acc)
-
-            loop messages budget []
-
     /// COMPANION-005：`InsertBlogFrames` 的唯一形状源是 `CompanionProjectionBuilder`。
-    /// WireMessage 无 MessageId；id 仅在 Application/Session 写 Host 时从同一 Builder 取。
-    /// Domain 侧 sha256 用恒等占位——wire 文本与 id 公式解耦（VERIFY-008）。
+    /// Builder 只在此调用一次；真实 `sha256` 产出 MessageId，经 Host 侧信道写回（PROJ-004）。
     ///
     /// - 完整 Companion 重建（delta / tips / squash）：用 Builder 计划整体替换 base
     ///   （生产 rebuild 的 base 为空）。
     /// - 仅帧 smoke（无 delta/tips/squash）：无帧则 no-op；有帧时在前缀头之后插入
     ///   包裹后的帧（兼容 Activate → BlogFrames 的 fold）。
     let private applyBlogFrames
+        (sha256: string -> string)
         (snapshot: ProjectionSnapshot)
         (intent: BlogFramesIntent)
-        (messages: ProviderProjection.WireMessage list)
-        : ProviderProjection.WireMessage list =
+        (acc: RenderedMessages)
+        : RenderedMessages =
         let hasDelta = Option.isSome intent.PhysicalDelta
         let hasTips = not (List.isEmpty intent.PreviousTips)
 
@@ -443,7 +425,7 @@ module ProjectionRenderer =
         let fullCompanionRebuild = hasDelta || hasTips || isSquash
 
         match snapshot.BlogFrames, fullCompanionRebuild with
-        | [], false -> messages
+        | [], false -> acc
         | frames, _ ->
             let kind =
                 if isSquash then
@@ -456,10 +438,10 @@ module ProjectionRenderer =
 
             let bloggerSessionId = SessionId.create intent.BloggerSessionId
             let frameEpoch = FrameEpochId.create intent.FrameEpoch
-            // MessageId 不进入 WireMessage；占位 sha256 只满足 Builder 签名。
+
             let plan =
                 CompanionProjectionBuilder.build
-                    id
+                    sha256
                     bloggerSessionId
                     frameEpoch
                     kind
@@ -467,15 +449,28 @@ module ProjectionRenderer =
                     intent.PhysicalDelta
                     intent.PreviousTips
 
+            let companionMessages = plan.Messages
+
             let companionWires: ProviderProjection.WireMessage list =
-                plan.Messages |> List.map (fun msg -> textMessage msg.Role msg.Text)
+                companionMessages |> List.map (fun msg -> textMessage msg.Role msg.Text)
+
+            let companionIds = companionMessages |> List.map (fun msg -> Some msg.MessageId)
+            let companionPhysical = companionMessages |> List.map (fun msg -> msg.IsPhysical)
 
             if fullCompanionRebuild then
-                companionWires
+                { Messages = companionWires
+                  HostMessageIds = companionIds
+                  HostIsPhysical = companionPhysical }
             else
-                match messages with
-                | [] -> companionWires
-                | head :: tail -> head :: companionWires @ tail
+                match acc.Messages with
+                | [] ->
+                    { Messages = companionWires
+                      HostMessageIds = companionIds
+                      HostIsPhysical = companionPhysical }
+                | head :: tail ->
+                    { Messages = head :: companionWires @ tail
+                      HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
+                      HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
 
     let private isPairMarker (message: ProviderProjection.WireMessage) : bool =
         message.Role = "assistant"
@@ -486,7 +481,10 @@ module ProjectionRenderer =
                | _ -> false)
 
     /// HOST-013：每个锚点后插一条 marker；已有 marker 则字节保持（幂等）。
-    let private applyPairThought (messages: ProviderProjection.WireMessage list) : ProviderProjection.WireMessage list =
+    /// 新插入 marker 无代数 id（None）；既有前缀侧信道按索引对齐。
+    let private applyPairThought (acc: RenderedMessages) : RenderedMessages =
+        let messages = acc.Messages
+
         let anchorIndexes =
             messages
             |> List.mapi (fun index msg -> index, msg)
@@ -494,49 +492,122 @@ module ProjectionRenderer =
             |> List.map fst
 
         if List.isEmpty anchorIndexes then
-            messages
+            acc
         else
             // 从后往前插，保持先出现的锚点索引稳定。
-            (messages, List.rev anchorIndexes)
-            ||> List.fold (fun acc anchorIndex ->
-                match List.tryItem (anchorIndex + 1) acc with
-                | Some next when isPairMarker next -> acc
+            ((acc.Messages, acc.HostMessageIds, acc.HostIsPhysical), List.rev anchorIndexes)
+            ||> List.fold (fun (msgs, ids, phys) anchorIndex ->
+                match List.tryItem (anchorIndex + 1) msgs with
+                | Some next when isPairMarker next -> msgs, ids, phys
                 | _ ->
                     let marker = reasoningMessage ProjectionConstants.PairProgrammingThoughtText
-                    List.take (anchorIndex + 1) acc @ (marker :: List.skip (anchorIndex + 1) acc))
+                    let take = anchorIndex + 1
+
+                    List.take take msgs @ (marker :: List.skip take msgs),
+                    List.take take ids @ (None :: List.skip take ids),
+                    List.take take phys @ (false :: List.skip take phys))
+            |> fun (msgs, ids, phys) ->
+                { Messages = msgs
+                  HostMessageIds = ids
+                  HostIsPhysical = phys }
+
+    let private appendSynthetic (role: string) (text: string) (acc: RenderedMessages) : RenderedMessages =
+        { Messages = acc.Messages @ [ textMessage role text ]
+          HostMessageIds = acc.HostMessageIds @ [ None ]
+          HostIsPhysical = acc.HostIsPhysical @ [ false ] }
+
+    /// Activate 合成前缀：头部无代数 MessageId；尾部侧信道按 DropLeading 截齐。
+    let private applyActivate (activation: PrefixActivation) (acc: RenderedMessages) : RenderedMessages =
+        let rendered =
+            renderMessages acc.Messages (RenderedPrefix.SyntheticPrefix activation)
+
+        let drop = activation.DropLeading
+        let headId: string option = None
+        let headPhysical = false
+
+        { Messages = rendered
+          HostMessageIds = headId :: List.skip drop acc.HostMessageIds
+          HostIsPhysical = headPhysical :: List.skip drop acc.HostIsPhysical }
+
+    /// Suppress：与 wire 同步裁剪侧信道（按同样 assistant 丢弃规则）。
+    let private applySuppressWithIds (snapshot: ProjectionSnapshot) (acc: RenderedMessages) : RenderedMessages =
+        if Set.isEmpty snapshot.TransportMessages then
+            acc
+        else
+            let budget = Set.count snapshot.TransportMessages
+
+            let rec loop
+                (remaining: (ProviderProjection.WireMessage * string option * bool) list)
+                (toDrop: int)
+                (accMsgs: ProviderProjection.WireMessage list)
+                (accIds: string option list)
+                (accPhys: bool list)
+                =
+                match remaining, toDrop with
+                | [], _ ->
+                    { Messages = List.rev accMsgs
+                      HostMessageIds = List.rev accIds
+                      HostIsPhysical = List.rev accPhys }
+                | _, 0 ->
+                    let restMsgs, restIds, restPhys =
+                        remaining
+                        |> List.fold (fun (ms, is, ps) (m, i, p) -> m :: ms, i :: is, p :: ps) ([], [], [])
+
+                    { Messages = List.rev accMsgs @ List.rev restMsgs
+                      HostMessageIds = List.rev accIds @ List.rev restIds
+                      HostIsPhysical = List.rev accPhys @ List.rev restPhys }
+                | (msg, _, _) :: tail, n when msg.Role = "assistant" -> loop tail (n - 1) accMsgs accIds accPhys
+                | (msg, id, phys) :: tail, n -> loop tail n (msg :: accMsgs) (id :: accIds) (phys :: accPhys)
+
+            let zipped = List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
+
+            loop zipped budget [] [] []
 
     let private applyOne
+        (sha256: string -> string)
         (snapshot: ProjectionSnapshot)
-        (messages: ProviderProjection.WireMessage list)
+        (acc: RenderedMessages)
         (intent: ProjectionIntent)
-        : ProviderProjection.WireMessage list =
+        : RenderedMessages =
         match intent with
-        | ProjectionIntent.KeepPhysicalPrefix -> messages
-        | ProjectionIntent.ActivatePrefixEpoch activation ->
-            renderMessages messages (RenderedPrefix.SyntheticPrefix activation)
-        | ProjectionIntent.InsertBlogFrames payload -> applyBlogFrames snapshot payload messages
-        | ProjectionIntent.InsertRepair _ -> messages @ [ textMessage "user" ProjectionConstants.RepairInstruction ]
-        | ProjectionIntent.SuppressTransportOnly -> applySuppress snapshot messages
+        | ProjectionIntent.KeepPhysicalPrefix -> acc
+        | ProjectionIntent.ActivatePrefixEpoch activation -> applyActivate activation acc
+        | ProjectionIntent.InsertBlogFrames payload -> applyBlogFrames sha256 snapshot payload acc
+        | ProjectionIntent.InsertRepair _ -> appendSynthetic "user" ProjectionConstants.RepairInstruction acc
+        | ProjectionIntent.SuppressTransportOnly -> applySuppressWithIds snapshot acc
         | ProjectionIntent.AppendReviewChallenge _ ->
             // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
-            messages @ [ textMessage "user" ProjectionConstants.ReviewChallengePrompt ]
-        | ProjectionIntent.InsertPairProgrammingThought _ -> applyPairThought messages
+            appendSynthetic "user" ProjectionConstants.ReviewChallengePrompt acc
+        | ProjectionIntent.InsertPairProgrammingThought _ -> applyPairThought acc
         // wire no-op：CommittedPrefix=None 的语义由 Coordinator 填 Snapshot；此处不改字节。
-        | ProjectionIntent.ReanchorAfterCompaction -> messages
+        | ProjectionIntent.ReanchorAfterCompaction -> acc
 
-    /// PROJ-008 step 3a：按 canonical rank 折叠有序意图到 base wire messages。
-    ///
-    /// 调用方可传入未排序意图列表；内部先 `plan` 归一化。plan 冲突时 fail-closed。
+    let private emptyRendered (baseMessages: ProviderProjection.WireMessage list) : RenderedMessages =
+        { Messages = baseMessages
+          HostMessageIds = baseMessages |> List.map (fun _ -> None)
+          HostIsPhysical = baseMessages |> List.map (fun _ -> false) }
+
+    /// PROJ-004：注入 sha256，一次 fold 产出 wire + Host MessageId / IsPhysical 侧信道。
+    /// Builder 仅在 `InsertBlogFrames` 路径调用一次。plan 冲突 fail-closed。
+    let renderMessagesWithHostIds
+        (sha256: string -> string)
+        (snapshot: ProjectionSnapshot)
+        (baseMessages: ProviderProjection.WireMessage list)
+        (intents: ProjectionIntent list)
+        : RenderedMessages =
+        match ProjectionPlanner.plan intents with
+        | Error _ -> invalidOp "ProjectionRenderer.renderMessagesWithHostIds requires a conflict-free intent set"
+        | Ok ordered ->
+            (emptyRendered baseMessages, ordered)
+            ||> List.fold (fun acc intent -> applyOne sha256 snapshot acc intent)
+
+    /// PROJ-008 step 3a：兼容入口——返回 wire list（默认恒等 sha256；测试不要求 MessageId）。
     let renderMessagesWithIntents
         (snapshot: ProjectionSnapshot)
         (baseMessages: ProviderProjection.WireMessage list)
         (intents: ProjectionIntent list)
         : ProviderProjection.WireMessage list =
-        match ProjectionPlanner.plan intents with
-        | Error _ -> invalidOp "ProjectionRenderer.renderMessagesWithIntents requires a conflict-free intent set"
-        | Ok ordered ->
-            (baseMessages, ordered)
-            ||> List.fold (fun acc intent -> applyOne snapshot acc intent)
+        (renderMessagesWithHostIds id snapshot baseMessages intents).Messages
 
     /// CTX-011 step 5：候选 cutoff 处 X 当前前缀的 digest 证明。
     ///

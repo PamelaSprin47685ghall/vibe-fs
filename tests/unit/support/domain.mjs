@@ -2047,6 +2047,8 @@ export const projectionAlgebra = (() => {
     /**
      * PROJ-008 step 3a: fold ordered intents over base wire messages against a
      * ProjectionSnapshot. Lazy: missing production export fails only callers.
+     * Production injects real sha256 via renderMessagesWithHostIds; this facade
+     * keeps wire-only shape (default identity sha256 inside F#).
      */
     renderMessagesWithIntents: (snapshot, baseWireMessages, orderedIntents) => {
       const render = member(ProjectionAlgebraModule, 'ProjectionRenderer', 'renderMessagesWithIntents')
@@ -2065,6 +2067,43 @@ export const projectionAlgebra = (() => {
       const items = Array.isArray(baseWireMessages) ? baseWireMessages : listItems(baseWireMessages)
       const encoded = toList(items.map(toWireMsg))
       return wireViewOf(render(snapshot, encoded, toList(orderedIntents)))
+    },
+
+    /**
+     * PROJ-004: wire + Host MessageId / IsPhysical side-channel (injected sha256).
+     * Lazy: only callers that need ids bind this export.
+     */
+    renderMessagesWithHostIds: (sha256, snapshot, baseWireMessages, orderedIntents) => {
+      const render = member(ProjectionAlgebraModule, 'ProjectionRenderer', 'renderMessagesWithHostIds')
+      const toWirePart = (p) => {
+        if (p.kind === 'WireText') return new ProviderProj.WirePart(0, [p.text])
+        if (p.kind === 'WireReasoning') return new ProviderProj.WirePart(1, [p.text])
+        if (p.kind === 'WireToolCall') return new ProviderProj.WirePart(2, [p.callId, p.name, p.text])
+        if (p.kind === 'WireToolResult') return new ProviderProj.WirePart(3, [p.callId, p.text])
+        return p
+      }
+      const toWireMsg = (m) => {
+        if (m.Role !== undefined) return m
+        const parts = toList((m.parts || []).map(toWirePart))
+        return new ProviderProj.WireMessage(m.role, parts)
+      }
+      const items = Array.isArray(baseWireMessages) ? baseWireMessages : listItems(baseWireMessages)
+      const encoded = toList(items.map(toWireMsg))
+      const rendered = render(sha256, snapshot, encoded, toList(orderedIntents))
+      const optionString = (id) => {
+        if (isNone(id)) return null
+        // Fable may box Some as value or as union with fields[0].
+        if (typeof id === 'object' && id !== null && 'fields' in id) {
+          const fields = id.fields
+          return Array.isArray(fields) && fields.length > 0 ? fields[0] : null
+        }
+        return id
+      }
+      return {
+        messages: wireViewOf(rendered.Messages),
+        hostMessageIds: listItems(rendered.HostMessageIds).map(optionString),
+        hostIsPhysical: listItems(rendered.HostIsPhysical),
+      }
     },
 
     renderedOf: renderOf,
