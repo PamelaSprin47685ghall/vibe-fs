@@ -17,8 +17,10 @@ module ManagerLifecycleGate =
         |> Option.exists (fun authority ->
             authority.PendingClaims
             |> Map.exists (fun _ claim ->
-                claim.Origin = PromptAuthority.PromptOrigin.Continuation
-                                   PromptAuthority.ContinuationKind.ManagerWorkActivation))
+                match claim.Origin with
+                | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ManagerWorkActivation ->
+                    true
+                | _ -> false))
 
     /// GLORY-018: every condition for sending the Activation continuation.
     ///
