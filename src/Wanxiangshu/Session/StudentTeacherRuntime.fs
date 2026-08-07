@@ -268,9 +268,7 @@ type StudentTeacherRuntime
             | None -> return Error "teacher rejected: no active Student run"
             | Some cell ->
                 let waiter =
-                    TaskCompletionSource<Result<string, string>>(
-                        TaskCreationOptions.RunContinuationsAsynchronously
-                    )
+                    TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
                 let stateOk, pendingOpt =
                     lock gate (fun () ->
@@ -291,14 +289,17 @@ type StudentTeacherRuntime
                         lock gate (fun () ->
                             cell.Waiter <- None
                             cell.State <- StudentTeacher.RunState.LearnReady)
+
                         return Error error
                     | Ok qaPath ->
                         match! satellites.Ensure(cell.SessionId, teacherSpec cell) with
                         | Error error ->
                             satellites.Invalidate(cell.SessionId, SatelliteKind.Teacher)
+
                             lock gate (fun () ->
                                 cell.Waiter <- None
                                 cell.State <- StudentTeacher.RunState.LearnReady)
+
                             return Error error
                         | Ok lease ->
                             lock gate (fun () ->
