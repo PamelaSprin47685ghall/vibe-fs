@@ -53,8 +53,6 @@ type ToolRuntimeScope
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
 
-    member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
-
     let registerChild parentSid (_role: Role) childId =
         sessionParents.[SessionId.value childId] <- parentSid
 
@@ -185,6 +183,7 @@ type ToolRuntimeScope
         |> Option.bind activeProfileFor
         |> Option.bind (fun profile -> ManagedAgent.tryParse profile.SelectedAgent)
 
+    member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
     member _.Sessions = sessions
     member _.Journal = journal
     member _.Snapshot = snapshot

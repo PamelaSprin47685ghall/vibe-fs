@@ -1149,7 +1149,19 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
 })
 
 test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    // The fixture git-inits but never commits (process-host-utils.js:111-112
+    // commits `git add -A` + `git commit --allow-empty -m init`); a missing HEAD
+    // makes GitTree.dirtyPayload throw on `git diff HEAD`, so FinalityTool's
+    // treeOf returns None and the suicide is rejected by the pre-condition gate
+    // before the hidden Reviewer ever forks. An initial commit routes this
+    // scenario past that gate into FinalityController.start, where the injected
+    // 1ms reviewerTimeoutMs (finalityReviewerTimeoutMs: 1) fires the timeout path.
+    execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: directory })
+    execFileSync('git', ['config', 'user.name', 'test'], { cwd: directory })
+    execFileSync('git', ['add', '-A'], { cwd: directory })
+    execFileSync('git', ['commit', '--allow-empty', '-m', 'init'], { cwd: directory })
+
     acceptAuthorityRoot(runtime, 'manager-finality-no-terminal', 'fast-manager')
     activateLife(runtime, 'manager-finality-no-terminal')
     const context = {
@@ -1161,7 +1173,7 @@ test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async
 
     const outcome = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
 
-    assert.equal(parseToml(outcome).error, '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n')
+    assert.equal(outcome, '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n')
     assert.ok(runtime.abortedIds.includes('host-child-1'), 'undecided finality must abort and clean the hidden reviewer')
   }, { finalityReviewerTimeoutMs: 1 })
 })

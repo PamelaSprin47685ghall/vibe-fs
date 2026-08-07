@@ -397,11 +397,12 @@ async function runWaitFactRenewsOnDeclaredFactAndCountsPrecisely() {
   const result = await runWatchdogChild(
     `import { appendFileSync } from 'node:fs';\n` +
       `let appended = 0;\n` +
-      `const iv = setInterval(() => {\n` +
-      `  appended += 1;\n` +
-      `  const fact = appended < 6 ? 'CandidateReady' : appended < 8 ? 'Published' : 'UnrelatedProgressFact';\n` +
-      `  appendFileSync(${JSON.stringify(journalFile)}, JSON.stringify({ type: fact, n: appended }) + '\\n');\n` +
-      `}, ${Math.floor(scaledWatchdogMs / 4)});\n` +
+       `const iv = setInterval(() => {\n` +
+       `  appended += 1;\n` +
+       `  const fact = appended < 6 ? 'CandidateReady' : appended < 8 ? 'Published' : 'UnrelatedProgressFact';\n` +
+       `  appendFileSync(${JSON.stringify(journalFile)}, JSON.stringify({ type: fact, n: appended }) + '\\n');\n` +
+       `  if (appended === 7) clearInterval(iv);\n` +
+       `}, ${Math.floor(scaledWatchdogMs / 4)});\n` +
       factBarrierScript(workDir, 'Published', 'gate-wait-fact-renew-on').replace(
         `{ waitFact: { name: ${JSON.stringify('Published')}, eq: 1 }, lane: 'fact-lane' }`,
         `{ waitFact: { name: 'Published', eq: 2, renewOn: ['CandidateReady'] }, lane: 'fact-lane' }`,
@@ -410,10 +411,14 @@ async function runWaitFactRenewsOnDeclaredFactAndCountsPrecisely() {
       `console.log('barrier returned after ' + appended + ' appends');\n`,
     WAIT_FACT_WINDOW_MS,
     budgetEnv,
-  );
-  assertEq(result.code, 0, `renewOn facts must keep the barrier alive: ${result.stderr}`);
-  assertEq(result.stdout.trim(), 'barrier returned after 7 appends', 'eq must wait for the exact target count');
-}
+   );
+   assertEq(result.code, 0, `renewOn facts must keep the barrier alive: ${result.stderr}`);
+   assertEq(result.stdout.trim(), 'barrier returned after 7 appends', 'eq must wait for the exact target count');
+   const facts = readFileSync(journalFile, 'utf8').trim().split('\n').map(JSON.parse);
+   assertEq(facts.filter((fact) => fact.type === 'Published').length, 2, 'eq must stop at two Published facts');
+   assertEq(facts.filter((fact) => fact.type === 'CandidateReady').length, 5, 'CandidateReady must renew before Published');
+   assertEq(facts.length, 7, 'background facts must not advance the target count');
+ }
 
 /** The child body both halves share: the real barrier, a real watchdog, a fake event source. */
 function factBarrierScript(workDir, factName, label) {

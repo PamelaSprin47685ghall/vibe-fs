@@ -404,7 +404,6 @@ module FinalityController =
                                      lastWordsRef
                                      lastWordsDigest
                                      providerRun
-                                     reviewerTimeoutMs
                         | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId, barrier, _tree, record)) ->
                             return!
                                 concludeRejection
