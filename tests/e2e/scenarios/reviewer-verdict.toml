@@ -15,15 +15,16 @@ setup = { strict = true, project = { files = { "review_target.txt" = "review tar
 session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Plan and then finish review_target.txt work with suicide when nothing useful remains." }
 
-must = ["finality-reviewer.1", "reviewer-nudged"]
+must = ["finality-reviewer.0", "reviewer-nudged", "finality-reviewer-challenge.0"]
 
 flow = [
   { wait = "manager.0" },
   { wait = "manager-activation" },
   { wait = "finality-reviewer.0" },
-  { wait = "finality-reviewer.1" },
+  { wait = "reviewer-nudged" },
+  { wait = "finality-reviewer-challenge.0" },
   { waitFact = { name = "ReviewVerdictRecorded", eq = 2 } },
-  { wait = "finality-reviewer.2" },
+  { wait = "finality-reviewer-challenge.1" },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { custom = "oracle" },
 
@@ -80,7 +81,13 @@ user = "# Review the current worktree against all authoritative user requirement
 tools = ["verdict"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "text", text = "The worktree appears correct." }
+
+[[turn]]
+id = "finality-reviewer-challenge"
+internal = true
+user = "# Nope, let's re-evaluate:"
+tools = ["verdict"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
@@ -115,7 +122,7 @@ tools = ["read", "glob", "grep", "verdict"]
 [[turn]]
 id = "reviewer-nudged"
 internal = true
-user = ["# Submit a structured verdict with the verdict tool: PERFECT or REVISE.", "# Do not put a verdict in prose."]
+user = ["# Your previous response did not submit a verdict.", "# Continue the review and submit PERFECT or REVISE with the verdict tool."]
 tools = ["verdict"]
 
   [[turn.step]]

@@ -62,6 +62,45 @@ module FinalityController =
                 | AgentAbandoned(_, reason) -> return Error reason
         }
 
+    let private continueReviewer
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        (prompt: string)
+        =
+        task {
+            let completed = TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            use subscription =
+                scope.Sessions.SubscribeTerminal(reviewerSessionId, fun _ outcome ->
+                    completed.TrySetResult outcome |> ignore)
+
+            let kind =
+                if prompt = ReviewChallenge.Prompt then
+                    PromptAuthority.ContinuationKind.ReviewConfirmation
+                else
+                    PromptAuthority.ContinuationKind.ReviewerGuard
+
+            let! sent =
+                HostSessionNudge.sendContinuation
+                    scope.Sessions
+                    reviewerSessionId
+                    prompt
+                    kind
+                    (scope.DirectoryFor(SessionId.value reviewerSessionId))
+                    (Some journal)
+
+            match sent with
+            | Error error -> return Error error
+            | Ok _ ->
+                let! outcome = completed.Task
+
+                match outcome with
+                | TerminalOutcome.Completed _ -> return Ok()
+                | TerminalOutcome.Failed error -> return Error error
+                | TerminalOutcome.Aborted reason -> return Error reason
+        }
+
     /// GLORY-058/059: re-read the tree and require byte equality with the
     /// request's tree before any confirmation lands.
     let private treeUnchanged (scope: ToolRuntimeScope) (managerSessionId: SessionId) (expected: GitTreeHash) =
@@ -371,21 +410,7 @@ module FinalityController =
                                 (Some journal)
                                 (fun () -> Task.FromResult(Ok reviewerSessionId))
                                 (fun () -> awaitReviewer reviewerTimeoutMs runtime reviewerAgentId)
-                                (fun () ->
-                                    task {
-                                        match!
-                                            runtime.Fork(
-                                                reviewerAgentId,
-                                                Role.Reviewer,
-                                                reviewerAgentName,
-                                                ReviewChallenge.Prompt,
-                                                None,
-                                                firstPrompt = false
-                                            )
-                                        with
-                                        | Error error -> return Error(sprintf "%A" error)
-                                        | Ok _ -> return Ok()
-                                    })
+                                (continueReviewer scope journal reviewerSessionId)
                                 managerSessionId
                                 barrierId
                                 requestTree

@@ -1,7 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
@@ -87,17 +86,6 @@ module VerdictTool =
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let diagLine =
-                sprintf
-                    "verdict-exec reviewer=%s role=%A run=%s"
-                    context.SessionId
-                    (scope.RoleFor context)
-                    (match context.ProviderRunId with
-                     | Some run -> ProviderRunIdentity.value run
-                     | None -> "-")
-
-            emitJsExpr diagLine "require('node:fs').appendFileSync('/tmp/verdict-diag.log', $0 + '\\n')"
-
             let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
 
             let validated =

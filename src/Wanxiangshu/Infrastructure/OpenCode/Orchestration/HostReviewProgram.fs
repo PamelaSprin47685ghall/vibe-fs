@@ -73,7 +73,7 @@ module HostReviewProgram =
         (journal: AgentJournal option)
         (forkReviewer: unit -> Task<Result<SessionId, string>>)
         (awaitReviewer: unit -> Task<Result<unit, string>>)
-        (nudgeReviewer: unit -> Task<Result<unit, string>>)
+        (continueReviewer: string -> Task<Result<unit, string>>)
         (managerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (tree: GitTreeHash)
@@ -90,22 +90,19 @@ module HostReviewProgram =
                     | Ok() ->
                         match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
                         | Ok outcome -> return Ok outcome
-                        | Error(HostReviewFailure.ConfirmationUnproven) ->
-                            // First PERFECT: nudge the SAME reviewer with the
-                            // skeptical challenge and require a confirmed second
-                            // PERFECT. Re-forking would open a new barrier and
-                            // throw the first PERFECT away.
-                            match! nudgeReviewer () with
+                        | Error HostReviewFailure.ReviewerProducedNoVerdict ->
+                            match! continueReviewer RuntimeNudge.reviewerVerdictGuard with
                             | Error error -> return Error(HostReviewFailure.CannotSendPrompt error)
                             | Ok() ->
-                                match! awaitReviewer () with
-                                | Error error -> return Error(HostReviewFailure.CannotAwaitReviewer error)
-                                | Ok() ->
-                                    match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
-                                    | Ok outcome -> return Ok outcome
-                                    // REVIEW-003 fail closed: the second PERFECT
-                                    // could not be proven causal, so this barrier
-                                    // does not confirm.
-                                    | Error _ -> return Error HostReviewFailure.ConfirmationUnproven
+                                match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
+                                | Ok outcome -> return Ok outcome
+                                | Error failure -> return Error failure
+                        | Error HostReviewFailure.ConfirmationUnproven ->
+                            match! continueReviewer ReviewChallenge.Prompt with
+                            | Error error -> return Error(HostReviewFailure.CannotSendPrompt error)
+                            | Ok() ->
+                                match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
+                                | Ok outcome -> return Ok outcome
+                                | Error _ -> return Error HostReviewFailure.ConfirmationUnproven
                         | Error failure -> return Error failure
         }
