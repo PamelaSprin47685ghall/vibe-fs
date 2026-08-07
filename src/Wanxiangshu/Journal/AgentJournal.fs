@@ -142,10 +142,25 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
     /// the fold each had their own idea of what identified an attempt.
     ///
     /// Replaying a duplicate is safe: the fold returns the projection unchanged.
-    member _.AppendAgent
+    member this.AppendAgent
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
+        : Result<ProjectionSet, JournalAppendFailure> =
+        this.AppendEnvelope stream providerRun (Fact.Agent fact)
+
+    /// GLORY-010: append one Manager lifecycle fact. Envelope `ProviderRun` is
+    /// `None` — the payload carries its own run identities (FinalityRequested).
+    member this.AppendManagerLifecycle
+        (stream: StreamId)
+        (fact: ManagerLifecycleFact)
+        : Result<ProjectionSet, JournalAppendFailure> =
+        this.AppendEnvelope stream None (Fact.ManagerLifecycle fact)
+
+    member private _.AppendEnvelope
+        (stream: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: Fact)
         : Result<ProjectionSet, JournalAppendFailure> =
         let mutable notify: (TaskCompletionSource<JournalChange> * JournalChange) list = []
 
@@ -154,7 +169,7 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
                 match rejected with
                 | Some(eventId, rejection) -> Error(FactRejected(eventId, rejection))
                 | None ->
-                    match writer.Append stream providerRun (Fact.Agent fact) with
+                    match writer.Append stream providerRun fact with
                     | CommitUnknown(eventId, failure) -> Error(WriteUnknown(eventId, failure))
                     | Committed envelope ->
                         match Fold.foldEnvelope projection envelope with
@@ -253,6 +268,14 @@ module AgentJournal =
         (journal: AgentJournal)
         : Result<ProjectionSet, JournalAppendFailure> =
         journal.AppendAgent stream providerRun fact
+
+    /// GLORY-010: append one Manager lifecycle fact.
+    let appendManagerLifecycle
+        (stream: StreamId)
+        (fact: ManagerLifecycleFact)
+        (journal: AgentJournal)
+        : Result<ProjectionSet, JournalAppendFailure> =
+        journal.AppendManagerLifecycle stream fact
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
 

@@ -935,6 +935,38 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
+        | ManagerLifecycle fact ->
+            // GLORY-010: lifecycle facts fold onto the session's lifecycle
+            // projection. Replays are idempotent inside the projection fold;
+            // every rejection names a line no correct writer produces (fatal).
+            let sessionId =
+                match fact with
+                | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
+                | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityReviewStarted payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityConfirmed payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
+                | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
+
+            AgentProjection.tryUpdate
+                sessionId
+                (fun session ->
+                    let current =
+                        session.ManagerLife |> Option.defaultValue ManagerLifecycleProjection.empty
+
+                    ManagerLifecycleProjection.fold current fact
+                    |> Result.map (fun updated ->
+                        { session with
+                            ManagerLife = Some updated }))
+                projection.AgentProjections
+            |> Result.map (fun agents ->
+                { projection with
+                    AgentProjections = agents })
+            |> Result.mapError (fun _ ->
+                { Fact = "ManagerLifecycle"
+                  Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
 
     /// Fold a journal. PERSIST-004: the first impossible line stops the fold and
     /// reports which fact and why, rather than producing a partially replayed

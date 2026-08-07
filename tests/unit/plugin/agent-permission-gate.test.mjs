@@ -94,13 +94,13 @@ const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agen
 
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog']
+  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog', 'suicide']
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
 // AGENT-006 matrix (tool names as they reach the Host permission schema).
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'list'],
+  Manager: ['fork', 'join', 'list', 'suicide'],
   Orchestrator: ['fork-manager', 'join'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm'],
   Inspector: ['read', 'glob', 'grep', 'executor'],
@@ -229,6 +229,7 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       network: 'Network',
       verdict: 'Verdict',
       blog: 'Blog',
+      suicide: 'Finality',
     })[toolName]
   for (const role of ROLES) {
     const fromRoles = roles.permissions(roles.of(role))

@@ -87,6 +87,15 @@ try {
     scenario.watchdog?.advance({ reason: 'blog-entry-wait', lane: 'manager-blogger', blocking: true });
   }
   assert.ok(runtimeFacts('BlogEntryCommitted').length >= 1, 'manager blogger must commit at least one BlogEntry');
+
+  // The Activation continuation is composed by the reconcile pass after the
+  // planning terminal settles; the provider request for the activation turn
+  // lands a beat later. Wait for the declared must turns to be answered
+  // (internal turns are excluded from `unanswered`, so poll `unmetMust`).
+  while (Date.now() < deadline && runtime.unmetMust().length > 0) {
+    await new Promise((r) => setTimeout(r, 50));
+    scenario.watchdog?.advance({ reason: 'must-wait', lane: 'manager', blocking: true });
+  }
   assert.deepEqual(runtime.unanswered().map((entry) => entry.id), [], 'all non-internal scenario steps must complete');
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
 

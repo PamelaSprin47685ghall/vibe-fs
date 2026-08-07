@@ -82,11 +82,6 @@ type ToolRuntimeScope
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
-            // REVIEW-007: this runtime is a Manager's own fork surface, so a
-            // Reviewer it forks gets its barrier opened here (see
-            // `HostForkAgent.Fork`). The Orchestrator's runtime keeps this
-            // off; ORCH-006 opens barriers at the reverify site.
-            managerOpensReviewBarrier = true,
             treeHashFor =
                 (fun agentId ->
                     // 主会话（无父）的目录从未经 RegisterChildDirectory 注册——
@@ -187,6 +182,9 @@ type ToolRuntimeScope
     member _.Snapshot = snapshot
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
+    /// GLORY-003: the run-started callback wired by the plugin bootstrap, exposed
+    /// so the Finality workflow's hidden Reviewer binds the same reconciler.
+    member _.RunStarted = onStarted
     // REVIEW-010/HOST-012: deferred seal candidates, shared across instances.
     member _.PendingReviewSeals = SharedState.PendingReviewSeals
 

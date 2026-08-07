@@ -48,6 +48,7 @@
  */
 
 import { walk } from '../../../scripts/lib/walk.mjs';
+import { availableParallelism } from 'node:os';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -103,10 +104,14 @@ export const CANARY_TESTS = readCanaryTests();
  * masking with longer windows: failure then depends on machine load rather than on logic, and slow
  * becomes indistinguishable from dead.
  *
- * Eight is the declared pressure. A scenario that cannot report causal progress inside the fixed
- * silence window is missing an event; reducing concurrency would only hide that missing edge.
- * `MAX_PARALLEL_CANARIES` still overrides for a machine that can take more.
+ * Each canary runs at least an OpenCode Host process plus its scenario/mock-provider process, so one
+ * slot consumes two available processors. The default is `floor(os.availableParallelism() / 2)`,
+ * respecting CPU affinity and cgroup limits, with a minimum of one and capped by the number of
+ * scenarios. `MAX_PARALLEL_CANARIES` remains the explicit override for machine-specific calibration.
  *
  * It lives here and not in `time-budget.js` because it is not a duration.
  */
-export const CANARY_MAX_PARALLEL = 8;
+export const CANARY_MAX_PARALLEL = Math.min(
+  Math.max(1, Math.floor(availableParallelism() / 2)),
+  CANARY_TESTS.length,
+);

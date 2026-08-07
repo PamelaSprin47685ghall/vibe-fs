@@ -41,6 +41,27 @@ module TerminalPolicy =
     let isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
         (tryLinkedChild journal sessionKey).IsSome
 
+    /// ORCH-003: true when the session's registered parent is an Orchestrator
+    /// session (its own canonical role is Orchestrator). Only that parent
+    /// suppresses the top-level Manager guard; a HumanRoot-forked Manager stays
+    /// top-level and keeps its guard.
+    let private parentedByOrchestrator
+        (projection: AgentProjectionSet)
+        (sessionParents: Dictionary<string, string>)
+        (sessionKey: string)
+        =
+        match sessionParents.TryGetValue sessionKey with
+        | true, parentId ->
+            Map.tryFind (SessionId.create parentId) projection.Sessions
+            |> Option.bind (fun parent -> parent.PromptAuthority)
+            |> Option.bind (fun authority ->
+                match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
+                | Some run, _ -> Some run.CanonicalRole
+                | None, Some profile -> Some profile.CanonicalRole
+                | None, None -> None)
+            |> Option.exists (fun role -> role = Role.Orchestrator)
+        | false, _ -> false
+
     /// Fork child whose handle is CompletedAwaitingJoin or Retired: Blogger must
     /// not Start/Offer. Human root (no handle) → false.
     let mainSealedForBlogger (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
@@ -66,7 +87,19 @@ module TerminalPolicy =
                 match session.PromptAuthority with
                 | Some authority ->
                     match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
-                    | Some run, _ -> run.CanonicalRole = Role.Manager
+                    | Some run, _ ->
+                        // ORCH-003: a Manager forked by an Orchestrator (AgentOwnerRoot)
+                        // is a job worker, not a top-level Manager — its review is the
+                        // Orchestrator's barrier (ORCH-006), never the top-level guard.
+                        // `CanonicalRole` alone is not enough: the forked Manager
+                        // carries the Manager role on purpose, and parent linkage
+                        // alone is not enough either (the HumanRoot's forked Manager
+                        // is linked too and must keep its guard). The discriminator
+                        // is the parent's own role: an Orchestrator parent means the
+                        // guard does not apply (measured: the guard deferred the
+                        // completion forever and the barrier review never started).
+                        run.CanonicalRole = Role.Manager
+                        && not (parentedByOrchestrator projection.AgentProjections sessionParents sessionKey)
                     | None, Some profile -> profile.CanonicalRole = Role.Manager
                     | None, None ->
                         not (sessionParents.ContainsKey sessionKey)

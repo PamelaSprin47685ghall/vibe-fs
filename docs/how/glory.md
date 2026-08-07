@@ -1,0 +1,93 @@
+# Glory：目标实现与算法（how 层）
+
+条款正文见 `docs/what/glory.md`；本文件描述实现切片的算法与触发点。实现差距跟踪见 `docs/status/glory.md`。
+
+## 事实与投影
+
+`ManagerLifecycleFact` 作为 `Fact.ManagerLifecycle` case 进入 journal（GLORY-010）。`Fold.foldAgentFact` 为 `AgentFact` 穷尽 match，新增 case 由编译器强制注册；`SessionAgentProjection` 增加 `ManagerLife: ManagerLifeProjection option`，由 `Journal/ManagerLifecycleProjection.fs` 折叠（GLORY-011）。`Identity.fs` 新增 `ManagerLifeId`、`FinalityRequestId` 包装类型。
+
+## Slice A：Lifecycle 与 Birth
+
+1. `ManagerNarrativeTransform` 挂在 SpikePlugin transform 链的 `XTraceCapture.captureProjection` 之后、`ReviewSeal` 之前（GLORY-013 顺序）。它读取最后一条 user 消息：
+   - 若该消息是合法 HumanRoot（无 PromptKey、非 compaction、非 retry，GLORY-012）且 session 是 Manager（从 journal Authority Root 的 CanonicalRole 判定）；
+   - 且当前无未完成 Life（`ManagerLife` 投影为 None）或上一 Life 已 `LifeCompleted` → 打开新 Life：
+     - 写 Opening blob（用户原始文本）→ append `LifeOpened`（openingCursor = 该消息在 XTrace 中的首个 part cursor）；
+     - 改写 provider-facing 消息：无前 Life 用 `FirstBirth`（`[X]\n\n` + PlanningTail），有已完成的 Life 用 `Reawakening`（ReawakeningPrefix + `\n\n` + `[X]\n\n` + PlanningTail）；
+     - 幂等：改写 identity 记录在内存 `Dictionary<(sessionId, lifeId, messageId), source>`，重复 transform 不重复注入（GLORY-015）。
+2. durable Opening 永远是原始 `[X]`：captureProjection 先于改写运行，XTrace 不含 synthetic tail（GLORY-013/014）。
+
+## Slice B：Activation 与 X floor
+
+1. `PromptAuthority.ContinuationKind.ManagerWorkActivation` + `ManagerLifecyclePrompt.WorkActivation` 冻结文本（GLORY-019/020）。
+2. `TurnCompletionProgram.applyWithContinuation` 的 `TurnCompleted` 分支新增 Manager 规划分支：role=Manager、Life 已 LifeOpened、未 WorkActivated、无 pending activation claim（读 `PromptAuthority.PendingClaims`）、terminal 有合法正式文本（`CompletedTurnClassifier.partsText` 非空）、session 未被中断 → 发送 `ManagerWorkActivation` continuation（`HostSessionNudge.sendContinuationResult`，Detached）并 deferred completion（不 NotifyTerminal、不 captureTerminal）。其余 terminal 类型（TurnFailed/TurnAborted/TurnNeedsContinuation/empty）不触发（GLORY-018）。
+3. `WorkActivated` 写在 Activation 消息 physical acceptance 之后：transform 中检查 `PromptAuthority.AcceptedContinuationIds` 含 `ManagerWorkActivation` 且投影无 `WorkActivated` → append `WorkActivated (lifeId, activationPromptKey, protectedPrefixEnd = XTraceProjection.headSequence + 1)`（Activation 消息的 XTrace 末端之后，GLORY-021）。幂等：已有 WorkActivated 则跳过。
+4. Blogger floor（GLORY-023/024）：`BloggerCoordinator.nextMainContext` 中 `effectiveStartSeq = max blog.Coverage.IngestedThroughSequence life.ProtectedPrefixEnd.Sequence`，用它替代 `semanticCursorFor(IngestedThroughSequence)` 的输入；`CompanionTransform.hasMaterial` 预过滤同步（切片 G 前，无 Life 的 Manager 保持现状）。
+5. `XTraceCapture.lifecycleWorkRecord` 增加 Manager 变体：当 session 是 Manager 且有 Life 时，按 `# Opening task / # Birth record / # Work log / # Uncompressed tail / # Final output` 渲染（GLORY-025），Birth 部分逐字渲染 `Life Opening cursor → ProtectedPrefixEnd` 的 XTrace（GLORY-022）。
+
+## Slice C：工具与角色边界
+
+1. `Roles.fs`：新增 `ToolPermission.Finality`；Manager permissions 加 `Finality`（GLORY-036）。
+2. `ToolRegistry.rolePredicate` 加 `"suicide" -> fun r -> r = Role.Manager`；`baseSpecs` 加 `FinalityTool.spec factory runtime`。
+3. `FinalityTool.execute`（GLORY-034/035/037-041）：
+   - 前置条件 1-16 按序检查，失败返回 GLORY-038/039 或对应拒绝文本（禁止泄漏内部细节）；
+   - 合法受理：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → `scope.MarkVerdictSubmitted`-式停靠（deferred completion 由 TurnCompletionProgram 的 FinalityRequested gate 保证）→ fire-and-forget 启动 `HostReviewProgram` 流程；
+   - tool result：`# Your final words have been received.`（golden fixture 6）。
+4. `ForkTool.executeManager`：解析 `agent` 为 `Role.Reviewer` 时（读 durable/canonical role，GLORY-031）返回 `That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.`；`ToolRuntimeScope.RuntimeFor` 创建 `HostForkRuntime` 时 `managerOpensReviewBarrier` 置 false（GLORY-033），`HostForkAgent.fork` 的 `ManagerOpensReviewBarrier && role = Role.Reviewer` 分支随之成为死代码，删除。
+5. 自动 Reviewer 隐藏：HostReviewProgram 使用独立 `HostForkRuntime`（同 OrchestratorHost 模式，不注册进 Manager 的 `Children`），其 completion 不进 Manager `join`/`list`（GLORY-002）。
+
+## Slice D：HostReviewProgram
+
+从 `OrchestratorHostReview.reverify` 提炼 `module HostReviewProgram`（GLORY-042/043/044）：
+
+```fsharp
+let reverify
+    (journal: AgentJournal option)
+    (forkReviewer: unit -> Task<Result<SessionId, string>>)   // 已含 agent 名与首次 prompt
+    (awaitReviewer: unit -> Task<Result<unit, string>>)
+    (nudgeReviewer: unit -> Task<Result<unit, string>>)       // ReviewChallenge.Prompt
+    (managerSessionId: SessionId)
+    (barrierId: ReviewBarrierId)
+    (tree: GitTreeHash)
+    : Task<Result<HostReviewOutcome, HostReviewFailure>>
+```
+
+- 流程：fork → `HostReviewGuard.openBarrier` → await → `OrchestratorReviewRead.read` → Confirmed=Ok(Confirmed) / RevisionRequired=Ok(RevisionRequired workRecord) / PendingConfirmation → nudge → 再读 → 非 Confirmed fail closed（`ConfirmationUnproven`）。
+- `RevisionRequired` 的 workRecord 由 `XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false |> Option.defaultValue ""` 填充；为空时 `WorkRecordUnavailable`（GLORY-051 的空记录不得伪装成 wounds）。
+- `OrchestratorHost` 与 `OrchestratorHostReview` 改为调用该通用程序；Orchestrator 的 Error 映射保持 `NeedsReview`（GLORY-044）。
+
+## Slice E：失败反馈
+
+1. `FinalityRejected` 流程（受理后由 HostReviewProgram 驱动）：`RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected` → 发送 `FinalityRejected` continuation（`FinalityPrompt.rejected`，SyntheticToml.document 渲染，GLORY-052/053）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ 清理 Reviewer session（`scope.DisposeSession`）。
+2. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
+3. 基础设施失败（GLORY-056/057）：按序尝试恢复；无法恢复时发送 `ManagerLifecyclePrompt.FinalityUndecidable` 并关闭 request，不伪造 work record。
+
+## Slice F：Glory
+
+1. `Confirmed` 后（GLORY-059/060）：重读 tree → 与 `FinalityRequested.GitTreeHash` 比较；不等 → 本次成功失效（fail closed 路径）。
+2. 相等 → append `FinalityConfirmed` → append `LifeCompleted`（terminalRef/Digest = last_words blob）→ `XTraceCapture` 式注册 last_words 为 terminal（`TerminalOutputCaptured`）→ `eventPort.NotifyTerminal managerSessionId (Completed { TerminalText = last_words; Role = Manager; ... })` → 完成 handle（Manager handle/ManagerJob 的 join 正常返回）→ 清理 Reviewer。
+3. 幂等：`LifeCompleted` 已存在则不再重复（GLORY-062 之后不再唤醒 Manager）。
+4. Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路径感知；GLORY-068 规定新任务创建新 job。
+
+## Slice G：Reawakening
+
+1. `ManagerLifeProjection` 保存 `Lives: ManagerLifeProjection list`（每 Life 的 opening cursor / protectedPrefixEnd / completed cursor）。
+2. `LifeCompleted` 后首个新 HumanRoot：打开新 Life（新 `ManagerLifeId`、新 Opening、无 WorkActivated、无 FinalityRequest），改写用 `Reawakening`（GLORY-063/064/065）。
+3. 当前 Life 工作中用户消息不改写（GLORY-007/026）；XTrace 不清空（GLORY-066）。
+
+## 迁移（GLORY-069/070/071）
+
+启动/transform 检测 Manager session 已有 Opening 但无 Life → 写 migration `LifeOpened`（用现有 Opening 数据）+ `WorkActivated`（ProtectedPrefixEnd = 当前安全 cursor = XTrace head+1），视为已 Activation；旧 Manager Review Guard 文本替换为 Finality requirement 提示；新 prompt 只对新 session/root/Life 生效。
+
+## Crash Recovery Matrix
+
+恢复只从 durable facts 推导（禁止 NextStep/ResumeAt/Stage 字段）。已实现行：
+
+| journal 状态 | 恢复动作 | 实现 |
+|------|------|------|
+| LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
+| LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + TurnCompletionProgram |
+| FinalityRequested 无 FinalityReviewStarted | FinalityTool「in motion」分支重启同一 request 的 FinalityController | ✅ |
+| REVISE 已存在但无 FinalityRejected | materialize 同一 Reviewer LWR | 🔶 未实现（reviewer 结果在内存，崩溃后需重跑 review；缺口见 status/glory.md） |
+| confirmed witness 存在但无 FinalityConfirmed/LifeCompleted | concludeGlory 幂等（Life 已完成/terminal 已记录则跳过） | ✅ |
+| LifeCompleted 存在但 terminal 未发布 | concludeGlory 幂等重放 | ✅ |
+| XTrace terminal 单槽冲突（第二 Life） | 首个 Life 后跳过 TerminalOutputCaptured（terminal 只记录于 LifeCompleted） | ✅ |

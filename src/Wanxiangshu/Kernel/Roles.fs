@@ -37,12 +37,19 @@ type ToolPermission =
     | Network
     | Verdict
     | Blog
+    /// GLORY-036: the Manager's own end-of-life tool (`suicide`).
+    | Finality
 
 module Roles =
 
     let permissions (role: Role) : ToolPermission Set =
         match role with
-        | Role.Manager -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.List ]
+        | Role.Manager ->
+            set
+                [ ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.List
+                  ToolPermission.Finality ]
         | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join ]
         | Role.Coder ->
             set
@@ -115,8 +122,8 @@ module RoleDefinitions =
     /// domain stub short so Kernel stays free of filesystem I/O.
     let managerPrompt =
         "Manager system prompt SSOT: prompts/manager-system.md\n"
-        + "Tools: fork / join / list only.\n"
-        + "Manager owns verification. Coder edits then stops. DevOps executes. Reviewer verifies."
+        + "Tools: fork / join / list / suicide.\n"
+        + "Manager owns verification. Coder edits then stops. DevOps executes."
 
     /// Full Coder system prompt lives in prompts/coder-system.md and is loaded
     /// into OpenCode AgentConfig.prompt (host system prompt).

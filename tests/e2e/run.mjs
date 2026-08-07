@@ -69,7 +69,7 @@ const canaryProcessTimeoutMs = parsePositiveInt(process.env.CANARY_TIMEOUT_MS, C
 // ladder's per-stage budgets only mean something under a bound.
 const MAX_PARALLEL = parsePositiveInt(
   process.env.MAX_PARALLEL_CANARIES,
-  Math.min(CANARY_MAX_PARALLEL, CANARY_TESTS.length),
+  CANARY_MAX_PARALLEL,
   "MAX_PARALLEL_CANARIES",
 );
 const activeCanaryPids = new Set();

@@ -50,9 +50,6 @@ flow = [
   { wait = "coder.1" },
   { wait = "manager.1" },
   { wait = "manager.2" },
-  { wait = "manager-guard.0" },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
   { wait = "barrier-reviewer.0" },
   { wait = "barrier-reviewer.1" },
   # The guard round's challenge answer (`reviewer-confirm.0`) is NOT awaited
@@ -76,12 +73,9 @@ flow = [
   # the restart-phase criterion — the conflict-resume wait below is deliberately
   # absent so a resolved-before-crash run is not held to a resume that never fires.
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
   { wait = "barrier-reviewer.0" },
   { wait = "barrier-reviewer.1" },
   { wait = "barrier-reviewer.2" },
-  { wait = "reviewer-confirm.0" },
   { wait = "orch-continue.0" },
   { waitFact = { name = "Published", eq = 1 }, timeoutMs = 20000 },
   { wait = "orch-continue.1" },
@@ -151,7 +145,7 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-guard"
 internal = true
-user = "# Review is required before completion."
+user = "# Your work is not yet complete."
 tools = ["fork", "join", "list"]
 
   [[turn.step]]
@@ -194,20 +188,8 @@ tools = ["write"]
   respond = { type = "text", text = "Coder finished." }
 
 [[turn]]
-id = "reviewer"
-lane = "fast-reviewer"
-user = "# Review the current worktree for correctness"
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer intermediate text after verdict tool." }
-
-[[turn]]
 id = "barrier-reviewer"
-lane = "deep-reviewer"
+internal = true
 user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
 tools = ["glob", "grep", "inspector", "read", "verdict"]
 

@@ -120,7 +120,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         lock lockObj (fun () ->
             match arming with
             | RecoveryArming.Armed tcs ->
-                tcs.TrySetCanceled() |> ignore
+                AsyncSupport.trySetCanceled tcs |> ignore
                 arming <- RecoveryArming.NotArmed
             | RecoveryArming.NotArmed -> ())
 

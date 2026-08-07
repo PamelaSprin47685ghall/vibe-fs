@@ -1,70 +1,64 @@
-# HOST-004/EXEC-009: a Host restart mid-run must reconcile from the journal, and a
-# restored child must still carry the tools its agent declares. The proof is that after
-# the restart the Manager can nudge the SAME coder child and get a reply.
-#
-# ── two files became one ────────────────────────────────────────────────────
-#
-# The JSON form kept the post-restart edges in `host-restart-after.json` and swapped them
-# in mid-run with `loadScripts`. §8 retires that: a scenario is one static file, and a
-# restart does not change what the model would say. The old split also hid the real
-# claim — that the restored session answers edges declared BEFORE the restart, which is
-# only meaningful if they were all declared up front.
-#
-# The `after` file also carried a second scenario name ("host-restart") with no setup,
-# session or flow — a fragment that could not load on its own and had no way to say so.
+# HOST-004/EXEC-009 + GLORY: a Host restart mid-run must reconcile from the
+# journal, and a restored child must still carry the tools its agent declares.
+# The Manager Life is born (GLORY-014), planned, activated (GLORY-018/020), and
+# finished via suicide → Host-owned Reviewer → confirmed (GLORY-060). The
+# restart fires after the Activation continuation lands; the restored Manager
+# nudges the SAME coder child (child-a1) and gets a reply (child-a2).
 
 scenario = "host-restart"
-description = "HOST-004 restart reconcile; a restored child retains its coder tools and answers a nudge"
+description = "HOST-004 restart reconcile; restored Manager Life continues; restored child retains coder tools"
 pass = "Host restart reconcile canary passed: restored child retained coder tools across restart."
 
 setup = { strict = true, project = { files = { "AGENTS.md" = "host restart canary\n" } } }
 session = { agent = "fast-manager", bind = ["parent-title", "fast-manager"] }
-prompt = { agent = "fast-manager", text = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews." }
+prompt = { agent = "fast-manager", text = "Fork a coder to write host_restart_proof.txt, join, then finish with suicide when nothing useful remains." }
 
-must = ["guard-nudged.2", "reviewer.1", "manager-after-restart.1", "child-a2"]
+must = ["manager.0", "manager-activation", "finality-reviewer.1", "manager-after-restart.1", "child-a2"]
 
 flow = [
-  { afterExpectation = { id = "guard-nudged.2", restart = true } },
-
   { wait = "title" },
   { wait = "manager.0" },
   { wait = "child-a1" },
-  { wait = "manager.2" },
-  { wait = "guard-nudged.0" },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
-  { wait = "guard-nudged.1" },
-  { wait = "guard-nudged.2" },
+  { wait = "manager-activation" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { restart = true },
 
-  { awaitRestart = true },
-
-  # The nudge is a fresh user message, so it opens a new turn in the same lane. Nothing
-  # is loaded here — the turn below was declared before the Host ever started.
+  # The restart is a fresh process reconciling the journal: the activation was
+  # accepted, the Life is active, the coder child is restored with its tools.
   { prompt = { agent = "fast-manager", text = "Nudge the coder child for child-a2." } },
   { wait = "manager-after-restart.0", timeoutMs = 15000 },
   { wait = "child-a2", timeoutMs = 15000 },
   { wait = "manager-after-restart.1", timeoutMs = 15000 },
+  { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
+  { wait = "finality-reviewer.0" },
+  { wait = "finality-reviewer.1" },
+  { wait = "finality-reviewer.2" },
 
   # EXEC-009 layer-4: durable completion blob + retire must exist after join across restart.
-  # CompletionRef is a field on HandleCompleted (not a fact name); HandleCompleted +
-  # HandleRetired are the durable facts join consumption leaves behind.
   { assertFacts = { name = "HandleCompleted", gte = 1 } },
   { assertFacts = { name = "HandleRetired", gte = 1 } },
 
   { awaitTerminal = true, requireAssistantTerminal = true },
+  { waitFact = { name = "ReviewVerdictRecorded", gte = 2 } },
   { expectSatisfied = true },
 ]
 
-# Six provider steps, ONE user message. The JSON form wrote these as six edges at
-# `lane.turn = 1..6` — a hand-maintained ordinal whose only distinguishing `match` was
-# `requiredTools`, identical on all six. Each tool call and its result append assistant
-# messages, so `step` counts them and the numbering becomes a property of the request.
+[[turn]]
+id = "title"
+lane = "parent-title"
+kind = "title"
+user = "Fork a coder to write host_restart_proof.txt, join, then finish with suicide when nothing useful remains."
 
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+# Planning turn: full tool surface (GLORY-016); fork + join + formal text is a
+# legal planning terminal → exactly one Activation continuation (GLORY-018).
 [[turn]]
 id = "manager"
 lane = "fast-manager"
-user = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews."
-tools = ["fork", "join", "list"]
+user = "Fork a coder to write host_restart_proof.txt, join, then finish with suicide when nothing useful remains."
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write host_restart_proof.txt with OK." } }
@@ -73,75 +67,7 @@ tools = ["fork", "join", "list"]
   respond = { type = "tool-call", tool = "join" }
 
   [[turn.step]]
-  respond = { type = "text", text = "Coder joined." }
-
-# The manager's turn ends here: a text answer to the join result is terminal
-# (`CompletedTurnClassifier`), so production never continues to a step 3 in
-# THIS turn. The REVIEW-007 guard then nudges the manager with
-# production-composed text (guard-nudged below), and the manager answers THAT
-# new user message by forking the reviewer — the review flow lives there.
-
-# The restart fires after the guard-nudged review flow completes (`afterExpectation`
-# above), so everything below is answered by a reconciled Host reading the journal
-# rather than in-memory state.
-
-# REVIEW-003: two PERFECT verdicts from two different ProviderRunIdentity, the second
-# proving from its input seal that it consumed the first's challenge. The JSON form used
-# `aliases` plus `reusable` on ONE edge — a single declaration pretending to be two runs,
-# which is exactly what REVIEW-003 says it may not be.
-#
-# ── which shape the challenge takes, and why the old form could not say ──────
-#
-# Production has two paths for delivering `ReviewChallenge.Text`:
-#
-#   `VerdictTool.fs:64`        returns it as the verdict TOOL RESULT — same user
-#                              message, so `step` advances within this turn
-#   `HostReviewGuard.fs:189`   sends it as a guard nudge — a NEW user message, so a
-#                              new turn whose text is the challenge
-#
-# The old edge matched `userRegex = "Nope, let's re-evaluate:"`, a substring predicate
-# over the conversation. The challenge text is present either way, so that predicate
-# matched BOTH shapes and the scenario never said which production path fired.
-#
-# It is the tool-result path. `reviewer-verdict.json` measured the same production code
-# with `afterToolResult: true` — the last user message unchanged after the verdict result
-# came back. So these are three steps of one turn, and the nudge path (which exists for
-# when the Host goes idle instead of continuing) is not what this scenario exercises.
-
-[[turn]]
-id = "reviewer"
-lane = "fast-reviewer"
-user = "# Review and PERFECT twice."
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  # Step 1: the challenge arrived as the tool result and is already part of the semantic
-  # prefix, so the step count says "after the tool result" without a predicate for it.
-  # That is what the retired `afterToolResult` flag was expressing one layer less directly.
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
-
-# The challenge may also arrive as a guard NUDGE — a NEW user message composed by
-# production (`HostReviewGuard.requestPerfectConfirmation`, REVIEW-003) when the Host
-# goes idle instead of continuing. `reviewer-challenge` below covers that fallback
-# (production-composed, internal).
-
-[[turn]]
-id = "reviewer-challenge"
-internal = true
-user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+  respond = { type = "text", text = "Coder joined; plan: verify the file, then seek my end when nothing useful remains." }
 
 [[turn]]
 id = "child-a1"
@@ -152,22 +78,63 @@ user = [
 ]
 
   [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "host_restart_proof.txt", content = "OK\n" } }
+
+  [[turn.step]]
   respond = { type = "text", text = "child-a1 done." }
 
-# The claim of the whole scenario: this turn is answered AFTER the restart, by a child the
-# reconcile restored, and it still has coder tools. Declared here, before the Host starts.
+# GLORY-018/020: the planning terminal is answered with the Activation
+# continuation. Production-composed → internal.
+[[turn]]
+id = "manager-activation"
+internal = true
+user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
+tools = ["fork", "join", "list", "suicide"]
 
+  [[turn.step]]
+  respond = { type = "text", text = "Activation acknowledged; working." }
+
+# After the restart: the restored Manager nudges the restored coder child
+# (child-a1's session) for a second write, then finishes via suicide.
 [[turn]]
 id = "manager-after-restart"
 lane = "fast-manager"
 user = "Nudge the coder child for child-a2."
-tools = ["fork", "join", "list"]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Report child-a2." } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Finished after restart." }
+  respond = { type = "tool-call", tool = "join" }
+
+  # GLORY-038: a child's completion event may land after the first join returns;
+  # a second join collects it so the ending's outstanding-work check is clean.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "host_restart_proof.txt written and verified." } }
+
+  # GLORY-041: the accepted suicide's tool result is the last thing the Manager
+  # sees; the Host still runs one more provider step for the tool round.
+  [[turn.step]]
+  respond = { type = "text", text = "Manager after restart ended." }
+
+# EXEC-016: the Manager's ending is deferred while background work is outstanding;
+# the join guard arrives if the blogger/child is still pending. Optional.
+[[turn]]
+id = "manager-join-guard"
+internal = true
+optional = true
+user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager joined." }
 
 [[turn]]
 id = "child-a2"
@@ -180,6 +147,24 @@ user = [
   [[turn.step]]
   respond = { type = "text", text = "child-a2 done." }
 
+# GLORY-040: the accepted suicide starts the Host-owned Reviewer. Two PERFECT
+# verdicts in one turn: the first issues the REVIEW-003 challenge as its tool
+# result, the second confirms via its input seal.
+[[turn]]
+id = "finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
 [[turn]]
 id = "blogger"
 internal = true
@@ -191,168 +176,9 @@ user = "# Write the dense work-log continuation now"
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", tip = "primitive-obsession" } }
 
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
-
+# The Blogger transcript is append-only between deliveries (ARCH-004); a frame
+# commit after the Activation continuation legitimately inserts the Activation
+# assistant turn in front of the user delta (same as manager-companion).
 [[epoch]]
 turn = "blogger"
 step = 0
@@ -362,302 +188,3 @@ reason = "frame-commit"
 turn = "blogger"
 step = 1
 reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 2
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 3
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 4
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 5
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 6
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 7
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 8
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 9
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 10
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 11
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 12
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 13
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 14
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 15
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 16
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 17
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 18
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 19
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 20
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 21
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 22
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 23
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 24
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 25
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 26
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 27
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 28
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 29
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 30
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 31
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 32
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 33
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 34
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 35
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 36
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 37
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 38
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 39
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 40
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 41
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 42
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 43
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 44
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 45
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 46
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 47
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 48
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 49
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 50
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 51
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 52
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 53
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 54
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 55
-reason = "frame-commit"
-
-# REVIEW-007: a Manager completing on a tree without a confirmed dual-PERFECT
-# is nudged with the production-composed guard text (HostReviewGuard.fs). The
-# manager answers that nudge by forking the reviewer, joining after the double
-# PERFECT confirms, then finishing (internal: no scenario text reaches the
-# nudge itself).
-[[turn]]
-id = "guard-nudged"
-internal = true
-user = "# Review is required before completion.\n# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."
-tools = ["fork", "join", "list"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review and PERFECT twice." } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager completed the review flow." }
-
-[[turn]]
-id = "title"
-lane = "parent-title"
-kind = "title"
-user = "Fork a coder to write host_restart_proof.txt, join, then obtain two PERFECT reviews."
-
-  [[turn.step]]
-  respond = { type = "title", text = "E2E Test Session" }

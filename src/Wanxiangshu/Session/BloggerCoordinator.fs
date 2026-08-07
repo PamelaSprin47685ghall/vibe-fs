@@ -61,10 +61,18 @@ module BloggerCoordinator =
         (observedEpoch: PrefixEpochId)
         (blog: BlogProjectionState)
         (xTrace: XTraceProjectionState)
+        (floorSequence: int64 option)
         (projection: ProviderSemanticProjection)
         : BloggerRequestContext option =
-        let ingestCursor =
-            XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+        // GLORY-023: the Manager Life's protected prefix never enters Y. The
+        // effective ingest start is max(blog coverage, life floor); a chunk that
+        // would span the floor is cut at it by the cursor itself (GLORY-024).
+        let effectiveIngested =
+            floorSequence
+            |> Option.map (fun floor -> max blog.Coverage.IngestedThroughSequence floor)
+            |> Option.defaultValue blog.Coverage.IngestedThroughSequence
+
+        let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
 
         match
             BloggerDelta.nextChunk
@@ -335,6 +343,21 @@ module BloggerCoordinator =
         task {
             let key = SessionId.value bloggerSessionId
 
+            // GLORY-023: the Manager Life compression floor. `None` for every
+            // non-Manager session and for Managers without a Life.
+            let floorSequence =
+                match journal with
+                | None -> None
+                | Some durable ->
+                    let floor =
+                        AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
+                        |> Option.bind (fun session -> session.ManagerLife)
+                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                        |> Option.bind (fun life -> life.ProtectedPrefixEnd)
+                        |> Option.map (fun cursor -> cursor.Sequence)
+
+                    floor
+
             if blocksNew journal mainSessionId scope key then
                 forceSealRuntime scope key
                 return DecisionEffect.Sealed
@@ -358,7 +381,16 @@ module BloggerCoordinator =
                         // fall through by tail-calling logic via Idle path
                         let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
 
-                        match nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace projection with
+                        match
+                            nextMainContext
+                                mainSessionId
+                                bloggerSessionId
+                                observedEpoch
+                                blog
+                                xTrace
+                                floorSequence
+                                projection
+                        with
                         | None -> return DecisionEffect.NoMaterial
                         | Some ctx ->
                             match BloggerRuntime.onMaterial (scope.GetBloggerRuntime key) ctx with
@@ -388,7 +420,16 @@ module BloggerCoordinator =
                     match squashEffect with
                     | Some effect -> return effect
                     | None ->
-                        match nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace projection with
+                        match
+                            nextMainContext
+                                mainSessionId
+                                bloggerSessionId
+                                observedEpoch
+                                blog
+                                xTrace
+                                floorSequence
+                                projection
+                        with
                         | None -> return DecisionEffect.NoMaterial
                         | Some ctx ->
                             match BloggerRuntime.onMaterial (scope.GetBloggerRuntime key) ctx with
@@ -430,5 +471,16 @@ module BloggerCoordinator =
         if blocksNew journal mainSessionId scope key then
             None
         else
+            // GLORY-023: same Manager Life floor as onMainMaterial.
+            let floorSequence =
+                match journal with
+                | None -> None
+                | Some durable ->
+                    AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
+                    |> Option.bind (fun session -> session.ManagerLife)
+                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                    |> Option.bind (fun life -> life.ProtectedPrefixEnd)
+                    |> Option.map (fun cursor -> cursor.Sequence)
+
             let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
-            nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace projection
+            nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace floorSequence projection

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
@@ -86,6 +87,17 @@ module VerdictTool =
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
+            let diagLine =
+                sprintf
+                    "verdict-exec reviewer=%s role=%A run=%s"
+                    context.SessionId
+                    (scope.RoleFor context)
+                    (match context.ProviderRunId with
+                     | Some run -> ProviderRunIdentity.value run
+                     | None -> "-")
+
+            emitJsExpr diagLine "require('node:fs').appendFileSync('/tmp/verdict-diag.log', $0 + '\\n')"
+
             let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
 
             let validated =
@@ -153,7 +165,6 @@ module VerdictTool =
                     // PROMPT-002 identity from a PROMPT-001 one.
                     match ReviewController.submit journal HostDigest.sha256Hex submission with
                     | Ok VerdictDecision.ChallengeUnproven ->
-                        // REVIEW-010: bind the transform-parked seal to THIS run and
                         // submit once more. The tool's `context.ProviderRunId` is the
                         // only reliable binding key — the reconcile `onTurn` run
                         // disagrees with it on Host 1.18.10 for challenge responses,

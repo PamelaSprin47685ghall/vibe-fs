@@ -62,6 +62,7 @@ module StaticTools =
         | ToolPermission.Network -> "network"
         | ToolPermission.Verdict -> "verdict"
         | ToolPermission.Blog -> "blog"
+        | ToolPermission.Finality -> "suicide"
 
     /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
@@ -87,7 +88,8 @@ module StaticTools =
               "executor"
               "network"
               "verdict"
-              "blog" ]
+              "blog"
+              "suicide" ]
 
         // Host defaults set external_directory:* = ask (agent.ts). Rulesets merge by
         // flat concat + findLast, so this trailing allow cancels the Host ask and

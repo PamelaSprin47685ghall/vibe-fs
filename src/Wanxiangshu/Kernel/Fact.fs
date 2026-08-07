@@ -579,6 +579,98 @@ module Fact =
                WorktreeIdentity: WorktreeIdentity
                WorktreePath: WorktreePath |}
 
+    // ── Manager lifecycle (docs/what/glory.md GLORY-010) ────────────────────────────────
+    //
+    // One Manager Life: LifeOpened → WorkActivated → FinalityRequested →
+    // (FinalityRejected loop) → FinalityConfirmed → LifeCompleted. Every fact
+    // is an event that HAPPENED; no fact carries a next step (ARCH-001).
+
+    /// GLORY-010: the Manager lifecycle fact algebra.
+    [<RequireQualifiedAccess>]
+    type ManagerLifecycleFact =
+        /// A Life opened for a new HumanRoot (GLORY-012/013). Opening text is
+        /// blob-addressed; `OpeningCursorSequence` is the XTraceCursor.Sequence
+        /// of its first XTrace part (Kernel stays free of Domain types).
+        | LifeOpened of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               OpeningUserMessageId: PhysicalUserMessageId
+               OpeningTextRef: BlobRef
+               OpeningTextDigest: BlobDigest
+               OpeningCursorSequence: int64 |}
+
+        /// Activation was physically accepted; the compression floor is fixed
+        /// after the Activation prompt's XTrace end (GLORY-021).
+        | WorkActivated of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               ActivationPromptKey: PromptKey
+               ProtectedPrefixEndSequence: int64 |}
+
+        /// A legal suicide was accepted (GLORY-040). Reviewer not yet created,
+        /// so no barrier here.
+        | FinalityRequested of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               GitTreeHash: GitTreeHash
+               LastWordsRef: BlobRef
+               LastWordsDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity
+               ToolCallId: ToolCallId |}
+
+        /// HostReviewProgram forked the reviewer and opened the barrier
+        /// (GLORY-003).
+        | FinalityReviewStarted of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash |}
+
+        /// REVISE: the reviewer's canonical work record is the wound record
+        /// (GLORY-004/051). Blob-addressed; digest verified at write.
+        | FinalityRejected of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               WorkRecordRef: BlobRef
+               WorkRecordDigest: BlobDigest |}
+
+        /// Confirmed dual PERFECT on the request tree, revalidated at read
+        /// (GLORY-059/060).
+        | FinalityConfirmed of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash |}
+
+        /// GLORY-057: infrastructure failure closed the request without a verdict.
+        /// Closes the request so a new suicide is possible; never fabricates a
+        /// wound record.
+        | FinalityUndecided of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash |}
+
+        /// The Life ended in glory: last_words is the terminal (GLORY-060).
+        | LifeCompleted of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               TerminalRef: BlobRef
+               TerminalDigest: BlobDigest |}
+
     type Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
+        | ManagerLifecycle of ManagerLifecycleFact
