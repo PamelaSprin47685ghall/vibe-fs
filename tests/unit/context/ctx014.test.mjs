@@ -75,6 +75,21 @@ test('CTX_014_diagnostic_emit_accepts_only_whitelisted_fields', () => {
   )
 })
 
+test('CTX_014_enforcer_protocol_violation_fields_are_whitelisted', () => {
+  // ENFORCER-042: the multi-call protocol-violation emit carries `result` and
+  // `call_count`. Both must be in AllowedFields so the emit never throws and the
+  // multi-call cycle can still proceed to commit (diagnostic is silent, HOST-007).
+  assert.doesNotThrow(() =>
+    diag.emit('enforcer-protocol-violation', [
+      ['result', 'multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)'],
+      ['call_count', '2'],
+    ]),
+  )
+  // call_count is numeric-only payload; the whitelist is name-based, so any value
+  // with that NAME is accepted (value shape is not the schema's concern).
+  assert.doesNotThrow(() => diag.emit('enforcer-protocol-violation', [['call_count', '7']]))
+})
+
 test('CTX_014_diagnostic_emit_is_silent', () => {
   const lines = []
   const w = console.warn

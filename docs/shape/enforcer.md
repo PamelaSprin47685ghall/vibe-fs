@@ -2,12 +2,39 @@
 
 ## 分层（禁止双写）
 
+### 所有权轴（physical ownership）
+
+0.5.4 之后，Blogger 生命周期不再由长期 `BloggerRuntimeState` / `BloggerRuntimeCell` 程序位置 DU 驱动，而由以下物理所有权轴承载：
+
+| 轴 | 当前权威 |
+|------|------|
+| busy / current request | Host flight ownership：`HasFlight` + CurrentRequest |
+| parked waiter | physical parked registry：`HasParked` |
+| pending offer | 独立 PendingOffer 槽 |
+| durable lifecycle seal | Journal projection |
+| reactivation window | `DrainWindow = Closed | Open of DrainPermit` |
+| protocol recovery | durable claim + provider-visible evidence → `BloggerToolRecovery` |
+
+Material routing 是一个纯决策：
+
+```
+hasFlight            → Skip
+!hasFlight + parked  → Offer
+otherwise            → Start
+```
+
+### 组件职责
+
 | 组件 | 职责 |
 |------|------|
-| BloggerRuntime | 纯 cell 转移 |
 | BloggerCoordinator | 主会话 material 唯一入口 `onMainMaterial` |
 | EnforcerHost | continuation / catch-up / repair |
 | BloggerRuntimeHost | seal / blocks / reactivate 侧效 |
+| BloggerRuntime | 纯 `decideMaterial`：从 `HasFlight` / `HasParked` / ctx 等物理事实派生决策；不是长期 State DU / cell 转移程序计数器 |
+
+### 物理所有权说明
+
+无生产 `BloggerRuntimeState` / `BloggerRuntimeCell` 程序位置 DU；`BloggerRuntimeState.fs` 文件名可保留，但所有权是物理槽（flight / parked / pending / seal / drain），不是 cell 状态机。
 
 规则数据：Domain 校验，Infrastructure 加载；启动 fail fast；无代码内 fallback catalog。
 

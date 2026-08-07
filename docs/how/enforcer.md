@@ -22,11 +22,11 @@ Blogger 以 `blog` 工具提交稠密工作日志。fast/deep blogger 统一加�
 1. 将所有 blog 工具调用按 PartOrdinal 升序排列。
 2. 过滤出包含有效 tip（tip 存在于 catalog.json 且 text 非空）的调用集合 S。
 3. 若 S 为空：归并失败，Cycle 视为无有效调用。
-4. 若 S 非空：
-   a. 按 catalog.json 中 RuleId 优先级（rule ordinal 越小优先级越高）对 S 排序。
-   b. 若 Rule 优先级最高者唯一，选中该调用派生 tip；
-   c. 若存在相同最高优先级的多个调用，取 PartOrdinal 最小（最早）的调用派生 tip。
+4. 若 S 非空：取 PartOrdinal 最小（排序后第一个）的调用派生 CanonicalTip。
+   不在多调用 tip 选择上按 catalog.json / RuleId ordinal 做二级排序。
 ```
+
+多调用 tip 选择只看 `PartOrdinal`；catalog 的 rule ordinal 只用于描述 catalog 数据排列，不作为多调用 tip 的优先级判据。
 
 ---
 
