@@ -130,10 +130,10 @@ type StudentTeacherRuntime
 
     let activeProfile sessionId = dispatcher.ActiveProfile sessionId
 
-    let sendTeacherPrompt (cell: StudentRunCell) (lease: SatelliteLease) question qaPath =
+    let sendTeacherPrompt (cell: StudentRunCell) (lease: SatelliteLease) question =
         task {
             let text =
-                StudentTeacherPrompt.teacherQuestion qaPath question (lease.Origin = SatelliteOrigin.Replacement)
+                StudentTeacherPrompt.teacherQuestion question (lease.Origin = SatelliteOrigin.Replacement)
 
             let tools = toolMap Role.Teacher ProviderRequestKind.WorkMain
             let agent = teacherAgent cell
@@ -306,7 +306,7 @@ type StudentTeacherRuntime
 
                             onTeacherReady lease.SessionId (teacherAgent cell)
 
-                            match! sendTeacherPrompt cell lease question qaPath with
+                            match! sendTeacherPrompt cell lease question with
                             | Error error ->
                                 lock gate (fun () ->
                                     cell.Waiter <- None

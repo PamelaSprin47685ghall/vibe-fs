@@ -9,7 +9,7 @@ import {
   toolsFor,
 } from '../../../dist/Domain/StudentTeacher.js'
 import { targetName, validateDocument } from '../../../dist/Domain/StudentSkill.js'
-import { compile, compileNudge } from '../../../dist/Domain/StudentTeacherPrompt.js'
+import { compile, compileNudge, teacherQuestion } from '../../../dist/Domain/StudentTeacherPrompt.js'
 import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
 import {
   StaticTools_requestToolMap as requestToolMap,
@@ -129,4 +129,16 @@ test('AGENT_022_StudentCompile_prompt_states_the_loadable_layout_and_restart_bou
     assert.match(prompt, /非空.*正文/)
   }
   assert.match(compile('/private/QA.md'), /重启 OpenCode/)
+})
+
+test('AGENT_020_Teacher_prompt_carries_commented_question_without_qa_path_or_data_fields', () => {
+  const prompt = teacherQuestion('What is the smallest principle?', false)
+  assert.equal(prompt.includes('qa_path'), false)
+  assert.equal(prompt.includes('question ='), false)
+  assert.match(prompt, /^# Answer the Student's current question/m)
+  assert.match(prompt, /^# What is the smallest principle\?$/m)
+
+  const replacementPrompt = teacherQuestion('What is the smallest principle?', true)
+  assert.match(replacementPrompt, /disaster-recovery replacement Teacher/)
+  assert.match(replacementPrompt, /^# What is the smallest principle\?$/m)
 })
