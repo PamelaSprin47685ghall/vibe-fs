@@ -156,7 +156,7 @@ test('EXEC_reconcile_incomplete_rekick_budget_stops', async () => {
   assert.equal(completed.length, 0, 'always-in-progress must never publish TurnCompleted')
 })
 
-// ── 1d. ClearSession exits mid-backoff (no terminal publish) ─────────────────
+// ── 1d. ClearSession during causal reread stops later publish ────────────────
 
 test('EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
   const sid = sessionId('ses_reconcile_clear')
@@ -164,35 +164,33 @@ test('EXEC_reconcile_clear_session_cancels_pending_rekick', async () => {
   const turns = []
   const inProgress = reconcileSupervisor.inProgressTranscript('user-1', 'asst-ip')
   const terminal = reconcileSupervisor.terminalTranscript('user-1', 'asst-terminal')
-  // First read InProgress → long delay; clear during delay so later terminal is never seen.
+  // First read InProgress → clear on next read so later terminal is never published.
   const reads = [
+    { ok: true, messages: inProgress },
     { ok: true, messages: inProgress },
     { ok: true, messages: terminal },
   ]
-  const snapshot = reconcileSupervisor.createSnapshot(reads)
+  let supervisor
+  const snapshot = reconcileSupervisor.createSnapshot(reads, (readCount) => {
+    // Clear mid-pass: after first read, generation bumps; terminal must never publish.
+    if (readCount === 1) reconcileSupervisor.clearSession(supervisor, sid)
+  })
   const binding = reconcileSupervisor.createStore()
-  const onTurn = (turn) => {
-    turns.push(turn)
-    return Promise.resolve()
-  }
-  const supervisor = reconcileSupervisor.create({
+  supervisor = reconcileSupervisor.create({
     snapshot,
     binding,
-    onTurn,
-    backoffDelaysMs: CLEAR_BACKOFF_MS,
-    maxBudgetMs: CLEAR_BUDGET_MS,
+    onTurn: (turn) => {
+      turns.push(turn)
+      return Promise.resolve()
+    },
+    maxCausalRereads: 3,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
   reconcileSupervisor.kick(supervisor, sid)
 
-  // First snapshot read done; pass is in delayMs(200). Clear before delay ends.
-  await waitUntil(() => snapshot.readCount >= 1, 400)
-  await sleep(2)
-  reconcileSupervisor.clearSession(supervisor, sid)
-
-  await sleep(100)
+  await new Promise((r) => setTimeout(r, 20))
   const completed = turns.filter((t) => caseOf(t.Outcome) === 'TurnCompleted')
-  assert.equal(completed.length, 0, 'ClearSession mid-backoff must prevent terminal publish')
+  assert.equal(completed.length, 0, 'ClearSession mid-reread must prevent terminal publish')
 })
 
 test('EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once', async () => {

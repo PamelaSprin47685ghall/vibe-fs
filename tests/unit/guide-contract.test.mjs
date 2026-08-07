@@ -110,10 +110,6 @@ test('VERIFY_005_Domain_ReconcileProgram_publishes_pure_decisions', async () => 
     `Domain ReconcileProgram must publish isTerminalOutcome; exports: ${names.join(', ')}`,
   )
   assert.ok(
-    names.some((n) => n.includes('pickDelay')),
-    `Domain ReconcileProgram must publish pickDelay; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
     names.some((n) => n.includes('decideStep')),
     `Domain ReconcileProgram must publish decideStep; exports: ${names.join(', ')}`,
   )

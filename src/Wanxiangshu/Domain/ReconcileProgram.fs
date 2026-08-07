@@ -41,12 +41,11 @@ module ReconcileProgram =
         | Provisional of ObservedTurn
         | Unknown of ObservedTurn option
         | Terminal of ObservedTurn
-        | BudgetExhausted of hasCandidate: bool
         | SessionCleared
 
     [<RequireQualifiedAccess>]
     type ReconcileDecision =
-        | RereadWithBackoff of clearContinuationCandidate: bool
+        | Reread of clearContinuationCandidate: bool * rereadsRemaining: int
         | Publish
         | StopPass
 
@@ -71,39 +70,34 @@ module ReconcileProgram =
         | TurnNeedsContinuation _
         | TurnUnknown -> false
 
-    let pickDelay (sequence: int array) (index: int) (budgetRemaining: int) : int =
-        if isNull sequence || sequence.Length = 0 || budgetRemaining <= 0 then
-            0
-        else
-            let raw = sequence.[min index (sequence.Length - 1)]
-            min raw budgetRemaining
-
-    /// Ok snapshot resets backoff to 0; Error escalates (previous + 1).
-    let nextBackoffIndex (previous: int) (snapshotOk: bool) : int = if snapshotOk then 0 else previous + 1
-
-    let decideStep (evidence: ReconcileEvidence) : ReconcileDecision =
+    /// 有界因果重读：rereadsRemaining = 还能进行多少次读取判定（初始 = maxCausalRereads + 1）。
+    /// remaining > 1 且非终态 → Reread(remaining-1)；remaining <= 1 且非终态 → StopPass；Terminal → Publish。
+    let decideStep (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
         match evidence with
+        | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
         | ReconcileEvidence.SnapshotError _
         | ReconcileEvidence.NoTurn
-        | ReconcileEvidence.Provisional _ -> ReconcileDecision.RereadWithBackoff false
-        | ReconcileEvidence.Unknown _ -> ReconcileDecision.RereadWithBackoff true
-        | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
-        | ReconcileEvidence.BudgetExhausted hasCandidate ->
-            if hasCandidate then
-                ReconcileDecision.Publish
+        | ReconcileEvidence.Provisional _ ->
+            if rereadsRemaining > 1 then
+                ReconcileDecision.Reread(false, rereadsRemaining - 1)
+            else
+                ReconcileDecision.StopPass
+        | ReconcileEvidence.Unknown _ ->
+            if rereadsRemaining > 1 then
+                ReconcileDecision.Reread(true, rereadsRemaining - 1)
             else
                 ReconcileDecision.StopPass
         | ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
 
     let decisionName (decision: ReconcileDecision) : string =
         match decision with
-        | ReconcileDecision.RereadWithBackoff _ -> "RereadWithBackoff"
+        | ReconcileDecision.Reread _ -> "Reread"
         | ReconcileDecision.Publish -> "Publish"
         | ReconcileDecision.StopPass -> "StopPass"
 
     let clearsContinuationCandidate (decision: ReconcileDecision) : bool =
         match decision with
-        | ReconcileDecision.RereadWithBackoff clear -> clear
+        | ReconcileDecision.Reread(clear, _) -> clear
         | ReconcileDecision.Publish
         | ReconcileDecision.StopPass -> false
 
@@ -195,8 +189,5 @@ module ReconcileProgram =
 
     let evidenceObservedTerminal (turn: PublishTurn) =
         ReconcileEvidence.Terminal(observedTurn turn)
-
-    let evidenceBudgetExhausted (hasCandidate: bool) =
-        ReconcileEvidence.BudgetExhausted hasCandidate
 
     let evidenceSessionCleared () = ReconcileEvidence.SessionCleared

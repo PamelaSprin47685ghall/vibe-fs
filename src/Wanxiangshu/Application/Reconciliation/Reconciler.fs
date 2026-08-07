@@ -32,12 +32,6 @@ module Reconciler =
         | ResumeDrain
         | Released
 
-    let private delayMs (ms: int) : Task<unit> =
-        if ms <= 0 then
-            Task.FromResult(())
-        else
-            emitJsExpr ms "new Promise(res => setTimeout(res, $0))"
-
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
 
@@ -70,8 +64,7 @@ module Reconciler =
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
-            ?backoffDelaysMs: int array,
-            ?maxBudgetMs: int
+            ?maxCausalRereads: int
         ) as this =
 
         let gate = obj ()
@@ -86,10 +79,7 @@ module Reconciler =
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
 
-        let delays =
-            defaultArg backoffDelaysMs [| 50; 100; 250; 500; 1000; 2000; 3000; 5000 |]
-
-        let budget = defaultArg maxBudgetMs 30_000
+        let maxRereads = defaultArg maxCausalRereads 3
 
         let isCleared (sessionId: SessionId) =
             lock gate (fun () -> cleared.Contains(SessionId.value sessionId))
@@ -195,8 +185,7 @@ module Reconciler =
         let rec materializeActive
             (sessionId: SessionId)
             (generation: int)
-            (budgetRemaining: int)
-            (backoffIndex: int)
+            (rereadsRemaining: int)
             (candidate: ReconcileProgram.PublishTurn option)
             (maps: ReconcileProgram.PublishMaps)
             (activeBinding: ActiveRunBinding)
@@ -206,18 +195,7 @@ module Reconciler =
             task {
                 if not (isCurrent sessionId generation) then
                     return ()
-                elif budgetRemaining <= 0 then
-                    let evidence = ReconcileProgram.ReconcileEvidence.BudgetExhausted candidate.IsSome
-
-                    match ReconcileProgram.decideStep evidence with
-                    | ReconcileProgram.ReconcileDecision.Publish ->
-                        do! publishIfAllowed sessionId generation maps candidate turns lastSnapshot
-                    | ReconcileProgram.ReconcileDecision.StopPass
-                    | ReconcileProgram.ReconcileDecision.RereadWithBackoff _ ->
-                        match lastSnapshot with
-                        | Some messages when isCurrent sessionId generation -> do! observeSnapshot sessionId messages
-                        | _ -> ()
-                else if isCleared sessionId || not (isCurrent sessionId generation) then
+                elif isCleared sessionId || not (isCurrent sessionId generation) then
                     return ()
                 else
                     let! result = snapshot.GetMessages sessionId
@@ -228,28 +206,20 @@ module Reconciler =
                         match result with
                         | Error error ->
                             logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
-                            let nextIdx = ReconcileProgram.nextBackoffIndex backoffIndex false
-                            let delay = ReconcileProgram.pickDelay delays backoffIndex budgetRemaining
 
-                            if delay <= 0 || not (isCurrent sessionId generation) then
-                                return ()
+                            if isCurrent sessionId generation then
+                                return!
+                                    materializeActive
+                                        sessionId
+                                        generation
+                                        rereadsRemaining
+                                        candidate
+                                        maps
+                                        activeBinding
+                                        turns
+                                        lastSnapshot
                             else
-                                do! delayMs delay
-
-                                if isCurrent sessionId generation then
-                                    return!
-                                        materializeActive
-                                            sessionId
-                                            generation
-                                            (budgetRemaining - delay)
-                                            nextIdx
-                                            candidate
-                                            maps
-                                            activeBinding
-                                            turns
-                                            lastSnapshot
-                                else
-                                    return ()
+                                return ()
                         | Ok messages ->
                             let turn = TurnReconcile.reconcile messages activeBinding
                             let evidence = evidenceOf turn
@@ -259,22 +229,20 @@ module Reconciler =
                                 | Some value -> Map.add (ReconcileProgram.consumeKey (publishTurnOf value)) value turns
                                 | None -> turns
 
-                            let afterOk = ReconcileProgram.nextBackoffIndex backoffIndex true
-                            let decision = ReconcileProgram.decideStep evidence
+                            let decision = ReconcileProgram.decideStep rereadsRemaining evidence
 
                             match decision with
                             | ReconcileProgram.ReconcileDecision.Publish ->
                                 let publishable =
                                     match evidence with
                                     | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
-                                    | ReconcileProgram.ReconcileEvidence.BudgetExhausted _ -> candidate
                                     | _ -> candidate
 
                                 do! publishIfAllowed sessionId generation maps publishable observedTurns (Some messages)
                             | ReconcileProgram.ReconcileDecision.StopPass ->
                                 if isCurrent sessionId generation then
                                     do! observeSnapshot sessionId messages
-                            | ReconcileProgram.ReconcileDecision.RereadWithBackoff clearCandidate ->
+                            | ReconcileProgram.ReconcileDecision.Reread(clearCandidate, remaining) ->
                                 let candidate' =
                                     if clearCandidate then
                                         None
@@ -284,29 +252,19 @@ module Reconciler =
                                             observed.PublishTurn
                                         | _ -> candidate
 
-                                let delay = ReconcileProgram.pickDelay delays afterOk budgetRemaining
-                                let nextIdx = afterOk + 1
-
-                                if delay <= 0 then
-                                    if isCurrent sessionId generation then
-                                        do! observeSnapshot sessionId messages
+                                if isCurrent sessionId generation then
+                                    return!
+                                        materializeActive
+                                            sessionId
+                                            generation
+                                            remaining
+                                            candidate'
+                                            maps
+                                            activeBinding
+                                            observedTurns
+                                            (Some messages)
                                 else
-                                    do! delayMs delay
-
-                                    if isCurrent sessionId generation then
-                                        return!
-                                            materializeActive
-                                                sessionId
-                                                generation
-                                                (budgetRemaining - delay)
-                                                nextIdx
-                                                candidate'
-                                                maps
-                                                activeBinding
-                                                observedTurns
-                                                (Some messages)
-                                    else
-                                        return ()
+                                    return ()
             }
 
         member private _.RunPass(sessionId: SessionId, generation: int) : Task =
@@ -332,8 +290,7 @@ module Reconciler =
                             materializeActive
                                 sessionId
                                 generation
-                                budget
-                                0
+                                (maxRereads + 1)
                                 None
                                 (mapsFor sessionId)
                                 bound

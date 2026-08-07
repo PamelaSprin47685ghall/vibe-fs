@@ -22,76 +22,52 @@ test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisiona
   assert.equal(reconcileProgram.isTerminalOutcome('TurnUnknown'), false)
 })
 
-test('RECONCILE_PROGRAM_002: pickDelay clamps to budget and holds last sequence entry', () => {
-  assert.equal(typeof reconcileProgram.pickDelay, 'function')
+// ── decideStep: bounded causal reread → next pure decision ───────────────────
 
-  const sequence = [50, 100, 250, 500]
-  assert.equal(reconcileProgram.pickDelay(sequence, 0, 1000), 50)
-  assert.equal(reconcileProgram.pickDelay(sequence, 1, 1000), 100)
-  // Past end of sequence → last entry (production stays at 5s after final step).
-  assert.equal(reconcileProgram.pickDelay(sequence, 99, 1000), 500)
-  // Budget clamp.
-  assert.equal(reconcileProgram.pickDelay(sequence, 0, 30), 30)
-  // Empty sequence or non-positive budget → 0 (no delay).
-  assert.equal(reconcileProgram.pickDelay([], 0, 1000), 0)
-  assert.equal(reconcileProgram.pickDelay(sequence, 0, 0), 0)
-  assert.equal(reconcileProgram.pickDelay(sequence, 0, -1), 0)
-})
-
-// ── decideStep: one snapshot observation → next pure decision ────────────────
-
-test('RECONCILE_PROGRAM_003: decideStep maps evidence to reread / publish / stop', () => {
+test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhaustion', () => {
   assert.equal(typeof reconcileProgram.decideStep, 'function')
   assert.equal(typeof reconcileProgram.decisionName, 'function')
 
-  const name = (evidence) => reconcileProgram.decisionName(reconcileProgram.decideStep(evidence))
+  const name = (remaining, evidence) =>
+    reconcileProgram.decisionName(reconcileProgram.decideStep(remaining, evidence))
 
-  // Snapshot Error: escalate delay, do not reset backoff; still reread.
-  assert.equal(name(reconcileProgram.evidence.snapshotError('transient')), 'RereadWithBackoff')
+  // Non-terminal evidence with budget remaining → Reread.
+  assert.equal(name(3, reconcileProgram.evidence.snapshotError('transient')), 'Reread')
+  assert.equal(name(3, reconcileProgram.evidence.noTurn()), 'Reread')
+  assert.equal(name(3, reconcileProgram.evidence.provisional('TurnInProgress')), 'Reread')
+  assert.equal(name(3, reconcileProgram.evidence.provisional('TurnNeedsContinuation')), 'Reread')
+  assert.equal(name(3, reconcileProgram.evidence.unknown()), 'Reread')
 
-  // No matching turn material yet.
-  assert.equal(name(reconcileProgram.evidence.noTurn()), 'RereadWithBackoff')
+  // Non-terminal with budget exhausted → StopPass (keep Dirty, wait next signal).
+  assert.equal(name(0, reconcileProgram.evidence.snapshotError('transient')), 'StopPass')
+  assert.equal(name(0, reconcileProgram.evidence.noTurn()), 'StopPass')
+  assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress')), 'StopPass')
+  assert.equal(name(0, reconcileProgram.evidence.unknown()), 'StopPass')
 
-  // Provisional incomplete: keep candidate, reread.
+  // Unknown clears continuation candidate; provisional keeps it.
   assert.equal(
-    name(reconcileProgram.evidence.provisional('TurnInProgress')),
-    'RereadWithBackoff',
-  )
-  assert.equal(
-    name(reconcileProgram.evidence.provisional('TurnNeedsContinuation')),
-    'RereadWithBackoff',
-  )
-
-  // Explicit Unknown: clear provisional candidate semantics, still reread.
-  assert.equal(name(reconcileProgram.evidence.unknown()), 'RereadWithBackoff')
-  assert.equal(
-    reconcileProgram.clearsContinuationCandidate(reconcileProgram.decideStep(reconcileProgram.evidence.unknown())),
+    reconcileProgram.clearsContinuationCandidate(reconcileProgram.decideStep(3, reconcileProgram.evidence.unknown())),
     true,
   )
   assert.equal(
     reconcileProgram.clearsContinuationCandidate(
-      reconcileProgram.decideStep(reconcileProgram.evidence.provisional('TurnInProgress')),
+      reconcileProgram.decideStep(3, reconcileProgram.evidence.provisional('TurnInProgress')),
     ),
     false,
   )
 
-  // Terminal: publish and stop materialization loop.
-  assert.equal(name(reconcileProgram.evidence.terminal('TurnCompleted')), 'Publish')
-  assert.equal(name(reconcileProgram.evidence.terminal('TurnAborted')), 'Publish')
-  assert.equal(name(reconcileProgram.evidence.terminal('TurnFailed')), 'Publish')
+  // Terminal → Publish regardless of remaining.
+  assert.equal(name(0, reconcileProgram.evidence.terminal('TurnCompleted')), 'Publish')
+  assert.equal(name(3, reconcileProgram.evidence.terminal('TurnAborted')), 'Publish')
+  assert.equal(name(3, reconcileProgram.evidence.terminal('TurnFailed')), 'Publish')
 
-  // Budget exhausted: publish continuation candidate when present; else stop.
-  assert.equal(
-    name(reconcileProgram.evidence.budgetExhausted({ hasCandidate: true })),
-    'Publish',
-  )
-  assert.equal(
-    name(reconcileProgram.evidence.budgetExhausted({ hasCandidate: false })),
-    'StopPass',
-  )
+  // Session cleared → StopPass.
+  assert.equal(name(3, reconcileProgram.evidence.sessionCleared()), 'StopPass')
 
-  // Session cleared mid-pass: no publish.
-  assert.equal(name(reconcileProgram.evidence.sessionCleared()), 'StopPass')
+  // Reread decrements remaining (no time/backoff information carried).
+  const rereadDecision = reconcileProgram.decideStep(3, reconcileProgram.evidence.provisional('TurnInProgress'))
+  // decisionName is 'Reread'; verify clearsContinuationCandidate is false.
+  assert.equal(reconcileProgram.clearsContinuationCandidate(rereadDecision), false)
 })
 
 // ── publishDecision: consumed (terminal) vs provisional maps ─────────────────
@@ -145,16 +121,6 @@ test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal an
   // clearProvisional removes provisional seal without touching consumed.
   const cleared = reconcileProgram.clearProvisional(firstProv.maps, 'ses-a')
   assert.equal(cleared.provisionalHas(provisional), false)
-})
-
-test('RECONCILE_PROGRAM_005: SnapshotError does not reset backoff index', () => {
-  assert.equal(typeof reconcileProgram.nextBackoffIndex, 'function')
-
-  // Ok snapshot → reset to 0 after a successful classify path.
-  assert.equal(reconcileProgram.nextBackoffIndex({ previous: 3, snapshotOk: true }), 0)
-  // Error snapshot → escalate (previous + 1), never reset.
-  assert.equal(reconcileProgram.nextBackoffIndex({ previous: 3, snapshotOk: false }), 4)
-  assert.equal(reconcileProgram.nextBackoffIndex({ previous: 0, snapshotOk: false }), 1)
 })
 
 test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {

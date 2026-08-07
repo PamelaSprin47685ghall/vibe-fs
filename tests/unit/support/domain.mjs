@@ -3959,15 +3959,11 @@ export const reconcileSupervisor = (() => {
       onDeleted,
       projection,
       onSnapshot,
-      backoffDelaysMs,
-      // Alias kept for callers that still name the injected sequence reKickDelaysMs.
-      reKickDelaysMs,
-      maxBudgetMs,
+      maxCausalRereads,
     } = {}) => {
       if (snapshot === undefined || binding === undefined || onTurn === undefined) {
         throw new Error('reconcileSupervisor.create requires snapshot, binding, onTurn')
       }
-      const delays = backoffDelaysMs ?? reKickDelaysMs
       // Fable optional ctor args: undefined → None → production defaults.
       return new Supervisor(
         snapshot,
@@ -3976,8 +3972,7 @@ export const reconcileSupervisor = (() => {
         onDeleted,
         projection,
         onSnapshot,
-        delays,
-        maxBudgetMs,
+        maxCausalRereads,
       )
     },
     bindUserMessage: (supervisor, session, physical, agentRole) =>
@@ -5275,20 +5270,12 @@ export const reconcileProgram = (() => {
       }
     },
 
-    get pickDelay() {
-      const fn = resolve(
-        [mod?.pickDelay, mod?.ReconcileProgram_pickDelay, mod?.Reconcile_pickDelay],
-        'pickDelay',
-      )
-      return (sequence, index, budgetRemaining) => applyArgs(fn, [sequence, index, budgetRemaining])
-    },
-
     get decideStep() {
       const fn = resolve(
         [mod?.decideStep, mod?.ReconcileProgram_decideStep, mod?.Reconcile_decideStep],
         'decideStep',
       )
-      return (evidence) => applyArgs(fn, [evidence])
+      return (rereadsRemaining, evidence) => applyArgs(fn, [rereadsRemaining, evidence])
     },
 
     get decisionName() {
@@ -5309,14 +5296,6 @@ export const reconcileProgram = (() => {
         'clearsContinuationCandidate',
       )
       return (decision) => applyArgs(fn, [decision])
-    },
-
-    get nextBackoffIndex() {
-      const fn = resolve(
-        [mod?.nextBackoffIndex, mod?.ReconcileProgram_nextBackoffIndex],
-        'nextBackoffIndex',
-      )
-      return ({ previous, snapshotOk }) => applyArgs(fn, [previous, snapshotOk])
     },
 
     get publishDecision() {
@@ -5410,17 +5389,6 @@ export const reconcileProgram = (() => {
           ],
           'ReconcileEvidence.Terminal(observedTurn)',
           [turn],
-        ),
-      budgetExhausted: ({ hasCandidate }) =>
-        call(
-          [
-            mod?.ReconcileProgram_evidenceBudgetExhausted,
-            mod?.evidenceBudgetExhausted,
-            mod?.ReconcileEvidence_BudgetExhausted,
-            mod?.BudgetExhausted,
-          ],
-          'ReconcileEvidence.BudgetExhausted',
-          [hasCandidate],
         ),
       sessionCleared: () =>
         call(
