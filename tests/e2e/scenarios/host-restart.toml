@@ -29,7 +29,7 @@ flow = [
   { wait = "manager-after-restart.0", timeoutMs = 15000 },
   { wait = "child-a2", timeoutMs = 15000 },
   { wait = "manager-after-restart.1", timeoutMs = 15000 },
-  { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
+  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
   { wait = "finality-reviewer.0" },
   { wait = "finality-reviewer.1" },
   { wait = "finality-reviewer.2" },

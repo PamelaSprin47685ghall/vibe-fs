@@ -5,7 +5,7 @@
 # (GLORY-060/061).
 #
 # The Manager never forks a Reviewer: the Reviewer lanes below are Host-owned
-# (deep-reviewer, opened by FinalityController, invisible to list/join).
+# (fast-reviewer, opened by FinalityController, invisible to list/join).
 
 scenario = "manager-full-loop"
 description = "GLORY: planning → Activation → Labor → suicide → hidden Reviewer → confirmed → last_words terminal"
@@ -20,7 +20,7 @@ must = ["manager.0", "manager-activation", "finality-reviewer.0", "finality-revi
 flow = [
   { wait = "manager.0" },
   { wait = "manager-activation" },
-  { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
+  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
   { wait = "finality-reviewer.0" },
   { wait = "finality-reviewer.1" },
   { wait = "finality-reviewer.2" },

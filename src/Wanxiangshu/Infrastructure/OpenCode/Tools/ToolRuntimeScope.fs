@@ -106,7 +106,10 @@ type ToolRuntimeScope
 
     let activeProfileFor sessionId =
         match journal with
-        | Some durable -> PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot durable).AgentProjections
+        | Some durable ->
+            let projections = (AgentJournal.snapshot durable).AgentProjections
+            PromptAuthorityLedger.activeProfile sessionId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
         | None -> None
 
     /// AGENT-007: the single Role source, or `None`.
@@ -182,6 +185,7 @@ type ToolRuntimeScope
     member _.Snapshot = snapshot
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
+    member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
     /// GLORY-003: the run-started callback wired by the plugin bootstrap, exposed
     /// so the Finality workflow's hidden Reviewer binds the same reconciler.
     member _.RunStarted = onStarted

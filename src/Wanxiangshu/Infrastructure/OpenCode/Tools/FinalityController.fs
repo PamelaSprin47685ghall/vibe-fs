@@ -305,13 +305,22 @@ module FinalityController =
                             managerOpensReviewBarrier = false
                         )
 
+                    let managerProfile = scope.ActiveProfileFor managerSessionId
+
+                    let reviewerTier =
+                        managerProfile
+                        |> Option.map (fun profile -> profile.SelectedTier)
+                        |> Option.defaultValue AgentTier.Deep
+
+                    let reviewerAgentName = ManagedAgent.nameOf reviewerTier Role.Reviewer
+
                     let reviewerAgentId = sprintf "finality-%s" (FinalityRequestId.value requestId)
 
                     let! forkResult =
                         runtime.Fork(
                             reviewerAgentId,
                             Role.Reviewer,
-                            ManagedAgent.nameOf AgentTier.Deep Role.Reviewer,
+                            reviewerAgentName,
                             HostReviewPrompt.OpeningAssignment,
                             None
                         )
@@ -363,7 +372,7 @@ module FinalityController =
                                             runtime.Fork(
                                                 reviewerAgentId,
                                                 Role.Reviewer,
-                                                ManagedAgent.nameOf AgentTier.Deep Role.Reviewer,
+                                                reviewerAgentName,
                                                 ReviewChallenge.Prompt,
                                                 None,
                                                 firstPrompt = false
