@@ -41,4 +41,5 @@ UnknownOrigin fail-closed（PROMPT-004）。
 | Teacher 首次/后续/idle | AgentOwnerRoot / TeacherQuestion / TeacherIdleNudge；SessionId 不变 | PROMPT-005、PROMPT-012 |
 | Student learning idle | 同一 Run/tier 的 `StudentCompile`；完整 tools override | PROMPT-008、PROMPT-012、AGENT-021 |
 | 编译 idle | `StudentCompileNudge`；不回到 Learn | PROMPT-003、PROMPT-012 |
+| 编译制品提示 | 精确 SKILL.md 路径、name/description frontmatter、非空正文与重启提醒 | AGENT-022、PROMPT-012 |
 | 任一插件发送失败或 unknown | 无旁路重发；按 PROMPT-011 保持或关闭 | PROMPT-005、PROMPT-011 |

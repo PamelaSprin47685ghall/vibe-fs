@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
@@ -102,7 +102,39 @@ test('EXEC_025_learning_idle_switches_to_compile_and_final_return_deletes_QA_bef
       },
     )
 
-    const finalMessage = '已生成并检查 .agent/skills/example/SKILL.md。'
+    await assert.rejects(
+      async () =>
+        hooks['tool.execute.before'](
+          { sessionID: student, tool: 'write', callID: 'call_flat_skill' },
+          { args: { filePath: '.agent/skills/example.md' } },
+        ),
+      /exactly \.agent\/skills\/<skill-name>\/SKILL\.md/,
+    )
+
+    const skillRelativePath = '.agent/skills/example/SKILL.md'
+    const skillPath = join(directory, skillRelativePath)
+    await hooks['tool.execute.before'](
+      { sessionID: student, tool: 'write', callID: 'call_valid_skill' },
+      { args: { filePath: skillRelativePath } },
+    )
+    mkdirSync(join(directory, '.agent', 'skills', 'example'), { recursive: true })
+    writeFileSync(skillPath, '# Missing frontmatter\n')
+
+    const invalidReturn = parseToml(
+      await hooks.tool.return.execute(
+        { message: '不应完成。' },
+        toolContext(student, 'asst_student_compile_invalid', 'call_student_return_invalid'),
+      ),
+    )
+    assert.match(invalidReturn.error, /YAML frontmatter/)
+    assert.equal(existsSync(qaPath), true, 'invalid SKILL must keep QA for repair')
+
+    writeFileSync(
+      skillPath,
+      '---\nname: example\ndescription: Preserve one proven causal chain.\n---\n\n# Example\n\nPreserve one proven causal chain.\n',
+    )
+
+    const finalMessage = '已生成并检查 .agent/skills/example/SKILL.md；重启 OpenCode 后加载。'
     const returnResult = parseToml(
       await hooks.tool.return.execute(
         { message: finalMessage },
@@ -194,8 +226,39 @@ test('EXEC_025_Teacher_plain_text_only_nudges_and_does_not_complete_the_parent_t
       { message: '只有 return 的文本才是答案。' },
       toolContext(teacher, 'asst_teacher_plain', 'call_teacher_return_after_idle'),
     )
-    assert.equal(returned, 'OK')
+    assert.equal(parseToml(returned).completion_text, 'Teacher answer returned to Student.')
+
+    const toolRunOutput = { text: 'text belonging to the tool-calling assistant' }
+    await hooks['experimental.text.complete'](
+      { sessionID: teacher, messageID: 'asst_teacher_plain', partID: 'part_teacher_tool_run' },
+      toolRunOutput,
+    )
+    assert.equal(
+      toolRunOutput.text,
+      'text belonging to the tool-calling assistant',
+      'the return-calling provider run cannot impersonate the following terminal completion',
+    )
+
+    const completionOutput = { text: 'provider trailing prose' }
+    await hooks['experimental.text.complete'](
+      { sessionID: teacher, messageID: 'asst_teacher_return_complete', partID: 'part_teacher_complete' },
+      completionOutput,
+    )
+    assert.equal(completionOutput.text, 'Teacher answer returned to Student.')
+    runtime.pushHostMessage(
+      teacher,
+      assistantMessage(
+        teacher,
+        'asst_teacher_return_complete',
+        teacherRootID,
+        'fast-teacher',
+        completionOutput.text,
+      ),
+    )
+    hooks.event(idle(teacher))
+
     assert.equal(parseToml(await parentTool).answer, '只有 return 的文本才是答案。')
+    assert.deepEqual(runtime.abortedIds, [], 'successful Teacher return must not abort its turn')
   })
 })
 

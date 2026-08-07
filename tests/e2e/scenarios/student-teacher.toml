@@ -41,6 +41,9 @@ user = "# Answer the Student's current question"
   [[turn.step]]
   respond = { type = "tool-call", tool = "return", args = { message = "The smallest sufficient principle is to preserve one proven causal chain." } }
 
+  [[turn.step]]
+  respond = { type = "text", text = "provider trailing Teacher prose that must be replaced" }
+
 [[turn]]
 id = "student-compile"
 internal = true
@@ -48,10 +51,10 @@ user = "# 你已经结束向 Teacher 提问"
 tools = ["read", "glob", "grep", "write", "edit", "return"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "write", args = { filePath = ".agent/skills/student-canary/SKILL.md", content = "# Student canary\n\nPreserve one proven causal chain.\n" } }
+  respond = { type = "tool-call", tool = "write", args = { filePath = ".agent/skills/student-canary/SKILL.md", content = "---\nname: student-canary\ndescription: Preserve one proven causal chain for the Student canary.\n---\n\n# Student canary\n\nPreserve one proven causal chain.\n" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "return", args = { message = "Created .agent/skills/student-canary/SKILL.md." } }
+  respond = { type = "tool-call", tool = "return", args = { message = "Created .agent/skills/student-canary/SKILL.md; restart OpenCode to load it." } }
 
   [[turn.step]]
   respond = { type = "text", text = "provider paraphrase that must be replaced" }

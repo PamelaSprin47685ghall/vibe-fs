@@ -158,3 +158,14 @@ StudentCompile → { read, glob, grep, write, edit, return }
 学习面不得出现文件、执行、委派或最终 `return`；编译面不得出现 `teacher`、委派、PTY 或网络工具。
 Teacher 的 `return` 只把自由文本交还等待中的 `teacher` 工具，普通正文、reasoning、idle 或工具流
 都不是回答。Student 的最终 `return` 只在编译面可执行。
+
+## AGENT-022：Student SKILL 可加载制品
+
+StudentCompile 的写入目标只能是精确形态 `.agent/skills/<skill-name>/SKILL.md`；不得把 `.md` 平铺在
+`skills` 目录，也不得写绝对路径、穿越路径、额外嵌套或其它文件。每个 `SKILL.md` 必须是 UTF-8，
+以 `---` 包围的 YAML frontmatter 开头，其中包含非空 `name` 与 `description`，且 `name` 与目录名完全
+相同；frontmatter 后必须有非空 Markdown 正文。
+
+write/edit 在副作用前校验目标形态；Student 最终 `return` 前重新读取并校验本次触达的全部 SKILL，
+且至少触达一个。任一文件缺失、不可解码或不满足上述契约时不得删除 QA、不得进入最终 completion。
+新 SKILL 只保证供新的 OpenCode 进程/会话发现；最终说明必须提醒用户重启 OpenCode 后加载。

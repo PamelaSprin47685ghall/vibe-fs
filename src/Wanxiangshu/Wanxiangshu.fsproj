@@ -60,6 +60,7 @@
     <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/ManagedAgentCatalog.fs"/>
     <Compile Include="Domain/StudentTeacher.fs"/>
+    <Compile Include="Domain/StudentSkill.fs"/>
     <Compile Include="Domain/StudentTeacherPrompt.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>

@@ -90,8 +90,9 @@ Transform 可在 provider-facing 历史上注入固定中文 synthetic assistant
    裁剪 provider-visible schema，并在执行时按同一 ruleset ask/deny。
 3. 普通 tool result 后同一 Host loop 会继续到 Assistant completion；Student `return` 可先删除 QA，
    再把其 message 约束为用户最终回复。
-4. Teacher `return` 先完成等待中的父 `teacher` 工具；父工具随后 abort 当前 Teacher provider turn。
-   abort 是内部 turn 控制面，不是 Teacher 答案，也不 retire Session；下一问题继续同一 Session。
+4. Teacher `return` 的普通 tool result 使同一 Host loop 继续到一个固定 Assistant completion；该 completion
+   正常结束并被 reconcile 后才完成等待中的父 `teacher` 工具。成功路径不得 abort、不得显示
+   `interrupted`，也不 retire Session；下一问题继续同一 Session。
 5. idle 只作 wake；Student/Teacher 策略必须从完整 snapshot、request profile 与 Satellite 关联决定 nudge。
 
 任一 canary 失败 → `HostContractUnsupported`，Student 功能 fail closed；不得影响其它 Agent。

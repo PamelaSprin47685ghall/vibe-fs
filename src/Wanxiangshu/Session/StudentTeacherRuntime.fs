@@ -17,11 +17,16 @@ module private StudentTeacherPath =
     [<Import("resolve", "node:path")>]
     let resolve (basePath: string, path: string) : string = jsNative
 
-    [<Import("relative", "node:path")>]
-    let relative (fromPath: string, toPath: string) : string = jsNative
+    [<Import("readFileSync", "node:fs")>]
+    let readFileSync (path: string) : obj = jsNative
 
-    [<Import("isAbsolute", "node:path")>]
-    let isAbsolute (path: string) : bool = jsNative
+    [<Emit("new TextDecoder('utf-8', { fatal: true }).decode($0)")>]
+    let decodeUtf8Fatal (bytes: obj) : string = jsNative
+
+type private PendingTeacherReturn =
+    { ToolRun: ProviderRunIdentity
+      Answer: string
+      mutable CompletionRun: ProviderRunIdentity option }
 
 type private StudentRunCell =
     { SessionId: SessionId
@@ -31,6 +36,8 @@ type private StudentRunCell =
       mutable State: StudentTeacher.RunState
       mutable TeacherSessionId: SessionId option
       mutable Waiter: TaskCompletionSource<Result<string, string>> option
+      mutable PendingTeacherReturn: PendingTeacherReturn option
+      mutable TouchedSkillDocuments: Map<string, string>
       mutable PendingFinal: (ProviderRunIdentity * string) option }
 
 /// EXEC-027/026: control-plane owner for Student learning. This type stores no
@@ -48,9 +55,28 @@ type StudentTeacherRuntime
     let gate = obj ()
     let runs = Dictionary<string, StudentRunCell>()
     let teacherOwners = Dictionary<string, string>()
-    let expectedTeacherAborts = HashSet<string>()
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
+
+    let validateTouchedSkills (cell: StudentRunCell) : Result<unit, string> =
+        if Map.isEmpty cell.TouchedSkillDocuments then
+            Error "return rejected: StudentCompile must write or edit at least one loadable SKILL.md"
+        else
+            cell.TouchedSkillDocuments
+            |> Map.toList
+            |> List.fold
+                (fun state (path, expectedName) ->
+                    state
+                    |> Result.bind (fun () ->
+                        try
+                            let content =
+                                StudentTeacherPath.readFileSync path |> StudentTeacherPath.decodeUtf8Fatal
+
+                            StudentSkill.validateDocument expectedName content
+                            |> Result.mapError (fun error -> sprintf "%s: %s" path error)
+                        with ex ->
+                            Error(sprintf "%s: SKILL.md UTF-8 read failed: %s" path ex.Message)))
+                (Ok())
 
     let appendFact owner fact =
         AgentJournal.appendAgent (StreamId.Session owner) None fact journal
@@ -219,6 +245,8 @@ type StudentTeacherRuntime
                                   State = StudentTeacher.RunState.LearnReady
                                   TeacherSessionId = restoredTeacher sessionId
                                   Waiter = None
+                                  PendingTeacherReturn = None
+                                  TouchedSkillDocuments = Map.empty
                                   PendingFinal = None }
 
                             runs.[sessionKey sessionId] <- created
@@ -242,7 +270,11 @@ type StudentTeacherRuntime
             | Some cell ->
                 let claimed =
                     lock gate (fun () ->
-                        if cell.State = StudentTeacher.RunState.LearnReady && cell.Waiter.IsNone then
+                        if
+                            cell.State = StudentTeacher.RunState.LearnReady
+                            && cell.Waiter.IsNone
+                            && cell.PendingTeacherReturn.IsNone
+                        then
                             cell.State <- StudentTeacher.RunState.TeacherWaiting
                             true
                         else
@@ -298,34 +330,45 @@ type StudentTeacherRuntime
                 match tryOwner sessionId |> Option.bind tryCell with
                 | None -> return Error "return rejected: Teacher has no active Student owner"
                 | Some cell ->
-                    let waiter = lock gate (fun () -> cell.Waiter)
+                    let waiter, existingReturn =
+                        lock gate (fun () -> cell.Waiter, cell.PendingTeacherReturn)
 
-                    match waiter with
-                    | None -> return Error "return rejected: no Student teacher call is waiting"
-                    | Some pending ->
+                    match waiter, existingReturn, providerRunId with
+                    | None, _, _ -> return Error "return rejected: no Student teacher call is waiting"
+                    | Some _, Some _, _ -> return Error "return rejected: Teacher return completion is already pending"
+                    | Some _, None, None ->
+                        return Error "return rejected: Host provided no Teacher provider-run identity"
+                    | Some _, None, Some toolRun ->
                         match qa.Append(cell.SessionId, cell.LogicalRunId, message) with
                         | Error error -> return Error error
                         | Ok _ ->
                             lock gate (fun () ->
-                                cell.Waiter <- None
-                                cell.State <- StudentTeacher.RunState.LearnReady
-                                expectedTeacherAborts.Add(sessionKeyValue) |> ignore)
+                                cell.PendingTeacherReturn <-
+                                    Some
+                                        { ToolRun = toolRun
+                                          Answer = message
+                                          CompletionRun = None })
 
-                            AsyncSupport.trySetResult pending (Ok message) |> ignore
-                            sessions.AbortSession sessionId |> ignore
-                            return Ok "OK"
+                            // Blogger-style deferred completion: the tool commits
+                            // its payload, while the following normal assistant
+                            // terminal releases the parent waiter. Never abort a
+                            // successful Teacher turn.
+                            return Ok StudentTeacherPrompt.teacherReturnResult
 
             | Some profile when profile.CanonicalRole = Role.Student ->
                 match tryCell sessionId, providerRunId with
                 | Some cell, Some providerRun when
                     cell.State = StudentTeacher.RunState.CompileReady && cell.PendingFinal.IsNone
                     ->
-                    match qa.Delete(cell.SessionId, cell.LogicalRunId) with
+                    match validateTouchedSkills cell with
                     | Error error -> return Error error
                     | Ok() ->
-                        lock gate (fun () -> cell.PendingFinal <- Some(providerRun, message))
+                        match qa.Delete(cell.SessionId, cell.LogicalRunId) with
+                        | Error error -> return Error error
+                        | Ok() ->
+                            lock gate (fun () -> cell.PendingFinal <- Some(providerRun, message))
 
-                        return Ok(StudentTeacherPrompt.finalReturnResult message)
+                            return Ok(StudentTeacherPrompt.finalReturnResult message)
                 | Some _, None -> return Error "return rejected: Host provided no provider-run identity"
                 | Some _, Some _ -> return Error "return rejected: Student is not in StudentCompile"
                 | None, _ -> return Error "return rejected: no active Student run"
@@ -351,7 +394,23 @@ type StudentTeacherRuntime
                 // next provider text completion is therefore the terminal slot.
                 | Some(_, finalMessage) -> output?text <- finalMessage
                 | _ -> ()
-            | None -> ()
+            | None ->
+                match tryOwner sessionId |> Option.bind tryCell with
+                | None -> ()
+                | Some cell ->
+                    let completionRun = ProviderRunIdentity.create (unbox<string> input?messageID)
+
+                    let ownsCompletion =
+                        lock gate (fun () ->
+                            match cell.PendingTeacherReturn with
+                            | Some pending when pending.CompletionRun.IsNone && completionRun <> pending.ToolRun ->
+                                pending.CompletionRun <- Some completionRun
+                                true
+                            | Some pending when pending.CompletionRun = Some completionRun -> true
+                            | _ -> false)
+
+                    if ownsCompletion then
+                        output?text <- StudentTeacherPrompt.TeacherReturnCompletion
 
     member _.ValidateTool(input: obj, output: obj) : Result<unit, string> =
         if isNull input || isNull input?sessionID || isNull input?tool then
@@ -393,28 +452,31 @@ type StudentTeacherRuntime
                         if isNull path then
                             Error(sprintf "StudentCompile %s requires a target path" tool)
                         else
-                            let target = StudentTeacherPath.resolve (workspaceDirectory, unbox<string> path)
-                            let skillRoot = StudentTeacherPath.resolve (workspaceDirectory, ".agent/skills")
-                            let relative = StudentTeacherPath.relative (skillRoot, target)
+                            let rawPath = unbox<string> path
 
-                            if
-                                relative = ""
-                                || (not (relative.StartsWith("..")))
-                                   && not (StudentTeacherPath.isAbsolute relative)
-                            then
+                            match StudentSkill.targetName rawPath with
+                            | Error error -> Error error
+                            | Ok skillName ->
+                                let target = StudentTeacherPath.resolve (workspaceDirectory, rawPath)
+
+                                lock gate (fun () ->
+                                    cell.TouchedSkillDocuments <- Map.add target skillName cell.TouchedSkillDocuments)
+
                                 Ok()
-                            else
-                                Error "StudentCompile write/edit is restricted to .agent/skills"
                     else
                         Ok()
 
             | Some profile when profile.CanonicalRole = Role.Teacher ->
                 let allowed = Roles.permissions Role.Teacher |> Set.map StaticTools.toolName
 
-                if Set.contains tool allowed then
-                    Ok()
-                else
-                    Error(sprintf "Tool '%s' is outside the Teacher execution profile" tool)
+                match tryOwner sessionId |> Option.bind tryCell with
+                | Some cell when cell.PendingTeacherReturn.IsSome ->
+                    Error "Teacher tool rejected: return completion is already expected"
+                | _ ->
+                    if Set.contains tool allowed then
+                        Ok()
+                    else
+                        Error(sprintf "Tool '%s' is outside the Teacher execution profile" tool)
             | _ -> Ok()
 
     member _.HandleTurn(turn: ReconciledTurn) : Task<bool> =
@@ -453,28 +515,55 @@ type StudentTeacherRuntime
                     | _ -> return true
 
             | Some Role.Teacher ->
-                let expectedAbort =
-                    lock gate (fun () -> expectedTeacherAborts.Remove(sessionKey turn.SessionId))
+                match tryOwner turn.SessionId |> Option.bind tryCell with
+                | None -> return true
+                | Some cell ->
+                    let pendingReturn, waiter =
+                        lock gate (fun () -> cell.PendingTeacherReturn, cell.Waiter)
 
-                if expectedAbort then
-                    return true
-                else
-                    match tryOwner turn.SessionId |> Option.bind tryCell with
-                    | None -> return true
-                    | Some cell ->
-                        match turn.Outcome, cell.Waiter with
-                        | ReconcileProgram.TurnCompleted, Some _ ->
-                            let! _ = sendTeacherNudge cell turn.SessionId
-                            return true
-                        | ReconcileProgram.TurnFailed error, Some waiter
-                        | ReconcileProgram.TurnAborted error, Some waiter ->
-                            AsyncSupport.trySetResult waiter (Error(sprintf "Teacher run failed: %s" error))
+                    match turn.Outcome, pendingReturn, waiter with
+                    | ReconcileProgram.TurnCompleted, Some pending, Some parentWaiter ->
+                        let finalText = CompletedTurnClassifier.partsText turn.Parts
+
+                        let completedExpectedRun =
+                            pending.CompletionRun = Some turn.ProviderRun
+                            && finalText = StudentTeacherPrompt.TeacherReturnCompletion
+
+                        lock gate (fun () ->
+                            cell.PendingTeacherReturn <- None
+                            cell.Waiter <- None
+                            cell.State <- StudentTeacher.RunState.LearnReady)
+
+                        if completedExpectedRun then
+                            AsyncSupport.trySetResult parentWaiter (Ok pending.Answer) |> ignore
+                        else
+                            AsyncSupport.trySetResult
+                                parentWaiter
+                                (Error "Teacher return completion did not match the pending provider run")
                             |> ignore
 
+                        return true
+                    | ReconcileProgram.TurnCompleted, None, Some _ ->
+                        let! _ = sendTeacherNudge cell turn.SessionId
+                        return true
+                    | ReconcileProgram.TurnFailed error, _, Some parentWaiter
+                    | ReconcileProgram.TurnAborted error, _, Some parentWaiter ->
+                        lock gate (fun () ->
+                            cell.PendingTeacherReturn <- None
                             cell.Waiter <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady
-                            return true
-                        | _ -> return true
+                            cell.State <- StudentTeacher.RunState.LearnReady)
+
+                        AsyncSupport.trySetResult parentWaiter (Error(sprintf "Teacher run failed: %s" error))
+                        |> ignore
+
+                        return true
+                    | ReconcileProgram.TurnCompleted, Some _, None ->
+                        lock gate (fun () ->
+                            cell.PendingTeacherReturn <- None
+                            cell.State <- StudentTeacher.RunState.LearnReady)
+
+                        return true
+                    | _ -> return true
             | _ -> return false
         }
 
@@ -487,6 +576,7 @@ type StudentTeacherRuntime
                     lock gate (fun () ->
                         let pending = cell.Waiter
                         cell.Waiter <- None
+                        cell.PendingTeacherReturn <- None
                         cell.State <- StudentTeacher.RunState.Closed
                         pending)
 

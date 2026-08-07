@@ -5,6 +5,9 @@ namespace Wanxiangshu.Domain
 [<RequireQualifiedAccess>]
 module StudentTeacherPrompt =
 
+    [<Literal>]
+    let TeacherReturnCompletion = "Teacher answer returned to Student."
+
     let teacherQuestion (qaPath: string) (question: string) (replacement: bool) =
         let instructions =
             [ "Answer the Student's current question using Socratic, first-principles reasoning."
@@ -29,12 +32,21 @@ module StudentTeacherPrompt =
             [ "This is the Teacher's returned answer. Continue learning from it." ]
             [ SyntheticToml.field "answer" (SyntheticToml.renderString answer) ]
 
+    let teacherReturnResult =
+        SyntheticToml.document
+            [ "The answer is durably recorded and will be delivered to the Student after this turn completes."
+              "Do not call another tool. Finish this turn now by outputting completion_text exactly." ]
+            [ SyntheticToml.field "completion_text" (SyntheticToml.renderString TeacherReturnCompletion) ]
+
     let compile (qaPath: string) =
         SyntheticToml.document
             [ "你已经结束向 Teacher 提问。"
               "qa_path 指向本次学习任务的完整 QA.md，也是唯一权威来源。"
               "读取其全部内容。不要依赖文件之外的记忆，不要补充文件未支持的知识。"
-              "把其中获得的全部有价值知识整理为 .agent/skills/... 下一个或多个边界清晰、可以独立使用的 SKILL。"
+              "把其中获得的全部有价值知识整理为一个或多个边界清晰、可以独立使用的 SKILL。"
+              "每个制品的唯一路径形态是 .agent/skills/<skill-name>/SKILL.md；禁止在 skills 目录平铺 .md。"
+              "每个 SKILL.md 必须以 YAML frontmatter 开头，至少含与目录名完全相同的非空 name 和非空 description。"
+              "frontmatter 后必须有非空 Markdown 正文。例如：--- / name: skill-name / description: 何时使用 / ---。"
               "以第一性原理重新表达知识；寻找能够解释并生成全部具体结论的最小充分原则。"
               "不要按照问答时间顺序做聊天摘要，也不要机械复制对话。"
               "第一性原理不等于删除细节；最终制品必须构成对 QA.md 的语义无损压缩。"
@@ -48,11 +60,16 @@ module StudentTeacherPrompt =
               "遵循仓库现有 SKILL 目录、命名与格式约定。先检查已有 SKILL；应扩展时精准修改，不创建平行真相。"
               "完成初稿后重新读取完整 QA.md 和全部最终 SKILL，逐段确认每项语义价值已直接表达、被基础原则完整蕴含或明确保留为未解决项。"
               "不得仅凭整体意思差不多判定完成。"
-              "成功写入并检查全部 SKILL 后调用 return；return 只简要说明生成或修改了哪些 SKILL，不复述全部知识。" ]
+              "成功写入并检查全部 SKILL 后调用 return；return 会再次验证路径、frontmatter 与正文。"
+              "return 只简要说明生成或修改了哪些 SKILL，并提醒用户新 SKILL 需要重启 OpenCode 后加载；不复述全部知识。" ]
             [ SyntheticToml.field "qa_path" (SyntheticToml.renderString qaPath) ]
 
     let compileNudge =
-        SyntheticToml.document [ "继续完成 QA.md 到 SKILL 的编译。"; "完成写入与复核后调用 return；不要把 idle 当作完成。" ] []
+        SyntheticToml.document
+            [ "继续完成 QA.md 到 SKILL 的编译。"
+              "只写 .agent/skills/<skill-name>/SKILL.md，并包含 name/description frontmatter 与非空正文。"
+              "完成写入与复核后调用 return；不要把 idle 当作完成。" ]
+            []
 
     let finalReturnResult message =
         SyntheticToml.document

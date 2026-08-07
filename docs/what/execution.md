@@ -85,9 +85,9 @@ schemaVersion=2；finality 仅 `completed|failed`。
 HumanRoot 原文先写 QA
 → StudentLearn（工具严格 {teacher}）
 → teacher(message)：问题先写 QA，再发同一 Teacher
-→ Teacher return：回答先写 QA，再交付 Student
+→ Teacher return：回答先写 QA，当前 Teacher turn 正常 completion 后再交付 Student
 → Student learning idle：发送 StudentCompile continuation
-→ StudentCompile（读 QA，写一个或多个 .agent/skills，工具含最终 return）
+→ StudentCompile（读 QA，写一个或多个 AGENT-022 SKILL.md，工具含最终 return）
 → return(message)：删除 QA 并确认不存在
 → 同一 Host loop 的 Assistant completion 显示 message，Student Run 终止
 ```
@@ -95,9 +95,14 @@ HumanRoot 原文先写 QA
 Teacher 未 return 的 idle 只 nudge 同一 Teacher；自动恢复预算耗尽后父 `teacher` 失败，绝不从普通正文
 截取答案。Student compile 未 return 的 idle 只发 compilation nudge；第一版不返回学习。
 
+Teacher `return` 不 abort Session 或当前成功 turn。其 tool result 约束同一 Host loop 产生固定、无业务内容的
+Assistant completion；只有该 completion 被 reconcile 为 `TurnCompleted` 后，等待中的父 `teacher` 才取得
+已落盘答案。后续问题继续使用同一 Teacher Session；成功路径不得产生 `interrupted`。
+
 同一 Student Run 同时最多一个 teacher 调用、一个 Teacher provider run、一个 QA 写入和一个 compile
 continuation。异常并发明确拒绝。用户取消时 abort Student/Teacher、删除 QA、retire Teacher 关联；删除
 失败保留文件并报告清理错误。
 
-最终 `return` 删除失败时不提交 terminal、不显示完成说明；不存在视为删除成功，重试幂等。最终 message
-只简述生成/修改了哪些 SKILL，不自动附带 QA/path。
+最终 `return` 先按 AGENT-022 校验全部触达制品，再删除 QA；任一步失败都不提交 terminal、不显示完成
+说明。QA 不存在视为删除成功，重试幂等。最终 message 只简述生成/修改了哪些 SKILL、提醒重启 OpenCode，
+不自动附带 QA/path。

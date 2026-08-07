@@ -34,8 +34,9 @@
 | 证明 | 期望 | 条款 |
 |------|------|------|
 | teacher single-flight | 并发第二调用拒绝；问题已落盘不回滚 | EXEC-027、EXEC-026 |
-| return completion cell | 无 waiter/重复/错 Session fail closed；只完成一个父调用 | EXEC-026 |
+| return completion cell | 无 waiter/重复/错 Session fail closed；匹配正常 terminal 后只完成一个父调用 | EXEC-026 |
+| Teacher 正常结束 | return 后固定 completion 为 `TurnCompleted`；成功路径无 abort/interrupted | EXEC-026、EXEC-027、HOST-014 |
 | Teacher idle | 同 Session nudge；预算耗尽失败；普通正文不作答案 | EXEC-027 |
 | Student idle | Learn→Compile 一次；Compile idle nudge；不回 Learn | EXEC-027、PROMPT-012 |
-| final return | delete/absent 后才 pending terminal；删除失败可重试且无最终回复 | EXEC-027 |
+| final return | AGENT-022 全量校验后才 delete/pending terminal；失败可重试且无最终回复 | EXEC-027、AGENT-022 |
 | cancel/delete | abort 两端、retire Teacher、删除 QA；清理失败不伪装成功 | EXEC-027、HOST-008 |

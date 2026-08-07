@@ -40,6 +40,32 @@ const acceptTeacherPrompt = async (hooks, host, prompt, teacher, ordinal) => {
   })
 }
 
+const completeTeacherReturn = async (hooks, host, teacher, ordinal) => {
+  const messageID = `asst_teacher_restart_completion_${ordinal}`
+  const output = { text: 'provider trailing prose' }
+  await hooks['experimental.text.complete'](
+    { sessionID: teacher, messageID, partID: `part_teacher_restart_completion_${ordinal}` },
+    output,
+  )
+  assert.equal(output.text, 'Teacher answer returned to Student.')
+  host.pushHostMessage(teacher, {
+    info: {
+      id: messageID,
+      role: 'assistant',
+      sessionID: teacher,
+      parentID: `msg_teacher_restart_${ordinal}`,
+      agent: 'fast-teacher',
+      finish: 'stop',
+      time: { completed: Date.now() },
+    },
+    parts: [{ type: 'text', text: output.text }],
+  })
+  hooks.event({
+    type: 'session.status',
+    properties: { sessionID: teacher, status: { type: 'idle' } },
+  })
+}
+
 test('HOST_014_plugin_restart_rebuilds_Student_control_and_reuses_proven_Teacher', async () => {
   await withRestartablePlugin(async (start, directory, host) => {
     const student = 'ses_student_restart'
@@ -63,11 +89,15 @@ test('HOST_014_plugin_restart_rebuilds_Student_control_and_reuses_proven_Teacher
     const teacher = host.createdIds[0]
     await awaitPrompted(teacher)
     await acceptTeacherPrompt(first, host, host.prompts[0], teacher, 1)
-    await first.tool.return.execute(
+    const abortsBeforeFirstReturn = host.abortedIds.length
+    const firstReturn = await first.tool.return.execute(
       { message: '重启前回答' },
       context(teacher, 'asst_teacher_restart_1', 'call_return_restart_1'),
     )
+    assert.equal(parseToml(firstReturn).completion_text, 'Teacher answer returned to Student.')
+    await completeTeacherReturn(first, host, teacher, 1)
     assert.equal(parseToml(await firstTool).answer, '重启前回答')
+    assert.equal(host.abortedIds.length, abortsBeforeFirstReturn)
     await first.dispose()
 
     const second = await start()
@@ -90,11 +120,15 @@ test('HOST_014_plugin_restart_rebuilds_Student_control_and_reuses_proven_Teacher
     assert.equal(host.createdIds.length, 1, 'restart must reuse the one proven Host child')
     assert.equal(host.prompts[1].path.id, teacher)
     await acceptTeacherPrompt(second, host, host.prompts[1], teacher, 2)
-    await second.tool.return.execute(
+    const abortsBeforeSecondReturn = host.abortedIds.length
+    const secondReturn = await second.tool.return.execute(
       { message: '重启后回答' },
       context(teacher, 'asst_teacher_restart_2', 'call_return_restart_2'),
     )
+    assert.equal(parseToml(secondReturn).completion_text, 'Teacher answer returned to Student.')
+    await completeTeacherReturn(second, host, teacher, 2)
     assert.equal(parseToml(await secondTool).answer, '重启后回答')
+    assert.equal(host.abortedIds.length, abortsBeforeSecondReturn)
 
     const gitDir = execFileSync('git', ['-C', directory, 'rev-parse', '--absolute-git-dir'], {
       encoding: 'utf8',

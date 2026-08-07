@@ -8,6 +8,8 @@ import {
   teacherAgentFor,
   toolsFor,
 } from '../../../dist/Domain/StudentTeacher.js'
+import { targetName, validateDocument } from '../../../dist/Domain/StudentSkill.js'
+import { compile, compileNudge } from '../../../dist/Domain/StudentTeacherPrompt.js'
 import { AgentTier, Role } from '../../../dist/Kernel/Roles.js'
 import {
   StaticTools_requestToolMap as requestToolMap,
@@ -70,4 +72,61 @@ test('PERSIST_011_replayed_HumanRoot_is_proved_from_the_exact_QA_opening', () =>
   assert.equal(hasOpening('root\n\nquestion\n\nanswer', 'root'), true)
   assert.equal(hasOpening('root suffix\n\nquestion', 'root'), false)
   assert.equal(hasOpening('other\n\nroot', 'root'), false)
+})
+
+test('AGENT_022_StudentCompile_accepts_only_the_OpenCode_SKILL_document_layout', () => {
+  const accepted = targetName('.agent/skills/blogger-blog-nudge/SKILL.md')
+  assert.equal(accepted.tag, 0)
+  assert.equal(accepted.fields[0], 'blogger-blog-nudge')
+
+  for (const rejected of [
+    '.agent/skills/blogger-blog-nudge.md',
+    '.agent\\skills\\blogger-blog-nudge\\SKILL.md',
+    '.agent/skills/.hidden/SKILL.md',
+    '.agents/skills/blogger-blog-nudge/SKILL.md',
+    '.agent/skills/blogger-blog-nudge/notes.md',
+    '.agent/skills/nested/blogger-blog-nudge/SKILL.md',
+    '../.agent/skills/blogger-blog-nudge/SKILL.md',
+    '/tmp/.agent/skills/blogger-blog-nudge/SKILL.md',
+  ]) {
+    assert.equal(targetName(rejected).tag, 1, `${rejected} must be rejected`)
+  }
+})
+
+test('AGENT_022_SKILL_requires_matching_name_description_and_non_empty_body', () => {
+  const valid = [
+    '---',
+    'name: blogger-blog-nudge',
+    'description: Diagnose and repair Blogger nudge behavior.',
+    '---',
+    '',
+    '# Blogger blog nudge',
+    '',
+    'Preserve the causal boundary.',
+    '',
+  ].join('\n')
+
+  assert.equal(validateDocument('blogger-blog-nudge', valid).tag, 0)
+
+  const failures = [
+    '# no frontmatter',
+    valid.replace('name: blogger-blog-nudge', 'name: other'),
+    valid.replace('description: Diagnose and repair Blogger nudge behavior.\n', ''),
+    '---\nname: blogger-blog-nudge\ndescription: empty body\n---\n',
+  ]
+
+  for (const content of failures) {
+    assert.equal(validateDocument('blogger-blog-nudge', content).tag, 1)
+  }
+})
+
+test('AGENT_022_StudentCompile_prompt_states_the_loadable_layout_and_restart_boundary', () => {
+  for (const prompt of [compile('/private/QA.md'), compileNudge]) {
+    assert.match(prompt, /\.agent\/skills\/<skill-name>\/SKILL\.md/)
+    assert.match(prompt, /frontmatter/)
+    assert.match(prompt, /name/)
+    assert.match(prompt, /description/)
+    assert.match(prompt, /非空.*正文/)
+  }
+  assert.match(compile('/private/QA.md'), /重启 OpenCode/)
 })
