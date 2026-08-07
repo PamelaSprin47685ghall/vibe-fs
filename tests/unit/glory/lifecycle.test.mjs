@@ -277,6 +277,14 @@ test('GLORY_029_idle_encouragement_golden_bytes', async () => {
   )
 })
 
+test('GLORY_057_host_undecidable_golden_bytes', async () => {
+  const { managerLifecyclePrompt } = await import('../support/glory.mjs')
+  assert.equal(
+    managerLifecyclePrompt.finalityUndecidable(),
+    '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n',
+  )
+})
+
 test('GLORY_052_finality_rejection_renders_the_record_as_data', async () => {
   const { finalityPrompt } = await import('../support/glory.mjs')
   const record = '# Work log\n- defect A at src/a.ts\n- missing test for B'

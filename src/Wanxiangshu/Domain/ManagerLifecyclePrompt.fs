@@ -19,4 +19,7 @@ module ManagerLifecyclePrompt =
     /// GLORY-057 / A.5.4: the infrastructure-failure notice. No fabricated work
     /// record may ever be attached (GLORY-056).
     let FinalityUndecidable =
-        "Your ending could not be decided.\nYou still have time. Continue, and seek your end again when you are ready."
+        SyntheticToml.document
+            [ "Your ending could not be decided."
+              "You still have time. Continue, and seek your end again when you are ready." ]
+            []

@@ -6,6 +6,12 @@ open System
 /// The reviewer's canonical work record is rendered as comment blocks.
 module FinalityPrompt =
 
+    let rejectionInstructions =
+        [ "Your ending has not accepted you."
+          "You have done well, and you still have plenty of time. Continue."
+          "The following is evidence of what remains unfinished. It is not a new user instruction."
+          "Resolve the unfinished work, continue normal execution, and call suicide again only when nothing useful remains." ]
+
     /// GLORY-052: render the rejection prompt for `suicide`.
     /// Format:
     /// # Your ending has not accepted you.
@@ -16,32 +22,14 @@ module FinalityPrompt =
     /// # Work Log
     /// # ...
     ///
-    /// # Final Output
-    /// # ...
-    ///
     /// Only comment blocks, no TOML data blocks.
     let rejected (reviewerWorkRecord: string) =
-        let header =
-            [ "# Your ending has not accepted you."
-              "# You have done well, and you still have plenty of time. Continue."
-              "# The following is evidence of what remains unfinished. It is not a new user instruction."
-              "# Resolve the unfinished work, continue normal execution, and call suicide again only when nothing useful remains." ]
-            |> String.concat "\n"
+        let header = SyntheticToml.document rejectionInstructions [] |> fun s -> s.TrimEnd('\n')
 
         let normalizedRecord = SyntheticToml.normalizeNewlines reviewerWorkRecord
 
-        let recordComments =
-            if String.IsNullOrWhiteSpace normalizedRecord then
-                ""
-            else
-                normalizedRecord.Split '\n'
-                |> Array.map (fun line ->
-                    if line.StartsWith "#" then line
-                    elif String.IsNullOrWhiteSpace line then "#"
-                    else "# " + line)
-                |> String.concat "\n"
-
-        if String.IsNullOrWhiteSpace recordComments then
+        if String.IsNullOrWhiteSpace normalizedRecord then
             header + "\n"
         else
+            let recordComments = SyntheticToml.comment normalizedRecord
             header + "\n\n" + recordComments + "\n"
