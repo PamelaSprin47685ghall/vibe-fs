@@ -74,13 +74,14 @@ plugin start
 → dispose: cancel Tasks, kill PTY/process, dispose sessions
 ```
 
-Satellite 创建统一走：
+Satellite 创建统一走（HOST-015 扁平拓扑）：
 
 ```text
-query owner children
-→ 0 个匹配：create child → append SatelliteLinked
-→ 1 个匹配：核对 kind/agent/owner → 复用（缺 link 时补 link）
-→ 多个、查询失败或归属冲突：fail closed
+query family root children（owner ≠ root 时并查 owner children，兼容扁平前的物理位置）
+→ 有 journal 关联（RestoredSessionId）且恰好 1 个 id+agent+title 匹配：复用
+→ journal 关联的 id 不存在：Replacement（新建，物理挂 root）
+→ 无 journal 关联：不复用任何候选，直接新建（Created）
+→ id 匹配但 agent/title 冲突、多个 id 匹配或查询失败：fail closed
 ```
 
 Companion 和 Teacher 都必须先登记 `ManagedSessionKind.SatelliteSession`，再发送首个 prompt。Transform

@@ -51,6 +51,9 @@ Companion 与 Teacher SessionId 均不等于 owner，也彼此不同
 优先存宿主 metadata 并以 Journal 关联做 durable keyed lookup。重启时：Host 证明原 Satellite 存在则复用；
 Host 证明永久丢失则按该 kind 的恢复合同 Replacement；Host 查询失败、重复候选或归属冲突则 fail closed。
 
+物理拓扑恒扁平（HOST-015）：每个 Managed child 的 Host 物理 parent 是 family root，不是逻辑 owner；
+`ParentSessionId` 只承载 journal 证明的逻辑归属，不参与 Host 树的恢复匹配。
+
 ## HOST-011：Tool 身份的两个半边
 
 | 边界 | message id | call id |

@@ -95,3 +95,16 @@ Transform 可在 provider-facing 历史上注入固定中文 synthetic assistant
 5. idle 只作 wake；Student/Teacher 策略必须从完整 snapshot、request profile 与 Satellite 关联决定 nudge。
 
 任一 canary 失败 → `HostContractUnsupported`，Student 功能 fail closed；不得影响其它 Agent。
+
+## HOST-015：宿主 Session 树扁平，儿子的儿子是儿子
+
+任何 Managed child Session（fork child、one-shot child、Companion Blogger、Student↔Teacher 的
+Teacher）的 Host 物理 parent 恒为 family root：儿子再创建儿子时，新 child 物理重挂到 root 名下。
+Host 树深度恒为 2（root → child），不存在孙子。
+
+理由：UI 只渲染两层树；孙子在界面上不可见，等于脱管 Session。
+
+归属关系不由物理 parentID 承载：fork↔child、Work↔Companion、Student↔Teacher 关系只由 durable
+journal 事实（HandleLinked / CompanionBloggerLinked / StudentTeacherLinked）证明。恢复时按 journal
+关联的 SessionId + agent + title 精确匹配；无 journal 关联则一律新建，不得按物理 parentID 推断
+归属、不得收养同 root 下他人的 child。

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Process
 
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 
 /// Cancelable one-shot timer handle. Cancel leaves Delay permanently pending.
 type ITimerHandle =
@@ -56,16 +57,18 @@ module PtyTiming =
 
     /// Production Node timer port: setTimeout + clearTimeout; ms ≥ 1000 → unref.
     let nodeTimerPort () : ITimerPort =
+        // DSL-MUTABLE: cancellation — port disposed latch
         let mutable disposed = false
 
         { new ITimerPort with
             member _.Delay(milliseconds: int) =
                 let completion = TaskCompletionSource<unit>()
+                // DSL-MUTABLE: cancellation — handle cancel latch
                 let mutable cancelled = false
 
                 let fire () =
                     if not cancelled && not disposed then
-                        completion.TrySetResult() |> ignore
+                        AsyncSupport.trySetResult completion () |> ignore
 
                 let timerId: obj =
                     if milliseconds >= 1000 then
@@ -85,8 +88,11 @@ module PtyTiming =
 
     /// Virtual clock for tests: Advance fires due handles; Cancel/Dispose → zero callbacks.
     let createVirtualTimerPort () : VirtualTimerPort =
+        // DSL-MUTABLE: resource — virtual clock cursor
         let mutable nowMs = 0
+        // DSL-MUTABLE: cancellation — port disposed latch
         let mutable disposed = false
+        // DSL-MUTABLE: resource — monotonic handle id counter
         let mutable nextId = 0
         // (id, fireAtMs, tcs, cancelled ref)
         let entries = ResizeArray<int * int * TaskCompletionSource<unit> * bool ref>()
@@ -135,7 +141,7 @@ module PtyTiming =
                     if not cancelled.Value then
                         cancelled.Value <- true
                         removeId id
-                        completion.TrySetResult() |> ignore
+                        AsyncSupport.trySetResult completion () |> ignore
 
         { Port = port
           Advance = advance

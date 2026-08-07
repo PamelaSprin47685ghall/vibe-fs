@@ -60,13 +60,27 @@ export const countByFileGate = (violations) => {
 
 const scanRoot = (root) => {
   const files = walk(root, ['.fs'])
+  // isProgramRelPath filters on root-relative paths (e.g. Process/PtyTiming.fs).
+  // scanFiles path predicates (isMutableDeclarationAllowed, isProcessPhysicalPath,
+  // isProcessCommandPath) match '/Process/' etc., so entry.file must carry the
+  // src/Wanxiangshu/ prefix used by dsl-ownership.mjs. Baseline keys stay
+  // root-relative: remap violation.file after scanning.
+  const prefix = `${PRODUCTION_ROOT}/`
   const entries = files
-    .map((file) => ({
-      file: norm(relative(root, file)),
-      text: readFileSync(file, 'utf8'),
-    }))
-    .filter((entry) => isProgramRelPath(entry.file))
-  return countByFileGate(scanFiles(entries))
+    .map((abs) => {
+      const rel = norm(relative(root, abs))
+      return {
+        rel,
+        file: norm(`${PRODUCTION_ROOT}/${rel}`),
+        text: readFileSync(abs, 'utf8'),
+      }
+    })
+    .filter((entry) => isProgramRelPath(entry.rel))
+  const violations = scanFiles(entries).map((v) => {
+    const n = norm(v.file)
+    return { ...v, file: n.startsWith(prefix) ? n.slice(prefix.length) : n }
+  })
+  return countByFileGate(violations)
 }
 
 const runCli = () => {
