@@ -308,7 +308,7 @@ const REPAIR_INSTRUCTION =
 
 const PAIR_THOUGHT_TEXT =
   projectionConstants.PairProgrammingThoughtText ??
-  '<do-not-repeat>让我遵循与用户结对编程的理念，用简体中文把所有的思考过程都作为正式文本输出。从第一个字开始就用中文，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。</do-not-repeat>'
+  '<do-not-output>让我遵循与用户结对编程的理念，用简体中文把所有的思考过程都作为正式文本输出。从第一个字开始就用中文，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。</do-not-output>'
 
 const REVIEW_CHALLENGE_PROMPT =
   projectionConstants.ReviewChallengePrompt ?? reviewChallenge.prompt ?? `# ${reviewChallenge.text}\n`
