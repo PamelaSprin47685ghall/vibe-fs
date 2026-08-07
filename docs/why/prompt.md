@@ -16,6 +16,6 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 
 **PromptKey：内容 digest vs 时间/随机窗口身份。** 拒时间窗口：跨崩溃不可靠，且无法区分「同一 Guard 连发两次」。`ClaimSequence` 由 journal fold 派生的单调序号，使同 payload 重发成为两个 key。
 
-**恢复预算与窗口取值。** `RecoveryTailWindow=50`：读取目标 Session 尾部足够判定 PromptKey 是否已物理落地，50 远大于一次 Logical Run 内同 key 可能重复的次数，静态常数不随容量估算（CTX-001）。`RecoveryAttemptBudget=3`：跨 3 次插件启动仍无法证明 → `Abandoned`；有限抑制永挂起，不 pretend 成功。
+**恢复预算与窗口取值。** PROMPT-011 选择有限尾部窗口，以 PromptKey 证据判定物理落地而不依赖容量估算；有限启动预算避免未知结局永久挂起，同时不伪装成功或盲目重发。数值只在 PROMPT-011 定义。
 
 **载体：metadata vs body 标签。** 拒 body：body 是 provider-visible prompt 的一部分，放恢复键会改变对话字节。放 metadata：不进入模型输入，恢复时按 key 检索（PROMPT-011）。

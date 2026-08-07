@@ -14,7 +14,7 @@
 | Blogger | data-only body 与 optional header 分离；chunk 字节合同；join LWR wire 形状 |
 | Tool result bound | pass-through 与 marker+tail 均满足 2000 行 / 51200 UTF-8 bytes；不切断 surrogate pair（ARCH-012） |
 
-## 测试落点（现行）
+## 测试落点
 
 - unit：`tests/unit/context/synthetic-toml*.test.mjs`（及相关 projection/join wire）  
 - tool bound：`tests/unit/context/tool-result-bound.test.mjs`

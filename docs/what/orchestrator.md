@@ -6,9 +6,9 @@ Job / Gate 边界见 `shape/orchestrator.md`。
 
 ## ORCH-001：工具面
 
-Orchestrator 只有 `fork-manager` 与 `join`。  
-不能读写仓库、解决冲突、操作 Git、调用普通子角色。  
-`fork-manager` 只接受 `fast-manager` / `deep-manager`。
+Orchestrator 的工具与可接受 Manager 类型由 AGENT-006、AGENT-009、AGENT-015
+唯一规定。本条只规定本领域应用：Orchestrator 不以自身权限执行 Manager Job 的仓库、
+冲突解决或 Git 工作；这些工作必须进入后续编排流程。
 
 ## ORCH-002：Clean Gate
 

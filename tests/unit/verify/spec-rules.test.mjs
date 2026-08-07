@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  clauseDefinitionHeadings,
   clauseReferences,
   fluidNavigationProblems,
+  markdownLocalLinks,
+  proposalDependencyReferences,
   statusNavigationProblems,
   unknownClauseReferences,
 } from '../../../scripts/checks/spec-rules.mjs'
@@ -41,13 +44,13 @@ test('spec gate requires exact README coverage of active status files', () => {
 test('spec gate covers proposal links with spaces and hash characters exactly', () => {
   const navigation = [
     '[kept](proposal/kept.md)',
-    '[research](<proposal/ChatGPT-F# DSL 规范问题.md>)',
+    '[research](<proposal/research # note.md>)',
     '[stale](proposal/stale.md)',
   ].join('\n')
 
   assert.deepEqual(
     fluidNavigationProblems(navigation, 'proposal', [
-      'proposal/ChatGPT-F# DSL 规范问题.md',
+      'proposal/research # note.md',
       'proposal/kept.md',
       'proposal/missing.md',
     ]),
@@ -71,6 +74,53 @@ test('spec gate expands slash lists and checks range endpoints', () => {
       { id: 'HOST-012', line: 2 },
       { id: 'ARCH-001', line: 3 },
       { id: 'ARCH-008', line: 3 },
+    ],
+  )
+})
+
+test('spec gate finds Clause-shaped headings for any prefix and heading depth', () => {
+  assert.deepEqual(
+    clauseDefinitionHeadings([
+      '# PROPOSE-001: candidate',
+      'text PROPOSE-002 is only a reference',
+      '### ARCH-010: shadow',
+      '## FUTURE-042B: suffixed candidate',
+    ].join('\n')),
+    [
+      { id: 'PROPOSE-001', line: 1 },
+      { id: 'ARCH-010', line: 3 },
+      { id: 'FUTURE-042B', line: 4 },
+    ],
+  )
+})
+
+test('spec gate detects implementation dependencies on Proposal IDs and paths', () => {
+  assert.deepEqual(
+    proposalDependencyReferences([
+      '// FUTURE-001 is treated as a contract',
+      '// docs/proposal/future.md',
+      '// ARCH-001 is formal',
+    ].join('\n'), ['FUTURE-001']),
+    [
+      { token: 'FUTURE-001', line: 1 },
+      { token: 'docs/proposal/', line: 2 },
+    ],
+  )
+})
+
+test('spec gate extracts local Markdown links without treating URLs or anchors as files', () => {
+  assert.deepEqual(
+    markdownLocalLinks([
+      '[plain](what/agent.md)',
+      '[space](<proposal/research note.md>)',
+      '[encoded](proposal/research%20note.md#section)',
+      '[anchor](#local)',
+      '[web](https://example.com/doc.md)',
+    ].join('\n')),
+    [
+      { target: 'what/agent.md', line: 1 },
+      { target: 'proposal/research note.md', line: 2 },
+      { target: 'proposal/research note.md', line: 3 },
     ],
   )
 })

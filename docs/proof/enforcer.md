@@ -22,7 +22,7 @@ integration：resources / package 套件覆盖加载失败路径。
 | catalog 形状与字段 | `tests/unit/enforcer/catalog.test.mjs` |
 | 收敛缺口回归 | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs` |
 
-恢复证明还必须覆盖：相同 terminal run 重放不重复 Nudge；新的无效 terminal 恰好一次经 `FallbackController` 推进 cursor；marker/投影注入不能冒充 A/A/B/B advance。当前缺口见 `status/enforcer-fallback-bridge-gap.md`。
+恢复证明还必须覆盖：相同 terminal run 重放不重复 Nudge；新的无效 terminal 恰好一次经 `FallbackController` 推进 cursor；marker/投影注入不能冒充 A/A/B/B advance。
 
 ## 端到端
 

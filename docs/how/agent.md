@@ -1,18 +1,12 @@
 # Agent — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在多 Agent 协同体系中，Agent 拥有不同的能力层级（Fast / Deep Tier）、模型配置与工具使用权限。如果允许模糊别名、运行时猜想 Agent 名或全局混用工具权限，会导致越权工具调用、混乱的提示词上下文与难以调试的越界行为。Agent 模块旨在提供静态校验的 20 名 Agent 目录、对称的 Fast/Deep 配对校验，以及基于 `CanonicalRole` 的严格工具权限裁剪。
+行为合同见 `what/agent.md`；本文件只描述目录装配、权限计算和可见面生成算法。
 
-### 2. 输入输出与规则边界
-- **输入**：`resources/prompts/` 下的静态 Prompt assets、`CanonicalRole` 规则。
-- **输出**：`ManagedAgentConfig` 实例、ToolPermission 结构、可暴露给 Provider 的 Agent 模式清单。
-- **核心边界与不变量**：
-  1. 20 名 Agent 静态目录（AGENT-002）：启动时校验 Fast/Deep 配对与模型非空；旧别名（AGENT-004）直接拒绝，不设兼容 Aliases。
-  2. 基于 CanonicalRole 的工具权限（AGENT-007）：工具使用权限严格从 CanonicalRole 派生；Role 未确定前可见工具集必须为空。
-  3. Blogger / Executor 物理隐匿（AGENT-008）：内部角色绝对禁止进入 Provider 可见的 Agent 模式或枚举。
-  4. 静态构造 Fork Schema（AGENT-009）：Fork 可选集合静态构造，禁止根据“当前哪些 Session 活跃”反推。
+## Ownership
+
+模块边界与写入口见 `shape/agent.md`。
 
 ---
 

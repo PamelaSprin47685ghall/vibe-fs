@@ -43,6 +43,8 @@ docs/
 
 `resources/` 属于实现面。规范定义语义；实现可把实例放在 JSON、代码、生成物等载体中。产物不得发明文档未声明的新语义。
 
+`AGENTS.md` 只承载 Agent 工作协议和规范路由；`docs/README.md` 只承载导航与索引。两者不得定义或改写正式产品条款。
+
 ## GOV-003：执行链
 
 ```text
@@ -71,7 +73,7 @@ what → shape → how → code/resources
 
 不维护按版本复制的文档快照，不引入文档 revision 封印或 release manifest 绑定每篇文档版本。下一变更合入时，相关规范面必须恢复内部一致。禁止长期“先改代码、后补文档”而不在 `status/` 登记差距。
 
-1.0.0 前：`what/` 是已裁决的当前行为设计，不是对外兼容承诺；允许破坏式修改，但修改必须同步传播到 `shape/how/proof`，且实现不得任意偏离当前 `what/`。破坏性变更必须显式选择 `Compatible | ExplicitMigration | ExplicitReset | CleanBreak` 之一——“不保证兼容”不等于“不作迁移决策”。
+`what/` 是已裁决的当前行为设计；兼容性承诺由相关产品条款决定。任何破坏性变更必须同步传播到 `shape/how/proof`，并显式选择 `Compatible | ExplicitMigration | ExplicitReset | CleanBreak` 之一——“不保证兼容”不等于“不作迁移决策”。
 
 ## GOV-005：条款 ID
 
@@ -85,14 +87,14 @@ what → shape → how → code/resources
 ## GOV-006：Proposal 生命周期
 
 ```text
-proposal(禁止未经用户同意删除任何未实现的 proposal) → 更新 why → what → shape → how → 决定 proof → 移动 proposal 文件到 status → 阅读相关的代码和文档 → 代码实现 → 检查 proof → 删除 status 中的 proposal 文件
+proposal → 裁决 → 正式层分发 → 活跃 status gap → 实现 → proof → 删除已关闭 gap
 ```
 
 - **未实现 Proposal 删除保护**：禁止未经用户同意删除任何未实现的 proposal。
 - **单向规范流动与更新**：Proposal 经裁决或推进时，遵循 `what → shape → how → code/resources` 单向链与 `proof` 验证，同一次变更内依序更新 `why` → `what` → `shape` → `how` 并决定 `proof`。
-- **移动至 status 跟踪差距**：规范更新后若实现尚未完成，须将未完成实现的 proposal 移动到 `status/`（或在 `status/` 中建立差距条目）作为流动面活跃差距进行跟踪；在实现未完成前不得提前删除。
+- **转换为 status 跟踪差距**：规范更新后若实现尚未完成，须把剩余物理差距写入 `status/`。不得把 Proposal 正文原样搬入 `status/`，也不得保留已分发的候选设计副本。
 - **代码实现与验证**：阅读相关的代码和文档，进行代码实现，并通过 `proof` 检查验证整条 `what → shape → how → code` 链。
-- **对齐后清理**：仅在代码实现完全对齐规范且通过 `proof` 检查后，方可删除 `status/` 中的 proposal 文件/差距条目。
+- **对齐后清理**：仅在代码实现完全对齐规范且通过 `proof` 检查后，方可删除对应差距条目。
 - **长期理由分发**：有长期价值的理由写入 `why/`；不保留已完成或已废止 proposal 全文副本作为第二设计源。
 
 ## GOV-007：规范面可接纳性（Proposal Admission）

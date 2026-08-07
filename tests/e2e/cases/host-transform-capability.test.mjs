@@ -1,5 +1,5 @@
 /**
- * host-transform-capability — STRENGTH-078 C-01..C-10 / ENFORCER-180 step 0.
+ * host-transform-capability — ENFORCER-180 step 0.
  *
  * The Blogger chain is the real production carrier for the Host capability
  * proof. Scenario: scenarios/host-transform-capability.toml
@@ -541,7 +541,7 @@ try {
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
   assert.equal(scenario.provider.unexpectedRequests.length, 0, 'scenario must not receive unexpected provider requests');
 
-  // ── 5. teardown cancels parked transforms (ENFORCER-162 / STRENGTH-078 C-09) ─
+  // ── 5. teardown cancels parked transforms (ENFORCER-162) ─
   // The Host awaits the plugin dispose hook before shutdown; every parked
   // transform is cancelled there. Teardown's own checks (process exit, no
   // lingering handles) are the observable side: a waiter that survived dispose

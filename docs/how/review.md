@@ -1,18 +1,12 @@
 # Review — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在自动化代码审查中，单次 LLM 输出的“同意/通过（PERFECT）”极易被模型随口给出，且容易忽略潜在的死角缺陷。Review 模块旨在建立严格的双 PERFECT 验证与怀疑式质询（Skeptical Challenge）机制，要求模型在第一次 PERFECT 后必须接受怀疑式质询工具输出，并通过密码学 `ProviderInputSeal` 证明模型在第二次 Provider Run 中确实消费了该质询，才允许派生可信的 `ConfirmedReviewWitness`。
+行为合同见 `what/review.md`；本文件只描述 attempt、seal、challenge 和 witness 派生算法。
 
-### 2. 输入输出与规则边界
-- **输入**：Reviewer 响应、Git Tree Hash、Skeptical Challenge Digest、`ProviderRunIdentity`。
-- **输出**：`ProviderInputSeal` 封印事实、自包含的 `ConfirmedReviewWitness` 证据。
-- **核心边界与不变量**：
-  1. 双 PERFECT + Seal 强制约束（REVIEW-003）：单次 PERFECT 绝对不可信；第二次 PERFECT 判定必须证明质询被成功密封进输入。
-  2. Witness 自包含（REVIEW-006）：ReviewWitness 必须自带全量证据，禁止保存在外围可变 Map 中，防止并发 Job 读到空确认。
-  3. Git Tree Hash 作废机制（REVIEW-008）：Git 树变基或代码变更后，旧 Witness 自动失效。
-  4. 绑定 Fail-Closed（REVIEW-010）：`ProviderRunIdentity` 绑定失败或未封印时，第二次 PERFECT 严禁通过，禁止 same-root 猜测。
+## Ownership
+
+Review writer、seal 与 Git tree 边界见 `shape/review.md`。
 
 ---
 

@@ -12,6 +12,6 @@ Join 有界批次 + 稳定排序，把并发完成收敛成确定性 wire。ABOR
 
 **PTY 完成：仅 backend onExit vs stdout 启发式。** 拒启发式：stdout 会假完成，污染 join 与父状态机；onExit 是物理完成信号（EXEC-015）。agent 路径禁止 aborted（EXEC-020），假 abort blob 由 EXEC-021/022 驳回——历史 aborted blob 永不 `RunCompletion`。
 
-**Join 输出：有界批次 + 稳定排序 vs 无序并发。** 拒无序：并发完成收敛成确定性 wire（EXEC-018 MaxJoinBatch=32），否则父状态机不可判定。
+**Join 输出：有界批次 + 稳定排序 vs 无序并发。** 拒无序：并发完成按 EXEC-018 收敛成确定性 wire，否则父流程无法稳定判断。
 
 **取消：ABORTED 当终态 vs 仅控制面。** 拒终态化：取消不是业务结果；洗成终态让恢复/fallback 走错分支（EXEC-020）。
