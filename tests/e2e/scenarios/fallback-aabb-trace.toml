@@ -44,7 +44,8 @@ flow = [
   # First continue match only. StrictMockSignals permanent-consume makes wait="continue"
   # return immediately after the first continue delivery — it cannot barrier multi-delivery
   # continues. assertModelTrajectory polls for the fifth (success) chat request.
-  { wait = "continue" },
+  # Reconciler snapshot backoff can legitimately cross the default 5s silence window.
+  { wait = "continue", timeoutMs = 15000 },
 
   # Exact list: four settled failures cycle A→A→B→B, then the fifth delivery
   # (Offset 3→0, still inside FALLBACK-005's budget of 12) succeeds and the run completes.

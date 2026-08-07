@@ -31,7 +31,8 @@ flow = [
   # on BEFORE the journal fact: `waitFact` polls on 500ms slices, and by the time the
   # fact is observed the continuation's SSE (and its session.idle) may already be over —
   # an `awaitEvent` after it would wait for an idle that never comes again.
-  { wait = "continue" },
+  # Reconciler snapshot backoff can legitimately cross the default 5s silence window.
+  { wait = "continue", timeoutMs = 15000 },
   # The durable cursor fact is written before the continuation is sent, so it is
   # guaranteed to exist by the time the continuation response has been consumed.
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
