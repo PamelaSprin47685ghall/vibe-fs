@@ -64,8 +64,7 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
                 | Error error -> return Error(sprintf "Cannot recover %s satellite: %s" (kindLabel spec.Kind) error)
                 | Ok ownerChildren ->
                     let merged =
-                        (rootChildren @ ownerChildren)
-                        |> List.distinctBy (fun child -> child.SessionId)
+                        (rootChildren @ ownerChildren) |> List.distinctBy (fun child -> child.SessionId)
 
                     let candidates = merged |> List.filter (exactCandidate spec)
 
@@ -128,11 +127,7 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
                                     )
                                 with
                                 | Error error -> return Error error
-                                | Ok child ->
-                                    return
-                                        Ok
-                                            { SessionId = child
-                                              Origin = Created }
+                                | Ok child -> return Ok { SessionId = child; Origin = Created }
                         }
 
                     match resolved with
