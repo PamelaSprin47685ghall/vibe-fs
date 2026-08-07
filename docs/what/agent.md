@@ -169,3 +169,12 @@ StudentCompile 的写入目标只能是精确形态 `.agent/skills/<skill-name>/
 write/edit 在副作用前校验目标形态；Student 最终 `return` 前重新读取并校验本次触达的全部 SKILL，
 且至少触达一个。任一文件缺失、不可解码或不满足上述契约时不得删除 QA、不得进入最终 completion。
 新 SKILL 只保证供新的 OpenCode 进程/会话发现；最终说明必须提醒用户重启 OpenCode 后加载。
+
+## AGENT-023：OpenCode 首页默认与可见集合
+
+OpenCode 首页的默认 Agent 必须是 `deep-manager`。Agent 选择器仅显示以下角色的
+`fast` 与 `deep` 实例：`Manager`、`Orchestrator`、`DevOps`、`Student`；其它角色的
+配置项必须为 `hidden=true`。
+
+本条只约束首页用户入口，不改变 Manager 内部 `fork-agent` 的枚举、角色权限或调度能力；
+工具面可见性仍由 AGENT-009 定义。

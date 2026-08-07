@@ -12,7 +12,7 @@ module ManagerConfig =
     /// - reject legacy unprefixed / build / plan names
     let configureManager (config: obj) : unit =
         match ManagedAgentConfig.configureFromHostConfig config with
-        | Ok _ -> ()
+        | Ok _ -> config?default_agent <- "deep-manager"
         | Error err ->
             // Fail closed at config time so Host surfaces the gate error.
             raise (System.InvalidOperationException err)

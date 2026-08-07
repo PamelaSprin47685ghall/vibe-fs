@@ -131,8 +131,12 @@ module StaticTools =
     let private primaryAgent (role: Role) (systemPrompt: string option) : obj =
         match systemPrompt with
         | Some text when not (String.IsNullOrWhiteSpace text) ->
-            createObj [ "mode", box "primary"; "permission", permissionObj role; "prompt", box text ]
-        | _ -> createObj [ "mode", box "primary"; "permission", permissionObj role ]
+            createObj
+                [ "mode", box "primary"
+                  "hidden", box false
+                  "permission", permissionObj role
+                  "prompt", box text ]
+        | _ -> createObj [ "mode", box "primary"; "hidden", box false; "permission", permissionObj role ]
 
     let private hiddenAgent (role: Role) (systemPrompt: string) : obj =
         createObj
@@ -156,16 +160,16 @@ module StaticTools =
     let private prompts () = RuntimeResources.current().Prompts
 
     let managerAgentConfig () : obj =
-        primaryAgent Role.Manager (Some (prompts ()).ManagerSystemPrompt)
+        (prompts ()).ManagerSystemPrompt |> Some |> primaryAgent Role.Manager
 
     let orchestratorAgentConfig () : obj =
-        primaryAgent Role.Orchestrator (Some (prompts ()).OrchestratorSystemPrompt)
+        (prompts ()).OrchestratorSystemPrompt |> Some |> primaryAgent Role.Orchestrator
 
     let coderAgentConfig () : obj =
-        primaryAgent Role.Coder (Some (prompts ()).CoderSystemPrompt)
+        hiddenAgent Role.Coder (prompts ()).CoderSystemPrompt
 
     let reviewerAgentConfig () : obj =
-        primaryAgent Role.Reviewer (Some (prompts ()).ReviewerSystemPrompt)
+        hiddenAgent Role.Reviewer (prompts ()).ReviewerSystemPrompt
 
     /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
     /// System prompt for B-record distillation with blog tool protocol.
@@ -178,22 +182,22 @@ module StaticTools =
         hiddenAgent Role.Executor (prompts ()).ExecutorSystemPrompt
 
     let studentAgentConfig () : obj =
-        primaryAgent Role.Student (Some (prompts ()).StudentSystemPrompt)
+        (prompts ()).StudentSystemPrompt |> Some |> primaryAgent Role.Student
 
     let teacherAgentConfig () : obj =
         hiddenAgent Role.Teacher (prompts ()).TeacherSystemPrompt
 
     let meditatorAgentConfig () : obj =
-        primaryAgent Role.Meditator (Some (prompts ()).MeditatorSystemPrompt)
+        hiddenAgent Role.Meditator (prompts ()).MeditatorSystemPrompt
 
     let browserAgentConfig () : obj =
-        primaryAgent Role.Browser (Some (prompts ()).BrowserSystemPrompt)
+        hiddenAgent Role.Browser (prompts ()).BrowserSystemPrompt
 
     let inspectorAgentConfig () : obj =
-        primaryAgent Role.Inspector (Some (prompts ()).InspectorSystemPrompt)
+        hiddenAgent Role.Inspector (prompts ()).InspectorSystemPrompt
 
     let devopsAgentConfig () : obj =
-        primaryAgent Role.DevOps (Some (prompts ()).DevopsSystemPrompt)
+        (prompts ()).DevopsSystemPrompt |> Some |> primaryAgent Role.DevOps
 
     let executorTool () : Tool =
         { Name = "executor"
