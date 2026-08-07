@@ -28,7 +28,8 @@
 |------|-------------|------|
 | Student 公开、Teacher 私有 | config/catalog 与 provider-visible enum 对照 | AGENT-008、AGENT-020 |
 | request-specific 双门 | Learn schema/gate 仅 `teacher`；Compile schema/gate 仅 read/glob/grep/write/edit/return | AGENT-007、AGENT-020、AGENT-021 |
-| Compile 写边界 | write/edit 只接受 `.agent/skills` 后代路径；伪造、绝对路径和穿越拒绝 | AGENT-021、PERSIST-011 |
+| Compile 制品边界 | 只接受 `.agent/skills/<name>/SKILL.md`；平铺/绝对/穿越/额外嵌套拒绝 | AGENT-021、AGENT-022、PERSIST-011 |
+| SKILL 可加载性 | final return 重读全部触达文件；name/description frontmatter、目录名一致与非空正文缺一即拒绝 | AGENT-022 |
 | Teacher 能力 | 普通执行工具 + `return`，无 fork/list/join/PTY；fast/deep 相等 | AGENT-010、AGENT-020 |
 | tier/model 绑定 | Student 与 Teacher 同 tier；发送只携带 Agent、不覆盖 model | AGENT-003、AGENT-020 |
 

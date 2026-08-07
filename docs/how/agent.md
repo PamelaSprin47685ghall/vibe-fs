@@ -43,3 +43,5 @@
 3. `PromptAuthority.toolCapabilitiesFor(role, requestKind)` 是两层权限的唯一纯函数；静态 Agent 配置、
    provider request 与执行 gate 只做投影或校验。
 4. Teacher Agent 设置 `hidden=true`，并从所有可创建 enum 中剔除；Student 保持公开 primary。
+5. StudentCompile 的 write/edit gate 先调用 AGENT-022 路径解析器，再允许 Host 执行并记录目标；最终
+   `return` 以 fatal UTF-8 重读全部目标，逐个校验 frontmatter 与正文，全部成功后才删除 QA。

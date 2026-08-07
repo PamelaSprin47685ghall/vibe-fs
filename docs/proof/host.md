@@ -41,6 +41,6 @@ Work↔Companion 深度 1；关联非 Role（HOST-008、COMPANION-001/002）。
 | kind 投影 | Work/Companion/Teacher 双向 O(1)；Satellite 无子 Satellite | HOST-008 |
 | Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-014、HOST-015 |
 | Teacher 三轮调用 | 同一 Teacher SessionId；普通正文不完成父工具 | HOST-014、AGENT-020 |
-| Teacher return | 文本只成为父 `teacher` 结果；abort 后 Session 可继续 | HOST-014 |
+| Teacher return | 文本只成为父 `teacher` 结果；固定 terminal 正常完成，无 abort/interrupted，Session 可继续 | HOST-014 |
 | Student final return | QA 删除先于最终 Assistant completion；message 成为最终回复 | HOST-014、EXEC-027 |
 | 非 Student 回归 | provider schema、hooks、Companion 行为字节/语义不变 | HOST-014 |

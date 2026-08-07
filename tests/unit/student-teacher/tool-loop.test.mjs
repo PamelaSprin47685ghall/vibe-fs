@@ -18,6 +18,24 @@ const promptKeyOf = (prompt) =>
   prompt?.body?.metadata?.wanxiangshu_prompt_key ??
   prompt?.body?.parts?.[0]?.metadata?.wanxiangshu_prompt_key
 
+const assistantMessage = (sessionID, id, parentID, agent, text) => ({
+  info: {
+    id,
+    role: 'assistant',
+    sessionID,
+    parentID,
+    agent,
+    finish: 'stop',
+    time: { completed: Date.now() },
+  },
+  parts: [{ type: 'text', text }],
+})
+
+const idle = (sessionID) => ({
+  type: 'session.status',
+  properties: { sessionID, status: { type: 'idle' } },
+})
+
 test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_order', async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     const student = 'ses_student_tool_loop'
@@ -78,16 +96,46 @@ test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_
           ],
         },
       )
+      runtime.pushHostMessage(teacher, {
+        info: {
+          id: `msg_teacher_${index}`,
+          role: 'user',
+          sessionID: teacher,
+          agent: 'fast-teacher',
+          metadata: { wanxiangshu_prompt_key: promptKey },
+        },
+        parts: [
+          {
+            type: 'text',
+            text: prompt.body.parts[0].text,
+            metadata: { wanxiangshu_prompt_key: promptKey },
+          },
+        ],
+      })
 
       const teacherReturn = await hooks.tool.return.execute(
         { message: answer },
         toolContext(teacher, `asst_teacher_${index}`, `call_return_${index}`),
       )
-      assert.equal(teacherReturn, 'OK')
+      assert.equal(parseToml(teacherReturn).completion_text, 'Teacher answer returned to Student.')
+
+      const completionID = `asst_teacher_completion_${index}`
+      const completion = { text: 'provider trailing prose' }
+      await hooks['experimental.text.complete'](
+        { sessionID: teacher, messageID: completionID, partID: `part_teacher_completion_${index}` },
+        completion,
+      )
+      assert.equal(completion.text, 'Teacher answer returned to Student.')
+      runtime.pushHostMessage(
+        teacher,
+        assistantMessage(teacher, completionID, `msg_teacher_${index}`, 'fast-teacher', completion.text),
+      )
+      hooks.event(idle(teacher))
 
       const delivered = parseToml(await studentRun)
       assert.equal(delivered.answer, answer)
       assert.equal(createdIds.length, 1, 'all calls must reuse exactly one Teacher Session')
+      assert.deepEqual(runtime.abortedIds, [], 'successful Teacher returns must never abort the Session')
     }
 
     const privateGitDir = execFileSync(

@@ -17,7 +17,7 @@ import { WATCHDOG_TIMEOUT_MS } from '../support/time-budget.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const rootText = 'Learn the canary topic and compile a reusable skill.';
-const finalText = 'Created .agent/skills/student-canary/SKILL.md.';
+const finalText = 'Created .agent/skills/student-canary/SKILL.md; restart OpenCode to load it.';
 
 const toolNames = (request) =>
   (request?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name);
@@ -129,15 +129,38 @@ try {
   );
 
   const teacherRequests = scenario.provider.requests.filter((request) => request.sessionID === teachers[0].id);
-  assert.equal(teacherRequests.length, 1, 'Teacher return must end its turn without a prose continuation');
+  assert.equal(teacherRequests.length, 2, 'Teacher return must reach one normal terminal completion');
   const teacherTools = toolNames(teacherRequests[0]);
   assert.ok(teacherTools.includes('return'), 'Teacher schema must expose return');
   for (const forbidden of ['fork', 'fork-manager', 'join', 'list', 'fork-pty', 'suicide']) {
     assert.equal(teacherTools.includes(forbidden), false, `Teacher schema must exclude ${forbidden}`);
   }
 
+  const teacherMessagesResponse = await scenario.client.request('GET', `/session/${teachers[0].id}/message`);
+  assert.equal(teacherMessagesResponse.ok, true, JSON.stringify(teacherMessagesResponse.data));
+  const teacherMessages = messagesOf(teacherMessagesResponse);
+  assert.ok(Array.isArray(teacherMessages), 'Teacher message history must be an array');
+  const teacherAssistants = teacherMessages.filter((message) => message?.info?.role === 'assistant');
+  assert.equal(
+    teacherAssistants.some(
+      (message) =>
+        message?.info?.finish === 'aborted' ||
+        message?.info?.error?.name === 'MessageAbortedError',
+    ),
+    false,
+    'successful Teacher return must never surface as interrupted',
+  );
+  assert.equal(
+    messageText(teacherAssistants.at(-1)),
+    'Teacher answer returned to Student.',
+    'Teacher return must end with the fixed normal completion',
+  );
+
   const skillPath = path.join(scenario.host.workDir, '.agent', 'skills', 'student-canary', 'SKILL.md');
-  assert.equal(fs.readFileSync(skillPath, 'utf8'), '# Student canary\n\nPreserve one proven causal chain.\n');
+  assert.equal(
+    fs.readFileSync(skillPath, 'utf8'),
+    '---\nname: student-canary\ndescription: Preserve one proven causal chain for the Student canary.\n---\n\n# Student canary\n\nPreserve one proven causal chain.\n',
+  );
 
   const absoluteGitDir = execFileSync('git', ['-C', scenario.host.workDir, 'rev-parse', '--absolute-git-dir'], {
     encoding: 'utf8',

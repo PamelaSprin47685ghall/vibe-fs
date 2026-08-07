@@ -56,3 +56,12 @@ Student 每次请求的 provider schema 与 ToolRegistry execution gate 必须�
 切换到编译必须在发送 continuation 前先构造完整 profile 并安装整套 permission；任一步失败都不得发送
 一个工具面不完整的请求。执行时 `ToolContext.messageID` 必须命中该 attempt；旧 Learn attempt 伪造
 `return`、Compile attempt 伪造 `teacher` 均 fail closed。
+
+## Student SKILL 制品门（AGENT-022）
+
+Student runtime 是制品形态门的唯一所有者。执行 gate 从当前 StudentCompile attempt 的 write/edit 参数中
+取得路径，只接受 `.agent/skills/<skill-name>/SKILL.md`，并在 StudentRun 中记录解析后的绝对目标与目录名；
+它不从文件正文反推 skill 身份。
+
+最终 `return` 对记录集合做全量、fatal UTF-8 读取，并以目录名校验 frontmatter `name`、非空
+`description` 与正文。集合为空或任一校验失败时 fail closed；QA 删除只能发生在全量校验之后。

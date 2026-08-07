@@ -31,9 +31,10 @@ PTY 路径：PublishPty
 登记、abort、retire 与 owner 级联。`StudentRun` 只拥有本学习任务的 request kind、single-flight latch、
 QA writer、pending Teacher return 与 pending final message；不得复制 child Session map。
 
-Teacher `return` 通过单赋值 completion cell 唤醒恰好一个父 `teacher` 调用。父调用在 QA 回答落盘后才
-abort Teacher 当前 provider turn并返回结果。无 flight、重复 return、错误 owner 或过期 provider run
-均 fail closed。
+Teacher `return` 在回答落盘后武装单赋值 pending return，其中同时保存调用 `return` 的 provider run、
+回答和随后固定 Assistant completion 的 provider run。只有匹配的 `TurnCompleted` 才清除 pending/waiter、
+回到 LearnReady 并唤醒恰好一个父 `teacher` 调用；成功路径不调用 abort。无 flight、重复 return、错误
+owner、过期 provider run、completion 身份或固定正文不匹配均 fail closed。
 
 Student 最终 `return` 的 pending message 只存到同一 Host loop 完成；不是知识 Journal，也不能跨任务复用。
 完成信号必须核对 StudentCompile attempt 和 QA 已不存在，之后才 retire run。
