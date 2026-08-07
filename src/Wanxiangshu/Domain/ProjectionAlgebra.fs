@@ -396,8 +396,9 @@ module ProjectionRenderer =
     let private isAnchor (message: ProviderProjection.WireMessage) =
         isUserAnchor message || isToolResultAnchor message
 
-    /// Step 3a：WireMessage 无 host id。TransportMessages 为空则 no-op；非空时丢弃
-    /// 至多 |TransportMessages| 条 assistant 消息（transport 槽位骨架行为；3b 接 id 侧信道）。
+    /// SuppressTransportOnly 骨架：生产路径从未声明该 intent，TransportMessages 恒空 → no-op。
+    /// WireMessage 无 host id。非空时丢弃至多 |TransportMessages| 条 assistant（unit 骨架行为；
+    /// 完整 id 级剔除待 host-id 侧信道后续变更）。COMPANION-012 字段级过滤不在此路径。
     let private applySuppress
         (snapshot: ProjectionSnapshot)
         (messages: ProviderProjection.WireMessage list)

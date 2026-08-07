@@ -17,8 +17,10 @@
 
 ### Remaining work
 
-- [x] Companion BloggerMain / BloggerSquash / BloggerDelta 接入 `insertBlogFrames`、
-      `suppressTransportOnly`，并将 `BlogFrames` 纳入 snapshot。
+- [x] Companion BloggerMain / BloggerSquash / BloggerDelta 接入 `insertBlogFrames`，
+      并将 `BlogFrames` 纳入 snapshot。
+      （`suppressTransportOnly`：Domain 骨架 + unit 证明已落地；生产路径
+      `TransportMessages` 恒 `Set.empty`、未声明该 intent——不虚报生产接入。）
 - [x] InteractionRepair 接入 `insertRepair`。
 - [x] ReviewConfirmation 与 skeptical challenge seal 接入 `appendReviewChallenge`、
       `insertPairProgrammingThought`。
@@ -47,12 +49,14 @@
 
 ## Final outcome
 
-**Outcome**：已闭环。PROJ-008 剩余生产路径全部进入
-`ProjectionSnapshot → ProjectionIntent → Planner → Canonical Renderer`；八 intent、
-Canonical Rank 与 Renderer fold 落地；业务侧旧消息直改路径删除，不保留双写 renderer。
+**Outcome**：生产主路径闭环（prefix / blog / repair / challenge / pair-thought /
+reanchor）。八 intent 在 Domain 定义 + Planner Canonical Rank + Renderer fold 落地；
+业务侧旧消息直改路径删除，不保留双写 renderer。**`SuppressTransportOnly` 未生产接线**。
 
-**Final specification**：正式条款仍在 `docs/{what,shape,how,proof}/projection.md`
-（PROJ-004/005/006/008）。本文件是历史变更记录，不是当前产品规范；本变更默认 docs 已对齐 PROJ-008，未改正式层。
+**Final specification**：正式条款在 `docs/{what,shape,how,proof}/projection.md`
+（PROJ-002/004/005/006/008）。本文件是历史变更记录，不是当前产品规范。
+REVISE 后正式层已诚实对齐：PROJ-002 为消费者驱动字段子集；proof 登记
+`projection-algebra.test.mjs` 与 Suppress 骨架边界。
 
 **Implementation result**：
 
@@ -62,11 +66,13 @@ Canonical Rank 与 Renderer fold 落地；业务侧旧消息直改路径删除�
   Renderer 逐步 fold。
 - 生产接线：EnforcerHost rebuild/repair；PairThought tryInject；HostReviewGuard challenge
   字节；XWire reanchor；`InsertBlogFrames` → `CompanionProjectionBuilder` 单形状源。
+- **`SuppressTransportOnly`**：仅 Domain + unit 骨架。生产路径 `TransportMessages`
+  恒 `Set.empty`、从不声明该 intent；`applySuppress` 在空集上 no-op。COMPANION-012
+  字段级 transport 过滤由模型边界 / `toSemantic` 路径承担；消息级 Suppress intent
+  待后续变更（需 WireMessage host-id 侧信道）。
 - 刻意保留：`replaceMessagesInPlace` 作为 Host 适配写回原语（SpikePlugin / XWire /
   CompanionTransform）；`CompanionHost.TransformRaw` 恒等（主会话 Host 视图）；
   ManagerNarrative 不在本变更范围。
-- 剩余限制：WireMessage 无 host-id 时 `SuppressTransportOnly` 为骨架/索引类行为等，
-  不伪装为已消解的完整身份剔除语义。
 
 **Verification**：
 

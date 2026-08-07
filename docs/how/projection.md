@@ -44,6 +44,8 @@ insertPairProgrammingThought // HOST-013 固定 marker
 reanchorAfterCompaction   // ContextReanchored → Snapshot=None
 ```
 
+消息级 `suppressTransportOnly` intent 路径以 proof/实现为准；当前生产未声明该 intent（`TransportMessages` 恒空）。COMPANION-012 字段级过滤由模型边界 / `toSemantic` 承担。
+
 同锚 intent 必须先按规范定义的稳定总序归一化，再执行显式合并或返回 `ProjectionConflict`。禁止依赖模块注册顺序。
 
 合并函数只需证明其真实代数性质：重放型 intent 必须幂等；有序追加型 intent 必须保持 canonical order，不能被虚构为可交换。任何尚未定义的组合 fail closed。PrefixEpoch 始终是冻结 X 前缀选择；`insertBlogFrames` 只在其后构造 Y 可见历史，不得“合入”或改写 active X epoch。

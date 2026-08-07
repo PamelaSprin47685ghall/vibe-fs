@@ -10,19 +10,26 @@ Provider-visible 消息投影必须用 typed 组合子/直接执行的 computati
 
 ## PROJ-002：输入是事实快照
 
-投影 DSL 核心输入为不可变的 `ProjectionSnapshot`：
+投影 DSL 核心输入为不可变的 `ProjectionSnapshot`。字段集为**消费者驱动子集**（DSL-003）：
+只承载当前已接线 intent 实际读取的事实，不得假装与完整目标形态同构。
+
+**当前实现字段**（与 `ProjectionAlgebra.ProjectionSnapshot` 对齐）：
 
 ```fsharp
 type ProjectionSnapshot =
-    { Attempt: AttemptExecutionProfile
-      PhysicalTimeline: PhysicalTimeline
-      SemanticEvents: SemanticEventTree
-      ActivePrefixEpoch: ActivePrefixEpoch
-      CandidatePrefixProbe: PrefixProbe option
-      BlogFrames: BlogFrame list
-      HostReanchor: ContextReanchorSnapshot option
-      LocalPendingParts: LocalPendingParts
-      TransportMessages: Set<MessageId> }
+    { CurrentProjection: ProviderSemanticProjection
+      CommittedPrefix: PrefixSnapshot option
+      BlogFrames: ResolvedBlogFrame list
+      /// host message id 字符串集合；生产路径当前恒空
+      TransportMessages: Set<string>
+      HostReanchor: HostReanchorFact option }
+```
+
+**目标 / 完整形态**（尚未作为当前权威同构实现；待后续变更按消费者落地）：
+
+```fsharp
+// Attempt / PhysicalTimeline / SemanticEvents / ActivePrefixEpoch /
+// CandidatePrefixProbe / LocalPendingParts 等——规范方向，非当前权威字段集
 ```
 
 ## PROJ-003：输出管线
