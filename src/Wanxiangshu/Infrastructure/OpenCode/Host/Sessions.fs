@@ -27,6 +27,10 @@ type ISessionHostPort =
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
     abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
 
+    /// HOST-015: the family root every managed child is physically parented to.
+    /// Ownership is proven by durable journal links, never by Host parentID.
+    abstract FamilyRootOf: sessionId: SessionId -> SessionId
+
 type InjectedSessionPort
     (
         underlyingPort: IOpenCodePort option,
@@ -165,11 +169,11 @@ type InjectedSessionPort
         member me.CreateChildSession(parentId, options) =
             task {
                 let rootId = familyRoot parentId
-                // Preserve the physical direct parent. Recovery must prove an
-                // exact owner/agent/title tuple; flattening every child onto the
-                // family root destroys that evidence when two work sessions use
-                // the same satellite agent.
-                let hostParentId = parentId
+                // HOST-015: every managed child is physically parented to the
+                // family root — a son's son is a son. Recovery proves ownership
+                // by the journal-linked SessionId + agent/title, never by the
+                // Host parentID.
+                let hostParentId = rootId
 
                 match underlyingPort with
                 | Some port ->
@@ -191,3 +195,5 @@ type InjectedSessionPort
             match underlyingPort with
             | Some port -> port.ListChildren parentId
             | None -> Task.FromResult(Error "No Host transport: cannot list child sessions")
+
+        member _.FamilyRootOf(sessionId) = familyRoot sessionId

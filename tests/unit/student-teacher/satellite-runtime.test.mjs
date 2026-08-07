@@ -16,7 +16,10 @@ import {
   FSharpResult$2_Ok as ok,
 } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'
 
-const child = (id, parent = 'student', agent = 'fast-teacher', title = 'fast-teacher') =>
+// HOST-015: satellites are physically parented to the family root ('root'),
+// never to their logical owner ('student'). Ownership is proven by the
+// journal-linked SessionId (spec.restored), never by Host parentID.
+const child = (id, parent = 'root', agent = 'fast-teacher', title = 'fast-teacher') =>
   new OpenCodeChildInfo(sessionId(id), sessionId(parent), agent, title)
 
 const spec = ({ restored, linked = [] } = {}) =>
@@ -41,12 +44,14 @@ const host = (children, created = []) => ({
     return ok(id)
   },
   AbortSession: async () => ok(undefined),
+  FamilyRootOf: () => sessionId('root'),
 })
 
-test('HOST_014_satellite_recovery_reuses_the_one_exact_Host_child', async () => {
+test('HOST_015_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
   const linked = []
   const created = []
-  const runtime = createRuntime(host([child('teacher-1')], created))
+  // Physical parent is 'root', not the owner — reuse must not depend on parentID.
+  const runtime = createRuntime(host([child('teacher-1', 'root')], created))
 
   const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-1', linked }))
 
@@ -57,7 +62,7 @@ test('HOST_014_satellite_recovery_reuses_the_one_exact_Host_child', async () => 
   assert.deepEqual(linked, [['student', 'teacher-1', 'fast-teacher']])
 })
 
-test('HOST_014_satellite_recovery_creates_an_explicit_replacement_when_the_old_child_is_gone', async () => {
+test('HOST_015_satellite_recovery_creates_an_explicit_replacement_when_the_old_child_is_gone', async () => {
   const linked = []
   const created = []
   const runtime = createRuntime(host([], created))
@@ -71,31 +76,69 @@ test('HOST_014_satellite_recovery_creates_an_explicit_replacement_when_the_old_c
   assert.deepEqual(linked, [['student', 'created-1', 'fast-teacher']])
 })
 
-test('HOST_014_satellite_recovery_fails_closed_on_ambiguous_exact_children', async () => {
+test('HOST_015_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
   const linked = []
   const created = []
-  const runtime = createRuntime(host([child('teacher-1'), child('teacher-2')], created))
+  // Journal links teacher-1, but the Host child with that id carries a
+  // different agent — ownership conflict, never reuse, never create.
+  const runtime = createRuntime(host([child('teacher-1', 'root', 'other-agent')], created))
 
   const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-1', linked }))
 
   assert.equal(result.tag, 1)
-  assert.match(result.fields[0], /Ambiguous teacher satellite recovery/)
+  assert.match(result.fields[0], /Conflicting teacher satellite recovery/)
   assert.deepEqual(created, [])
   assert.deepEqual(linked, [])
 })
 
+test('HOST_015_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
+  const linked = []
+  const created = []
+  // A same-agent/title child sits under the shared flat root (it belongs to
+  // another work session). Without a journal link there is no proof of
+  // ownership — always create a fresh child.
+  const runtime = createRuntime(host([child('teacher-1', 'root')], created))
+
+  const result = await ensure(runtime, sessionId('student'), spec({ linked }))
+
+  assert.equal(result.tag, 0)
+  assert.equal(result.fields[0].SessionId.fields[0], 'created-1')
+  assert.equal(result.fields[0].Origin.tag, SatelliteOrigin.Created.tag)
+  assert.deepEqual(created, ['created-1'])
+  assert.deepEqual(linked, [['student', 'created-1', 'fast-teacher']])
+})
+
+test('HOST_015_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
+  const linked = []
+  const created = []
+  // Journal links teacher-old (gone from the Host); teacher-other is another
+  // owner's satellite under the same flat root. Replacement must create a new
+  // child and leave the sibling untouched.
+  const runtime = createRuntime(host([child('teacher-other', 'root')], created))
+
+  const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-old', linked }))
+
+  assert.equal(result.tag, 0)
+  assert.equal(result.fields[0].SessionId.fields[0], 'created-1')
+  assert.equal(result.fields[0].Origin.tag, SatelliteOrigin.Replacement.tag)
+  assert.deepEqual(created, ['created-1'])
+  assert.deepEqual(linked, [['student', 'created-1', 'fast-teacher']])
+})
+
 test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', async () => {
   const created = []
-  let listCalls = 0
-  let releaseList
-  const listBarrier = new Promise((resolve) => {
-    releaseList = resolve
+  let createCalls = 0
+  let releaseCreate
+  const createBarrier = new Promise((resolve) => {
+    releaseCreate = resolve
   })
   const sessions = host([], created)
-  sessions.ListChildren = async () => {
-    listCalls += 1
-    await listBarrier
-    return ok(ofArray([]))
+  sessions.CreateChildSession = async () => {
+    createCalls += 1
+    await createBarrier
+    const id = sessionId(`created-${created.length + 1}`)
+    created.push(id.fields[0])
+    return ok(id)
   }
   const runtime = createRuntime(sessions)
   const owner = sessionId('student')
@@ -103,13 +146,13 @@ test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', 
 
   const first = ensure(runtime, owner, satelliteSpec)
   const second = ensure(runtime, owner, satelliteSpec)
-  releaseList()
+  releaseCreate()
   const [a, b] = await Promise.all([first, second])
 
   assert.equal(a.tag, 0)
   assert.equal(b.tag, 0)
   assert.equal(a.fields[0].SessionId.fields[0], b.fields[0].SessionId.fields[0])
-  assert.equal(listCalls, 1)
+  assert.equal(createCalls, 1)
   assert.deepEqual(created, ['created-1'])
 })
 
