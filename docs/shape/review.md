@@ -42,5 +42,7 @@ Seal 类型与绑定流程见 `how/review.md`。
 
 ## REVIEW-012：Reviewer 提示词资源权威来源
 
-Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 的 8 大代码质量支柱、工具规范与双 PERFECT 流程。
+Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 的 8 大代码质量支柱与工具规范。
+
+双 PERFECT 流程不得写入 Reviewer 提示词（REVIEW-003）：屏障由 Host 侧执行，Reviewer 只需针对当前 tree 给出独立 verdict；提前告知流程会诱导模型自行扮演确认方。
 

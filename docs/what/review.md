@@ -37,6 +37,8 @@ Seal 绑定与因果链算法见 `how/review.md`。
 
 ReviewConfirmation prompt 只让 Host 启动下一次 provider request，**不是**确认事实本身。
 
+双 PERFECT 屏障完全由 Host 执行，Reviewer 提示词不灌输该流程（REVIEW-012）：Reviewer 只提交基于当前 tree 的独立 verdict，确认与计数由 Host 侧 witness / seal 完成。
+
 ## REVIEW-008：Git tree 变化使 witness 无效
 
 任意 Git tree 变化：
