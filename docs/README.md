@@ -134,7 +134,6 @@ why（设计理由与被拒方案；不直接约束实现）
 | 差距记录文件 | 主题与消除目标 |
 |------|------|
 | [projection-algebra-gap.md](status/projection-algebra-gap.md) | 收敛 Legacy 拼接到纯 Projection Planner，并覆盖现行投影 intent |
-| [glory.md](status/glory.md) | Born with Task, Suicide with Glory：Manager 生命周期、隐藏 Reviewer、Finality 与 Reawakening（GLORY-001..071 / SURFACE-001..006） |
 
 ---
 
@@ -147,7 +146,7 @@ why（设计理由与被拒方案；不直接约束实现）
 | [student-teacher.md](proposal/student-teacher.md) | Student / Teacher 知识生产流程 |
 | [waitfact-causal-renewal.md](proposal/waitfact-causal-renewal.md) | waitFact 续期显式归因：背景 journal 事实只记录、不续期 |
 
-> 注：glory 提案已裁决（见 `status/glory.md`），原始设计稿归档于 `docs/archive/glory-proposal-original.md`。
+> 注：glory 提案已裁决并实现；正式规范见 `what/shape/how/proof/why/glory.md`，原始设计稿归档于 `docs/archive/glory-proposal-original.md`。
 
 Proposal 仅供讨论，不是实现依据。裁决流程与最小模板见 [document-governance](how/document-governance.md)。
 
